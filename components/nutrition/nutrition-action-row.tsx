@@ -1,0 +1,59 @@
+'use client'
+
+import { Droplets, UtensilsCrossed, Plus } from 'lucide-react'
+
+interface Props {
+  /** Today's water, in millilitres. Null when the day has none — not the same as zero. */
+  todayWaterMl: number | null
+  /** Disabled until meal types load, since the bucket cannot be picked without them. */
+  canLogFood: boolean
+  onLogFood: () => void
+  onLogWater: () => void
+  onOpenSavedMeals: () => void
+}
+
+/**
+ * The Nutrition tab's actions, directly under the macro ring.
+ *
+ * They used to be placed by scroll depth (Q-237): Saved Meals sat below every meal card, so where it
+ * landed depended on how many meals the day had, and Water was mid-scroll for the same reason.
+ *
+ * Extracted from `nutrition-content.tsx` when adding Log Food took that file to 803 lines (Q-257) —
+ * the size rule asks for extraction rather than appending, and an action row is a self-contained
+ * thing rather than a fragment of the screen's state.
+ */
+export function NutritionActionRow({
+  todayWaterMl, canLogFood, onLogFood, onLogWater, onOpenSavedMeals,
+}: Props) {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <button
+        onClick={onLogFood}
+        disabled={!canLogFood}
+        className="min-h-[48px] flex items-center gap-2.5 rounded-2xl border border-border bg-muted/60 px-3 py-3 active:bg-muted/20 transition-colors disabled:opacity-60"
+      >
+        <Plus className="w-4 h-4 text-muted-foreground flex-none" />
+        <span className="text-sm font-semibold flex-1 text-left">Log Food</span>
+      </button>
+
+      <button
+        onClick={onLogWater}
+        className="min-h-[48px] flex items-center gap-2.5 rounded-2xl border border-border bg-muted/60 px-3 py-3 active:bg-muted/20 transition-colors"
+      >
+        <Droplets className="w-4 h-4 text-muted-foreground flex-none" />
+        <span className="text-sm font-semibold flex-1 text-left">Water</span>
+        <span className="text-sm tabular-nums text-muted-foreground">
+          {todayWaterMl != null ? `${(todayWaterMl / 1000).toFixed(1)} L` : '—'}
+        </span>
+      </button>
+
+      <button
+        onClick={onOpenSavedMeals}
+        className="min-h-[48px] flex items-center gap-2.5 rounded-2xl border border-border bg-muted/60 px-3 py-3 active:bg-muted/20 transition-colors"
+      >
+        <UtensilsCrossed className="w-4 h-4 text-muted-foreground flex-none" />
+        <span className="text-sm font-semibold flex-1 text-left">Saved Meals</span>
+      </button>
+    </div>
+  )
+}

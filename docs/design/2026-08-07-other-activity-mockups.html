@@ -1,0 +1,451 @@
+<title>Other Activity — Design Mockups</title>
+<style>
+/* Deliberately single-theme: this page depicts a dark app screen, so every surface
+   is painted explicitly and no theme stamps are honoured. */
+:root{
+  --ground:#080b12;
+  --ground-2:#0c111b;
+  --surface:#111827;
+  --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075);
+  --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8;
+  --ink-2:#9aa5b8;
+  --ink-3:#5f6a7d;
+  --chrome:#38bdf8;
+  --readiness:#60a5fa;
+  --hr:#f87171;
+  --sleep:#a78bfa;
+  --activity:#f97316;
+  --band-high:#22c55e;
+  --band-mod:#f59e0b;
+  --band-low:#ef4444;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--app);
+  line-height:1.55;
+  font-size:15px;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 96px}
+
+/* ---------- masthead ---------- */
+header.mast{
+  padding:56px 0 28px;
+  border-bottom:1px solid var(--hair);
+  margin-bottom:36px;
+}
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--chrome);
+  margin:0 0 14px;
+}
+h1{
+  margin:0 0 16px;
+  font-size:clamp(30px,5.2vw,50px);
+  line-height:1.02;
+  letter-spacing:-.035em;
+  font-weight:800;
+  text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:64ch;color:var(--ink-2);font-size:16px}
+
+.constraint{
+  margin:26px 0 0;
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+.constraint span{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+  padding:6px 11px;border-radius:999px;
+  border:1px solid var(--hair-2);color:var(--ink-2);
+  background:var(--surface);
+}
+.constraint span b{color:var(--ink);font-weight:600}
+
+/* ---------- section ---------- */
+section{margin:0 0 20px;scroll-margin-top:20px}
+.sec-head{
+  display:flex;align-items:baseline;gap:14px;
+  padding:38px 0 18px;
+  border-top:1px solid var(--hair);
+  margin-top:36px;
+}
+.sec-head:first-child{border-top:0;margin-top:0}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+
+/* ---------- gallery ---------- */
+.gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:18px;
+}
+.mock{
+  border:1px solid var(--hair);
+  border-radius:16px;
+  background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.mock-head{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 15px 11px;
+  border-bottom:1px solid var(--hair);
+}
+.mock-id{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  color:var(--ground);background:var(--chrome);
+  padding:2px 6px;border-radius:5px;font-weight:700;
+}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{
+  padding:0 15px 13px;margin:11px 0 0;
+  color:var(--ink-2);font-size:12.5px;line-height:1.5;
+}
+.mock-note b{color:var(--ink);font-weight:600}
+/* the phone-truthful canvas: 412dp wide with the app's mx-4 gutters */
+.canvas{align-items:flex-start;
+  background:
+    radial-gradient(120% 80% at 18% 0%,rgba(59,90,160,.28),transparent 62%),
+    radial-gradient(90% 70% at 88% 12%,rgba(120,70,170,.16),transparent 60%),
+    #05070d;
+  padding:22px 0;
+  display:flex;justify-content:center;
+  border-bottom:1px solid var(--hair);
+}
+.phone{width:412px;padding:0 16px;transform-origin:top center}
+@media(max-width:420px){.phone{transform:scale(.82)}.canvas{align-items:flex-start;padding:16px 0}}
+
+/* ---------- shared cell primitives (mirroring the real component) ---------- */
+.strip{display:flex;justify-content:space-between;gap:8px}
+.strip.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strip.stack{flex-direction:column;gap:8px}
+.cell{
+  flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.cell:focus-visible{outline:2px solid var(--chrome);outline-offset:3px;border-radius:12px}
+.dial{position:relative;width:100%;aspect-ratio:1;max-width:96px}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.num{font-weight:900;line-height:1;letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:#fff}
+.cap{font-size:11px;line-height:1;color:#9aa5b8}
+.ico{display:block}
+
+/* tiles */
+.tile{
+  flex:1;min-width:0;border-radius:16px;padding:11px 12px 12px;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+  display:flex;flex-direction:column;gap:7px;text-align:left;
+  color:inherit;font:inherit;cursor:pointer;
+}
+.tile-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+
+/* legend / meta */
+.legend{
+  display:flex;flex-wrap:wrap;gap:8px;padding:12px 15px;
+  border-top:1px solid var(--hair);
+}
+.tag{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+  padding:3px 8px;border-radius:6px;border:1px solid var(--hair-2);color:var(--ink-2);
+}
+.tag.live{border-color:rgba(56,189,248,.5);color:var(--chrome)}
+.tag.data{border-color:rgba(34,197,94,.45);color:#4ade80}
+.tag.risk{border-color:rgba(239,68,68,.45);color:#fca5a5}
+
+/* notes block */
+.callout{
+  border:1px solid var(--hair);border-left:3px solid var(--chrome);
+  background:var(--surface);border-radius:0 12px 12px 0;
+  padding:16px 18px;margin:22px 0 0;
+}
+.callout h3{margin:0 0 8px;font-size:14px;letter-spacing:-.01em}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+td b{font-weight:650}
+.tablewrap{overflow-x:auto}
+
+@media(prefers-reduced-motion:no-preference){
+  .cell,.tile{transition:transform .12s ease}
+  .cell:active,.tile:active{transform:scale(.95)}
+}
+
+/* round-2 additions */
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:6px}
+.pick{border:1px solid rgba(56,189,248,.3);background:rgba(56,189,248,.06);border-radius:12px;padding:11px 13px}
+.pick b{display:block;font-size:13.5px;margin-bottom:2px}
+.pick span{font-size:11.5px;color:var(--ink-2)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:20px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+</style>
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Workout screen · the Other Activity row</p>
+  <h1>It's a door to half the app <em>— drawn as a grey slab.</em></h1>
+  <p class="lede">The card above it shows five exercises, forty-five minutes, a muscle map and four
+  recovery percentages. The row below it shows a grey rectangle and two words. That gap is the
+  problem &mdash; not the styling. <b>Behind that button sit a running plan with a run scheduled
+  for today, a weekly zone-minute quota you're 72 minutes short on, a steps quota, a heart profile
+  and a trends section.</b> The row fetches none of it and says none of it.</p>
+
+  <div class="read">
+    <div><h4>It already knows there's a run today</h4><p><code>/api/running-plan</code> returns a
+    pending prescription with a type and a duration. The workout card would call that
+    "Recommended today". This row calls it nothing.</p></div>
+    <div><h4>Three destinations, not one</h4><p>Tapping it opens a menu of Run, Guided walk and Log
+    activity. Several designs here promote those onto the screen and delete a whole tap.</p></div>
+    <div><h4>Cyan is already taken</h4><p>Start Workout is cyan. Any cardio treatment in the same
+    cyan competes with it for the same "press me" &mdash; which is why C2 uses the walk modality's
+    green instead. Noted on each mockup that hits it.</p></div>
+  </div>
+</header>
+
+<div class="callout" style="margin-top:26px">
+  <h3>One thing I noticed that isn't what you asked about</h3>
+  <p>In your screenshot the <b>RECOVERY chip row is clipped</b> &mdash; the first chip reads
+  "&hellip;ms" with its label cut off at the left edge, and the last one is flush against the card
+  border. It's a horizontally scrolled strip whose first item is scrolled partly out of view on
+  first paint. Worth a separate look; I haven't touched it.</p>
+</div>
+
+<div id="app"></div>
+
+<div class="callout">
+  <h3>Where I'd go</h3>
+  <p><b>A1 Next up</b> is the one I'd build. It costs almost nothing &mdash; the data is already
+  fetched on the cardio screen &mdash; and it's the only change that makes the row impossible to
+  ignore for the right reason: it stops being a place and starts being a scheduled thing. On days
+  with no run planned it falls back to A5's "No cardio logged today", so the row is never blank.</p>
+  <p><b>B1 Fifth slide</b> is the strongest idea and the largest build. The dots under the carousel
+  already promise a set of sessions; cardio not being one of them is the actual structural oddity
+  on this screen. It's a bigger change than a restyle and worth treating as its own piece of work.</p>
+  <p>The honest caution on the data-bearing options (A1&ndash;A4): they put a second network
+  dependency on a screen that currently paints instantly from the workout cache. Each would need
+  its own cache seed, or the row flashes empty on every visit &mdash; which would be worse than
+  the grey slab.</p>
+</div>
+
+</div>
+
+<script>
+const P = {
+  heart: 'M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5|M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27',
+  foot:  'M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z|M20 20v-2.38c0-1.12 1.03-2.12 1-4.62-.03-2.72-1.49-6-4.5-6C14.63 7 14 8.8 14 10.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z',
+  act:   'M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2',
+  chev:  'm9 18 6-6-6-6',
+  timer: 'M10 2h4|M12 14v-4|M4 13a8 8 0 0 1 8-7 8 8 0 1 1-5.3 14L4 17.6',
+  plus:  'M5 12h14|M12 5v14',
+  bike:  'M18.5 17.5 12 6l-1.5 6h4l-1.5 6|M5.5 18a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z|M18.5 18a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z'
+};
+const CY = '#22d3ee', GR = '#22c55e', MU = '#8b94a7';
+
+function ic(k, px, color, sw){
+  return `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="${color}"
+    stroke-width="${sw||2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    style="display:block;flex:none">${P[k].split('|').map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+}
+
+/* The screen context. Every variant is judged sitting between the workout card's bottom edge and
+   the nav bar, because the complaint is contextual — the slab looks like an afterthought *next to*
+   a vivid card, not in isolation. */
+function stage(inner, opts){
+  const o = opts || {};
+  // The real screen's wallpaper fades purple → dark behind this row. Reproduced, but the fade is
+  // finished *before* the variant starts so the mockup is judged on a stable ground.
+  return `<div style="width:340px;background:linear-gradient(180deg,#6b5f9e 0%,#6f61a0 20%,#3a3350 34%,#1b1d27 48%,#101219 70%);border-radius:14px;overflow:hidden;padding-top:6px">
+    <div style="margin:0 10px;border-radius:14px 14px 0 0;background:rgba(255,255,255,.09);height:64px;position:relative;overflow:hidden">
+      <div style="position:absolute;inset:auto 0 0 0;display:flex;justify-content:center;gap:6px;padding-bottom:9px">
+        ${[0,1,2,3].map(()=>`<span style="width:5px;height:5px;border-radius:9px;background:rgba(255,255,255,.3)"></span>`).join('')}
+        <span style="width:5px;height:15px;border-radius:9px;background:${CY};margin-top:-5px"></span>
+      </div>
+      <div style="position:absolute;top:0;left:0;right:0;height:34px;background:linear-gradient(180deg,rgba(120,86,190,.5),transparent)"></div>
+      <div style="position:absolute;top:9px;left:14px;right:14px;height:26px;border-radius:8px;background:${CY};display:grid;place-items:center;font-size:11px;font-weight:800;color:#062a30">Start Workout</div>
+    </div>
+    <div style="padding:${o.pad||'11px 10px 12px'}">${inner}</div>
+    <div style="background:#000;display:flex;justify-content:space-around;align-items:center;padding:7px 0 9px;font-size:7.5px;color:#6b7280">
+      ${['Home','Health','','Nutrition','More'].map((t,i)=>i===2
+        ? `<span style="width:34px;height:26px;border-radius:9px;background:${CY};display:grid;place-items:center;font-size:7px;color:#062a30;font-weight:800">GYM</span>`
+        : `<span>${t}</span>`).join('')}
+    </div>
+  </div>`;
+}
+
+const V = [];
+const add = (id,name,note,inner,opts) => V.push({id,name,note,inner,opts});
+
+/* ============ A · SHOW WHAT'S BEHIND IT ============ */
+
+add('A1','Next up','The single biggest change available: <b>the button already knows there\'s an easy run scheduled today and says nothing about it.</b> Given the same language as the card above — name, "Recommended today", duration — cardio stops being a drawer and becomes the day\'s second session.',
+`<button style="width:100%;border:1px solid ${CY}3d;background:linear-gradient(160deg,${CY}1f,${CY}0a);border-radius:16px;padding:12px 13px;display:flex;align-items:center;gap:12px;text-align:left;cursor:pointer">
+  <span style="display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:${CY}26;flex:none">${ic('foot',19,CY)}</span>
+  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+    <span style="display:flex;align-items:center;gap:7px">
+      <span style="font-size:15px;font-weight:800;color:#fff;letter-spacing:-.02em">Easy run</span>
+      <span style="font-size:8.5px;font-weight:800;background:${CY};color:#062a30;padding:2px 6px;border-radius:99px">TODAY</span></span>
+    <span style="font-size:11px;color:#b6c0cc">30 min · from your running plan</span></span>
+  ${ic('chev',16,MU)}
+</button>`);
+
+add('A2','Stat line','Keeps the slab\'s footprint but stops it being blank. Three live numbers it already fetches — steps, zone minutes left this week, resting HR — turn "somewhere else to go" into "here\'s where you stand".',
+`<div style="border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);border-radius:16px;overflow:hidden">
+  <div style="display:flex;padding:11px 4px 10px">
+    ${[['4,176','STEPS','#fff'],['72','ZONE MIN LEFT',CY],['52','RESTING HR','#f87171']].map(([v,l,c],i)=>
+    `<span style="flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;${i?'border-left:1px solid rgba(255,255,255,.09)':''}">
+      <span style="font-size:17px;font-weight:800;color:${c};letter-spacing:-.03em;font-variant-numeric:tabular-nums">${v}</span>
+      <span style="font-size:7.5px;letter-spacing:.13em;color:#75808f">${l}</span></span>`).join('')}
+  </div>
+  <button style="width:100%;border:0;border-top:1px solid rgba(255,255,255,.09);background:transparent;padding:11px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+    ${ic('heart',15,CY)}<span style="font-size:13px;font-weight:700;color:${CY}">Other Activity</span></button>
+</div>`);
+
+add('A3','Three doors','The hub\'s three destinations promoted onto this screen, each keeping its own colour. Removes a whole tap — today the button is a corridor you walk down to reach a menu you could have seen from here.',
+`<div style="display:flex;gap:7px">
+  ${[['foot','Run',CY,'30 min'],['foot','Walk',GR,'Guided'],['act','Log',MU,'Anything']].map(([k,n,c,h])=>
+  `<button style="flex:1;min-width:0;border:1px solid ${c}33;background:${c}12;border-radius:14px;padding:11px 6px;display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer">
+    ${ic(k,18,c)}
+    <span style="font-size:12px;font-weight:800;color:#fff">${n}</span>
+    <span style="font-size:8.5px;color:#8b94a7">${h}</span></button>`).join('')}
+</div>`);
+
+add('A4','Quota-led','Leads with the number that actually creates urgency: the week\'s zone-minute deficit. The row reads as an unfinished task rather than a place to visit — and it is the one framing that makes skipping it feel like a decision.',
+`<button style="width:100%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);border-radius:16px;padding:13px;display:flex;align-items:center;gap:13px;text-align:left;cursor:pointer">
+  <span style="display:flex;flex-direction:column;gap:3px;flex:none">
+    <span style="font-size:26px;font-weight:800;color:${CY};line-height:1;letter-spacing:-.04em;font-variant-numeric:tabular-nums">72</span>
+    <span style="font-size:7.5px;letter-spacing:.13em;color:#75808f">MIN LEFT</span></span>
+  <span style="width:1px;align-self:stretch;background:rgba(255,255,255,.11)"></span>
+  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+    <span style="font-size:13.5px;font-weight:700;color:#fff">Zone minutes this week</span>
+    <span style="font-size:10.5px;color:#8b94a7">78 of 150 · a 30 min run covers it</span></span>
+  ${ic('chev',16,MU)}
+</button>`);
+
+add('A5','Today','States the one fact the screen is silent about: nothing cardio has been logged today. Neutral, not nagging — and it changes to "45 min logged" once something is, so the row is never dead.',
+`<button style="width:100%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.05);border-radius:16px;padding:12px 13px;display:flex;align-items:center;gap:11px;text-align:left;cursor:pointer">
+  <span style="width:7px;height:7px;border-radius:9px;background:${MU};flex:none"></span>
+  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+    <span style="font-size:13.5px;font-weight:700;color:#fff">No cardio logged today</span>
+    <span style="font-size:10.5px;color:#8b94a7">Run, walk, or log something else</span></span>
+  ${ic('chev',16,MU)}
+</button>`);
+
+/* ============ B · PEER OF THE CARD ============ */
+
+add('B1','Fifth slide','The dots below the carousel already imply a set of sessions. Make cardio the fifth one, with the card\'s own chrome — then it isn\'t a lesser thing under the card, it\'s another card. <b>The most structurally honest option and the biggest build.</b>',
+`<div style="border-radius:16px;border:1px dashed ${CY}59;background:${CY}0f;padding:13px;display:flex;flex-direction:column;gap:9px">
+  <div style="display:flex;align-items:center;gap:8px">
+    ${ic('foot',17,CY)}<span style="font-size:14px;font-weight:800;color:${CY};letter-spacing:-.02em">Easy Run</span>
+    <span style="margin-left:auto;font-size:10px;color:#b6c0cc">30 min</span></div>
+  <div style="font-size:10.5px;color:#9aa5b8;line-height:1.5">Swipes in as the fifth card — same rounding, same Start button, same dots. Cardio sits beside your gym sessions instead of underneath them.</div>
+  <div style="height:24px;border-radius:8px;background:${CY};display:grid;place-items:center;font-size:11px;font-weight:800;color:#062a30">Start Run</div>
+</div>`);
+
+add('B2','Half card','Same corner radius and inset as the workout card at a third the height, tinted cyan instead of purple. Reads as a sibling of what\'s above rather than furniture below it, with no change to how the carousel works.',
+`<div style="border-radius:18px;background:linear-gradient(160deg,${CY}2e,${CY}0f);border:1px solid ${CY}30;padding:14px 15px;display:flex;align-items:center;gap:13px">
+  <span style="display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:${CY}26;flex:none">${ic('heart',21,CY)}</span>
+  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:4px">
+    <span style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.02em">Other Activity</span>
+    <span style="font-size:11px;color:#c3cbd9">Run · Walk · Log anything</span></span>
+  ${ic('chev',17,'#fff')}
+</div>`);
+
+add('B3','Paired','Splits the one grey slab into the two things you actually do: a weighted primary for the scheduled run, and a quiet secondary for everything else. Hierarchy inside the row instead of one undifferentiated door.',
+`<div style="display:flex;flex-direction:column;gap:7px">
+  <button style="width:100%;border:0;background:${CY};border-radius:14px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer">
+    ${ic('foot',16,'#062a30',2.4)}<span style="font-size:13.5px;font-weight:800;color:#062a30">Start easy run · 30 min</span></button>
+  <button style="width:100%;border:1px solid rgba(255,255,255,.13);background:transparent;border-radius:14px;padding:9px;display:flex;align-items:center;justify-content:center;gap:7px;cursor:pointer">
+    ${ic('act',14,MU)}<span style="font-size:11.5px;font-weight:600;color:#b6c0cc">Walk, or log something else</span></button>
+</div>`);
+
+/* ============ C · CTA WEIGHT ============ */
+
+add('C1','Outlined','The smallest possible change with real effect: keep the shape, drop the grey fill, put the cardio cyan on the border and the label. <b>Careful — cyan is the Start Workout colour</b>, and two cyan actions on one screen compete for the same "press me".',
+`<button style="width:100%;border:1.5px solid ${CY};background:transparent;border-radius:14px;padding:13px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer">
+  ${ic('heart',16,CY)}<span style="font-size:13.5px;font-weight:800;color:${CY}">Other Activity</span></button>`);
+
+add('C2','Green','Solves C1\'s collision by taking the walk modality\'s green instead of the run\'s cyan. Full weight, unmistakably a button, and it never competes with Start Workout because it is a different colour entirely.',
+`<button style="width:100%;border:0;background:${GR};border-radius:14px;padding:13px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer">
+  ${ic('heart',16,'#062a10',2.4)}<span style="font-size:13.5px;font-weight:800;color:#062a10">Other Activity</span></button>`);
+
+add('C3','Split action','A wide primary with a separate icon button for logging. Two targets, two intents — start a run, or record something already done — instead of one label covering both.',
+`<div style="display:flex;gap:7px">
+  <button style="flex:1;border:0;background:${CY};border-radius:14px;padding:12px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer">
+    ${ic('foot',16,'#062a30',2.4)}<span style="font-size:13px;font-weight:800;color:#062a30">Start a run</span></button>
+  <button style="flex:none;width:48px;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);border-radius:14px;display:grid;place-items:center;cursor:pointer">
+    ${ic('plus',18,'#fff',2.4)}</button>
+</div>`);
+
+/* ============ D · MINIMAL AND PRESENT ============ */
+
+add('D1','Band','The treatment you just picked for the score row, applied here: hairlines edge to edge, three destinations as type and icon, no container at all. Consistent with where the home screen is going, and it weighs nothing.',
+`<div style="margin:0 -10px">
+  <div style="height:1px;background:rgba(255,255,255,.14)"></div>
+  <div style="display:flex;padding:12px 10px">
+    ${[['foot','RUN',CY],['foot','WALK',GR],['act','LOG',MU]].map(([k,n,c],i)=>
+    `<button style="flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:7px;cursor:pointer;${i?'border-left:1px solid rgba(255,255,255,.1)':''}">
+      ${ic(k,17,c)}<span style="font-size:8.5px;letter-spacing:.15em;color:#a8b1bf;font-weight:600">${n}</span></button>`).join('')}
+  </div>
+  <div style="height:1px;background:rgba(255,255,255,.14)"></div>
+</div>`, { pad: '10px 10px 12px' });
+
+add('D2','Rule','One hairline and one line of type. The least it can possibly be while still being visible — worth seeing precisely because the current slab\'s problem may be that it is <i>too</i> present without saying anything.',
+`<div style="margin:0 -10px">
+  <div style="height:1px;background:rgba(255,255,255,.14)"></div>
+  <button style="width:100%;background:none;border:0;padding:14px 12px;display:flex;align-items:center;gap:9px;cursor:pointer">
+    ${ic('heart',15,CY)}
+    <span style="font-size:13px;font-weight:600;color:#e6ebf2">Other Activity</span>
+    <span style="margin-left:auto;font-size:10.5px;color:#75808f">72 zone min left</span>
+    ${ic('chev',14,MU)}</button>
+</div>`, { pad: '10px 10px 10px' });
+
+add('D3','Bare','No box, no rule, no fill — three coloured glyphs with their names, floating on the wallpaper the same way the score row will. The wallpaper gradient does the separating instead of a border.',
+`<div style="display:flex;padding:4px 0 2px">
+  ${[['foot','Run',CY],['foot','Walk',GR],['act','Log',MU]].map(([k,n,c])=>
+  `<button style="flex:1;background:none;border:0;display:flex;flex-direction:column;align-items:center;gap:8px;cursor:pointer">
+    ${ic(k,20,c)}<span style="font-size:11px;color:#c3cbd9;font-weight:600">${n}</span></button>`).join('')}
+</div>`);
+
+const SECTIONS = [
+  {n:'A', title:'Show what\'s behind it', blurb:'The row already fetches this data and displays none of it.', ids:/^A/},
+  {n:'B', title:'Peer of the card', blurb:'Stop it being a lesser thing underneath the carousel.', ids:/^B/},
+  {n:'C', title:'CTA weight', blurb:'Keep the shape, give it the presence of a real action.', ids:/^C/},
+  {n:'D', title:'Minimal and present', blurb:'Matching the direction the home score row just took.', ids:/^D/}
+];
+
+function mockHTML(v){
+  return `<article class="mock">
+    <div class="mock-head"><span class="mock-id">${v.id}</span><span class="mock-name">${v.name}</span></div>
+    <div class="canvas" style="padding:16px 0">${stage(v.inner, v.opts)}</div>
+    <p class="mock-note">${v.note}</p>
+  </article>`;
+}
+
+document.getElementById('app').innerHTML = SECTIONS.map(s=>`
+  <section>
+    <div class="sec-head"><span class="sec-num">${s.n}</span><h2>${s.title}</h2><p>${s.blurb}</p></div>
+    <div class="gallery">${V.filter(v=>s.ids.test(v.id)).map(mockHTML).join('')}</div>
+  </section>`).join('');
+
+</script>

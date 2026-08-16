@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Required: lets the app query for Health Connect availability -->
+    <queries>
+        <package android:name="com.google.android.apps.healthdata" />
+        <!-- Android 11+ package visibility: without this SpeechRecognizer cannot see the
+             recognition service and reports "not available" even when one is installed. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService" />
+        </intent>
+    </queries>
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme">
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:supportsPictureInPicture="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Deep link for Capacitor Browser OAuth callback -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="trainingai" android:host="auth-complete" />
+            </intent-filter>
+
+            <!-- Health Connect permission rationale — Android 13 and below -->
+            <intent-filter>
+                <action android:name="androidx.health.ACTION_SHOW_PERMISSIONS_RATIONALE" />
+            </intent-filter>
+
+            <!-- Health Connect permission rationale — Android 14+ -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW_PERMISSION_USAGE" />
+                <category android:name="android.intent.category.HEALTH_PERMISSIONS" />
+            </intent-filter>
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/file_paths" />
+        </provider>
+
+        <!-- Oura Ring direct-BLE persistence service (Phase 2 spike) -->
+        <service
+            android:name=".oura.OuraRingService"
+            android:foregroundServiceType="connectedDevice"
+            android:exported="false" />
+
+        <!-- Chest-strap (Polar H10) all-day BLE service — keeps strap HR streaming
+             with the screen off / app backgrounded (the JS path is suspended then) -->
+        <service
+            android:name=".polar.PolarStrapService"
+            android:foregroundServiceType="connectedDevice"
+            android:exported="false" />
+
+        <!-- Direct-BLE Renpho scale (docs/superpowers/plans/2026-07-27-renpho-ble-direct-scale.md).
+             Opt-in only (background-sync toggle) — periodic connect attempts, not a held
+             connection, since the scale sleeps except when stepped on. -->
+        <service
+            android:name=".scale.ScaleBleService"
+            android:foregroundServiceType="connectedDevice"
+            android:exported="false" />
+
+        <!-- Restart the ring service after a reboot / app update if a key is stored -->
+        <receiver
+            android:name=".oura.OuraBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Fires when the passive BLE scan (ScaleBleScanManager) sees the paired scale
+             advertising — targeted only via the PendingIntent this app creates for itself, so it
+             does not need to be exported. -->
+        <receiver
+            android:name=".scale.ScaleScanReceiver"
+            android:exported="false" />
+
+        <!-- Re-arms the scale scan after a reboot / app update, if background sync is on -->
+        <receiver
+            android:name=".scale.ScaleBootReceiver"
+            android:enabled="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+    </application>
+
+    <!-- Permissions -->
+
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <!-- Voice set-logging. Android silently fails a runtime request for a permission the manifest
+         never declares, so without this the WebView's AUDIO_CAPTURE request was denied before any
+         prompt appeared — which is why the Voice button turned itself off the instant it was
+         pressed. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+
+    <!-- Rest-timer local notifications -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Promote the rest-timer countdown to the Android 16 status-bar chip / Now Bar. -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- Exact alarms so the rest-complete alert fires on time even in Doze.
+         USE_EXACT_ALARM (API 33+) and SCHEDULE_EXACT_ALARM (API ≤32) are both
+         granted at install for a timer app, no runtime prompt. -->
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" android:maxSdkVersion="32" />
+
+    <!-- Location — for live activity tracking (GPS route + pace) -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+
+    <!-- Oura Ring direct BLE (Phase 2 spike) -->
+    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_CONNECTED_DEVICE" />
+    <!-- Restart the ring sync service after a reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!-- Prompt the user to exempt the app from battery optimization so Samsung's
+         aggressive background management doesn't kill the ring service (ops manual L9) -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
+    <!-- Health Connect read permissions -->
+
+    <!-- Activity — Fitbit Air writes all of these -->
+    <uses-permission android:name="android.permission.health.READ_STEPS" />
+    <uses-permission android:name="android.permission.health.READ_DISTANCE" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVE_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_TOTAL_CALORIES_BURNED" />
+    <uses-permission android:name="android.permission.health.READ_FLOORS_CLIMBED" />
+    <uses-permission android:name="android.permission.health.READ_EXERCISE" />
+    <uses-permission android:name="android.permission.health.READ_ACTIVITY_INTENSITY" />
+    <uses-permission android:name="android.permission.health.READ_SPEED" />
+    <uses-permission android:name="android.permission.health.READ_POWER" />
+    <uses-permission android:name="android.permission.health.READ_VO2_MAX" />
+
+    <!-- Vitals — Fitbit Air writes all of these -->
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_RESTING_HEART_RATE" />
+    <uses-permission android:name="android.permission.health.READ_HEART_RATE_VARIABILITY" />
+    <uses-permission android:name="android.permission.health.READ_OXYGEN_SATURATION" />
+    <uses-permission android:name="android.permission.health.READ_RESPIRATORY_RATE" />
+    <uses-permission android:name="android.permission.health.READ_SKIN_TEMPERATURE" />
+
+    <!-- Sleep -->
+    <uses-permission android:name="android.permission.health.READ_SLEEP" />
+
+    <!-- Body metrics — device writes weight/body fat; height/BMR user-entered in Google Health -->
+    <uses-permission android:name="android.permission.health.READ_WEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_HEIGHT" />
+    <uses-permission android:name="android.permission.health.READ_BODY_FAT" />
+    <uses-permission android:name="android.permission.health.READ_BASAL_METABOLIC_RATE" />
+
+    <!-- Nutrition — manually logged in Google Health -->
+    <uses-permission android:name="android.permission.health.READ_NUTRITION" />
+    <uses-permission android:name="android.permission.health.READ_HYDRATION" />
+
+    <!-- Background + historical reads — needed for cold sync on first install -->
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_IN_BACKGROUND" />
+    <uses-permission android:name="android.permission.health.READ_HEALTH_DATA_HISTORY" />
+</manifest>

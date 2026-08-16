@@ -1,0 +1,101 @@
+'use client'
+import { useState } from 'react'
+import { GitCompare, Copy, Check, Play } from 'lucide-react'
+import { Button } from '@/components/ui/button'
+
+/**
+ * D6 admin spot-check: ring-derived HR vs Polar H10 HR over a recent window, bucketed per-minute.
+ * Wear both the ring and the H10 for a short burst (~15 min), then run this to see whether the
+ * two sources roughly agree — this run doubles as the first real signal on whether the ring's
+ * own HR is trustworthy. See docs/superpowers/plans/2026-07-26-d6-polar-h10-comparison-harness.md.
+ */
+export function ComparisonHarnessConsole() {
+  const [minutes, setMinutes] = useState('15')
+  const [running, setRunning] = useState(false)
+  const [log, setLog] = useState('')
+  const [copied, setCopied] = useState(false)
+
+  async function run() {
+    setRunning(true)
+    setLog('')
+    try {
+      const n = Math.max(1, Math.min(24 * 60, Number(minutes) || 15))
+      const res = await fetch(`/api/oura-ble/comparison-harness?minutes=${n}`)
+      const data = await res.json()
+      setLog(res.ok ? formatComparison(data) : `ERROR ${res.status}: ${data?.error ?? 'unknown'}`)
+    } catch (err) {
+      setLog(`ERROR: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setRunning(false)
+    }
+  }
+
+  async function copy() {
+    await navigator.clipboard.writeText(log)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <section className="rounded-lg border border-border p-3">
+      <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
+        <GitCompare className="h-4 w-4" /> Comparison harness — ring HR vs Polar H10
+      </h2>
+      <p className="mb-3 text-xs text-muted-foreground">
+        Wear both the ring and the H10 chest strap for a short burst, then run this over that
+        window to see whether the ring&apos;s own HR agrees with the strap, per minute.
+      </p>
+      <div className="flex items-center gap-2">
+        <input
+          type="number"
+          min={1}
+          max={24 * 60}
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          className="w-20 rounded-md border border-border bg-background px-2 py-1 text-sm"
+          aria-label="Minutes to look back"
+        />
+        <span className="text-xs text-muted-foreground">minutes back</span>
+        <Button size="sm" onClick={run} disabled={running}>
+          <Play className="mr-1 h-4 w-4" /> {running ? 'Running…' : 'Compare'}
+        </Button>
+        {log && (
+          <Button size="sm" variant="outline" onClick={copy}>
+            {copied ? <Check className="mr-1 h-4 w-4" /> : <Copy className="mr-1 h-4 w-4" />}
+            {copied ? 'Copied' : 'Copy'}
+          </Button>
+        )}
+      </div>
+      {log && (
+        <pre className="mt-3 max-h-96 overflow-auto whitespace-pre rounded-md bg-muted p-2 font-mono text-[11px] leading-tight">
+          {log}
+        </pre>
+      )}
+    </section>
+  )
+}
+
+/* eslint-disable @typescript-eslint/no-explicit-any */
+function formatComparison(r: any): string {
+  const { withinCount, outOfBandCount, meanAbsDelta } = r.summary ?? {}
+  const scored = (withinCount ?? 0) + (outOfBandCount ?? 0)
+  const lines: string[] = [
+    `${r.metric} — ours (ring) vs reference (H10), tolerance ±${r.toleranceBand}${r.unit}`,
+    scored > 0
+      ? `${withinCount}/${scored} within ±${r.toleranceBand}${r.unit}, mean |Δ| = ${meanAbsDelta?.toFixed(1)}${r.unit}`
+      : '(no bucket has both sides present — wear both devices and re-run)',
+    '',
+    'bucket (local)         ours   ref   Δ',
+  ]
+  for (const p of r.points ?? []) {
+    const local = new Date(p.bucketStart).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+    const ours = p.ours === null ? '  —' : String(Math.round(p.ours)).padStart(4)
+    const ref = p.reference === null ? '  —' : String(Math.round(p.reference)).padStart(4)
+    const hasBoth = p.ours !== null && p.reference !== null
+    const delta = hasBoth ? Math.abs(p.ours - p.reference) : null
+    const deltaStr = delta === null ? '  —' : String(Math.round(delta)).padStart(4)
+    const flag = hasBoth && delta! > r.toleranceBand ? '  ⚠ out of band' : ''
+    lines.push(`${local.padEnd(20)}${ours}  ${ref}  ${deltaStr}${flag}`)
+  }
+  return lines.join('\n')
+}

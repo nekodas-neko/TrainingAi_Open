@@ -1,0 +1,640 @@
+<title>Health Score Row — Design Mockups</title>
+<style>
+/* Deliberately single-theme: this page depicts a dark app screen, so every surface
+   is painted explicitly and no theme stamps are honoured. */
+:root{
+  --ground:#080b12;
+  --ground-2:#0c111b;
+  --surface:#111827;
+  --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075);
+  --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8;
+  --ink-2:#9aa5b8;
+  --ink-3:#5f6a7d;
+  --chrome:#38bdf8;
+  --readiness:#60a5fa;
+  --hr:#f87171;
+  --sleep:#a78bfa;
+  --activity:#f97316;
+  --band-high:#22c55e;
+  --band-mod:#f59e0b;
+  --band-low:#ef4444;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--app);
+  line-height:1.55;
+  font-size:15px;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 96px}
+
+/* ---------- masthead ---------- */
+header.mast{
+  padding:56px 0 28px;
+  border-bottom:1px solid var(--hair);
+  margin-bottom:36px;
+}
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--chrome);
+  margin:0 0 14px;
+}
+h1{
+  margin:0 0 16px;
+  font-size:clamp(30px,5.2vw,50px);
+  line-height:1.02;
+  letter-spacing:-.035em;
+  font-weight:800;
+  text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:64ch;color:var(--ink-2);font-size:16px}
+
+.constraint{
+  margin:26px 0 0;
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+.constraint span{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+  padding:6px 11px;border-radius:999px;
+  border:1px solid var(--hair-2);color:var(--ink-2);
+  background:var(--surface);
+}
+.constraint span b{color:var(--ink);font-weight:600}
+
+/* ---------- section ---------- */
+section{margin:0 0 20px;scroll-margin-top:20px}
+.sec-head{
+  display:flex;align-items:baseline;gap:14px;
+  padding:38px 0 18px;
+  border-top:1px solid var(--hair);
+  margin-top:36px;
+}
+.sec-head:first-child{border-top:0;margin-top:0}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+
+/* ---------- gallery ---------- */
+.gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:18px;
+}
+.mock{
+  border:1px solid var(--hair);
+  border-radius:16px;
+  background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.mock-head{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 15px 11px;
+  border-bottom:1px solid var(--hair);
+}
+.mock-id{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  color:var(--ground);background:var(--chrome);
+  padding:2px 6px;border-radius:5px;font-weight:700;
+}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{
+  padding:0 15px 13px;margin:11px 0 0;
+  color:var(--ink-2);font-size:12.5px;line-height:1.5;
+}
+.mock-note b{color:var(--ink);font-weight:600}
+/* the phone-truthful canvas: 412dp wide with the app's mx-4 gutters */
+.canvas{
+  background:
+    radial-gradient(120% 80% at 18% 0%,rgba(59,90,160,.28),transparent 62%),
+    radial-gradient(90% 70% at 88% 12%,rgba(120,70,170,.16),transparent 60%),
+    #05070d;
+  padding:22px 0;
+  display:flex;justify-content:center;
+  border-bottom:1px solid var(--hair);
+}
+.phone{width:412px;padding:0 16px;transform-origin:top center}
+@media(max-width:420px){.phone{transform:scale(.82)}.canvas{padding:16px 0}}
+
+/* ---------- shared cell primitives (mirroring the real component) ---------- */
+.strip{display:flex;justify-content:space-between;gap:8px}
+.strip.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strip.stack{flex-direction:column;gap:8px}
+.cell{
+  flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.cell:focus-visible{outline:2px solid var(--chrome);outline-offset:3px;border-radius:12px}
+.dial{position:relative;width:100%;aspect-ratio:1;max-width:96px}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.num{font-weight:900;line-height:1;letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:#fff}
+.cap{font-size:11px;line-height:1;color:#9aa5b8}
+.ico{display:block}
+
+/* tiles */
+.tile{
+  flex:1;min-width:0;border-radius:16px;padding:11px 12px 12px;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+  display:flex;flex-direction:column;gap:7px;text-align:left;
+  color:inherit;font:inherit;cursor:pointer;
+}
+.tile-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+
+/* legend / meta */
+.legend{
+  display:flex;flex-wrap:wrap;gap:8px;padding:12px 15px;
+  border-top:1px solid var(--hair);
+}
+.tag{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+  padding:3px 8px;border-radius:6px;border:1px solid var(--hair-2);color:var(--ink-2);
+}
+.tag.live{border-color:rgba(56,189,248,.5);color:var(--chrome)}
+.tag.data{border-color:rgba(34,197,94,.45);color:#4ade80}
+.tag.risk{border-color:rgba(239,68,68,.45);color:#fca5a5}
+
+/* notes block */
+.callout{
+  border:1px solid var(--hair);border-left:3px solid var(--chrome);
+  background:var(--surface);border-radius:0 12px 12px 0;
+  padding:16px 18px;margin:22px 0 0;
+}
+.callout h3{margin:0 0 8px;font-size:14px;letter-spacing:-.01em}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+td b{font-weight:650}
+.tablewrap{overflow-x:auto}
+
+@media(prefers-reduced-motion:no-preference){
+  .cell,.tile{transition:transform .12s ease}
+  .cell:active,.tile:active{transform:scale(.95)}
+}
+</style>
+
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Home screen · score row · design exploration</p>
+  <h1>Twenty-eight ways to draw four numbers <em>— without touching the icons.</em></h1>
+  <p class="lede">The four metric buttons at the top of Home are the most-looked-at, least-designed
+  surface in the app. Every mockup below keeps the Lucide glyph and its identity colour exactly as
+  they are today &mdash; blue bolt, red pulse, purple moon, orange flame. Everything around them is
+  up for grabs: the frame, the fill, the shape, the layout, whether there's a frame at all.</p>
+  <div class="constraint">
+    <span><b>Fixed:</b> icon glyph</span>
+    <span><b>Fixed:</b> icon colour</span>
+    <span><b>Free:</b> frame · fill · shape · type · layout</span>
+    <span><b>Canvas:</b> 412dp &mdash; S25 Ultra</span>
+  </div>
+</header>
+
+<div id="app"></div>
+
+<div class="callout">
+  <h3>Three things worth deciding before any of these ship</h3>
+  <p><b>1. Heart Rate has no percentage.</b> 52&nbsp;bpm is not 52% of anything, so every
+  fill-based design needs a defined arc length for it. The mockups derive it from the existing
+  <code>restingHrCue</code> tiers (Low / Steady / Elevated / High &rarr; 85 / 70 / 45 / 25), which
+  keeps the arc honest but means the HR ring encodes a <i>tier</i>, not the number under it. The
+  alternative is a frame-only treatment for HR while the other three fill &mdash; visually
+  inconsistent, but never misleading.</p>
+  <p><b>2. Colour-only state is a rule violation.</b> CLAUDE.md forbids conveying state by colour
+  alone. Anything that drops today's dot needs the band word, a symbol, or a fill length carrying
+  the same information &mdash; the aria-label alone is not enough for a sighted user. Designs
+  tagged <span class="tag data">encodes value</span> satisfy this through arc length; designs
+  tagged <span class="tag risk">needs a state cue</span> do not yet.</p>
+  <p><b>3. Row height is a budget.</b> Today's row costs ~140dp of the first screen. The compact
+  layouts at the end buy back 60&ndash;90dp for the recommendation card, which is the thing you
+  actually act on.</p>
+</div>
+
+<div class="sec-head" style="margin-top:44px">
+  <span class="sec-num">/</span>
+  <h2>Quick comparison</h2>
+  <p>What each family costs and what it buys.</p>
+</div>
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Family</th><th>Height</th><th>Encodes the value</th><th>Best for</th></tr></thead>
+  <tbody>
+    <tr><td><b>Shipping today</b></td><td>~140dp</td><td>No &mdash; dot only, on one style</td><td>Baseline</td></tr>
+    <tr><td><b>Filled dials</b> (A)</td><td>~140dp</td><td>Yes &mdash; arc length</td><td>Glanceable trend, no extra height</td></tr>
+    <tr><td><b>Frameless</b> (B)</td><td>~105dp</td><td>Varies</td><td>Letting the wallpaper through</td></tr>
+    <tr><td><b>Tiles</b> (C)</td><td>~90&ndash;130dp</td><td>Yes &mdash; bar or sparkline</td><td>Room for a second data point</td></tr>
+    <tr><td><b>Compact</b> (D)</td><td>~48&ndash;90dp</td><td>Yes</td><td>Getting the recommendation above the fold</td></tr>
+  </tbody>
+</table>
+</div>
+
+</div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ * Data — the exact numbers from the screenshot, the exact accents
+ * from components/oura-score-chip-row.tsx.
+ * ------------------------------------------------------------------ */
+const ICONS = {
+  zap:   ['M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'],
+  heart: ['M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5','M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27'],
+  moon:  ['M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401'],
+  flame: ['M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z']
+};
+
+const M = [
+  {label:'Readiness',  value:76, fill:76, accent:'#60a5fa', icon:'zap',   band:'High',   trend:[68,71,70,74,72,79,76]},
+  {label:'Heart Rate', value:52, fill:70, accent:'#f87171', icon:'heart', band:'Steady', unit:'bpm', tier:true, trend:[55,54,56,53,54,52,52]},
+  {label:'Sleep',      value:90, fill:90, accent:'#a78bfa', icon:'moon',  band:'High',   trend:[74,81,77,85,88,86,90]},
+  {label:'Activity',   value:76, fill:76, accent:'#f97316', icon:'flame', band:'High',   trend:[62,70,58,73,80,71,76]}
+];
+
+const bandColor = b => b==='High'||b==='Steady' ? '#22c55e' : b==='Moderate'||b==='Elevated' ? '#f59e0b' : '#ef4444';
+
+/* ---------- svg helpers ---------- */
+const TRACK = 'rgba(255,255,255,.16)';
+const pol = (c,r,deg) => { const a=(deg-90)*Math.PI/180; return [c+Math.cos(a)*r, c+Math.sin(a)*r]; };
+function arc(c,r,a0,a1){
+  if (a1-a0 >= 359.99) a1 = a0+359.99;
+  const [x0,y0]=pol(c,r,a0), [x1,y1]=pol(c,r,a1);
+  return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${r} ${r} 0 ${a1-a0>180?1:0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+}
+function icon(name, px, color, sw){
+  return `<svg class="ico" viewBox="0 0 24 24" width="${px}" height="${px}" fill="none"
+    stroke="${color}" stroke-width="${sw||2.2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    ${ICONS[name].map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+}
+function spark(pts, color, w, h){
+  const mn=Math.min(...pts), mx=Math.max(...pts), rng=(mx-mn)||1;
+  const d = pts.map((p,i)=>`${(i/(pts.length-1)*w).toFixed(1)},${(h-((p-mn)/rng)*h).toFixed(1)}`).join(' ');
+  const last = pts.length-1;
+  return `<svg viewBox="0 0 ${w} ${h}" width="100%" height="${h}" fill="none" aria-hidden="true" style="display:block;overflow:visible">
+    <polyline points="${d}" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" opacity=".85"/>
+    <circle cx="${w}" cy="${(h-((pts[last]-mn)/rng)*h).toFixed(1)}" r="2.4" fill="${color}"/></svg>`;
+}
+const label = m => `<span class="cap">${m.label}</span>`;
+
+/* ------------------------------------------------------------------ *
+ * The variants.
+ * ------------------------------------------------------------------ */
+const V = [];
+const add = (id,name,note,tags,render,rowClass) => V.push({id,name,note,tags,render,rowClass});
+
+/* ============ A · FILLED DIALS =========================== */
+
+add('A1','Progress ring','The plainest honest change: the ring becomes the score. 76 fills 76% of the circle, the accent stays the identity colour, the icon is untouched. Nothing new on screen &mdash; the stroke that was already there just starts meaning something.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=40;
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${TRACK}" stroke-width="4"/>
+    <path d="${arc(c,r,0,m.fill/100*360)}" fill="none" stroke="${m.accent}" stroke-width="4" stroke-linecap="round"/>
+  </svg>`, 20, 2.0);
+});
+
+add('A2','Segmented ring','Twenty ticks around the dial, lit up to the score. Reads as a count rather than a smooth quantity, which suits a number that only ever moves a few points a day. Dense enough to survive the Samsung compositor without a blur pass.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=40,n=20,lit=Math.round(m.fill/100*n);
+  let out='';
+  for(let i=0;i<n;i++){
+    const a=i/n*360, [x0,y0]=pol(c,r-4,a), [x1,y1]=pol(c,r+4,a);
+    out+=`<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}"
+      stroke="${i<lit?m.accent:TRACK}" stroke-width="2.6" stroke-linecap="round"/>`;
+  }
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">${out}</svg>`, 19, 1.85);
+});
+
+add('A3','270° gauge','An instrument, not a ring. The gap at the bottom gives the label somewhere to sit and stops the shape reading as "complete" at any value. Familiar from every car dashboard, which is the point.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=40,a0=-135,a1=135;
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <path d="${arc(c,r,a0,a1)}" fill="none" stroke="${TRACK}" stroke-width="5" stroke-linecap="round"/>
+    <path d="${arc(c,r,a0,a0+(a1-a0)*m.fill/100)}" fill="none" stroke="${m.accent}" stroke-width="5" stroke-linecap="round"/>
+  </svg>`, 19, 1.95);
+});
+
+add('A4','Double track','A hairline outer ring holds the shape at a constant diameter; a thick inner arc carries the value. Two weights of the same colour family give it depth the single-stroke version never gets.',
+ ['encodes value'], m => {
+  const S=100,c=S/2;
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <circle cx="${c}" cy="${c}" r="44" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="1"/>
+    <circle cx="${c}" cy="${c}" r="36" fill="none" stroke="rgba(255,255,255,.13)" stroke-width="6"/>
+    <path d="${arc(c,36,0,m.fill/100*360)}" fill="none" stroke="${m.accent}" stroke-width="6" stroke-linecap="round"/>
+  </svg>`, 19, 2.0);
+});
+
+add('A5','Bezel + marker','Watch-face logic: a fixed tick bezel for scale, and one bright marker riding it at the current value. The value is a <i>position</i>, so a two-point move is visible without reading the digits.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=41;
+  let ticks='';
+  for(let i=0;i<12;i++){
+    const a=i/12*360, [x0,y0]=pol(c,r-3,a), [x1,y1]=pol(c,r,a);
+    ticks+=`<line x1="${x0.toFixed(1)}" y1="${y0.toFixed(1)}" x2="${x1.toFixed(1)}" y2="${y1.toFixed(1)}" stroke="rgba(255,255,255,.22)" stroke-width="${i%3?1.4:2.4}"/>`;
+  }
+  const [mx,my]=pol(c,r-1.5,m.fill/100*360);
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="1"/>${ticks}
+    <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="4" fill="${m.accent}"/>
+    <circle cx="${mx.toFixed(1)}" cy="${my.toFixed(1)}" r="7.5" fill="${m.accent}" opacity=".22"/>
+  </svg>`, 19, 1.9);
+});
+
+add('A6','Dot progress','Ten dots, filled to the nearest tenth. Coarser on purpose &mdash; it says "about 8 out of 10" and refuses to imply single-point precision the underlying score does not have.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=40,n=10,lit=Math.round(m.fill/10);
+  let out='';
+  for(let i=0;i<n;i++){
+    const [x,y]=pol(c,r,i/n*360);
+    out+=`<circle cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="${i<lit?3.2:2.2}" fill="${i<lit?m.accent:'rgba(255,255,255,.18)'}"/>`;
+  }
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">${out}</svg>`, 19, 1.9);
+});
+
+add('A7','Band arc','The arc length is the value; the arc <i>colour</i> is the band &mdash; green/amber/red &mdash; while the icon keeps the identity colour. Two channels of meaning that never collide, and it satisfies the no-colour-alone rule through length.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=40, bc=bandColor(m.band);
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${TRACK}" stroke-width="4"/>
+    <path d="${arc(c,r,0,m.fill/100*360)}" fill="none" stroke="${bc}" stroke-width="4" stroke-linecap="round"/>
+  </svg>`, 20, 2.0) ;
+});
+
+add('A8','Soft glow ring','The progress arc, blurred behind itself. Ambient rather than clinical &mdash; the row reads as light coming off the numbers instead of four instruments bolted to the screen.',
+ ['encodes value','check on device'], m => {
+  const S=100,c=S/2,r=40;
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <defs><filter id="g${m.label.replace(/\s/g,'')}" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="4"/></filter></defs>
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="3"/>
+    <path d="${arc(c,r,0,m.fill/100*360)}" fill="none" stroke="${m.accent}" stroke-width="5" filter="url(#g${m.label.replace(/\s/g,'')})" opacity=".8"/>
+    <path d="${arc(c,r,0,m.fill/100*360)}" fill="none" stroke="${m.accent}" stroke-width="2.5" stroke-linecap="round"/>
+  </svg>`, 20, 2.0);
+});
+
+add('A9','Tapered arc','The stroke thins as it travels, so the arc has a head and a tail and the eye lands on where the value ended up. Costs one extra path; reads noticeably less like a stock progress ring.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=40,end=m.fill/100*360;
+  const seg=[[0,.35,1.6],[.35,.7,3],[.7,1,4.6]].map(([s,e,w])=>
+    `<path d="${arc(c,r,end*s,end*e+0.6)}" fill="none" stroke="${m.accent}" stroke-width="${w}" stroke-linecap="round" opacity="${.55+w/10}"/>`).join('');
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,.1)" stroke-width="1.5"/>${seg}
+  </svg>`, 20, 2.0);
+});
+
+add('A10','Filled disc','No stroke at all &mdash; a tinted disc whose fill level rises with the score, like liquid in a glass. The most physical of the set, and the only one you can read from across a room.',
+ ['encodes value'], m => {
+  const S=100,c=S/2,r=42, y=c+r-(m.fill/100)*(r*2);
+  const uid = m.label.replace(/\s/g,'');
+  return cell(m,`<svg viewBox="0 0 ${S} ${S}">
+    <defs><clipPath id="c${uid}"><circle cx="${c}" cy="${c}" r="${r}"/></clipPath></defs>
+    <circle cx="${c}" cy="${c}" r="${r}" fill="rgba(255,255,255,.05)"/>
+    <g clip-path="url(#c${uid})"><rect x="0" y="${y.toFixed(1)}" width="${S}" height="${S}" fill="${m.accent}" opacity=".28"/>
+      <rect x="0" y="${y.toFixed(1)}" width="${S}" height="2" fill="${m.accent}" opacity=".9"/></g>
+    <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="rgba(255,255,255,.14)" stroke-width="1"/>
+  </svg>`, 20, 2.0);
+});
+
+/* ============ B · FRAMELESS =========================== */
+
+add('B1','Bare','Delete the ring. The icon and the number were always doing the work; the circle was scaffolding. Wallpaper shows through, the row loses 35dp, and nothing about the reading changes.',
+ ['needs a state cue'], m => `
+  <button class="cell" aria-label="${m.label}: ${m.value}">
+    <span style="display:flex;flex-direction:column;align-items:center;gap:5px;padding:14px 0 6px">
+      ${icon(m.icon,22,m.accent,2.2)}
+      <span class="num" style="font-size:2.3rem">${m.value}</span>
+    </span>${label(m)}
+  </button>`);
+
+add('B2','Underline','A rule under the number, its length the score and its colour the identity accent. The lightest possible way to keep the value encoded once the ring is gone.',
+ ['encodes value'], m => `
+  <button class="cell" aria-label="${m.label}: ${m.value}">
+    <span style="display:flex;flex-direction:column;align-items:center;gap:6px;padding:14px 0 4px;width:100%">
+      ${icon(m.icon,20,m.accent,2.2)}
+      <span class="num" style="font-size:2.2rem">${m.value}</span>
+      <span style="width:64%;height:3px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden">
+        <i style="display:block;height:100%;width:${m.fill}%;background:${m.accent};border-radius:99px"></i></span>
+    </span>${label(m)}
+  </button>`);
+
+add('B3','Watermark','The glyph blown up to 64px at 12% opacity, sitting behind the number as a field rather than a marker. Identity colour intact, but felt instead of read &mdash; the number gets the whole stage.',
+ ['needs a state cue'], m => `
+  <button class="cell" aria-label="${m.label}: ${m.value}">
+    <span style="position:relative;display:flex;align-items:center;justify-content:center;height:88px;width:100%">
+      <span style="position:absolute;opacity:.16">${icon(m.icon,66,m.accent,1.6)}</span>
+      <span class="num" style="font-size:2.5rem;position:relative">${m.value}</span>
+    </span>${label(m)}
+  </button>`);
+
+add('B4','Icon chip','The glyph gets a soft tinted chip of its own colour, stacked above the number. Reads as a badge rather than a dial, and gives each metric a bit of physical identity at a very small footprint.',
+ ['needs a state cue'], m => `
+  <button class="cell" aria-label="${m.label}: ${m.value}">
+    <span style="display:flex;flex-direction:column;align-items:center;gap:8px;padding:12px 0 4px">
+      <span style="display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:${m.accent}22;border:1px solid ${m.accent}44">
+        ${icon(m.icon,17,m.accent,2.3)}</span>
+      <span class="num" style="font-size:2rem">${m.value}</span>
+    </span>${label(m)}
+  </button>`);
+
+add('B5','Band word','No frame, no fill &mdash; the band label carries the state in words, which is the rule-compliant floor for a frameless design. Slightly taller than Bare, and the only variant a colour-blind user reads identically to everyone else.',
+ ['rule-compliant'], m => `
+  <button class="cell" aria-label="${m.label}: ${m.value}, ${m.band}">
+    <span style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:12px 0 2px">
+      ${icon(m.icon,20,m.accent,2.2)}
+      <span class="num" style="font-size:2.15rem">${m.value}</span>
+      <span style="font-size:10.5px;font-weight:700;letter-spacing:.09em;text-transform:uppercase;color:${bandColor(m.band)}">${m.band}</span>
+    </span>${label(m)}
+  </button>`);
+
+add('B6','Halo','Shipping today as an option, included for comparison: no stroke, a blurred radial glow in the identity colour. Handsome, but it encodes nothing &mdash; two metrics 40 points apart look identical.',
+ ['shipping now','needs a state cue'], m => `
+  <button class="cell" aria-label="${m.label}: ${m.value}">
+    <span style="position:relative;display:flex;align-items:center;justify-content:center;height:92px;width:100%">
+      <span style="position:absolute;inset:14% 22%;border-radius:99px;filter:blur(15px);opacity:.5;background:radial-gradient(circle,${m.accent} 0%,transparent 68%)"></span>
+      <span style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px">
+        ${icon(m.icon,20,m.accent,2.2)}<span class="num" style="font-size:2.15rem">${m.value}</span></span>
+    </span>${label(m)}
+  </button>`);
+
+/* ============ C · TILES =========================== */
+
+add('C1','Squircle','One UI\'s own shape language, borrowed. A rounded square holds a tint of the identity colour, the icon sits top-left, the number bottom-right. Bigger tap target than a circle at the same width.',
+ ['needs a state cue'], m => `
+  <button class="tile" style="background:linear-gradient(160deg,${m.accent}22,${m.accent}0a);border-color:${m.accent}33;border-radius:22px;aspect-ratio:1;justify-content:space-between" aria-label="${m.label}: ${m.value}">
+    ${icon(m.icon,19,m.accent,2.3)}
+    <span><span class="num" style="font-size:1.85rem">${m.value}</span>
+    <span style="display:block;font-size:10px;color:#9aa5b8;margin-top:3px">${m.label}</span></span>
+  </button>`);
+
+add('C2','Bar tile','A flat card with the value bar along the bottom edge. The bar is the only coloured-by-state element, so the tile stays quiet until something is actually wrong.',
+ ['encodes value'], m => `
+  <button class="tile" aria-label="${m.label}: ${m.value}">
+    <span class="tile-row">${icon(m.icon,17,m.accent,2.3)}<span class="num" style="font-size:1.5rem">${m.value}</span></span>
+    <span style="font-size:10px;color:#9aa5b8;letter-spacing:.02em">${m.label}</span>
+    <span class="bar"><i style="width:${m.fill}%;background:${m.accent}"></i></span>
+  </button>`);
+
+add('C3','Sparkline tile','The one design that adds information rather than rearranging it: seven days of context under the number. Answers "is 76 good <i>for me</i>" without a tap, which is the question the row currently can\'t answer.',
+ ['encodes value','adds data'], m => `
+  <button class="tile" aria-label="${m.label}: ${m.value}, 7 day trend">
+    <span class="tile-row">${icon(m.icon,17,m.accent,2.3)}<span class="num" style="font-size:1.5rem">${m.value}</span></span>
+    <span style="height:20px;margin-top:-1px">${spark(m.trend,m.accent,64,20)}</span>
+    <span style="font-size:10px;color:#9aa5b8">${m.label}</span>
+  </button>`);
+
+add('C4','Edge stripe','A 3px stripe of the identity colour down the left edge does all the identifying, so the tile itself can be completely neutral. Scales to a fifth or sixth metric without the row turning into a paint chart.',
+ ['needs a state cue'], m => `
+  <button class="tile" style="border-left:3px solid ${m.accent};border-radius:6px 14px 14px 6px;padding-left:10px" aria-label="${m.label}: ${m.value}">
+    ${icon(m.icon,16,m.accent,2.3)}
+    <span class="num" style="font-size:1.6rem">${m.value}</span>
+    <span style="font-size:10px;color:#9aa5b8">${m.label}</span>
+  </button>`);
+
+add('C5','Frosted','Translucent panel over the wallpaper with a hairline top highlight &mdash; the surface catches the dynamic background instead of covering it. Depends entirely on the wallpaper behind it, so it needs checking against a light theme.',
+ ['needs a state cue','check on device'], m => `
+  <button class="tile" style="background:rgba(255,255,255,.07);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border-top-color:rgba(255,255,255,.2);border-radius:18px;align-items:center;text-align:center" aria-label="${m.label}: ${m.value}">
+    ${icon(m.icon,18,m.accent,2.3)}
+    <span class="num" style="font-size:1.7rem">${m.value}</span>
+    <span style="font-size:10px;color:#9aa5b8">${m.label}</span>
+  </button>`);
+
+add('C6','Corner brackets','Four corner ticks instead of a closed frame &mdash; a viewfinder. Suggests the boundary without drawing it, which keeps four of them in a row from reading as a wall of boxes.',
+ ['needs a state cue'], m => {
+  const b = `<span style="position:absolute;width:10px;height:10px;border-color:${m.accent};border-style:solid"></span>`;
+  return `
+  <button class="cell" aria-label="${m.label}: ${m.value}">
+    <span style="position:relative;width:100%;max-width:84px;aspect-ratio:1;display:grid;place-items:center">
+      <span style="position:absolute;inset:0;top:0;left:0;width:12px;height:12px;border-top:2px solid ${m.accent};border-left:2px solid ${m.accent};border-radius:3px 0 0 0"></span>
+      <span style="position:absolute;top:0;right:0;width:12px;height:12px;border-top:2px solid ${m.accent};border-right:2px solid ${m.accent};border-radius:0 3px 0 0"></span>
+      <span style="position:absolute;bottom:0;left:0;width:12px;height:12px;border-bottom:2px solid ${m.accent};border-left:2px solid ${m.accent};border-radius:0 0 0 3px"></span>
+      <span style="position:absolute;bottom:0;right:0;width:12px;height:12px;border-bottom:2px solid ${m.accent};border-right:2px solid ${m.accent};border-radius:0 0 3px 0"></span>
+      <span style="display:flex;flex-direction:column;align-items:center;gap:3px">
+        ${icon(m.icon,18,m.accent,2.2)}<span class="num" style="font-size:1.9rem">${m.value}</span></span>
+    </span>${label(m)}
+  </button>`;
+});
+
+add('C7','Column','A vertical capsule filling from the bottom, with the icon riding on top of the fill. Four of them read as a bar chart &mdash; you compare the metrics against each other, not just against their own history.',
+ ['encodes value'], m => `
+  <button class="cell" aria-label="${m.label}: ${m.value}">
+    <span style="position:relative;width:100%;max-width:52px;height:96px;border-radius:26px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.09);overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:flex-end">
+      <span style="position:absolute;left:0;right:0;bottom:0;height:${m.fill}%;background:linear-gradient(180deg,${m.accent}55,${m.accent}22)"></span>
+      <span style="position:absolute;left:0;right:0;bottom:${m.fill}%;height:2px;background:${m.accent}"></span>
+      <span style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding-bottom:10px">
+        ${icon(m.icon,16,m.accent,2.3)}<span class="num" style="font-size:1.25rem">${m.value}</span></span>
+    </span>${label(m)}
+  </button>`);
+
+/* ============ D · COMPACT LAYOUTS =========================== */
+
+add('D1','Pill row','Icon and number side by side in a 44dp pill. The row collapses from 140dp to 48dp, which puts the recommendation card above the fold on first paint &mdash; the biggest single win available here.',
+ ['saves ~92dp'], m => `
+  <button class="tile" style="flex-direction:row;align-items:center;justify-content:center;gap:7px;padding:11px 6px;border-radius:14px;background:${m.accent}14;border-color:${m.accent}2e" aria-label="${m.label}: ${m.value}">
+    ${icon(m.icon,16,m.accent,2.4)}<span class="num" style="font-size:1.15rem">${m.value}</span>
+  </button>`);
+
+add('D2','Labelled pill','The pill with its name back, stacked two-up. Half the height of today\'s row, keeps every word, and the 2&times;2 grid gives each target ~190&times;60dp &mdash; comfortably past the 48dp floor.',
+ ['saves ~40dp'], m => `
+  <button class="tile" style="flex-direction:row;align-items:center;gap:10px;padding:11px 13px;border-radius:14px" aria-label="${m.label}: ${m.value}">
+    <span style="display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:${m.accent}1f;flex:none">${icon(m.icon,16,m.accent,2.3)}</span>
+    <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+      <span class="num" style="font-size:1.25rem">${m.value}</span>
+      <span style="font-size:10px;color:#9aa5b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.label}</span></span>
+  </button>`, 'grid2');
+
+add('D3','Ring grid','The dials survive, but two-up at a larger size with the value bar alongside. Half the width buys a bigger dial, a longer label and room for the band word &mdash; the most information-dense option in the set.',
+ ['encodes value','rule-compliant'], m => {
+  const S=100,c=S/2,r=42;
+  return `
+  <button class="tile" style="flex-direction:row;align-items:center;gap:11px;padding:10px 12px;border-radius:16px" aria-label="${m.label}: ${m.value}, ${m.band}">
+    <span style="position:relative;width:52px;height:52px;flex:none">
+      <svg viewBox="0 0 ${S} ${S}" style="position:absolute;inset:0;width:100%;height:100%">
+        <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${TRACK}" stroke-width="6"/>
+        <path d="${arc(c,r,0,m.fill/100*360)}" fill="none" stroke="${m.accent}" stroke-width="6" stroke-linecap="round"/></svg>
+      <span style="position:absolute;inset:0;display:grid;place-items:center">${icon(m.icon,17,m.accent,2.4)}</span>
+    </span>
+    <span style="display:flex;flex-direction:column;gap:1px;min-width:0">
+      <span class="num" style="font-size:1.4rem">${m.value}</span>
+      <span style="font-size:10px;color:#9aa5b8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${m.label}</span>
+      <span style="font-size:9.5px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${bandColor(m.band)}">${m.band}</span></span>
+  </button>`;
+}, 'grid2');
+
+add('D4','Rail','One full-width bar, four metrics divided by hairlines. Reads as a single instrument panel rather than four buttons &mdash; and the whole thing costs 62dp. Tap targets are ~95&times;62dp, above the floor but the tightest here.',
+ ['saves ~78dp'], null, 'custom');
+
+add('D5','Full-width bars','Each metric is a labelled bar across the whole width. The least "app-like" option and the most readable: length is directly comparable between rows, and nothing depends on colour to be understood.',
+ ['encodes value','rule-compliant'], m => `
+  <button class="tile" style="flex-direction:row;align-items:center;gap:11px;padding:9px 13px;border-radius:12px" aria-label="${m.label}: ${m.value}, ${m.band}">
+    ${icon(m.icon,17,m.accent,2.3)}
+    <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:5px">
+      <span style="display:flex;justify-content:space-between;align-items:baseline;gap:8px">
+        <span style="font-size:11.5px;color:#c3cbd9">${m.label}</span>
+        <span class="num" style="font-size:1.05rem">${m.value}<span style="font-size:9px;color:#6b7688;margin-left:3px;font-weight:600">${m.band}</span></span></span>
+      <span class="bar" style="height:3px"><i style="width:${m.fill}%;background:${m.accent}"></i></span></span>
+  </button>`, 'stack');
+
+/* ------------------------------------------------------------------ *
+ * Assembly
+ * ------------------------------------------------------------------ */
+function cell(m, svg, iconPx, numRem){
+  return `<button class="cell" aria-label="${m.label}: ${m.value}${m.band?', '+m.band:''}">
+    <span class="dial">${svg}
+      <span class="face">${icon(m.icon,iconPx,m.accent,2.2)}
+        <span class="num" style="font-size:${numRem}rem">${m.value}</span></span>
+    </span>${label(m)}
+  </button>`;
+}
+
+function railRow(){
+  return `<div style="display:flex;border-radius:16px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);overflow:hidden">
+  ${M.map((m,i)=>`
+    <button class="cell" style="gap:4px;padding:11px 2px;${i?'border-left:1px solid rgba(255,255,255,.08)':''}" aria-label="${m.label}: ${m.value}">
+      ${icon(m.icon,16,m.accent,2.4)}
+      <span class="num" style="font-size:1.3rem">${m.value}</span>
+      <span style="font-size:9.5px;color:#8b94a7;letter-spacing:.02em">${m.label}</span>
+    </button>`).join('')}</div>`;
+}
+
+const SECTIONS = [
+  {n:'A', title:'Filled dials', blurb:'The circle stays, but starts carrying the number. Same footprint as today.', ids:/^A/},
+  {n:'B', title:'Frameless', blurb:'Delete the ring entirely and see what the icon and number can hold on their own.', ids:/^B/},
+  {n:'C', title:'Tiles', blurb:'Trade the circle for a surface — which buys room for a second data point.', ids:/^C/},
+  {n:'D', title:'Compact layouts', blurb:'Rearranging the row to give the screen back to the thing you act on.', ids:/^D/}
+];
+
+const TAGCLASS = {'shipping now':'live','encodes value':'data','adds data':'data','rule-compliant':'data','needs a state cue':'risk','check on device':'risk'};
+
+function mockHTML(v){
+  const row = v.rowClass==='custom' ? railRow()
+    : `<div class="strip ${v.rowClass||''}">${M.map(v.render).join('')}</div>`;
+  return `<article class="mock">
+    <div class="mock-head"><span class="mock-id">${v.id}</span><span class="mock-name">${v.name}</span></div>
+    <div class="canvas"><div class="phone">${row}</div></div>
+    <p class="mock-note">${v.note}</p>
+    <div class="legend">${v.tags.map(t=>`<span class="tag ${TAGCLASS[t]||''}">${t}</span>`).join('')}</div>
+  </article>`;
+}
+
+document.getElementById('app').innerHTML = SECTIONS.map(s=>`
+  <section>
+    <div class="sec-head"><span class="sec-num">${s.n}</span><h2>${s.title}</h2><p>${s.blurb}</p></div>
+    <div class="gallery">${V.filter(v=>s.ids.test(v.id)).map(mockHTML).join('')}</div>
+  </section>`).join('');
+</script>

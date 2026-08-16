@@ -1,0 +1,95 @@
+name: Android
+
+# The Android job compiles the Kotlin plugin/service, runs the JVM protocol tests,
+# and builds a debug APK. The APK loads the UI remotely from Railway
+# (capacitor.config.ts server.url), so JS/server/docs changes never require an APK
+# rebuild — only native/Kotlin/Capacitor changes do. Path-gating this whole workflow
+# keeps ~6 billed minutes off the vast majority of runs, which are non-native.
+#
+# This is deliberately NOT a required status check, so path-filtering it is safe:
+# a filtered-out run leaves no "Expected" check hanging on branch protection (unlike
+# the required jobs in ci.yml, which must always run on every PR).
+#
+# `package.json` is deliberately NOT in the path list, even though dependency changes do
+# need a rebuild. Every release bumps its `version` field, so including it rebuilt and
+# republished the APK on literally every merge — six consecutive releases checked, all
+# version-only, none native. That made the published APK's version track the app version
+# exactly, which is what left the More -> update card permanently lit: it always had a
+# "newer" APK to point at, for changes the WebView had already received. Dependency changes
+# are covered by `pnpm-lock.yaml`, which pnpm always rewrites alongside package.json and
+# which a version bump never touches.
+on:
+  pull_request:
+    branches: [main]
+    paths: &native-paths
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android.yml'
+  # On push to main the build additionally publishes the rolling APK release, but
+  # only when native files actually changed — a JS-only merge does not need a new APK.
+  push:
+    branches: [main]
+    paths: *native-paths
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Android (Kotlin tests + debug APK)
+    runs-on: ubuntu-latest
+    # Needed by the "Publish APK" step below to create/replace the rolling release.
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      # Node 22, not 20: the Capacitor CLI 8.x (`npx cap sync`) requires >=22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+      # The android gradle project resolves Capacitor from node_modules.
+      - run: pnpm install --frozen-lockfile
+      # cap sync needs the webDir to exist; the APK loads the UI remotely
+      # (capacitor.config.ts server.url), so an empty dir is fine.
+      - run: mkdir -p www && npx cap sync android
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - name: Kotlin unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --no-daemon
+      - name: Assemble debug APK
+        working-directory: android
+        run: ./gradlew :app:assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-debug-apk
+          path: android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14
+
+      # On merge to main only (not PRs): publish the freshly-built APK to a single
+      # rolling "apk-latest" release so there's always one stable, non-expiring
+      # download — no need to log into the Actions run or rebuild locally. The
+      # workflow-artifact above stays for PR builds (which never touch releases).
+      # Stable URL: /releases/download/apk-latest/app-debug.apk
+      - name: Publish APK to the rolling "latest" release
+        if: github.event_name == 'push'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          # Recreate the rolling release so its single asset is always the newest
+          # build (gh can't overwrite an existing asset of the same name in place).
+          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
+          gh release create apk-latest \
+            android/app/build/outputs/apk/debug/app-debug.apk \
+            --title "Latest debug APK (v$VERSION)" \
+            --notes "Auto-built from \`main\` @ ${GITHUB_SHA::7} (v$VERSION). Debug build for sideloading on the S25 — download \`app-debug.apk\` below." \
+            --prerelease

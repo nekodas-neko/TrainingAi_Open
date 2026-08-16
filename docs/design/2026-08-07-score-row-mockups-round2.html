@@ -1,0 +1,521 @@
+<title>Score Row — Round 2</title>
+<style>
+/* Deliberately single-theme: this page depicts a dark app screen, so every surface
+   is painted explicitly and no theme stamps are honoured. */
+:root{
+  --ground:#080b12;
+  --ground-2:#0c111b;
+  --surface:#111827;
+  --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075);
+  --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8;
+  --ink-2:#9aa5b8;
+  --ink-3:#5f6a7d;
+  --chrome:#38bdf8;
+  --readiness:#60a5fa;
+  --hr:#f87171;
+  --sleep:#a78bfa;
+  --activity:#f97316;
+  --band-high:#22c55e;
+  --band-mod:#f59e0b;
+  --band-low:#ef4444;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--app);
+  line-height:1.55;
+  font-size:15px;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 96px}
+
+/* ---------- masthead ---------- */
+header.mast{
+  padding:56px 0 28px;
+  border-bottom:1px solid var(--hair);
+  margin-bottom:36px;
+}
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--chrome);
+  margin:0 0 14px;
+}
+h1{
+  margin:0 0 16px;
+  font-size:clamp(30px,5.2vw,50px);
+  line-height:1.02;
+  letter-spacing:-.035em;
+  font-weight:800;
+  text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:64ch;color:var(--ink-2);font-size:16px}
+
+.constraint{
+  margin:26px 0 0;
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+.constraint span{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+  padding:6px 11px;border-radius:999px;
+  border:1px solid var(--hair-2);color:var(--ink-2);
+  background:var(--surface);
+}
+.constraint span b{color:var(--ink);font-weight:600}
+
+/* ---------- section ---------- */
+section{margin:0 0 20px;scroll-margin-top:20px}
+.sec-head{
+  display:flex;align-items:baseline;gap:14px;
+  padding:38px 0 18px;
+  border-top:1px solid var(--hair);
+  margin-top:36px;
+}
+.sec-head:first-child{border-top:0;margin-top:0}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+
+/* ---------- gallery ---------- */
+.gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:18px;
+}
+.mock{
+  border:1px solid var(--hair);
+  border-radius:16px;
+  background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.mock-head{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 15px 11px;
+  border-bottom:1px solid var(--hair);
+}
+.mock-id{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  color:var(--ground);background:var(--chrome);
+  padding:2px 6px;border-radius:5px;font-weight:700;
+}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{
+  padding:0 15px 13px;margin:11px 0 0;
+  color:var(--ink-2);font-size:12.5px;line-height:1.5;
+}
+.mock-note b{color:var(--ink);font-weight:600}
+/* the phone-truthful canvas: 412dp wide with the app's mx-4 gutters */
+.canvas{
+  background:
+    radial-gradient(120% 80% at 18% 0%,rgba(59,90,160,.28),transparent 62%),
+    radial-gradient(90% 70% at 88% 12%,rgba(120,70,170,.16),transparent 60%),
+    #05070d;
+  padding:22px 0;
+  display:flex;justify-content:center;
+  border-bottom:1px solid var(--hair);
+}
+.phone{width:412px;padding:0 16px;transform-origin:top center}
+@media(max-width:420px){.phone{transform:scale(.82)}.canvas{padding:16px 0}}
+
+/* ---------- shared cell primitives (mirroring the real component) ---------- */
+.strip{display:flex;justify-content:space-between;gap:8px}
+.strip.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strip.stack{flex-direction:column;gap:8px}
+.cell{
+  flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.cell:focus-visible{outline:2px solid var(--chrome);outline-offset:3px;border-radius:12px}
+.dial{position:relative;width:100%;aspect-ratio:1;max-width:96px}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.num{font-weight:900;line-height:1;letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:#fff}
+.cap{font-size:11px;line-height:1;color:#9aa5b8}
+.ico{display:block}
+
+/* tiles */
+.tile{
+  flex:1;min-width:0;border-radius:16px;padding:11px 12px 12px;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+  display:flex;flex-direction:column;gap:7px;text-align:left;
+  color:inherit;font:inherit;cursor:pointer;
+}
+.tile-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+
+/* legend / meta */
+.legend{
+  display:flex;flex-wrap:wrap;gap:8px;padding:12px 15px;
+  border-top:1px solid var(--hair);
+}
+.tag{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+  padding:3px 8px;border-radius:6px;border:1px solid var(--hair-2);color:var(--ink-2);
+}
+.tag.live{border-color:rgba(56,189,248,.5);color:var(--chrome)}
+.tag.data{border-color:rgba(34,197,94,.45);color:#4ade80}
+.tag.risk{border-color:rgba(239,68,68,.45);color:#fca5a5}
+
+/* notes block */
+.callout{
+  border:1px solid var(--hair);border-left:3px solid var(--chrome);
+  background:var(--surface);border-radius:0 12px 12px 0;
+  padding:16px 18px;margin:22px 0 0;
+}
+.callout h3{margin:0 0 8px;font-size:14px;letter-spacing:-.01em}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+td b{font-weight:650}
+.tablewrap{overflow-x:auto}
+
+@media(prefers-reduced-motion:no-preference){
+  .cell,.tile{transition:transform .12s ease}
+  .cell:active,.tile:active{transform:scale(.95)}
+}
+
+/* round-2 additions */
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:6px}
+.pick{border:1px solid rgba(56,189,248,.3);background:rgba(56,189,248,.06);border-radius:12px;padding:11px 13px}
+.pick b{display:block;font-size:13.5px;margin-bottom:2px}
+.pick span{font-size:11.5px;color:var(--ink-2)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:20px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+</style>
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Home screen · score row · round two</p>
+  <h1>Twenty more, built from what you kept <em>— and what you threw out.</em></h1>
+  <p class="lede">Seven picks out of twenty-eight, and the pattern in them is sharper than the
+  picks themselves: <b>every hard-stroke instrument went in the bin.</b> All ten filled dials, the
+  gauge, the bezel, the segmented ring, the progress arc &mdash; gone. What survived was soft
+  light, tinted surface, and density. So none of the twenty below draws a ring, a stroke, or an
+  arc. They pull harder on the three things that did survive.</p>
+
+  <div class="read">
+    <div><h4>Light, not line</h4><p>Halo and Watermark both work by <i>glow and field</i> rather
+    than by edge. Family E takes that further: light that pools, casts, and drifts, with nothing
+    ever outlined.</p></div>
+    <div><h4>The icon is the graphic</h4><p>Watermark and Bare both said the glyph doesn't need a
+    container to hold the cell together. Family F makes the icon the composition instead of a
+    marker sitting above a number.</p></div>
+    <div><h4>Surface over frame</h4><p>Squircle and Frosted are both <i>materials</i> &mdash; tint
+    and glass. Family G explores what else that material can do: rim light, recess, gradient,
+    blob.</p></div>
+    <div><h4>Height is the real currency</h4><p>Picking both Pill and Rail says the row is too tall.
+    Family H goes further down: 44dp, and a version where all four share a single line.</p></div>
+  </div>
+</header>
+
+<div class="sec-head" style="border-top:0;margin-top:0;padding-top:26px">
+  <span class="sec-num">✓</span>
+  <h2>Your seven — now selectable in the app</h2>
+  <p>Settings &rarr; More &rarr; Home widgets &rarr; Score Card Style. Halo was already there; the other six are new.</p>
+</div>
+<div class="picks">
+  <div class="pick"><b>Bare</b><span>No frame at all. B1</span></div>
+  <div class="pick"><b>Watermark</b><span>Glyph blown up behind the number. B3</span></div>
+  <div class="pick"><b>Halo</b><span>Soft glow, no stroke. B6 — already shipped</span></div>
+  <div class="pick"><b>Squircle</b><span>Rounded tile, tinted. C1</span></div>
+  <div class="pick"><b>Frosted</b><span>Translucent glass panel. C5</span></div>
+  <div class="pick"><b>Pill row</b><span>Compact capsules, −88dp. D1</span></div>
+  <div class="pick"><b>Rail</b><span>One divided bar, −66dp. D4</span></div>
+</div>
+
+<div id="app"></div>
+
+<div class="callout">
+  <h3>What round two deliberately does not do</h3>
+  <p><b>No design here encodes the value.</b> Round one offered ten that did; you kept none of them,
+  so I've stopped proposing them rather than re-serving the same idea in new clothes. The
+  consequence is worth stating plainly once: in every design below, a Readiness of 91 and a
+  Readiness of 34 look identical apart from the digits. That's a legitimate choice &mdash; the
+  number <i>is</i> the information and the row is a launchpad, not a dashboard &mdash; but it means
+  the row can never be glanced at, only read.</p>
+  <p>If you ever want the middle ground, <b>G5 Split</b> and <b>H5 Two-tier</b> are the two here
+  with somewhere obvious to put a band word later without a redesign.</p>
+</div>
+
+</div>
+
+<script>
+const ICONS = {
+  zap:   ['M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'],
+  heart: ['M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5','M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27'],
+  moon:  ['M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401'],
+  flame: ['M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z']
+};
+
+/* accent2 = the neighbouring hue used only by the aurora variant, so the second blob is a shift
+   of the identity colour rather than an unrelated new colour entering the palette. */
+const M = [
+  {label:'Readiness',  value:76, accent:'#60a5fa', accent2:'#22d3ee', icon:'zap',   band:'High'},
+  {label:'Heart Rate', value:52, accent:'#f87171', accent2:'#fb923c', icon:'heart', band:'Steady'},
+  {label:'Sleep',      value:90, accent:'#a78bfa', accent2:'#818cf8', icon:'moon',  band:'High'},
+  {label:'Activity',   value:76, accent:'#f97316', accent2:'#facc15', icon:'flame', band:'High'}
+];
+
+function icon(name, px, color, sw, op){
+  return `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="${color}"
+    stroke-width="${sw||2.2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    style="display:block${op!=null?';opacity:'+op:''}">${ICONS[name].map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+}
+const cap = (m,s) => `<span class="cap"${s?` style="${s}"`:''}>${m.label}</span>`;
+const aria = m => `aria-label="${m.label}: ${m.value}"`;
+
+const V = [];
+const add = (id,name,note,tags,render,rowClass) => V.push({id,name,note,tags,render,rowClass});
+
+/* ================= E · LIGHT ================= */
+
+add('E1','Underglow','Halo, but the light pools <i>under</i> the group instead of surrounding it &mdash; as if the number were sitting on a lit surface. Grounds the row rather than making four things float, which is what the symmetric halo does when you see all four at once.',
+ ['soft'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:16px 0 12px;width:100%">
+      <span style="position:absolute;left:12%;right:12%;bottom:2px;height:26px;border-radius:50%;filter:blur(13px);opacity:.65;background:${m.accent}" aria-hidden></span>
+      <span style="position:relative">${icon(m.icon,20,m.accent)}</span>
+      <span class="num" style="font-size:2.15rem;position:relative">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('E2','Top light','A wide elliptical wash falling from above, shaped to the cell rather than to a circle. The icon sits in the brightest part of it, so the glyph looks lit instead of coloured &mdash; a small distinction that reads as depth.',
+ ['soft'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="position:relative;display:flex;flex-direction:column;align-items:center;gap:4px;padding:18px 0 10px;width:100%">
+      <span style="position:absolute;left:0;right:0;top:-14px;height:56px;border-radius:50%;filter:blur(17px);opacity:.5;background:radial-gradient(ellipse at 50% 30%,${m.accent},transparent 70%)" aria-hidden></span>
+      <span style="position:relative">${icon(m.icon,20,m.accent)}</span>
+      <span class="num" style="font-size:2.1rem;position:relative">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('E3','Aurora','Two blurred fields drifting behind each cell &mdash; the identity colour plus its nearest neighbour on the wheel. The four cells stop being four separate glows and start reading as one band of light across the top of the screen.',
+ ['soft','check on device'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px;padding:16px 0 10px;width:100%">
+      <span style="position:absolute;left:-6%;top:6%;width:70%;height:64%;border-radius:50%;filter:blur(18px);opacity:.5;background:${m.accent}" aria-hidden></span>
+      <span style="position:absolute;right:-6%;bottom:2%;width:62%;height:58%;border-radius:50%;filter:blur(18px);opacity:.42;background:${m.accent2}" aria-hidden></span>
+      <span style="position:relative">${icon(m.icon,20,m.accent)}</span>
+      <span class="num" style="font-size:2.1rem;position:relative">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('E4','Cast shadow','Everything crisp, with a single large soft shadow in the identity colour thrown down and right. No blur on the content itself, so the digits stay razor sharp while the cell still reads as lit &mdash; the cleanest of the light family.',
+ ['soft'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:16px 0 10px;filter:drop-shadow(0 6px 14px ${m.accent}66)">
+      ${icon(m.icon,20,m.accent)}
+      <span class="num" style="font-size:2.15rem">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('E5','Orb','A filled disc of the identity colour at very low opacity with no edge whatsoever &mdash; it fades out rather than stopping. Keeps the circular footprint you had for a year without any of the ring hardware.',
+ ['soft'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;max-width:96px;aspect-ratio:1">
+      <span style="position:absolute;inset:4%;border-radius:99px;background:radial-gradient(circle at 50% 38%,${m.accent}59,${m.accent}14 58%,transparent 74%)" aria-hidden></span>
+      <span style="position:relative;display:flex;flex-direction:column;align-items:center;gap:3px">
+        ${icon(m.icon,20,m.accent)}<span class="num" style="font-size:2.05rem">${m.value}</span></span>
+    </span>${cap(m)}
+  </button>`);
+
+/* ================= F · ICON AS FIELD ================= */
+
+add('F1','Bleed','The watermark pushed until it no longer fits &mdash; the glyph is cropped by the cell on every side. Reads as texture rather than as an icon, and at four across it gives the row a graphic rhythm the contained version doesn\'t have.',
+ ['bold'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:96px;overflow:hidden">
+      <span style="position:absolute;inset:0;display:grid;place-items:center" aria-hidden>${icon(m.icon,124,m.accent,1.4,.2)}</span>
+      <span class="num" style="font-size:2.5rem;position:relative">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('F2','Duotone','Two copies of the glyph &mdash; a large faint one behind and a small solid one offset over it. Gives the icon dimension without any lighting effects, so it survives the Samsung compositor with no blur or filter anywhere.',
+ ['bold','safe on device'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="position:relative;display:flex;flex-direction:column;align-items:center;gap:2px;padding:12px 0 8px;width:100%">
+      <span style="position:absolute;left:50%;top:2px;transform:translateX(-58%)" aria-hidden>${icon(m.icon,54,m.accent,1.5,.22)}</span>
+      <span style="position:relative;transform:translateX(9px)">${icon(m.icon,17,m.accent,2.4)}</span>
+      <span class="num" style="font-size:2.05rem;position:relative;margin-top:6px">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('F3','Inline','Icon and number share one baseline instead of stacking. Kills a whole line of height, and the glyph starts working like a unit marker &mdash; "76 readiness" reads as one phrase rather than a symbol above a figure.',
+ ['compact'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="display:flex;align-items:center;justify-content:center;gap:6px;padding:14px 0 8px">
+      ${icon(m.icon,19,m.accent,2.4)}
+      <span class="num" style="font-size:2rem">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('F4','Overlap','The glyph sits on the corner of the numerals at full strength and full colour, breaking the digits\' bounding box. The most deliberately imperfect layout here &mdash; and the only one where the icon reads as part of the number rather than a label for it.',
+ ['bold'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="position:relative;display:flex;align-items:center;justify-content:center;width:100%;height:90px">
+      <span class="num" style="font-size:2.6rem">${m.value}</span>
+      <span style="position:absolute;left:50%;top:14px;transform:translateX(-160%)">${icon(m.icon,26,m.accent,2.5)}</span>
+    </span>${cap(m)}
+  </button>`);
+
+add('F5','Ghost number','Hierarchy inverted: the icon goes to full weight and the number drops to a hairline outline. Loses instant legibility of the figure &mdash; include it to see how far the icon can carry the cell before the number stops being the point.',
+ ['bold','legibility risk'], m => `
+  <button class="cell" ${aria(m)}>
+    <span style="display:flex;flex-direction:column;align-items:center;gap:4px;padding:14px 0 8px">
+      ${icon(m.icon,26,m.accent,2.6)}
+      <span class="num" style="font-size:2.1rem;color:transparent;-webkit-text-stroke:1.4px rgba(255,255,255,.72);text-stroke:1.4px rgba(255,255,255,.72)">${m.value}</span>
+    </span>${cap(m)}
+  </button>`);
+
+/* ================= G · SURFACES ================= */
+
+add('G1','Gradient tile','Squircle with the border deleted and the tint pushed into a real top-to-bottom gradient. Without an outline the tiles stop looking like buttons and start looking like painted areas &mdash; softer at four across.',
+ ['surface'], m => `
+  <button class="tile" style="border:0;border-radius:20px;min-height:96px;justify-content:space-between;background:linear-gradient(180deg,${m.accent}3d,${m.accent}0f 70%,transparent)" ${aria(m)}>
+    ${icon(m.icon,19,m.accent,2.3)}
+    <span><span class="num" style="font-size:1.8rem">${m.value}</span>
+    ${cap(m,'display:block;font-size:10px;margin-top:3px')}</span>
+  </button>`);
+
+add('G2','Rim light','Glass with a physical edge: a bright hairline along the top, nothing along the bottom. One line of CSS that makes a flat panel look like it has thickness &mdash; the trick every OS uses and this app currently doesn\'t.',
+ ['surface'], m => `
+  <button class="tile" style="border:0;border-radius:20px;min-height:96px;justify-content:space-between;background:linear-gradient(180deg,rgba(255,255,255,.11),rgba(255,255,255,.03));box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 1px 2px rgba(0,0,0,.5)" ${aria(m)}>
+    ${icon(m.icon,19,m.accent,2.3)}
+    <span><span class="num" style="font-size:1.8rem">${m.value}</span>
+    ${cap(m,'display:block;font-size:10px;margin-top:3px')}</span>
+  </button>`);
+
+add('G3','Blob','A neutral glass tile with one blurred puddle of the identity colour bleeding out of a corner. The colour is present without tinting the whole surface, so the four tiles stay a matched set instead of four different-coloured cards.',
+ ['surface','check on device'], m => `
+  <button class="tile" style="position:relative;overflow:hidden;border-radius:20px;min-height:96px;justify-content:space-between;background:rgba(255,255,255,.055);border-color:rgba(255,255,255,.1)" ${aria(m)}>
+    <span style="position:absolute;right:-26%;top:-30%;width:80%;height:80%;border-radius:50%;filter:blur(20px);opacity:.6;background:${m.accent}" aria-hidden></span>
+    <span style="position:relative">${icon(m.icon,19,m.accent,2.3)}</span>
+    <span style="position:relative"><span class="num" style="font-size:1.8rem">${m.value}</span>
+    ${cap(m,'display:block;font-size:10px;margin-top:3px')}</span>
+  </button>`);
+
+add('G4','Inset','The tile pressed into the page rather than raised off it &mdash; dark fill, inner shadow, and the icon the only lit thing in the recess. Reverses the usual figure/ground and makes the wallpaper feel like the surface the UI is cut into.',
+ ['surface'], m => `
+  <button class="tile" style="border:0;border-radius:20px;min-height:96px;justify-content:space-between;background:rgba(0,0,0,.42);box-shadow:inset 0 2px 6px rgba(0,0,0,.75),inset 0 -1px 0 rgba(255,255,255,.07)" ${aria(m)}>
+    <span style="filter:drop-shadow(0 0 7px ${m.accent}b3)">${icon(m.icon,19,m.accent,2.3)}</span>
+    <span><span class="num" style="font-size:1.8rem">${m.value}</span>
+    ${cap(m,'display:block;font-size:10px;margin-top:3px')}</span>
+  </button>`);
+
+add('G5','Split','The tile divided: a solid block of identity colour holds the icon, a neutral field holds the number. Two zones means there is somewhere obvious to add a band word later without redesigning anything.',
+ ['surface','extensible'], m => `
+  <button class="tile" style="padding:0;overflow:hidden;border-radius:18px;min-height:96px;gap:0;background:rgba(255,255,255,.045);border-color:rgba(255,255,255,.09)" ${aria(m)}>
+    <span style="display:grid;place-items:center;padding:9px 0;background:${m.accent}30;border-bottom:1px solid ${m.accent}40">${icon(m.icon,18,m.accent,2.4)}</span>
+    <span style="display:flex;flex-direction:column;gap:2px;padding:9px 10px 10px">
+      <span class="num" style="font-size:1.65rem">${m.value}</span>
+      ${cap(m,'font-size:9.5px')}</span>
+  </button>`);
+
+/* ================= H · COMPACT ================= */
+
+add('H1','Frosted rail','Your two compact picks combined: the rail\'s single bar, built from frosted glass, with each cell carrying a bar of its own colour along the bottom edge. The colours identify without four separate tinted backgrounds fighting each other.',
+ ['compact'], null, 'custom-frostedrail');
+
+add('H2','Floating pills','The pill row with borders and fills removed and replaced with a soft glow underneath each capsule. The four read as lit objects on the wallpaper rather than four buttons in a strip.',
+ ['compact','soft'], m => `
+  <button class="tile" style="position:relative;border:0;background:transparent;flex-direction:row;align-items:center;justify-content:center;gap:7px;padding:13px 4px;min-height:50px" ${aria(m)}>
+    <span style="position:absolute;left:14%;right:14%;bottom:6px;height:16px;border-radius:50%;filter:blur(11px);opacity:.75;background:${m.accent}" aria-hidden></span>
+    <span style="position:relative">${icon(m.icon,17,m.accent,2.4)}</span>
+    <span class="num" style="font-size:1.2rem;position:relative">${m.value}</span>
+  </button>`);
+
+add('H3','One line','The shortest possible version: all four on a single 44dp line, hairline-divided, no container. Buys back ~96dp &mdash; the whole recommendation card moves above the fold. Tap targets land at 95&times;44dp, which is under the 48dp floor and would need the row padded to 48 before it ships.',
+ ['compact','under 48dp'], null, 'custom-oneline');
+
+add('H4','Watermark rail','Rail cells that each carry their own glyph as a full-bleed watermark behind the number. Keeps the identity colour readable at rail density, where a 16px icon is nearly invisible against the wallpaper.',
+ ['compact'], null, 'custom-wmrail');
+
+add('H5','Two-tier','One glass bar with the numbers on the top line and the labels on a dimmer line beneath, aligned as columns rather than four separate stacks. Reads as a table, which is exactly what four unrelated numbers are.',
+ ['compact','extensible'], null, 'custom-twotier');
+
+/* ---------------- custom full-row layouts ---------------- */
+const ROWS = {
+  'custom-frostedrail': () => `
+    <div style="display:flex;border-radius:18px;overflow:hidden;background:rgba(255,255,255,.07);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:inset 0 1px 0 rgba(255,255,255,.22)">
+      ${M.map((m,i)=>`<button class="cell" style="position:relative;gap:3px;padding:11px 2px 13px;${i?'border-left:1px solid rgba(255,255,255,.09)':''}" ${aria(m)}>
+        ${icon(m.icon,16,m.accent,2.4)}
+        <span class="num" style="font-size:1.3rem">${m.value}</span>
+        ${cap(m,'font-size:9.5px')}
+        <span style="position:absolute;left:22%;right:22%;bottom:0;height:2px;border-radius:2px;background:${m.accent}" aria-hidden></span>
+      </button>`).join('')}
+    </div>`,
+
+  'custom-oneline': () => `
+    <div style="display:flex;align-items:stretch;height:44px">
+      ${M.map((m,i)=>`<button class="cell" style="flex-direction:row;align-items:center;justify-content:center;gap:6px;${i?'border-left:1px solid rgba(255,255,255,.1)':''}" ${aria(m)}>
+        ${icon(m.icon,16,m.accent,2.4)}
+        <span class="num" style="font-size:1.2rem">${m.value}</span>
+      </button>`).join('')}
+    </div>`,
+
+  'custom-wmrail': () => `
+    <div style="display:flex;border-radius:18px;overflow:hidden;background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.09)">
+      ${M.map((m,i)=>`<button class="cell" style="position:relative;overflow:hidden;gap:2px;padding:12px 2px;${i?'border-left:1px solid rgba(255,255,255,.08)':''}" ${aria(m)}>
+        <span style="position:absolute;inset:0;display:grid;place-items:center" aria-hidden>${icon(m.icon,62,m.accent,1.5,.2)}</span>
+        <span class="num" style="font-size:1.4rem;position:relative">${m.value}</span>
+        ${cap(m,'font-size:9.5px;position:relative')}
+      </button>`).join('')}
+    </div>`,
+
+  'custom-twotier': () => `
+    <div style="border-radius:18px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.16);padding:10px 4px 8px">
+      <div style="display:flex">
+        ${M.map(m=>`<button class="cell" style="flex-direction:row;align-items:center;justify-content:center;gap:6px;padding-bottom:6px" ${aria(m)}>
+          ${icon(m.icon,16,m.accent,2.4)}<span class="num" style="font-size:1.35rem">${m.value}</span></button>`).join('')}
+      </div>
+      <div style="display:flex;border-top:1px solid rgba(255,255,255,.08);padding-top:6px">
+        ${M.map(m=>`<span style="flex:1;min-width:0;text-align:center;font-size:9.5px;color:#7d879a;letter-spacing:.02em">${m.label}</span>`).join('')}
+      </div>
+    </div>`
+};
+
+/* ---------------- assembly ---------------- */
+const SECTIONS = [
+  {n:'E', title:'Light', blurb:'From Halo. Glow that pools, casts and drifts — no edges anywhere.', ids:/^E/},
+  {n:'F', title:'Icon as field', blurb:'From Watermark and Bare. The glyph becomes the composition.', ids:/^F/},
+  {n:'G', title:'Surfaces', blurb:'From Squircle and Frosted. What else the material can do.', ids:/^G/},
+  {n:'H', title:'Compact', blurb:'From Pill and Rail. Down to 44dp, and one that shares a single line.', ids:/^H/}
+];
+const TAGCLASS = {'soft':'live','surface':'live','compact':'data','extensible':'data','safe on device':'data','bold':'live','check on device':'risk','legibility risk':'risk','under 48dp':'risk'};
+
+function mockHTML(v){
+  const row = v.rowClass && ROWS[v.rowClass] ? ROWS[v.rowClass]()
+    : `<div class="strip ${v.rowClass||''}">${M.map(v.render).join('')}</div>`;
+  return `<article class="mock">
+    <div class="mock-head"><span class="mock-id">${v.id}</span><span class="mock-name">${v.name}</span></div>
+    <div class="canvas"><div class="phone">${row}</div></div>
+    <p class="mock-note">${v.note}</p>
+    <div class="legend">${v.tags.map(t=>`<span class="tag ${TAGCLASS[t]||''}">${t}</span>`).join('')}</div>
+  </article>`;
+}
+
+document.getElementById('app').innerHTML = SECTIONS.map(s=>`
+  <section>
+    <div class="sec-head"><span class="sec-num">${s.n}</span><h2>${s.title}</h2><p>${s.blurb}</p></div>
+    <div class="gallery">${V.filter(v=>s.ids.test(v.id)).map(mockHTML).join('')}</div>
+  </section>`).join('');
+
+</script>

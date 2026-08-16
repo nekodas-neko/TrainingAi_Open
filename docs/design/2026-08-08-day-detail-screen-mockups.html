@@ -1,0 +1,482 @@
+<title>Day Detail Screen — Q-110 Mockups</title>
+<style>
+:root{
+  --ground:#080b12; --surface:#111827; --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075); --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8; --ink-2:#9aa5b8; --ink-3:#5f6a7d; --chrome:#38bdf8;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--app);line-height:1.55;font-size:15px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px 90px}
+header.mast{padding:52px 0 26px;border-bottom:1px solid var(--hair);margin-bottom:6px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--chrome);margin:0 0 13px}
+h1{margin:0 0 15px;font-size:clamp(28px,4.6vw,44px);line-height:1.03;letter-spacing:-.035em;font-weight:800;text-wrap:balance}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:66ch;color:var(--ink-2);font-size:16px}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:22px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.sec-head{display:flex;align-items:baseline;gap:14px;padding:38px 0 18px;border-top:1px solid var(--hair);margin-top:30px}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(370px,1fr));gap:18px}
+.mock{border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--surface-2),var(--surface));overflow:hidden;display:flex;flex-direction:column}
+.mock-head{display:flex;align-items:center;gap:9px;padding:13px 15px 11px;border-bottom:1px solid var(--hair)}
+.mock-id{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--ground);background:var(--chrome);padding:2px 6px;border-radius:5px;font-weight:700}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{padding:14px 15px 16px;margin:0;color:var(--ink-2);font-size:12.5px;line-height:1.55}
+.mock-note b{color:var(--ink);font-weight:600}
+.mock-note code{font-family:var(--mono);font-size:11.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:4px}
+.canvas{display:flex;justify-content:center;padding:20px 0;background:#05070d;border-bottom:1px solid var(--hair)}
+
+/* ---------- the phone: true S25 dp ---------- */
+.phone{
+  width:412px;height:891px;flex:none;display:flex;flex-direction:column;overflow:hidden;
+  background:linear-gradient(180deg,#0e1520 0%,#0b1119 34%,#080b12 100%);
+  border-radius:22px;font-size:16px;transform-origin:top center;
+}
+@media(max-width:1000px){.phone{transform:scale(.84)}}
+.status{flex:none;height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 15px;font-size:11px;color:#e8ecf3;font-weight:600}
+.hdr{flex:none;display:flex;align-items:center;gap:6px;padding:8px 12px 14px}
+.navbtn{background:none;border:0;padding:6px;display:grid;place-items:center;cursor:pointer}
+.scroll{flex:1;min-height:0;overflow:hidden;padding:0 16px}
+.pinned{flex:none;background:rgba(255,255,255,.03)}
+.sec{padding:16px 0 2px}
+.card{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:14px;padding:13px}
+.statrow{display:flex;justify-content:space-between;text-align:center}
+.statrow>span{flex:1}
+.nav{flex:none;background:#000;padding:9px 0 22px;display:flex;justify-content:space-around;align-items:center}
+.nav span{font-size:9.5px;color:#6b7280}
+.nav .cur{color:#22d3ee;font-weight:700}
+
+/* A1 timeline */
+.tl{padding-top:2px}
+.tlrow{display:grid;grid-template-columns:52px 16px 1fr;gap:0;padding-bottom:18px}
+.tltime{font-size:9.5px;color:#6b7688;padding-top:3px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.tlmark{position:relative;display:flex;justify-content:center}
+.tlmark span{width:7px;height:7px;border-radius:9px;margin-top:4px;z-index:1}
+.tlmark::before{content:"";position:absolute;top:10px;bottom:-18px;width:1px;background:rgba(255,255,255,.11)}
+.tlrow:last-child .tlmark::before{display:none}
+.tlbody{padding-left:10px;min-width:0}
+
+/* A4 index rows */
+.row{border-bottom:1px solid rgba(255,255,255,.08);padding:13px 0}
+.rowhead{display:flex;align-items:center;gap:9px;min-width:0}
+
+/* A5 tabs */
+.tabs{display:flex;background:rgba(255,255,255,.06);border-radius:11px;padding:3px}
+.tabs span{flex:1;text-align:center;font-size:12px;font-weight:600;color:#9aa5b8;padding:7px 0;border-radius:9px}
+.tabs span.on{background:rgba(255,255,255,.13);color:#fff}
+
+/* B1 key/value grid */
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.kv div{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.055)}
+.kv span{font-size:11px;color:#8b94a7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv b{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;flex:none}
+.kv b i{font-style:normal;font-size:9px;font-weight:600;color:#6b7688;margin-left:2px}
+
+/* B2 tiles */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:12px;padding:11px 8px;display:flex;flex-direction:column;align-items:center}
+
+/* B3 legend */
+.legend{display:flex;gap:12px;margin-top:11px}
+.legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#8b94a7}
+.legend i{width:8px;height:8px;border-radius:2px;display:block}
+
+/* B4 week strip */
+.weekstrip{display:flex;gap:4px;padding:0 16px}
+.wd{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0 7px;border-radius:11px}
+.wd.on{background:rgba(255,255,255,.1)}
+.wdl{font-size:8.5px;color:#6b7688;letter-spacing:.1em}
+.wdn{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.wdd{display:flex;gap:2.5px;height:4px}
+.wdd i{width:4px;height:4px;border-radius:9px;display:block}
+
+.callout{border:1px solid var(--hair);border-left:3px solid var(--chrome);background:var(--surface);border-radius:0 12px 12px 0;padding:16px 18px;margin:26px 0 0}
+.callout h3{margin:0 0 8px;font-size:14px}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+</style>
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Health · Training calendar · day detail — backlog Q-110</p>
+  <h1>Six data domains, one day, one screen <em>— the layout is the whole problem.</em></h1>
+  <p class="lede">The backlog item already exists and is well specified. What it deliberately
+  leaves open is the thing you actually asked for: <b>what this screen looks like.</b> It says, in
+  its own words, "don't default to a flat scroll of stat tiles (the current sheet's weakness) — with
+  this much data per day, the layout itself is a real design problem." So these mockups are about
+  structure, not decoration: exercise, HR, sleep, twelve body-composition fields, four scores and
+  logged activities all belong to one day, and the decision is what leads, what groups, and what
+  stays folded.</p>
+
+  <div class="read">
+    <div><h4>It becomes a screen, not a sheet</h4><p>Q-110's second round supersedes the first: a
+    real route you swipe left/right between days on, "kinda like the food logging" — not more
+    sections crammed into the bottom sheet.</p></div>
+    <div><h4>The swipe is already written</h4><p><code>nutrition-content.tsx</code> has the exact
+    pattern — <code>useDrag</code>, <code>shiftDateStr</code>, <code>AnimatePresence</code> keyed on
+    the date. The plan mandates copying it rather than hand-rolling a third swipe.</p></div>
+    <div><h4>Five fields are already wasted</h4><p><code>DayBodyMeta</code> fetches
+    <code>bodyFat</code>, <code>protein</code>, <code>carb</code>, <code>fat</code> and
+    <code>distanceKm</code> today and renders none of them. That part is free.</p></div>
+    <div><h4>Scores have a trap</h4><p>They must come through <code>buildDayAudit</code>, never a
+    direct <code>oura_daily</code> read — those Cloud columns are frozen since the 2026-07-07 BLE
+    re-key and would silently show wrong history.</p></div>
+  </div>
+</header>
+
+<div class="callout">
+  <h3>One correction to the backlog before anyone builds this</h3>
+  <p>Q-93-followup says the workout timeline card "needs a new historical per-session HR-chart +
+  exercise-detail screen (doesn't exist yet at all)" and that "the only HR chart component renders
+  live, in-progress data only". <b>That is now out of date.</b>
+  <code>day-overlay-sheet.tsx:186-190</code> already renders an <code>HrRecoveryChart</code> per
+  session, for an arbitrary historical date, with per-exercise markers — it is visible in the second
+  screenshot. The capability exists; what's missing is a screen to host it properly.</p>
+  <p>That makes the cross-reference stronger, not weaker: Q-110's screen is Q-93's missing
+  destination, and the HR chart is already built and working inside the thing being replaced. Worth
+  fixing that line in the backlog in whichever PR picks this up.</p>
+</div>
+
+<div id="app"></div>
+
+<div class="callout">
+  <h3>Where I'd go</h3>
+  <p><b>A1 Chronological, with B4's week strip on top.</b> It is the only layout that answers "what
+  did I do on Friday" instead of "what data exists for Friday", and a day genuinely is a sequence —
+  you slept, then trained, then walked, then weighed in. It also degrades best: a day with only a
+  weigh-in is one row, not five empty section headers. The week strip earns its place separately by
+  making the swipe discoverable — a bare date gives no hint the screen moves sideways.</p>
+  <p><b>A3 Pinned summary</b> is the one to take seriously if you disagree. Its argument is real:
+  in every scrolling layout, once you are down in the exercise list you have lost all sense of what
+  kind of day this was.</p>
+  <p><b>A5 Tabbed I would not build</b>, despite the density being tempting. Horizontal swipe
+  changes the day, and tabs invite horizontal swipe — two gestures competing on one axis. This app
+  has already lost a session to exactly that class of bug twice with pull-to-sync.</p>
+</div>
+
+<div class="callout">
+  <h3>Two things worth deciding before implementation, not during</h3>
+  <p><b>1. Does the full HR chart come with?</b> The plan recommends starting with summary stats
+  (resting HR / HRV / SpO₂) and adding a full-day chart later. But the per-session HR chart already
+  exists and is the most interesting thing on the current sheet — A1 and A2 both keep it. A separate
+  question is the full 24-hour trace from <code>/api/oura/hr-day</code>, which no mockup here
+  includes; it is a third chart on an already-dense screen.</p>
+  <p><b>2. What happens on an empty day?</b> Every mockup shows a rich Friday. Most days will have a
+  weigh-in and steps and nothing else. A1 handles that best by construction; the sectioned layouts
+  need an explicit empty state per section or the screen becomes five headers over nothing.</p>
+</div>
+
+</div>
+
+<script>
+/* Real values from the owner's screenshots + the app's own palettes. */
+const A = { ready:'#60a5fa', hr:'#f87171', sleep:'#a78bfa', act:'#f97316', cy:'#22d3ee', gr:'#22c55e', am:'#f59e0b' };
+const STAGE = { deep:'#1e3a70', light:'#3f7dc9', rem:'#7ec3ea', awake:'#e9d9c8' };
+const MU = '#8b94a7', DIM = '#6b7688';
+
+const P = {
+  chev:'m9 18 6-6-6-6', chevL:'m15 18-6-6 6-6', chevD:'m6 9 6 6 6-6', chevU:'m18 15-6-6-6 6',
+  zap:'M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z',
+  heart:'M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5|M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27',
+  moon:'M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401',
+  flame:'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z',
+  dumb:'m6.5 6.5 11 11|m21 21-1-1|m3 3 1 1|m18 22 4-4|m2 6 4-4|m3 10 7-7|m14 21 7-7',
+  foot:'M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z|M20 20v-2.38c0-1.12 1.03-2.12 1-4.62-.03-2.72-1.49-6-4.5-6C14.63 7 14 8.8 14 10.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z',
+  scale:'M12 3v18|M5 8h14l2 10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+};
+const ic = (k,px,c,sw)=>`<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="${c}"
+  stroke-width="${sw||2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+  style="display:block;flex:none">${P[k].split('|').map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+
+const N = (s,w,ls)=>`font-variant-numeric:tabular-nums;line-height:1;color:#fff;font-size:${s};font-weight:${w||800};letter-spacing:${ls||'-.04em'}`;
+const CAPS = `font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:${DIM};line-height:1`;
+
+/* ---------- shared fragments ---------- */
+
+const SCORES = [['zap','Ready',76,A.ready],['heart','HR',52,A.hr],['moon','Sleep',90,A.sleep],['flame','Move',76,A.act]];
+
+/* Divider style — the treatment the owner picked for the home row, reused here for consistency. */
+const scoreRow = () => `<div style="display:flex">
+  ${SCORES.map(([k,l,v,c],i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:2px 0;${i?'border-left:1px solid rgba(255,255,255,.1)':''}">
+    ${ic(k,15,c,2.3)}<span style="${N('1.6rem',800)}">${v}</span><span style="${CAPS}">${l}</span></div>`).join('')}
+</div>`;
+
+const hypno = (h) => {
+  // 5-min stages across ~7.5h — deliberately irregular so it reads as data, not decoration.
+  const seq = 'AWLLDDDLLRRLLDDLLLRRRLLDLLRRLLLAWLLRRRLLLA';
+  const map = {A:'awake',W:'awake',L:'light',D:'deep',R:'rem'};
+  const lane = { awake:0, rem:1, light:2, deep:3 };
+  const w = 100/seq.length;
+  return `<svg viewBox="0 0 100 ${h}" width="100%" height="${h}" preserveAspectRatio="none" aria-hidden="true" style="display:block">
+    ${seq.split('').map((ch,i)=>{ const st=map[ch]; const laneH=h/4;
+      return `<rect x="${(i*w).toFixed(2)}" y="${(lane[st]*laneH+laneH*0.18).toFixed(1)}" width="${(w*1.04).toFixed(2)}" height="${(laneH*0.64).toFixed(1)}" fill="${STAGE[st]}" rx="0.6"/>`;}).join('')}
+  </svg>`;
+};
+
+const hrTrace = (h, color) => {
+  const pts=[68,66,70,69,72,70,64,62,74,86,88,84,80,79,79,78,76,74,74,88,90,85,92,86,84,88,82,80,78,76];
+  const mn=58,mx=96;
+  const d=pts.map((p,i)=>`${(i/(pts.length-1)*100).toFixed(1)},${(h-((p-mn)/(mx-mn))*h).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 100 ${h}" width="100%" height="${h}" preserveAspectRatio="none" aria-hidden="true" style="display:block">
+    <polyline points="${d}" fill="none" stroke="${color}" stroke-width="1.4" vector-effect="non-scaling-stroke" stroke-linejoin="round"/>
+  </svg>`;
+};
+
+const EXERCISES = [
+  ['Incline Bench Press','2 × 10 × 42.5kg'], ['Cable Pulldown','2 × 8 × 18.75kg'],
+  ['Barbell Overhead Press','2 × 9 × 30kg'], ['Barbell Skull Crusher','2 × 10 × 25kg'],
+  ['Cable Preacher Curl','2 × 10 × 10kg'],
+];
+const BODY = [
+  ['Weight','70.7','kg'],['Body fat','18.4','%'],['Skeletal muscle','43.1','%'],['Muscle mass','54.2','kg'],
+  ['Body water','56.8','%'],['Visceral fat','6',''],['Bone mass','3.1','kg'],['Protein','19.2','%'],
+  ['BMR','1,742','kcal'],['Metabolic age','27','yr'],['Subcut. fat','14.9','%'],['Fat-free mass','57.7','kg'],
+];
+
+/* ---------- the phone shell ---------- */
+function phone(id, inner, opts){
+  const o = opts||{};
+  return `<div class="phone" id="${id}">
+    <div class="status"><span>10:13</span><span>84</span></div>
+    ${inner}
+    <div class="nav">
+      <span>Home</span><span class="cur">Health</span><span>Workout</span><span>Nutrition</span><span>More</span>
+    </div>
+  </div>`;
+}
+/* Standard day header: chevrons + date, the nutrition-screen pattern the plan mandates. */
+const header = (sub) => `<div class="hdr">
+  <button class="navbtn">${ic('chevL',18,'#c3cbd9',2.4)}</button>
+  <div style="flex:1;text-align:center">
+    <div style="font-size:17px;font-weight:800;letter-spacing:-.02em">Friday 7 August</div>
+    ${sub?`<div style="font-size:11px;color:${MU};margin-top:2px">${sub}</div>`:''}
+  </div>
+  <button class="navbtn">${ic('chev',18,'#c3cbd9',2.4)}</button>
+</div>`;
+
+const secLabel = t => `<div style="${CAPS};padding:0 0 8px">${t}</div>`;
+
+const V = [];
+const add = (id,name,note,build) => V.push({id,name,note,build});
+
+/* ==================== A · SCREEN STRUCTURE ==================== */
+
+add('A1','Chronological','<b>The day in the order it happened.</b> Sleep opens it because it did; the workout, the walk and the weigh-in follow on their timestamps. No section headers at all — the times are the structure. This is the only layout where the screen answers "what did I do on Friday" rather than "what data exists for Friday".',
+ () => phone('a1', `${header('Trained · Walked · Slept 7h 32m')}
+  <div class="scroll">
+    <div class="tl">
+      ${[
+        ['6:04am', 'moon', A.sleep, 'Slept 7h 32m', 'Sleep score 90 · 1h 42m deep · efficiency 94%', hypno(26)],
+        ['7:26am', 'dumb', A.cy, 'Upper · 44 min', '5 exercises · 12,190 kg volume', hrTrace(24, A.hr)],
+        ['11:46am','foot', A.gr, 'Treadmill interval walk', '30 min · 2,840 steps', ''],
+        ['9:20pm', 'scale', '#c084fc', '70.7 kg', 'Body fat 18.4% · muscle 43.1%', ''],
+      ].map(([t,k,c,title,sub,extra])=>`
+        <div class="tlrow">
+          <div class="tltime">${t}</div>
+          <div class="tlmark"><span style="background:${c}"></span></div>
+          <div class="tlbody">
+            <div style="display:flex;align-items:center;gap:7px">${ic(k,14,c,2.3)}<span style="font-size:14px;font-weight:700">${title}</span></div>
+            <div style="font-size:11px;color:${MU};margin-top:3px">${sub}</div>
+            ${extra?`<div style="margin-top:8px">${extra}</div>`:''}
+          </div>
+        </div>`).join('')}
+    </div>
+    <div style="padding:6px 0 0">${scoreRow()}</div>
+  </div>`));
+
+add('A2','Scores first','Opens with the four scores — the same Divider treatment you picked for Home, so the two screens speak the same language — then Training, Sleep and Body as flat sections beneath. <b>The most conventional option here</b>, and the easiest to build; its weakness is that everything below the scores is an undifferentiated scroll.',
+ () => phone('a2', `${header()}
+  <div class="scroll">
+    <div style="padding-bottom:14px;border-bottom:1px solid rgba(255,255,255,.1);margin:0 -16px;padding-left:16px;padding-right:16px">${scoreRow()}</div>
+    <div class="sec">${secLabel('Training')}
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:9px">
+          ${ic('dumb',16,A.cy,2.3)}<span style="font-size:14px;font-weight:700">Upper</span>
+          <span style="margin-left:auto;font-size:11px;color:${MU}">7:26 → 8:11 · 44 min</span></div>
+        <div style="margin-top:9px">${hrTrace(30, A.hr)}</div>
+        <div style="font-size:10.5px;color:${MU};margin-top:6px">5 exercises · avg HR 79 · peak 92</div>
+      </div>
+      <div class="card" style="margin-top:7px;display:flex;align-items:center;gap:9px">
+        ${ic('foot',15,A.gr,2.3)}<span style="font-size:13px">Treadmill interval walk</span>
+        <span style="margin-left:auto;font-size:11px;color:${MU}">30 min</span></div>
+    </div>
+    <div class="sec">${secLabel('Sleep')}
+      <div class="card">${hypno(30)}
+        <div class="statrow" style="margin-top:10px">
+          ${[['7h 32m','TOTAL'],['1h 42m','DEEP'],['94%','EFFIC'],['61','HRV']].map(([v,l])=>
+            `<span><span style="${N('1rem',700)}">${v}</span><span style="${CAPS};display:block;margin-top:4px">${l}</span></span>`).join('')}
+        </div></div>
+    </div>
+    <div class="sec">${secLabel('Body')}
+      <div class="statrow">
+        ${[['70.7 kg','WEIGHT'],['18.4%','BODY FAT'],['4,184','STEPS']].map(([v,l])=>
+          `<span><span style="${N('1.05rem',700)}">${v}</span><span style="${CAPS};display:block;margin-top:4px">${l}</span></span>`).join('')}
+      </div>
+    </div>
+  </div>`));
+
+add('A3','Pinned summary','The date and the four scores stay pinned while everything else scrolls under them. <b>Solves the problem the other layouts share</b> — once you scroll into the exercise list you have lost all context of what kind of day this was. Costs ~96dp of permanent screen.',
+ () => phone('a3', `<div class="pinned">${header()}
+    <div style="padding:10px 16px 12px;border-bottom:1px solid rgba(255,255,255,.12)">${scoreRow()}</div>
+  </div>
+  <div class="scroll">
+    <div class="sec" style="padding-top:12px">${secLabel('Training')}
+      <div class="card">
+        <div style="display:flex;align-items:center;gap:9px">${ic('dumb',16,A.cy,2.3)}
+          <span style="font-size:14px;font-weight:700">Upper</span>
+          <span style="margin-left:auto;font-size:11px;color:${MU}">44 min</span></div>
+        <div style="margin-top:10px;display:flex;flex-direction:column;gap:9px">
+          ${EXERCISES.slice(0,4).map(([n,s])=>`<div style="display:flex;justify-content:space-between;gap:10px">
+            <span style="font-size:12.5px">${n}</span><span style="font-size:11px;color:${MU};font-variant-numeric:tabular-nums">${s}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="sec">${secLabel('Sleep')}<div class="card">${hypno(28)}</div></div>
+  </div>`));
+
+add('A4','Index','Every section collapses to a one-line summary, so <b>the whole day fits on one screen with no scrolling</b> — you expand only what you want. The fastest layout to scan across days when swiping, and the one that best survives a day with almost no data in it.',
+ () => phone('a4', `${header()}
+  <div class="scroll">
+    ${[
+      ['moon',A.sleep,'Sleep','7h 32m · score 90',true],
+      ['dumb',A.cy,'Training','Upper · 44 min · 5 exercises',false],
+      ['foot',A.gr,'Activity','Treadmill walk · 30 min',false],
+      ['scale','#c084fc','Body','70.7 kg · 18.4% fat',false],
+      ['heart',A.hr,'Heart','RHR 52 · HRV 61 · SpO₂ 97%',false],
+      ['zap',A.ready,'Scores','Ready 76 · Sleep 90 · Move 76',false],
+    ].map(([k,c,t,s,open])=>`
+      <div class="row">
+        <div class="rowhead">
+          ${ic(k,16,c,2.3)}
+          <span style="font-size:13.5px;font-weight:650;flex:none">${t}</span>
+          <span style="font-size:11px;color:${MU};margin-left:auto;text-align:right;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${s}</span>
+          ${ic(open?'chevU':'chevD',15,DIM,2.2)}
+        </div>
+        ${open?`<div style="padding:10px 0 4px">${hypno(26)}
+          <div class="statrow" style="margin-top:9px">
+            ${[['1h 42m','DEEP'],['1h 51m','REM'],['94%','EFFIC'],['12m','LATENCY']].map(([v,l])=>
+              `<span><span style="${N('.95rem',700)}">${v}</span><span style="${CAPS};display:block;margin-top:4px">${l}</span></span>`).join('')}
+          </div></div>`:''}
+      </div>`).join('')}
+  </div>`));
+
+add('A5','Tabbed','Segmented tabs inside the day, using the existing <code>segmented-tabs</code> primitive. <b>Highest data density per screen and the biggest risk</b>: two axes of navigation — swipe for days, tap for tabs — and horizontal swipe on a tabbed screen is ambiguous. Included because the density is genuinely tempting, not because I would ship it.',
+ () => phone('a5', `${header()}
+  <div style="padding:0 16px 10px">
+    <div class="tabs">${['Training','Sleep','Body'].map((t,i)=>`<span class="${i===0?'on':''}">${t}</span>`).join('')}</div>
+  </div>
+  <div class="scroll" style="padding-top:2px">
+    <div class="card">
+      <div style="display:flex;align-items:center;gap:9px">${ic('dumb',16,A.cy,2.3)}
+        <span style="font-size:14px;font-weight:700">Upper</span>
+        <span style="margin-left:auto;font-size:11px;color:${MU}">7:26 → 8:11 · 44 min</span></div>
+      <div style="margin-top:11px;display:flex;flex-direction:column;gap:10px">
+        ${EXERCISES.map(([n,s])=>`<div style="display:flex;justify-content:space-between;gap:10px">
+          <span style="font-size:12.5px">${n}</span><span style="font-size:11px;color:${MU};font-variant-numeric:tabular-nums">${s}</span></div>`).join('')}
+      </div>
+      <div style="margin-top:12px;padding-top:11px;border-top:1px solid rgba(255,255,255,.09)">
+        ${secLabel('HR through the session')}${hrTrace(34, A.hr)}</div>
+    </div>
+  </div>`));
+
+/* ==================== B · SECTION STUDIES ==================== */
+
+add('B1','Body composition — list','Twelve scale fields is the hardest part of this screen. The list gives them a <b>hierarchy</b> — weight at display size because it is the one you actually track, the other eleven as label→value reference pairs. Measured at 286dp against the tile grid\'s 252dp, so this is <i>not</i> the shorter option; it is the more readable one. The plan notes five of these are already fetched and thrown away today.',
+ () => phone('b1', `${header()}
+  <div class="scroll">
+    <div class="sec">${secLabel('Body composition')}
+      <div class="card">
+        <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:12px;border-bottom:1px solid rgba(255,255,255,.09)">
+          <span style="${N('2.4rem',300)}">70.7</span><span style="font-size:12px;color:${MU}">kg</span>
+          <span style="margin-left:auto;font-size:11px;color:${A.gr}">−0.4 kg this week</span>
+        </div>
+        <div class="kv">
+          ${BODY.slice(1).map(([l,v,u])=>`<div><span>${l}</span><b>${v}${u?`<i>${u}</i>`:''}</b></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`));
+
+add('B2','Body composition — tiles','The same twelve as tiles. <b>I expected these to be much taller and measured instead of assuming — they are 252dp against the list\'s 286dp, so tiles are actually the more compact of the two.</b> The real cost is flatness: twelve equal boxes give weight no more prominence than bone mass, and the grid reads as a dashboard rather than a record of a day. That is the trade, not height.',
+ () => phone('b2', `${header()}
+  <div class="scroll">
+    <div class="sec">${secLabel('Body composition')}
+      <div class="tiles">
+        ${BODY.map(([l,v,u])=>`<div class="tile">
+          <span style="${N('1.15rem',700)}">${v}<i style="font-size:9px;font-weight:600;color:${DIM};font-style:normal;margin-left:2px">${u}</i></span>
+          <span style="${CAPS};margin-top:6px">${l}</span></div>`).join('')}
+      </div>
+    </div>
+  </div>`));
+
+add('B3','Sleep section','Hypnogram first, stats under it. The stage bar is the one piece of this day\'s data that <b>only works as a picture</b> — "1h 42m deep" tells you the amount, the hypnogram tells you whether it came in one block or five. Reuses the existing <code>Hypnogram</code> component and its canonical <code>STAGE_COLOR</code> palette.',
+ () => phone('b3', `${header()}
+  <div class="scroll">
+    <div class="sec">${secLabel('Sleep')}
+      <div class="card">
+        <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:12px">
+          <span style="${N('2.1rem',300)}">7<i style="font-size:13px;font-weight:600;font-style:normal;color:${MU}">h</i> 32<i style="font-size:13px;font-weight:600;font-style:normal;color:${MU}">m</i></span>
+          <span style="margin-left:auto;display:flex;align-items:baseline;gap:5px">
+            <span style="${N('1.4rem',700)};color:${A.sleep}">90</span><span style="${CAPS}">SCORE</span></span>
+        </div>
+        ${hypno(40)}
+        <div style="display:flex;justify-content:space-between;font-size:9px;color:${DIM};margin-top:5px">
+          <span>10:32pm</span><span>6:04am</span></div>
+        <div class="legend">
+          ${[['Awake',STAGE.awake],['REM',STAGE.rem],['Light',STAGE.light],['Deep',STAGE.deep]].map(([l,c])=>
+            `<span><i style="background:${c}"></i>${l}</span>`).join('')}
+        </div>
+        <div class="kv" style="margin-top:12px;border-top:1px solid rgba(255,255,255,.09);padding-top:11px">
+          ${[['Deep','1h 42m'],['REM','1h 51m'],['Light','3h 59m'],['Awake','24m'],
+             ['Efficiency','94%'],['Onset','12m'],['Avg HRV','61ms'],['Lowest HR','48bpm']].map(([l,v])=>
+            `<div><span>${l}</span><b>${v}</b></div>`).join('')}
+        </div>
+      </div>
+    </div>
+  </div>`));
+
+add('B4','Date navigation','Three ways to move between days, stacked for comparison. <b>The week strip is the one I would build</b>: it makes the swipe gesture discoverable (a bare date gives no hint the screen moves), shows which nearby days have data before you travel to them, and reuses the dot language already on the calendar you tapped from.',
+ () => phone('b4', `
+  <div style="padding:8px 16px 0">${secLabel('1 · Chevrons only — the nutrition-screen pattern')}</div>
+  ${header()}
+  <div style="padding:16px 16px 0">${secLabel('2 · Week strip — swipeable, shows what has data')}</div>
+  <div class="weekstrip">
+    ${[['M','3',['#22c55e']],['T','4',[]],['W','5',['#f97316','#22d3ee']],['T','6',['#a78bfa']],
+       ['F','7',['#22d3ee','#22c55e'],true],['S','8',['#22d3ee']],['S','9',[]]].map(([d,n,dots,on])=>`
+      <div class="wd ${on?'on':''}">
+        <span class="wdl">${d}</span><span class="wdn">${n}</span>
+        <span class="wdd">${dots.map(c=>`<i style="background:${c}"></i>`).join('')}</span>
+      </div>`).join('')}
+  </div>
+  <div style="padding:18px 16px 0">${secLabel('3 · Date only — relies entirely on the swipe')}</div>
+  <div style="padding:10px 16px 0;text-align:center">
+    <div style="font-size:19px;font-weight:800;letter-spacing:-.02em">Friday 7 August</div>
+    <div style="font-size:10.5px;color:${DIM};margin-top:5px">swipe to change day</div>
+  </div>
+  <div style="flex:1"></div>`));
+
+const SECTIONS = [
+  {n:'A', title:'Screen structure', blurb:'The real decision — six data domains on one screen.', ids:/^A/},
+  {n:'B', title:'Section studies', blurb:'The three parts that are genuinely hard on their own.', ids:/^B/},
+];
+
+document.getElementById('app').innerHTML = SECTIONS.map(s=>`
+  <section>
+    <div class="sec-head"><span class="sec-num">${s.n}</span><h2>${s.title}</h2><p>${s.blurb}</p></div>
+    <div class="gallery">${V.filter(v=>s.ids.test(v.id)).map(v=>`
+      <article class="mock">
+        <div class="mock-head"><span class="mock-id">${v.id}</span><span class="mock-name">${v.name}</span></div>
+        <div class="canvas">${v.build()}</div>
+        <p class="mock-note">${v.note}</p>
+      </article>`).join('')}</div>
+  </section>`).join('');
+
+</script>

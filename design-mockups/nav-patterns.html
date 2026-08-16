@@ -1,0 +1,788 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TrainingAI — Nav Pattern Mockups</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0a;
+      --card: #161616;
+      --border: rgba(255,255,255,0.07);
+      --green: #00ff87;
+      --blue: #00d4ff;
+      --purple: #bf5fff;
+      --orange: #ff6a1a;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+      color: white;
+      padding: 48px 32px 80px;
+      min-height: 100vh;
+    }
+
+    /* ── Page header ── */
+    .page-header { max-width: 1100px; margin: 0 auto 48px; }
+    .page-header .eyebrow {
+      font-size: 11px; font-weight: 600; letter-spacing: 2px;
+      text-transform: uppercase; color: rgba(255,255,255,0.3); margin-bottom: 10px;
+    }
+    .page-header h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; }
+    .page-header p { font-size: 14px; color: rgba(255,255,255,0.45); max-width: 520px; line-height: 1.6; }
+
+    /* ── Phone grid ── */
+    .phone-row {
+      max-width: 1100px; margin: 0 auto;
+      display: flex; gap: 32px; overflow-x: auto; padding-bottom: 24px;
+      align-items: flex-start;
+    }
+
+    .phone-col { display: flex; flex-direction: column; align-items: center; gap: 20px; flex-shrink: 0; }
+
+    .pattern-label {
+      text-align: center;
+    }
+    .pattern-badge {
+      display: inline-block; background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.1); border-radius: 999px;
+      padding: 3px 12px; font-size: 10px; font-weight: 500;
+      color: rgba(255,255,255,0.4); margin-bottom: 6px;
+    }
+    .pattern-label h2 { font-size: 16px; font-weight: 700; margin-bottom: 3px; }
+    .pattern-label p { font-size: 11px; color: rgba(255,255,255,0.35); }
+
+    /* ── Phone frame ── */
+    .phone {
+      width: 300px; height: 650px;
+      background: #0d0d0d;
+      border-radius: 44px;
+      border: 1.5px solid rgba(255,255,255,0.1);
+      overflow: hidden;
+      position: relative;
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04),
+        0 40px 80px rgba(0,0,0,0.6),
+        inset 0 1px 0 rgba(255,255,255,0.06);
+    }
+
+    /* Status bar */
+    .sbar {
+      height: 44px; display: flex; align-items: center;
+      justify-content: space-between; padding: 0 20px;
+      font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.7);
+      position: relative; z-index: 10;
+    }
+    .sbar-icons { display: flex; align-items: center; gap: 5px; }
+
+    /* Scroll area */
+    .scroll-area {
+      overflow-y: auto; overflow-x: hidden;
+      -webkit-overflow-scrolling: touch;
+      scrollbar-width: none;
+    }
+    .scroll-area::-webkit-scrollbar { display: none; }
+
+    /* ── Shared card styles ── */
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 12px 14px;
+    }
+    .label-xs {
+      font-size: 10px; font-weight: 600; letter-spacing: 1.2px;
+      text-transform: uppercase; color: rgba(255,255,255,0.35);
+      margin-bottom: 8px;
+    }
+    .stat-big { font-size: 24px; font-weight: 800; font-variant-numeric: tabular-nums; }
+    .stat-unit { font-size: 12px; font-weight: 400; color: rgba(255,255,255,0.4); margin-left: 2px; }
+
+    /* Progress bar */
+    .pbar { height: 4px; border-radius: 2px; background: rgba(255,255,255,0.07); overflow: hidden; }
+    .pbar-fill { height: 100%; border-radius: 2px; }
+
+    /* ── Bottom nav: Pattern A (5-tab) ── */
+    .nav-a {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 70px;
+      background: rgba(14,14,14,0.97);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: flex-start; justify-content: space-around;
+      padding: 8px 4px 0;
+    }
+    .tab-a {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      min-width: 44px; cursor: pointer;
+    }
+    .tab-a .icon-wrap {
+      width: 28px; height: 28px; border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tab-a .icon-wrap.active { background: rgba(0,255,135,0.12); }
+    .tab-a span { font-size: 9px; }
+
+    /* ── Bottom nav: Pattern B (4-tab + FAB) ── */
+    .nav-b {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 80px;
+      background: rgba(14,14,14,0.97);
+      backdrop-filter: blur(20px);
+      border-top: 1px solid rgba(255,255,255,0.06);
+      display: flex; align-items: flex-start; justify-content: space-around;
+      padding: 10px 4px 0;
+    }
+    .nav-b .fab {
+      position: absolute; top: -22px; left: 50%; transform: translateX(-50%);
+      width: 50px; height: 50px;
+      background: linear-gradient(135deg, #00d4ff, #00ff87);
+      border-radius: 16px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 0 24px rgba(0,212,255,0.35), 0 8px 20px rgba(0,0,0,0.4);
+      cursor: pointer;
+    }
+    .tab-b {
+      display: flex; flex-direction: column; align-items: center; gap: 3px;
+      min-width: 44px; cursor: pointer;
+    }
+    .tab-b .icon-wrap { width: 28px; height: 28px; border-radius: 8px; display: flex; align-items: center; justify-content: center; }
+    .tab-b .icon-wrap.active { background: rgba(0,212,255,0.12); }
+    .tab-b span { font-size: 9px; }
+
+    /* ── Bottom nav: Pattern C (floating pill) ── */
+    .nav-c-wrap {
+      position: absolute; bottom: 0; left: 0; right: 0;
+      padding: 0 14px 18px;
+    }
+    .nav-c {
+      background: rgba(20,20,20,0.96);
+      backdrop-filter: blur(24px);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 26px;
+      padding: 6px 6px;
+      display: flex; justify-content: space-around; align-items: center;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .tab-c {
+      display: flex; flex-direction: column; align-items: center; gap: 2px;
+      padding: 7px 14px; border-radius: 20px;
+      cursor: pointer;
+    }
+    .tab-c.active { background: rgba(191,95,255,0.14); }
+    .tab-c span { font-size: 9px; }
+
+    /* ── Annotation cards ── */
+    .annotations { display: flex; flex-direction: column; gap: 6px; width: 300px; }
+    .annotation {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 10px; padding: 10px 12px;
+    }
+    .annotation .ann-title { font-size: 10px; font-weight: 600; margin-bottom: 3px; }
+    .annotation .ann-body { font-size: 10px; color: rgba(255,255,255,0.4); line-height: 1.5; }
+
+    /* ── Recommendation box ── */
+    .rec-box {
+      max-width: 1100px; margin: 40px auto 0;
+      background: var(--card); border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 20px; padding: 28px 32px;
+    }
+    .rec-box .rec-eyebrow {
+      font-size: 10px; font-weight: 600; letter-spacing: 2px;
+      text-transform: uppercase; color: rgba(255,255,255,0.25); margin-bottom: 12px;
+    }
+    .rec-cols { display: flex; gap: 48px; flex-wrap: wrap; }
+    .rec-col { flex: 1; min-width: 220px; }
+    .rec-col h3 { font-size: 15px; font-weight: 700; margin-bottom: 8px; }
+    .rec-col p { font-size: 13px; color: rgba(255,255,255,0.45); line-height: 1.7; }
+    .tab-list { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+    .tab-item { display: flex; align-items: flex-start; gap: 10px; }
+    .tab-item .ti-icon { font-size: 15px; flex-shrink: 0; margin-top: 1px; }
+    .tab-item .ti-name { font-size: 13px; font-weight: 600; }
+    .tab-item .ti-desc { font-size: 11px; color: rgba(255,255,255,0.4); margin-top: 1px; }
+
+    /* scrollbar for phone row */
+    .phone-row::-webkit-scrollbar { height: 4px; }
+    .phone-row::-webkit-scrollbar-track { background: transparent; }
+    .phone-row::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 2px; }
+  </style>
+</head>
+<body>
+
+  <!-- ─── Page header ─── -->
+  <div class="page-header">
+    <p class="eyebrow">Design Reference · TrainingAI</p>
+    <h1>Gym App Navigation Patterns</h1>
+    <p>Three bottom-nav approaches used by leading fitness apps. Each optimises for a different primary user intent — choose based on what action you want users to reach fastest.</p>
+  </div>
+
+  <!-- ─── Phone row ─── -->
+  <div class="phone-row">
+
+    <!-- ════════════════════════════════════
+         PATTERN A  —  5-Tab Classic
+         Used by: MyFitnessPal, Cronometer
+         ════════════════════════════════════ -->
+    <div class="phone-col">
+      <div class="pattern-label">
+        <div class="pattern-badge">Pattern A</div>
+        <h2>5-Tab Classic</h2>
+        <p>MyFitnessPal · Cronometer · FitBod</p>
+      </div>
+
+      <div class="phone">
+        <!-- Status bar -->
+        <div class="sbar">
+          <span>9:41</span>
+          <div class="sbar-icons">
+            <!-- signal bars -->
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="none">
+              <rect x="0" y="4" width="2.5" height="6" rx="0.4" fill="white" fill-opacity="0.35"/>
+              <rect x="4" y="2.5" width="2.5" height="7.5" rx="0.4" fill="white" fill-opacity="0.55"/>
+              <rect x="8" y="1" width="2.5" height="9" rx="0.4" fill="white" fill-opacity="0.75"/>
+              <rect x="12" y="0" width="2.5" height="10" rx="0.4" fill="white"/>
+            </svg>
+            <!-- battery -->
+            <svg width="23" height="11" viewBox="0 0 23 11" fill="none">
+              <rect x="0.5" y="0.5" width="19" height="10" rx="3" stroke="white" stroke-opacity="0.3"/>
+              <rect x="2" y="2" width="13" height="7" rx="1.5" fill="white" fill-opacity="0.85"/>
+              <path d="M21 3.5v4c.9-.4 1.5-1.2 1.5-2s-.6-1.6-1.5-2z" fill="white" fill-opacity="0.35"/>
+            </svg>
+          </div>
+        </div>
+
+        <!-- Scrollable content -->
+        <div class="scroll-area" style="height:calc(100% - 44px - 70px); padding:0 14px 12px;">
+
+          <!-- Greeting row -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div>
+              <p style="font-size:11px;color:rgba(255,255,255,0.4);">Good morning</p>
+              <p style="font-size:18px;font-weight:800;letter-spacing:-0.3px;">Delan 👋</p>
+            </div>
+            <div style="width:34px;height:34px;border-radius:50%;background:linear-gradient(135deg,#00ff87,#00d4ff);display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:13px;font-weight:800;color:#000;">D</span>
+            </div>
+          </div>
+
+          <!-- Stats row -->
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <!-- Streak -->
+            <div class="card" style="flex:1;">
+              <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:4px;">STREAK</p>
+              <p class="stat-big" style="color:var(--green);">12<span class="stat-unit">d</span></p>
+              <div style="display:flex;gap:2px;margin-top:6px;">
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:rgba(255,255,255,0.07);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:var(--green);"></div>
+                <div style="width:8px;height:8px;border-radius:2px;background:rgba(255,255,255,0.07);"></div>
+              </div>
+            </div>
+            <!-- This week -->
+            <div class="card" style="flex:1;">
+              <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:4px;">THIS WEEK</p>
+              <p class="stat-big">4<span class="stat-unit">sess</span></p>
+              <div class="pbar" style="margin-top:8px;">
+                <div class="pbar-fill" style="width:65%;background:linear-gradient(90deg,var(--green),var(--blue));"></div>
+              </div>
+              <p style="font-size:9px;color:rgba(255,255,255,0.25);margin-top:3px;">Goal: 5/week</p>
+            </div>
+          </div>
+
+          <!-- Next session CTA -->
+          <div style="background:linear-gradient(135deg,rgba(0,255,135,0.09),rgba(0,212,255,0.05));border:1px solid rgba(0,255,135,0.18);border-radius:16px;padding:13px 13px;margin-bottom:10px;position:relative;overflow:hidden;">
+            <div style="position:absolute;top:-20px;right:-20px;width:70px;height:70px;background:rgba(0,255,135,0.05);border-radius:50%;"></div>
+            <p style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:5px;">Recommended</p>
+            <p style="font-size:15px;font-weight:700;margin-bottom:2px;">💪 Push Day</p>
+            <p style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:10px;">6 exercises · ~55 min</p>
+            <div style="display:inline-flex;align-items:center;gap:5px;background:var(--green);border-radius:9px;padding:6px 13px;">
+              <span style="color:#000;font-size:11px;font-weight:700;">Start Workout</span>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5h6M6 3l2 2-2 2" stroke="black" stroke-width="1.5" stroke-linecap="round"/></svg>
+            </div>
+          </div>
+
+          <!-- Nutrition today -->
+          <p class="label-xs">Today's Nutrition</p>
+          <div class="card" style="margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+              <span style="font-size:11px;color:rgba(255,255,255,0.4);">Calories</span>
+              <span style="font-size:11px;font-weight:600;">1,840 <span style="color:rgba(255,255,255,0.3);">/ 2,400</span></span>
+            </div>
+            <div class="pbar" style="margin-bottom:10px;">
+              <div class="pbar-fill" style="width:77%;background:linear-gradient(90deg,var(--blue),var(--purple));"></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;">
+              <div style="text-align:center;">
+                <p style="font-size:13px;font-weight:700;color:var(--green);">148g</p>
+                <p style="font-size:9px;color:rgba(255,255,255,0.35);">Protein</p>
+              </div>
+              <div style="text-align:center;">
+                <p style="font-size:13px;font-weight:700;color:var(--blue);">220g</p>
+                <p style="font-size:9px;color:rgba(255,255,255,0.35);">Carbs</p>
+              </div>
+              <div style="text-align:center;">
+                <p style="font-size:13px;font-weight:700;color:var(--purple);">62g</p>
+                <p style="font-size:9px;color:rgba(255,255,255,0.35);">Fat</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Recent activity -->
+          <p class="label-xs">Recent Activity</p>
+          <div class="card" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="width:30px;height:30px;background:rgba(0,255,135,0.1);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M4 4L1 7l3 3M10 4l3 3-3 3" stroke="#00ff87" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <div style="flex:1;">
+              <p style="font-size:12px;font-weight:600;">Pull Day</p>
+              <p style="font-size:10px;color:rgba(255,255,255,0.35);">Yesterday · 8 exercises</p>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+          <div class="card" style="display:flex;align-items:center;gap:10px;">
+            <div style="width:30px;height:30px;background:rgba(0,212,255,0.1);border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M4 4L1 7l3 3M10 4l3 3-3 3" stroke="#00d4ff" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <div style="flex:1;">
+              <p style="font-size:12px;font-weight:600;">Legs</p>
+              <p style="font-size:10px;color:rgba(255,255,255,0.35);">3 days ago · 7 exercises</p>
+            </div>
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M4 2l4 4-4 4" stroke="rgba(255,255,255,0.25)" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </div>
+        </div>
+
+        <!-- Bottom nav A: 5 equal tabs -->
+        <div class="nav-a">
+          <!-- Home (active) -->
+          <div class="tab-a">
+            <div class="icon-wrap active">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.5 7L8.5 1.5 15.5 7V15.5H11V10H6V15.5H1.5V7Z" stroke="#00ff87" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            </div>
+            <span style="color:var(--green);font-weight:600;">Home</span>
+          </div>
+          <!-- Workout -->
+          <div class="tab-a">
+            <div class="icon-wrap">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3.5 8.5h10M1.5 6.5v4M15.5 6.5v4M0.5 5.5v6M16.5 5.5v6" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <span style="color:rgba(255,255,255,0.3);">Workout</span>
+          </div>
+          <!-- Nutrition -->
+          <div class="tab-a">
+            <div class="icon-wrap">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M14 2C8 2 3 7 3 12c0 2 1 3 2 3 1 0 2-1 3-3C11 8 15 5 15 2" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/><path d="M3 12L1 15.5" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <span style="color:rgba(255,255,255,0.3);">Nutrition</span>
+          </div>
+          <!-- Progress -->
+          <div class="tab-a">
+            <div class="icon-wrap">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M2.5 13.5V8M6.5 13.5V4M10.5 13.5V7M14.5 13.5V2" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <span style="color:rgba(255,255,255,0.3);">Progress</span>
+          </div>
+          <!-- Profile -->
+          <div class="tab-a">
+            <div class="icon-wrap">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="5.5" r="3" stroke="rgba(255,255,255,0.28)" stroke-width="1.4"/><path d="M1.5 15.5c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <span style="color:rgba(255,255,255,0.3);">Profile</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Annotations -->
+      <div class="annotations">
+        <div class="annotation">
+          <p class="ann-title" style="color:var(--green);">✓ Immediately learnable</p>
+          <p class="ann-body">All 5 sections visible at once. No hunting for where things are. Users grasp the whole app on first glance.</p>
+        </div>
+        <div class="annotation">
+          <p class="ann-title" style="color:rgba(255,130,80,0.9);">⚠ Crowded on large phones</p>
+          <p class="ann-body">5 equal tabs gives each only ~52px — tight for tap targets. Far-left tab requires a thumb stretch on S25 Ultra.</p>
+        </div>
+        <div class="annotation">
+          <p class="ann-title" style="color:rgba(255,130,80,0.9);">⚠ No visual hierarchy</p>
+          <p class="ann-body">"Start Workout" and "View Nutrition" appear equally important. Users don't know what the app wants them to do.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════
+         PATTERN B  —  4-Tab + Central FAB
+         Used by: Hevy, Strong, Fitbod
+         ════════════════════════════════════ -->
+    <div class="phone-col">
+      <div class="pattern-label">
+        <div class="pattern-badge">Pattern B · Recommended</div>
+        <h2 style="color:var(--blue);">4-Tab + Central FAB</h2>
+        <p>Hevy · Strong · Fitbod</p>
+      </div>
+
+      <div class="phone" style="border-color:rgba(0,212,255,0.25);box-shadow:0 0 0 1px rgba(0,212,255,0.06),0 40px 80px rgba(0,0,0,0.6);">
+        <!-- Status bar -->
+        <div class="sbar">
+          <span>9:41</span>
+          <div class="sbar-icons">
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="none"><rect x="0" y="4" width="2.5" height="6" rx="0.4" fill="white" fill-opacity="0.35"/><rect x="4" y="2.5" width="2.5" height="7.5" rx="0.4" fill="white" fill-opacity="0.55"/><rect x="8" y="1" width="2.5" height="9" rx="0.4" fill="white" fill-opacity="0.75"/><rect x="12" y="0" width="2.5" height="10" rx="0.4" fill="white"/></svg>
+            <svg width="23" height="11" viewBox="0 0 23 11" fill="none"><rect x="0.5" y="0.5" width="19" height="10" rx="3" stroke="white" stroke-opacity="0.3"/><rect x="2" y="2" width="13" height="7" rx="1.5" fill="white" fill-opacity="0.85"/><path d="M21 3.5v4c.9-.4 1.5-1.2 1.5-2s-.6-1.6-1.5-2z" fill="white" fill-opacity="0.35"/></svg>
+          </div>
+        </div>
+
+        <div class="scroll-area" style="height:calc(100% - 44px - 80px); padding:0 14px 12px;">
+
+          <!-- Header -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+            <div>
+              <p style="font-size:11px;color:rgba(255,255,255,0.4);">Monday · Push Day</p>
+              <p style="font-size:20px;font-weight:800;letter-spacing:-0.5px;">Dashboard</p>
+            </div>
+            <div style="display:flex;gap:7px;align-items:center;">
+              <div style="width:30px;height:30px;background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.2);border-radius:50%;display:flex;align-items:center;justify-content:center;">
+                <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="#00d4ff" stroke-width="1.6" stroke-linecap="round"/></svg>
+              </div>
+              <div style="width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--blue),var(--purple));display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:11px;font-weight:800;color:#000;">D</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Big stat cards -->
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <div style="flex:1;background:linear-gradient(135deg,rgba(0,212,255,0.11),rgba(0,212,255,0.03));border:1px solid rgba(0,212,255,0.18);border-radius:18px;padding:13px;text-align:center;">
+              <p class="stat-big" style="color:var(--blue);">4</p>
+              <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">Sessions</p>
+              <p style="font-size:9px;color:rgba(255,255,255,0.25);">this week</p>
+            </div>
+            <div style="flex:1;background:linear-gradient(135deg,rgba(191,95,255,0.11),rgba(191,95,255,0.03));border:1px solid rgba(191,95,255,0.18);border-radius:18px;padding:13px;text-align:center;">
+              <p class="stat-big" style="color:var(--purple);">87<span style="font-size:13px;">kg</span></p>
+              <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-top:2px;">Body Weight</p>
+              <p style="font-size:9px;color:rgba(255,255,255,0.25);">↓ 0.3 this week</p>
+            </div>
+          </div>
+
+          <!-- Calorie card with donut -->
+          <div class="card" style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+            <svg width="56" height="56" viewBox="0 0 56 56">
+              <circle cx="28" cy="28" r="20" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
+              <circle cx="28" cy="28" r="20" fill="none" stroke="#00d4ff" stroke-width="7"
+                stroke-dasharray="125.7 125.7" stroke-dashoffset="31.4"
+                stroke-linecap="round" transform="rotate(-90 28 28)" opacity="0.9"/>
+              <text x="28" y="31" text-anchor="middle" fill="white" font-size="10" font-weight="700">75%</text>
+            </svg>
+            <div style="flex:1;">
+              <p style="font-size:10px;color:rgba(255,255,255,0.4);margin-bottom:4px;">CALORIES TODAY</p>
+              <p style="font-size:17px;font-weight:700;">1,840 <span style="font-size:12px;font-weight:400;color:rgba(255,255,255,0.3);">/ 2,400</span></p>
+              <div style="display:flex;gap:10px;margin-top:5px;">
+                <span style="font-size:10px;color:rgba(255,255,255,0.4);">P <span style="color:var(--green);font-weight:600;">148g</span></span>
+                <span style="font-size:10px;color:rgba(255,255,255,0.4);">C <span style="color:var(--blue);font-weight:600;">220g</span></span>
+                <span style="font-size:10px;color:rgba(255,255,255,0.4);">F <span style="color:var(--purple);font-weight:600;">62g</span></span>
+              </div>
+            </div>
+          </div>
+
+          <!-- PRs -->
+          <p class="label-xs">Recent PRs 🏆</p>
+          <div class="card" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0;box-shadow:0 0 6px var(--blue);"></div>
+            <div style="flex:1;">
+              <p style="font-size:12px;font-weight:600;">Bench Press</p>
+              <p style="font-size:10px;color:rgba(255,255,255,0.35);">↑ 2.5 kg from last session</p>
+            </div>
+            <p style="font-size:14px;font-weight:700;color:var(--blue);">100 kg</p>
+          </div>
+          <div class="card" style="display:flex;align-items:center;gap:10px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:var(--purple);flex-shrink:0;box-shadow:0 0 6px var(--purple);"></div>
+            <div style="flex:1;">
+              <p style="font-size:12px;font-weight:600;">Deadlift</p>
+              <p style="font-size:10px;color:rgba(255,255,255,0.35);">↑ 5 kg from last session</p>
+            </div>
+            <p style="font-size:14px;font-weight:700;color:var(--purple);">160 kg</p>
+          </div>
+        </div>
+
+        <!-- Bottom nav B: 4 tabs + FAB -->
+        <div class="nav-b">
+          <div class="fab">
+            <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M10 3v14M3 10h14" stroke="black" stroke-width="2.2" stroke-linecap="round"/></svg>
+          </div>
+          <!-- Home (active) -->
+          <div class="tab-b">
+            <div class="icon-wrap active">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.5 7L8.5 1.5 15.5 7V15.5H11V10H6V15.5H1.5V7Z" stroke="#00d4ff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+            </div>
+            <span style="color:var(--blue);font-weight:600;">Home</span>
+          </div>
+          <!-- History -->
+          <div class="tab-b">
+            <div class="icon-wrap">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="8.5" r="6.5" stroke="rgba(255,255,255,0.28)" stroke-width="1.4"/><path d="M8.5 5v3.5l2.5 1.5" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <span style="color:rgba(255,255,255,0.3);">History</span>
+          </div>
+          <!-- FAB spacer -->
+          <div style="min-width:44px;"></div>
+          <!-- Nutrition -->
+          <div class="tab-b">
+            <div class="icon-wrap">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M14 2C8 2 3 7 3 12c0 2 1 3 2 3 1 0 2-1 3-3C11 8 15 5 15 2" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/><path d="M3 12L1.5 15.5" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <span style="color:rgba(255,255,255,0.3);">Nutrition</span>
+          </div>
+          <!-- Profile -->
+          <div class="tab-b">
+            <div class="icon-wrap">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="5.5" r="3" stroke="rgba(255,255,255,0.28)" stroke-width="1.4"/><path d="M1.5 15.5c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+            </div>
+            <span style="color:rgba(255,255,255,0.3);">Profile</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Annotations -->
+      <div class="annotations">
+        <div class="annotation" style="border-color:rgba(0,212,255,0.2);">
+          <p class="ann-title" style="color:var(--blue);">✓ Action-first hierarchy</p>
+          <p class="ann-body">The glowing FAB is the first thing the eye sees. "Start workout" is the #1 action — it should be the #1 visual. Used by Hevy and Strong for exactly this reason.</p>
+        </div>
+        <div class="annotation" style="border-color:rgba(0,212,255,0.2);">
+          <p class="ann-title" style="color:var(--blue);">✓ 4 tabs is the sweet spot</p>
+          <p class="ann-body">Plenty of width per tab (~62px). Easy thumb reach. Cognitive load research shows 4 is the limit before users start forgetting what's where.</p>
+        </div>
+        <div class="annotation" style="border-color:rgba(0,212,255,0.2);">
+          <p class="ann-title" style="color:var(--blue);">✓ Future-proof for Nutrition</p>
+          <p class="ann-body">Nutrition tab is present but can show a "coming soon" placeholder — sets the expectation without blocking the launch.</p>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- ════════════════════════════════════
+         PATTERN C  —  Floating Pill Nav
+         Used by: WHOOP, Garmin, Oura
+         ════════════════════════════════════ -->
+    <div class="phone-col">
+      <div class="pattern-label">
+        <div class="pattern-badge">Pattern C</div>
+        <h2>Floating Pill Nav</h2>
+        <p>WHOOP · Garmin Connect · Oura</p>
+      </div>
+
+      <div class="phone">
+        <!-- Status bar -->
+        <div class="sbar">
+          <span>9:41</span>
+          <div class="sbar-icons">
+            <svg width="16" height="10" viewBox="0 0 16 10" fill="none"><rect x="0" y="4" width="2.5" height="6" rx="0.4" fill="white" fill-opacity="0.35"/><rect x="4" y="2.5" width="2.5" height="7.5" rx="0.4" fill="white" fill-opacity="0.55"/><rect x="8" y="1" width="2.5" height="9" rx="0.4" fill="white" fill-opacity="0.75"/><rect x="12" y="0" width="2.5" height="10" rx="0.4" fill="white"/></svg>
+            <svg width="23" height="11" viewBox="0 0 23 11" fill="none"><rect x="0.5" y="0.5" width="19" height="10" rx="3" stroke="white" stroke-opacity="0.3"/><rect x="2" y="2" width="13" height="7" rx="1.5" fill="white" fill-opacity="0.85"/><path d="M21 3.5v4c.9-.4 1.5-1.2 1.5-2s-.6-1.6-1.5-2z" fill="white" fill-opacity="0.35"/></svg>
+          </div>
+        </div>
+
+        <div class="scroll-area" style="height:calc(100% - 44px - 88px); padding:0 14px 12px;">
+
+          <!-- Performance hero -->
+          <p class="label-xs" style="text-align:center;margin-bottom:10px;">Today's Performance</p>
+          <div style="display:flex;align-items:center;justify-content:center;margin-bottom:14px;">
+            <div style="position:relative;width:110px;height:110px;">
+              <svg width="110" height="110" viewBox="0 0 110 110">
+                <!-- Track rings -->
+                <circle cx="55" cy="55" r="46" fill="none" stroke="rgba(0,255,135,0.1)" stroke-width="9"/>
+                <circle cx="55" cy="55" r="35" fill="none" stroke="rgba(0,212,255,0.1)" stroke-width="9"/>
+                <circle cx="55" cy="55" r="24" fill="none" stroke="rgba(191,95,255,0.1)" stroke-width="9"/>
+                <!-- Progress rings -->
+                <circle cx="55" cy="55" r="46" fill="none" stroke="#00ff87" stroke-width="9"
+                  stroke-dasharray="289 289" stroke-dashoffset="72"
+                  stroke-linecap="round" transform="rotate(-90 55 55)"/>
+                <circle cx="55" cy="55" r="35" fill="none" stroke="#00d4ff" stroke-width="9"
+                  stroke-dasharray="220 220" stroke-dashoffset="88"
+                  stroke-linecap="round" transform="rotate(-90 55 55)"/>
+                <circle cx="55" cy="55" r="24" fill="none" stroke="#bf5fff" stroke-width="9"
+                  stroke-dasharray="151 151" stroke-dashoffset="60"
+                  stroke-linecap="round" transform="rotate(-90 55 55)"/>
+              </svg>
+              <div style="position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center;">
+                <p style="font-size:14px;font-weight:800;">72%</p>
+                <p style="font-size:8px;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.8px;">Ready</p>
+              </div>
+            </div>
+          </div>
+          <!-- Ring legend -->
+          <div style="display:flex;justify-content:center;gap:16px;margin-bottom:14px;">
+            <div style="text-align:center;">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--green);margin:0 auto 3px;"></div>
+              <p style="font-size:9px;color:rgba(255,255,255,0.35);">Move</p>
+              <p style="font-size:11px;font-weight:600;">4/5</p>
+            </div>
+            <div style="text-align:center;">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--blue);margin:0 auto 3px;"></div>
+              <p style="font-size:9px;color:rgba(255,255,255,0.35);">Train</p>
+              <p style="font-size:11px;font-weight:600;">60%</p>
+            </div>
+            <div style="text-align:center;">
+              <div style="width:6px;height:6px;border-radius:50%;background:var(--purple);margin:0 auto 3px;"></div>
+              <p style="font-size:9px;color:rgba(255,255,255,0.35);">Sleep</p>
+              <p style="font-size:11px;font-weight:600;">7h 12m</p>
+            </div>
+          </div>
+
+          <!-- Metric grid -->
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px;">
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <p style="font-size:10px;color:rgba(255,255,255,0.4);">Heart Rate</p>
+                <span style="font-size:13px;color:#ff6a6a;">♥</span>
+              </div>
+              <p style="font-size:16px;font-weight:700;">62 bpm</p>
+            </div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <p style="font-size:10px;color:rgba(255,255,255,0.4);">Steps</p>
+                <span style="font-size:13px;color:var(--blue);">↑</span>
+              </div>
+              <p style="font-size:16px;font-weight:700;">8,430</p>
+            </div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <p style="font-size:10px;color:rgba(255,255,255,0.4);">HRV</p>
+                <span style="font-size:13px;color:var(--green);">~</span>
+              </div>
+              <p style="font-size:16px;font-weight:700;">54 ms</p>
+            </div>
+            <div class="card">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <p style="font-size:10px;color:rgba(255,255,255,0.4);">Body Wt</p>
+                <span style="font-size:13px;color:var(--purple);">⬡</span>
+              </div>
+              <p style="font-size:16px;font-weight:700;">87 kg</p>
+            </div>
+          </div>
+
+          <!-- Next workout pill -->
+          <div style="background:linear-gradient(135deg,rgba(191,95,255,0.1),rgba(0,212,255,0.06));border:1px solid rgba(191,95,255,0.2);border-radius:16px;padding:12px;display:flex;align-items:center;justify-content:space-between;">
+            <div>
+              <p style="font-size:10px;color:rgba(255,255,255,0.4);text-transform:uppercase;letter-spacing:1px;margin-bottom:3px;">Next</p>
+              <p style="font-size:14px;font-weight:700;">Push Day A</p>
+              <p style="font-size:10px;color:rgba(255,255,255,0.35);margin-top:2px;">6 exercises · ~55 min</p>
+            </div>
+            <div style="background:var(--purple);border-radius:10px;padding:8px 14px;">
+              <span style="font-size:11px;font-weight:700;">Start</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bottom nav C: floating pill -->
+        <div class="nav-c-wrap">
+          <div class="nav-c">
+            <!-- Home (active) -->
+            <div class="tab-c active">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M1.5 7L8.5 1.5 15.5 7V15.5H11V10H6V15.5H1.5V7Z" stroke="#bf5fff" stroke-width="1.4" stroke-linejoin="round"/></svg>
+              <span style="color:var(--purple);font-weight:600;">Home</span>
+            </div>
+            <!-- Train -->
+            <div class="tab-c">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M3.5 8.5h10M1.5 6.5v4M15.5 6.5v4M0.5 5.5v6M16.5 5.5v6" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <span style="color:rgba(255,255,255,0.3);">Train</span>
+            </div>
+            <!-- Nutrition -->
+            <div class="tab-c">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><path d="M14 2C8 2 3 7 3 12c0 2 1 3 2 3 1 0 2-1 3-3C11 8 15 5 15 2" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/><path d="M3 12L1.5 15.5" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <span style="color:rgba(255,255,255,0.3);">Nutrition</span>
+            </div>
+            <!-- Me -->
+            <div class="tab-c">
+              <svg width="17" height="17" viewBox="0 0 17 17" fill="none"><circle cx="8.5" cy="5.5" r="3" stroke="rgba(255,255,255,0.28)" stroke-width="1.4"/><path d="M1.5 15.5c0-3.3 3.1-6 7-6s7 2.7 7 6" stroke="rgba(255,255,255,0.28)" stroke-width="1.4" stroke-linecap="round"/></svg>
+              <span style="color:rgba(255,255,255,0.3);">Me</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Annotations -->
+      <div class="annotations">
+        <div class="annotation">
+          <p class="ann-title" style="color:var(--purple);">✓ Premium, distinctive feel</p>
+          <p class="ann-body">The floating pill is visually unique. Content scrolls behind it and the transparent blur creates depth. Feels expensive — like WHOOP or Oura.</p>
+        </div>
+        <div class="annotation">
+          <p class="ann-title" style="color:var(--purple);">✓ More usable screen space</p>
+          <p class="ann-body">No hard edge — content visible to the very bottom of the screen. Works especially well for the activity-ring hero layout.</p>
+        </div>
+        <div class="annotation">
+          <p class="ann-title" style="color:rgba(255,130,80,0.9);">⚠ No primary action emphasis</p>
+          <p class="ann-body">Without a FAB, "Start Workout" is buried in the scroll area. Works better for data-viewing apps (WHOOP) than action-first apps (logging reps).</p>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /phone-row -->
+
+
+  <!-- ─── Recommendation ─── -->
+  <div class="rec-box">
+    <p class="rec-eyebrow">Verdict for TrainingAI</p>
+    <div class="rec-cols">
+      <div class="rec-col">
+        <h3>Pattern B is the best fit <span style="color:var(--blue);">⚡</span></h3>
+        <p>
+          Your app is action-first — users open it to <em>log reps</em>, not passively review data.
+          The central FAB puts "Start Workout" permanently in the thumb zone, where Hevy and Strong have placed it for exactly this reason.
+          4 tabs avoids the crowding of Pattern A on the S25 Ultra's wide display,
+          and the standard nav bar (vs. floating pill) is better suited to an app where fast,
+          eyes-down tapping matters more than visual prestige.
+        </p>
+      </div>
+      <div class="rec-col">
+        <h3>Suggested tab structure</h3>
+        <div class="tab-list">
+          <div class="tab-item">
+            <span class="ti-icon">🏠</span>
+            <div>
+              <p class="ti-name">Home</p>
+              <p class="ti-desc">Session recommendation · calendar · body weight · streak</p>
+            </div>
+          </div>
+          <div class="tab-item">
+            <span class="ti-icon">📋</span>
+            <div>
+              <p class="ti-name">History</p>
+              <p class="ti-desc">Past workout log · per-exercise progress charts</p>
+            </div>
+          </div>
+          <div class="tab-item">
+            <span class="ti-icon" style="color:var(--blue);font-weight:700;">＋</span>
+            <div>
+              <p class="ti-name" style="color:var(--blue);">Start (FAB)</p>
+              <p class="ti-desc">Glowing gradient — the primary action, always visible</p>
+            </div>
+          </div>
+          <div class="tab-item">
+            <span class="ti-icon">🥦</span>
+            <div>
+              <p class="ti-name">Nutrition</p>
+              <p class="ti-desc">Calories · macros — placeholder for now, build later</p>
+            </div>
+          </div>
+          <div class="tab-item">
+            <span class="ti-icon">👤</span>
+            <div>
+              <p class="ti-name">Profile</p>
+              <p class="ti-desc">Stats · progress photos · settings · 1RM records</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</body>
+</html>

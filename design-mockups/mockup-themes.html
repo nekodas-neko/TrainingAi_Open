@@ -1,0 +1,810 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrainingAI — Theme Comparison</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    font-family: -apple-system, 'Inter', sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 32px 16px 64px;
+    gap: 48px;
+  }
+
+  h1 {
+    color: #fff;
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    text-align: center;
+  }
+  .subtitle { color: #666; font-size: 13px; text-align: center; margin-top: 4px; }
+
+  .pair {
+    display: flex;
+    gap: 28px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .phone-wrap {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+  }
+  .phone-label {
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+  }
+
+  /* Phone frame */
+  .phone {
+    width: 375px;
+    border-radius: 44px;
+    overflow: hidden;
+    background: #0a0a0a;
+    border: 1.5px solid #2a2a2a;
+    box-shadow: 0 32px 80px rgba(0,0,0,0.8), inset 0 1px 0 rgba(255,255,255,0.06);
+    position: relative;
+  }
+
+  /* ── Shared screen layout ── */
+  .screen { background: #0a0a0a; }
+
+  /* ─── Status bar ─── */
+  .status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px 0;
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+  }
+  .status-bar-icons { display: flex; gap: 6px; align-items: center; }
+  .status-bar-icons svg { opacity: 0.9; }
+
+  /* ── HOME SCREEN ── */
+  .home-header {
+    padding: 12px 20px 0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .greeting-small { font-size: 12px; font-weight: 500; }
+  .greeting-name { font-size: 22px; font-weight: 800; letter-spacing: -0.5px; color: #fff; }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px;
+  }
+
+  /* Recommendation label */
+  .rec-label {
+    margin: 18px 20px 10px;
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  /* Session card carousel */
+  .carousel {
+    display: flex;
+    gap: 10px;
+    padding: 0 20px 4px;
+    overflow: hidden;
+  }
+  .session-card {
+    flex: 0 0 140px;
+    border-radius: 20px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    position: relative;
+    overflow: hidden;
+  }
+  .session-card.active { flex: 0 0 160px; }
+  .session-card.side { opacity: 0.45; transform: scale(0.94); }
+  .card-emoji { font-size: 28px; }
+  .card-session { font-size: 10px; font-weight: 700; letter-spacing: 1.5px; text-transform: uppercase; opacity: 0.7; margin-top: 2px; }
+  .card-title { font-size: 18px; font-weight: 800; color: #fff; letter-spacing: -0.3px; }
+  .card-meta { font-size: 11px; opacity: 0.65; color: #fff; }
+  .card-badge {
+    position: absolute;
+    top: 12px; right: 12px;
+    font-size: 9px;
+    font-weight: 700;
+    padding: 3px 7px;
+    border-radius: 20px;
+    background: rgba(255,255,255,0.15);
+    color: #fff;
+    letter-spacing: 0.5px;
+  }
+  .card-glow {
+    position: absolute;
+    top: -30px; right: -30px;
+    width: 100px; height: 100px;
+    border-radius: 50%;
+    filter: blur(30px);
+    opacity: 0.35;
+  }
+
+  /* Stats row */
+  .stats-row {
+    display: flex;
+    gap: 8px;
+    padding: 14px 20px 0;
+  }
+  .stat-chip {
+    flex: 1;
+    border-radius: 14px;
+    padding: 10px 10px 10px;
+    background: #161616;
+    border: 1px solid #222;
+  }
+  .stat-label { font-size: 9px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; opacity: 0.5; color: #fff; }
+  .stat-value { font-size: 17px; font-weight: 800; color: #fff; margin-top: 2px; letter-spacing: -0.5px; }
+  .stat-unit { font-size: 10px; font-weight: 500; opacity: 0.5; color: #fff; }
+
+  /* Start button */
+  .start-btn {
+    margin: 14px 20px 0;
+    height: 52px;
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 15px;
+    font-weight: 800;
+    color: #000;
+    letter-spacing: -0.2px;
+  }
+
+  /* ── WORKOUT SCREEN ── */
+  .workout-header {
+    padding: 12px 16px 10px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid #1e1e1e;
+  }
+  .back-btn {
+    width: 36px; height: 36px;
+    border-radius: 10px;
+    background: #1a1a1a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 16px; color: #fff;
+    flex-shrink: 0;
+  }
+  .workout-title { font-size: 16px; font-weight: 800; color: #fff; }
+  .workout-sub { font-size: 11px; opacity: 0.45; color: #fff; margin-top: 1px; }
+  .badge-1rm {
+    margin-left: auto;
+    font-size: 10px;
+    font-weight: 700;
+    padding: 4px 9px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+
+  /* Timer ring area */
+  .timer-area {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 16px 20px 10px;
+    gap: 4px;
+  }
+  .timer-ring-wrap { position: relative; width: 110px; height: 110px; }
+  .timer-ring-wrap svg { position: absolute; top: 0; left: 0; }
+  .timer-center {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  .timer-time { font-size: 22px; font-weight: 800; color: #fff; letter-spacing: -1px; font-variant-numeric: tabular-nums; }
+  .timer-label { font-size: 9px; font-weight: 600; opacity: 0.45; color: #fff; text-transform: uppercase; letter-spacing: 1px; }
+
+  /* Weight display */
+  .weight-display {
+    font-size: 11px;
+    font-weight: 700;
+    color: #fff;
+    opacity: 0.4;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-align: center;
+    padding-top: 4px;
+  }
+  .weight-value { font-size: 36px; font-weight: 900; letter-spacing: -1.5px; color: #fff; text-align: center; }
+
+  /* Set cards row */
+  .set-cards {
+    display: flex;
+    gap: 8px;
+    padding: 8px 16px 0;
+  }
+  .set-card {
+    flex: 1;
+    border-radius: 18px;
+    padding: 10px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    background: #161616;
+    border: 1px solid #222;
+  }
+  .set-card.active-card {
+    background: #161616;
+  }
+  .set-card.done-card { opacity: 0.6; }
+  .set-label { font-size: 9px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; }
+  .set-reps { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
+  .set-time { font-size: 10px; color: #4ade80; font-weight: 600; }
+  .set-btn {
+    width: 100%;
+    padding: 6px 0;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: 800;
+    text-align: center;
+    letter-spacing: 0.5px;
+  }
+
+  /* Bottom bar */
+  .bottom-bar {
+    margin-top: 12px;
+    padding: 10px 16px 24px;
+    display: flex;
+    gap: 8px;
+    border-top: 1px solid #1e1e1e;
+  }
+  .skip-btn {
+    width: 48px; height: 48px;
+    border-radius: 14px;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .complete-btn {
+    flex: 1; height: 48px;
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 800;
+    letter-spacing: -0.2px;
+    color: #000;
+  }
+
+  /* ── DONE SCREEN ── */
+  .done-screen {
+    padding: 40px 24px 24px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+  }
+  .done-check {
+    width: 88px; height: 88px;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 36px;
+    position: relative;
+  }
+  .done-check::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid;
+    opacity: 0.3;
+  }
+  .done-title { font-size: 28px; font-weight: 900; color: #fff; letter-spacing: -0.8px; text-align: center; }
+  .done-sub { font-size: 13px; opacity: 0.5; color: #fff; text-align: center; margin-top: 4px; }
+  .done-stats {
+    width: 100%;
+    border-radius: 18px;
+    background: #161616;
+    border: 1px solid #222;
+    padding: 16px;
+    display: flex;
+    justify-content: space-around;
+  }
+  .done-stat { text-align: center; }
+  .done-stat-value { font-size: 22px; font-weight: 900; color: #fff; letter-spacing: -0.5px; }
+  .done-stat-label { font-size: 10px; opacity: 0.4; color: #fff; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; margin-top: 2px; }
+  .done-ai-btn {
+    width: 100%;
+    height: 52px;
+    border-radius: 16px;
+    display: flex; align-items: center; justify-content: center;
+    gap: 8px;
+    font-size: 14px;
+    font-weight: 800;
+    color: #000;
+  }
+  .done-home-btn {
+    width: 100%;
+    height: 48px;
+    border-radius: 16px;
+    border: 1px solid #2a2a2a;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(255,255,255,0.6);
+    background: transparent;
+  }
+
+  /* Section heading */
+  .section-heading {
+    color: #fff;
+    font-size: 18px;
+    font-weight: 800;
+    text-align: center;
+    margin-top: 8px;
+  }
+  .section-sub {
+    color: #555;
+    font-size: 12px;
+    text-align: center;
+    margin-top: 4px;
+    max-width: 600px;
+  }
+
+  /* Divider */
+  .divider {
+    width: 100%;
+    max-width: 830px;
+    border: none;
+    border-top: 1px solid #1e1e1e;
+  }
+
+  /* ── GREEN THEME ── */
+  .green .phone-label { color: #00ff87; }
+  .green .greeting-small { color: rgba(0,255,135,0.6); }
+  .green .rec-label { color: rgba(0,255,135,0.5); }
+  .green .session-card.active {
+    background: linear-gradient(135deg, #003320 0%, #00200f 100%);
+    border: 1px solid rgba(0,255,135,0.2);
+  }
+  .green .session-card.side { background: #141414; border: 1px solid #1e1e1e; }
+  .green .card-glow { background: #00ff87; }
+  .green .start-btn { background: linear-gradient(135deg, #00ff87 0%, #00cc6a 100%); }
+  .green .badge-1rm { background: rgba(0,255,135,0.12); color: #00ff87; border: 1px solid rgba(0,255,135,0.2); }
+  .green .set-label.active-label { color: #00ff87; }
+  .green .set-card.active-card { border-color: rgba(0,255,135,0.3); }
+  .green .set-btn.start-set { background: linear-gradient(135deg, #00ff87, #00cc6a); color: #000; }
+  .green .set-btn.log-set { background: #1a3d25; color: #00ff87; border: 1px solid rgba(0,255,135,0.2); }
+  .green .complete-btn { background: linear-gradient(135deg, #00ff87 0%, #00cc6a 100%); }
+  .green .done-check { background: linear-gradient(135deg, #003320, #001a10); border: 1px solid rgba(0,255,135,0.2); }
+  .green .done-check::after { border-color: #00ff87; }
+  .green .done-ai-btn { background: linear-gradient(135deg, #00ff87 0%, #00cc6a 100%); }
+  .green .timer-track { stroke: #0a2b1a; }
+  .green .timer-progress { stroke: #00ff87; }
+  .green .timer-glow { stroke: #00ff87; filter: blur(4px); opacity: 0.4; }
+  .green .stat-chip { background: linear-gradient(135deg, #0d1f14 0%, #0a1a10 100%); border-color: rgba(0,255,135,0.1); }
+
+  /* ── BLUE THEME ── */
+  .blue .phone-label { color: #00d4ff; }
+  .blue .greeting-small { color: rgba(0,212,255,0.6); }
+  .blue .rec-label { color: rgba(0,212,255,0.5); }
+  .blue .session-card.active {
+    background: linear-gradient(135deg, #001a2e 0%, #000f1e 100%);
+    border: 1px solid rgba(0,212,255,0.2);
+  }
+  .blue .session-card.side { background: #141414; border: 1px solid #1e1e1e; }
+  .blue .card-glow { background: #00d4ff; }
+  .blue .start-btn { background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%); }
+  .blue .badge-1rm { background: rgba(0,212,255,0.12); color: #00d4ff; border: 1px solid rgba(0,212,255,0.2); }
+  .blue .set-label.active-label { color: #00d4ff; }
+  .blue .set-card.active-card { border-color: rgba(0,212,255,0.3); }
+  .blue .set-btn.start-set { background: linear-gradient(135deg, #00d4ff, #0099cc); color: #000; }
+  .blue .set-btn.log-set { background: #001f30; color: #00d4ff; border: 1px solid rgba(0,212,255,0.2); }
+  .blue .complete-btn { background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%); }
+  .blue .done-check { background: linear-gradient(135deg, #001a2e, #000f1e); border: 1px solid rgba(0,212,255,0.2); }
+  .blue .done-check::after { border-color: #00d4ff; }
+  .blue .done-ai-btn { background: linear-gradient(135deg, #00d4ff 0%, #0099cc 100%); }
+  .blue .timer-track { stroke: #001a2e; }
+  .blue .timer-progress { stroke: #00d4ff; }
+  .blue .timer-glow { stroke: #00d4ff; filter: blur(4px); opacity: 0.4; }
+  .blue .stat-chip { background: linear-gradient(135deg, #0a1a24 0%, #070f18 100%); border-color: rgba(0,212,255,0.1); }
+
+  @media (max-width: 820px) {
+    .pair { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+
+<h1>TrainingAI — Theme Options</h1>
+<p class="subtitle">Dark &amp; Intense · Electric Green vs Electric Blue</p>
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 1: HOME SCREEN -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section-heading">Home Screen</div>
+<p class="section-sub">Session recommendation carousel · today's stats · start button</p>
+
+<div class="pair">
+
+  <!-- GREEN HOME -->
+  <div class="phone-wrap green">
+    <div class="phone-label">⚡ Electric Green</div>
+    <div class="phone screen">
+      <div class="status-bar">
+        <span>9:41</span>
+        <div class="status-bar-icons">
+          <svg width="16" height="11" viewBox="0 0 16 11" fill="white"><rect x="0" y="3" width="3" height="8" rx="1"/><rect x="4.5" y="2" width="3" height="9" rx="1"/><rect x="9" y="0" width="3" height="11" rx="1"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="white"><path d="M8 2C5.5 2 3.3 3 1.7 4.7L0 3C2 1.1 4.9 0 8 0s6 1.1 8 3l-1.7 1.7C12.7 3 10.5 2 8 2z"/><path d="M8 6c-1.4 0-2.7.6-3.6 1.5L3 6.1C4.3 4.8 6 4 8 4s3.7.8 5 2.1L11.6 7.5C10.7 6.6 9.4 6 8 6z"/><circle cx="8" cy="10" r="2"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="15" height="8" rx="2" fill="white"/><path d="M23 4v4a2 2 0 000-4z" fill="white" opacity="0.4"/></svg>
+        </div>
+      </div>
+
+      <div class="home-header">
+        <div>
+          <div class="greeting-small">Good morning,</div>
+          <div class="greeting-name">Dasan</div>
+        </div>
+        <div class="avatar" style="background:linear-gradient(135deg,#003320,#00ff87);color:#000;font-weight:800;">D</div>
+      </div>
+
+      <div class="rec-label">Today's Session</div>
+
+      <div class="carousel">
+        <div class="session-card side" style="background:#141414;border:1px solid #1e1e1e;">
+          <div class="card-emoji">🏋️</div>
+          <div class="card-session" style="color:rgba(255,255,255,0.4);">Pull</div>
+          <div class="card-title" style="font-size:15px;">Pull Day</div>
+        </div>
+        <div class="session-card active" style="background:linear-gradient(135deg,#003320 0%,#00200f 100%);border:1px solid rgba(0,255,135,0.2);">
+          <div class="card-glow" style="background:#00ff87;"></div>
+          <div class="card-badge">TODAY</div>
+          <div class="card-emoji">💪</div>
+          <div class="card-session" style="color:rgba(0,255,135,0.6);">Push</div>
+          <div class="card-title">Push Day</div>
+          <div class="card-meta">6 exercises · ~55 min</div>
+        </div>
+        <div class="session-card side" style="background:#141414;border:1px solid #1e1e1e;">
+          <div class="card-emoji">🦵</div>
+          <div class="card-session" style="color:rgba(255,255,255,0.4);">Legs</div>
+          <div class="card-title" style="font-size:15px;">Leg Day</div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-chip" style="background:linear-gradient(135deg,#0d1f14,#0a1a10);border-color:rgba(0,255,135,0.1);">
+          <div class="stat-label">Weight</div>
+          <div><span class="stat-value">92</span><span class="stat-unit"> kg</span></div>
+        </div>
+        <div class="stat-chip" style="background:linear-gradient(135deg,#0d1f14,#0a1a10);border-color:rgba(0,255,135,0.1);">
+          <div class="stat-label">Steps</div>
+          <div><span class="stat-value">8.2</span><span class="stat-unit">k</span></div>
+        </div>
+        <div class="stat-chip" style="background:linear-gradient(135deg,#0d1f14,#0a1a10);border-color:rgba(0,255,135,0.1);">
+          <div class="stat-label">Streak</div>
+          <div><span class="stat-value">12</span><span class="stat-unit"> d</span></div>
+        </div>
+      </div>
+
+      <div class="start-btn" style="background:linear-gradient(135deg,#00ff87 0%,#00cc6a 100%);margin:14px 20px 24px;">
+        <span style="font-size:18px;">💪</span> Start Push Day
+      </div>
+    </div>
+  </div>
+
+  <!-- BLUE HOME -->
+  <div class="phone-wrap blue">
+    <div class="phone-label">⚡ Electric Blue</div>
+    <div class="phone screen">
+      <div class="status-bar">
+        <span>9:41</span>
+        <div class="status-bar-icons">
+          <svg width="16" height="11" viewBox="0 0 16 11" fill="white"><rect x="0" y="3" width="3" height="8" rx="1"/><rect x="4.5" y="2" width="3" height="9" rx="1"/><rect x="9" y="0" width="3" height="11" rx="1"/></svg>
+          <svg width="16" height="12" viewBox="0 0 16 12" fill="white"><path d="M8 2C5.5 2 3.3 3 1.7 4.7L0 3C2 1.1 4.9 0 8 0s6 1.1 8 3l-1.7 1.7C12.7 3 10.5 2 8 2z"/><path d="M8 6c-1.4 0-2.7.6-3.6 1.5L3 6.1C4.3 4.8 6 4 8 4s3.7.8 5 2.1L11.6 7.5C10.7 6.6 9.4 6 8 6z"/><circle cx="8" cy="10" r="2"/></svg>
+          <svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="15" height="8" rx="2" fill="white"/><path d="M23 4v4a2 2 0 000-4z" fill="white" opacity="0.4"/></svg>
+        </div>
+      </div>
+
+      <div class="home-header">
+        <div>
+          <div class="greeting-small" style="color:rgba(0,212,255,0.6);">Good morning,</div>
+          <div class="greeting-name">Dasan</div>
+        </div>
+        <div class="avatar" style="background:linear-gradient(135deg,#001a2e,#00d4ff);color:#000;font-weight:800;">D</div>
+      </div>
+
+      <div class="rec-label" style="color:rgba(0,212,255,0.5);">Today's Session</div>
+
+      <div class="carousel">
+        <div class="session-card side" style="background:#141414;border:1px solid #1e1e1e;">
+          <div class="card-emoji">🏋️</div>
+          <div class="card-session" style="color:rgba(255,255,255,0.4);">Pull</div>
+          <div class="card-title" style="font-size:15px;">Pull Day</div>
+        </div>
+        <div class="session-card active" style="background:linear-gradient(135deg,#001a2e 0%,#000f1e 100%);border:1px solid rgba(0,212,255,0.2);">
+          <div class="card-glow" style="background:#00d4ff;"></div>
+          <div class="card-badge">TODAY</div>
+          <div class="card-emoji">💪</div>
+          <div class="card-session" style="color:rgba(0,212,255,0.6);">Push</div>
+          <div class="card-title">Push Day</div>
+          <div class="card-meta">6 exercises · ~55 min</div>
+        </div>
+        <div class="session-card side" style="background:#141414;border:1px solid #1e1e1e;">
+          <div class="card-emoji">🦵</div>
+          <div class="card-session" style="color:rgba(255,255,255,0.4);">Legs</div>
+          <div class="card-title" style="font-size:15px;">Leg Day</div>
+        </div>
+      </div>
+
+      <div class="stats-row">
+        <div class="stat-chip" style="background:linear-gradient(135deg,#0a1a24,#070f18);border-color:rgba(0,212,255,0.1);">
+          <div class="stat-label">Weight</div>
+          <div><span class="stat-value">92</span><span class="stat-unit"> kg</span></div>
+        </div>
+        <div class="stat-chip" style="background:linear-gradient(135deg,#0a1a24,#070f18);border-color:rgba(0,212,255,0.1);">
+          <div class="stat-label">Steps</div>
+          <div><span class="stat-value">8.2</span><span class="stat-unit">k</span></div>
+        </div>
+        <div class="stat-chip" style="background:linear-gradient(135deg,#0a1a24,#070f18);border-color:rgba(0,212,255,0.1);">
+          <div class="stat-label">Streak</div>
+          <div><span class="stat-value">12</span><span class="stat-unit"> d</span></div>
+        </div>
+      </div>
+
+      <div class="start-btn" style="background:linear-gradient(135deg,#00d4ff 0%,#0099cc 100%);margin:14px 20px 24px;">
+        <span style="font-size:18px;">💪</span> Start Push Day
+      </div>
+    </div>
+  </div>
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 2: ACTIVE WORKOUT -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section-heading">Active Workout</div>
+<p class="section-sub">Timer ring · weight · set cards · complete button</p>
+
+<div class="pair">
+
+  <!-- GREEN WORKOUT -->
+  <div class="phone-wrap green">
+    <div class="phone-label">⚡ Electric Green</div>
+    <div class="phone screen">
+      <div class="status-bar"><span>9:52</span><div class="status-bar-icons"><svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="15" height="8" rx="2" fill="white"/><path d="M23 4v4a2 2 0 000-4z" fill="white" opacity="0.4"/></svg></div></div>
+
+      <div class="workout-header">
+        <div class="back-btn">‹</div>
+        <div>
+          <div class="workout-title">Bench Press</div>
+          <div class="workout-sub">Exercise 2 of 6</div>
+        </div>
+        <div class="badge-1rm" style="background:rgba(0,255,135,0.12);color:#00ff87;border:1px solid rgba(0,255,135,0.2);">1RM ~110 kg</div>
+      </div>
+
+      <div class="timer-area">
+        <div class="timer-ring-wrap">
+          <svg width="110" height="110" viewBox="0 0 110 110">
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#0a2b1a" stroke-width="8"/>
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#00ff87" stroke-width="8" stroke-opacity="0.15" stroke-dasharray="301 0" stroke-linecap="round"/>
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#00ff87" stroke-width="8" stroke-dasharray="180 121" stroke-dashoffset="75" stroke-linecap="round" transform="rotate(-90 55 55)"/>
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#00ff87" stroke-width="10" stroke-dasharray="180 121" stroke-dashoffset="75" stroke-linecap="round" transform="rotate(-90 55 55)" style="filter:blur(4px);opacity:0.3"/>
+          </svg>
+          <div class="timer-center">
+            <div class="timer-time">1:47</div>
+            <div class="timer-label">Set time</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="weight-display">WEIGHT</div>
+      <div class="weight-value">100 <span style="font-size:18px;opacity:0.4;font-weight:600;">kg</span></div>
+
+      <div class="set-cards">
+        <div class="set-card done-card">
+          <div class="set-label" style="color:#f59e0b;">SET 1</div>
+          <div class="set-reps">8</div>
+          <div class="set-time">1:23</div>
+        </div>
+        <div class="set-card active-card" style="border-color:rgba(0,255,135,0.35);background:#0d1f14;">
+          <div class="set-label active-label" style="color:#00ff87;">SET 2</div>
+          <div class="set-reps">8</div>
+          <div class="set-btn log-set" style="background:#1a3d25;color:#00ff87;border:1px solid rgba(0,255,135,0.2);">Log ✓</div>
+        </div>
+        <div class="set-card" style="opacity:0.5;">
+          <div class="set-label" style="color:rgba(255,255,255,0.4);">SET 3</div>
+          <div class="set-reps">8</div>
+          <div class="set-btn" style="background:#1a1a1a;color:rgba(255,255,255,0.2);">—</div>
+        </div>
+      </div>
+
+      <div class="bottom-bar">
+        <div class="skip-btn">⇥</div>
+        <div class="complete-btn" style="background:#1a1a1a;color:rgba(255,255,255,0.25);">Complete Set →</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLUE WORKOUT -->
+  <div class="phone-wrap blue">
+    <div class="phone-label">⚡ Electric Blue</div>
+    <div class="phone screen">
+      <div class="status-bar"><span>9:52</span><div class="status-bar-icons"><svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="15" height="8" rx="2" fill="white"/><path d="M23 4v4a2 2 0 000-4z" fill="white" opacity="0.4"/></svg></div></div>
+
+      <div class="workout-header">
+        <div class="back-btn">‹</div>
+        <div>
+          <div class="workout-title">Bench Press</div>
+          <div class="workout-sub">Exercise 2 of 6</div>
+        </div>
+        <div class="badge-1rm" style="background:rgba(0,212,255,0.12);color:#00d4ff;border:1px solid rgba(0,212,255,0.2);">1RM ~110 kg</div>
+      </div>
+
+      <div class="timer-area">
+        <div class="timer-ring-wrap">
+          <svg width="110" height="110" viewBox="0 0 110 110">
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#001a2e" stroke-width="8"/>
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#00d4ff" stroke-width="8" stroke-opacity="0.15" stroke-dasharray="301 0" stroke-linecap="round"/>
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#00d4ff" stroke-width="8" stroke-dasharray="180 121" stroke-dashoffset="75" stroke-linecap="round" transform="rotate(-90 55 55)"/>
+            <circle cx="55" cy="55" r="48" fill="none" stroke="#00d4ff" stroke-width="10" stroke-dasharray="180 121" stroke-dashoffset="75" stroke-linecap="round" transform="rotate(-90 55 55)" style="filter:blur(4px);opacity:0.3"/>
+          </svg>
+          <div class="timer-center">
+            <div class="timer-time">1:47</div>
+            <div class="timer-label">Set time</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="weight-display">WEIGHT</div>
+      <div class="weight-value">100 <span style="font-size:18px;opacity:0.4;font-weight:600;">kg</span></div>
+
+      <div class="set-cards">
+        <div class="set-card done-card">
+          <div class="set-label" style="color:#f59e0b;">SET 1</div>
+          <div class="set-reps">8</div>
+          <div class="set-time" style="color:#00d4ff;">1:23</div>
+        </div>
+        <div class="set-card active-card" style="border-color:rgba(0,212,255,0.35);background:#001f30;">
+          <div class="set-label active-label" style="color:#00d4ff;">SET 2</div>
+          <div class="set-reps">8</div>
+          <div class="set-btn log-set" style="background:#001f30;color:#00d4ff;border:1px solid rgba(0,212,255,0.2);">Log ✓</div>
+        </div>
+        <div class="set-card" style="opacity:0.5;">
+          <div class="set-label" style="color:rgba(255,255,255,0.4);">SET 3</div>
+          <div class="set-reps">8</div>
+          <div class="set-btn" style="background:#1a1a1a;color:rgba(255,255,255,0.2);">—</div>
+        </div>
+      </div>
+
+      <div class="bottom-bar">
+        <div class="skip-btn">⇥</div>
+        <div class="complete-btn" style="background:#1a1a1a;color:rgba(255,255,255,0.25);">Complete Set →</div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<hr class="divider">
+
+<!-- ═══════════════════════════════════════════════════════════ -->
+<!-- SECTION 3: DONE / WORKOUT COMPLETE -->
+<!-- ═══════════════════════════════════════════════════════════ -->
+<div class="section-heading">Workout Complete</div>
+<p class="section-sub">Peak moment — the screen you see after finishing</p>
+
+<div class="pair">
+
+  <!-- GREEN DONE -->
+  <div class="phone-wrap green">
+    <div class="phone-label">⚡ Electric Green</div>
+    <div class="phone screen">
+      <div class="status-bar"><span>10:48</span><div class="status-bar-icons"><svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="15" height="8" rx="2" fill="white"/><path d="M23 4v4a2 2 0 000-4z" fill="white" opacity="0.4"/></svg></div></div>
+
+      <div class="done-screen">
+        <div class="done-check" style="background:linear-gradient(135deg,#003320,#001a10);border:1px solid rgba(0,255,135,0.25);">
+          <span>✓</span>
+          <div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #00ff87;opacity:0.3;"></div>
+          <div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid #00ff87;opacity:0.1;"></div>
+        </div>
+
+        <div>
+          <div class="done-title">You crushed it! 💪</div>
+          <div class="done-sub">6 of 6 exercises done · Monday 25 May</div>
+        </div>
+
+        <div class="done-stats">
+          <div class="done-stat">
+            <div class="done-stat-value" style="color:#00ff87;">58</div>
+            <div class="done-stat-label">Minutes</div>
+          </div>
+          <div style="width:1px;background:#222;"></div>
+          <div class="done-stat">
+            <div class="done-stat-value">6</div>
+            <div class="done-stat-label">Exercises</div>
+          </div>
+          <div style="width:1px;background:#222;"></div>
+          <div class="done-stat">
+            <div class="done-stat-value" style="color:#00ff87;">18</div>
+            <div class="done-stat-label">Sets</div>
+          </div>
+        </div>
+
+        <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+          <div class="done-ai-btn" style="background:linear-gradient(135deg,#00ff87 0%,#00cc6a 100%);">
+            ✦ Ask AI to analyse
+          </div>
+          <div class="done-home-btn">← Back to home</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BLUE DONE -->
+  <div class="phone-wrap blue">
+    <div class="phone-label">⚡ Electric Blue</div>
+    <div class="phone screen">
+      <div class="status-bar"><span>10:48</span><div class="status-bar-icons"><svg width="25" height="12" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="21" height="11" rx="3.5" stroke="white" stroke-opacity="0.35"/><rect x="2" y="2" width="15" height="8" rx="2" fill="white"/><path d="M23 4v4a2 2 0 000-4z" fill="white" opacity="0.4"/></svg></div></div>
+
+      <div class="done-screen">
+        <div class="done-check" style="background:linear-gradient(135deg,#001a2e,#000f1e);border:1px solid rgba(0,212,255,0.25);">
+          <span>✓</span>
+          <div style="position:absolute;inset:-6px;border-radius:50%;border:2px solid #00d4ff;opacity:0.3;"></div>
+          <div style="position:absolute;inset:-14px;border-radius:50%;border:1px solid #00d4ff;opacity:0.1;"></div>
+        </div>
+
+        <div>
+          <div class="done-title">You crushed it! 💪</div>
+          <div class="done-sub">6 of 6 exercises done · Monday 25 May</div>
+        </div>
+
+        <div class="done-stats">
+          <div class="done-stat">
+            <div class="done-stat-value" style="color:#00d4ff;">58</div>
+            <div class="done-stat-label">Minutes</div>
+          </div>
+          <div style="width:1px;background:#222;"></div>
+          <div class="done-stat">
+            <div class="done-stat-value">6</div>
+            <div class="done-stat-label">Exercises</div>
+          </div>
+          <div style="width:1px;background:#222;"></div>
+          <div class="done-stat">
+            <div class="done-stat-value" style="color:#00d4ff;">18</div>
+            <div class="done-stat-label">Sets</div>
+          </div>
+        </div>
+
+        <div style="width:100%;display:flex;flex-direction:column;gap:10px;">
+          <div class="done-ai-btn" style="background:linear-gradient(135deg,#00d4ff 0%,#0099cc 100%);">
+            ✦ Ask AI to analyse
+          </div>
+          <div class="done-home-btn">← Back to home</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<p class="subtitle" style="margin-top:16px;">Open this file in your phone browser for the best comparison at S25 Ultra scale</p>
+
+</body>
+</html>

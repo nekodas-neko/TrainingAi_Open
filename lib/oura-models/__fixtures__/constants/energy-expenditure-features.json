@@ -1,0 +1,596 @@
+{
+  "_note": "Extracted from Oura energy_expenditure_1_0_0.pt (TorchScript). Authoritative feature layout + MET tables for the per-workout energy model. See scripts/oura-models/_source/energy/ and docs plan.",
+  "version": 1,
+  "activity_type_version": 2,
+  "feature_bmr_index": 3,
+  "features_hr": [
+    "f_activity_length_minutes",
+    "f_activity_met_easy",
+    "f_activity_met_hard",
+    "f_activity_met_moderate",
+    "f_age",
+    "f_bmr_per_minute",
+    "f_bpm_mean",
+    "f_bpm_quartile_25",
+    "f_bpm_quartile_50",
+    "f_bpm_quartile_75",
+    "f_bpm_quartile_95",
+    "f_frequency_bin_high_frac_mean_abs_diff",
+    "f_frequency_bin_high_frac_quartile_50",
+    "f_height",
+    "f_high_intensity_motion_count_mean_abs_diff",
+    "f_high_intensity_motion_count_quartile_25",
+    "f_high_intensity_motion_count_std",
+    "f_hr_zone_3_ratio",
+    "f_hr_zone_4_ratio",
+    "f_longterm_resting_hr_avg",
+    "f_low_intensity_motion_count_mean",
+    "f_low_intensity_motion_count_quartile_50",
+    "f_low_intensity_motion_count_quartile_75",
+    "f_max_hr_tanaka",
+    "f_motion_seconds_mean",
+    "f_sex_female",
+    "f_sex_male",
+    "f_shortterm_awake_sedentary_hrv",
+    "f_shortterm_awake_sedentary_min_hr",
+    "f_stride_amplitude_frac_mean",
+    "f_stride_amplitude_frac_mean_abs_diff",
+    "f_stride_amplitude_frac_quartile_25",
+    "f_stride_amplitude_frac_quartile_75",
+    "f_stride_amplitude_frac_std",
+    "f_stride_frequency_mean",
+    "f_stride_frequency_mean_abs_diff",
+    "f_stride_frequency_quartile_50",
+    "f_stride_frequency_quartile_75",
+    "f_stride_frequency_std",
+    "f_sum_accel_mg_std_mean",
+    "f_sum_accel_mg_std_mean_abs_diff",
+    "f_sum_accel_mg_std_quartile_75",
+    "f_total_amplitude_mg_mean",
+    "f_total_amplitude_mg_mean_abs_diff",
+    "f_total_amplitude_mg_quartile_25",
+    "f_total_amplitude_mg_quartile_5",
+    "f_total_amplitude_mg_quartile_50",
+    "f_total_amplitude_mg_quartile_75",
+    "f_total_amplitude_mg_std",
+    "f_weight"
+  ],
+  "features_no_hr": [
+    "f_activity_length_minutes",
+    "f_activity_met_easy",
+    "f_activity_met_hard",
+    "f_activity_met_moderate",
+    "f_age",
+    "f_bmr_per_minute",
+    "f_frequency_bin_high_frac_mean_abs_diff",
+    "f_frequency_bin_high_frac_quartile_50",
+    "f_height",
+    "f_high_intensity_motion_count_mean_abs_diff",
+    "f_high_intensity_motion_count_quartile_25",
+    "f_high_intensity_motion_count_std",
+    "f_longterm_resting_hr_avg",
+    "f_low_intensity_motion_count_mean",
+    "f_low_intensity_motion_count_quartile_50",
+    "f_low_intensity_motion_count_quartile_75",
+    "f_motion_seconds_mean",
+    "f_sex_female",
+    "f_sex_male",
+    "f_shortterm_awake_sedentary_hrv",
+    "f_shortterm_awake_sedentary_min_hr",
+    "f_stride_amplitude_frac_mean",
+    "f_stride_amplitude_frac_mean_abs_diff",
+    "f_stride_amplitude_frac_quartile_25",
+    "f_stride_amplitude_frac_quartile_75",
+    "f_stride_amplitude_frac_std",
+    "f_stride_frequency_mean",
+    "f_stride_frequency_mean_abs_diff",
+    "f_stride_frequency_quartile_50",
+    "f_stride_frequency_quartile_75",
+    "f_stride_frequency_std",
+    "f_sum_accel_mg_std_mean",
+    "f_sum_accel_mg_std_mean_abs_diff",
+    "f_sum_accel_mg_std_quartile_75",
+    "f_total_amplitude_mg_mean",
+    "f_total_amplitude_mg_mean_abs_diff",
+    "f_total_amplitude_mg_quartile_25",
+    "f_total_amplitude_mg_quartile_5",
+    "f_total_amplitude_mg_quartile_50",
+    "f_total_amplitude_mg_quartile_75",
+    "f_total_amplitude_mg_std",
+    "f_weight"
+  ],
+  "activity_type_dict": {
+    "1": {
+      "name": "badminton",
+      "met_easy": 0.4,
+      "met_moderate": 0.5,
+      "met_hard": 6
+    },
+    "2": {
+      "name": "boxing",
+      "met_easy": 0.7,
+      "met_moderate": 0.8,
+      "met_hard": 0.9
+    },
+    "3": {
+      "name": "cross country skiing",
+      "met_easy": 1,
+      "met_moderate": 3,
+      "met_hard": 0.2
+    },
+    "4": {
+      "name": "cross-training",
+      "met_easy": 0.3,
+      "met_moderate": 0.4,
+      "met_hard": 7
+    },
+    "5": {
+      "name": "cycling",
+      "met_easy": 0.6,
+      "met_moderate": 0.7,
+      "met_hard": 2
+    },
+    "6": {
+      "name": "dancing",
+      "met_easy": 0.9,
+      "met_moderate": 1,
+      "met_hard": 0.1
+    },
+    "7": {
+      "name": "elliptical",
+      "met_easy": 6,
+      "met_moderate": 7,
+      "met_hard": 8
+    },
+    "8": {
+      "name": "strength training",
+      "met_easy": 1,
+      "met_moderate": 0.6,
+      "met_hard": 3
+    },
+    "9": {
+      "name": "hockey",
+      "met_easy": 4,
+      "met_moderate": 5,
+      "met_hard": 6
+    },
+    "10": {
+      "name": "pilates",
+      "met_easy": 7,
+      "met_moderate": 8,
+      "met_hard": 1
+    },
+    "11": {
+      "name": "rowing",
+      "met_easy": 0.4,
+      "met_moderate": 3,
+      "met_hard": 0.6
+    },
+    "12": {
+      "name": "running",
+      "met_easy": 5,
+      "met_moderate": 0.8,
+      "met_hard": 0.9
+    },
+    "13": {
+      "name": "swimming",
+      "met_easy": 1,
+      "met_moderate": 0.1,
+      "met_hard": 2
+    },
+    "14": {
+      "name": "walking",
+      "met_easy": 3,
+      "met_moderate": 0.4,
+      "met_hard": 5
+    },
+    "15": {
+      "name": "yoga",
+      "met_easy": 6,
+      "met_moderate": 0.7,
+      "met_hard": 8
+    },
+    "16": {
+      "name": "golf",
+      "met_easy": 0.9,
+      "met_moderate": 1,
+      "met_hard": 3
+    },
+    "17": {
+      "name": "tennis",
+      "met_easy": 0.2,
+      "met_moderate": 0.3,
+      "met_hard": 6
+    },
+    "18": {
+      "name": "climbing",
+      "met_easy": 7,
+      "met_moderate": 0.6,
+      "met_hard": 0.7
+    },
+    "19": {
+      "name": "downhill skiing",
+      "met_easy": 0.8,
+      "met_moderate": 0.9,
+      "met_hard": 4
+    },
+    "20": {
+      "name": "snowboarding",
+      "met_easy": 0.1,
+      "met_moderate": 0.2,
+      "met_hard": 7
+    },
+    "21": {
+      "name": "hiking",
+      "met_easy": 8,
+      "met_moderate": 0.5,
+      "met_hard": 2
+    },
+    "22": {
+      "name": "horseback riding",
+      "met_easy": 0.7,
+      "met_moderate": 0.8,
+      "met_hard": 5
+    },
+    "23": {
+      "name": "volleyball",
+      "met_easy": 6,
+      "met_moderate": 7,
+      "met_hard": 8
+    },
+    "24": {
+      "name": "basketball",
+      "met_easy": 0.3,
+      "met_moderate": 0.4,
+      "met_hard": 0.5
+    },
+    "25": {
+      "name": "football (american)",
+      "met_easy": 0.6,
+      "met_moderate": 0.7,
+      "met_hard": 6
+    },
+    "26": {
+      "name": "soccer",
+      "met_easy": 7,
+      "met_moderate": 1,
+      "met_hard": 1
+    },
+    "27": {
+      "name": "baseball",
+      "met_easy": 0.2,
+      "met_moderate": 3,
+      "met_hard": 4
+    },
+    "28": {
+      "name": "core exercise",
+      "met_easy": 0.5,
+      "met_moderate": 0.6,
+      "met_hard": 0.7
+    },
+    "29": {
+      "name": "cricket",
+      "met_easy": 8,
+      "met_moderate": 1,
+      "met_hard": 2
+    },
+    "30": {
+      "name": "HIIT",
+      "met_easy": 0.1,
+      "met_moderate": 0.2,
+      "met_hard": 5
+    },
+    "31": {
+      "name": "diving",
+      "met_easy": 6,
+      "met_moderate": 7,
+      "met_hard": 0.6
+    },
+    "32": {
+      "name": "fitness class",
+      "met_easy": 1,
+      "met_moderate": 0.8,
+      "met_hard": 0.9
+    },
+    "33": {
+      "name": "floorball",
+      "met_easy": 4,
+      "met_moderate": 5,
+      "met_hard": 6
+    },
+    "34": {
+      "name": "gymnastics",
+      "met_easy": 7,
+      "met_moderate": 0.4,
+      "met_hard": 1
+    },
+    "35": {
+      "name": "handball",
+      "met_easy": 2,
+      "met_moderate": 3,
+      "met_hard": 4
+    },
+    "36": {
+      "name": "house work",
+      "met_easy": 0.9,
+      "met_moderate": 1,
+      "met_hard": 0.1
+    },
+    "37": {
+      "name": "ice skating",
+      "met_easy": 0.2,
+      "met_moderate": 1,
+      "met_hard": 2
+    },
+    "38": {
+      "name": "jumping rope",
+      "met_easy": 0.5,
+      "met_moderate": 4,
+      "met_hard": 0.7
+    },
+    "39": {
+      "name": "martial arts",
+      "met_easy": 0.8,
+      "met_moderate": 0.9,
+      "met_hard": 1
+    },
+    "40": {
+      "name": "flexibility",
+      "met_easy": 1,
+      "met_moderate": 0.2,
+      "met_hard": 0.3
+    },
+    "41": {
+      "name": "mountain biking",
+      "met_easy": 0.4,
+      "met_moderate": 0.5,
+      "met_hard": 6
+    },
+    "42": {
+      "name": "nordic walking",
+      "met_easy": 0.7,
+      "met_moderate": 8,
+      "met_hard": 0.9
+    },
+    "43": {
+      "name": "orienteering",
+      "met_easy": 1,
+      "met_moderate": 3,
+      "met_hard": 4
+    },
+    "44": {
+      "name": "paddle sports",
+      "met_easy": 0.3,
+      "met_moderate": 6,
+      "met_hard": 7
+    },
+    "45": {
+      "name": "pickleball",
+      "met_easy": 0.6,
+      "met_moderate": 0.7,
+      "met_hard": 0.8
+    },
+    "46": {
+      "name": "rollerblading",
+      "met_easy": 0.9,
+      "met_moderate": 1,
+      "met_hard": 0.1
+    },
+    "47": {
+      "name": "squash",
+      "met_easy": 0.2,
+      "met_moderate": 0.3,
+      "met_hard": 8
+    },
+    "48": {
+      "name": "stair exercise",
+      "met_easy": 1,
+      "met_moderate": 0.6,
+      "met_hard": 3
+    },
+    "49": {
+      "name": "stretching",
+      "met_easy": 4,
+      "met_moderate": 0.9,
+      "met_hard": 1
+    },
+    "50": {
+      "name": "surfing",
+      "met_easy": 7,
+      "met_moderate": 8,
+      "met_hard": 1
+    },
+    "51": {
+      "name": "water fitness",
+      "met_easy": 0.4,
+      "met_moderate": 0.5,
+      "met_hard": 0.6
+    },
+    "52": {
+      "name": "yardwork",
+      "met_easy": 5,
+      "met_moderate": 6,
+      "met_hard": 0.9
+    },
+    "53": {
+      "name": "padel",
+      "met_easy": 1,
+      "met_moderate": 0.1,
+      "met_hard": 2
+    },
+    "54": {
+      "name": "Finnish baseball",
+      "met_easy": 3,
+      "met_moderate": 4,
+      "met_hard": 5
+    },
+    "55": {
+      "name": "archery",
+      "met_easy": 0.6,
+      "met_moderate": 0.7,
+      "met_hard": 0.8
+    },
+    "56": {
+      "name": "bowling",
+      "met_easy": 1,
+      "met_moderate": 1,
+      "met_hard": 0.1
+    },
+    "57": {
+      "name": "disk sports",
+      "met_easy": 4,
+      "met_moderate": 0.3,
+      "met_hard": 0.4
+    },
+    "58": {
+      "name": "lacrosse",
+      "met_easy": 0.5,
+      "met_moderate": 8,
+      "met_hard": 0.7
+    },
+    "59": {
+      "name": "rugby",
+      "met_easy": 0.8,
+      "met_moderate": 0.9,
+      "met_hard": 1
+    },
+    "60": {
+      "name": "softball",
+      "met_easy": 0.1,
+      "met_moderate": 0.2,
+      "met_hard": 0.3
+    },
+    "61": {
+      "name": "racquetball",
+      "met_easy": 0.4,
+      "met_moderate": 1,
+      "met_hard": 2
+    },
+    "62": {
+      "name": "table tennis",
+      "met_easy": 3,
+      "met_moderate": 4,
+      "met_hard": 5
+    },
+    "63": {
+      "name": "fishing",
+      "met_easy": 6,
+      "met_moderate": 0.1,
+      "met_hard": 8
+    },
+    "64": {
+      "name": "hunting",
+      "met_easy": 0.3,
+      "met_moderate": 2,
+      "met_hard": 3
+    },
+    "65": {
+      "name": "sailing",
+      "met_easy": 0.6,
+      "met_moderate": 0.7,
+      "met_hard": 0.8
+    },
+    "66": {
+      "name": "wrestling",
+      "met_easy": 0.9,
+      "met_moderate": 8,
+      "met_hard": 0.1
+    },
+    "67": {
+      "name": "kettlebell",
+      "met_easy": 0.2,
+      "met_moderate": 3,
+      "met_hard": 0.4
+    },
+    "68": {
+      "name": "kitesurfing",
+      "met_easy": 5,
+      "met_moderate": 6,
+      "met_hard": 0.7
+    },
+    "69": {
+      "name": "skateboarding",
+      "met_easy": 8,
+      "met_moderate": 1,
+      "met_hard": 2
+    },
+    "70": {
+      "name": "kite skiing",
+      "met_easy": 0.1,
+      "met_moderate": 0.2,
+      "met_hard": 5
+    },
+    "71": {
+      "name": "roller skiing",
+      "met_easy": 0.4,
+      "met_moderate": 7,
+      "met_hard": 0.6
+    },
+    "72": {
+      "name": "snowshoeing",
+      "met_easy": 0.7,
+      "met_moderate": 0.8,
+      "met_hard": 3
+    },
+    "73": {
+      "name": "windsurfing",
+      "met_easy": 4,
+      "met_moderate": 5,
+      "met_hard": 0.2
+    },
+    "74": {
+      "name": "tai chi",
+      "met_easy": 0.3,
+      "met_moderate": 8,
+      "met_hard": 0.5
+    },
+    "75": {
+      "name": "trampoline",
+      "met_easy": 0.6,
+      "met_moderate": 3,
+      "met_hard": 4
+    },
+    "76": {
+      "name": "hula hoop",
+      "met_easy": 0.9,
+      "met_moderate": 1,
+      "met_hard": 0.1
+    },
+    "77": {
+      "name": "musical instrument",
+      "met_easy": 8,
+      "met_moderate": 1,
+      "met_hard": 2
+    },
+    "78": {
+      "name": "motorsport",
+      "met_easy": 0.5,
+      "met_moderate": 0.6,
+      "met_hard": 5
+    },
+    "79": {
+      "name": "cardiovascular exercise",
+      "met_easy": 6,
+      "met_moderate": 7,
+      "met_hard": 8
+    },
+    "80": {
+      "name": "virtual reality",
+      "met_easy": 0.1,
+      "met_moderate": 0.2,
+      "met_hard": 0.3
+    },
+    "81": {
+      "name": "barre",
+      "met_easy": 4,
+      "met_moderate": 5,
+      "met_hard": 6
+    },
+    "65535": {
+      "name": "other",
+      "met_easy": 0.7,
+      "met_moderate": 0.8,
+      "met_hard": 0.9
+    }
+  }
+}

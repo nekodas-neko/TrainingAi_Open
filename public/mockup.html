@@ -1,0 +1,990 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>TrainingAI — Workout UI Mockups</title>
+<style>
+  :root {
+    --brand: #00ff87;
+    --blue: #00d4ff;
+    --bg: #0d0d0d;
+    --card: #161616;
+    --card2: #1c1c1c;
+    --border: rgba(255,255,255,0.07);
+    --muted: rgba(255,255,255,0.38);
+    --text: #f0f0f0;
+    --red: #ff4d4d;
+    --green: #00ff87;
+    --purple: #bf5fff;
+    --orange: #ff6a1a;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: #111;
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', sans-serif;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 28px 16px 60px;
+  }
+  h1 { font-size: 22px; font-weight: 800; text-align: center; margin-bottom: 4px; color: var(--brand); }
+  .subtitle { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 24px; }
+
+  /* Top tabs */
+  .tabs { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 28px; }
+  .tab { padding: 8px 16px; border-radius: 20px; font-size: 13px; font-weight: 600; background: #222; border: 1px solid rgba(255,255,255,0.1); color: var(--muted); cursor: pointer; transition: all .15s; }
+  .tab.active { background: var(--brand); color: #000; border-color: var(--brand); }
+
+  .section { display: none; }
+  .section.active { display: block; }
+
+  /* Phone grid */
+  .phones { display: flex; gap: 18px; flex-wrap: wrap; justify-content: center; align-items: flex-start; }
+  .phone-col { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .phone-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); }
+  .phone-sublabel { font-size: 11px; color: rgba(255,255,255,0.2); text-align: center; max-width: 240px; line-height: 1.4; }
+
+  /* Phone frame */
+  .phone {
+    width: 270px; height: 585px;
+    background: var(--bg);
+    border-radius: 40px;
+    border: 1.5px solid rgba(255,255,255,0.1);
+    overflow: hidden;
+    position: relative;
+    box-shadow: 0 24px 60px rgba(0,0,0,0.7), inset 0 1px 0 rgba(255,255,255,0.06);
+    display: flex; flex-direction: column;
+    flex-shrink: 0;
+  }
+
+  /* Status bar */
+  .sbar { height: 36px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px; font-size: 11px; font-weight: 600; color: rgba(255,255,255,0.6); flex-shrink: 0; }
+  .sbar-r { display: flex; align-items: center; gap: 4px; }
+
+  /* Scroll area */
+  .scroll { flex: 1; overflow-y: auto; overflow-x: hidden; scrollbar-width: none; padding: 10px 13px; display: flex; flex-direction: column; gap: 9px; }
+  .scroll::-webkit-scrollbar { display: none; }
+
+  /* Footer */
+  .footer { padding: 10px 13px 18px; border-top: 1px solid var(--border); flex-shrink: 0; }
+  .btn { width: 100%; height: 46px; border-radius: 14px; font-size: 14px; font-weight: 700; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px; }
+  .btn-brand { background: var(--brand); color: #000; }
+  .btn-blue { background: linear-gradient(135deg, var(--blue), var(--brand)); color: #000; box-shadow: 0 0 18px rgba(0,212,255,0.2); }
+  .btn-green { background: #00c96e; color: #000; }
+  .btn-bounce { animation: bounce .9s ease-in-out infinite; }
+  @keyframes bounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
+  @keyframes border-run { from { stroke-dashoffset: 660; } to { stroke-dashoffset: 0; } }
+  @keyframes pulse-glow { 0%,100% { box-shadow: 0 0 10px rgba(0,212,255,0.2), inset 0 0 0 1px rgba(0,212,255,0.15); } 50% { box-shadow: 0 0 22px rgba(0,212,255,0.45), inset 0 0 0 1px rgba(0,212,255,0.35); } }
+
+  /* Cards */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 11px 13px; }
+  .card-brand { background: rgba(0,255,135,0.08); border: 1px solid rgba(0,255,135,0.2); border-radius: 14px; padding: 11px 13px; }
+  .lxs { font-size: 10px; font-weight: 700; letter-spacing: 1.2px; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+
+  /* Set cards */
+  .set-card { border-radius: 13px; padding: 9px 11px; display: flex; align-items: center; gap: 9px; border: 1px solid var(--border); background: var(--card); }
+  .set-card.done { opacity: 0.45; }
+  .set-card.active { background: rgba(0,212,255,0.05); border-color: transparent; animation: pulse-glow 2s ease-in-out infinite; position: relative; }
+  .set-num { width: 26px; height: 26px; border-radius: 7px; background: rgba(255,255,255,0.06); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: var(--muted); flex-shrink: 0; }
+  .set-num.done-num { background: rgba(0,255,135,0.15); color: var(--green); }
+  .set-num.active-num { background: rgba(0,212,255,0.18); color: var(--blue); }
+  .set-info { flex: 1; min-width: 0; }
+  .set-wt { font-size: 14px; font-weight: 700; }
+  .set-sub { font-size: 10px; color: var(--muted); margin-top: 1px; }
+  .set-tag { font-size: 10px; font-weight: 600; }
+  .tag-green { color: var(--green); }
+  .tag-blue { color: var(--blue); }
+
+  /* Dial */
+  .dial { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+  .dial-btn { width: 26px; height: 26px; border-radius: 7px; background: rgba(255,255,255,0.07); border: 1px solid var(--border); display: flex; align-items: center; justify-content: center; font-size: 15px; font-weight: 700; color: var(--text); cursor: pointer; flex-shrink: 0; }
+  .dial-val { font-size: 14px; font-weight: 800; min-width: 22px; text-align: center; color: var(--blue); }
+
+  /* Rest timer */
+  .rest-row { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 10px 12px; display: flex; align-items: center; gap: 12px; }
+  .rest-right { flex: 1; }
+  .rest-count { font-size: 22px; font-weight: 900; color: var(--brand); letter-spacing: -.02em; }
+  .rest-bar { height: 3px; background: rgba(255,255,255,0.07); border-radius: 2px; overflow: hidden; margin-top: 6px; }
+  .rest-fill { height: 100%; background: var(--brand); border-radius: 2px; }
+  .rest-next { font-size: 10px; color: var(--muted); margin-top: 4px; }
+
+  /* Section description */
+  .desc { text-align: center; color: var(--muted); font-size: 13px; margin-bottom: 20px; line-height: 1.5; max-width: 720px; margin-left: auto; margin-right: auto; }
+  .desc strong { color: var(--text); }
+
+  /* Variant label boxes */
+  .variant-badge {
+    display: inline-block; padding: 4px 14px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-bottom: 8px;
+  }
+  .va-badge { background: rgba(0,255,135,0.12); color: var(--green); border: 1px solid rgba(0,255,135,0.25); }
+  .vb-badge { background: rgba(0,212,255,0.12); color: var(--blue); border: 1px solid rgba(0,212,255,0.25); }
+  .vc-badge { background: rgba(191,95,255,0.12); color: var(--purple); border: 1px solid rgba(191,95,255,0.25); }
+
+  /* Timer variants */
+  /* A: pill chip in header right */
+  .timer-chip-a {
+    display: flex; align-items: center; gap: 5px;
+    background: rgba(0,255,135,0.1); border: 1px solid rgba(0,255,135,0.22);
+    border-radius: 20px; padding: 4px 10px; flex-shrink: 0;
+  }
+  .timer-chip-a .t-val { font-size: 14px; font-weight: 800; color: var(--brand); letter-spacing: -.01em; }
+  .timer-chip-a .t-icon { font-size: 11px; }
+
+  /* B: 3-line header with timer on its own line */
+  .timer-line-b {
+    font-size: 18px; font-weight: 900; color: var(--brand); letter-spacing: -.02em; text-align: center; line-height: 1;
+  }
+
+  /* C: floating sticky badge (position absolute top-right) */
+  .timer-float-c {
+    position: absolute; top: 10px; right: 10px; z-index: 20;
+    display: flex; align-items: center; gap: 4px;
+    background: rgba(0,0,0,0.75); border: 1px solid rgba(0,255,135,0.3);
+    border-radius: 20px; padding: 5px 11px;
+    backdrop-filter: blur(8px);
+  }
+  .timer-float-c .t-val { font-size: 15px; font-weight: 800; color: var(--brand); letter-spacing: -.01em; }
+  .timer-float-c .t-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--brand); box-shadow: 0 0 6px var(--brand); }
+</style>
+</head>
+<body>
+
+<h1>TrainingAI — Workout UI</h1>
+<p class="subtitle">Design exploration</p>
+
+<div class="tabs">
+  <button class="tab active" onclick="showTab('timer')">Timer Placement</button>
+  <button class="tab" onclick="showTab('stats')">Stats Card</button>
+  <button class="tab" onclick="showTab('confirm')">Start Confirm</button>
+  <button class="tab" onclick="showTab('ready')">Ready Screen</button>
+  <button class="tab" onclick="showTab('summary')">Set Summary</button>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     TIMER PLACEMENT
+══════════════════════════════════════════════ -->
+<div id="timer" class="section active">
+  <p class="desc">
+    Three placements for the session timer — shown across <strong>warmup</strong>, <strong>active set</strong>, and <strong>rest</strong> states.<br>
+    All keep the current set-card layout. Difference is only where the timer lives.
+  </p>
+
+  <!-- ── OPTION A ── -->
+  <p style="text-align:center;margin-bottom:14px;"><span class="variant-badge va-badge">A · Timer chip — header right</span></p>
+  <div class="phones" style="margin-bottom:36px;">
+
+    <!-- Warmup -->
+    <div class="phone-col">
+      <div class="phone-label">Warmup screen</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <!-- Header A -->
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:13px;font-weight:700;">Push Day A</p>
+            <p style="font-size:10px;color:var(--muted);">Warmup</p>
+          </div>
+          <div class="timer-chip-a"><span class="t-icon">⏱</span><span class="t-val">02:14</span></div>
+        </div>
+        <div class="scroll">
+          <div style="text-align:center;padding:8px 0 4px;">
+            <p style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Full body warmup</p>
+            <p style="font-size:11px;color:rgba(255,255,255,0.25);">5–8 min · before first exercise</p>
+          </div>
+          <div class="card-brand" style="text-align:center;padding:14px;">
+            <p style="font-size:28px;font-weight:900;margin-bottom:4px;">🔥</p>
+            <p style="font-size:13px;font-weight:700;color:var(--brand);margin-bottom:2px;">Activate your muscles</p>
+            <p style="font-size:11px;color:rgba(0,255,135,0.55);">5 min cardio · dynamic stretching</p>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;gap:7px;">
+            <p class="lxs">Target muscles today</p>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <span style="background:rgba(0,255,135,0.1);border:1px solid rgba(0,255,135,0.22);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;color:var(--brand);">Chest</span>
+              <span style="background:rgba(0,255,135,0.06);border:1px solid rgba(0,255,135,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:rgba(0,255,135,0.7);">Shoulders</span>
+              <span style="background:rgba(0,255,135,0.06);border:1px solid rgba(0,255,135,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:rgba(0,255,135,0.7);">Triceps</span>
+            </div>
+          </div>
+          <div class="card">
+            <p class="lxs">Mood check-in</p>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:22px;">⚡</span>
+              <div>
+                <p style="font-size:13px;font-weight:700;">Feeling pumped</p>
+                <p style="font-size:10px;color:var(--muted);">Logged · tap to edit</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-brand">Begin Exercises →</button></div>
+      </div>
+      <p class="phone-sublabel">Timer chip always visible, doesn't compete with screen title</p>
+    </div>
+
+    <!-- Active set -->
+    <div class="phone-col">
+      <div class="phone-label">Active set</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:13px;font-weight:700;">Bench Press</p>
+            <p style="font-size:10px;color:var(--muted);">Ex 2 of 6 · Set 2 active</p>
+          </div>
+          <div class="timer-chip-a"><span class="t-icon">⏱</span><span class="t-val">24:13</span></div>
+        </div>
+        <div class="scroll">
+          <p style="font-size:11px;color:var(--muted);">Last: 100×5, 5, 4 · 3 sets</p>
+          <!-- Set 1 done -->
+          <div class="set-card done">
+            <div class="set-num done-num">✓</div>
+            <div class="set-info"><div class="set-wt">100 kg</div><div class="set-sub">5 reps · 1:12</div></div>
+            <span class="set-tag tag-green">Done</span>
+          </div>
+          <!-- Set 2 active with SVG border -->
+          <div style="position:relative;">
+            <div class="set-card active">
+              <svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;" viewBox="0 0 244 46" preserveAspectRatio="none">
+                <rect x=".75" y=".75" width="242.5" height="44.5" rx="12.25" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="660 660" style="animation:border-run 2.5s linear infinite;"/>
+              </svg>
+              <div class="set-num active-num">2</div>
+              <div class="set-info"><div class="set-wt" style="color:var(--blue);">102.5 kg</div><div class="set-sub" style="color:var(--blue);">Set 2 · Active ▶</div></div>
+              <div class="dial"><div class="dial-btn">−</div><div class="dial-val">5</div><div class="dial-btn">+</div></div>
+            </div>
+          </div>
+          <!-- Set 3 upcoming -->
+          <div class="set-card" style="opacity:0.4;">
+            <div class="set-num">3</div>
+            <div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">Target: 5 reps</div></div>
+            <div class="dial"><div class="dial-btn">−</div><div class="dial-val">5</div><div class="dial-btn">+</div></div>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-blue">Log Set 2</button></div>
+      </div>
+      <p class="phone-sublabel">Chip sits right of title — no vertical space taken from set cards</p>
+    </div>
+
+    <!-- Rest -->
+    <div class="phone-col">
+      <div class="phone-label">Rest timer</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:13px;font-weight:700;">Bench Press</p>
+            <p style="font-size:10px;color:var(--muted);">Resting · next: Set 3</p>
+          </div>
+          <div class="timer-chip-a"><span class="t-icon">⏱</span><span class="t-val">26:04</span></div>
+        </div>
+        <div class="scroll">
+          <div class="rest-row">
+            <svg width="56" height="56" viewBox="0 0 72 72" style="flex-shrink:0;">
+              <circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="6"/>
+              <circle cx="36" cy="36" r="30" fill="none" stroke="var(--brand)" stroke-width="6" stroke-dasharray="127 188" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 36 36)"/>
+              <text x="36" y="40" text-anchor="middle" fill="var(--text)" font-size="13" font-weight="800">42s</text>
+            </svg>
+            <div class="rest-right">
+              <p style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px;">Rest · 90s</p>
+              <p class="rest-count">42s left</p>
+              <div class="rest-bar"><div class="rest-fill" style="width:53%;"></div></div>
+              <p class="rest-next">Next: Set 3 · 102.5 kg × 5</p>
+            </div>
+          </div>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">100 kg</div><div class="set-sub">5 reps · 1:12</div></div><span class="set-tag tag-green">Done</span></div>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">5 reps · 1:08</div></div><span class="set-tag tag-green">Done</span></div>
+          <div class="set-card" style="opacity:0.4;"><div class="set-num">3</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">Target: 5 reps</div></div></div>
+        </div>
+        <div class="footer"><button class="btn btn-brand btn-bounce">▶ Start Set 3 early</button></div>
+      </div>
+      <p class="phone-sublabel">Timer visible throughout rest without changing layout</p>
+    </div>
+  </div>
+
+  <!-- ── OPTION B ── -->
+  <p style="text-align:center;margin-bottom:14px;"><span class="variant-badge vb-badge">B · Timer on its own header line</span></p>
+  <div class="phones" style="margin-bottom:36px;">
+
+    <!-- Warmup B -->
+    <div class="phone-col">
+      <div class="phone-label">Warmup screen</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <!-- Header B: 3 lines -->
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;text-align:center;">
+            <p style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.65);">Push Day A · Warmup</p>
+            <p class="timer-line-b">02:14</p>
+          </div>
+          <div style="width:30px;flex-shrink:0;"></div>
+        </div>
+        <div class="scroll">
+          <div style="text-align:center;padding:6px 0;">
+            <p style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Full body warmup</p>
+            <p style="font-size:11px;color:rgba(255,255,255,0.22);">5–8 min · before first exercise</p>
+          </div>
+          <div class="card-brand" style="text-align:center;padding:14px;">
+            <p style="font-size:28px;font-weight:900;margin-bottom:4px;">🔥</p>
+            <p style="font-size:13px;font-weight:700;color:var(--brand);margin-bottom:2px;">Activate your muscles</p>
+            <p style="font-size:11px;color:rgba(0,255,135,0.55);">5 min cardio · dynamic stretching</p>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;gap:7px;">
+            <p class="lxs">Target muscles today</p>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <span style="background:rgba(0,255,135,0.1);border:1px solid rgba(0,255,135,0.22);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;color:var(--brand);">Chest</span>
+              <span style="background:rgba(0,255,135,0.06);border:1px solid rgba(0,255,135,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:rgba(0,255,135,0.7);">Shoulders</span>
+              <span style="background:rgba(0,255,135,0.06);border:1px solid rgba(0,255,135,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:rgba(0,255,135,0.7);">Triceps</span>
+            </div>
+          </div>
+          <div class="card">
+            <p class="lxs">Mood check-in</p>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <span style="font-size:22px;">⚡</span>
+              <div><p style="font-size:13px;font-weight:700;">Feeling pumped</p><p style="font-size:10px;color:var(--muted);">Logged · tap to edit</p></div>
+            </div>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-brand">Begin Exercises →</button></div>
+      </div>
+      <p class="phone-sublabel">Timer dominates the header — very hard to miss</p>
+    </div>
+
+    <!-- Active set B -->
+    <div class="phone-col">
+      <div class="phone-label">Active set</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;text-align:center;">
+            <p style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.65);">Bench Press · Ex 2/6</p>
+            <p class="timer-line-b">24:13</p>
+          </div>
+          <div style="width:30px;flex-shrink:0;"></div>
+        </div>
+        <div class="scroll">
+          <p style="font-size:11px;color:var(--muted);">Last: 100×5, 5, 4 · 3 sets</p>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">100 kg</div><div class="set-sub">5 reps · 1:12</div></div><span class="set-tag tag-green">Done</span></div>
+          <div style="position:relative;">
+            <div class="set-card active">
+              <svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;" viewBox="0 0 244 46" preserveAspectRatio="none">
+                <rect x=".75" y=".75" width="242.5" height="44.5" rx="12.25" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="660 660" style="animation:border-run 2.5s linear infinite;"/>
+              </svg>
+              <div class="set-num active-num">2</div>
+              <div class="set-info"><div class="set-wt" style="color:var(--blue);">102.5 kg</div><div class="set-sub" style="color:var(--blue);">Set 2 · Active ▶</div></div>
+              <div class="dial"><div class="dial-btn">−</div><div class="dial-val">5</div><div class="dial-btn">+</div></div>
+            </div>
+          </div>
+          <div class="set-card" style="opacity:0.4;"><div class="set-num">3</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">Target: 5 reps</div></div><div class="dial"><div class="dial-btn">−</div><div class="dial-val">5</div><div class="dial-btn">+</div></div></div>
+        </div>
+        <div class="footer"><button class="btn btn-blue">Log Set 2</button></div>
+      </div>
+      <p class="phone-sublabel">Exercise name pushed to subtitle — timer takes centre stage</p>
+    </div>
+
+    <!-- Rest B -->
+    <div class="phone-col">
+      <div class="phone-label">Rest timer</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;text-align:center;">
+            <p style="font-size:12px;font-weight:700;color:rgba(255,255,255,0.65);">Bench Press · Resting</p>
+            <p class="timer-line-b">26:04</p>
+          </div>
+          <div style="width:30px;flex-shrink:0;"></div>
+        </div>
+        <div class="scroll">
+          <div class="rest-row">
+            <svg width="56" height="56" viewBox="0 0 72 72" style="flex-shrink:0;"><circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="6"/><circle cx="36" cy="36" r="30" fill="none" stroke="var(--brand)" stroke-width="6" stroke-dasharray="127 188" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 36 36)"/><text x="36" y="40" text-anchor="middle" fill="var(--text)" font-size="13" font-weight="800">42s</text></svg>
+            <div class="rest-right"><p style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px;">Rest · 90s</p><p class="rest-count">42s left</p><div class="rest-bar"><div class="rest-fill" style="width:53%;"></div></div><p class="rest-next">Next: Set 3 · 102.5 kg × 5</p></div>
+          </div>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">100 kg</div><div class="set-sub">5 reps · 1:12</div></div><span class="set-tag tag-green">Done</span></div>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">5 reps · 1:08</div></div><span class="set-tag tag-green">Done</span></div>
+          <div class="set-card" style="opacity:0.4;"><div class="set-num">3</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">Target: 5 reps</div></div></div>
+        </div>
+        <div class="footer"><button class="btn btn-brand btn-bounce">▶ Start Set 3 early</button></div>
+      </div>
+      <p class="phone-sublabel">Exercise name + context in subtitle, timer bold in header</p>
+    </div>
+  </div>
+
+  <!-- ── OPTION C ── -->
+  <p style="text-align:center;margin-bottom:14px;"><span class="variant-badge vc-badge">C · Floating badge — top-right corner</span></p>
+  <div class="phones" style="margin-bottom:20px;">
+
+    <!-- Warmup C -->
+    <div class="phone-col">
+      <div class="phone-label">Warmup screen</div>
+      <div class="phone" style="position:relative;">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <!-- Timer float -->
+        <div class="timer-float-c"><div class="t-dot"></div><span class="t-val">02:14</span></div>
+        <!-- Header: simple, no timer -->
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:13px;font-weight:700;">Push Day A</p>
+            <p style="font-size:10px;color:var(--muted);">Warmup</p>
+          </div>
+          <div style="width:68px;flex-shrink:0;"></div><!-- spacer for float badge -->
+        </div>
+        <div class="scroll">
+          <div style="text-align:center;padding:6px 0;">
+            <p style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:3px;">Full body warmup</p>
+            <p style="font-size:11px;color:rgba(255,255,255,0.22);">5–8 min · before first exercise</p>
+          </div>
+          <div class="card-brand" style="text-align:center;padding:14px;">
+            <p style="font-size:28px;font-weight:900;margin-bottom:4px;">🔥</p>
+            <p style="font-size:13px;font-weight:700;color:var(--brand);margin-bottom:2px;">Activate your muscles</p>
+            <p style="font-size:11px;color:rgba(0,255,135,0.55);">5 min cardio · dynamic stretching</p>
+          </div>
+          <div class="card" style="display:flex;flex-direction:column;gap:7px;">
+            <p class="lxs">Target muscles today</p>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              <span style="background:rgba(0,255,135,0.1);border:1px solid rgba(0,255,135,0.22);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;color:var(--brand);">Chest</span>
+              <span style="background:rgba(0,255,135,0.06);border:1px solid rgba(0,255,135,0.14);border-radius:20px;padding:3px 9px;font-size:11px;color:rgba(0,255,135,0.7);">Shoulders</span>
+            </div>
+          </div>
+          <div class="card">
+            <p class="lxs">Mood check-in</p>
+            <div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">⚡</span><div><p style="font-size:13px;font-weight:700;">Feeling pumped</p><p style="font-size:10px;color:var(--muted);">Logged · tap to edit</p></div></div>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-brand">Begin Exercises →</button></div>
+      </div>
+      <p class="phone-sublabel">Badge overlays content — always visible but can cover top-right corner of cards</p>
+    </div>
+
+    <!-- Active set C -->
+    <div class="phone-col">
+      <div class="phone-label">Active set</div>
+      <div class="phone" style="position:relative;">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <div class="timer-float-c"><div class="t-dot"></div><span class="t-val">24:13</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:13px;font-weight:700;">Bench Press</p>
+            <p style="font-size:10px;color:var(--muted);">Ex 2 of 6 · Set 2 active</p>
+          </div>
+          <div style="width:68px;flex-shrink:0;"></div>
+        </div>
+        <div class="scroll">
+          <p style="font-size:11px;color:var(--muted);">Last: 100×5, 5, 4 · 3 sets</p>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">100 kg</div><div class="set-sub">5 reps · 1:12</div></div><span class="set-tag tag-green">Done</span></div>
+          <div style="position:relative;">
+            <div class="set-card active">
+              <svg style="position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;overflow:visible;" viewBox="0 0 244 46" preserveAspectRatio="none">
+                <rect x=".75" y=".75" width="242.5" height="44.5" rx="12.25" fill="none" stroke="#00d4ff" stroke-width="1.5" stroke-dasharray="660 660" style="animation:border-run 2.5s linear infinite;"/>
+              </svg>
+              <div class="set-num active-num">2</div>
+              <div class="set-info"><div class="set-wt" style="color:var(--blue);">102.5 kg</div><div class="set-sub" style="color:var(--blue);">Set 2 · Active ▶</div></div>
+              <div class="dial"><div class="dial-btn">−</div><div class="dial-val">5</div><div class="dial-btn">+</div></div>
+            </div>
+          </div>
+          <div class="set-card" style="opacity:0.4;"><div class="set-num">3</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">Target: 5 reps</div></div><div class="dial"><div class="dial-btn">−</div><div class="dial-val">5</div><div class="dial-btn">+</div></div></div>
+        </div>
+        <div class="footer"><button class="btn btn-blue">Log Set 2</button></div>
+      </div>
+      <p class="phone-sublabel">Header stays clean — badge floats over scroll area</p>
+    </div>
+
+    <!-- Rest C -->
+    <div class="phone-col">
+      <div class="phone-label">Rest timer</div>
+      <div class="phone" style="position:relative;">
+        <div class="sbar"><span>9:41</span><div class="sbar-r"><svg width="15" height="10" viewBox="0 0 15 10" fill="none"><rect x="0" y="3" width="2.2" height="7" rx=".4" fill="white" fill-opacity=".35"/><rect x="4" y="2" width="2.2" height="8" rx=".4" fill="white" fill-opacity=".55"/><rect x="8" y="0" width="2.2" height="10" rx=".4" fill="white" fill-opacity=".8"/><rect x="12" y="0" width="2.2" height="10" rx=".4" fill="white"/></svg></div></div>
+        <div class="timer-float-c"><div class="t-dot"></div><span class="t-val">26:04</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;">
+            <p style="font-size:13px;font-weight:700;">Bench Press</p>
+            <p style="font-size:10px;color:var(--muted);">Resting · next: Set 3</p>
+          </div>
+          <div style="width:68px;flex-shrink:0;"></div>
+        </div>
+        <div class="scroll">
+          <div class="rest-row">
+            <svg width="56" height="56" viewBox="0 0 72 72" style="flex-shrink:0;"><circle cx="36" cy="36" r="30" fill="none" stroke="rgba(255,255,255,0.07)" stroke-width="6"/><circle cx="36" cy="36" r="30" fill="none" stroke="var(--brand)" stroke-width="6" stroke-dasharray="127 188" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 36 36)"/><text x="36" y="40" text-anchor="middle" fill="var(--text)" font-size="13" font-weight="800">42s</text></svg>
+            <div class="rest-right"><p style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:2px;">Rest · 90s</p><p class="rest-count">42s left</p><div class="rest-bar"><div class="rest-fill" style="width:53%;"></div></div><p class="rest-next">Next: Set 3 · 102.5 kg × 5</p></div>
+          </div>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">100 kg</div><div class="set-sub">5 reps · 1:12</div></div><span class="set-tag tag-green">Done</span></div>
+          <div class="set-card done"><div class="set-num done-num">✓</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">5 reps · 1:08</div></div><span class="set-tag tag-green">Done</span></div>
+          <div class="set-card" style="opacity:0.4;"><div class="set-num">3</div><div class="set-info"><div class="set-wt">102.5 kg</div><div class="set-sub">Target: 5 reps</div></div></div>
+        </div>
+        <div class="footer"><button class="btn btn-brand btn-bounce">▶ Start Set 3 early</button></div>
+      </div>
+      <p class="phone-sublabel">Most layout-neutral but badge can occlude content top-right</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     STATS CARD
+══════════════════════════════════════════════ -->
+<div id="stats" class="section">
+  <p class="desc">
+    Pre-workout: tapping an exercise opens this bottom sheet.<br>
+    <strong>Left</strong> = current · <strong>Right</strong> = proposed (working weight hero + coloured rep targets)
+  </p>
+  <div class="phones">
+    <div class="phone-col">
+      <div class="phone-label">Current</div>
+      <div class="phone">
+        <div style="padding:14px 13px 11px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="font-size:15px;font-weight:800;">Bench Press</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Last: 3 sets · 8,8,6 reps · 12 May</div>
+        </div>
+        <div class="scroll">
+          <div class="card">
+            <p class="lxs">Rep targets at 80 kg</p>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;">Below 1RM</span><span style="font-size:12px;font-weight:700;">7 reps → ~112 kg</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;">Match 1RM</span><span style="font-size:12px;font-weight:700;">8 reps → ~116 kg</span></div>
+            <div style="display:flex;justify-content:space-between;padding:8px 0;color:var(--brand);"><span style="font-size:12px;">Beat 1RM ⚡</span><span style="font-size:12px;font-weight:700;">9 reps → ~120 kg</span></div>
+          </div>
+          <div class="card">
+            <p class="lxs">1RM Trend</p>
+            <svg width="100%" viewBox="0 0 240 50" style="display:block"><polyline points="6,42 54,36 102,32 150,24 198,18 234,12" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round"/><circle cx="234" cy="12" r="3" fill="var(--brand)"/></svg>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="phone-col">
+      <div class="phone-label">Proposed</div>
+      <div class="phone">
+        <div style="padding:14px 13px 11px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-shrink:0;">
+          <div style="flex:1;"><div style="font-size:15px;font-weight:800;">Bench Press</div><div style="font-size:11px;color:var(--muted);margin-top:2px;">Last: 8×80 | 8×80 | 6×80 · 12 May</div></div>
+          <div style="text-align:right;flex-shrink:0;"><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Est. 1RM</div><div style="font-size:18px;font-weight:900;color:var(--brand);">116 kg</div></div>
+        </div>
+        <div class="scroll">
+          <!-- Hero weight -->
+          <div class="card-brand" style="text-align:center;padding:14px;">
+            <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--brand);margin-bottom:4px;">Working Weight</div>
+            <div style="font-size:44px;font-weight:900;color:var(--brand);letter-spacing:-.04em;line-height:1;">80 kg</div>
+            <div style="font-size:11px;color:rgba(0,255,135,0.55);margin-top:4px;">85% of 1RM · top set</div>
+          </div>
+          <!-- Coloured rep targets -->
+          <div class="card">
+            <p class="lxs">Reps at 80 kg</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+              <div><div style="font-size:16px;font-weight:800;color:var(--red);">7 reps</div><div style="font-size:10px;color:var(--muted);">Below baseline</div></div>
+              <span style="background:rgba(255,77,77,0.12);border:1px solid rgba(255,77,77,0.25);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;color:var(--red);">~112 kg ↓</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);">
+              <div><div style="font-size:16px;font-weight:800;color:var(--green);">8 reps</div><div style="font-size:10px;color:var(--muted);">Matches 1RM</div></div>
+              <span style="background:rgba(0,255,135,0.12);border:1px solid rgba(0,255,135,0.25);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;color:var(--green);">~116 kg ✓</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;">
+              <div><div style="font-size:16px;font-weight:800;color:var(--blue);">9+ reps</div><div style="font-size:10px;color:var(--muted);">New PR territory</div></div>
+              <span style="background:rgba(0,212,255,0.12);border:1px solid rgba(0,212,255,0.25);border-radius:20px;padding:3px 9px;font-size:11px;font-weight:600;color:var(--blue);">~120 kg ⚡</span>
+            </div>
+          </div>
+          <!-- Sparkline -->
+          <div class="card">
+            <p class="lxs">1RM Trend</p>
+            <svg width="100%" viewBox="0 0 240 50" style="display:block">
+              <defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand)" stop-opacity=".2"/><stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/></linearGradient></defs>
+              <polygon points="6,50 6,42 54,36 102,32 150,24 198,18 234,12 234,50" fill="url(#g1)"/>
+              <polyline points="6,42 54,36 102,32 150,24 198,18 234,12" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round"/>
+              <circle cx="234" cy="12" r="3.5" fill="var(--brand)"/>
+              <text x="228" y="8" text-anchor="end" fill="var(--brand)" font-size="9" font-weight="700">116 kg</text>
+            </svg>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     START CONFIRM
+══════════════════════════════════════════════ -->
+<div id="confirm" class="section">
+  <p class="desc">
+    Pressing "Start Workout" triggers a 3-second countdown — timer starts immediately, giving you time to get to the first station.
+  </p>
+  <div class="phones">
+    <div class="phone-col">
+      <div class="phone-label">Pre-workout</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div><p style="font-size:13px;font-weight:700;">Push Day A</p><p style="font-size:10px;color:var(--muted);">Thursday, 29 May</p></div>
+        </div>
+        <div class="scroll">
+          <p class="lxs">Recommended workout</p>
+          <div style="display:flex;flex-direction:column;gap:7px;">
+            <div style="background:rgba(0,255,135,0.04);border:1px solid rgba(0,255,135,0.16);border-radius:12px;padding:10px 12px;"><p style="font-size:13px;font-weight:600;">Bench Press</p><p style="font-size:10px;color:var(--muted);margin-top:2px;">3 sets · 8×80 | 8×80 | 6×80 · 12 May</p></div>
+            <div style="background:rgba(0,255,135,0.04);border:1px solid rgba(0,255,135,0.16);border-radius:12px;padding:10px 12px;"><p style="font-size:13px;font-weight:600;">Overhead Press</p><p style="font-size:10px;color:var(--muted);margin-top:2px;">3 sets · 6×50kg · 10 May</p></div>
+            <div style="background:rgba(0,255,135,0.04);border:1px solid rgba(0,255,135,0.16);border-radius:12px;padding:10px 12px;"><p style="font-size:13px;font-weight:600;">Dumbbell Flyes</p><p style="font-size:10px;color:var(--muted);margin-top:2px;">3 sets · 12×18kg · 12 May</p></div>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-brand">🏋️ Start Workout</button></div>
+      </div>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone-label">Countdown overlay (3s)</div>
+      <div class="phone" style="position:relative;">
+        <div class="sbar"><span>9:41</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;filter:blur(1.5px);opacity:.5;">
+          <div><p style="font-size:13px;font-weight:700;">Push Day A</p><p style="font-size:10px;color:var(--muted);">Thursday, 29 May</p></div>
+        </div>
+        <div class="scroll" style="filter:blur(2px);opacity:.4;">
+          <div style="background:rgba(0,255,135,0.04);border:1px solid rgba(0,255,135,0.16);border-radius:12px;padding:10px 12px;"><p style="font-size:13px;font-weight:600;">Bench Press</p></div>
+          <div style="background:rgba(0,255,135,0.04);border:1px solid rgba(0,255,135,0.16);border-radius:12px;padding:10px 12px;"><p style="font-size:13px;font-weight:600;">Overhead Press</p></div>
+        </div>
+        <!-- Overlay -->
+        <div style="position:absolute;inset:0;background:rgba(0,0,0,0.82);backdrop-filter:blur(6px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;z-index:10;">
+          <!-- Ring -->
+          <div style="position:relative;width:96px;height:96px;">
+            <svg width="96" height="96" viewBox="0 0 96 96">
+              <circle cx="48" cy="48" r="42" fill="none" stroke="rgba(0,255,135,0.12)" stroke-width="4"/>
+              <circle cx="48" cy="48" r="42" fill="none" stroke="var(--brand)" stroke-width="4" stroke-dasharray="198 264" stroke-dashoffset="0" stroke-linecap="round" transform="rotate(-90 48 48)"/>
+            </svg>
+            <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;">
+              <span style="font-size:40px;font-weight:900;color:var(--brand);letter-spacing:-.04em;">3</span>
+            </div>
+          </div>
+          <div style="text-align:center;">
+            <p style="font-size:17px;font-weight:800;margin-bottom:5px;">Get ready…</p>
+            <p style="font-size:12px;color:var(--muted);line-height:1.5;">First up: <strong style="color:var(--text);">Bench Press</strong><br>Head to the station now</p>
+          </div>
+          <button style="background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.12);border-radius:12px;padding:9px 22px;font-size:12px;font-weight:600;color:var(--muted);cursor:pointer;">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone-label">Warmup (timer running)</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;"><p style="font-size:13px;font-weight:700;">Push Day A</p><p style="font-size:10px;color:var(--muted);">Warmup</p></div>
+          <div class="timer-chip-a"><span class="t-icon">⏱</span><span class="t-val">00:03</span></div>
+        </div>
+        <div class="scroll">
+          <div class="card-brand" style="text-align:center;padding:16px;">
+            <p style="font-size:26px;font-weight:900;margin-bottom:4px;">🔥</p>
+            <p style="font-size:13px;font-weight:700;color:var(--brand);margin-bottom:2px;">Activate your muscles</p>
+            <p style="font-size:11px;color:rgba(0,255,135,0.55);">5 min cardio · dynamic stretching</p>
+          </div>
+          <div class="card"><p class="lxs">First exercise</p><p style="font-size:14px;font-weight:700;">Bench Press</p><p style="font-size:11px;color:var(--muted);margin-top:2px;">3 sets · target 80 kg</p></div>
+          <div class="card"><p class="lxs">Mood check-in</p><div style="display:flex;align-items:center;gap:10px;"><span style="font-size:22px;">⚡</span><div><p style="font-size:13px;font-weight:700;">Feeling pumped</p><p style="font-size:10px;color:var(--muted);">Logged · tap to edit</p></div></div></div>
+        </div>
+        <div class="footer"><button class="btn btn-brand">Begin Exercises →</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     READY SCREEN
+══════════════════════════════════════════════ -->
+<div id="ready" class="section">
+  <p class="desc">
+    Before starting sets. <strong>Left</strong> = same-weight sets · <strong>Right</strong> = different weights per set.<br>
+    Both keep the muscle map. Warmup ramps to just below the first (lightest) working set.
+  </p>
+  <div class="phones">
+
+    <!-- Same-weight sets -->
+    <div class="phone-col">
+      <div class="phone-label">Same weight per set</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;"><p style="font-size:13px;font-weight:700;">Bench Press</p><p style="font-size:10px;color:var(--muted);">Exercise 1 of 5</p></div>
+          <div class="timer-chip-a"><span class="t-icon">⏱</span><span class="t-val">04:32</span></div>
+        </div>
+        <div class="scroll">
+          <!-- Last session: pill chips left, 1RM text right -->
+          <div class="card" style="padding:9px 12px;">
+            <p style="font-size:10px;color:var(--muted);margin-bottom:7px;">Last session — 12 May</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;">
+              <div style="display:flex;gap:5px;flex-wrap:wrap;">
+                <span style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:600;">80×8</span>
+                <span style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:600;">80×8</span>
+                <span style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:600;">80×6</span>
+              </div>
+              <div style="flex-shrink:0;text-align:center;">
+                <p style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.05em;line-height:1.3;">1RM</p>
+                <p style="font-size:16px;font-weight:900;color:var(--brand);line-height:1.1;">116 kg</p>
+              </div>
+            </div>
+          </div>
+          <!-- Today targets -->
+          <div class="card-brand">
+            <p class="lxs">Today's targets</p>
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:rgba(0,255,135,0.6);">Set 1 · 75%</span><span style="font-size:14px;font-weight:800;color:var(--brand);">87.5 kg × 8</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:rgba(0,255,135,0.6);">Set 2 · 82%</span><span style="font-size:14px;font-weight:800;color:var(--brand);">95 kg × 6</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:rgba(0,255,135,0.6);">Set 3 · 85%</span><span style="font-size:14px;font-weight:800;color:var(--brand);">100 kg × 5</span></div>
+            </div>
+          </div>
+          <!-- Warmup: 3 sets, ramps to just below Set 1 (87.5 kg) -->
+          <div class="card" style="padding:9px 11px;">
+            <p class="lxs">Warmup · Set 1 = 87.5 kg</p>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 7px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);width:20px;flex-shrink:0;">W1</span>
+                <span style="font-size:13px;font-weight:700;flex:1;">45 kg <span style="font-size:11px;font-weight:400;color:var(--muted);">× 5</span></span>
+                <span style="font-size:9px;color:var(--muted);">50% · prep</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 7px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);width:20px;flex-shrink:0;">W2</span>
+                <span style="font-size:13px;font-weight:700;flex:1;">65 kg <span style="font-size:11px;font-weight:400;color:var(--muted);">× 3</span></span>
+                <span style="font-size:9px;color:var(--muted);">74% · activate</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 7px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                <span style="font-size:10px;font-weight:700;color:var(--brand);width:20px;flex-shrink:0;">W3</span>
+                <span style="font-size:13px;font-weight:700;flex:1;color:var(--brand);">80 kg <span style="font-size:11px;font-weight:400;color:rgba(0,255,135,0.5);">× 1</span></span>
+                <span style="font-size:9px;color:var(--brand);">92% · potentiate</span>
+              </div>
+            </div>
+          </div>
+          <!-- Muscle map (kept) -->
+          <div class="card" style="padding:9px 11px;">
+            <p class="lxs">Muscles</p>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <svg width="52" height="74" viewBox="0 0 52 74">
+                <ellipse cx="26" cy="7" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                <path d="M14 17 Q26 13 38 17 L40 50 Q32 52 26 52 Q20 52 12 50 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M12 19 L5 42 Q8 44 11 42 L14 25 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M40 19 L47 42 Q44 44 41 42 L38 25 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M19 52 L17 72 Q21 73 23 72 L24 52 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M33 52 L35 72 Q31 73 29 72 L28 52 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <!-- chest primary -->
+                <path d="M17 20 Q22 18 26 22 Q22 29 15 31 Q13 27 14 22 Z" fill="rgba(0,212,255,0.5)" stroke="rgba(0,212,255,0.5)" stroke-width="0.5"/>
+                <path d="M35 20 Q30 18 26 22 Q30 29 37 31 Q39 27 38 22 Z" fill="rgba(0,212,255,0.4)" stroke="rgba(0,212,255,0.5)" stroke-width="0.5"/>
+                <!-- shoulders secondary -->
+                <ellipse cx="12" cy="19" rx="3.5" ry="3" fill="rgba(0,212,255,0.2)" stroke="rgba(0,212,255,0.25)" stroke-width="0.5"/>
+                <ellipse cx="40" cy="19" rx="3.5" ry="3" fill="rgba(0,212,255,0.2)" stroke="rgba(0,212,255,0.25)" stroke-width="0.5"/>
+              </svg>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                <span style="background:rgba(0,212,255,0.1);border:1px solid rgba(0,212,255,0.22);border-radius:6px;padding:3px 7px;font-size:10px;color:var(--blue);">Chest</span>
+                <span style="background:rgba(0,212,255,0.06);border:1px solid rgba(0,212,255,0.12);border-radius:6px;padding:3px 7px;font-size:10px;color:rgba(0,212,255,0.6);">Shoulders</span>
+                <span style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:10px;color:var(--muted);">Triceps</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-brand">🏋️ Begin Sets</button></div>
+      </div>
+      <p class="phone-sublabel">Same weight → single compact line. Warmup W4 = 82.5 kg, safely below Set 1 (87.5 kg)</p>
+    </div>
+
+    <!-- Different weights per set -->
+    <div class="phone-col">
+      <div class="phone-label">Different weights per set</div>
+      <div class="phone">
+        <div class="sbar"><span>9:41</span></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:0 13px 10px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;"><p style="font-size:13px;font-weight:700;">Squat</p><p style="font-size:10px;color:var(--muted);">Exercise 2 of 5</p></div>
+          <div class="timer-chip-a"><span class="t-icon">⏱</span><span class="t-val">14:08</span></div>
+        </div>
+        <div class="scroll">
+          <!-- Last session: per-set chips when weights differ -->
+          <div class="card" style="padding:9px 12px;">
+            <p style="font-size:10px;color:var(--muted);margin-bottom:5px;">Last session — 15 May</p>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;">
+              <span style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:600;">100×5</span>
+              <span style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:600;">120×4</span>
+              <span style="background:rgba(255,255,255,0.05);border:1px solid var(--border);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:600;">130×3</span>
+              <span style="background:rgba(0,255,135,0.08);border:1px solid rgba(0,255,135,0.18);border-radius:7px;padding:4px 8px;font-size:11px;font-weight:600;color:var(--brand);">1RM 158kg</span>
+            </div>
+          </div>
+          <!-- Today targets -->
+          <div class="card-brand">
+            <p class="lxs">Today's targets</p>
+            <div style="display:flex;flex-direction:column;gap:5px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:rgba(0,255,135,0.6);">Set 1 · 65%</span><span style="font-size:14px;font-weight:800;color:var(--brand);">102.5 kg × 5</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:rgba(0,255,135,0.6);">Set 2 · 75%</span><span style="font-size:14px;font-weight:800;color:var(--brand);">120 kg × 4</span></div>
+              <div style="display:flex;justify-content:space-between;align-items:center;"><span style="font-size:11px;color:rgba(0,255,135,0.6);">Set 3 · 82%</span><span style="font-size:14px;font-weight:800;color:var(--brand);">130 kg × 3</span></div>
+            </div>
+          </div>
+          <!-- Warmup: ramps to Set 1 (102.5 kg) -->
+          <div class="card" style="padding:9px 11px;">
+            <p class="lxs">Warmup · ramps to Set 1 (102.5 kg)</p>
+            <div style="display:flex;flex-direction:column;gap:4px;">
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 7px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);width:20px;flex-shrink:0;">W1</span>
+                <span style="font-size:13px;font-weight:700;flex:1;">52.5 kg <span style="font-size:11px;font-weight:400;color:var(--muted);">× 5</span></span>
+                <span style="font-size:9px;color:var(--muted);">50% · prep</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 7px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                <span style="font-size:10px;font-weight:700;color:var(--muted);width:20px;flex-shrink:0;">W2</span>
+                <span style="font-size:13px;font-weight:700;flex:1;">75 kg <span style="font-size:11px;font-weight:400;color:var(--muted);">× 3</span></span>
+                <span style="font-size:9px;color:var(--muted);">74% · activate</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px;padding:5px 7px;background:rgba(255,255,255,0.03);border-radius:8px;">
+                <span style="font-size:10px;font-weight:700;color:var(--brand);width:20px;flex-shrink:0;">W3</span>
+                <span style="font-size:13px;font-weight:700;flex:1;color:var(--brand);">95 kg <span style="font-size:11px;font-weight:400;color:rgba(0,255,135,0.5);">× 1</span></span>
+                <span style="font-size:9px;color:var(--brand);">92% · potentiate</span>
+              </div>
+            </div>
+          </div>
+          <!-- Muscle map (kept) -->
+          <div class="card" style="padding:9px 11px;">
+            <p class="lxs">Muscles</p>
+            <div style="display:flex;align-items:center;gap:10px;">
+              <svg width="52" height="74" viewBox="0 0 52 74">
+                <ellipse cx="26" cy="7" rx="6" ry="6" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+                <path d="M14 17 Q26 13 38 17 L40 50 Q32 52 26 52 Q20 52 12 50 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M12 19 L5 42 Q8 44 11 42 L14 25 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M40 19 L47 42 Q44 44 41 42 L38 25 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M19 52 L17 72 Q21 73 23 72 L24 52 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <path d="M33 52 L35 72 Q31 73 29 72 L28 52 Z" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+                <!-- quads primary -->
+                <path d="M17 50 L14 72 Q19 73 22 72 L22 50 Z" fill="rgba(191,95,255,0.45)" stroke="rgba(191,95,255,0.5)" stroke-width="0.5"/>
+                <path d="M35 50 L38 72 Q33 73 30 72 L30 50 Z" fill="rgba(191,95,255,0.4)" stroke="rgba(191,95,255,0.5)" stroke-width="0.5"/>
+                <!-- glutes secondary -->
+                <path d="M14 46 Q20 48 26 48 Q32 48 38 46 L38 52 Q32 53 26 53 Q20 53 14 52 Z" fill="rgba(191,95,255,0.2)" stroke="rgba(191,95,255,0.25)" stroke-width="0.5"/>
+              </svg>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                <span style="background:rgba(191,95,255,0.1);border:1px solid rgba(191,95,255,0.22);border-radius:6px;padding:3px 7px;font-size:10px;color:var(--purple);">Quads</span>
+                <span style="background:rgba(191,95,255,0.06);border:1px solid rgba(191,95,255,0.12);border-radius:6px;padding:3px 7px;font-size:10px;color:rgba(191,95,255,0.65);">Glutes</span>
+                <span style="background:rgba(255,255,255,0.04);border:1px solid var(--border);border-radius:6px;padding:3px 7px;font-size:10px;color:var(--muted);">Hamstrings</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="footer"><button class="btn btn-brand">🏋️ Begin Sets</button></div>
+      </div>
+      <p class="phone-sublabel">Different weights → per-set chips (100×5 | 120×4 | 130×3). 3-set warmup: W1=52.5×5 (50%), W2=75×3 (74%), W3=95×1 (92%) of Set 1 (102.5 kg)</p>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════
+     SET SUMMARY
+══════════════════════════════════════════════ -->
+<div id="summary" class="section">
+  <p class="desc">
+    After logging all sets — 1RM sparkline with this session highlighted, bigger timer, cleaner next-session targets.
+  </p>
+  <div class="phones">
+    <div class="phone-col">
+      <div class="phone-label">Current</div>
+      <div class="phone">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;"><p style="font-size:14px;font-weight:800;">Bench Press</p><p style="font-size:11px;color:var(--muted);">Set summary</p></div>
+          <span style="font-size:14px;font-weight:800;color:var(--brand);">12:08</span>
+        </div>
+        <div class="scroll">
+          <div class="card">
+            <p class="lxs">Sets</p>
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--muted);">Set 1</span><span style="font-size:12px;font-weight:700;">80 kg × 8 · 1:24</span></div>
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);"><span style="font-size:12px;color:var(--muted);">Set 2</span><span style="font-size:12px;font-weight:700;">80 kg × 8 · 1:31</span></div>
+            <div style="display:flex;justify-content:space-between;padding:7px 0;"><span style="font-size:12px;color:var(--muted);">Set 3</span><span style="font-size:12px;font-weight:700;">80 kg × 6 · 1:18</span></div>
+          </div>
+          <div class="card">
+            <p class="lxs">Estimated 1RM</p>
+            <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
+              <div style="text-align:center;"><p style="font-size:10px;color:var(--muted);margin-bottom:3px;">Previous</p><p style="font-size:18px;font-weight:800;">110 kg</p></div>
+              <span style="font-size:24px;font-weight:900;color:var(--green);">↑</span>
+              <div style="text-align:center;"><p style="font-size:10px;color:var(--muted);margin-bottom:3px;">This session</p><p style="font-size:18px;font-weight:800;color:var(--green);">116 kg</p></div>
+            </div>
+          </div>
+          <div class="card-brand">
+            <p class="lxs">Next Session</p>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="font-size:12px;color:var(--muted);">Set 1 (75%)</span><span style="font-size:13px;font-weight:800;color:var(--brand);">87.5 kg</span></div>
+            <div style="display:flex;justify-content:space-between;padding:3px 0;"><span style="font-size:12px;color:var(--muted);">Set 2 (82%)</span><span style="font-size:13px;font-weight:800;color:var(--brand);">95 kg</span></div>
+          </div>
+        </div>
+        <div style="padding:10px 13px 18px;border-top:1px solid var(--border);flex-shrink:0;"><button class="btn btn-brand">Next Exercise →</button></div>
+      </div>
+    </div>
+
+    <div class="phone-col">
+      <div class="phone-label">Proposed</div>
+      <div class="phone">
+        <!-- Header with big timer -->
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 13px;border-bottom:1px solid var(--border);flex-shrink:0;">
+          <div style="width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M8 2L3.5 6.5 8 11" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" stroke-linecap="round"/></svg></div>
+          <div style="flex:1;min-width:0;"><p style="font-size:14px;font-weight:800;">Bench Press</p><p style="font-size:10px;color:var(--muted);">Exercise done</p></div>
+          <!-- Bigger timer on summary -->
+          <div style="text-align:right;flex-shrink:0;">
+            <p style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Session</p>
+            <p style="font-size:20px;font-weight:900;color:var(--brand);letter-spacing:-.03em;">12:08</p>
+          </div>
+        </div>
+        <div class="scroll">
+          <!-- 1RM + sparkline combined -->
+          <div class="card">
+            <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:9px;">
+              <div><p class="lxs" style="margin-bottom:3px;">Estimated 1RM</p><p style="font-size:26px;font-weight:900;color:var(--green);letter-spacing:-.03em;">116 kg</p><p style="font-size:11px;color:var(--green);margin-top:1px;">+6 kg from last session ↑</p></div>
+              <div style="text-align:right;"><p style="font-size:10px;color:var(--muted);margin-bottom:2px;">Previous</p><p style="font-size:18px;font-weight:700;color:var(--muted);">110 kg</p></div>
+            </div>
+            <!-- Sparkline with current session star -->
+            <div style="background:rgba(0,0,0,0.3);border-radius:10px;padding:9px;">
+              <svg width="100%" viewBox="0 0 240 52" style="display:block">
+                <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="var(--brand)" stop-opacity=".18"/><stop offset="100%" stop-color="var(--brand)" stop-opacity="0"/></linearGradient></defs>
+                <polygon points="6,52 6,44 54,38 102,34 150,26 198,20 234,8 234,52" fill="url(#sg)"/>
+                <polyline points="6,44 54,38 102,34 150,26 198,20 234,8" fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round"/>
+                <circle cx="6" cy="44" r="2.5" fill="rgba(0,255,135,0.4)"/>
+                <circle cx="54" cy="38" r="2.5" fill="rgba(0,255,135,0.4)"/>
+                <circle cx="102" cy="34" r="2.5" fill="rgba(0,255,135,0.4)"/>
+                <circle cx="150" cy="26" r="2.5" fill="rgba(0,255,135,0.4)"/>
+                <circle cx="198" cy="20" r="2.5" fill="rgba(0,255,135,0.4)"/>
+                <!-- Current session: bigger, glowing -->
+                <circle cx="234" cy="8" r="5" fill="var(--brand)" stroke="rgba(0,0,0,0.5)" stroke-width="2"/>
+                <circle cx="234" cy="8" r="9" fill="none" stroke="var(--brand)" stroke-opacity=".22" stroke-width="1.5"/>
+                <text x="228" y="5" text-anchor="end" fill="var(--brand)" font-size="9" font-weight="800">★ 116 kg</text>
+              </svg>
+            </div>
+          </div>
+          <!-- Sets with numbered badges -->
+          <div class="card">
+            <p class="lxs">Sets logged</p>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:7px;"><span style="width:22px;height:22px;border-radius:6px;background:rgba(0,255,135,0.12);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--brand);flex-shrink:0;">1</span><span style="font-size:13px;font-weight:700;">80 kg × 8</span></div>
+              <span style="font-size:11px;color:var(--muted);">1:24</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--border);">
+              <div style="display:flex;align-items:center;gap:7px;"><span style="width:22px;height:22px;border-radius:6px;background:rgba(0,255,135,0.12);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--brand);flex-shrink:0;">2</span><span style="font-size:13px;font-weight:700;">80 kg × 8</span></div>
+              <span style="font-size:11px;color:var(--muted);">1:31</span>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;">
+              <div style="display:flex;align-items:center;gap:7px;"><span style="width:22px;height:22px;border-radius:6px;background:rgba(0,255,135,0.12);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:var(--brand);flex-shrink:0;">3</span><span style="font-size:13px;font-weight:700;">80 kg × 6</span></div>
+              <span style="font-size:11px;color:var(--muted);">1:18</span>
+            </div>
+          </div>
+          <!-- Next session as 3 tiles -->
+          <div class="card-brand">
+            <p class="lxs">Next session targets</p>
+            <div style="display:flex;gap:6px;">
+              <div style="flex:1;background:rgba(0,0,0,0.2);border-radius:9px;padding:8px;text-align:center;"><p style="font-size:10px;color:rgba(0,255,135,0.55);">Set 1 · 75%</p><p style="font-size:15px;font-weight:800;color:var(--brand);">87.5 kg</p></div>
+              <div style="flex:1;background:rgba(0,0,0,0.2);border-radius:9px;padding:8px;text-align:center;"><p style="font-size:10px;color:rgba(0,255,135,0.55);">Set 2 · 82%</p><p style="font-size:15px;font-weight:800;color:var(--brand);">95 kg</p></div>
+              <div style="flex:1;background:rgba(0,0,0,0.2);border-radius:9px;padding:8px;text-align:center;"><p style="font-size:10px;color:rgba(0,255,135,0.55);">Set 3 · 85%</p><p style="font-size:15px;font-weight:800;color:var(--brand);">100 kg</p></div>
+            </div>
+          </div>
+        </div>
+        <div style="padding:10px 13px 18px;border-top:1px solid var(--border);flex-shrink:0;"><button class="btn btn-brand">Next Exercise →</button></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  const SECTIONS = ['timer','stats','confirm','ready','summary'];
+  function showTab(id) {
+    SECTIONS.forEach(s => { const el = document.getElementById(s); if (el) el.classList.remove('active'); });
+    const el = document.getElementById(id);
+    if (el) el.classList.add('active');
+    document.querySelectorAll('.tabs .tab').forEach(t => t.classList.remove('active'));
+    event.target.classList.add('active');
+  }
+</script>
+</body>
+</html>

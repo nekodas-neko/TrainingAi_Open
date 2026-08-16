@@ -1,0 +1,355 @@
+{
+  "source": {
+    "file": "stress_resilience_2_2_1.pt",
+    "sha256": "2929292929292929292929292929292929292929292929292929292929292929",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "resilience_plane_fit_coef": {
+      "kind": "tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "numel": 3,
+      "values": [
+        0.4,
+        0.5,
+        0.6
+      ]
+    },
+    "sleep_score_weight": {
+      "kind": "tensor",
+      "shape": [
+        7
+      ],
+      "dtype": "float32",
+      "numel": 8,
+      "values": [
+        0.9
+      ]
+    },
+    "low_weight": {
+      "kind": "tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "numel": 3,
+      "values": [
+        4
+      ]
+    },
+    "recovery_index_weight": {
+      "kind": "tensor",
+      "shape": [
+        5
+      ],
+      "dtype": "float32",
+      "numel": 6,
+      "values": [
+        0.5
+      ]
+    },
+    "met_unworn_thresh": {
+      "kind": "tensor",
+      "shape": [
+        8
+      ],
+      "dtype": "float32",
+      "numel": 1,
+      "values": [
+        0.8
+      ]
+    },
+    "moderate_to_high_coef": {
+      "kind": "tensor",
+      "shape": [
+        3
+      ],
+      "dtype": "float32",
+      "numel": 4,
+      "values": [
+        0.1
+      ]
+    },
+    "resolution_minutes": {
+      "kind": "tensor",
+      "shape": [
+        6
+      ],
+      "dtype": "int64",
+      "numel": 7,
+      "values": [
+        8
+      ]
+    },
+    "daytime_recovery_weight": {
+      "kind": "tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "numel": 2,
+      "values": [
+        0.7
+      ]
+    },
+    "percent_multiplier": {
+      "kind": "tensor",
+      "shape": [
+        4
+      ],
+      "dtype": "float32",
+      "numel": 5,
+      "values": [
+        6
+      ]
+    },
+    "resilience_level_multipier": {
+      "kind": "tensor",
+      "shape": [
+        7
+      ],
+      "dtype": "float32",
+      "numel": 8,
+      "values": [
+        0.3,
+        0.4,
+        0.5,
+        0.6
+      ]
+    },
+    "pca_minor_axis_length": {
+      "kind": "tensor",
+      "shape": [
+        5
+      ],
+      "dtype": "float32",
+      "numel": 6,
+      "values": [
+        7
+      ]
+    },
+    "moderate_weight": {
+      "kind": "tensor",
+      "shape": [
+        8
+      ],
+      "dtype": "float32",
+      "numel": 1,
+      "values": [
+        2
+      ]
+    },
+    "high_weight": {
+      "kind": "tensor",
+      "shape": [
+        3
+      ],
+      "dtype": "float32",
+      "numel": 4,
+      "values": [
+        5
+      ]
+    },
+    "min_hours_of_stress_available_in_daytime": {
+      "kind": "tensor",
+      "shape": [
+        6
+      ],
+      "dtype": "int64",
+      "numel": 7,
+      "values": [
+        8
+      ]
+    },
+    "low_to_moderate_coef": {
+      "kind": "tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "numel": 2,
+      "values": [
+        0.1
+      ]
+    },
+    "sleep_recovery_scaler_coef": {
+      "kind": "tensor",
+      "shape": [
+        4
+      ],
+      "dtype": "float32",
+      "numel": 5,
+      "values": [
+        0.4,
+        0.5,
+        0.6,
+        0.7
+      ]
+    },
+    "neutral_weight": {
+      "kind": "tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "numel": 3,
+      "values": [
+        4
+      ]
+    },
+    "default_error_value": {
+      "kind": "tensor",
+      "shape": [
+        5,
+        6
+      ],
+      "dtype": "float32",
+      "numel": 7,
+      "values": [
+        null
+      ]
+    },
+    "resilience_window_length": {
+      "kind": "tensor",
+      "shape": [
+        8
+      ],
+      "dtype": "int16",
+      "numel": 1,
+      "values": [
+        2
+      ]
+    },
+    "resilience_window_min_length": {
+      "kind": "tensor",
+      "shape": [
+        3
+      ],
+      "dtype": "int16",
+      "numel": 4,
+      "values": [
+        5
+      ]
+    },
+    "max_n_obs_per_bucket": {
+      "kind": "tensor",
+      "shape": [
+        6
+      ],
+      "dtype": "int64",
+      "numel": 7,
+      "values": [
+        8
+      ]
+    },
+    "resilience_today_weight": {
+      "kind": "tensor",
+      "shape": [
+        1
+      ],
+      "dtype": "float32",
+      "numel": 2,
+      "values": [
+        3
+      ]
+    },
+    "resting_heart_rate_weight": {
+      "kind": "tensor",
+      "shape": [
+        4
+      ],
+      "dtype": "float32",
+      "numel": 5,
+      "values": [
+        0.8
+      ]
+    },
+    "resilience_version": "2.2.1",
+    "hrv_balance_weight": {
+      "kind": "tensor",
+      "shape": [
+        7
+      ],
+      "dtype": "float32",
+      "numel": 8,
+      "values": [
+        0.1
+      ]
+    },
+    "sleep_recovery_weight": {
+      "kind": "tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "numel": 3,
+      "values": [
+        0.4
+      ]
+    },
+    "error_code_to_message": {
+      "0": "No errors.",
+      "1": "Condition, Sleep score is missing or out of bounds.",
+      "2": "Error, HRV balance contributor is missing and not NaN.",
+      "3": "Condition, Recovery index contributor is missing or out of bounds.",
+      "4": "Condition, Resting heart rate contributor is missing or out of bounds.",
+      "5": "Error, Stress limit is missing.",
+      "6": "Error, Saturation stress deviation is missing.",
+      "7": "Error, Saturation recovery deviation is missing.",
+      "8": "Error, Recovery limit is missing.",
+      "10": "Error, Stress values are not the same length as stress timestamps.",
+      "11": "Error, Sleep timestamps are missing or contain nan values.",
+      "12": "Error, Sleep start and end timestamps are not the same length.",
+      "13": "Error, Sleep start timestamp is after sleep end timestamp.",
+      "14": "Error, Sleep start or end timestamps are not ordered.",
+      "15": "Error, Daily stress, restorative time or sleep recovery lists should always be the length of 13."
+    },
+    "resilience_last_period_weight": {
+      "kind": "tensor",
+      "shape": [
+        5
+      ],
+      "dtype": "float32",
+      "numel": 6,
+      "values": [
+        7
+      ]
+    },
+    "validator.max_contibutor": 8,
+    "validator.min_contibutor": 1,
+    "validator.error_code_to_message": {
+      "0": "No errors.",
+      "1": "Condition, Sleep score is missing or out of bounds.",
+      "2": "Error, HRV balance contributor is missing and not NaN.",
+      "3": "Condition, Recovery index contributor is missing or out of bounds.",
+      "4": "Condition, Resting heart rate contributor is missing or out of bounds.",
+      "5": "Error, Stress limit is missing.",
+      "6": "Error, Saturation stress deviation is missing.",
+      "7": "Error, Saturation recovery deviation is missing.",
+      "8": "Error, Recovery limit is missing.",
+      "10": "Error, Stress values are not the same length as stress timestamps.",
+      "11": "Error, Sleep timestamps are missing or contain nan values.",
+      "12": "Error, Sleep start and end timestamps are not the same length.",
+      "13": "Error, Sleep start timestamp is after sleep end timestamp.",
+      "14": "Error, Sleep start or end timestamps are not ordered.",
+      "15": "Error, Daily stress, restorative time or sleep recovery lists should always be the length of 13."
+    },
+    "preprocessor.max_n_obs_per_bucket": {
+      "kind": "tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "int64",
+      "numel": 3,
+      "values": [
+        4
+      ]
+    }
+  },
+  "errors": []
+}

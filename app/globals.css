@@ -1,0 +1,786 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+@theme {
+  --color-brand: oklch(0.723 0.219 149.579); /* overridden at runtime via --brand */
+}
+
+@theme inline {
+  /* Text/icon colour that stays legible on a --brand fill. Set per brand ×
+     scheme below; black or white is chosen by measured WCAG contrast against
+     that pair's brand value, not by scheme. */
+  --color-brand-foreground: var(--brand-foreground);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-sidebar-ring: var(--sidebar-ring);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar: var(--sidebar);
+  --color-chart-5: var(--chart-5);
+  --color-chart-4: var(--chart-4);
+  --color-chart-3: var(--chart-3);
+  --color-chart-2: var(--chart-2);
+  --color-chart-1: var(--chart-1);
+  --color-ring: var(--ring);
+  --color-input: var(--input);
+  --color-border: var(--border);
+  --color-destructive: var(--destructive);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-accent: var(--accent);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-muted: var(--muted);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-secondary: var(--secondary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary: var(--primary);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-popover: var(--popover);
+  --color-card-foreground: var(--card-foreground);
+  --color-card: var(--card);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+}
+
+html, body {
+  overscroll-behavior-y: none;
+}
+
+:root {
+  /* green — darkened for light-mode text readability. --color-brand is the
+     variable the `text-brand`/`bg-brand` utilities actually read (495 sites);
+     setting only --brand left every one of them on the @theme default, which is
+     the .dark value and reads 2.2:1 on white. 0.52 measures 4.70:1 on white;
+     the previous 0.55 was 4.16:1, still under the 4.5 floor. */
+  --brand: oklch(0.52 0.22 149);
+  --color-brand: oklch(0.52 0.22 149);
+  --brand-foreground: oklch(1 0 0);
+  --brand-card-bg: rgba(0, 255, 135, 0.04);
+  --brand-card-border: rgba(0, 255, 135, 0.10);
+  --brand-glow: rgba(0, 255, 135, 0.12);
+  /* Semantic accent colours — readable on white in light mode; overridden vivid in .dark */
+  --accent-green: oklch(0.52 0.20 145);
+  --accent-cyan: oklch(0.48 0.18 210);
+  --accent-amber: oklch(0.55 0.18 75);
+  --accent-purple: oklch(0.50 0.20 295);
+  --radius: 0.625rem;
+  /* Higher tint % in light mode keeps accentCardStyle() cards readable
+     against the near-white --background (see lib/utils.ts accentCardStyle). */
+  --card-tint-pct: 88%;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  /* 0.556 measured 4.34:1 on --muted, under the 4.5:1 AA bar for the 10-12px pill badges that use
+     this pair at full opacity. 0.546 gives 4.52:1 there and 4.94:1 on white — a 0.01 lightness
+     step, visually imperceptible. See scripts/check-contrast.js. */
+  --muted-foreground: oklch(0.546 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+  /* Detail-hero page-root backgrounds, keyed by the .dark class next-themes
+     already stamps synchronously pre-paint — reading these avoids the
+     mounted-gated JS flash useHeroColorScheme() has for the decorations. */
+  --page-gradient-sleep: linear-gradient(180deg, #e8eafb 0%, #eef0fc 18%, #f2f3fd 42%, #f6f7fe 68%, #fafaff 100%);
+  --page-gradient-readiness: linear-gradient(180deg, #e3f0ff 0%, #eaf4ff 18%, #eff8ff 40%, #f5fbff 65%, #fafdff 100%);
+  --page-gradient-activity: linear-gradient(180deg, #ede8fb 0%, #f0ecfc 18%, #f4f0fc 40%, #f8f5fd 65%, #fbf9fe 100%);
+  --page-gradient-heart-rate: linear-gradient(180deg, #ffe1e1 0%, #ffe9e9 16%, #fff0f0 36%, #fff6f6 62%, #fffafa 100%);
+  /* Per-screen wallpaper scenes for ScreenPaletteLayer. Kept here rather than branched in JS
+     for the same reason as --page-gradient-* above: next-themes stamps `.dark` on <html>
+     synchronously before hydration, so the cascade resolves the right scene on the first
+     paint. The mounted-gated useHeroColorScheme() read this replaced defaulted to dark,
+     which flashed a full-screen dark wallpaper on every launch for light-theme users
+     across 7 screens. */
+  --screen-palette-health: radial-gradient(circle at 20% -10%, rgba(56,189,248,0.30), transparent 55%), radial-gradient(circle at 100% 100%, rgba(34,197,94,0.18), transparent 60%), linear-gradient(180deg, #eaf6fb 0%, #f2fbf5 55%, #ffffff 100%);
+  --screen-palette-nutrition: radial-gradient(circle at 15% 0%, rgba(249,115,22,0.25), transparent 55%), radial-gradient(circle at 100% 100%, rgba(234,179,8,0.18), transparent 60%), linear-gradient(180deg, #fff6ec 0%, #fffaf0 55%, #ffffff 100%);
+  --screen-palette-more: radial-gradient(circle at 85% -10%, rgba(139,92,246,0.22), transparent 55%), radial-gradient(circle at 0% 100%, rgba(99,102,241,0.15), transparent 60%), linear-gradient(180deg, #f5f2ff 0%, #f8f6ff 55%, #ffffff 100%);
+  --screen-palette-stats: radial-gradient(circle at 20% -10%, rgba(37,99,235,0.24), transparent 55%), radial-gradient(circle at 100% 100%, rgba(245,158,11,0.15), transparent 60%), linear-gradient(180deg, #eaf1fd 0%, #f5f8fc 55%, #ffffff 100%);
+  --screen-palette-workout-select: radial-gradient(circle at 15% -10%, rgba(239,68,68,0.22), transparent 55%), radial-gradient(circle at 100% 100%, rgba(225,29,72,0.15), transparent 60%), linear-gradient(180deg, #fdedee 0%, #fdf3f3 55%, #ffffff 100%);
+  --screen-palette-session-explain: radial-gradient(circle at 20% -10%, rgba(245,158,11,0.22), transparent 55%), radial-gradient(circle at 100% 100%, rgba(139,92,246,0.16), transparent 60%), linear-gradient(180deg, #fef7ea 0%, #faf7ff 55%, #ffffff 100%);
+}
+
+.dark {
+  --background: oklch(0.05 0 0);
+  --foreground: oklch(0.985 0 0);
+  /* Matches the original hardcoded 60% used by accentCardStyle() — dark
+     --muted is near-black, so 60% already contrasts fine here. */
+  --card-tint-pct: 60%;
+  --card: oklch(0.09 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.09 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.13 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.13 0 0);
+  --muted-foreground: oklch(0.75 0 0);
+  --accent: oklch(0.13 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --border: oklch(1 0 0 / 7%);
+  --input: oklch(1 0 0 / 12%);
+  --ring: oklch(0.556 0 0);
+  --chart-1: oklch(0.488 0.243 264.376);
+  --chart-2: oklch(0.696 0.17 162.48);
+  --chart-3: oklch(0.769 0.188 70.08);
+  --chart-4: oklch(0.627 0.265 303.9);
+  --chart-5: oklch(0.645 0.246 16.439);
+  --sidebar: oklch(0.09 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.13 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 7%);
+  --sidebar-ring: oklch(0.556 0 0);
+  --brand-card-bg: rgba(0, 255, 135, 0.07);
+  --brand-card-border: rgba(0, 255, 135, 0.18);
+  --brand-glow: rgba(0, 255, 135, 0.25);
+  /* Restore vivid brand colour for dark backgrounds */
+  --brand: oklch(0.723 0.219 149.579);
+  --color-brand: oklch(0.723 0.219 149.579);
+  /* Every dark-scheme brand is light enough that black wins on measured
+     contrast — except red, overridden below. */
+  --brand-foreground: oklch(0 0 0);
+  --accent-green: oklch(0.84 0.22 145);
+  --accent-cyan: oklch(0.84 0.15 210);
+  --accent-amber: oklch(0.79 0.18 85);
+  --accent-purple: oklch(0.70 0.18 295);
+  --page-gradient-sleep: linear-gradient(180deg, #060620 0%, #09082a 18%, #070818 42%, #050614 68%, #040512 100%);
+  --page-gradient-readiness: linear-gradient(180deg, #020a18 0%, #040e1e 18%, #030b18 40%, #020810 65%, #010508 100%);
+  --page-gradient-activity: linear-gradient(180deg, #0d0a2e 0%, #0e0a25 18%, #0a0720 40%, #080519 65%, #060413 100%);
+  --page-gradient-heart-rate: linear-gradient(180deg, #3d0808 0%, #280505 16%, #1a0303 36%, #100202 62%, #0a0202 100%);
+  --screen-palette-health: radial-gradient(circle at 20% -10%, rgba(56,189,248,0.35), transparent 55%), radial-gradient(circle at 100% 100%, rgba(34,197,94,0.22), transparent 60%), linear-gradient(180deg, #071119 0%, #0a1a1f 55%, #05090c 100%);
+  --screen-palette-nutrition: radial-gradient(circle at 15% 0%, rgba(249,115,22,0.30), transparent 55%), radial-gradient(circle at 100% 100%, rgba(234,179,8,0.20), transparent 60%), linear-gradient(180deg, #170f08 0%, #1a130a 55%, #0b0705 100%);
+  --screen-palette-more: radial-gradient(circle at 85% -10%, rgba(139,92,246,0.30), transparent 55%), radial-gradient(circle at 0% 100%, rgba(99,102,241,0.20), transparent 60%), linear-gradient(180deg, #0d0a17 0%, #100c1c 55%, #06040a 100%);
+  --screen-palette-stats: radial-gradient(circle at 20% -10%, rgba(37,99,235,0.32), transparent 55%), radial-gradient(circle at 100% 100%, rgba(245,158,11,0.16), transparent 60%), linear-gradient(180deg, #0a1120 0%, #0d1526 55%, #05070c 100%);
+  --screen-palette-workout-select: radial-gradient(circle at 15% -10%, rgba(239,68,68,0.32), transparent 55%), radial-gradient(circle at 100% 100%, rgba(225,29,72,0.18), transparent 60%), linear-gradient(180deg, #170708 0%, #1a0809 55%, #0a0303 100%);
+  --screen-palette-session-explain: radial-gradient(circle at 20% -10%, rgba(245,158,11,0.30), transparent 55%), radial-gradient(circle at 100% 100%, rgba(139,92,246,0.20), transparent 60%), linear-gradient(180deg, #171008 0%, #1a130d 55%, #0a0705 100%);
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply bg-background;
+  }
+  body {
+    @apply text-foreground;
+  }
+}
+
+/* Page-root containers use this instead of bg-background so the dynamic
+   background can show through — DynamicBackground sets --page-bg: transparent
+   on <html> when active. */
+@layer utilities {
+  .bg-page {
+    background-color: var(--page-bg, var(--background));
+  }
+}
+
+/* Keeps text legible over the dynamic sky/celestial background */
+@layer utilities {
+  .text-shadow-bg {
+    text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Brand accent colour themes — set via data-brand on <html> */
+[data-brand="blue"] {
+  --brand: oklch(0.45 0.22 210);
+  --color-brand: oklch(0.45 0.22 210);
+  --brand-card-bg: rgba(0, 212, 255, 0.04);
+  --brand-card-border: rgba(0, 212, 255, 0.10);
+  --brand-glow: rgba(0, 212, 255, 0.12);
+}
+.dark[data-brand="blue"] {
+  --brand: oklch(0.84 0.15 210);
+  --color-brand: oklch(0.84 0.15 210);
+  --brand-card-bg: rgba(0, 212, 255, 0.07);
+  --brand-card-border: rgba(0, 212, 255, 0.18);
+  --brand-glow: rgba(0, 212, 255, 0.25);
+}
+
+[data-brand="purple"] {
+  --brand: oklch(0.50 0.25 305);
+  --color-brand: oklch(0.50 0.25 305);
+  --brand-card-bg: rgba(191, 95, 255, 0.04);
+  --brand-card-border: rgba(191, 95, 255, 0.10);
+  --brand-glow: rgba(191, 95, 255, 0.12);
+}
+.dark[data-brand="purple"] {
+  --brand: oklch(0.65 0.28 305);
+  --color-brand: oklch(0.65 0.28 305);
+  --brand-card-bg: rgba(191, 95, 255, 0.07);
+  --brand-card-border: rgba(191, 95, 255, 0.18);
+  --brand-glow: rgba(191, 95, 255, 0.25);
+}
+
+[data-brand="orange"] {
+  --brand: oklch(0.55 0.22 45);
+  --color-brand: oklch(0.55 0.22 45);
+  --brand-card-bg: rgba(255, 106, 26, 0.04);
+  --brand-card-border: rgba(255, 106, 26, 0.10);
+  --brand-glow: rgba(255, 106, 26, 0.12);
+}
+.dark[data-brand="orange"] {
+  --brand: oklch(0.70 0.22 45);
+  --color-brand: oklch(0.70 0.22 45);
+  --brand-card-bg: rgba(255, 106, 26, 0.07);
+  --brand-card-border: rgba(255, 106, 26, 0.18);
+  --brand-glow: rgba(255, 106, 26, 0.25);
+}
+
+[data-brand="pink"] {
+  --brand: oklch(0.52 0.25 350);
+  --color-brand: oklch(0.52 0.25 350);
+  --brand-card-bg: rgba(255, 61, 154, 0.04);
+  --brand-card-border: rgba(255, 61, 154, 0.10);
+  --brand-glow: rgba(255, 61, 154, 0.12);
+}
+.dark[data-brand="pink"] {
+  --brand: oklch(0.67 0.27 350);
+  --color-brand: oklch(0.67 0.27 350);
+  --brand-card-bg: rgba(255, 61, 154, 0.07);
+  --brand-card-border: rgba(255, 61, 154, 0.18);
+  --brand-glow: rgba(255, 61, 154, 0.25);
+}
+
+[data-brand="cyan"] {
+  --brand: oklch(0.45 0.18 215);
+  --color-brand: oklch(0.45 0.18 215);
+  --brand-card-bg: rgba(0, 229, 255, 0.04);
+  --brand-card-border: rgba(0, 229, 255, 0.10);
+  --brand-glow: rgba(0, 229, 255, 0.12);
+}
+.dark[data-brand="cyan"] {
+  --brand: oklch(0.88 0.13 215);
+  --color-brand: oklch(0.88 0.13 215);
+  --brand-card-bg: rgba(0, 229, 255, 0.07);
+  --brand-card-border: rgba(0, 229, 255, 0.18);
+  --brand-glow: rgba(0, 229, 255, 0.25);
+}
+
+[data-brand="red"] {
+  --brand: oklch(0.48 0.23 25);
+  --color-brand: oklch(0.48 0.23 25);
+  --brand-card-bg: rgba(255, 45, 85, 0.04);
+  --brand-card-border: rgba(255, 45, 85, 0.10);
+  --brand-glow: rgba(255, 45, 85, 0.12);
+}
+.dark[data-brand="red"] {
+  --brand: oklch(0.55 0.25 25);
+  --color-brand: oklch(0.55 0.25 25);
+  /* The one dark brand dark enough that white beats black (5.07 vs 4.14). */
+  --brand-foreground: oklch(1 0 0);
+  --brand-card-bg: rgba(255, 45, 85, 0.07);
+  --brand-card-border: rgba(255, 45, 85, 0.18);
+  --brand-glow: rgba(255, 45, 85, 0.25);
+}
+
+[data-brand="gold"] {
+  --brand: oklch(0.50 0.18 85);
+  --color-brand: oklch(0.50 0.18 85);
+  --brand-card-bg: rgba(255, 215, 0, 0.04);
+  --brand-card-border: rgba(255, 215, 0, 0.10);
+  --brand-glow: rgba(255, 215, 0, 0.12);
+}
+.dark[data-brand="gold"] {
+  --brand: oklch(0.80 0.18 85);
+  --color-brand: oklch(0.80 0.18 85);
+  --brand-card-bg: rgba(255, 215, 0, 0.07);
+  --brand-card-border: rgba(255, 215, 0, 0.18);
+  --brand-glow: rgba(255, 215, 0, 0.25);
+}
+
+/* Prevent horizontal overflow/scroll on any screen */
+body {
+  overflow-x: hidden;
+}
+
+/* KaTeX display math can't wrap — let a long equation scroll inside its own
+   box instead of widening the AI markdown card past the viewport. */
+.katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+}
+
+/* Mobile safe-area (iOS notch / status bar) */
+:root {
+  /* Raw inset values for screens that must compose safe-area with another
+     dynamic offset (keyboard height, toast stacking) beyond what the
+     pt-safe / pb-safe / pb-nav-safe utilities below cover. Consumers reference
+     these vars instead of calling env(safe-area-inset-*) directly, so every
+     raw inset read stays centralised here for the CI safe-area rule. */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  /* Shared value for pt-safe/pt-safe-or-4 below — same intent (safe-area inset
+     + breathing room, or at least 1rem), historically two byte-identical rule
+     bodies. Defined once here so they can't drift; kept as two class names
+     since pt-safe-or-4 is already relied on by the health detail-page heroes
+     and the day-timeline header. */
+  --pt-safe-value: max(1rem, calc(env(safe-area-inset-top, 0px) + 0.5rem));
+}
+
+@layer utilities {
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  /* pt-safe ensures content clears the Android status bar / iOS notch and
+     leaves breathing room below it. See --pt-safe-value above for why the
+     computed value lives in one place. */
+  .pt-safe {
+    padding-top: var(--pt-safe-value);
+  }
+  .pt-safe-or-4 {
+    padding-top: var(--pt-safe-value);
+  }
+  /* Fixed/sticky bottom action bars & sheet footers: clear the gesture bar,
+     with a comfortable floor when there is no inset (3-button nav / desktop). */
+  .pb-safe-action {
+    padding-bottom: max(env(safe-area-inset-bottom, 0px), 0.75rem);
+  }
+  /* Scrollable page content on screens WITH the bottom nav: clear nav + inset,
+     plus a breathing gap (0.75rem, matching the app's standard card gutter) so
+     content doesn't butt flush against the nav (and the -top-4 elevated FAB).
+     3.5rem = the nav's h-14. Do not use on navless screens or sheets. */
+  .pb-nav-safe {
+    padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px) + 0.75rem);
+  }
+  /* Shared clearance for the full-screen workout-phase action bars (warmup, pre,
+     active Start/Log/Complete, exercise summary, done). The inset is ADDED to a
+     breathing gap rather than max()'d against a floor: under edge-to-edge (Capacitor
+     draws the WebView behind the nav bar, so env reports the ~48px 3-button bar),
+     max(env, 4rem) left the button only ~16px above the nav bar. `env + 2rem`
+     guarantees a real gap above the nav on-device, and the 4rem floor keeps the
+     no-inset (web QA / gesture-nav) look unchanged. Use this — not pb-safe-action —
+     on every workout-phase action bar so they clear the nav bar consistently. */
+  .pb-safe-action-lg {
+    padding-bottom: max(calc(env(safe-area-inset-bottom, 0px) + 2rem), 4rem);
+  }
+  /* `bottom` positioning equivalents of pb-nav-safe/pb-safe for fixed elements
+     that must clear the bottom nav (3.5rem = the nav's h-14) rather than pad
+     around their own content. bottom-nav-safe: flush against the nav (no extra
+     gutter). bottom-fab-safe: nav + the app's standard 0.75rem card gutter, for
+     floating action buttons that sit above the nav with breathing room. */
+  .bottom-nav-safe {
+    bottom: calc(3.5rem + var(--safe-bottom));
+  }
+  .bottom-fab-safe {
+    bottom: calc(3.5rem + 0.75rem + var(--safe-bottom));
+  }
+}
+
+/* W2: border-run animation for active set indicator (uses pathLength=1000 normalisation) */
+@keyframes border-run {
+  from { stroke-dashoffset: 1000; }
+  to   { stroke-dashoffset: 0; }
+}
+
+@keyframes ta-marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* The recovery strip renders both branches and lets CSS pick, so there is no hydration
+   mismatch and no first-paint flash. Motion users get the marquee; reduced-motion users get the
+   static subset (see the reduced-motion block below and muscle-recovery-card.tsx). */
+.recovery-static { display: none; }
+
+@keyframes xp-pop {
+  from { opacity: 0; transform: scale(0.7) translateY(8px); }
+  to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+@keyframes meteor {
+  0%   { transform: rotate(215deg) translateX(0); opacity: 1; }
+  70%  { opacity: 1; }
+  100% { transform: rotate(215deg) translateX(-500px); opacity: 0; }
+}
+.meteor-particle {
+  animation: meteor linear infinite;
+}
+
+@keyframes pr-pulse {
+  0%   { transform: scale(0.8); opacity: 0; box-shadow: 0 0 0 0 rgba(250,204,21,0.7); }
+  40%  { transform: scale(1.15); opacity: 1; box-shadow: 0 0 0 12px rgba(250,204,21,0); }
+  70%  { transform: scale(0.95); }
+  100% { transform: scale(1); box-shadow: 0 0 0 0 rgba(250,204,21,0); }
+}
+
+/* Achievement badge shimmer for newly-unlocked badges */
+@keyframes shimmer-sweep {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+/* Collapsible open/close height animation — one change upgrades every
+   Radix Collapsible site instead of each hand-rolling its own transition. */
+@keyframes collapsible-down {
+  from { height: 0; }
+  to   { height: var(--radix-collapsible-content-height); }
+}
+@keyframes collapsible-up {
+  from { height: var(--radix-collapsible-content-height); }
+  to   { height: 0; }
+}
+[data-slot="collapsible-content"] {
+  overflow: hidden;
+}
+[data-slot="collapsible-content"][data-state="open"] {
+  animation: collapsible-down 0.2s ease-out;
+}
+[data-slot="collapsible-content"][data-state="closed"] {
+  animation: collapsible-up 0.2s ease-out;
+}
+
+/* Skeleton→content fade-in — apply to a screen's content container as it
+   replaces a loading skeleton, so real data doesn't just hard-pop in. */
+@keyframes content-fade-in { from { opacity: 0; } to { opacity: 1; } }
+.content-fade-in { animation: content-fade-in 0.25s ease-out both; }
+
+/* Respect user's reduced-motion preference.
+   Decorative particles stop entirely; functional indicators (set-timer border,
+   timer-ring pulse) freeze to their static state — state stays visible, motion stops. */
+@media (prefers-reduced-motion: reduce) {
+  .meteor-particle { animation: none !important; }
+  .bg-particle-star,
+  .bg-particle-cloud,
+  .bg-particle-rain,
+  .bg-particle-snow,
+  .bg-particle-fog,
+  .bg-particle-lightning { animation: none !important; }
+  @keyframes ta-marquee { from { transform: none; } to { transform: none; } }
+  .recovery-marquee { display: none; }
+  .recovery-static { display: flex; }
+  [data-slot="collapsible-content"][data-state="open"],
+  [data-slot="collapsible-content"][data-state="closed"] { animation: none !important; }
+  .xp-pop-badge,
+  .pr-pulse-badge,
+  .shimmer-sweep::after { animation: none !important; }
+  .border-run { animation: none !important; stroke-dashoffset: 0 !important; }
+  .content-fade-in { animation: none !important; }
+}
+.shimmer-sweep::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.35) 50%, transparent 60%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 1.2s ease-in-out 2;
+  pointer-events: none;
+  border-radius: inherit;
+}
+
+/* Mobile usability */
+@media (max-width: 640px) {
+  /* Prevent iOS zoom on input focus */
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+
+  /* Minimum tap target size — 48dp, the Android mandate this used to under-deliver by 4px.
+     Deliberately still a bare element selector rather than a `components/ui/button.tsx` variant:
+     every Button size (h-8/h-9/h-10/size-9) declares LESS than this and relies on the floor, and
+     most of the app's controls are hand-rolled `<button>`s that a variant would not reach at all.
+     Moving it into the variants would shrink coverage, not tidy it. `[role="button"]` is included
+     because the WebView nested-control pattern (a tappable card containing other controls) cannot
+     use a real <button> — see CLAUDE.md. `<a>` is deliberately excluded: an inline text link in
+     prose is not a tap target and a 48px floor would wreck paragraph layout. */
+  button,
+  [role="button"] {
+    min-height: 48px;
+    min-width: 48px;
+  }
+  /* Opt-out for controls that are intentionally dense (e.g. inline text buttons) */
+  button.tap-dense,
+  [role="button"].tap-dense {
+    min-height: 0;
+    min-width: 0;
+  }
+}
+
+/* Gives a control that opted out of the floor an invisible touch box larger than its ink, so it
+   stays reachable at its drawn size — what Material and iOS page indicators do.
+ * NOT 48px, and the reason is worth stating: a carousel dot row sits on a 15px pitch, so 48px
+ * boxes would overlap by 33px on each side and the later sibling — painted on top — would swallow
+ * taps aimed at its neighbours. A hit area wider than the pitch is worse than a small one. 24px
+ * is WCAG 2.5.8 AA's minimum and the widest that stays disjoint once the row is spaced to match
+ * (see CAROUSEL_DOT_PITCH_PX). Height is free: siblings are laid out horizontally, so a tall box
+ * overlaps nothing.
+ * Outside the max-width query on purpose — a dot is the same size on every viewport, unlike the
+ * floor above, which exists for touch screens. */
+/* Square 44px touch box for a small ISOLATED control — one with no interactive neighbour close
+ * enough to be overlapped. Same rule as `.tap-target-dot`: never give a control a hit area larger
+ * than its clearance, because the later sibling in DOM order wins the overlap and steals taps
+ * meant for the earlier one. */
+.tap-target-44 {
+  position: relative;
+}
+.tap-target-44::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+.tap-target-dot {
+  position: relative;
+}
+.tap-target-dot::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 24px;
+  height: 44px;
+  transform: translate(-50%, -50%);
+}
+
+/* Dynamic background — keyframes (Section 2 of dynamic wallpaper backgrounds spec) */
+/* Plain numbers, deliberately. Reading --bg-star-opacity here (as this used to)
+   makes the opacity animation non-compositable, forcing a main-thread style
+   recalc per star per frame — measured at 19.8% of main-thread time on device.
+   The phase opacity now lives on a static wrapper in particles.tsx and
+   multiplies with this, so the rendered result is unchanged. */
+@keyframes twinkle {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.3; }
+}
+
+@keyframes cloud-drift {
+  from { transform: translateX(-10%); }
+  to   { transform: translateX(10%); }
+}
+
+@keyframes rain-fall {
+  from { transform: translateY(-10%) translateX(0); opacity: 0.6; }
+  to   { transform: translateY(110%) translateX(-6%); opacity: 0.2; }
+}
+
+@keyframes snow-fall {
+  0%   { transform: translateY(-10%) translateX(0); opacity: 0.9; }
+  50%  { transform: translateY(50%) translateX(8px); }
+  100% { transform: translateY(110%) translateX(-8px); opacity: 0.4; }
+}
+
+@keyframes fog-drift {
+  from { transform: translateX(-8%); opacity: 0.5; }
+  to   { transform: translateX(8%); opacity: 0.7; }
+}
+
+@keyframes lightning-flash {
+  0%, 92%, 100% { opacity: 0; }
+  93%, 95%      { opacity: 0.8; }
+  94%           { opacity: 0.2; }
+}
+
+/* Dynamic background — particle animation classes */
+.bg-particle-star {
+  animation-name: twinkle;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+.bg-particle-cloud {
+  animation-name: cloud-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.bg-particle-rain {
+  animation-name: rain-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.bg-particle-snow {
+  animation-name: snow-fall;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.bg-fog-band {
+  animation-name: fog-drift;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+.bg-lightning-flash {
+  animation-name: lightning-flash;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+/* ── Native-feeling screen transitions (View Transitions API) ───────────────
+   Driven from lib/view-transition.ts, which sets data-view-transition on <html>
+   for the duration of the transition. Applied to full-screen route changes only
+   — a bottom-nav tab flip is not a navigation and gets the fade-through below
+   instead.
+
+   Interpolated by the compositor from before/after snapshots, so no JS runs per
+   frame. That matters on Samsung's WebView specifically (see CLAUDE.md), where
+   JS-driven animation is the documented jank source.
+
+   This is Material 3's **shared axis Y**, and it replaced a full-width iOS-style
+   horizontal slide. Two reasons, one aesthetic and one practical:
+
+   - Android's convention for moving *deeper* into a hierarchy is vertical, not
+     lateral. Lateral motion on Android means "peer" (tabs, pager pages), so a
+     sideways push reads as the wrong relationship.
+   - A 100%-width slide has to stay legible across the whole screen width for its
+     full duration. A 30px displacement does not: if the incoming screen is a few
+     frames late to paint, there is far less travel over which that can show. The
+     horizontal version was the one the owner reported as not feeling right.
+
+   Easings are M3's emphasized pair — decelerate for what is arriving,
+   accelerate for what is leaving. */
+
+/* The fades are SEQUENCED, not simultaneous, and that is the whole point of the
+   percentage stops below. M3's shared axis clears the outgoing screen before the
+   incoming one arrives; fading both across the full duration instead superimposes
+   two content-dense screens at ~50% each for most of the animation, which renders
+   as text over text rather than as a page opening. That double-exposure was
+   visible in a slowed capture of the Health → Sleep push.
+
+   The 25%/40% split leaves a deliberate ~15% overlap: enough that the screen is
+   never fully empty mid-transition (the app's persistent background would show
+   through), while short enough that the two never read as superimposed. */
+@keyframes ta-axis-y-in    { from { transform: translateY(30px);  opacity: 0; } 25% { opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ta-axis-y-out   { from { transform: none; opacity: 1; } 40% { opacity: 0; } to { transform: translateY(-30px); opacity: 0; } }
+@keyframes ta-axis-y-in-r  { from { transform: translateY(-30px); opacity: 0; } 25% { opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ta-axis-y-out-r { from { transform: none; opacity: 1; } 40% { opacity: 0; } to { transform: translateY(30px);  opacity: 0; } }
+
+/* Forward (push): the incoming screen rises into place while the outgoing one
+   continues up and out — the stack moving up under your thumb. */
+html[data-view-transition="forward"]::view-transition-old(root) {
+  animation: 200ms cubic-bezier(0.3, 0, 0.8, 0.15) both ta-axis-y-out;
+}
+html[data-view-transition="forward"]::view-transition-new(root) {
+  animation: 200ms cubic-bezier(0.05, 0.7, 0.1, 1) both ta-axis-y-in;
+}
+
+/* Back (pop): mirrored, so returning reads as retreating rather than a second push. */
+html[data-view-transition="back"]::view-transition-old(root) {
+  animation: 200ms cubic-bezier(0.3, 0, 0.8, 0.15) both ta-axis-y-out-r;
+}
+html[data-view-transition="back"]::view-transition-new(root) {
+  animation: 200ms cubic-bezier(0.05, 0.7, 0.1, 1) both ta-axis-y-in-r;
+}
+
+/* Both snapshots fade, so this is a cross-dissolve: the arriving screen has to
+   sit on top or it emerges from underneath a screen that is still opaque. */
+html[data-view-transition]::view-transition-old(root) { z-index: 0; }
+html[data-view-transition]::view-transition-new(root) { z-index: 1; }
+
+/* Reduced motion: lib/view-transition.ts already declines to start a transition,
+   so this is belt-and-braces for a preference that changes mid-transition. */
+@media (prefers-reduced-motion: reduce) {
+  html[data-view-transition]::view-transition-old(root),
+  html[data-view-transition]::view-transition-new(root) { animation: none !important; }
+}
+
+/* Tab-panel fade-through — Material 3's standard for *peer* destinations, which
+   is what the five bottom-nav tabs are. Deliberately not shared-axis: axis motion
+   asserts a direction between screens, and tabs have no order to assert.
+
+   Every tab panel is mounted at all times (TabShell keeps them alive for scroll
+   position and state), so a switch costs no network and no re-render — this
+   animates content that is already painted, which is why it reads as polish
+   rather than as waiting.
+
+   Spec fade-through scales the incoming content 92% → 100% over 300ms. Both
+   numbers are relaxed here: 0.96 because a full-screen panel makes 92% read as a
+   zoom rather than a settle, and 180ms because the whole point of this app is to
+   feel instant. Opacity finishes ahead of the scale so the content is readable
+   before the motion has stopped. Transform + opacity only — both composite. */
+@keyframes ta-tab-enter {
+  from { opacity: 0; transform: scale(0.96); }
+  60%  { opacity: 1; }
+  to   { opacity: 1; transform: none; }
+}
+.tab-panel-enter { animation: ta-tab-enter 180ms cubic-bezier(0.05, 0.7, 0.1, 1) both; }
+
+@media (prefers-reduced-motion: reduce) {
+  .tab-panel-enter { animation: none !important; }
+}
+
+/* Decorative background animation is mounted in the root layout, so it runs on
+   every screen for as long as the app is open. A device profile showed
+   "Event: animationiteration" at 16% of main-thread time — the browser
+   dispatching iteration events for ~60 looping elements that nothing listens
+   for — alongside the style-recalc cost fixed in the twinkle keyframes above.
+   Pausing while the app is backgrounded stops that work entirely without
+   changing anything the user can see. Set by CapacitorNativeInit. */
+html[data-app-hidden="true"] .bg-particle-star,
+html[data-app-hidden="true"] .bg-particle-cloud,
+html[data-app-hidden="true"] .bg-particle-rain,
+html[data-app-hidden="true"] .bg-particle-snow,
+html[data-app-hidden="true"] .bg-fog-band,
+html[data-app-hidden="true"] .bg-lightning-flash,
+html[data-app-hidden="true"] .meteor-particle {
+  animation-play-state: paused !important;
+}
+
+/* Pause every animation inside a hidden tab panel.
+   TabShell keeps all five tabs mounted so scroll position and component state
+   survive a switch — which also means the four you are not looking at keep
+   running their animations. 49 components use animate-pulse and 46 use
+   animate-spin, both `infinite` in Tailwind, and Home renders meteors. A device
+   profile taken with the dynamic wallpaper *disabled* still attributed 21.3% of
+   main-thread time to animationiteration; this is where the rest of it lives.
+   Nothing here is visible, so pausing changes nothing the user can see. */
+.tab-panel-idle,
+.tab-panel-idle * {
+  animation-play-state: paused !important;
+}

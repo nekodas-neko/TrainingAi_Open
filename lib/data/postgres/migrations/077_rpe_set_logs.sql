@@ -1,0 +1,1 @@
+ALTER TABLE set_logs ADD COLUMN IF NOT EXISTS rpe integer;

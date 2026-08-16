@@ -1,0 +1,91 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/auth'
+import { requireAdmin } from '@/lib/admin'
+import { getRepository } from '@/lib/data'
+import { z } from 'zod'
+
+const ActivityTypeBody = z.object({
+  label:           z.string().min(1).max(40),
+  icon:            z.string().min(1).max(60),
+  isDistanceBased: z.boolean(),
+  sortOrder:       z.number().int(),
+})
+
+export async function GET() {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    await requireAdmin(session.user.id, session.user.isAdmin)
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const repo = await getRepository()
+  const activityTypes = await repo.listActivityTypes()
+  return NextResponse.json({ activityTypes })
+}
+
+export async function POST(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    await requireAdmin(session.user.id, session.user.isAdmin)
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const body = ActivityTypeBody.safeParse(await req.json())
+  if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+
+  const repo = await getRepository()
+  const activityType = await repo.createActivityType(body.data)
+  return NextResponse.json({ activityType }, { status: 201 })
+}
+
+export async function PATCH(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    await requireAdmin(session.user.id, session.user.isAdmin)
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { id, ...rest } = await req.json()
+  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+
+  const body = ActivityTypeBody.partial().safeParse(rest)
+  if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+
+  const repo = await getRepository()
+  const activityType = await repo.updateActivityType(id, body.data)
+  return NextResponse.json({ activityType })
+}
+
+export async function DELETE(req: NextRequest) {
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  try {
+    await requireAdmin(session.user.id, session.user.isAdmin)
+  } catch {
+    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  }
+
+  const { searchParams } = new URL(req.url)
+  const id = searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
+  if (id === 'other') return NextResponse.json({ error: "Cannot delete the 'other' activity type" }, { status: 400 })
+
+  const repo = await getRepository()
+  try {
+    await repo.deleteActivityType(id)
+  } catch {
+    return NextResponse.json({ error: 'Activity type is in use' }, { status: 409 })
+  }
+
+  return NextResponse.json({ ok: true })
+}

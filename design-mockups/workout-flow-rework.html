@@ -1,0 +1,927 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrainingAI — Workout Flow Rework Mockups</title>
+<style>
+:root {
+  --brand: #00ff87;
+  --brand10: rgba(0,255,135,0.10);
+  --brand20: rgba(0,255,135,0.20);
+  --brand40: rgba(0,255,135,0.40);
+  --bg: #080808;
+  --card: #111111;
+  --card2: #161616;
+  --border: rgba(255,255,255,0.07);
+  --border2: rgba(255,255,255,0.13);
+  --text: #ffffff;
+  --muted: rgba(255,255,255,0.45);
+  --muted2: rgba(255,255,255,0.25);
+  --green: #22c55e;
+  --green10: rgba(34,197,94,0.10);
+  --green20: rgba(34,197,94,0.20);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: #0c0c18;
+  min-height: 100vh;
+  padding: 36px 16px 72px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
+  color: var(--text);
+}
+
+.page-header { text-align: center; margin-bottom: 32px; }
+.page-title {
+  font-size: 1.9rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  background: linear-gradient(135deg, #fff 50%, rgba(0,255,135,0.9));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 6px;
+}
+.page-sub { color: var(--muted); font-size: 0.85rem; line-height: 1.6; }
+
+/* ── Tabs ── */
+.tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 580px;
+}
+.tab {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.09);
+  color: var(--muted);
+  border-radius: 100px;
+  padding: 8px 16px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s;
+  white-space: nowrap;
+}
+.tab:hover { color: var(--text); background: rgba(255,255,255,0.1); }
+.tab.active { background: var(--brand); color: #000; border-color: var(--brand); }
+
+/* ── Phone ── */
+.phone {
+  width: 390px;
+  height: 844px;
+  background: var(--bg);
+  border-radius: 50px;
+  border: 2px solid rgba(255,255,255,0.13);
+  position: relative;
+  overflow: hidden;
+  box-shadow:
+    0 0 0 1px rgba(0,0,0,0.95),
+    0 50px 120px rgba(0,0,0,0.9),
+    0 0 80px rgba(0,255,135,0.05);
+  flex-shrink: 0;
+}
+.dynamic-island {
+  position: absolute;
+  top: 13px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 122px;
+  height: 36px;
+  background: #000;
+  border-radius: 20px;
+  z-index: 300;
+}
+
+/* ── Screens ── */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: none;
+  flex-direction: column;
+  background: var(--bg);
+}
+.screen.active { display: flex; }
+
+/* ── Persistent session header (screens 2-5) ── */
+.session-hdr {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 62px 14px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  position: relative;
+  z-index: 10;
+  flex-shrink: 0;
+}
+.hdr-btn {
+  width: 38px; height: 38px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 11px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.hdr-center { flex: 1; text-align: center; min-width: 0; }
+.hdr-session {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+}
+.hdr-timer {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--brand);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+}
+.hdr-sub { font-size: 0.7rem; color: var(--muted2); margin-top: 1px; }
+
+/* ── Body + footer ── */
+.s-body {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+.s-footer {
+  padding: 12px 16px 28px;
+  border-top: 1px solid var(--border);
+  background: var(--bg);
+  flex-shrink: 0;
+}
+
+/* ── Buttons ── */
+.btn-primary {
+  width: 100%;
+  height: 56px;
+  background: var(--brand);
+  color: #000;
+  border: none;
+  border-radius: 15px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  cursor: pointer;
+  letter-spacing: -0.01em;
+}
+.btn-brand-grad {
+  background: linear-gradient(135deg, var(--brand), rgba(0,212,255,0.85));
+  color: #000;
+}
+.btn-ghost {
+  width: 100%;
+  height: 46px;
+  background: transparent;
+  color: var(--brand);
+  border: 1px solid var(--brand20);
+  border-radius: 13px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.btn-row { display: flex; gap: 10px; }
+.btn-icon {
+  width: 56px; height: 56px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid var(--border2);
+  border-radius: 15px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+/* ── Cards ── */
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px;
+}
+.card-label {
+  font-size: 0.69rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+/* ── Done set chip ── */
+.done-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #0f2018;
+  border: 1px solid rgba(34,197,94,0.28);
+  border-radius: 10px;
+  padding: 7px 10px;
+}
+.done-check {
+  width: 18px; height: 18px;
+  border-radius: 5px;
+  background: rgba(34,197,94,0.25);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.25} }
+@keyframes timer { from{opacity:0.7} to{opacity:1} }
+</style>
+</head>
+<body>
+
+<div class="page-header">
+  <div class="page-title">Workout Flow — Rework Mockups</div>
+  <p class="page-sub">
+    Push Day · Barbell Bench Press · Exercise 1 of 6<br>
+    S25 Ultra format · 5 screen states · data capture annotated
+  </p>
+</div>
+
+<div class="tabs">
+  <button class="tab active" onclick="show(0)">1 · Pre-Workout</button>
+  <button class="tab" onclick="show(1)">2 · Exercise Ready</button>
+  <button class="tab" onclick="show(2)">3 · Active Set</button>
+  <button class="tab" onclick="show(3)">4 · Rest Timer</button>
+  <button class="tab" onclick="show(4)">5 · Set Summary</button>
+</div>
+
+<div class="phone">
+  <div class="dynamic-island"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN 0 · Pre-Workout list (no session timer yet)
+  ══════════════════════════════════════════════════════ -->
+  <div class="screen active" id="s0">
+    <!-- Header -->
+    <header style="display:flex;align-items:center;gap:10px;padding:62px 16px 14px;border-bottom:1px solid var(--border);flex-shrink:0;">
+      <div class="hdr-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:1.1rem;font-weight:800;letter-spacing:-0.02em;">Push Day</div>
+        <div style="font-size:0.78rem;color:var(--muted);">Wednesday, 28 May · 6 exercises</div>
+      </div>
+      <div class="hdr-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 4v6h6M23 20v-6h-6M20.49 9A9 9 0 005.64 5.64L1 10M23 14l-4.64 4.36A9 9 0 013.51 15"/></svg>
+      </div>
+    </header>
+
+    <!-- Mood banner -->
+    <div style="margin:10px 16px 0;padding:10px 14px;background:rgba(0,255,135,0.07);border:1px solid rgba(0,255,135,0.2);border-radius:12px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+      <div>
+        <div style="font-size:0.82rem;font-weight:600;color:var(--brand);">Log today's mood</div>
+        <div style="font-size:0.72rem;color:var(--muted);margin-top:1px;">Energy, sleep quality, sore muscles</div>
+      </div>
+      <span style="font-size:1.5rem;">💭</span>
+    </div>
+
+    <!-- Exercise list -->
+    <div class="s-body" style="padding:10px 16px 4px;">
+
+      <!-- Note: tapping a pill opens stats sheet (no solo launch) -->
+      <div style="font-size:0.69rem;color:var(--muted2);text-align:center;margin-bottom:8px;letter-spacing:0.03em;">Tap any exercise to view history &amp; 1RM trend</div>
+
+      <!-- Bench Press -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <div style="width:40px;height:40px;border-radius:11px;background:var(--brand10);border:1px solid var(--brand20);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🏋️</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.88rem;font-weight:700;">Barbell Bench Press</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">4 sets · Last: 92.5 kg × 8 · 14 May</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <div style="font-size:0.69rem;font-weight:700;color:var(--brand);background:var(--brand10);border:1px solid rgba(0,255,135,0.22);border-radius:7px;padding:3px 7px;white-space:nowrap;">1RM ~115 kg</div>
+          <div style="color:var(--muted2);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Incline DB Press -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🏋️</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.88rem;font-weight:700;">Incline DB Press</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">3 sets · Last: 30 kg × 10 · 14 May</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <div style="font-size:0.69rem;font-weight:700;color:var(--brand);background:var(--brand10);border:1px solid rgba(0,255,135,0.22);border-radius:7px;padding:3px 7px;white-space:nowrap;">1RM ~52 kg</div>
+          <div style="color:var(--muted2);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Cable Fly (no 1RM) -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🤸</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.88rem;font-weight:700;">Cable Fly</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">3 sets · Last: 15 kg × 12 · 14 May</div>
+        </div>
+        <div style="color:var(--muted2);flex-shrink:0;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+      </div>
+
+      <!-- OHP -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">⬆️</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.88rem;font-weight:700;">Overhead Press</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">4 sets · Last: 65 kg × 6 · 14 May</div>
+        </div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;">
+          <div style="font-size:0.69rem;font-weight:700;color:var(--brand);background:var(--brand10);border:1px solid rgba(0,255,135,0.22);border-radius:7px;padding:3px 7px;white-space:nowrap;">1RM ~78 kg</div>
+          <div style="color:var(--muted2);">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tricep Pushdown -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">💪</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.88rem;font-weight:700;">Tricep Pushdown</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">3 sets · Last: 45 kg × 12 · 14 May</div>
+        </div>
+        <div style="color:var(--muted2);flex-shrink:0;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+      </div>
+
+      <!-- Lateral Raises -->
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:14px;padding:11px 13px;margin-bottom:7px;display:flex;align-items:center;gap:10px;cursor:pointer;">
+        <div style="width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,0.05);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-size:1.1rem;flex-shrink:0;">🙆</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:0.88rem;font-weight:700;">Lateral Raises</div>
+          <div style="font-size:0.72rem;color:var(--muted);margin-top:2px;">3 sets · Last: 12 kg × 15 · 14 May</div>
+        </div>
+        <div style="color:var(--muted2);flex-shrink:0;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="s-footer">
+      <!-- DATA: workoutStartTime = Date.now() on press -->
+      <button class="btn-primary" onclick="show(1)">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+        Start Workout
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN 1 · Exercise Ready (timer running from warmup)
+  ══════════════════════════════════════════════════════ -->
+  <div class="screen" id="s1">
+    <!-- Persistent session header -->
+    <div class="session-hdr">
+      <div class="hdr-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="hdr-center">
+        <div class="hdr-session">Push Day</div>
+        <!-- DATA: workoutStartTime stamped, ticking since warmup ended -->
+        <div class="hdr-timer">02:14</div>
+        <div class="hdr-sub">Exercise 1 of 6</div>
+      </div>
+      <div class="hdr-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="1" fill="currentColor"/><circle cx="19" cy="12" r="1" fill="currentColor"/><circle cx="5" cy="12" r="1" fill="currentColor"/></svg>
+      </div>
+    </div>
+
+    <div class="s-body" style="padding:18px 16px 8px;">
+
+      <!-- Exercise hero -->
+      <div style="margin-bottom:16px;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:5px;">Up next</div>
+        <h2 style="font-size:1.85rem;font-weight:800;letter-spacing:-0.03em;line-height:1.1;">Barbell Bench Press</h2>
+        <div style="font-size:0.78rem;color:var(--muted);margin-top:5px;">Last: 92.5 kg × 8 reps · 14 May</div>
+      </div>
+
+      <!-- Goal chip — 1RM target -->
+      <div style="margin-bottom:14px;padding:12px 14px;background:linear-gradient(135deg,rgba(0,255,135,0.11),rgba(0,255,135,0.04));border:1px solid rgba(0,255,135,0.28);border-radius:14px;display:flex;align-items:center;gap:10px;">
+        <span style="font-size:1.5rem;flex-shrink:0;">⚡</span>
+        <div>
+          <div style="font-size:0.83rem;font-weight:700;color:var(--brand);">New 1RM in reach</div>
+          <div style="font-size:0.75rem;color:rgba(255,255,255,0.72);margin-top:2px;">
+            Hit <strong style="color:var(--brand);">9+ reps</strong> on sets 3–4 at 92.5 kg → ~120 kg 1RM
+          </div>
+        </div>
+      </div>
+
+      <!-- Set targets card -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-label">Set Targets</div>
+
+        <!-- Set 1: 60% warmup -->
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <div style="width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--muted);flex-shrink:0;">1</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+              <span style="font-size:0.85rem;font-weight:600;">70 kg × 5</span>
+              <span style="font-size:0.72rem;color:var(--muted);">60%</span>
+            </div>
+            <div style="height:4px;border-radius:2px;background:var(--border2);overflow:hidden;">
+              <div style="height:100%;width:60%;background:rgba(255,255,255,0.2);border-radius:2px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Set 2: 75% -->
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <div style="width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--muted);flex-shrink:0;">2</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+              <span style="font-size:0.85rem;font-weight:600;">87.5 kg × 3</span>
+              <span style="font-size:0.72rem;color:var(--muted);">75%</span>
+            </div>
+            <div style="height:4px;border-radius:2px;background:var(--border2);overflow:hidden;">
+              <div style="height:100%;width:75%;background:rgba(255,255,255,0.3);border-radius:2px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Set 3: 80% working (brand highlighted) -->
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);">
+          <div style="width:24px;height:24px;border-radius:7px;background:var(--brand10);border:1px solid var(--brand20);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--brand);flex-shrink:0;">3</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+              <span style="font-size:0.85rem;font-weight:700;color:var(--brand);">92.5 kg × 8 ⚡</span>
+              <span style="font-size:0.72rem;color:var(--brand);">80%</span>
+            </div>
+            <div style="height:4px;border-radius:2px;background:var(--border2);overflow:hidden;">
+              <div style="height:100%;width:80%;background:var(--brand);border-radius:2px;"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Set 4: 80% working -->
+        <div style="display:flex;align-items:center;gap:10px;padding:7px 0;">
+          <div style="width:24px;height:24px;border-radius:7px;background:var(--brand10);border:1px solid var(--brand20);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--brand);flex-shrink:0;">4</div>
+          <div style="flex:1;">
+            <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px;">
+              <span style="font-size:0.85rem;font-weight:700;color:var(--brand);">92.5 kg × 8 ⚡</span>
+              <span style="font-size:0.72rem;color:var(--brand);">80%</span>
+            </div>
+            <div style="height:4px;border-radius:2px;background:var(--border2);overflow:hidden;">
+              <div style="height:100%;width:80%;background:var(--brand);border-radius:2px;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 1RM sparkline -->
+      <div class="card" style="margin-bottom:4px;">
+        <div class="card-label">1RM Trend — Bench Press</div>
+        <svg width="100%" height="52" viewBox="0 0 340 52" preserveAspectRatio="none">
+          <defs>
+            <linearGradient id="sparkGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="#00ff87" stop-opacity="0.25"/>
+              <stop offset="100%" stop-color="#00ff87" stop-opacity="0"/>
+            </linearGradient>
+          </defs>
+          <!-- Grid -->
+          <line x1="0" y1="42" x2="340" y2="42" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <line x1="0" y1="22" x2="340" y2="22" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+          <!-- Points: 108,110,109,112,113,115 → minV=108 range=7 h=40 yBase=48 -->
+          <!-- y = 48 - ((v-108)/7)*40 -->
+          <!-- 108→48, 110→36.6, 109→42.3, 112→25.1, 113→19.4, 115→8 -->
+          <polygon points="0,48 68,37 136,42 204,25 272,19 340,8 340,48 0,48" fill="url(#sparkGrad)"/>
+          <polyline points="0,48 68,37 136,42 204,25 272,19 340,8"
+            fill="none" stroke="var(--brand)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.85"/>
+          <circle cx="340" cy="8" r="3.5" fill="var(--brand)"/>
+          <text x="330" y="5" text-anchor="middle" fill="var(--brand)" font-size="9" font-weight="700">115 kg</text>
+        </svg>
+        <div style="display:flex;justify-content:space-between;margin-top:5px;">
+          <span style="font-size:0.67rem;color:var(--muted);">6 sessions ago</span>
+          <span style="font-size:0.67rem;color:var(--muted);">Today</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="s-footer">
+      <!-- DATA: exerciseStartTime = Date.now() on press (inter-exercise rest = exerciseStartTime - prevExercise.lastSetEndTime) -->
+      <div class="btn-row">
+        <div class="btn-icon">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="5 4 15 12 5 20 5 4"/><line x1="19" y1="5" x2="19" y2="19"/></svg>
+        </div>
+        <button class="btn-primary" style="flex:1;" onclick="show(2)">
+          Begin Exercise
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN 2 · Active Set (Set 3 in progress)
+  ══════════════════════════════════════════════════════ -->
+  <div class="screen" id="s2">
+    <div class="session-hdr">
+      <div class="hdr-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="hdr-center">
+        <div class="hdr-session">Push Day</div>
+        <div class="hdr-timer">07:43</div>
+        <div class="hdr-sub">Exercise 1 of 6 · Bench Press</div>
+      </div>
+      <div class="hdr-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+      </div>
+    </div>
+
+    <div class="s-body" style="padding:14px 16px;">
+
+      <!-- Done set chips -->
+      <div style="display:flex;gap:7px;margin-bottom:14px;flex-wrap:wrap;">
+        <!-- DATA: set 1 setTime = 31s (setEndTime - setStartTime) -->
+        <div class="done-chip">
+          <div class="done-check">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;font-weight:700;color:var(--green);">Set 1</div>
+            <div style="font-size:0.67rem;color:var(--muted);">70 kg × 5 · 0:31</div>
+          </div>
+        </div>
+        <!-- DATA: set 2 setTime = 24s, restBefore = 1:48 (setStartTime2 - setEndTime1) -->
+        <div class="done-chip">
+          <div class="done-check">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+          </div>
+          <div>
+            <div style="font-size:0.72rem;font-weight:700;color:var(--green);">Set 2</div>
+            <div style="font-size:0.67rem;color:var(--muted);">87.5 kg × 3 · 0:24</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ── Hero: Current set card ── -->
+      <div style="background:var(--card2);border:1.5px solid var(--brand40);border-radius:22px;padding:20px;margin-bottom:14px;position:relative;overflow:hidden;">
+
+        <!-- Ambient glow -->
+        <div style="position:absolute;top:-40px;right:-40px;width:140px;height:140px;border-radius:50%;background:var(--brand);opacity:0.04;filter:blur(40px);pointer-events:none;"></div>
+
+        <!-- Set label + running set timer -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div style="font-size:0.73rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;">Set 3 of 4</div>
+          <!-- DATA: setStartTime stamped when "Start Set" pressed; this ticks up -->
+          <div style="display:flex;align-items:center;gap:5px;background:var(--brand10);border:1px solid var(--brand20);border-radius:9px;padding:4px 9px;">
+            <div style="width:6px;height:6px;border-radius:50%;background:var(--brand);animation:pulse 1.4s ease-in-out infinite;"></div>
+            <div style="font-size:0.8rem;font-weight:700;color:var(--brand);font-variant-numeric:tabular-nums;">0:22</div>
+          </div>
+        </div>
+
+        <!-- Weight stepper -->
+        <div style="display:flex;align-items:stretch;gap:0;margin-bottom:11px;border-radius:13px;overflow:hidden;border:1px solid var(--border2);">
+          <button style="width:52px;background:rgba(255,255,255,0.05);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div style="flex:1;background:rgba(255,255,255,0.03);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 0;border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
+            <div style="font-size:1.75rem;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">92.5 kg</div>
+          </div>
+          <button style="width:52px;background:rgba(255,255,255,0.05);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+
+        <!-- Reps stepper -->
+        <div style="display:flex;align-items:stretch;gap:0;margin-bottom:16px;border-radius:13px;overflow:hidden;border:1px solid var(--border2);">
+          <button style="width:52px;background:rgba(255,255,255,0.05);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+          <div style="flex:1;background:rgba(255,255,255,0.03);display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 0;border-left:1px solid var(--border2);border-right:1px solid var(--border2);">
+            <div style="font-size:1.75rem;font-weight:800;letter-spacing:-0.02em;font-variant-numeric:tabular-nums;">8 reps</div>
+          </div>
+          <button style="width:52px;background:rgba(255,255,255,0.05);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--text);">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          </button>
+        </div>
+
+        <!-- Intensity bar -->
+        <div style="margin-bottom:12px;">
+          <div style="height:5px;border-radius:3px;background:var(--border2);overflow:hidden;">
+            <div style="height:100%;width:80%;background:linear-gradient(90deg,var(--brand),rgba(0,212,255,0.8));border-radius:3px;"></div>
+          </div>
+          <div style="font-size:0.69rem;color:var(--muted);margin-top:4px;text-align:right;">80% of 1RM</div>
+        </div>
+
+        <!-- 1RM goal nudge -->
+        <div style="background:var(--brand10);border:1px solid var(--brand20);border-radius:11px;padding:9px 12px;display:flex;align-items:center;gap:7px;">
+          <span style="font-size:1rem;flex-shrink:0;">⚡</span>
+          <span style="font-size:0.75rem;color:var(--brand);font-weight:600;">+1 rep (9 total) sets a new 1RM → 120 kg</span>
+        </div>
+      </div>
+
+      <!-- Upcoming sets (dimmed) -->
+      <div style="opacity:0.38;">
+        <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:7px;">Upcoming</div>
+        <div style="background:var(--card);border:1px solid var(--border);border-radius:13px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;">
+          <span style="font-size:0.83rem;font-weight:600;">Set 4</span>
+          <span style="font-size:0.8rem;color:var(--muted);">92.5 kg × 8 · 80%</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="s-footer">
+      <!-- DATA: setEndTime = Date.now() on press; restStartTime = setEndTime (auto, no user action) -->
+      <button class="btn-primary btn-brand-grad" onclick="show(3)">
+        Log Set 3 ✓
+      </button>
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN 3 · Rest Timer (between Set 3 → Set 4)
+  ══════════════════════════════════════════════════════ -->
+  <div class="screen" id="s3">
+    <div class="session-hdr">
+      <div class="hdr-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="hdr-center">
+        <div class="hdr-session">Push Day</div>
+        <div class="hdr-timer">08:21</div>
+        <div class="hdr-sub">Exercise 1 of 6 · Bench Press</div>
+      </div>
+      <div class="hdr-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="8" cy="12" r="1.5" fill="currentColor"/><circle cx="12" cy="12" r="1.5" fill="currentColor"/><circle cx="16" cy="12" r="1.5" fill="currentColor"/></svg>
+      </div>
+    </div>
+
+    <div class="s-body" style="padding:16px;display:flex;flex-direction:column;align-items:center;">
+
+      <!-- Set 3 result chip -->
+      <div style="width:100%;margin-bottom:22px;">
+        <div style="background:#0f2018;border:1px solid rgba(34,197,94,0.3);border-radius:13px;padding:11px 14px;display:flex;align-items:center;justify-content:space-between;">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <div style="width:26px;height:26px;border-radius:8px;background:rgba(34,197,94,0.25);display:flex;align-items:center;justify-content:center;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#22c55e" stroke-width="3.5" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg>
+            </div>
+            <div>
+              <div style="font-size:0.83rem;font-weight:700;color:var(--green);">Set 3 done — 9 reps! 🔥</div>
+              <!-- DATA: setTime = 0:38, restBefore (auto) = 2:12 from prev set -->
+              <div style="font-size:0.72rem;color:var(--muted);">92.5 kg · set: 0:38 · prev rest: 2:12</div>
+            </div>
+          </div>
+          <div style="font-size:0.7rem;font-weight:700;color:var(--brand);background:var(--brand10);border:1px solid var(--brand20);border-radius:7px;padding:3px 8px;white-space:nowrap;">+1RM ⚡</div>
+        </div>
+      </div>
+
+      <!-- Rest ring (hero) -->
+      <!-- DATA: restTime = Date.now() - setEndTime (auto running, no user tap needed) -->
+      <!-- 1:12 elapsed / 2:00 target = 60% done → 40% remaining on ring -->
+      <!-- circumference = 2π × 84 ≈ 527.8; remaining arc = 0.40 × 527.8 ≈ 211 -->
+      <div style="position:relative;margin-bottom:22px;">
+        <svg width="200" height="200" viewBox="0 0 200 200">
+          <!-- Track -->
+          <circle cx="100" cy="100" r="84" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="11"/>
+          <!-- Remaining time arc (green) -->
+          <circle cx="100" cy="100" r="84"
+            fill="none"
+            stroke="var(--brand)"
+            stroke-width="11"
+            stroke-dasharray="211 317"
+            stroke-dashoffset="0"
+            stroke-linecap="round"
+            transform="rotate(-90 100 100)"
+            style="filter:drop-shadow(0 0 10px rgba(0,255,135,0.45));"
+          />
+          <!-- Time remaining -->
+          <text x="100" y="92" text-anchor="middle" fill="white" font-size="38" font-weight="800" font-family="system-ui" letter-spacing="-2">0:48</text>
+          <text x="100" y="112" text-anchor="middle" fill="rgba(255,255,255,0.38)" font-size="12" font-family="system-ui">remaining</text>
+          <text x="100" y="130" text-anchor="middle" fill="rgba(255,255,255,0.22)" font-size="10" font-family="system-ui">of 2:00 rest</text>
+        </svg>
+      </div>
+
+      <!-- Elapsed / target chips -->
+      <div style="display:flex;gap:10px;width:100%;margin-bottom:20px;">
+        <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:11px;text-align:center;">
+          <div style="font-size:0.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;">Elapsed</div>
+          <div style="font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums;">1:12</div>
+        </div>
+        <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:13px;padding:11px;text-align:center;">
+          <div style="font-size:0.67rem;color:var(--muted);text-transform:uppercase;letter-spacing:0.06em;margin-bottom:3px;">Target</div>
+          <div style="font-size:1.15rem;font-weight:700;font-variant-numeric:tabular-nums;">2:00</div>
+        </div>
+      </div>
+
+      <!-- Next set preview -->
+      <div style="width:100%;background:var(--card2);border:1px solid var(--brand20);border-radius:15px;padding:14px;margin-bottom:14px;">
+        <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:9px;">Coming up — Set 4 (Final)</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+          <div>
+            <div style="font-size:1.1rem;font-weight:700;">92.5 kg × 8 reps</div>
+            <div style="font-size:0.74rem;color:var(--muted);margin-top:2px;">80% of 1RM</div>
+          </div>
+          <div style="text-align:right;">
+            <div style="font-size:0.71rem;color:var(--brand);font-weight:700;">⚡ Goal: 9+ reps</div>
+            <div style="font-size:0.67rem;color:var(--muted);margin-top:1px;">new 1RM confirmed</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- DATA: restEndTime = Date.now() on "Start Set 4" press (auto or early) -->
+      <button class="btn-ghost" onclick="show(2)">Start Set 4 Early</button>
+
+    </div>
+  </div>
+
+
+  <!-- ═══════════════════════════════════════════════════
+       SCREEN 4 · Set Summary (all sets done for this exercise)
+  ══════════════════════════════════════════════════════ -->
+  <div class="screen" id="s4">
+    <div class="session-hdr">
+      <div class="hdr-btn">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </div>
+      <div class="hdr-center">
+        <div class="hdr-session">Push Day</div>
+        <div class="hdr-timer">14:22</div>
+        <!-- Total session time includes inter-exercise rest after this exercise -->
+        <div class="hdr-sub">Exercise 1 of 6 · Bench Press</div>
+      </div>
+      <div class="hdr-btn">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+      </div>
+    </div>
+
+    <div class="s-body" style="padding:16px;">
+
+      <!-- 1RM result hero -->
+      <div style="background:linear-gradient(135deg,rgba(0,255,135,0.11),rgba(0,255,135,0.04));border:1px solid rgba(0,255,135,0.28);border-radius:20px;padding:20px;margin-bottom:14px;text-align:center;">
+        <div style="font-size:0.72rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:6px;">Barbell Bench Press</div>
+        <div style="font-size:2.9rem;font-weight:800;color:var(--brand);letter-spacing:-0.04em;line-height:1;">+5.3 kg</div>
+        <div style="font-size:0.85rem;color:rgba(255,255,255,0.7);margin-top:5px;">
+          1RM: 115 kg → <strong style="color:white;">120.3 kg</strong>
+        </div>
+        <div style="margin-top:12px;display:inline-flex;align-items:center;gap:5px;background:rgba(34,197,94,0.14);border:1px solid rgba(34,197,94,0.28);border-radius:9px;padding:5px 12px;">
+          <span style="font-size:0.78rem;color:var(--green);font-weight:600;">🔥 New personal best!</span>
+        </div>
+      </div>
+
+      <!-- Per-set breakdown (with set time + rest time for HR correlation) -->
+      <div class="card" style="margin-bottom:12px;">
+        <div class="card-label">Sets — Times &amp; Rest</div>
+
+        <!-- Set 1 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <div style="width:23px;height:23px;border-radius:7px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--muted);">1</div>
+            <div>
+              <div style="font-size:0.85rem;font-weight:600;">70 kg × 5</div>
+              <!-- DATA: restBefore set 1 = N/A (first set, rest = exercise ready time) -->
+              <div style="font-size:0.69rem;color:var(--muted2);margin-top:1px;">rest before: —</div>
+            </div>
+          </div>
+          <!-- DATA: setTime1 = 31s -->
+          <div style="font-size:0.78rem;color:var(--muted);font-variant-numeric:tabular-nums;">set: 0:31</div>
+        </div>
+
+        <!-- Set 2 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <div style="width:23px;height:23px;border-radius:7px;background:rgba(255,255,255,0.06);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--muted);">2</div>
+            <div>
+              <div style="font-size:0.85rem;font-weight:600;">87.5 kg × 3</div>
+              <!-- DATA: restBefore set 2 = setStartTime2 - setEndTime1 = 1:48 -->
+              <div style="font-size:0.69rem;color:var(--muted2);margin-top:1px;">rest before: 1:48</div>
+            </div>
+          </div>
+          <div style="font-size:0.78rem;color:var(--muted);font-variant-numeric:tabular-nums;">set: 0:24</div>
+        </div>
+
+        <!-- Set 3 (starred — beat 1RM) -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border);">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <div style="width:23px;height:23px;border-radius:7px;background:var(--brand10);border:1px solid var(--brand20);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--brand);">3</div>
+            <div>
+              <div style="font-size:0.85rem;font-weight:700;color:var(--brand);">92.5 kg × 9 ⚡</div>
+              <!-- DATA: restBefore set 3 = setStartTime3 - setEndTime2 = 2:12 -->
+              <div style="font-size:0.69rem;color:var(--muted2);margin-top:1px;">rest before: 2:12</div>
+            </div>
+          </div>
+          <div style="font-size:0.78rem;color:var(--brand);font-variant-numeric:tabular-nums;font-weight:600;">set: 0:38</div>
+        </div>
+
+        <!-- Set 4 -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:8px 0;">
+          <div style="display:flex;align-items:center;gap:9px;">
+            <div style="width:23px;height:23px;border-radius:7px;background:var(--brand10);border:1px solid var(--brand20);display:flex;align-items:center;justify-content:center;font-size:0.69rem;font-weight:700;color:var(--brand);">4</div>
+            <div>
+              <div style="font-size:0.85rem;font-weight:700;color:var(--brand);">92.5 kg × 8</div>
+              <!-- DATA: restBefore set 4 = setStartTime4 - setEndTime3 = 2:05 -->
+              <div style="font-size:0.69rem;color:var(--muted2);margin-top:1px;">rest before: 2:05</div>
+            </div>
+          </div>
+          <div style="font-size:0.78rem;color:var(--muted);font-variant-numeric:tabular-nums;">set: 0:35</div>
+        </div>
+
+        <!-- Inter-exercise rest note -->
+        <div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+          <div style="font-size:0.7rem;color:var(--muted2);">
+            Rest to next exercise<br>
+            <span style="font-size:0.65rem;color:var(--muted2);opacity:0.7;">(tracked until Begin pressed)</span>
+          </div>
+          <!-- DATA: interExRest = nextExercise.exerciseStartTime - thisExercise.lastSetEndTime -->
+          <div style="font-size:0.78rem;color:var(--muted);font-style:italic;">auto ↗</div>
+        </div>
+      </div>
+
+      <!-- Next session targets -->
+      <div style="background:rgba(0,255,135,0.05);border:1px solid var(--brand20);border-radius:15px;padding:14px;">
+        <div style="font-size:0.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.08em;margin-bottom:10px;">Next Session Targets</div>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:7px;">
+          <span style="font-size:0.82rem;color:rgba(255,255,255,0.7);">Sets 3–4 (80%)</span>
+          <span style="font-size:0.92rem;font-weight:700;color:var(--brand);">96 kg × 8</span>
+        </div>
+        <div style="font-size:0.71rem;color:var(--muted);">Based on new 1RM of 120.3 kg</div>
+      </div>
+
+    </div>
+
+    <div class="s-footer">
+      <!-- Tapping this: nextExercise.exerciseReadyTime = Date.now() (for inter-exercise rest calc) -->
+      <button class="btn-primary btn-brand-grad" onclick="show(1)">
+        Next: Incline DB Press →
+      </button>
+    </div>
+  </div>
+
+</div><!-- /phone -->
+
+
+<!-- ── Data capture legend ── -->
+<div style="max-width:600px;width:100%;margin-top:36px;padding:20px 24px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.07);border-radius:18px;">
+  <div style="font-size:0.82rem;font-weight:700;color:var(--brand);text-transform:uppercase;letter-spacing:0.07em;margin-bottom:12px;">Data Capture Map — HR Correlation</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">workoutStartTime</div>
+      "Start Workout" pressed
+    </div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">exerciseStartTime</div>
+      "Begin Exercise" pressed
+    </div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">setStartTime[n]</div>
+      "Start Set" or "Start Early"
+    </div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">setEndTime[n]</div>
+      "Log Set" pressed
+    </div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">setTime[n]</div>
+      setEndTime − setStartTime
+    </div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">restBefore[n]</div>
+      setStartTime[n] − setEndTime[n−1]
+    </div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;grid-column:span 2;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">interExerciseRest</div>
+      nextExercise.setStartTime[0] − thisExercise.setEndTime[last] · approximate — includes walk, setup, ready screen time
+    </div>
+    <div style="font-size:0.75rem;color:rgba(255,255,255,0.65);padding:8px 10px;background:rgba(255,255,255,0.04);border-radius:9px;grid-column:span 2;">
+      <div style="font-weight:700;color:white;margin-bottom:2px;">workoutEndTime</div>
+      "Complete Workout" pressed on done screen — total session duration = workoutEndTime − workoutStartTime
+    </div>
+  </div>
+</div>
+
+<script>
+function show(idx) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById('s' + idx).classList.add('active');
+  document.querySelectorAll('.tab')[idx].classList.add('active');
+}
+</script>
+</body>
+</html>

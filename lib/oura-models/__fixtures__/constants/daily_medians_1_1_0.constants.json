@@ -1,0 +1,43 @@
+{
+  "source": {
+    "file": "daily_medians_1_1_0.pt",
+    "sha256": "1212121212121212121212121212121212121212121212121212121212121212",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "combined_medians_version": "1.1.0",
+    "default_error_value": {
+      "kind": "tensor",
+      "shape": [
+        2,
+        3
+      ],
+      "dtype": "float32",
+      "numel": 4,
+      "values": [
+        null
+      ]
+    },
+    "error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, MET values are empty.",
+      "2": "Silent Condition, All MET values are 1.8 or greater.",
+      "3": "Error, Sleep timestamps array should be a tensor.",
+      "4": "Error, The number of sleep timestamps must be even if the array is non empty.",
+      "5": "Error, At least one of the medians is NaN.",
+      "6": "Condition, No good quality sedentary awake HRV measurements to facilitate the daily median."
+    },
+    "validator.error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, MET values are empty.",
+      "2": "Silent Condition, All MET values are 1.8 or greater.",
+      "3": "Error, Sleep timestamps array should be a tensor.",
+      "4": "Error, The number of sleep timestamps must be even if the array is non empty.",
+      "5": "Error, At least one of the medians is NaN.",
+      "6": "Condition, No good quality sedentary awake HRV measurements to facilitate the daily median."
+    }
+  },
+  "errors": []
+}

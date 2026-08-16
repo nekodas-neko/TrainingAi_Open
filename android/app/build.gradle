@@ -1,0 +1,78 @@
+apply plugin: 'com.android.application'
+apply plugin: 'kotlin-android'
+
+// The APK's version comes from package.json — the same number the server reports at /api/version
+// and the changelog is written against. It used to be hardcoded here, and had drifted from 1.30.0
+// to the app's actual 1.252.x, which broke the More → "Update available" card in a way that could
+// never self-correct: it compares the installed APK's versionName against /api/version, so a frozen
+// versionName means the card claims an update is available forever, including immediately after
+// you install the newest build.
+//
+// Read at configure time rather than patched by CI, so a local Gradle build gets the same number.
+def appVersionName = new groovy.json.JsonSlurper()
+        .parseText(file("$rootDir/../package.json").text)
+        .version
+
+// Android needs a monotonically increasing integer, and refuses to install an APK whose code is
+// lower than the installed one. major·1,000,000 + minor·1,000 + patch keeps it ordered and leaves
+// room for 999 minors and 999 patches; the ceiling (2,100,000,000) is far away.
+def appVersionCode = { ->
+    def parts = appVersionName.tokenize('.').collect { it.toInteger() }
+    parts[0] * 1_000_000 + parts[1] * 1_000 + parts[2]
+}()
+
+android {
+    namespace = "com.trainingai.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.trainingai.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode appVersionCode
+        versionName appVersionName
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    kotlinOptions {
+        jvmTarget = '21'
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

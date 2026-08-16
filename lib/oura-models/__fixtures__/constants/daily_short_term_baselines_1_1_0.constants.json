@@ -1,0 +1,78 @@
+{
+  "source": {
+    "file": "daily_short_term_baselines_1_1_0.pt",
+    "sha256": "1313131313131313131313131313131313131313131313131313131313131313",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "stress_baselines_version": "1.1.0",
+    "default_error_value": {
+      "kind": "tensor",
+      "shape": [
+        2,
+        3
+      ],
+      "dtype": "float32",
+      "numel": 4,
+      "values": [
+        null
+      ]
+    },
+    "error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, DHRV medians array is empty",
+      "2": "Condition, DHRV medians array has less than 5 observations",
+      "3": "Error, DHRV medians array has more than 21 observations",
+      "4": "Error, Skin temperature medians array is empty",
+      "5": "Condition, Skin temperature medians array has less than 5 observations",
+      "6": "Error, Skin temperature medians array has more than 21 observations",
+      "7": "Error, HR min medians array is empty",
+      "8": "Condition, HR min medians array has less than 5 observations",
+      "9": "Error, HR min medians array has more than 21 observations",
+      "10": "Error, Total sleep durations array is empty",
+      "11": "Condition, Total sleep durations array has less than 5 observations",
+      "12": "Error, Total sleep durations array has more than 21 observations",
+      "13": "Error, Lowest heart rates array is empty",
+      "14": "Condition, Lowest heart rates array has less than 5 observations",
+      "15": "Error, Lowest heart rates array has more than 21 observations",
+      "16": "Error, Highest temperatures array is empty",
+      "17": "Condition, Highest temperatures array has less than 5 observations",
+      "18": "Error, Highest temperatures array has more than 21 observations",
+      "19": "Error, Average HRV array is empty",
+      "20": "Condition, Average HRV array has less than 5 observations",
+      "21": "Error, Average HRV array has more than 21 observations",
+      "22": "Error, total_sleep_durations, lowest_heart_rates, highest_temperatures, average_hrvs arrays have different shapes",
+      "23": "Error, At least one of the non-optional baselines is NaN"
+    },
+    "validator.success_code": 5,
+    "validator.error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, DHRV medians array is empty",
+      "2": "Condition, DHRV medians array has less than 5 observations",
+      "3": "Error, DHRV medians array has more than 21 observations",
+      "4": "Error, Skin temperature medians array is empty",
+      "5": "Condition, Skin temperature medians array has less than 5 observations",
+      "6": "Error, Skin temperature medians array has more than 21 observations",
+      "7": "Error, HR min medians array is empty",
+      "8": "Condition, HR min medians array has less than 5 observations",
+      "9": "Error, HR min medians array has more than 21 observations",
+      "10": "Error, Total sleep durations array is empty",
+      "11": "Condition, Total sleep durations array has less than 5 observations",
+      "12": "Error, Total sleep durations array has more than 21 observations",
+      "13": "Error, Lowest heart rates array is empty",
+      "14": "Condition, Lowest heart rates array has less than 5 observations",
+      "15": "Error, Lowest heart rates array has more than 21 observations",
+      "16": "Error, Highest temperatures array is empty",
+      "17": "Condition, Highest temperatures array has less than 5 observations",
+      "18": "Error, Highest temperatures array has more than 21 observations",
+      "19": "Error, Average HRV array is empty",
+      "20": "Condition, Average HRV array has less than 5 observations",
+      "21": "Error, Average HRV array has more than 21 observations",
+      "22": "Error, total_sleep_durations, lowest_heart_rates, highest_temperatures, average_hrvs arrays have different shapes",
+      "23": "Error, At least one of the non-optional baselines is NaN"
+    }
+  },
+  "errors": []
+}

@@ -1,0 +1,203 @@
+'use client'
+
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { FITNESS_GOALS, type FitnessGoal } from '@trainingai/shared/types/user'
+import { GoalProgressBar } from '@/components/health/goal-progress-bar'
+import { MacroTargetsPane } from './macro-targets-pane'
+
+const FITNESS_GOAL_LABELS: Record<FitnessGoal, { label: string; description: string }> = {
+  lose_weight:  { label: 'Lose Weight',                       description: 'Calorie deficit to reduce body fat' },
+  maintain:     { label: 'Maintain',                          description: 'Stay at current weight and performance' },
+  build_muscle: { label: 'Build Muscle',                      description: 'Calorie surplus to support muscle growth' },
+  recomp:       { label: 'Lose fat & build muscle (recomp)',  description: 'Slight deficit with high protein' },
+}
+
+interface GoalTargetsSectionProps {
+  fitnessGoal: FitnessGoal | null | undefined
+  onFitnessGoalChange: (goal: FitnessGoal | null) => void
+  saving: boolean
+
+  stepsGoalStr: string
+  onStepsGoalChange: (value: string) => void
+  stepsGoalType: 'daily' | 'weekly'
+  onStepsGoalTypeChange: (type: 'daily' | 'weekly') => void
+
+  sleepGoalStr: string
+  onSleepGoalChange: (value: string) => void
+
+  calorieGoalStr: string
+  onCalorieGoalChange: (value: string) => void
+  calorieGoalType: 'daily' | 'weekly'
+  onCalorieGoalTypeChange: (type: 'daily' | 'weekly') => void
+
+  waterGoalStr: string
+  onWaterGoalChange: (value: string) => void
+  waterGoalType: 'daily' | 'weekly'
+  onWaterGoalTypeChange: (type: 'daily' | 'weekly') => void
+
+  todayMeta: { steps: number | null; waterMl: number | null; calories: number | null } | null
+  weekToDate: { steps: number; calories: number; waterMl: number } | null
+  macroRefreshKey: number
+}
+
+export function GoalTargetsSection({
+  fitnessGoal, onFitnessGoalChange, saving,
+  stepsGoalStr, onStepsGoalChange, stepsGoalType, onStepsGoalTypeChange,
+  sleepGoalStr, onSleepGoalChange,
+  calorieGoalStr, onCalorieGoalChange, calorieGoalType, onCalorieGoalTypeChange,
+  waterGoalStr, onWaterGoalChange, waterGoalType, onWaterGoalTypeChange,
+  todayMeta, weekToDate, macroRefreshKey,
+}: GoalTargetsSectionProps) {
+  return (
+    <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden divide-y divide-border">
+      <div className="px-4 pt-3 pb-1.5">
+        <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground/60">Your Goals</p>
+      </div>
+
+      {/* Fitness Goal */}
+      <div className="px-4 py-3 space-y-2">
+        <Label className="text-xs text-muted-foreground">Fitness Goal</Label>
+        <div className="space-y-1.5">
+          {FITNESS_GOALS.map(goal => {
+            const active = fitnessGoal === goal
+            return (
+              <button
+                key={goal}
+                type="button"
+                disabled={saving}
+                onClick={() => onFitnessGoalChange(active ? null : goal)}
+                className={[
+                  'w-full text-left rounded-xl border px-3 py-2 transition',
+                  active ? 'bg-foreground text-background border-foreground' : 'bg-muted border-transparent text-foreground',
+                ].join(' ')}
+              >
+                <p className="text-sm font-semibold">{FITNESS_GOAL_LABELS[goal].label}</p>
+                <p className={`text-[10px] ${active ? 'text-background/70' : 'text-muted-foreground'}`}>
+                  {FITNESS_GOAL_LABELS[goal].description}
+                </p>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+
+      {/* Steps Goal */}
+      <div className="px-4 py-3 space-y-2">
+        <Label htmlFor="goals-stepsGoal" className="text-xs text-muted-foreground">Steps Goal</Label>
+        <Input
+          type="number"
+          id="goals-stepsGoal"
+          value={stepsGoalStr}
+          onChange={e => onStepsGoalChange(e.target.value)}
+          placeholder="10000"
+          min={1000}
+          step={500}
+          className="border-border bg-muted/60 text-sm font-medium"
+        />
+        <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border self-start">
+          <button type="button" onClick={() => onStepsGoalTypeChange('daily')}
+            className={`rounded-lg px-4 py-1.5 transition ${stepsGoalType === 'daily' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Daily</button>
+          <button type="button" onClick={() => onStepsGoalTypeChange('weekly')}
+            className={`rounded-lg px-4 py-1.5 transition ${stepsGoalType === 'weekly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Weekly</button>
+        </div>
+        {(() => {
+          const weekly = stepsGoalType === 'weekly'
+          const goalNum = parseInt(stepsGoalStr) || null
+          return (
+            <GoalProgressBar
+              value={weekly ? weekToDate?.steps ?? null : todayMeta?.steps ?? null}
+              goal={weekly && goalNum != null ? goalNum * 7 : goalNum}
+              weekly={weekly}
+              color="#22c55e"
+            />
+          )
+        })()}
+      </div>
+
+      {/* Sleep Goal */}
+      <div className="px-4 py-3">
+        <Label htmlFor="goals-sleepGoal" className="text-xs text-muted-foreground">Sleep Goal (hours)</Label>
+        <Input
+          type="number"
+          id="goals-sleepGoal"
+          value={sleepGoalStr}
+          onChange={e => onSleepGoalChange(e.target.value)}
+          placeholder="8"
+          min={4}
+          max={12}
+          step={0.5}
+          className="mt-0.5 border-0 bg-transparent p-0 h-auto text-sm font-medium focus-visible:ring-0 focus-visible:ring-offset-0 placeholder:text-muted-foreground/50"
+        />
+      </div>
+
+      {/* Water Goal */}
+      <div className="px-4 py-3 space-y-2">
+        <Label htmlFor="goals-waterGoal" className="text-xs text-muted-foreground">Daily Water Goal</Label>
+        <Input
+          type="number"
+          id="goals-waterGoal"
+          value={waterGoalStr}
+          onChange={e => onWaterGoalChange(e.target.value)}
+          placeholder="2500"
+          min={500}
+          step={250}
+          className="border-border bg-muted/60 text-sm font-medium"
+        />
+        <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border self-start">
+          <button type="button" onClick={() => onWaterGoalTypeChange('daily')}
+            className={`rounded-lg px-4 py-1.5 transition ${waterGoalType === 'daily' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Daily</button>
+          <button type="button" onClick={() => onWaterGoalTypeChange('weekly')}
+            className={`rounded-lg px-4 py-1.5 transition ${waterGoalType === 'weekly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Weekly</button>
+        </div>
+        {(() => {
+          const weekly = waterGoalType === 'weekly'
+          const goalNum = parseInt(waterGoalStr) || null
+          return (
+            <GoalProgressBar
+              value={weekly ? weekToDate?.waterMl ?? null : todayMeta?.waterMl ?? null}
+              goal={weekly && goalNum != null ? goalNum * 7 : goalNum}
+              weekly={weekly}
+              color="#38bdf8"
+            />
+          )
+        })()}
+      </div>
+
+      {/* Calorie Goal */}
+      <div className="px-4 py-3 space-y-2">
+        <Label htmlFor="goals-calorieGoal" className="text-xs text-muted-foreground">Calorie Goal</Label>
+        <Input
+          type="number"
+          inputMode="decimal"
+          id="goals-calorieGoal"
+          value={calorieGoalStr}
+          onChange={e => onCalorieGoalChange(e.target.value)}
+          placeholder="e.g. 2500"
+          className="border-border bg-muted/60 text-sm font-medium"
+        />
+        <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border self-start">
+          <button type="button" onClick={() => onCalorieGoalTypeChange('daily')}
+            className={`rounded-lg px-4 py-1.5 transition ${calorieGoalType === 'daily' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Daily</button>
+          <button type="button" onClick={() => onCalorieGoalTypeChange('weekly')}
+            className={`rounded-lg px-4 py-1.5 transition ${calorieGoalType === 'weekly' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}>Weekly</button>
+        </div>
+        {(() => {
+          const weekly = calorieGoalType === 'weekly'
+          const goalNum = parseInt(calorieGoalStr) || null
+          return (
+            <GoalProgressBar
+              value={weekly ? weekToDate?.calories ?? null : todayMeta?.calories ?? null}
+              goal={weekly && goalNum != null ? goalNum * 7 : goalNum}
+              weekly={weekly}
+              color="#f97316"
+            />
+          )
+        })()}
+      </div>
+
+      {/* Macro Targets — collapsible, auto-filled by AI recommendations */}
+      <MacroTargetsPane refreshKey={macroRefreshKey} />
+    </div>
+  )
+}

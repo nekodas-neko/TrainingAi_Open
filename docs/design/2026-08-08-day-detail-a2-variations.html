@@ -1,0 +1,367 @@
+<title>Day Detail — A2 Variations</title>
+<style>
+:root{
+  --ground:#080b12; --surface:#111827; --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075); --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8; --ink-2:#9aa5b8; --ink-3:#5f6a7d; --chrome:#38bdf8;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--app);line-height:1.55;font-size:15px}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px 90px}
+header.mast{padding:52px 0 26px;border-bottom:1px solid var(--hair);margin-bottom:6px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--chrome);margin:0 0 13px}
+h1{margin:0 0 15px;font-size:clamp(28px,4.6vw,44px);line-height:1.03;letter-spacing:-.035em;font-weight:800;text-wrap:balance}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:66ch;color:var(--ink-2);font-size:16px}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:22px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.sec-head{display:flex;align-items:baseline;gap:14px;padding:38px 0 18px;border-top:1px solid var(--hair);margin-top:30px}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(370px,1fr));gap:18px}
+.mock{border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--surface-2),var(--surface));overflow:hidden;display:flex;flex-direction:column}
+.mock-head{display:flex;align-items:center;gap:9px;padding:13px 15px 11px;border-bottom:1px solid var(--hair)}
+.mock-id{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--ground);background:var(--chrome);padding:2px 6px;border-radius:5px;font-weight:700}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{padding:14px 15px 16px;margin:0;color:var(--ink-2);font-size:12.5px;line-height:1.55}
+.mock-note b{color:var(--ink);font-weight:600}
+.mock-note code{font-family:var(--mono);font-size:11.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:4px}
+.canvas{display:flex;justify-content:center;padding:20px 0;background:#05070d;border-bottom:1px solid var(--hair);align-items:flex-start}
+
+/* ---------- the phone: true S25 dp ---------- */
+.phone{
+  width:412px;flex:none;display:flex;flex-direction:column;position:relative;
+  background:linear-gradient(180deg,#0e1520 0%,#0b1119 34%,#080b12 100%);
+  border-radius:22px;font-size:16px;transform-origin:top center;
+}
+@media(max-width:1000px){.phone{transform:scale(.8)}}
+.status{flex:none;height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 15px;font-size:11px;color:#e8ecf3;font-weight:600}
+.hdr{flex:none;display:flex;align-items:center;gap:6px;padding:8px 12px 14px}
+.navbtn{background:none;border:0;padding:6px;display:grid;place-items:center;cursor:pointer}
+.content{padding:0}
+.pad{padding:0 16px}
+.rule{height:1px;background:rgba(255,255,255,.1);margin:12px 0 0}
+.foldline{position:absolute;left:0;right:0;top:891px;border-top:1px dashed rgba(56,189,248,.55);pointer-events:none}
+.foldline span{position:absolute;right:6px;top:3px;font-family:var(--mono);font-size:8.5px;letter-spacing:.1em;color:#38bdf8;background:#05070d;padding:1px 4px;border-radius:3px}
+.foldrow{display:flex;align-items:center;gap:9px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.08);min-width:0}
+.more{width:100%;margin-top:10px;background:none;border:0;display:flex;align-items:center;justify-content:center;gap:5px;font-size:11.5px;font-weight:600;color:#22d3ee;padding:7px 0;cursor:pointer}
+.pinned{flex:none;background:rgba(255,255,255,.03)}
+.sec{padding-top:16px;padding-bottom:2px}
+.card{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:14px;padding:13px}
+.statrow{display:flex;justify-content:space-between;text-align:center}
+.statrow>span{flex:1}
+.nav{flex:none;background:#000;padding:9px 0 22px;display:flex;justify-content:space-around;align-items:center}
+.nav span{font-size:9.5px;color:#6b7280}
+.nav .cur{color:#22d3ee;font-weight:700}
+
+/* A1 timeline */
+.tl{padding-top:2px}
+.tlrow{display:grid;grid-template-columns:52px 16px 1fr;gap:0;padding-bottom:18px}
+.tltime{font-size:9.5px;color:#6b7688;padding-top:3px;font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.tlmark{position:relative;display:flex;justify-content:center}
+.tlmark span{width:7px;height:7px;border-radius:9px;margin-top:4px;z-index:1}
+.tlmark::before{content:"";position:absolute;top:10px;bottom:-18px;width:1px;background:rgba(255,255,255,.11)}
+.tlrow:last-child .tlmark::before{display:none}
+.tlbody{padding-left:10px;min-width:0}
+
+/* A4 index rows */
+.row{border-bottom:1px solid rgba(255,255,255,.08);padding:13px 0}
+.rowhead{display:flex;align-items:center;gap:9px;min-width:0}
+
+/* A5 tabs */
+.tabs{display:flex;background:rgba(255,255,255,.06);border-radius:11px;padding:3px}
+.tabs span{flex:1;text-align:center;font-size:12px;font-weight:600;color:#9aa5b8;padding:7px 0;border-radius:9px}
+.tabs span.on{background:rgba(255,255,255,.13);color:#fff}
+
+/* B1 key/value grid */
+.kv{display:grid;grid-template-columns:1fr 1fr;gap:0 18px}
+.kv div{display:flex;justify-content:space-between;align-items:baseline;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.055)}
+.kv span{font-size:11px;color:#8b94a7;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kv b{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums;flex:none}
+.kv b i{font-style:normal;font-size:9px;font-weight:600;color:#6b7688;margin-left:2px}
+
+/* B2 tiles */
+.tiles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.tile{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:12px;padding:11px 8px;display:flex;flex-direction:column;align-items:center}
+
+/* B3 legend */
+.legend{display:flex;gap:12px;margin-top:11px}
+.legend span{display:flex;align-items:center;gap:5px;font-size:9.5px;color:#8b94a7}
+.legend i{width:8px;height:8px;border-radius:2px;display:block}
+
+/* B4 week strip */
+.weekstrip{display:flex;gap:4px;padding:0 16px}
+.wd{flex:1;display:flex;flex-direction:column;align-items:center;gap:5px;padding:8px 0 7px;border-radius:11px}
+.wd.on{background:rgba(255,255,255,.1)}
+.wdl{font-size:8.5px;color:#6b7688;letter-spacing:.1em}
+.wdn{font-size:14px;font-weight:700;font-variant-numeric:tabular-nums}
+.wdd{display:flex;gap:2.5px;height:4px}
+.wdd i{width:4px;height:4px;border-radius:9px;display:block}
+
+.callout{border:1px solid var(--hair);border-left:3px solid var(--chrome);background:var(--surface);border-radius:0 12px 12px 0;padding:16px 18px;margin:26px 0 0}
+.callout h3{margin:0 0 8px;font-size:14px}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+</style>
+<div class="wrap">
+<header class="mast">
+  <p class="eyebrow">Health · day detail — A2 with real depth</p>
+  <h1>Scores on top, the day underneath <em>— six ways to fill it in.</em></h1>
+  <p class="lede">A2's structure kept: the four scores lead, sections follow. What changes is what's
+  <i>in</i> them — the full five-exercise list with set, rep and weight columns, session totals, the
+  HR trace, and the twelve-field body-composition card at the bottom. <b>Each mockup is rendered at
+  its full content height with the 891&nbsp;dp fold marked</b>, because with this much detail the
+  real question is what you see before scrolling.</p>
+  <div class="read">
+    <div><h4>Swipe is in all six</h4><p>Every variation moves between days. C4 shows the treatment
+    I'd pick — a week strip instead of chevrons, which makes the gesture discoverable and shows
+    which nearby days have data.</p></div>
+    <div><h4>The fold is the decision</h4><p>C1 puts the exercise list above it and everything else
+    below. C2 fits the whole day above it. C6 splits the difference. Same content, three different
+    answers to "what do I see when I land".</p></div>
+    <div><h4>Nothing here is decoration</h4><p>Every number shown maps to a real column — the
+    exercise rows to <code>set_logs</code>, the twelve body fields to <code>body_metrics</code>, the
+    HR trace to the chart that already exists in the sheet.</p></div>
+  </div>
+</header>
+<div id="app"></div>
+<div class="callout">
+  <h3>Where I'd go</h3>
+  <p><b>C2 collapsible, with C4's week strip.</b> It is the only one where the whole day is visible
+  before you scroll — which is what makes swiping between days actually useful, since you land and
+  read the shape of the day in one glance rather than scrolling each one. Training stays open
+  because it is the headline; Sleep and Body composition are one line until you want them.</p>
+  <p>If you'd rather never tap to reveal, <b>C6 compact</b> is the honest alternative: everything
+  always visible, at the cost of the day reading like a table.</p>
+  <p><b>C5 flat</b> is worth a look regardless of which you pick — it removes a real redundancy.
+  In C1 every section is a bordered card sitting inside a padded screen, which is two borders doing
+  one job, and it is the treatment furthest from the Band/Divider language you chose for Home.</p>
+</div>
+<div class="callout">
+  <h3>Two things these mockups assume that the API does not do yet</h3>
+  <p><b>Session totals and per-set weights.</b> The volume/avg-HR/peak-HR row and the
+  set&nbsp;×&nbsp;rep&nbsp;×&nbsp;weight columns are shown as if available per exercise.
+  <code>DayExercise</code> already carries <code>setWeights</code>, <code>sets</code> and
+  <code>reps</code>, so the columns are real — but volume is not returned and would need deriving,
+  and avg/peak HR would come from the same source the existing HR chart uses.</p>
+  <p><b>The weekly weight delta.</b> "−0.4 kg this week" needs a second query the day route doesn't
+  make. Cheap, but it is not free, and it is the kind of thing that quietly turns a one-fetch screen
+  into a three-fetch one — which matters here, because this screen must paint instantly from cache
+  when you swipe between days.</p>
+</div>
+</div>
+
+<script>
+const A = { ready:'#60a5fa', hr:'#f87171', sleep:'#a78bfa', act:'#f97316', cy:'#22d3ee', gr:'#22c55e' };
+const STAGE = { deep:'#1e3a70', light:'#3f7dc9', rem:'#7ec3ea', awake:'#e9d9c8' };
+const MU='#8b94a7', DIM='#6b7688';
+
+const P = {
+  chev:'m9 18 6-6-6-6', chevL:'m15 18-6-6 6-6', chevD:'m6 9 6 6 6-6', chevU:'m18 15-6-6-6 6',
+  zap:'M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z',
+  heart:'M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5|M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27',
+  moon:'M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401',
+  flame:'M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z',
+  dumb:'m6.5 6.5 11 11|m21 21-1-1|m3 3 1 1|m18 22 4-4|m2 6 4-4|m3 10 7-7|m14 21 7-7',
+  foot:'M4 16v-2.38C4 11.5 2.97 10.5 3 8c.03-2.72 1.49-6 4.5-6C9.37 2 10 3.8 10 5.5c0 3.11-2 5.66-2 8.68V16a2 2 0 1 1-4 0Z|M20 20v-2.38c0-1.12 1.03-2.12 1-4.62-.03-2.72-1.49-6-4.5-6C14.63 7 14 8.8 14 10.5c0 3.11 2 5.66 2 8.68V20a2 2 0 1 0 4 0Z',
+  scale:'M12 3v18|M5 8h14l2 10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z',
+};
+const ic=(k,px,c,sw)=>`<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="${c}" stroke-width="${sw||2}"
+  stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" style="display:block;flex:none">${P[k].split('|').map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+const N=(s,w,ls)=>`font-variant-numeric:tabular-nums;line-height:1;color:#fff;font-size:${s};font-weight:${w||800};letter-spacing:${ls||'-.04em'}`;
+const CAPS=`font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:${DIM};line-height:1`;
+
+const SCORES=[['zap','Ready',76,A.ready],['heart','HR',52,A.hr],['moon','Sleep',90,A.sleep],['flame','Move',76,A.act]];
+const scoreRow=(pad)=>`<div style="display:flex">
+  ${SCORES.map(([k,l,v,c],i)=>`<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;padding:${pad||'2px 0'};${i?'border-left:1px solid rgba(255,255,255,.1)':''}">
+    ${ic(k,15,c,2.3)}<span style="${N('1.6rem',800)}">${v}</span><span style="${CAPS}">${l}</span></div>`).join('')}</div>`;
+
+const hypno=(h)=>{const seq='AWLLDDDLLRRLLDDLLLRRRLLDLLRRLLLAWLLRRRLLLA';
+  const m={A:'awake',W:'awake',L:'light',D:'deep',R:'rem'},lane={awake:0,rem:1,light:2,deep:3},w=100/seq.length;
+  return `<svg viewBox="0 0 100 ${h}" width="100%" height="${h}" preserveAspectRatio="none" aria-hidden="true" style="display:block">
+  ${seq.split('').map((ch,i)=>{const st=m[ch],lh=h/4;
+    return `<rect x="${(i*w).toFixed(2)}" y="${(lane[st]*lh+lh*.18).toFixed(1)}" width="${(w*1.04).toFixed(2)}" height="${(lh*.64).toFixed(1)}" fill="${STAGE[st]}" rx="0.6"/>`;}).join('')}</svg>`;};
+
+const hrTrace=(h,c)=>{const pts=[68,66,70,69,72,70,64,62,74,86,88,84,80,79,79,78,76,74,74,88,90,85,92,86,84,88,82,80,78,76];
+  const mn=58,mx=96,d=pts.map((p,i)=>`${(i/(pts.length-1)*100).toFixed(1)},${(h-((p-mn)/(mx-mn))*h).toFixed(1)}`).join(' ');
+  return `<svg viewBox="0 0 100 ${h}" width="100%" height="${h}" preserveAspectRatio="none" aria-hidden="true" style="display:block">
+  <polyline points="${d}" fill="none" stroke="${c}" stroke-width="1.4" vector-effect="non-scaling-stroke" stroke-linejoin="round"/></svg>`;};
+
+const EX=[['Incline Bench Press','2 × 10','42.5'],['Cable Pulldown','2 × 8','18.75'],['Barbell Overhead Press','2 × 9','30'],
+          ['Barbell Skull Crusher','2 × 10','25'],['Cable Preacher Curl','2 × 10','10']];
+const BODY=[['Body fat','18.4','%'],['Skeletal muscle','43.1','%'],['Muscle mass','54.2','kg'],['Body water','56.8','%'],
+  ['Visceral fat','6',''],['Bone mass','3.1','kg'],['Protein','19.2','%'],['BMR','1,742','kcal'],
+  ['Metabolic age','27','yr'],['Subcut. fat','14.9','%'],['Fat-free mass','57.7','kg']];
+
+/* ---------- reusable section bodies ---------- */
+const secLabel=t=>`<div style="${CAPS};padding:0 0 9px">${t}</div>`;
+
+const exerciseRows = (compact) => EX.map(([n,sr,kg])=>`
+  <div style="display:flex;align-items:baseline;gap:10px;padding:${compact?'6px':'8px'} 0;border-bottom:1px solid rgba(255,255,255,.055)">
+    <span style="flex:1;min-width:0;font-size:12.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${n}</span>
+    <span style="font-size:10.5px;color:${MU};font-variant-numeric:tabular-nums;flex:none">${sr}</span>
+    <span style="${N('.82rem',700)};flex:none;min-width:44px;text-align:right">${kg}<i style="font-size:9px;font-weight:600;color:${DIM};font-style:normal;margin-left:1px">kg</i></span>
+  </div>`).join('');
+
+const trainingBody = (opts={}) => `
+  <div style="display:flex;align-items:center;gap:9px;padding-bottom:${opts.tight?8:10}px">
+    ${ic('dumb',16,A.cy,2.3)}<span style="font-size:14.5px;font-weight:750;letter-spacing:-.01em">Upper</span>
+    <span style="margin-left:auto;font-size:10.5px;color:${MU}">7:26 → 8:11 · 44 min</span></div>
+  ${exerciseRows(opts.tight)}
+  <div style="display:flex;justify-content:space-between;padding:${opts.tight?9:11}px 0 0">
+    ${[['12,190','VOLUME kg'],['79','AVG HR'],['92','PEAK HR']].map(([v,l])=>
+      `<span style="flex:1;text-align:center"><span style="${N('.95rem',700)}">${v}</span><span style="${CAPS};display:block;margin-top:4px">${l}</span></span>`).join('')}
+  </div>
+  <div style="margin-top:${opts.tight?9:11}px;padding-top:10px;border-top:1px solid rgba(255,255,255,.08)">
+    <div style="${CAPS};margin-bottom:7px">HR through the session</div>${hrTrace(34,A.hr)}</div>`;
+
+const sleepBody = () => `
+  <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:11px">
+    <span style="${N('1.7rem',300)}">7<i style="font-size:12px;font-weight:600;font-style:normal;color:${MU}">h</i> 32<i style="font-size:12px;font-weight:600;font-style:normal;color:${MU}">m</i></span>
+    <span style="margin-left:auto;display:flex;align-items:baseline;gap:5px">
+      <span style="${N('1.2rem',700)};color:${A.sleep}">90</span><span style="${CAPS}">SCORE</span></span></div>
+  ${hypno(34)}
+  <div style="display:flex;justify-content:space-between;font-size:9px;color:${DIM};margin-top:5px"><span>10:32pm</span><span>6:04am</span></div>
+  <div class="kv" style="margin-top:11px">
+    ${[['Deep','1h 42m'],['REM','1h 51m'],['Light','3h 59m'],['Awake','24m'],['Efficiency','94%'],['Onset','12m'],['Avg HRV','61ms'],['Lowest HR','48bpm']]
+      .map(([l,v])=>`<div><span>${l}</span><b>${v}</b></div>`).join('')}</div>`;
+
+const bodyBody = (opts={}) => `
+  <div style="display:flex;align-items:baseline;gap:8px;padding-bottom:11px;border-bottom:1px solid rgba(255,255,255,.08)">
+    <span style="${N('2.2rem',300)}">70.7</span><span style="font-size:12px;color:${MU}">kg</span>
+    <span style="margin-left:auto;font-size:10.5px;color:${A.gr}">−0.4 kg this week</span></div>
+  <div class="kv" style="margin-top:9px">
+    ${(opts.limit?BODY.slice(0,opts.limit):BODY).map(([l,v,u])=>`<div><span>${l}</span><b>${v}${u?`<i>${u}</i>`:''}</b></div>`).join('')}</div>
+  ${opts.limit?`<button class="more">Show all 12 measurements ${ic('chevD',13,A.cy,2.4)}</button>`:''}`;
+
+const activityBody = () => `
+  <div style="display:flex;align-items:center;gap:10px">
+    ${ic('foot',15,A.gr,2.3)}
+    <span style="flex:1;min-width:0"><span style="font-size:13px;display:block">Treadmill interval walk</span>
+      <span style="font-size:10.5px;color:${MU};display:block;margin-top:2px">11:46am · 2,840 steps</span></span>
+    <span style="${N('.9rem',700)};flex:none">30<i style="font-size:9px;font-weight:600;color:${DIM};font-style:normal;margin-left:1px">min</i></span></div>`;
+
+const weekStrip = () => `<div class="weekstrip">
+  ${[['M','3',['#22c55e']],['T','4',[]],['W','5',['#f97316','#22d3ee']],['T','6',['#a78bfa']],
+     ['F','7',['#22d3ee','#22c55e'],1],['S','8',['#22d3ee']],['S','9',[]]].map(([d,n,dots,on])=>`
+    <div class="wd ${on?'on':''}"><span class="wdl">${d}</span><span class="wdn">${n}</span>
+      <span class="wdd">${dots.map(c=>`<i style="background:${c}"></i>`).join('')}</span></div>`).join('')}</div>`;
+
+const chevHeader = (sub) => `<div class="hdr">
+  <button class="navbtn">${ic('chevL',18,'#c3cbd9',2.4)}</button>
+  <div style="flex:1;text-align:center">
+    <div style="font-size:17px;font-weight:800;letter-spacing:-.02em">Friday 7 August</div>
+    ${sub?`<div style="font-size:10.5px;color:${MU};margin-top:2px">${sub}</div>`:''}</div>
+  <button class="navbtn">${ic('chev',18,'#c3cbd9',2.4)}</button></div>`;
+
+/* ---------- shell: full content height with the 891dp fold marked ---------- */
+function screen(id, inner, pinned){
+  return `<div class="phone" id="${id}">
+    <div class="status"><span>10:13</span><span>84</span></div>
+    ${pinned||''}
+    <div class="content">${inner}</div>
+    <div class="foldline"><span>fold — 891dp</span></div>
+    <div class="nav"><span>Home</span><span class="cur">Health</span><span>Workout</span><span>Nutrition</span><span>More</span></div>
+  </div>`;
+}
+
+const V=[]; const add=(id,name,note,build)=>V.push({id,name,note,build});
+
+/* ==================== VARIATIONS ==================== */
+
+add('C1','Straight assembly','A2 exactly as you saw it, with the sections opened up: the full five-exercise list with set/rep/weight columns, session totals, the HR trace, and the body-composition card at the bottom. <b>Everything visible, nothing folded.</b> This is the baseline the others are measured against — it works, and it is a long scroll.',
+ () => screen('c1', `
+  ${chevHeader()}
+  <div class="pad">${scoreRow()}</div>
+  <div class="rule"></div>
+  <div class="pad sec">${secLabel('Training')}<div class="card">${trainingBody()}</div></div>
+  <div class="pad sec">${secLabel('Activity')}<div class="card">${activityBody()}</div></div>
+  <div class="pad sec">${secLabel('Sleep')}<div class="card">${sleepBody()}</div></div>
+  <div class="pad sec">${secLabel('Body composition')}<div class="card">${bodyBody()}</div></div>
+  <div style="height:14px"></div>`));
+
+add('C2','Collapsible','Same content, but each section can fold. Training is open because it is the day\'s headline; Sleep and Body composition are one line each until tapped. <b>The whole day fits above the fold in its collapsed state</b>, which is what makes swiping between days worth doing — you land and see the shape of the day immediately.',
+ () => screen('c2', `
+  ${chevHeader()}
+  <div class="pad">${scoreRow()}</div>
+  <div class="rule"></div>
+  <div class="pad sec">${secLabel('Training')}<div class="card">${trainingBody()}</div></div>
+  <div class="pad" style="padding-top:14px">
+    ${[['foot',A.gr,'Activity','Treadmill walk · 30 min'],
+       ['moon',A.sleep,'Sleep','7h 32m · score 90'],
+       ['scale','#c084fc','Body composition','70.7 kg · 18.4% fat']].map(([k,c,t,s])=>`
+      <div class="foldrow">${ic(k,15,c,2.3)}
+        <span style="font-size:13px;font-weight:650;flex:none">${t}</span>
+        <span style="font-size:10.5px;color:${MU};margin-left:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${s}</span>
+        ${ic('chevD',14,DIM,2.2)}</div>`).join('')}
+  </div>
+  <div style="height:14px"></div>`));
+
+add('C3','Body first','The same sections, reordered so <b>body composition sits directly under the scores</b> and training moves down. Worth seeing because the weigh-in is the one number you look up historically — "what did I weigh on the 7th" is a more common question than "what did I lift on the 7th", which you can already see on the workout screen.',
+ () => screen('c3', `
+  ${chevHeader()}
+  <div class="pad">${scoreRow()}</div>
+  <div class="rule"></div>
+  <div class="pad sec">${secLabel('Body composition')}<div class="card">${bodyBody({limit:5})}</div></div>
+  <div class="pad sec">${secLabel('Training')}<div class="card">${trainingBody({tight:true})}</div></div>
+  <div class="pad sec">${secLabel('Sleep')}<div class="card">${sleepBody()}</div></div>
+  <div style="height:14px"></div>`));
+
+add('C4','Week strip + pinned scores','The navigation answer. <b>A week strip replaces the chevrons</b> — it makes the swipe discoverable, shows which nearby days have data before you travel to them, and reuses the calendar\'s own dot language. The strip and scores stay pinned while everything below scrolls, so you never lose the sense of which day you are looking at.',
+ () => screen('c4', `
+  <div class="pad sec">${secLabel('Training')}<div class="card">${trainingBody()}</div></div>
+  <div class="pad sec">${secLabel('Activity')}<div class="card">${activityBody()}</div></div>
+  <div class="pad sec">${secLabel('Sleep')}<div class="card">${sleepBody()}</div></div>
+  <div class="pad sec">${secLabel('Body composition')}<div class="card">${bodyBody()}</div></div>
+  <div style="height:14px"></div>`,
+  `<div class="pinned">
+     <div style="text-align:center;padding:2px 0 9px;font-size:16px;font-weight:800;letter-spacing:-.02em">Friday 7 August</div>
+     ${weekStrip()}
+     <div class="pad" style="padding-top:11px;padding-bottom:11px">${scoreRow()}</div>
+   </div>`));
+
+add('C5','Flat','No cards at all — sections separated by full-bleed hairlines, in the Band language you picked for the home score row. <b>The most consistent with where the rest of the app is going</b>, and it removes a whole layer of nested boxes: on C1 every section is a card inside a padded screen, which is two borders doing one job.',
+ () => screen('c5', `
+  ${chevHeader()}
+  <div class="pad">${scoreRow()}</div>
+  <div class="rule"></div>
+  <div class="pad sec">${secLabel('Training')}${trainingBody()}</div>
+  <div class="rule"></div>
+  <div class="pad sec">${secLabel('Activity')}${activityBody()}</div>
+  <div class="rule"></div>
+  <div class="pad sec">${secLabel('Sleep')}${sleepBody()}</div>
+  <div class="rule"></div>
+  <div class="pad sec">${secLabel('Body composition')}${bodyBody()}</div>
+  <div style="height:14px"></div>`));
+
+add('C6','Compact','Everything from C1 at reduced scale — tighter rows, smaller section gaps, body composition trimmed to five fields behind a "show all" control. <b>Fits the whole day in roughly one and a half screens instead of two and a half.</b> The trade is that nothing is emphasised: at this density the day reads as a table rather than a record.',
+ () => screen('c6', `
+  ${chevHeader('Trained · Walked · Slept 7h 32m')}
+  <div class="pad">${scoreRow('0')}</div>
+  <div class="rule"></div>
+  <div class="pad sec" style="padding-top:12px">${secLabel('Training')}<div class="card" style="padding:11px">${trainingBody({tight:true})}</div></div>
+  <div class="pad" style="padding-top:11px"><div class="card" style="padding:11px">${activityBody()}</div></div>
+  <div class="pad sec" style="padding-top:11px">${secLabel('Sleep')}<div class="card" style="padding:11px">${sleepBody()}</div></div>
+  <div class="pad sec" style="padding-top:11px">${secLabel('Body composition')}<div class="card" style="padding:11px">${bodyBody({limit:5})}</div></div>
+  <div style="height:14px"></div>`));
+
+const SECTIONS=[{n:'C', title:'A2 with depth', blurb:'Scores on top, full exercise detail, body composition at the bottom — six ways.', ids:/^C/}];
+
+document.getElementById('app').innerHTML = SECTIONS.map(s=>`
+  <section>
+    <div class="sec-head"><span class="sec-num">${s.n}</span><h2>${s.title}</h2><p>${s.blurb}</p></div>
+    <div class="gallery">${V.filter(v=>s.ids.test(v.id)).map(v=>`
+      <article class="mock">
+        <div class="mock-head"><span class="mock-id">${v.id}</span><span class="mock-name">${v.name}</span></div>
+        <div class="canvas">${v.build()}</div>
+        <p class="mock-note">${v.note}</p>
+      </article>`).join('')}</div>
+  </section>`).join('');
+
+</script>

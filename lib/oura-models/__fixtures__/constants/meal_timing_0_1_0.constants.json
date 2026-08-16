@@ -1,0 +1,50 @@
+{
+  "source": {
+    "file": "meal_timing_0_1_0.pt",
+    "sha256": "1818181818181818181818181818181818181818181818181818181818181818",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "default_error_value": {
+      "kind": "tensor",
+      "shape": [
+        2,
+        3
+      ],
+      "dtype": "float32",
+      "numel": 4,
+      "values": [
+        null
+      ]
+    },
+    "consistency_meals_within_clusters_threshold": 0.5,
+    "consistency_min_total_meals_logged": 6,
+    "meal_clustering_version": "0.1.0",
+    "min_between_window_distance_hours": 7,
+    "min_scaled_meal_frequency": 0.8,
+    "min_cluster_elements": 1,
+    "extention_length": 2,
+    "consistency_max_cluster_length_hours_threshold": 3,
+    "min_cluster_elements_percentage": 0.2,
+    "error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, Input unix_timestamps tensor is empty.",
+      "2": "Error, Input unix_timestamps tensor has an incorrect shape. Expected shape: (n).",
+      "3": "Error, Input unix_timezones tensor is empty.",
+      "4": "Error, Input unix_timezones tensor has an incorrect shape. Expected shape: (n).",
+      "5": "Error, Input unix_timestamps and unix_timezones tensors have different lengths."
+    },
+    "validator.error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, Input unix_timestamps tensor is empty.",
+      "2": "Error, Input unix_timestamps tensor has an incorrect shape. Expected shape: (n).",
+      "3": "Error, Input unix_timezones tensor is empty.",
+      "4": "Error, Input unix_timezones tensor has an incorrect shape. Expected shape: (n).",
+      "5": "Error, Input unix_timestamps and unix_timezones tensors have different lengths."
+    },
+    "preprocessor.extention_length": 5
+  },
+  "errors": []
+}

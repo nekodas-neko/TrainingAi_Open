@@ -1,0 +1,89 @@
+import { NextResponse } from 'next/server'
+import { auth } from '@/auth'
+import { getRepository } from '@/lib/data'
+import { rateLimit } from '@/lib/rate-limit'
+import { errorLog } from '@trainingai/shared/logger'
+import { estWorkoutKcal, intensityFromRpe, metForActivity, isKnownActivity, DEFAULT_ACTIVITY_ID, type Sex } from '@trainingai/shared/health/workout-energy'
+import { reportServerError } from '@/lib/observability'
+
+// Estimated per-workout active energy via Oura's MET fallback (Phase A). Deterministic —
+// duration + intensity (RPE) + the user's profile → kcal. `durationMin`/`rpe` come from the
+// client (authoritative, and avoids depending on completion having synced to the server yet);
+// the server verifies session ownership and supplies the profile + formula.
+export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
+  try {
+    const session = await auth()
+    const userId = session?.user?.id
+    if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!rateLimit(`workout-energy:${userId}`, 60, 60 * 1000)) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
+    const { id: sessionId } = await params
+    const repo = await getRepository()
+
+    const ws = await repo.getWorkoutSessionDetail(userId, sessionId)
+    if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const url = new URL(req.url)
+    const rpeParam = url.searchParams.get('rpe')
+    const durParam = url.searchParams.get('durationMin')
+    const rpe = rpeParam != null && Number.isFinite(Number(rpeParam)) ? Number(rpeParam) : ws.sessionRpe ?? null
+    const durationMin =
+      durParam != null && Number.isFinite(Number(durParam)) && Number(durParam) > 0
+        ? Number(durParam)
+        : ws.completedAt
+          ? (ws.completedAt.getTime() - ws.startedAt.getTime()) / 60_000
+          : null
+
+    const [user, baseline] = await Promise.all([repo.getUserById(userId), repo.getBodyMetricsBaseline(userId)])
+    const sexRaw = user?.sex
+    const sex: Sex | null = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
+    const ageYears = user?.dateOfBirth ? yearsSince(user.dateOfBirth) : null
+    const weightKg = baseline.weightKg
+
+    // A profile gap (no DOB / non-binary sex / no logged weight) means we can't run Schofield —
+    // return kcal: null with a reason so the client shows nothing rather than a wrong number.
+    if (ageYears == null || sex == null || weightKg == null || durationMin == null) {
+      const missing = [
+        ageYears == null && 'date of birth',
+        sex == null && 'sex',
+        weightKg == null && 'body weight',
+        durationMin == null && 'duration',
+      ].filter(Boolean)
+      return NextResponse.json(
+        { kcal: null, reason: `missing ${missing.join(', ')}` },
+        { headers: { 'Cache-Control': 'private, no-store' } },
+      )
+    }
+
+    const intensity = intensityFromRpe(rpe)
+    const activityParam = Number(url.searchParams.get('activityId'))
+    const activityId = Number.isFinite(activityParam) && isKnownActivity(activityParam) ? activityParam : DEFAULT_ACTIVITY_ID
+    const kcal = estWorkoutKcal({ durationMin, ageYears, weightKg, sex, activityId, intensity })
+
+    return NextResponse.json(
+      {
+        kcal: kcal != null ? Math.round(kcal) : null,
+        intensity,
+        met: metForActivity(activityId, intensity),
+        activityId,
+        durationMin: Math.round(durationMin),
+      },
+      { headers: { 'Cache-Control': 'private, no-store' } },
+    )
+  } catch (error) {
+    reportServerError(error, { url: '/api/workout-sessions/[id]/energy' })
+    const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/energy')
+    return NextResponse.json({ error: errMsg }, { status: 500 })
+  }
+}
+
+function yearsSince(isoDate: string): number | null {
+  const dob = new Date(isoDate)
+  if (Number.isNaN(dob.getTime())) return null
+  const diffMs = Date.now() - dob.getTime()
+  if (diffMs <= 0) return null
+  return diffMs / (365.25 * 24 * 3600 * 1000)
+}

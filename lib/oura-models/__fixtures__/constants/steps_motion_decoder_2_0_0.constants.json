@@ -1,0 +1,158 @@
+{
+  "source": {
+    "file": "steps_motion_decoder_2_0_0.pt",
+    "sha256": "2727272727272727272727272727272727272727272727272727272727272727",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "n_features_30s": 3,
+    "decoder_transform_settings": {
+      "total_amplitude_mg": {
+        "transform": "log_transform",
+        "inverse_transform": "log_itransform"
+      },
+      "stride_amplitude_frac": {
+        "transform": "sqrt",
+        "inverse_transform": "square"
+      },
+      "gait_amplitude_frac": {
+        "transform": "sqrt",
+        "inverse_transform": "square"
+      },
+      "first_non_locomotor_amplitude_frac": {
+        "transform": "sqrt",
+        "inverse_transform": "square"
+      },
+      "sum_accel_mg_std": {
+        "transform": "log_transform",
+        "inverse_transform": "log_itransform"
+      }
+    },
+    "output_columns": [
+      "timestamp",
+      "sum_accel_mg_std",
+      "y_accel_std_ratio",
+      "z_accel_std_ratio",
+      "total_amplitude_mg",
+      "stride_frequency",
+      "stride_amplitude_frac",
+      "first_non_locomotor_frequency",
+      "first_non_locomotor_amplitude_frac",
+      "gait_amplitude_frac",
+      "frequency_bin_high_frac",
+      "frequency_bin_mid_frac"
+    ],
+    "n_output_features": 11,
+    "decoder_base_settings": {
+      "total_amplitude_mg": {
+        "low": 2,
+        "high": 3,
+        "bits": 4
+      },
+      "stride_frequency": {
+        "encode_zero": 5,
+        "low": 0.6,
+        "high": 0.7,
+        "bits": 8
+      },
+      "first_non_locomotor_frequency": {
+        "encode_zero": 1,
+        "low": 2,
+        "high": 0.1,
+        "bits": 4
+      },
+      "stride_amplitude_frac": {
+        "low": 5,
+        "high": 6,
+        "bits": 7
+      },
+      "gait_amplitude_frac": {
+        "low": 8,
+        "high": 0.7,
+        "bits": 2
+      },
+      "first_non_locomotor_amplitude_frac": {
+        "low": 3,
+        "high": 1,
+        "bits": 5
+      },
+      "frequency_bin_high_frac": {
+        "low": 6,
+        "high": 7,
+        "bits": 8
+      },
+      "frequency_bin_mid_frac": {
+        "low": 1,
+        "high": 2,
+        "bits": 3
+      },
+      "sum_accel_mg_std": {
+        "low": 4,
+        "high": 5,
+        "bits": 6
+      },
+      "x_accel_std_ratio": {
+        "low": 7,
+        "high": 0.2,
+        "bits": 1
+      },
+      "y_accel_std_ratio": {
+        "low": 2,
+        "high": 0.5,
+        "bits": 4
+      },
+      "z_accel_std_ratio": {
+        "low": 5,
+        "high": 0.8,
+        "bits": 7
+      },
+      "x_accel_mg_mean": {
+        "low": 8,
+        "high": 1,
+        "bits": 2
+      },
+      "y_accel_mg_mean": {
+        "low": 3,
+        "high": 4,
+        "bits": 5
+      },
+      "z_accel_mg_mean": {
+        "low": 6,
+        "high": 7,
+        "bits": 8
+      }
+    },
+    "data_columns": [
+      "sum_accel_mg_std",
+      "y_accel_std_ratio",
+      "z_accel_std_ratio",
+      "total_amplitude_mg_1",
+      "stride_frequency_1",
+      "stride_amplitude_frac_1",
+      "first_non_locomotor_frequency_1",
+      "first_non_locomotor_amplitude_frac_1",
+      "gait_amplitude_frac_1",
+      "frequency_bin_high_frac_1",
+      "frequency_bin_mid_frac_1",
+      "total_amplitude_mg_2",
+      "stride_frequency_2",
+      "stride_amplitude_frac_2",
+      "first_non_locomotor_frequency_2",
+      "first_non_locomotor_amplitude_frac_2",
+      "gait_amplitude_frac_2",
+      "frequency_bin_high_frac_2",
+      "frequency_bin_mid_frac_2",
+      "total_amplitude_mg_3",
+      "stride_frequency_3",
+      "stride_amplitude_frac_3",
+      "first_non_locomotor_frequency_3",
+      "first_non_locomotor_amplitude_frac_3",
+      "gait_amplitude_frac_3",
+      "frequency_bin_high_frac_3",
+      "frequency_bin_mid_frac_3"
+    ]
+  },
+  "errors": []
+}

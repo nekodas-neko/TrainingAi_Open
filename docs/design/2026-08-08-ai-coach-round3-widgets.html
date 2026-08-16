@@ -1,0 +1,625 @@
+<title>AI Coach — round 3: paired widgets and the full scope</title>
+<style>
+:root{
+  --ground:#080b12; --surface:#111827; --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075); --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8; --ink-2:#9aa5b8; --ink-3:#5f6a7d; --chrome:#38bdf8;
+  --adj:#c084fc; --res:#34d399; --ana:#38bdf8; --warn:#fbbf24; --dang:#fb7185;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--app);line-height:1.55;font-size:15px}
+.wrap{max-width:1400px;margin:0 auto;padding:0 20px 90px}
+header.mast{padding:52px 0 26px;border-bottom:1px solid var(--hair);margin-bottom:6px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--chrome);margin:0 0 13px}
+h1{margin:0 0 15px;font-size:clamp(28px,4.6vw,44px);line-height:1.03;letter-spacing:-.035em;font-weight:800;text-wrap:balance}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:70ch;color:var(--ink-2);font-size:16px}
+.lede + .lede{margin-top:12px}
+.lede b{color:var(--ink);font-weight:600}
+.lede code{font-family:var(--mono);font-size:13.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:24px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.sec-head{display:flex;align-items:baseline;gap:14px;padding:38px 0 18px;border-top:1px solid var(--hair);margin-top:30px;flex-wrap:wrap}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+.prose{max-width:80ch;color:var(--ink-2);font-size:14px}
+.prose p{margin:0 0 13px}
+.prose b{color:var(--ink);font-weight:600}
+.prose code{font-family:var(--mono);font-size:12.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+
+table{width:100%;border-collapse:collapse;margin:6px 0 24px;font-size:13px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:0 12px 9px 0;border-bottom:1px solid var(--hair-2)}
+td{padding:10px 12px 10px 0;border-bottom:1px solid var(--hair);vertical-align:top;color:var(--ink-2)}
+td:first-child{color:var(--ink);font-weight:550;width:24%}
+td code,th code{font-family:var(--mono);font-size:11.5px;color:var(--chrome);background:rgba(56,189,248,.07);padding:1px 5px;border-radius:4px;white-space:nowrap}
+.t{display:inline-block;font-family:var(--mono);font-size:10px;font-weight:700;padding:2px 6px;border-radius:5px;letter-spacing:.05em}
+.t1{background:rgba(52,211,153,.16);color:#6ee7b7}
+.t2{background:rgba(251,191,36,.16);color:#fcd34d}
+.t3{background:rgba(251,113,133,.16);color:#fda4af}
+
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(452px,1fr));gap:18px}
+.mock{border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--surface-2),var(--surface));overflow:hidden;display:flex;flex-direction:column}
+.mock-head{display:flex;align-items:center;gap:9px;padding:13px 15px 11px;border-bottom:1px solid var(--hair)}
+.mock-id{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--ground);background:var(--chrome);padding:2px 6px;border-radius:5px;font-weight:700}
+.mock-id.w{background:#c084fc}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.rec{font-size:11px;font-weight:700;color:#6ee7b7;letter-spacing:.02em}
+.mock-note{padding:14px 15px 16px;margin:0;color:var(--ink-2);font-size:12.5px;line-height:1.55}
+.mock-note b{color:var(--ink);font-weight:600}
+.mock-note em{color:#fcd34d;font-style:normal}
+.mock-note code{font-family:var(--mono);font-size:11.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:4px}
+.canvas{display:flex;justify-content:center;padding:20px 0;background:#05070d;border-bottom:1px solid var(--hair);align-items:flex-start}
+
+.phone{
+  width:412px;flex:none;display:flex;flex-direction:column;position:relative;
+  background:linear-gradient(180deg,#0e1520 0%,#0b1119 34%,#080b12 100%);
+  border-radius:22px;font-size:16px;transform-origin:top center;overflow:hidden;min-height:430px;
+}
+@media(max-width:1000px){.phone{transform:scale(.8)}}
+.status{flex:none;height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 15px;font-size:11px;color:#e8ecf3;font-weight:600}
+.hdr{flex:none;display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
+.hdr .ttl{font-size:16px;font-weight:700;letter-spacing:-.015em}
+.hdr .sub{font-size:11px;color:#6b7688}
+.navbtn{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.06);display:grid;place-items:center;flex:none}
+.pad{padding-left:16px;padding-right:16px}
+.lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#5f6a7d;font-weight:600}
+.card{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:14px;padding:13px}
+.mut{color:#9aa5b8}.dim{color:#6b7688}
+.num{font-variant-numeric:tabular-nums}
+.strike{text-decoration:line-through;text-decoration-color:rgba(251,113,133,.7);color:#6b7688}
+.thread{display:flex;flex-direction:column;gap:11px;padding-top:4px}
+
+.bub{max-width:86%;border-radius:16px;padding:10px 13px;font-size:13.5px;line-height:1.5}
+.bub.me{margin-left:auto;background:#eef2f8;color:#0b1119;border-bottom-right-radius:5px}
+.bub.ai{background:rgba(255,255,255,.06);border-bottom-left-radius:5px;color:#dbe3ee}
+.bub.tap{display:inline-flex;align-items:center;gap:7px;width:auto}
+.bub.tap svg{opacity:.5}
+.composer{flex:none;display:flex;align-items:center;gap:9px;padding:10px 14px 26px;border-top:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.02);margin-top:auto}
+.composer .box{flex:1;height:44px;border-radius:14px;background:rgba(255,255,255,.07);display:flex;align-items:center;padding:0 14px;font-size:13.5px;color:#5f6a7d}
+.composer .send{width:44px;height:44px;border-radius:14px;background:#eef2f8;display:grid;place-items:center;flex:none}
+
+.wg{border-radius:15px;border:1px solid rgba(192,132,252,.26);background:linear-gradient(180deg,rgba(192,132,252,.075),rgba(192,132,252,.022));overflow:hidden}
+.wg.plain{border-color:rgba(255,255,255,.11);background:rgba(255,255,255,.035)}
+.wg.warn{border-color:rgba(251,113,133,.3);background:linear-gradient(180deg,rgba(251,113,133,.09),rgba(251,113,133,.025))}
+.wg.good{border-color:rgba(52,211,153,.25);background:linear-gradient(180deg,rgba(52,211,153,.08),rgba(52,211,153,.02))}
+.wg-h{display:flex;align-items:center;gap:7px;padding:9px 13px;border-bottom:1px solid rgba(192,132,252,.18)}
+.wg.plain .wg-h{border-bottom-color:rgba(255,255,255,.09)}
+.wg.warn .wg-h{border-bottom-color:rgba(251,113,133,.2)}
+.wg.good .wg-h{border-bottom-color:rgba(52,211,153,.2)}
+.wg-h .k{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#d8b4fe;font-weight:700}
+.wg.plain .wg-h .k{color:#7dd3fc}
+.wg.warn .wg-h .k{color:#fda4af}
+.wg.good .wg-h .k{color:#6ee7b7}
+.wg-h .cnt{margin-left:auto;font-size:10.5px;color:#5f6a7d;font-variant-numeric:tabular-nums}
+
+.opt{display:flex;align-items:center;gap:11px;padding:0 13px;min-height:56px;border-bottom:1px solid rgba(255,255,255,.06)}
+.opt:last-child{border-bottom:0}
+.opt .ob{flex:1;min-width:0;padding:8px 0}
+.opt .on{font-size:13.5px;font-weight:600;letter-spacing:-.005em}
+.opt .os{font-size:11.5px;color:#6b7688;margin-top:1px}
+.opt .oc{flex:none}
+.opt .key{width:3px;height:26px;border-radius:3px;flex:none}
+.opt.sel{background:rgba(192,132,252,.1)}
+.opt.dis{opacity:.36}
+
+.chiprow{display:flex;flex-wrap:wrap;gap:8px;padding:12px 13px}
+.chipbtn{display:inline-flex;align-items:center;gap:7px;min-height:48px;padding:0 15px;border-radius:13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);font-size:13px;font-weight:600;color:#dbe3ee}
+.chipbtn.acc{background:rgba(192,132,252,.16);border-color:rgba(192,132,252,.34);color:#e9d5ff}
+.chipbtn.sm{min-height:40px;padding:0 13px;font-size:12.5px}
+.srch{display:flex;align-items:center;gap:9px;margin:11px 13px 12px;height:44px;border-radius:12px;background:rgba(255,255,255,.06);padding:0 13px;font-size:13px;color:#5f6a7d}
+
+.dr{display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.07)}
+.dr .db{flex:1;min-width:0}
+.dr .dn{font-size:13px;font-weight:600}
+.dr .dv{font-size:11.5px;margin-top:2px}
+.sw{width:40px;height:24px;border-radius:999px;flex:none;position:relative;background:#34d399}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:999px;background:#05070d}
+.sw.off{background:rgba(255,255,255,.14)}
+.sw.off::after{right:auto;left:3px;background:#8b95a6}
+.btnrow{display:flex;gap:9px;padding:11px 13px 13px}
+.btn{flex:1;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13.5px;font-weight:650}
+.btn.pri{background:#eef2f8;color:#0b1119}
+.btn.gho{background:rgba(255,255,255,.06);color:#9aa5b8;border:1px solid rgba(255,255,255,.1)}
+.btn.acc{background:#c084fc;color:#1a0b2e}
+.btn.dang{background:#fb7185;color:#2a0810}
+.btn.hold{background:linear-gradient(90deg,rgba(251,113,133,.46) 38%,rgba(251,113,133,.13) 38%);color:#ffe4e6;border:1px solid rgba(251,113,133,.42);position:relative}
+.rip{display:flex;gap:9px;padding:7px 13px;font-size:12px;color:#9aa5b8;align-items:flex-start}
+.rip b{color:#dbe3ee;font-weight:600}
+
+.chartbox{padding:12px 13px 4px}
+.legend{display:flex;flex-wrap:wrap;gap:12px;padding:0 13px 11px}
+.legend span{display:flex;align-items:center;gap:6px;font-size:11px;color:#9aa5b8}
+.legend i{width:11px;height:2.5px;border-radius:2px;display:block}
+.bars{display:flex;align-items:flex-end;gap:10px;height:96px;padding:0 13px}
+.bars > div{flex:1;display:flex;flex-direction:column;align-items:center;gap:6px;justify-content:flex-end}
+.bars b{width:100%;border-radius:5px 5px 0 0;display:block}
+.bars small{font-size:9.5px;color:#6b7688;white-space:nowrap}
+.wframe{width:412px;flex:none;background:#0b1119;border-radius:16px;padding:14px}
+.spk{display:block}
+
+.callout{border-left:2px solid var(--warn);background:rgba(251,191,36,.06);padding:13px 16px;border-radius:0 10px 10px 0;margin:6px 0 22px;max-width:84ch}
+.callout p{margin:0;font-size:13.5px;color:#e5c98a}
+.callout p + p{margin-top:9px}
+.callout b{color:#fde68a}
+.callout code{font-family:var(--mono);font-size:12.5px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px}
+.callout.ok{border-left-color:#34d399;background:rgba(52,211,153,.06)}
+.callout.ok p{color:#9fe6c4}
+.callout.ok b{color:#c9f5e0}
+ol.q{max-width:80ch;color:var(--ink-2);font-size:14px;padding-left:20px}
+ol.q li{margin-bottom:14px}
+ol.q b{color:var(--ink);font-weight:600;display:block;margin-bottom:2px}
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <p class="eyebrow">Mockups · 2026-08-08 · round 3 · S25 Ultra 412dp</p>
+  <h1>Paired widgets, and the <em>four domains you added</em></h1>
+  <p class="lede">Your answers settled the shape. Two changes drive this round: turns may now carry <b>two widgets</b> — you specifically want a chart alongside a picker — and the scope grew to include <b>phase, deload, injuries and cardio goals</b>, which pulls tier-3 confirmation into v1 rather than a later pass.</p>
+  <p class="lede">§1 is the chart-plus-picker question, four ways. §2 is the newly in-scope domains, including the pushed full-screen confirm that phase changes need. §3 is the plumbing your answers implied but did not draw: persisted history, the offline state, grounded research, and what a program-creation handoff looks like.</p>
+  <div class="read">
+    <div><h4>Settled, not revisited</h4><p>Name, route, resolved-state collapse, per-row toggles, terse voice, tier tiers. Round 2 covers those and they are not re-opened here.</p></div>
+    <div><h4>Two live controls, one rule</h4><p>Two widgets per turn is fine when only one of them <i>wants</i> something. §1 is really about which one is the input.</p></div>
+    <div><h4>Scope is now most of the map</h4><p>Round 1's §0 tiers still govern. With phase and deload in, tier 3 exists on day one — D1 draws it.</p></div>
+    <div><h4>Answers to your two questions</h4><p>The model, and which entry points are actually live. Both in the box below — one of them corrects something you said.</p></div>
+  </div>
+</header>
+
+<div class="callout ok">
+<p><b>Model: <code>gemini-3.6-flash</code>.</b> Queried against your key rather than guessed. Available to you: <code>gemini-3.6-flash</code>, <code>gemini-3.5-flash</code>, <code>gemini-3.1-pro-preview</code>, and the <code>gemini-3.1-flash-lite</code> you run today. 3.6-flash is <b>GA rather than preview</b> — which matters for the one route that writes to your program — and is a real step up in tool selection without pro-tier cost. <code>3.1-pro-preview</code> is stronger and I would not put a preview model behind an Apply button. Ship it as a per-route override so the other AI routes stay on flash-lite and the blast radius is one file.</p>
+</div>
+
+<div class="callout">
+<p><b>All four entry points are live, not just Home.</b> Worth correcting because it triples the repointing work. Home is a text button (<code>overview-screen.tsx:315</code>), Stats has a sparkles button (<code>stats-content.tsx:174</code>), the done screen has one (<code>done-screen.tsx:553</code>), and session-select renders the overlay <b>uncontrolled</b> — which makes the component draw its own floating FAB at <code>bottom-fab-safe right-6</code>. That last one is easy to miss because there is no button in the screen's own source; the FAB comes from inside the overlay.</p>
+</div>
+
+<!-- ═══════════════ §1 TWO WIDGETS ═══════════════ -->
+<div class="sec-head"><span class="sec-num">§1</span><h2>Chart + picker in one turn</h2><p>Your ask, four ways. The question underneath: is the chart context for the picker, or is it the picker?</p></div>
+
+<div class="prose">
+<p>All four answer "how is my lifting progressing" with both an overview and a way to drill in. The rule that keeps two widgets unambiguous: <b>only one of them may want something from you.</b> A chart is output — it takes the neutral frame and never waits. The picker is input and takes the purple. When both are tappable (T3) that rule bends, and the note says what it costs.</p>
+</div>
+
+<div class="gallery">
+
+  <!-- T1 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">T1</span><span class="mock-name">Stacked — two cards, one turn</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">how is my lifting progressing</div>
+        <div class="bub ai" style="max-width:100%">Upper is carrying it. Hinge is flat.</div>
+        <div class="wg plain">
+          <div class="wg-h"><span class="k">Estimated 1RM · 14 weeks</span></div>
+          <div class="chartbox">
+            <svg class="spk" width="100%" height="76" viewBox="0 0 350 76" preserveAspectRatio="none">
+              <polyline points="0,58 50,54 100,47 150,39 200,35 250,26 300,21 350,15" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"/>
+              <polyline points="0,64 50,62 100,63 150,60 200,62 250,60 300,63 350,61" fill="none" stroke="#fb7185" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="4 4"/>
+              <polyline points="0,50 50,47 100,44 150,42 200,37 250,34 300,32 350,28" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div class="legend">
+            <span><i style="background:#38bdf8"></i>Press +14%</span>
+            <span><i style="background:#34d399"></i>Squat +9%</span>
+            <span><i style="background:#fb7185"></i>Hinge +1%</span>
+          </div>
+        </div>
+        <div class="wg">
+          <div class="wg-h"><span class="k">Look at one</span><span class="cnt">3</span></div>
+          <div class="opt"><div class="ob"><div class="on">Overhead Press</div><div class="os num">+14% · PR 12 days ago</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob"><div class="on">Back Squat</div><div class="os num">+9% · PR 26 days ago</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob"><div class="on">Deadlift</div><div class="os num">+1% · PR 92 days ago</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">The literal reading of your ask: chart card, then picker card, one turn. <b>The frame colours do the disambiguating</b> — neutral means "this is an answer", purple means "this needs a tap" — so there is never a question about what the AI is waiting for. Costs the most vertical of the four (about 330dp), which on a 412×891 screen means the composer is the only other thing visible.</p>
+  </div>
+
+  <!-- T2 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">T2</span><span class="mock-name">Fused — chart is the legend <span class="rec">recommended</span></span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">how is my lifting progressing</div>
+        <div class="bub ai" style="max-width:100%">Upper is carrying it. Hinge is flat.</div>
+        <div class="wg">
+          <div class="wg-h"><span class="k">Estimated 1RM · 14 weeks</span></div>
+          <div class="chartbox" style="padding-bottom:10px">
+            <svg class="spk" width="100%" height="76" viewBox="0 0 350 76" preserveAspectRatio="none">
+              <polyline points="0,58 50,54 100,47 150,39 200,35 250,26 300,21 350,15" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"/>
+              <polyline points="0,64 50,62 100,63 150,60 200,62 250,60 300,63 350,61" fill="none" stroke="#fb7185" stroke-width="2.2" stroke-linecap="round" stroke-dasharray="4 4"/>
+              <polyline points="0,50 50,47 100,44 150,42 200,37 250,34 300,32 350,28" fill="none" stroke="#34d399" stroke-width="2.2" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <div style="height:1px;background:rgba(255,255,255,.09)"></div>
+          <div class="opt"><span class="key" style="background:#38bdf8"></span><div class="ob"><div class="on">Overhead Press</div><div class="os num">+14% · PR 12 days ago</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><span class="key" style="background:#34d399"></span><div class="ob"><div class="on">Back Squat</div><div class="os num">+9% · PR 26 days ago</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><span class="key" style="background:#fb7185"></span><div class="ob"><div class="on">Deadlift</div><div class="os num">+1% · PR 92 days ago</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">One card, chart on top, options below — and <b>the option rows are the legend</b>, so the separate legend row disappears and the colour key earns its space twice. Saves ~55dp against T1 and reads as one thought rather than two. Strictly this is one widget with a chart header, which is the neatest way to honour "two per turn" without ever having two live controls. The one I would build.</p>
+  </div>
+
+  <!-- T3 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">T3</span><span class="mock-name">Chart is the picker</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">whats lagging</div>
+        <div class="bub ai" style="max-width:100%">Deadlift and rows. Tap one to dig in.</div>
+        <div class="wg">
+          <div class="wg-h"><span class="k">1RM change · 14 weeks</span><span class="cnt">tap a bar</span></div>
+          <div style="padding:14px 0 4px">
+            <div class="bars">
+              <div><b style="height:70px;background:linear-gradient(180deg,#38bdf8,rgba(56,189,248,.35))"></b><small>Press</small></div>
+              <div><b style="height:46px;background:linear-gradient(180deg,#34d399,rgba(52,211,153,.35))"></b><small>Squat</small></div>
+              <div><b style="height:30px;background:linear-gradient(180deg,#fbbf24,rgba(251,191,36,.35))"></b><small>Pulldown</small></div>
+              <div><b style="height:9px;background:#fb7185"></b><small>Deadlift</small></div>
+              <div><b style="height:6px;background:#fb7185"></b><small>Row</small></div>
+            </div>
+          </div>
+          <div style="height:11px"></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">Most compact by a distance — about 150dp for the same information — because the chart <i>is</i> the control. Genuinely satisfying to use. <em>Two real costs</em>: at five series each bar is ~62dp wide but only as tall as its value, so the "Row" bar is a 6dp-high tap target unless the whole column is made tappable, and it stops working past about six items. Fine as a variant the model picks for small comparisons; wrong as the general answer.</p>
+  </div>
+
+  <!-- T4 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">T4</span><span class="mock-name">Per-row sparklines, no chart</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">how is my lifting progressing</div>
+        <div class="bub ai" style="max-width:100%">Upper is carrying it. Hinge is flat.</div>
+        <div class="wg">
+          <div class="wg-h"><span class="k">Estimated 1RM · 14 weeks</span><span class="cnt">5</span></div>
+          <div class="opt">
+            <div class="ob"><div class="on">Overhead Press</div><div class="os num">62 → 71 kg</div></div>
+            <svg width="66" height="24" viewBox="0 0 66 24" style="flex:none"><polyline points="0,19 16,17 33,12 49,8 66,4" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="num" style="font-size:12px;color:#6ee7b7;width:38px;text-align:right">+14%</span>
+          </div>
+          <div class="opt">
+            <div class="ob"><div class="on">Back Squat</div><div class="os num">128 → 140 kg</div></div>
+            <svg width="66" height="24" viewBox="0 0 66 24" style="flex:none"><polyline points="0,18 16,16 33,13 49,10 66,7" fill="none" stroke="#34d399" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="num" style="font-size:12px;color:#6ee7b7;width:38px;text-align:right">+9%</span>
+          </div>
+          <div class="opt">
+            <div class="ob"><div class="on">Lat Pulldown</div><div class="os num">72 → 76 kg</div></div>
+            <svg width="66" height="24" viewBox="0 0 66 24" style="flex:none"><polyline points="0,16 16,15 33,14 49,12 66,11" fill="none" stroke="#fbbf24" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="num" style="font-size:12px;color:#fcd34d;width:38px;text-align:right">+5%</span>
+          </div>
+          <div class="opt">
+            <div class="ob"><div class="on">Deadlift</div><div class="os num">138 → 140 kg</div></div>
+            <svg width="66" height="24" viewBox="0 0 66 24" style="flex:none"><polyline points="0,14 16,14 33,15 49,13 66,14" fill="none" stroke="#fb7185" stroke-width="2" stroke-linecap="round"/></svg>
+            <span class="num" style="font-size:12px;color:#fda4af;width:38px;text-align:right">+1%</span>
+          </div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">No chart at all — each row carries its own trend, which <b>scales to twenty exercises where a five-line chart is already spaghetti</b>. Every row is a proper 56dp target. <em>What you lose is the shared axis</em>: these sparklines are each normalised to themselves, so you cannot see that the press gained 9kg while the squat gained 12. Best for "show me everything", worst for "compare these".</p>
+  </div>
+
+</div>
+
+<div class="callout">
+<p><b>These four are not rivals — they are a selection rule.</b> The model should pick by shape of question: comparing 2–5 things on one axis → T2; scanning many things → T4; a small ranked comparison where tapping the picture is the joy of it → T3. T1 exists as the fallback when the chart and the choice are genuinely about different things (a readiness chart above a session picker, say). Encoding that rule in the system prompt is the actual work; drawing the four was the easy part.</p>
+</div>
+
+<!-- ═══════════════ §2 NEW DOMAINS ═══════════════ -->
+<div class="sec-head"><span class="sec-num">§2</span><h2>The four domains you added</h2><p>Phase, deload, injuries, cardio goals. Phase and deload are tier 3, which means the pushed screen exists in v1.</p></div>
+
+<table>
+<tr><th>Domain</th><th>Tier</th><th>Confirms as</th><th>Notes</th></tr>
+<tr><td>Phase settings / phase set</td><td><span class="t t3">3</span></td><td>Pushed screen, hold to confirm</td><td>Cascades into prescribed load across the whole block. D1.</td></tr>
+<tr><td>Early deload</td><td><span class="t t3">3</span></td><td>Pushed screen</td><td>Route already exists — <code>/api/confirm-early-deload</code>. Coach calls it; does not reimplement. D2.</td></tr>
+<tr><td>Injury</td><td><span class="t t2">2</span></td><td>Inline</td><td>Two-step: what and how bad, then the program consequence. D3.</td></tr>
+<tr><td>Cardio goal</td><td><span class="t t2">2</span></td><td>Inline</td><td>Goal, not a logged run. Feeds the running plan. D4.</td></tr>
+<tr><td>New program</td><td>—</td><td>Handoff, no write</td><td>Links to the existing generator rather than building one in chat. D5.</td></tr>
+</table>
+
+<div class="gallery">
+
+  <!-- D1 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">D1</span><span class="mock-name">Phase change — tier 3, pushed</span></div>
+    <div class="canvas"><div class="phone" style="min-height:660px">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr">
+        <div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></div>
+        <div style="flex:1"><div class="ttl">Change phase</div><div class="sub">This affects your whole block</div></div>
+      </div>
+      <div class="pad">
+        <div style="border:1px solid rgba(255,255,255,.09);border-radius:14px;overflow:hidden">
+          <div style="padding:12px 13px;background:rgba(251,113,133,.06);border-bottom:1px solid rgba(255,255,255,.08)">
+            <div class="dim" style="font-size:9.5px;font-family:var(--mono);letter-spacing:.14em;margin-bottom:4px">NOW</div>
+            <div style="font-size:14px;font-weight:600">Hypertrophy</div>
+            <div class="dim num" style="font-size:12px">cycle 3 of 4 · 8–12 reps @ 65–75%</div>
+          </div>
+          <div style="padding:12px 13px;background:rgba(52,211,153,.06)">
+            <div style="font-size:9.5px;font-family:var(--mono);letter-spacing:.14em;margin-bottom:4px;color:#6ee7b7">AFTER</div>
+            <div style="font-size:14px;font-weight:600">Strength</div>
+            <div class="num" style="font-size:12px;color:#9aa5b8">cycle 1 of 4 · 3–5 reps @ 82–90%</div>
+          </div>
+        </div>
+      </div>
+      <div class="pad" style="padding-top:17px">
+        <div class="lbl" style="margin-bottom:9px">What this does</div>
+        <div class="rip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fb7185" stroke-width="2.2" style="margin-top:2px;flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>Resets your cycle counter — <b>you lose 3 cycles of progress</b> toward the next deload</span></div>
+        <div class="rip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" style="margin-top:2px;flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>Re-prescribes <b>every exercise in all 3 sessions</b> — 18 in total</span></div>
+        <div class="rip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2" style="margin-top:2px;flex:none"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg><span>Working weights jump roughly <b class="num">+15%</b> at 3–5 reps</span></div>
+        <div class="rip"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" stroke-width="2.2" style="margin-top:2px;flex:none"><path d="M20 6L9 17l-5-5"/></svg><span>Logged history and PRs are <b>untouched</b></span></div>
+      </div>
+      <div class="pad" style="padding-top:16px">
+        <div class="lbl" style="margin-bottom:7px">Why now</div>
+        <div style="font-size:13px;color:#9aa5b8;line-height:1.55">You've hit rep targets on 11 of your last 12 sets. That's the signal the current phase has given you what it can.</div>
+      </div>
+      <div style="margin-top:auto"></div>
+      <div class="pad" style="padding-top:16px;padding-bottom:26px">
+        <div style="display:flex;gap:9px">
+          <div class="btn gho">Cancel</div>
+          <div class="btn hold" style="flex:1.6">Hold to change phase</div>
+        </div>
+        <div class="dim" style="font-size:11px;text-align:center;margin-top:9px">Undoable until your next session</div>
+      </div>
+    </div></div>
+    <p class="mock-note">The one change in scope that a chat bubble genuinely cannot hold: <b>four consequences, one of which is destructive</b> (losing three cycles of counter progress). Hold-to-confirm rather than tap, and the button is red — this is the only widget in the whole system that is not purple, because it is the only one that takes something away. Note the last consequence is <i>good news</i>; a list that only warns reads as a scare rather than a briefing.</p>
+  </div>
+
+  <!-- D2 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">D2</span><span class="mock-name">Deload — proposal, then existing route</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">im feeling wrecked, should I deload</div>
+        <div class="bub ai" style="max-width:100%">Probably. Three signals agree.</div>
+        <div class="wg plain">
+          <div class="wg-h"><span class="k">Last 8 days</span></div>
+          <div style="padding:11px 13px 4px">
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:12.5px">HRV vs baseline</span><span class="num" style="font-size:12.5px;color:#fda4af">−11%</span></div>
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:12.5px">Sessions under prescribed load</span><span class="num" style="font-size:12.5px;color:#fda4af">2 of 2</span></div>
+            <div style="display:flex;justify-content:space-between;padding:7px 0"><span style="font-size:12.5px">Training load (ACWR)</span><span class="num" style="font-size:12.5px;color:#fcd34d">1.42 · high</span></div>
+          </div>
+        </div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span class="k">Deload a week early</span></div>
+          <div style="padding:11px 13px 3px;font-size:12.5px;color:#9aa5b8;line-height:1.5">Next cycle drops to <span class="num" style="color:#fff;font-weight:600">60%</span> load for one week, then picks up where you left off.</div>
+          <div class="btnrow"><div class="btn gho">Not yet</div><div class="btn acc" style="flex:1.4">Review deload</div></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">The clearest case for two widgets in one turn, and both are honest about their role: <b>the evidence card takes no input, the proposal takes the tap</b>. Three numbers beat a paragraph of hedging, and showing them means you can disagree with the conclusion on its merits. "Review deload" hands to <code>/api/confirm-early-deload</code>, which already exists and already confirms — Coach is a new front door to it, not a second implementation.</p>
+  </div>
+
+  <!-- D3 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">D3</span><span class="mock-name">Injury — said plainly, recorded properly</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">my left shoulder is bothering me</div>
+        <div class="bub ai" style="max-width:100%">How bad?</div>
+        <div class="wg">
+          <div class="wg-h"><span class="k">Left shoulder</span></div>
+          <div class="chiprow" style="padding-bottom:6px">
+            <span class="chipbtn">Niggle</span><span class="chipbtn acc">Sore, can train</span><span class="chipbtn">Can't load it</span>
+          </div>
+        </div>
+        <div style="display:flex;justify-content:flex-end"><div class="bub me tap">Sore, can train <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div></div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg><span class="k">Log injury</span></div>
+          <div class="dr"><div class="db"><div class="dn">Left shoulder · sore</div><div class="dv dim">Active from today</div></div><div class="sw"></div></div>
+          <div class="dr" style="border-bottom:0"><div class="db"><div class="dn">Flag 3 exercises</div><div class="dv dim">Overhead Press, Bench, Lateral Raise</div></div><div class="sw"></div></div>
+          <div class="rip" style="padding-top:9px;padding-bottom:2px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2" style="margin-top:2px;flex:none"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg><span>Flagged lifts warn before you load them — <b>nothing is removed</b></span></div>
+          <div class="btnrow"><div class="btn gho">Cancel</div><div class="btn acc" style="flex:1.5">Log it</div></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">The most natural sentence anyone says to a trainer, turned into a record without a form. It asks <b>one question, not four</b> — side and body part came from your sentence, dates default, and severity is the only thing it genuinely cannot infer. <em>Corrected after the owner's answer</em>: the second toggle as drawn is wrong. Coach should <b>write the injury record and stop</b> — deload weighting, session-swap recommendation and per-exercise substitution already exist downstream (<code>signals.ts</code> → the periodization prompt's <code>session_swap_recommended</code> path, and <code>injurySafeAlternatives</code>). The widget states what will follow; it does not do it. See the Phase 3 plan, Task 3.</p>
+  </div>
+
+  <!-- D4 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">D4</span><span class="mock-name">Cardio goal</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">I want to get my 5k under 25 minutes</div>
+        <div class="bub ai" style="max-width:100%">Your best is <span class="num">27:10</span> six weeks ago. That's reachable — here's the shape of it.</div>
+        <div class="wg plain">
+          <div class="wg-h"><span class="k">5k best · 6 months</span></div>
+          <div class="chartbox" style="padding-bottom:11px">
+            <svg class="spk" width="100%" height="58" viewBox="0 0 350 58" preserveAspectRatio="none">
+              <line x1="0" y1="14" x2="350" y2="14" stroke="#34d399" stroke-width="1.5" stroke-dasharray="5 5" opacity=".7"/>
+              <polyline points="0,50 70,46 140,44 210,36 280,31 350,29" fill="none" stroke="#38bdf8" stroke-width="2.3" stroke-linecap="round"/>
+            </svg>
+            <div style="display:flex;justify-content:space-between;margin-top:7px"><span class="dim num" style="font-size:10.5px">29:40</span><span class="num" style="font-size:10.5px;color:#6ee7b7">target 25:00</span></div>
+          </div>
+        </div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg><span class="k">Set cardio goal</span></div>
+          <div class="dr"><div class="db"><div class="dn">5k target</div><div class="dv num"><span class="strike">none</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">25:00</span></div></div><div class="sw"></div></div>
+          <div class="dr" style="border-bottom:0"><div class="db"><div class="dn">Runs per week</div><div class="dv num"><span class="strike">1</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">2</span></div></div><div class="sw"></div></div>
+          <div class="rip" style="padding-top:9px;padding-bottom:2px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" style="margin-top:2px;flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>A second run lands on a lifting day — <b>Wednesday</b></span></div>
+          <div class="btnrow"><div class="btn gho">Cancel</div><div class="btn acc" style="flex:1.5">Set goal</div></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">Chart-plus-confirmation rather than chart-plus-picker — the target line drawn against your actual trend <b>makes the goal arguable before you commit to it</b>. The amber line is the point of the whole widget: a cardio goal is not a nutrition goal, it collides with your lifting week, and saying so is the difference between setting a goal and setting a realistic one.</p>
+  </div>
+
+  <!-- D5 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">D5</span><span class="mock-name">Handoff — new program</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">can you build me a whole new program</div>
+        <div class="bub ai" style="max-width:100%">Not in here — that's a bigger job than a chat should do, and there's a proper builder for it.</div>
+        <div class="wg plain">
+          <div style="display:flex;align-items:center;gap:11px;padding:13px">
+            <div style="width:38px;height:38px;border-radius:11px;background:rgba(56,189,248,.14);display:grid;place-items:center;flex:none">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+            </div>
+            <div style="flex:1"><div style="font-size:13.5px;font-weight:650">Program builder</div><div class="dim" style="font-size:11.5px">Goals, days, equipment, experience</div></div>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+        </div>
+        <div class="bub ai" style="max-width:100%">If it's really the split you're unhappy with, I can rework the sessions you have instead — say the word.</div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">Your answer to Q3, drawn. <b>The refusal is one sentence and does not apologise</b>, the handoff is a real tappable destination, and the follow-up offers the thing it <i>can</i> do — which is what stops a boundary feeling like a dead end. Neutral frame, because a link is output. Same widget serves every other out-of-scope ask: log a run, edit a past workout, change account settings.</p>
+  </div>
+
+</div>
+
+<!-- ═══════════════ §3 PLUMBING ═══════════════ -->
+<div class="sec-head"><span class="sec-num">§3</span><h2>What your answers implied but nobody drew</h2><p>Persisted history, offline, grounded research, and the stale-widget case.</p></div>
+
+<div class="gallery">
+
+  <!-- P1 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">P1</span><span class="mock-name">History — cheap version</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr">
+        <div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+        <div style="flex:1"><div class="ttl">AI Coach</div></div>
+        <div class="navbtn"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      </div>
+      <div class="pad">
+        <div class="lbl" style="padding-bottom:9px">Changes you've made</div>
+        <div class="opt" style="padding:0"><div class="ob"><div class="on">Swapped Deadlift → Romanian Deadlift</div><div class="os">Today · Lower</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div class="opt" style="padding:0"><div class="ob"><div class="on">Calories 2,540 → 2,340</div><div class="os">4 Aug</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div class="opt" style="padding:0"><div class="ob"><div class="on">Logged left shoulder injury</div><div class="os">28 Jul</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div style="height:16px"></div>
+        <div class="lbl" style="padding-bottom:9px">Recent conversations</div>
+        <div class="opt" style="padding:0"><div class="ob"><div class="on">whats lagging</div><div class="os">Yesterday · 6 messages</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div class="opt" style="padding:0"><div class="ob"><div class="on">what can I eat instead of rice</div><div class="os">2 Aug · 3 messages</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+      <div style="margin-top:auto"></div>
+      <div class="pad" style="padding-bottom:26px"><div class="btn acc" style="width:100%">New conversation</div></div>
+    </div></div>
+    <p class="mock-note">You said yes to persistence "if it's not too resource intense" — <b>this is the cheap version and the split is the trick</b>. Applied changes are the part with lasting value, and they are already a row in the DB the moment you tap Apply; listing them costs one query and no new storage. Conversations are the expensive part (a table, message rows, a growing blob), so they get a 30-day window and no search. If storage ever bites, drop the bottom half and the top half still answers "when did I change that, and why".</p>
+  </div>
+
+  <!-- P2 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">P2</span><span class="mock-name">Offline</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>✕ ▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">whats lagging</div>
+        <div class="bub ai" style="max-width:100%">Rows and rear delts…</div>
+        <div style="display:flex;justify-content:flex-end"><div class="bub me" style="opacity:.5">swap my rows then</div></div>
+        <div class="wg warn">
+          <div style="display:flex;align-items:center;gap:11px;padding:13px">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#fda4af" stroke-width="2.2" stroke-linecap="round" style="flex:none"><path d="M1 1l22 22M16.7 11.7a6 6 0 0 0-4.4-1.7M5 12.5a10 10 0 0 1 3.5-2.2M2 8.8a15 15 0 0 1 4-2.4M22 8.8a15 15 0 0 0-8.5-3.7M12 20h.01"/></svg>
+            <div style="flex:1"><div style="font-size:13px;font-weight:650">You're offline</div><div class="dim" style="font-size:11.5px">Coach needs a connection — nothing was sent</div></div>
+          </div>
+          <div class="btnrow" style="padding-top:0"><div class="btn gho">Retry</div></div>
+        </div>
+        <div class="dim" style="font-size:11.5px;text-align:center;padding-top:2px">Your history is still readable</div>
+      </div>
+      <div class="composer" style="opacity:.45"><div class="box">Offline</div><div class="send" style="background:rgba(255,255,255,.14)"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">The one surface that breaks the offline-first rule, so it should <b>say so out loud rather than fail silently</b> — a composer that swallows a message is exactly the bug class this app keeps re-fixing. Your unsent message stays visible and dimmed rather than vanishing, the composer is visibly disabled, and persisted history stays readable because it is local. <em>Not verified:</em> real airplane-mode behaviour behind the service worker is a device check.</p>
+  </div>
+
+  <!-- P3 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">P3</span><span class="mock-name">Grounded research</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">what can I swap for 100g of rice</div>
+        <div class="bub ai" style="max-width:100%">Matched on calories. Lentils are the pick — you're <span class="num">18g</span> under protein on training days.</div>
+        <div class="wg plain">
+          <div class="wg-h"><span class="k">≈ 130 kcal each</span></div>
+          <div style="padding:11px 13px 3px">
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:12.5px">Lentils 130g</span><span class="num" style="font-size:12px;color:#6ee7b7">12g protein</span></div>
+            <div style="display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.07)"><span style="font-size:12.5px">Quinoa 100g</span><span class="num dim" style="font-size:12px">4g protein</span></div>
+            <div style="display:flex;justify-content:space-between;padding:7px 0"><span style="font-size:12.5px">Potato 150g</span><span class="num dim" style="font-size:12px">3g protein</span></div>
+          </div>
+          <div style="display:flex;align-items:center;gap:7px;padding:9px 13px 11px;border-top:1px solid rgba(255,255,255,.07);margin-top:6px">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2" style="flex:none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>
+            <span class="dim" style="font-size:10.5px">Checked against USDA FoodData Central</span>
+          </div>
+        </div>
+        <div style="display:flex;gap:8px"><span class="chipbtn sm">Add lentils to my foods</span></div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">With grounding on, the source line is the whole reason to bother — <b>a macro number with no provenance is indistinguishable from a confident guess</b>, which is exactly the failure mode you were buying protection from. Small and grey: present when you want to check, invisible when you don't. If a given answer came back ungrounded, that line should say so rather than being omitted, or its absence teaches nothing.</p>
+  </div>
+
+  <!-- P4 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">P4</span><span class="mock-name">Abandoned widget</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="thread">
+        <div class="bub ai">Which session?</div>
+        <div class="wg" style="opacity:.45;border-style:dashed">
+          <div class="wg-h"><span class="k">Your sessions</span></div>
+          <div class="opt dis"><div class="ob"><div class="on">Upper</div><div class="os">Mon &amp; Fri</div></div></div>
+          <div class="opt dis"><div class="ob"><div class="on">Lower</div><div class="os">Wed</div></div></div>
+          <div style="padding:9px 13px 11px;font-size:11px;color:#6b7688">No longer current — ask again to reopen</div>
+        </div>
+        <div class="bub me">actually whats my protein target</div>
+        <div class="bub ai">185g. You're averaging 167g.</div>
+      </div>
+    </div></div>
+    <p class="mock-note">The case round 2 flagged and did not draw. You asked something else instead of answering, so the picker is <b>inert rather than quietly still live</b> — dashed border, dimmed, and a line saying why. Same rule as the stale-proposal problem: a control that has been overtaken by a newer turn must not silently act. Without this, scrolling up and tapping an old list applies a change to a conversation you have left.</p>
+  </div>
+
+</div>
+
+<!-- ═══════════════ §4 ═══════════════ -->
+<div class="sec-head"><span class="sec-num">§4</span><h2>What's left to decide</h2><p>Three, all small. Everything else is settled.</p></div>
+
+<p class="prose" style="margin-bottom:16px"><b style="color:#6ee7b7">All three were answered on 2026-08-08 and are recorded here so they are not re-opened.</b></p>
+<ol class="q">
+<li><b>Pairing default → T2, with T4 for long lists.</b> Fused card for 2–6 items, per-row sparklines beyond that, T3 bar-tapping available for small ranked comparisons. The selection rule lives in the system prompt.</li>
+<li><b>Injury → neither warn nor remove; Coach only writes the record.</b> The owner's answer was that it should behave exactly as manual injury entry does, and that behaviour already exists end to end: <code>signals.ts</code> derives <code>activeInjuredMusclesInSession</code>, the periodization prompt weighs it via <code>session_swap_recommended</code> / <code>deload_recommended</code>, and <code>injurySafeAlternatives</code> drives per-exercise swaps at workout time. Emergency-deload deliberately excludes injuries as a blunt standalone trigger (AI-4) — that comment is a decision, not an oversight. <b>Coach reimplements none of it.</b> D3's second toggle is superseded.</li>
+<li><b>History → both halves.</b> Applied changes (one query, no new storage) plus conversations on a 30-day window with no search. Pruned on write, since there is no cron layer.</li>
+</ol>
+
+<div class="sec-head"><span class="sec-num">§5</span><h2>Build order, updated</h2><p>Unchanged in shape; the scope answers moved two things earlier.</p></div>
+<div class="prose">
+<p><b>1. Widget protocol + ChangePreview + apply endpoint</b>, with re-validation so a stale patch is refused rather than applied to moved ground. Two widgets are enough to prove the loop — ChoiceList and ChangePreview.</p>
+<p><b>2. The <code>/coach</code> route</b> on <code>gemini-3.6-flash</code>, reusing the existing streaming and the fourteen read-only tools. Analysis and research work immediately because those tools already exist.</p>
+<p><b>3. Tier-3 pushed confirmation</b> — moved up from "later" by phase and deload being in v1. D1 is the reference; deload routes to the endpoint that already exists.</p>
+<p><b>4. The rest of the vocabulary</b>, one widget per write domain, each landing with its ChangePreview shape and its consequence list.</p>
+<p><b>5. Repoint all four entry points</b> and retire the overlay. Bigger than it looked — session-select's FAB lives inside the overlay component, so removing it needs its own replacement.</p>
+</div>
+
+</div>

@@ -1,0 +1,33 @@
+{
+  "source": {
+    "file": "atlas_trendline_1_0_0.pt",
+    "sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "_input_validator.ERRORS": {
+      "101": "101, Error, days: invalid dtype (got {}, expected {})",
+      "102": "102, Error, days: invalid number of dimensions (got {}, expected {})",
+      "104": "104, Error, days: min value is out of bounds ({} < {})",
+      "105": "105, Error, days: max value is out of bounds ({} > {})",
+      "106": "106, Error, days: must not be empty",
+      "201": "201, Error, values: invalid dtype (got {}, expected {})",
+      "202": "202, Error, values: invalid number of dimensions (got {}, expected {})",
+      "204": "204, Error, values: min value is out of bounds ({} < {})",
+      "205": "205, Error, values: max value is out of bounds ({} > {})",
+      "206": "206, Error, values: must not be empty",
+      "301": "301, Error, confidences: invalid dtype (got {}, expected {})",
+      "302": "302, Error, confidences: invalid number of dimensions (got {}, expected {})",
+      "304": "304, Error, confidences: min value is out of bounds ({} < {})",
+      "305": "305, Error, confidences: max value is out of bounds ({} > {})",
+      "306": "306, Error, confidences: must not be empty",
+      "401": "401, Error, days/values length mismatch (got {} and {})",
+      "402": "402, Error, days/confidences length mismatch (got {} and {})",
+      "501": "501, Error, window: invalid value (got {}, expected 0-2)",
+      "502": "502, Error, metric: invalid value (got {}, expected 0-4)"
+    }
+  },
+  "errors": []
+}

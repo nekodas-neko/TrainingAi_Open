@@ -1,0 +1,80 @@
+{
+  "_comment": "Lookup tables from `stress_daytime_sensing_1_1_0`'s `stress_saturation` / `recovery_saturation`, transcribed from the model's own traced source rather than extracted from its `.pt` attributes — which is why they are not in `stress_daytime_sensing_1_1_0.constants.json` alongside the scalars. They lived inline in `lib/health/daytime-stress.ts` until 2026-08-10, where they were invisible to every check that looks for imports of private material and would have shipped into the public repository. They belong here so they travel with the rest of the vendor constants.",
+  "_provenance": "Traced source, `stress_saturation` and `recovery_saturation`. Transcribed, not extracted — there is no `source.sha256` to pin them to, unlike the `.constants.json` files. Verified byte-for-byte against the source arrays at transcription time.",
+  "stress_saturation": {
+    "limits": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "values": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ]
+  },
+  "recovery_saturation": {
+    "limits": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ],
+    "values": [
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8
+    ]
+  }
+}

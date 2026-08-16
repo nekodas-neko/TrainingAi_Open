@@ -1,0 +1,36 @@
+{
+  "source": {
+    "file": "astd_event_detection_0_1_0.pt",
+    "sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "event_detection_version": "0.1.0",
+    "bin_width_minutes": 2,
+    "validator.min_n_bins": 3,
+    "validator.error_code_to_message": {
+      "0": "No errors.",
+      "1": "Condition, insufficient data: n_bins < 4.",
+      "2": "Error, length mismatch: dsa_values and dsa_timestamps_ms have different lengths.",
+      "3": "Error, dsa_timestamps_ms is not strictly monotonically increasing.",
+      "4": "Error, finite dsa_values outside [-1, +1] detected.",
+      "5": "Error, internal segmentation exception.",
+      "6": "Error, internal aggregation/assembly exception."
+    },
+    "preprocessor.relaxed_threshold": 0.4,
+    "preprocessor.extreme_stress_threshold": 0.5,
+    "processor.N_restored": 6,
+    "processor.bin_width_ms": 7,
+    "processor.min_window_delta_ms": 8,
+    "processor.allowed_merge_gap_ms": 1,
+    "processor.rule_stressed": 2,
+    "processor.borderline_count_rule": 3,
+    "processor.max_window_delta_ms": 4,
+    "processor.N_stressed": 5,
+    "processor.rule_restored": 6,
+    "processor.borderline_min_fully_count": 7
+  },
+  "errors": []
+}

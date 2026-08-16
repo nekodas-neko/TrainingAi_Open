@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TrainingAI — Widget & UI Mockups</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --brand: #00ff87;
+    --brand-dim: rgba(0,255,135,0.15);
+    --brand-border: rgba(0,255,135,0.25);
+    --bg: #0d0d0d;
+    --card: #161616;
+    --card2: #1e1e1e;
+    --border: rgba(255,255,255,0.07);
+    --text: #f0f0f0;
+    --muted: #888;
+    --blue: #00d4ff;
+    --purple: #bf5fff;
+    --orange: #ff6a1a;
+    --pink: #ff3d9a;
+    --red: #ff4444;
+    --yellow: #ffd60a;
+  }
+  body { background: var(--bg); color: var(--text); font-family: 'Inter', system-ui, sans-serif; padding: 24px 16px 80px; }
+  h1 { font-size: 22px; font-weight: 700; margin-bottom: 6px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 32px; }
+  h2 { font-size: 15px; font-weight: 600; color: var(--muted); letter-spacing: 0.08em; text-transform: uppercase; margin: 36px 0 14px; }
+  .section-note { font-size: 12px; color: var(--muted); margin-bottom: 14px; margin-top: -8px; }
+
+  /* Tab nav */
+  .tabs { display: flex; gap: 8px; margin-bottom: 32px; flex-wrap: wrap; }
+  .tab { padding: 8px 16px; border-radius: 999px; border: 1px solid var(--border); background: var(--card); color: var(--muted); font-size: 13px; cursor: pointer; transition: all .2s; }
+  .tab.active { background: var(--brand-dim); border-color: var(--brand); color: var(--brand); }
+
+  /* Phone frame */
+  .phone-row { display: flex; gap: 20px; flex-wrap: wrap; align-items: flex-start; }
+  .phone { width: 340px; background: var(--bg); border: 2px solid var(--border); border-radius: 40px; overflow: hidden; position: relative; flex-shrink: 0; }
+  .phone-notch { height: 36px; background: #111; display: flex; align-items: center; justify-content: center; }
+  .notch-pill { width: 100px; height: 10px; background: #000; border-radius: 999px; }
+  .phone-screen { padding: 16px 14px 24px; min-height: 680px; }
+  .phone-label { font-size: 12px; color: var(--muted); text-align: center; margin-top: 12px; }
+
+  /* Status bar area */
+  .status-bar { display: flex; justify-content: space-between; align-items: center; padding: 0 4px 14px; font-size: 11px; color: var(--muted); }
+
+  /* Header variants */
+  .header-v1 { padding: 12px 0 16px; }
+  .header-v1 .greeting { font-size: 20px; font-weight: 700; }
+  .header-v1 .date { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .header-v2 { padding: 0 0 16px; }
+  .header-v2 .pill { background: var(--card2); border: 1px solid var(--border); border-radius: 999px; padding: 8px 16px; display: flex; justify-content: space-between; align-items: center; }
+  .header-v2 .greeting { font-size: 15px; font-weight: 600; }
+  .header-v2 .date { font-size: 11px; color: var(--muted); }
+  .avatar { width: 28px; height: 28px; border-radius: 999px; background: var(--brand-dim); border: 1.5px solid var(--brand); display: flex; align-items: center; justify-content: center; font-size: 12px; color: var(--brand); }
+
+  /* Widget: Current style */
+  .widget-current { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+  .widget-title { font-size: 11px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.06em; }
+  .widget-value { font-size: 26px; font-weight: 700; }
+  .widget-unit { font-size: 13px; color: var(--muted); margin-left: 4px; }
+  .widget-sub { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+  /* Widget: Option A — Colored gradient cards */
+  .widget-a { border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; position: relative; overflow: hidden; }
+  .widget-a::before { content: ''; position: absolute; inset: 0; opacity: 0.08; }
+  .widget-a-steps { background: linear-gradient(135deg, rgba(0,212,255,0.18), rgba(0,212,255,0.06)); border: 1px solid rgba(0,212,255,0.25); }
+  .widget-a-sleep { background: linear-gradient(135deg, rgba(191,95,255,0.18), rgba(191,95,255,0.06)); border: 1px solid rgba(191,95,255,0.25); }
+  .widget-a-weight { background: linear-gradient(135deg, rgba(0,255,135,0.18), rgba(0,255,135,0.06)); border: 1px solid rgba(0,255,135,0.25); }
+  .widget-a-nutrition { background: linear-gradient(135deg, rgba(255,106,26,0.18), rgba(255,106,26,0.06)); border: 1px solid rgba(255,106,26,0.25); }
+  .widget-a .icon { font-size: 20px; margin-bottom: 6px; }
+  .widget-a .val { font-size: 28px; font-weight: 800; line-height: 1; }
+  .widget-a .unit { font-size: 12px; color: var(--muted); }
+  .widget-a .label { font-size: 11px; color: var(--muted); margin-top: 3px; }
+  .widget-a-2col { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+
+  /* Progress bar */
+  .prog-track { height: 5px; background: rgba(255,255,255,0.08); border-radius: 999px; margin-top: 8px; overflow: hidden; }
+  .prog-fill { height: 100%; border-radius: 999px; }
+  .prog-label { display: flex; justify-content: space-between; font-size: 10px; color: var(--muted); margin-top: 3px; }
+
+  /* Widget: Option B — Ring / donut style */
+  .widget-b { background: var(--card); border: 1px solid var(--border); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; display: flex; align-items: center; gap: 14px; }
+  .ring-wrap { position: relative; width: 56px; height: 56px; flex-shrink: 0; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-center { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+  .ring-pct { font-size: 13px; font-weight: 700; }
+  .ring-sub { font-size: 9px; color: var(--muted); }
+  .widget-b-info .title { font-size: 12px; color: var(--muted); }
+  .widget-b-info .value { font-size: 22px; font-weight: 700; line-height: 1.2; }
+  .widget-b-info .sub { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Widget: Option C — Minimal stat tiles with accent line */
+  .tiles-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .tile-c { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; position: relative; overflow: hidden; }
+  .tile-c::after { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px; border-radius: 14px 14px 0 0; }
+  .tile-c.tc-steps::after { background: var(--blue); }
+  .tile-c.tc-sleep::after { background: var(--purple); }
+  .tile-c.tc-weight::after { background: var(--brand); }
+  .tile-c.tc-kcal::after { background: var(--orange); }
+  .tile-c .t-icon { font-size: 16px; margin-bottom: 4px; }
+  .tile-c .t-val { font-size: 20px; font-weight: 700; }
+  .tile-c .t-label { font-size: 10px; color: var(--muted); }
+
+  /* Sleep widget detailed */
+  .sleep-widget { background: var(--card); border: 1px solid rgba(191,95,255,0.25); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; }
+  .sleep-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+  .sleep-title { font-size: 12px; color: #bf5fff; font-weight: 600; }
+  .sleep-duration { font-size: 22px; font-weight: 800; }
+  .sleep-stages { display: flex; gap: 4px; height: 6px; border-radius: 999px; overflow: hidden; margin-bottom: 6px; }
+  .ss-deep { background: #3b5bff; }
+  .ss-rem { background: var(--purple); }
+  .ss-light { background: rgba(191,95,255,0.4); }
+  .ss-awake { background: rgba(255,255,255,0.1); }
+  .sleep-legend { display: flex; gap: 10px; flex-wrap: wrap; }
+  .sl-item { display: flex; align-items: center; gap: 4px; font-size: 10px; color: var(--muted); }
+  .sl-dot { width: 7px; height: 7px; border-radius: 2px; }
+
+  /* Steps widget */
+  .steps-widget { background: var(--card); border: 1px solid rgba(0,212,255,0.25); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; }
+  .steps-top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+  .steps-title { font-size: 12px; color: var(--blue); font-weight: 600; }
+  .steps-val { font-size: 26px; font-weight: 800; }
+  .steps-goal { font-size: 11px; color: var(--muted); }
+  .steps-arc-wrap { position: relative; }
+  .steps-bar-row { display: flex; gap: 3px; margin-top: 6px; }
+  .steps-bar-day { flex: 1; border-radius: 4px 4px 0 0; background: rgba(0,212,255,0.15); position: relative; display: flex; flex-direction: column; justify-content: flex-end; }
+  .steps-bar-fill { border-radius: 4px 4px 0 0; background: var(--blue); width: 100%; }
+  .steps-bar-label { text-align: center; font-size: 8px; color: var(--muted); margin-top: 2px; }
+  .steps-today-bar .steps-bar-fill { background: var(--brand); }
+
+  /* Mood tracker */
+  .mood-card { background: var(--card); border: 1px solid var(--border); border-radius: 20px; padding: 16px; margin-bottom: 10px; }
+  .mood-header { font-size: 14px; font-weight: 600; margin-bottom: 4px; }
+  .mood-sub { font-size: 11px; color: var(--muted); margin-bottom: 14px; }
+  .mood-faces { display: flex; justify-content: space-between; margin-bottom: 14px; }
+  .mood-face { display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; }
+  .mf-emoji { font-size: 28px; filter: grayscale(1) opacity(0.4); transition: all .2s; }
+  .mf-emoji.selected { filter: none; transform: scale(1.25); }
+  .mf-label { font-size: 9px; color: var(--muted); }
+  .mood-chips-label { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+  .chip { padding: 5px 10px; border-radius: 999px; border: 1px solid var(--border); background: var(--card2); font-size: 11px; cursor: pointer; transition: all .2s; white-space: nowrap; }
+  .chip.selected { border-color: var(--brand); background: var(--brand-dim); color: var(--brand); }
+  .chip.sore-chip.selected { border-color: var(--orange); background: rgba(255,106,26,0.15); color: var(--orange); }
+  .chip.sick-chip.selected { border-color: var(--red); background: rgba(255,68,68,0.15); color: var(--red); }
+  .mood-log-btn { width: 100%; background: var(--brand); color: #000; border: none; border-radius: 12px; padding: 11px; font-size: 13px; font-weight: 700; cursor: pointer; }
+
+  /* Pre-workout mood prompt */
+  .pre-mood-banner { background: linear-gradient(135deg, rgba(0,255,135,0.12), rgba(0,212,255,0.08)); border: 1px solid var(--brand-border); border-radius: 16px; padding: 12px 14px; margin-bottom: 10px; display: flex; align-items: center; gap: 10px; }
+  .pre-mood-text { flex: 1; }
+  .pre-mood-text .title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+  .pre-mood-text .sub { font-size: 10px; color: var(--muted); }
+  .pre-mood-btn { background: var(--brand); color: #000; border: none; border-radius: 10px; padding: 7px 12px; font-size: 11px; font-weight: 700; cursor: pointer; white-space: nowrap; }
+
+  /* Recommendation card */
+  .rec-card { background: linear-gradient(135deg, rgba(0,255,135,0.14), rgba(0,255,135,0.05)); border: 1px solid rgba(0,255,135,0.28); border-radius: 20px; padding: 16px; margin-bottom: 10px; }
+  .rec-row { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .rec-emoji { font-size: 32px; }
+  .rec-badge { background: rgba(0,255,135,0.2); color: var(--brand); font-size: 10px; font-weight: 600; padding: 3px 8px; border-radius: 999px; border: 1px solid rgba(0,255,135,0.3); }
+  .rec-name { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+  .rec-meta { font-size: 11px; color: var(--muted); }
+  .rec-start { width: 100%; background: var(--brand); color: #000; border: none; border-radius: 12px; padding: 12px; font-size: 14px; font-weight: 700; cursor: pointer; }
+
+  /* Streak card */
+  .streak-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+  .streak-card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 12px; }
+  .sc-label { font-size: 10px; color: var(--muted); margin-bottom: 6px; }
+  .sc-val { font-size: 22px; font-weight: 800; }
+  .sc-sub { font-size: 10px; color: var(--muted); }
+  .sc-dots { display: flex; gap: 4px; margin-top: 6px; }
+  .sc-dot { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* Animations */
+  @keyframes pulse-ring { 0%,100% { opacity:1; } 50% { opacity:0.6; } }
+  @keyframes shimmer { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  @keyframes count-up { from { opacity:0; transform: translateY(4px); } to { opacity:1; transform: translateY(0); } }
+  @keyframes bar-grow { from { height: 0; } to { } }
+  .animate-pulse-ring { animation: pulse-ring 2s ease-in-out infinite; }
+  .animate-in { animation: count-up 0.4s ease both; }
+  .shimmer-line { position: relative; overflow: hidden; }
+  .shimmer-line::after { content:''; position:absolute; inset:0; background: linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.05) 50%, transparent 100%); animation: shimmer 2s infinite; }
+
+  /* Bottom nav */
+  .bottom-nav { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(16,16,16,0.98); border-top: 1px solid var(--border); display: flex; align-items: center; padding: 8px 0 12px; }
+  .nav-item { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; font-size: 10px; color: var(--muted); }
+  .nav-item.active { color: var(--brand); }
+  .nav-icon { font-size: 18px; }
+  .nav-workout { background: var(--brand); color: #000; width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; font-size: 24px; margin-top: -20px; border: 3px solid var(--bg); }
+
+  /* Sparkline */
+  .sparkline { width: 100%; height: 36px; }
+
+  /* Health page widgets */
+  .health-metric-card { background: var(--card); border-radius: 18px; padding: 14px 16px; margin-bottom: 10px; overflow: hidden; position: relative; }
+  .hm-glow { position: absolute; top: -20px; right: -20px; width: 80px; height: 80px; border-radius: 50%; filter: blur(30px); opacity: 0.4; }
+  .hm-row { display: flex; justify-content: space-between; align-items: flex-start; }
+  .hm-label { font-size: 11px; font-weight: 600; margin-bottom: 4px; }
+  .hm-val { font-size: 30px; font-weight: 800; line-height: 1; }
+  .hm-unit { font-size: 12px; color: var(--muted); }
+  .hm-change { font-size: 11px; margin-top: 4px; }
+  .hm-chart { margin-top: 10px; }
+
+  /* Profile */
+  .profile-header { display: flex; align-items: center; gap: 14px; padding: 14px 0 18px; border-bottom: 1px solid var(--border); margin-bottom: 14px; }
+  .profile-avatar { width: 60px; height: 60px; border-radius: 50%; background: var(--brand-dim); border: 2px solid var(--brand); display: flex; align-items: center; justify-content: center; font-size: 24px; flex-shrink: 0; }
+  .profile-name { font-size: 18px; font-weight: 700; }
+  .profile-email { font-size: 12px; color: var(--muted); }
+  .profile-since { font-size: 11px; color: var(--muted); margin-top: 2px; }
+  .profile-stats { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+  .ps-card { background: var(--card2); border-radius: 12px; padding: 10px; text-align: center; }
+  .ps-val { font-size: 18px; font-weight: 700; }
+  .ps-label { font-size: 10px; color: var(--muted); }
+  .section-group { background: var(--card); border-radius: 16px; margin-bottom: 10px; overflow: hidden; }
+  .section-group-title { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; padding: 12px 14px 6px; }
+  .setting-row { display: flex; align-items: center; justify-content: space-between; padding: 11px 14px; border-bottom: 1px solid var(--border); }
+  .setting-row:last-child { border-bottom: none; }
+  .setting-label { font-size: 14px; }
+  .setting-value { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 6px; }
+  .chevron { color: var(--muted); font-size: 12px; }
+  .toggle { width: 36px; height: 20px; background: var(--brand); border-radius: 999px; position: relative; }
+  .toggle::after { content:''; position:absolute; top:3px; right:3px; width:14px; height:14px; background:#000; border-radius:50%; }
+  .toggle.off { background: var(--border); }
+  .toggle.off::after { right: auto; left:3px; background: var(--muted); }
+
+  /* Drag indicator */
+  .drag-handle { color: var(--muted); font-size: 16px; cursor: grab; opacity: 0.5; }
+  .draggable-widget { position: relative; }
+  .draggable-widget .drag-pill { position: absolute; top: 8px; right: 8px; background: rgba(255,255,255,0.06); border-radius: 6px; padding: 2px 6px; font-size: 10px; color: var(--muted); }
+
+  /* Scrollable area */
+  .phone-scroll { max-height: 640px; overflow-y: auto; padding-bottom: 60px; scrollbar-width: none; }
+  .phone-scroll::-webkit-scrollbar { display: none; }
+
+  /* Page tab content */
+  .page { display: none; }
+  .page.active { display: block; }
+</style>
+</head>
+<body>
+
+<h1>TrainingAI — UI Mockups</h1>
+<p class="subtitle">Widget designs, mood tracker, health page, profile rework. Toggle sections below.</p>
+
+<div class="tabs">
+  <div class="tab active" onclick="showPage('home-widgets')">Home Widgets</div>
+  <div class="tab" onclick="showPage('mood-tracker')">Mood Tracker</div>
+  <div class="tab" onclick="showPage('health-page')">Health Page</div>
+  <div class="tab" onclick="showPage('profile-page')">Profile</div>
+</div>
+
+<!-- ======= HOME WIDGETS ======= -->
+<div class="page active" id="home-widgets">
+  <h2>Home Screen — Widget Options</h2>
+  <p class="section-note">Three visual directions. All use the same data — just different card treatments.</p>
+
+  <div class="phone-row">
+
+    <!-- Current style -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen" style="padding-bottom:0; position:relative;">
+          <div class="phone-scroll">
+            <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+
+            <!-- Header V1: current -->
+            <div class="header-v1">
+              <div class="greeting">Good morning, Alex 👋</div>
+              <div class="date">Tuesday, 27 May</div>
+            </div>
+
+            <!-- Rec card -->
+            <div class="rec-card">
+              <div class="rec-row">
+                <div>
+                  <div style="font-size:11px;color:var(--brand);font-weight:600;margin-bottom:4px;">TODAY'S SESSION</div>
+                  <div class="rec-name">🫁 Push</div>
+                  <div class="rec-meta">6 exercises · ~55 min</div>
+                </div>
+                <div class="rec-badge">Recommended</div>
+              </div>
+              <button class="rec-start">Start Workout</button>
+            </div>
+
+            <!-- Stats row -->
+            <div class="streak-row">
+              <div class="streak-card">
+                <div class="sc-label">STREAK</div>
+                <div class="sc-val">7 <span style="font-size:14px">🔥</span></div>
+                <div class="sc-dots">
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--border)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                </div>
+              </div>
+              <div class="streak-card">
+                <div class="sc-label">THIS WEEK</div>
+                <div class="sc-val">4/5</div>
+                <div class="sc-sub" style="color:var(--brand)">On track</div>
+              </div>
+            </div>
+
+            <!-- Current widgets: plain cards -->
+            <div class="widget-current">
+              <div class="widget-title">Body Weight</div>
+              <div><span class="widget-value">84.2</span><span class="widget-unit">kg</span></div>
+              <div class="widget-sub">↓ 0.4 kg this week</div>
+            </div>
+            <div class="widget-current">
+              <div class="widget-title">Steps Today</div>
+              <div><span class="widget-value">6,240</span><span class="widget-unit">steps</span></div>
+              <div class="widget-sub">No goal set</div>
+            </div>
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item active"><div class="nav-icon">🏠</div><span>Home</span></div>
+            <div class="nav-item"><div class="nav-icon">📊</div><span>Stats</span></div>
+            <div class="nav-item"><div class="nav-workout">🏋️</div></div>
+            <div class="nav-item"><div class="nav-icon">❤️</div><span>Health</span></div>
+            <div class="nav-item"><div class="nav-icon">👤</div><span>Profile</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Current style</div>
+    </div>
+
+    <!-- Option A: Colored gradient cards -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen" style="padding-bottom:0; position:relative;">
+          <div class="phone-scroll">
+            <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+
+            <!-- Header V2: pill -->
+            <div class="header-v2" style="margin-bottom:14px;">
+              <div class="pill">
+                <div>
+                  <div class="greeting">Good morning, Alex 👋</div>
+                  <div class="date">Tuesday, 27 May</div>
+                </div>
+                <div class="avatar">A</div>
+              </div>
+            </div>
+
+            <!-- Rec card -->
+            <div class="rec-card">
+              <div class="rec-row">
+                <div>
+                  <div style="font-size:11px;color:var(--brand);font-weight:600;margin-bottom:4px;">TODAY'S SESSION</div>
+                  <div class="rec-name">🫁 Push</div>
+                  <div class="rec-meta">6 exercises · ~55 min</div>
+                </div>
+                <div class="rec-badge">Recommended</div>
+              </div>
+              <button class="rec-start">Start Workout</button>
+            </div>
+
+            <!-- Stats row -->
+            <div class="streak-row">
+              <div class="streak-card">
+                <div class="sc-label">STREAK</div>
+                <div class="sc-val">7 <span style="font-size:14px">🔥</span></div>
+                <div class="sc-dots">
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--border)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                  <div class="sc-dot" style="background:var(--brand)"></div>
+                </div>
+              </div>
+              <div class="streak-card">
+                <div class="sc-label">THIS WEEK</div>
+                <div class="sc-val">4/5</div>
+                <div class="sc-sub" style="color:var(--brand)">On track</div>
+              </div>
+            </div>
+
+            <!-- Option A: 2-col colored tiles -->
+            <div class="widget-a-2col animate-in">
+              <div class="widget-a widget-a-steps">
+                <div class="icon">👟</div>
+                <div class="val" style="color:var(--blue)">6,240</div>
+                <div class="label">Steps today</div>
+                <div class="prog-track"><div class="prog-fill" style="width:62%;background:var(--blue)"></div></div>
+                <div class="prog-label"><span>62%</span><span>10k goal</span></div>
+              </div>
+              <div class="widget-a widget-a-sleep">
+                <div class="icon">🌙</div>
+                <div class="val" style="color:var(--purple)">7h 22m</div>
+                <div class="label">Last night</div>
+                <div class="prog-track"><div class="prog-fill" style="width:92%;background:var(--purple)"></div></div>
+                <div class="prog-label"><span>Good</span><span>8h goal</span></div>
+              </div>
+            </div>
+            <div class="widget-a-2col">
+              <div class="widget-a widget-a-weight">
+                <div class="icon">⚖️</div>
+                <div class="val" style="color:var(--brand)">84.2</div>
+                <div class="label">kg · ↓ 0.4 this wk</div>
+              </div>
+              <div class="widget-a widget-a-nutrition">
+                <div class="icon">🔥</div>
+                <div class="val" style="color:var(--orange)">1,840</div>
+                <div class="label">kcal today</div>
+                <div class="prog-track"><div class="prog-fill" style="width:73%;background:var(--orange)"></div></div>
+                <div class="prog-label"><span>73%</span><span>2,500 goal</span></div>
+              </div>
+            </div>
+
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item active"><div class="nav-icon">🏠</div><span>Home</span></div>
+            <div class="nav-item"><div class="nav-icon">📊</div><span>Stats</span></div>
+            <div class="nav-workout">🏋️</div>
+            <div class="nav-item"><div class="nav-icon">❤️</div><span>Health</span></div>
+            <div class="nav-item"><div class="nav-icon">👤</div><span>Profile</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Option A — Colored gradient cards</div>
+    </div>
+
+    <!-- Option B: Ring style with progress -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen" style="padding-bottom:0; position:relative;">
+          <div class="phone-scroll">
+            <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+
+            <!-- Header V2: pill -->
+            <div class="header-v2" style="margin-bottom:14px;">
+              <div class="pill">
+                <div>
+                  <div class="greeting">Good morning, Alex 👋</div>
+                  <div class="date">Tuesday, 27 May</div>
+                </div>
+                <div class="avatar">A</div>
+              </div>
+            </div>
+
+            <!-- Rec card -->
+            <div class="rec-card">
+              <div class="rec-row">
+                <div>
+                  <div style="font-size:11px;color:var(--brand);font-weight:600;margin-bottom:4px;">TODAY'S SESSION</div>
+                  <div class="rec-name">🫁 Push</div>
+                  <div class="rec-meta">6 exercises · ~55 min</div>
+                </div>
+                <div class="rec-badge">Recommended</div>
+              </div>
+              <button class="rec-start">Start Workout</button>
+            </div>
+
+            <!-- Steps — ring style -->
+            <div class="widget-b" style="border-color:rgba(0,212,255,0.2)">
+              <div class="ring-wrap">
+                <svg width="56" height="56" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(0,212,255,0.12)" stroke-width="6"/>
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="#00d4ff" stroke-width="6"
+                    stroke-dasharray="138 138" stroke-dashoffset="52" stroke-linecap="round"/>
+                </svg>
+                <div class="ring-center"><div class="ring-pct" style="color:var(--blue)">62%</div></div>
+              </div>
+              <div class="widget-b-info">
+                <div class="title">👟 Steps Today</div>
+                <div class="value" style="color:var(--blue)">6,240</div>
+                <div class="sub">3,760 to reach 10,000 goal</div>
+              </div>
+            </div>
+
+            <!-- Sleep — ring style -->
+            <div class="widget-b" style="border-color:rgba(191,95,255,0.2)">
+              <div class="ring-wrap">
+                <svg width="56" height="56" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(191,95,255,0.12)" stroke-width="6"/>
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="#bf5fff" stroke-width="6"
+                    stroke-dasharray="138 138" stroke-dashoffset="11" stroke-linecap="round"/>
+                </svg>
+                <div class="ring-center"><div class="ring-pct" style="color:var(--purple)">92%</div></div>
+              </div>
+              <div class="widget-b-info">
+                <div class="title">🌙 Sleep</div>
+                <div class="value" style="color:var(--purple)">7h 22m</div>
+                <div class="sub">Deep 1h 20m · REM 1h 45m</div>
+              </div>
+            </div>
+
+            <!-- Weight ring -->
+            <div class="widget-b" style="border-color:rgba(0,255,135,0.2)">
+              <div class="ring-wrap">
+                <svg width="56" height="56" viewBox="0 0 56 56">
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(0,255,135,0.12)" stroke-width="6"/>
+                  <circle cx="28" cy="28" r="22" fill="none" stroke="#00ff87" stroke-width="6"
+                    stroke-dasharray="138 138" stroke-dashoffset="35" stroke-linecap="round"/>
+                </svg>
+                <div class="ring-center"><div class="ring-pct" style="color:var(--brand)">75%</div></div>
+              </div>
+              <div class="widget-b-info">
+                <div class="title">⚖️ Body Weight</div>
+                <div class="value" style="color:var(--brand)">84.2 kg</div>
+                <div class="sub">Goal: 80 kg · ↓ 0.4 this wk</div>
+              </div>
+            </div>
+
+          </div>
+          <div class="bottom-nav">
+            <div class="nav-item active"><div class="nav-icon">🏠</div><span>Home</span></div>
+            <div class="nav-item"><div class="nav-icon">📊</div><span>Stats</span></div>
+            <div class="nav-workout">🏋️</div>
+            <div class="nav-item"><div class="nav-icon">❤️</div><span>Health</span></div>
+            <div class="nav-item"><div class="nav-icon">👤</div><span>Profile</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Option B — Ring / progress arc</div>
+    </div>
+
+  </div><!-- end phone-row -->
+
+  <!-- Sleep & Steps detailed widgets -->
+  <h2>Sleep & Steps — Expanded Widget Designs</h2>
+  <p class="section-note">These replace the current bare-value tiles when expanded on the home screen.</p>
+  <div class="phone-row">
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen">
+          <!-- Sleep detailed -->
+          <div class="sleep-widget draggable-widget">
+            <div class="drag-pill">⠿ drag</div>
+            <div class="sleep-header">
+              <span class="sleep-title">🌙 Sleep</span>
+              <span style="font-size:10px;color:var(--muted)">Last night</span>
+            </div>
+            <div class="sleep-duration">7h 22m</div>
+            <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">Fell asleep 10:43 PM · Woke 6:05 AM</div>
+            <div class="sleep-stages">
+              <div class="ss-deep" style="flex:1.3"></div>
+              <div class="ss-rem" style="flex:1.75"></div>
+              <div class="ss-light" style="flex:3.5"></div>
+              <div class="ss-awake" style="flex:0.5"></div>
+            </div>
+            <div class="sleep-legend">
+              <div class="sl-item"><div class="sl-dot" style="background:#3b5bff"></div>Deep 1h 20m</div>
+              <div class="sl-item"><div class="sl-dot" style="background:var(--purple)"></div>REM 1h 45m</div>
+              <div class="sl-item"><div class="sl-dot" style="background:rgba(191,95,255,0.4)"></div>Light 4h 10m</div>
+              <div class="sl-item"><div class="sl-dot" style="background:rgba(255,255,255,0.1)"></div>Awake 7m</div>
+            </div>
+          </div>
+
+          <!-- Steps detailed -->
+          <div class="steps-widget draggable-widget">
+            <div class="drag-pill">⠿ drag</div>
+            <div class="steps-top">
+              <div>
+                <div class="steps-title">👟 Steps</div>
+                <div class="steps-val">6,240</div>
+                <div class="steps-goal">Goal: 10,000 / day</div>
+              </div>
+              <div style="text-align:right">
+                <div style="font-size:22px;font-weight:800;color:var(--blue)">62%</div>
+                <div style="font-size:10px;color:var(--muted)">today</div>
+              </div>
+            </div>
+            <div class="prog-track" style="height:7px"><div class="prog-fill" style="width:62%;background:linear-gradient(90deg,var(--blue),var(--brand))"></div></div>
+            <div class="prog-label"><span style="color:var(--blue)">3,760 to go</span><span>10k goal</span></div>
+            <!-- 7-day bar chart -->
+            <div style="margin-top:12px">
+              <div style="font-size:10px;color:var(--muted);margin-bottom:6px;">This week</div>
+              <div class="steps-bar-row" style="height:40px;align-items:flex-end">
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;border-radius:3px 3px 0 0;background:var(--blue);opacity:0.7;height:32px"></div>
+                  <div style="font-size:8px;color:var(--muted)">M</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;border-radius:3px 3px 0 0;background:var(--blue);opacity:0.7;height:28px"></div>
+                  <div style="font-size:8px;color:var(--muted)">T</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;border-radius:3px 3px 0 0;background:var(--blue);opacity:0.5;height:14px"></div>
+                  <div style="font-size:8px;color:var(--muted)">W</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;border-radius:3px 3px 0 0;background:var(--blue);opacity:0.7;height:36px"></div>
+                  <div style="font-size:8px;color:var(--muted)">T</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;border-radius:3px 3px 0 0;background:var(--blue);opacity:0.7;height:30px"></div>
+                  <div style="font-size:8px;color:var(--muted)">F</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;border-radius:3px 3px 0 0;background:var(--brand);height:25px"></div>
+                  <div style="font-size:8px;color:var(--brand);font-weight:600">Sa</div>
+                </div>
+                <div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px">
+                  <div style="width:100%;border-radius:3px 3px 0 0;background:rgba(255,255,255,0.08);height:40px"></div>
+                  <div style="font-size:8px;color:var(--muted)">Su</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Sleep + Steps expanded widgets</div>
+    </div>
+
+    <!-- Draggable edit mode -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+            <div style="font-size:14px;font-weight:600">Edit Widgets</div>
+            <div style="font-size:12px;color:var(--brand);cursor:pointer">Done</div>
+          </div>
+          <div style="font-size:11px;color:var(--muted);margin-bottom:12px;">Hold and drag to reorder. Tap – to remove.</div>
+
+          <!-- draggable items -->
+          <div style="border:1.5px dashed rgba(0,255,135,0.3);border-radius:18px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;background:rgba(0,255,135,0.05);">
+            <span style="font-size:20px">⠿</span>
+            <span style="font-size:13px;flex:1">Workout Recommendation</span>
+            <span style="font-size:18px;color:rgba(255,68,68,0.7)">⊖</span>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:18px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;background:var(--card);">
+            <span style="font-size:20px">⠿</span>
+            <span style="font-size:13px;flex:1">Streak &amp; Weekly Stats</span>
+            <span style="font-size:18px;color:rgba(255,68,68,0.7)">⊖</span>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:18px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;background:var(--card);">
+            <span style="font-size:20px">⠿</span>
+            <span style="font-size:13px;flex:1">Steps Widget</span>
+            <span style="font-size:18px;color:rgba(255,68,68,0.7)">⊖</span>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:18px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;background:var(--card);">
+            <span style="font-size:20px">⠿</span>
+            <span style="font-size:13px;flex:1">Sleep Widget</span>
+            <span style="font-size:18px;color:rgba(255,68,68,0.7)">⊖</span>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:18px;padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;gap:10px;background:var(--card);">
+            <span style="font-size:20px">⠿</span>
+            <span style="font-size:13px;flex:1">Body Weight Trend</span>
+            <span style="font-size:18px;color:rgba(255,68,68,0.7)">⊖</span>
+          </div>
+          <div style="border:1px solid var(--border);border-radius:18px;padding:12px 14px;margin-bottom:16px;display:flex;align-items:center;gap:10px;background:var(--card);">
+            <span style="font-size:20px">⠿</span>
+            <span style="font-size:13px;flex:1">Nutrition Donut</span>
+            <span style="font-size:18px;color:rgba(255,68,68,0.7)">⊖</span>
+          </div>
+
+          <!-- Add widget -->
+          <div style="border:1px dashed var(--border);border-radius:18px;padding:12px 14px;display:flex;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px;">
+            <span style="font-size:20px">＋</span> Add Widget
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Drag-to-reorder edit mode</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======= MOOD TRACKER ======= -->
+<div class="page" id="mood-tracker">
+  <h2>Mood Tracker</h2>
+  <p class="section-note">Two placement options and the full mood sheet UI.</p>
+
+  <div class="phone-row">
+
+    <!-- Option 1: Banner on pre-workout screen -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen">
+          <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;">
+            <span style="font-size:18px">←</span>
+            <div style="flex:1">
+              <div style="font-size:17px;font-weight:700">🫁 Push</div>
+              <div style="font-size:11px;color:var(--muted)">Tuesday, 27 May</div>
+            </div>
+            <span style="font-size:18px">🔄</span>
+          </div>
+
+          <!-- Mood banner — not yet logged today -->
+          <div class="pre-mood-banner">
+            <span style="font-size:24px">🧠</span>
+            <div class="pre-mood-text">
+              <div class="title">How are you feeling today?</div>
+              <div class="sub">Log your mood before training — takes 15 sec</div>
+            </div>
+            <button class="pre-mood-btn">Log</button>
+          </div>
+
+          <!-- Exercise list -->
+          <div style="font-size:12px;color:var(--muted);margin-bottom:10px;">6 EXERCISES</div>
+          <div style="background:rgba(0,255,135,0.08);border:1px solid rgba(0,255,135,0.2);border-radius:14px;padding:10px 12px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:600">Bench Press ✓</div>
+                <div style="font-size:10px;color:var(--muted)">Chest · Triceps</div>
+              </div>
+              <div style="font-size:11px;color:var(--muted)">3×5 · 100kg</div>
+            </div>
+          </div>
+          <div style="background:rgba(0,212,255,0.06);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:600">Incline DB Press</div>
+                <div style="font-size:10px;color:var(--muted)">Chest · Shoulders</div>
+              </div>
+              <div style="font-size:11px;color:var(--muted)">3×8 · 30kg</div>
+            </div>
+          </div>
+          <div style="background:rgba(0,212,255,0.06);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin-bottom:8px;">
+            <div style="display:flex;justify-content:space-between;align-items:center;">
+              <div>
+                <div style="font-size:13px;font-weight:600">OHP</div>
+                <div style="font-size:10px;color:var(--muted)">Shoulders · Triceps</div>
+              </div>
+              <div style="font-size:11px;color:var(--muted)">3×6 · 65kg</div>
+            </div>
+          </div>
+
+          <button style="width:100%;background:var(--brand);color:#000;border:none;border-radius:14px;padding:13px;font-size:14px;font-weight:700;margin-top:8px;">Start Workout</button>
+        </div>
+      </div>
+      <div class="phone-label">Option A — Banner on pre-workout</div>
+    </div>
+
+    <!-- Full mood sheet -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen" style="padding-bottom:0;position:relative;">
+          <div class="phone-scroll">
+            <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+            <div class="mood-card">
+              <div class="mood-header">How are you feeling? 🧠</div>
+              <div class="mood-sub">Tuesday · Before Push session</div>
+
+              <!-- Energy level -->
+              <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">ENERGY LEVEL</div>
+              <div class="mood-faces">
+                <div class="mood-face">
+                  <div class="mf-emoji">😴</div>
+                  <div class="mf-label">Drained</div>
+                </div>
+                <div class="mood-face">
+                  <div class="mf-emoji">😑</div>
+                  <div class="mf-label">Low</div>
+                </div>
+                <div class="mood-face">
+                  <div class="mf-emoji selected">😐</div>
+                  <div class="mf-label">OK</div>
+                </div>
+                <div class="mood-face">
+                  <div class="mf-emoji">😊</div>
+                  <div class="mf-label">Good</div>
+                </div>
+                <div class="mood-face">
+                  <div class="mf-emoji">⚡</div>
+                  <div class="mf-label">Pumped</div>
+                </div>
+              </div>
+
+              <!-- Sleep quality -->
+              <div style="font-size:11px;color:var(--muted);margin-bottom:8px;">LAST NIGHT'S SLEEP</div>
+              <div class="chips" style="margin-bottom:12px;">
+                <div class="chip">Terrible</div>
+                <div class="chip selected">Poor</div>
+                <div class="chip">OK</div>
+                <div class="chip">Good</div>
+                <div class="chip">Great</div>
+              </div>
+
+              <!-- Body state -->
+              <div class="mood-chips-label">BODY STATE — how do you feel physically?</div>
+              <div class="chips">
+                <div class="chip selected">Feeling good</div>
+                <div class="chip">Stiff</div>
+                <div class="chip sore-chip selected">Sore muscles</div>
+                <div class="chip sick-chip">Feeling sick</div>
+                <div class="chip">Tired legs</div>
+                <div class="chip">Joint pain</div>
+                <div class="chip">Tight back</div>
+                <div class="chip">Low motivation</div>
+              </div>
+
+              <!-- Sore muscles (shows if Sore selected) -->
+              <div style="margin-top:10px;padding:10px 12px;background:rgba(255,106,26,0.1);border:1px solid rgba(255,106,26,0.2);border-radius:12px;">
+                <div style="font-size:11px;color:var(--orange);font-weight:600;margin-bottom:6px;">WHICH MUSCLES ARE SORE?</div>
+                <div class="chips" style="margin-bottom:0">
+                  <div class="chip sore-chip selected">Chest 🫁</div>
+                  <div class="chip">Back</div>
+                  <div class="chip sore-chip selected">Triceps</div>
+                  <div class="chip">Biceps</div>
+                  <div class="chip">Shoulders</div>
+                  <div class="chip">Quads</div>
+                  <div class="chip">Hamstrings</div>
+                  <div class="chip">Glutes</div>
+                  <div class="chip">Calves</div>
+                  <div class="chip">Core</div>
+                </div>
+                <div style="margin-top:8px;padding:7px 10px;background:rgba(255,106,26,0.12);border-radius:8px;font-size:11px;color:var(--orange);">
+                  ⚠️ Chest and Triceps are sore — these are primary muscles in today's Push session.
+                </div>
+              </div>
+
+              <button class="mood-log-btn" style="margin-top:14px;">Save Mood Check-in</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Full mood check-in sheet</div>
+    </div>
+
+    <!-- Option 2: Mood logged today → shown as widget -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen">
+          <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+          <div style="font-size:17px;font-weight:700;margin-bottom:14px;">Good morning, Alex 👋</div>
+
+          <!-- Mood already logged — shows as summary widget on home -->
+          <div style="background:rgba(255,106,26,0.1);border:1px solid rgba(255,106,26,0.2);border-radius:18px;padding:14px 16px;margin-bottom:10px;">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px;">
+              <div style="font-size:12px;color:var(--orange);font-weight:600;">TODAY'S MOOD</div>
+              <div style="font-size:10px;color:var(--muted)">9:22 AM</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+              <span style="font-size:28px">😐</span>
+              <div>
+                <div style="font-size:14px;font-weight:600;">OK energy · Poor sleep</div>
+                <div style="font-size:11px;color:var(--orange);">⚠️ Chest + Triceps sore (training today)</div>
+              </div>
+            </div>
+            <div style="font-size:10px;color:var(--muted);">Tap to edit</div>
+          </div>
+
+          <!-- Rec card -->
+          <div class="rec-card">
+            <div class="rec-row">
+              <div>
+                <div style="font-size:11px;color:var(--brand);font-weight:600;margin-bottom:4px;">TODAY'S SESSION</div>
+                <div class="rec-name">🫁 Push</div>
+                <div class="rec-meta">6 exercises · ~55 min</div>
+              </div>
+              <div class="rec-badge">Recommended</div>
+            </div>
+            <button class="rec-start">Start Workout</button>
+          </div>
+
+          <!-- Stats -->
+          <div class="streak-row">
+            <div class="streak-card">
+              <div class="sc-label">STREAK</div>
+              <div class="sc-val">7 🔥</div>
+            </div>
+            <div class="streak-card">
+              <div class="sc-label">THIS WEEK</div>
+              <div class="sc-val" style="color:var(--brand)">4/5</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Option B — Mood shows as home widget</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ======= HEALTH PAGE ======= -->
+<div class="page" id="health-page">
+  <h2>Health Page — More Color & Animation</h2>
+  <p class="section-note">Current health cards are plain dark cards. These add glow, color accents, and richer data viz.</p>
+
+  <div class="phone-row">
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen" style="padding-bottom:0;position:relative;">
+          <div class="phone-scroll">
+            <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+            <div style="font-size:18px;font-weight:700;margin-bottom:16px;">Health</div>
+
+            <!-- Body weight card with glow -->
+            <div class="health-metric-card" style="border:1px solid rgba(0,255,135,0.2)">
+              <div class="hm-glow" style="background:var(--brand)"></div>
+              <div class="hm-row">
+                <div>
+                  <div class="hm-label" style="color:var(--brand)">⚖️ Body Weight</div>
+                  <div><span class="hm-val">84.2</span><span class="hm-unit"> kg</span></div>
+                  <div class="hm-change" style="color:var(--brand)">↓ 0.4 kg this week</div>
+                </div>
+                <div style="text-align:right">
+                  <div style="font-size:11px;color:var(--muted)">Goal</div>
+                  <div style="font-size:16px;font-weight:700">80 kg</div>
+                  <div style="font-size:10px;color:var(--muted)">4.2 to go</div>
+                </div>
+              </div>
+              <!-- Sparkline -->
+              <div class="hm-chart">
+                <svg width="100%" height="40" viewBox="0 0 280 40" preserveAspectRatio="none">
+                  <defs>
+                    <linearGradient id="wg" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stop-color="#00ff87" stop-opacity="0.3"/>
+                      <stop offset="100%" stop-color="#00ff87" stop-opacity="0"/>
+                    </linearGradient>
+                  </defs>
+                  <path d="M0,28 L40,26 L80,30 L120,24 L160,22 L200,20 L240,18 L280,16" fill="none" stroke="#00ff87" stroke-width="2" stroke-linecap="round"/>
+                  <path d="M0,28 L40,26 L80,30 L120,24 L160,22 L200,20 L240,18 L280,16 L280,40 L0,40 Z" fill="url(#wg)"/>
+                </svg>
+              </div>
+            </div>
+
+            <!-- Steps card with blue accent -->
+            <div class="health-metric-card" style="border:1px solid rgba(0,212,255,0.2)">
+              <div class="hm-glow" style="background:var(--blue)"></div>
+              <div class="hm-row">
+                <div>
+                  <div class="hm-label" style="color:var(--blue)">👟 Steps</div>
+                  <div><span class="hm-val" style="color:var(--blue)">6,240</span></div>
+                  <div class="hm-change" style="color:var(--muted)">62% of 10,000 daily goal</div>
+                </div>
+                <div>
+                  <!-- Mini ring -->
+                  <svg width="52" height="52" viewBox="0 0 52 52" style="transform:rotate(-90deg)">
+                    <circle cx="26" cy="26" r="20" fill="none" stroke="rgba(0,212,255,0.12)" stroke-width="5"/>
+                    <circle cx="26" cy="26" r="20" fill="none" stroke="#00d4ff" stroke-width="5"
+                      stroke-dasharray="126" stroke-dashoffset="48" stroke-linecap="round"/>
+                  </svg>
+                </div>
+              </div>
+              <div class="prog-track" style="height:6px;margin-top:8px"><div class="prog-fill" style="width:62%;background:var(--blue)"></div></div>
+            </div>
+
+            <!-- Sleep card -->
+            <div class="health-metric-card" style="border:1px solid rgba(191,95,255,0.2)">
+              <div class="hm-glow" style="background:var(--purple)"></div>
+              <div class="hm-label" style="color:var(--purple);margin-bottom:6px;">🌙 Sleep</div>
+              <div class="hm-row" style="margin-bottom:10px;">
+                <div><span class="hm-val" style="color:var(--purple)">7h 22m</span></div>
+                <div style="text-align:right;font-size:11px;color:var(--muted)">10:43 PM → 6:05 AM</div>
+              </div>
+              <div class="sleep-stages" style="height:8px">
+                <div class="ss-deep" style="flex:1.3"></div>
+                <div class="ss-rem" style="flex:1.75"></div>
+                <div class="ss-light" style="flex:3.5"></div>
+                <div class="ss-awake" style="flex:0.5"></div>
+              </div>
+              <div class="sleep-legend" style="margin-top:6px">
+                <div class="sl-item"><div class="sl-dot" style="background:#3b5bff"></div>Deep 1h 20m</div>
+                <div class="sl-item"><div class="sl-dot" style="background:var(--purple)"></div>REM 1h 45m</div>
+                <div class="sl-item"><div class="sl-dot" style="background:rgba(191,95,255,0.4)"></div>Light 4h 10m</div>
+              </div>
+            </div>
+
+            <!-- Nutrition card -->
+            <div class="health-metric-card" style="border:1px solid rgba(255,106,26,0.2)">
+              <div class="hm-glow" style="background:var(--orange)"></div>
+              <div class="hm-label" style="color:var(--orange);margin-bottom:6px;">🔥 Nutrition</div>
+              <div style="display:flex;align-items:center;gap:14px;">
+                <!-- Donut -->
+                <svg width="64" height="64" viewBox="0 0 64 64" style="transform:rotate(-90deg);flex-shrink:0">
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#1e1e1e" stroke-width="10"/>
+                  <!-- Protein 35% -->
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#00d4ff" stroke-width="10"
+                    stroke-dasharray="52.8 150.7" stroke-dashoffset="0"/>
+                  <!-- Carbs 45% -->
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#ffd60a" stroke-width="10"
+                    stroke-dasharray="67.8 150.7" stroke-dashoffset="-52.8"/>
+                  <!-- Fat 20% -->
+                  <circle cx="32" cy="32" r="24" fill="none" stroke="#ff6a1a" stroke-width="10"
+                    stroke-dasharray="30.1 150.7" stroke-dashoffset="-120.6"/>
+                </svg>
+                <div style="flex:1">
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:11px;color:var(--blue)">● Protein</span><span style="font-size:11px;font-weight:600">142g</span></div>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="font-size:11px;color:#ffd60a">● Carbs</span><span style="font-size:11px;font-weight:600">183g</span></div>
+                  <div style="display:flex;justify-content:space-between;margin-bottom:8px;"><span style="font-size:11px;color:var(--orange)">● Fat</span><span style="font-size:11px;font-weight:600">62g</span></div>
+                  <div style="font-size:18px;font-weight:700;">1,840 <span style="font-size:11px;color:var(--muted);font-weight:400">/ 2,500 kcal</span></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Health page — colored cards with glow</div>
+    </div>
+  </div>
+</div>
+
+<!-- ======= PROFILE PAGE ======= -->
+<div class="page" id="profile-page">
+  <h2>Profile Page — Reworked Layout</h2>
+  <p class="section-note">Current profile is a flat list. This groups settings into cards with a hero header.</p>
+
+  <div class="phone-row">
+    <!-- Current flat list approximation -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen" style="padding-bottom:0;position:relative;">
+          <div class="phone-scroll">
+            <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+            <div style="font-size:17px;font-weight:700;margin-bottom:16px;">Profile</div>
+            <!-- flat everything -->
+            <div class="widget-current" style="display:flex;align-items:center;gap:12px;margin-bottom:10px;">
+              <div style="width:50px;height:50px;border-radius:50%;background:var(--brand-dim);border:2px solid var(--brand);display:flex;align-items:center;justify-content:center;font-size:22px">A</div>
+              <div><div style="font-weight:600">Alex</div><div style="font-size:11px;color:var(--muted)">alex@email.com</div></div>
+            </div>
+            <div class="widget-current">Display Name · Alex</div>
+            <div class="widget-current">Height · 180 cm</div>
+            <div class="widget-current">Date of Birth · 01/01/1990</div>
+            <div class="widget-current">Weight Goal · 80 kg</div>
+            <div class="widget-current">Change Password</div>
+            <div class="widget-current">Theme: Green</div>
+            <div class="widget-current">Timezone: AEST</div>
+            <div class="widget-current">Home Widgets</div>
+            <div class="widget-current">Calorie Goal</div>
+            <div class="widget-current" style="color:var(--red)">Sign Out</div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Current (flat list)</div>
+    </div>
+
+    <!-- New grouped layout -->
+    <div>
+      <div class="phone">
+        <div class="phone-notch"><div class="notch-pill"></div></div>
+        <div class="phone-screen" style="padding-bottom:0;position:relative;">
+          <div class="phone-scroll">
+            <div class="status-bar"><span>9:41</span><span>●●●</span></div>
+
+            <!-- Hero header -->
+            <div class="profile-header">
+              <div class="profile-avatar">A</div>
+              <div>
+                <div class="profile-name">Alex</div>
+                <div class="profile-email">alex@email.com</div>
+                <div class="profile-since">Member since Jan 2025</div>
+              </div>
+            </div>
+
+            <!-- Quick stats strip -->
+            <div class="profile-stats">
+              <div class="ps-card">
+                <div class="ps-val" style="color:var(--brand)">47</div>
+                <div class="ps-label">Workouts</div>
+              </div>
+              <div class="ps-card">
+                <div class="ps-val" style="color:var(--orange)">12</div>
+                <div class="ps-label">Best streak</div>
+              </div>
+              <div class="ps-card">
+                <div class="ps-val" style="color:var(--blue)">4.2kg</div>
+                <div class="ps-label">Lost</div>
+              </div>
+            </div>
+
+            <!-- Account group -->
+            <div class="section-group">
+              <div class="section-group-title">Account</div>
+              <div class="setting-row">
+                <span class="setting-label">Display Name</span>
+                <span class="setting-value">Alex <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Height</span>
+                <span class="setting-value">180 cm <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Date of Birth</span>
+                <span class="setting-value">01/01/1990 <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Change Password</span>
+                <span class="setting-value"><span class="chevron">›</span></span>
+              </div>
+            </div>
+
+            <!-- Preferences group -->
+            <div class="section-group">
+              <div class="section-group-title">Preferences</div>
+              <div class="setting-row">
+                <span class="setting-label">Theme</span>
+                <span class="setting-value"><span style="display:inline-block;width:12px;height:12px;border-radius:50%;background:var(--brand);margin-right:4px"></span>Green <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Timezone</span>
+                <span class="setting-value">AEST <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Notifications</span>
+                <div class="toggle"></div>
+              </div>
+            </div>
+
+            <!-- Goals group -->
+            <div class="section-group">
+              <div class="section-group-title">Goals</div>
+              <div class="setting-row">
+                <span class="setting-label">Weight Goal</span>
+                <span class="setting-value">80 kg <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Daily Steps Goal</span>
+                <span class="setting-value">10,000 <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Calorie Goal</span>
+                <span class="setting-value">2,500 kcal <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Sleep Goal</span>
+                <span class="setting-value">8h <span class="chevron">›</span></span>
+              </div>
+            </div>
+
+            <!-- Home Widgets group -->
+            <div class="section-group">
+              <div class="section-group-title">Home Widgets</div>
+              <div class="setting-row">
+                <span class="setting-label">Manage Widgets</span>
+                <span class="setting-value">6 active <span class="chevron">›</span></span>
+              </div>
+              <div class="setting-row">
+                <span class="setting-label">Metric Tiles</span>
+                <span class="setting-value">5 shown <span class="chevron">›</span></span>
+              </div>
+            </div>
+
+            <!-- Sign out -->
+            <div class="section-group" style="margin-top:10px">
+              <div class="setting-row">
+                <span class="setting-label" style="color:#ff4444">Sign Out</span>
+              </div>
+            </div>
+
+            <div style="height:20px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-label">Redesigned (grouped sections + hero)</div>
+    </div>
+  </div>
+</div>
+
+<script>
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  event.target.classList.add('active');
+}
+
+// Animate mood chips on click
+document.querySelectorAll('.chip').forEach(chip => {
+  chip.addEventListener('click', () => chip.classList.toggle('selected'));
+});
+document.querySelectorAll('.mf-emoji').forEach(face => {
+  face.addEventListener('click', () => {
+    face.closest('.mood-faces').querySelectorAll('.mf-emoji').forEach(f => f.classList.remove('selected'));
+    face.classList.add('selected');
+  });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,82 @@
+'use client'
+
+import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
+import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
+
+interface Props {
+  calories: number
+  proteinG: number
+  carbsG: number
+  fatG: number
+  targets: NutritionTargets | null
+  calsBurnedToday?: number | null
+}
+
+export function MacroRing({ calories, proteinG, carbsG, fatG, targets, calsBurnedToday }: Props) {
+  const calTarget = targets?.calories ?? 2000
+  const remaining = Math.max(0, calTarget - calories)
+  const pct = Math.min(100, Math.round((calories / calTarget) * 100))
+  const ringMask = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%, transparent 90%)'
+
+  return (
+    <div className="rounded-2xl bg-muted/60 border border-border px-4 py-4">
+      <div className="flex items-center gap-5">
+        {/* Ring — conic-gradient + mask instead of an animated SVG stroke-dashoffset,
+            which is unreliable on the Samsung WebView compositor. */}
+        <div className="relative w-24 h-24 flex-none">
+          <div
+            className="absolute inset-0 rounded-full text-muted-foreground/30"
+            style={{ background: 'currentColor', WebkitMask: ringMask, mask: ringMask }}
+          />
+          <div
+            className="absolute inset-0 rounded-full"
+            style={{
+              background: pct > 0
+                ? `conic-gradient(from -90deg, var(--brand) ${pct * 3.6}deg, transparent ${pct * 3.6}deg)`
+                : 'transparent',
+              WebkitMask: ringMask,
+              mask: ringMask,
+            }}
+          />
+          <div className="absolute inset-0 flex flex-col items-center justify-center">
+            <span className="text-lg font-bold leading-none tabular-nums">{Math.round(calories)}</span>
+            <span className="text-[10px] text-muted-foreground mt-0.5">kcal</span>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-baseline justify-between mb-3">
+            <span className="text-xs text-muted-foreground">
+              {calsBurnedToday != null && calsBurnedToday > 0 ? `+${Math.round(calsBurnedToday)} from cardio` : 'Daily goal'}
+            </span>
+            <span className="text-xs font-semibold tabular-nums">{remaining > 0 ? `${remaining} left` : 'Goal reached'}</span>
+          </div>
+          <div className="space-y-2">
+            <MacroBar label="Protein" value={proteinG} target={targets?.proteinG ?? 150} color={MACRO_COLORS.protein} />
+            <MacroBar label="Carbs"   value={carbsG}   target={targets?.carbsG   ?? 250} color={MACRO_COLORS.carbs} />
+            <MacroBar label="Fat"     value={fatG}      target={targets?.fatG     ?? 80}  color={MACRO_COLORS.fat} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function MacroBar({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
+  const pct = Math.min(100, Math.round((value / target) * 100))
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-xs text-muted-foreground w-12 shrink-0">{label}</span>
+      <div className="flex-1 h-2 rounded-full bg-muted/40">
+        <div
+          className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none"
+          style={{ transform: `scaleX(${pct / 100})`, backgroundColor: color }}
+        />
+      </div>
+      <span className="text-xs tabular-nums text-muted-foreground w-16 text-right shrink-0">
+        {Math.round(value)}/{Math.round(target)}g
+      </span>
+    </div>
+  )
+}

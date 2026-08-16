@@ -1,0 +1,84 @@
+{
+  "captured": [
+    "astd_event_detection_0_1_0",
+    "awhr_profile_selector_1_0_1",
+    "cumulative_stress_1_2_2",
+    "daily_short_term_baselines_1_1_0",
+    "meal_timing_0_1_0",
+    "sleepnet_bdi_0_3_0",
+    "sleepnet_bdi_0_4_0",
+    "step_counter_1_3_0",
+    "steps_motion_decoder_2_0_0",
+    "stress_daytime_sensing_1_1_0",
+    "stress_resilience_2_2_1",
+    "training_stress_score_0_2_1"
+  ],
+  "skipped": [
+    {
+      "model": "atlas_2_1_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "atlas_trendline_1_0_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "automatic_activity_detection_3_0_8",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "automatic_activity_detection_3_1_11",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "awhr_imputation_1_2_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "cva_1_3_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "cva_2_1_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "cva_calibrator_1_3_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "daily_medians_1_1_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "halite_1_2_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "popsicle_1_6_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "popsicle_1_8_1",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "pregnancy_biometrics_0_4_0",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    },
+    {
+      "model": "sleepstaging_2_6_0",
+      "reason": "load: \nUnknown builtin op: oura_ops::oura_create_windows.\nCould not find any similar ops to oura_ops::oura_create_windows. Thi"
+    },
+    {
+      "model": "whr_2_7_1",
+      "reason": "forward: The following operation failed in the TorchScript interpreter.\nTraceback of TorchScript, serialized code (most recent call last):\n  File \"co"
+    }
+  ],
+  "already": [
+    "dhrv_imputation_1_1_0",
+    "energy_expenditure_1_0_0",
+    "illness_detection_0_5_1",
+    "sleepnet_moonstone_1_2_0"
+  ]
+}

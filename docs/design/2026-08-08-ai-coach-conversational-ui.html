@@ -1,0 +1,638 @@
+<title>AI Coach — conversation that renders UI</title>
+<style>
+:root{
+  --ground:#080b12; --surface:#111827; --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075); --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8; --ink-2:#9aa5b8; --ink-3:#5f6a7d; --chrome:#38bdf8;
+  --adj:#c084fc; --res:#34d399; --ana:#38bdf8; --warn:#fbbf24; --dang:#fb7185;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--app);line-height:1.55;font-size:15px}
+.wrap{max-width:1400px;margin:0 auto;padding:0 20px 90px}
+header.mast{padding:52px 0 26px;border-bottom:1px solid var(--hair);margin-bottom:6px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--chrome);margin:0 0 13px}
+h1{margin:0 0 15px;font-size:clamp(28px,4.6vw,44px);line-height:1.03;letter-spacing:-.035em;font-weight:800;text-wrap:balance}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:70ch;color:var(--ink-2);font-size:16px}
+.lede + .lede{margin-top:12px}
+.lede b{color:var(--ink);font-weight:600}
+.lede code{font-family:var(--mono);font-size:13.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:14px;margin-top:24px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+.sec-head{display:flex;align-items:baseline;gap:14px;padding:38px 0 18px;border-top:1px solid var(--hair);margin-top:30px;flex-wrap:wrap}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+.prose{max-width:80ch;color:var(--ink-2);font-size:14px}
+.prose p{margin:0 0 13px}
+.prose b{color:var(--ink);font-weight:600}
+.prose code{font-family:var(--mono);font-size:12.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+
+table{width:100%;border-collapse:collapse;margin:6px 0 24px;font-size:13px}
+th{text-align:left;font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600;padding:0 12px 9px 0;border-bottom:1px solid var(--hair-2)}
+td{padding:10px 12px 10px 0;border-bottom:1px solid var(--hair);vertical-align:top;color:var(--ink-2)}
+td:first-child{color:var(--ink);font-weight:550;width:26%}
+td code,th code{font-family:var(--mono);font-size:11.5px;color:var(--chrome);background:rgba(56,189,248,.07);padding:1px 5px;border-radius:4px;white-space:nowrap}
+
+.gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(452px,1fr));gap:18px}
+.gallery.tight{grid-template-columns:repeat(auto-fill,minmax(360px,1fr))}
+.mock{border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--surface-2),var(--surface));overflow:hidden;display:flex;flex-direction:column}
+.mock-head{display:flex;align-items:center;gap:9px;padding:13px 15px 11px;border-bottom:1px solid var(--hair)}
+.mock-id{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--ground);background:var(--chrome);padding:2px 6px;border-radius:5px;font-weight:700}
+.mock-id.w{background:#c084fc}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{padding:14px 15px 16px;margin:0;color:var(--ink-2);font-size:12.5px;line-height:1.55}
+.mock-note b{color:var(--ink);font-weight:600}
+.mock-note em{color:#fcd34d;font-style:normal}
+.mock-note code{font-family:var(--mono);font-size:11.5px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 4px;border-radius:4px}
+.canvas{display:flex;justify-content:center;padding:20px 0;background:#05070d;border-bottom:1px solid var(--hair);align-items:flex-start}
+
+.phone{
+  width:412px;flex:none;display:flex;flex-direction:column;position:relative;
+  background:linear-gradient(180deg,#0e1520 0%,#0b1119 34%,#080b12 100%);
+  border-radius:22px;font-size:16px;transform-origin:top center;overflow:hidden;min-height:430px;
+}
+@media(max-width:1000px){.phone{transform:scale(.8)}}
+.status{flex:none;height:26px;display:flex;justify-content:space-between;align-items:center;padding:0 15px;font-size:11px;color:#e8ecf3;font-weight:600}
+.hdr{flex:none;display:flex;align-items:center;gap:8px;padding:8px 12px 12px}
+.hdr .ttl{font-size:16px;font-weight:700;letter-spacing:-.015em}
+.hdr .sub{font-size:11px;color:#6b7688}
+.navbtn{width:40px;height:40px;border-radius:11px;background:rgba(255,255,255,.06);display:grid;place-items:center;flex:none}
+.pad{padding-left:16px;padding-right:16px}
+.rule{height:1px;background:rgba(255,255,255,.09)}
+.lbl{font-family:var(--mono);font-size:9.5px;letter-spacing:.18em;text-transform:uppercase;color:#5f6a7d;font-weight:600}
+.card{border:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.04);border-radius:14px;padding:13px}
+.mut{color:#9aa5b8}.dim{color:#6b7688}
+.num{font-variant-numeric:tabular-nums}
+.strike{text-decoration:line-through;text-decoration-color:rgba(251,113,133,.7);color:#6b7688}
+.thread{display:flex;flex-direction:column;gap:11px;padding-top:4px}
+
+.bub{max-width:86%;border-radius:16px;padding:10px 13px;font-size:13.5px;line-height:1.5}
+.bub.me{margin-left:auto;background:#eef2f8;color:#0b1119;border-bottom-right-radius:5px}
+.bub.ai{background:rgba(255,255,255,.06);border-bottom-left-radius:5px;color:#dbe3ee}
+.bub.tap{display:inline-flex;align-items:center;gap:7px;width:auto}
+.bub.tap svg{opacity:.5}
+.composer{flex:none;display:flex;align-items:center;gap:9px;padding:10px 14px 26px;border-top:1px solid rgba(255,255,255,.09);background:rgba(255,255,255,.02);margin-top:auto}
+.composer .box{flex:1;height:44px;border-radius:14px;background:rgba(255,255,255,.07);display:flex;align-items:center;padding:0 14px;font-size:13.5px;color:#5f6a7d}
+.composer .box.typing{color:#eef2f8}
+.composer .box.typing::after{content:"";display:inline-block;width:1.5px;height:17px;background:#38bdf8;margin-left:2px}
+.composer .send{width:44px;height:44px;border-radius:14px;background:#eef2f8;display:grid;place-items:center;flex:none}
+
+/* ---------- WIDGET SHELL: the AI's rendered UI ---------- */
+.wg{border-radius:15px;border:1px solid rgba(192,132,252,.26);background:linear-gradient(180deg,rgba(192,132,252,.075),rgba(192,132,252,.022));overflow:hidden}
+.wg.plain{border-color:rgba(255,255,255,.11);background:rgba(255,255,255,.035)}
+.wg-h{display:flex;align-items:center;gap:7px;padding:9px 13px;border-bottom:1px solid rgba(192,132,252,.18)}
+.wg.plain .wg-h{border-bottom-color:rgba(255,255,255,.09)}
+.wg-h .k{font-family:var(--mono);font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:#d8b4fe;font-weight:700}
+.wg.plain .wg-h .k{color:#7dd3fc}
+.wg-h .cnt{margin-left:auto;font-size:10.5px;color:#5f6a7d;font-variant-numeric:tabular-nums}
+
+/* option rows — 48dp floor */
+.opt{display:flex;align-items:center;gap:11px;padding:0 13px;min-height:56px;border-bottom:1px solid rgba(255,255,255,.06)}
+.opt:last-child{border-bottom:0}
+.opt .oi{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.06);display:grid;place-items:center;flex:none}
+.opt .ob{flex:1;min-width:0;padding:8px 0}
+.opt .on{font-size:13.5px;font-weight:600;letter-spacing:-.005em}
+.opt .os{font-size:11.5px;color:#6b7688;margin-top:1px}
+.opt .oc{flex:none}
+.opt.sel{background:rgba(192,132,252,.1)}
+.opt.sel .on{color:#fff}
+.opt.dis{opacity:.36}
+
+/* chips row */
+.chiprow{display:flex;flex-wrap:wrap;gap:8px;padding:12px 13px}
+.chipbtn{display:inline-flex;align-items:center;gap:7px;min-height:48px;padding:0 15px;border-radius:13px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);font-size:13px;font-weight:600;color:#dbe3ee}
+.chipbtn.acc{background:rgba(192,132,252,.16);border-color:rgba(192,132,252,.34);color:#e9d5ff}
+.chipbtn.sm{min-height:40px;padding:0 13px;font-size:12.5px}
+
+/* search field inside widget */
+.srch{display:flex;align-items:center;gap:9px;margin:11px 13px 3px;height:44px;border-radius:12px;background:rgba(255,255,255,.06);padding:0 13px;font-size:13px;color:#5f6a7d}
+
+/* resolved pill */
+.resolved{display:inline-flex;align-items:center;gap:8px;padding:8px 13px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.09);font-size:12.5px;color:#9aa5b8}
+.resolved b{color:#eef2f8;font-weight:600}
+
+/* dial */
+.dial{display:flex;flex-direction:column;align-items:center;padding:16px 13px 6px;gap:3px}
+.dial .v{font-size:36px;font-weight:800;letter-spacing:-.04em;font-variant-numeric:tabular-nums;line-height:1}
+.dial .u{font-size:11.5px;color:#6b7688}
+.dial .track{width:100%;height:44px;margin-top:12px;display:flex;align-items:center;justify-content:center;gap:0;position:relative;overflow:hidden;mask-image:linear-gradient(90deg,transparent,#000 22%,#000 78%,transparent)}
+.dial .track i{width:2px;background:rgba(255,255,255,.18);margin:0 7px;flex:none;height:12px;border-radius:2px}
+.dial .track i.maj{height:22px;background:rgba(255,255,255,.34)}
+.dial .track::after{content:"";position:absolute;left:50%;top:4px;bottom:4px;width:2.5px;background:#c084fc;border-radius:2px;transform:translateX(-50%)}
+.dial .delta{font-size:11.5px;color:#6ee7b7;margin-top:8px;font-variant-numeric:tabular-nums}
+
+/* diff / confirm */
+.dr{display:flex;align-items:center;gap:11px;padding:11px 13px;border-bottom:1px solid rgba(255,255,255,.07)}
+.dr:last-of-type{border-bottom:0}
+.dr .db{flex:1;min-width:0}
+.dr .dn{font-size:13px;font-weight:600}
+.dr .dv{font-size:11.5px;margin-top:2px}
+.sw{width:40px;height:24px;border-radius:999px;flex:none;position:relative;background:#34d399}
+.sw::after{content:"";position:absolute;top:3px;right:3px;width:18px;height:18px;border-radius:999px;background:#05070d}
+.sw.off{background:rgba(255,255,255,.14)}
+.sw.off::after{right:auto;left:3px;background:#8b95a6}
+.btnrow{display:flex;gap:9px;padding:11px 13px 13px}
+.btn{flex:1;height:48px;border-radius:13px;display:flex;align-items:center;justify-content:center;gap:6px;font-size:13.5px;font-weight:650}
+.btn.pri{background:#eef2f8;color:#0b1119}
+.btn.gho{background:rgba(255,255,255,.06);color:#9aa5b8;border:1px solid rgba(255,255,255,.1)}
+.btn.acc{background:#c084fc;color:#1a0b2e}
+.rip{display:flex;gap:9px;padding:7px 13px;font-size:12px;color:#9aa5b8;align-items:flex-start}
+.rip b{color:#dbe3ee;font-weight:600}
+
+/* mini widget frame for the catalogue */
+.wframe{width:380px;flex:none;background:#0b1119;border-radius:16px;padding:14px}
+
+.rt{width:100%;border-collapse:collapse;font-size:12.5px}
+.rt th{font-family:var(--mono);font-size:9px;letter-spacing:.1em;color:#5f6a7d;padding:0 0 7px;border-bottom:1px solid rgba(255,255,255,.1);text-align:right}
+.rt th:first-child{text-align:left}
+.rt td{padding:9px 0;border-bottom:1px solid rgba(255,255,255,.07);text-align:right;color:#9aa5b8;font-variant-numeric:tabular-nums}
+.rt td:first-child{text-align:left;color:#eef2f8;font-weight:550}
+.rt tr:last-child td{border-bottom:0}
+.wframe .rt td:first-child{white-space:nowrap}
+.up{color:#6ee7b7}
+
+.callout{border-left:2px solid var(--warn);background:rgba(251,191,36,.06);padding:13px 16px;border-radius:0 10px 10px 0;margin:6px 0 22px;max-width:82ch}
+.callout p{margin:0;font-size:13.5px;color:#e5c98a}
+.callout p + p{margin-top:9px}
+.callout b{color:#fde68a}
+.callout code{font-family:var(--mono);font-size:12.5px;background:rgba(255,255,255,.07);padding:1px 5px;border-radius:4px}
+ol.q{max-width:80ch;color:var(--ink-2);font-size:14px;padding-left:20px}
+ol.q li{margin-bottom:14px}
+ol.q b{color:var(--ink);font-weight:600;display:block;margin-bottom:2px}
+.flowlabel{font-family:var(--mono);font-size:10px;letter-spacing:.14em;color:#5f6a7d;padding:0 0 8px}
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <p class="eyebrow">Mockups · 2026-08-08 · round 2 · S25 Ultra 412dp</p>
+  <h1>AI Coach — a conversation that <em>renders its own UI</em></h1>
+  <p class="lede">You talk to it normally. When answering would mean typing something it could just show you, <b>it renders a control instead of a question</b> — a list of your sessions, a picker, a dial, a diff. You tap, the conversation moves on. Same thread, no menus, no forms.</p>
+  <p class="lede">Which means the thing to design is not screens — it is a <b>vocabulary of widgets the model can call</b>, plus the rules for how they behave once you have answered. Eight widgets, drawn in §2. The rules are in §3 and they matter more than the pixels: get the resolved state wrong and the thread turns into a graveyard of stale pickers.</p>
+  <div class="read">
+    <div><h4>§1 is the answer</h4><p>Your exact example — "I want to change my workout" — walked end to end in eight frames. Read this first; everything else supports it.</p></div>
+    <div><h4>Widgets resolve ambiguity</h4><p>They are not a wizard. Say something specific and it skips straight to the change. F8 shows that, and it is the difference between a coach and a menu.</p></div>
+    <div><h4>Typing always works</h4><p>Every widget has a typed equivalent. The list is an accelerator, never a gate — F3 shows someone ignoring it.</p></div>
+    <div><h4>Named AI Coach</h4><p>Applied throughout. Home button routes to a full page rather than opening the 78vh sheet — reasons in §4.</p></div>
+  </div>
+</header>
+
+<div class="callout">
+<p><b>Session names in these mockups are illustrative.</b> "Upper", "Lower" and "Full Body" are read from the user's active program at render time. CLAUDE.md's rule stands and is load-bearing here: session identity is the DB id, never the name, and the widget's option list is built from <code>program.sessions</code> — there is no fallback array with named content.</p>
+</div>
+
+<!-- ═══════════════════════ §1 THE FLOW ═══════════════════════ -->
+<div class="sec-head"><span class="sec-num">§1</span><h2>"I want to change my workout" — end to end</h2><p>Eight frames of one conversation. Same thread throughout; nothing navigates away until the change is applied.</p></div>
+
+<div class="gallery">
+
+  <!-- F1 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F1</span><span class="mock-name">Opening</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr">
+        <div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+        <div style="flex:1"><div class="ttl">AI Coach</div></div>
+      </div>
+      <div class="pad" style="display:flex;flex-direction:column;align-items:center;gap:13px;padding-top:44px;text-align:center">
+        <svg width="27" height="27" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="1.7" stroke-linecap="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/><path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z"/></svg>
+        <div style="font-size:19px;font-weight:700;letter-spacing:-.02em;line-height:1.25">What do you want<br>to work on?</div>
+        <div class="dim" style="font-size:12px;max-width:265px;line-height:1.5">I can look at your data, explain something, or change your program — nothing changes without you confirming it.</div>
+      </div>
+      <div class="pad" style="display:flex;flex-direction:column;gap:8px;padding-top:24px">
+        <div class="card" style="padding:12px 13px;font-size:13px;color:#9aa5b8">Change my workout</div>
+        <div class="card" style="padding:12px 13px;font-size:13px;color:#9aa5b8">What can I eat instead of rice</div>
+        <div class="card" style="padding:12px 13px;font-size:13px;color:#9aa5b8">What's lagging?</div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">Deliberately not a launcher with three labelled sections. <b>The sections from round 1 are gone from the shell</b> — with widgets doing the work, "Adjust / Research / Analyse" is a taxonomy the user never needed to learn. The three examples happen to be one of each, which teaches the range without naming it.</p>
+  </div>
+
+  <!-- F2 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F2</span><span class="mock-name">Ask → it renders the list</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">I want to change my workout</div>
+        <div class="bub ai">Sure — which session?</div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="k">Your sessions</span><span class="cnt">3</span></div>
+          <div class="opt">
+            <div class="oi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2.2" stroke-linecap="round"><path d="M6 7v10M18 7v10M2 10v4M22 10v4M6 12h12"/></svg></div>
+            <div class="ob"><div class="on">Upper</div><div class="os">Mon &amp; Fri · 6 exercises</div></div>
+            <svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+          <div class="opt">
+            <div class="oi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2.2" stroke-linecap="round"><path d="M6 7v10M18 7v10M2 10v4M22 10v4M6 12h12"/></svg></div>
+            <div class="ob"><div class="on">Lower</div><div class="os">Wed · 5 exercises</div></div>
+            <svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+          <div class="opt">
+            <div class="oi"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2.2" stroke-linecap="round"><path d="M6 7v10M18 7v10M2 10v4M22 10v4M6 12h12"/></svg></div>
+            <div class="ob"><div class="on">Full Body</div><div class="os">Sat · 7 exercises</div></div>
+            <svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg>
+          </div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Or just say which one…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">One sentence of narration, then the control. The AI does not ask "which session — Upper, Lower or Full Body?" and make you type it back; <b>it asks once and hands you the list</b>. Subtitles carry the disambiguating detail (which days, how many exercises) so you can pick without opening anything. Note the placeholder — the composer stays live and says so.</p>
+  </div>
+
+  <!-- F3 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F3</span><span class="mock-name">Typing instead of tapping</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">I want to change my workout</div>
+        <div class="bub ai">Sure — which session?</div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg><span class="k">Your sessions</span><span class="cnt">3</span></div>
+          <div class="opt dis"><div class="ob"><div class="on">Upper</div><div class="os">Mon &amp; Fri · 6 exercises</div></div></div>
+          <div class="opt dis"><div class="ob"><div class="on">Lower</div><div class="os">Wed · 5 exercises</div></div></div>
+          <div class="opt dis"><div class="ob"><div class="on">Full Body</div><div class="os">Sat · 7 exercises</div></div></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box typing">the wednesday one</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">The rule that keeps it a conversation rather than a form: <b>every widget has a typed equivalent, always</b>. Start typing and the list dims to show it has stepped aside — it is a suggestion, not a gate. "The wednesday one" resolves to Lower because the widget's options carry their schedule days, so the model is matching against real structure rather than guessing. <em>Without this rule you have built a menu with a chat skin.</em></p>
+  </div>
+
+  <!-- F4 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F4</span><span class="mock-name">Picked → collapses to your reply</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">I want to change my workout</div>
+        <div class="bub ai">Sure — which session?</div>
+        <div style="display:flex;justify-content:flex-end"><div class="bub me tap">Lower <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div></div>
+        <div class="bub ai">Here's what's in it. Which exercise?</div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M6 7v10M18 7v10M2 10v4M22 10v4M6 12h12"/></svg><span class="k">Lower · 5 exercises</span></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Back Squat</div><div class="os num">4 × 5 @ 82.5% · 180s</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Deadlift</div><div class="os num">4 × 5 @ 80% · 180s</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Leg Press</div><div class="os num">3 × 10 @ 70% · 120s</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Leg Curl</div><div class="os num">3 × 12 @ 65% · 90s</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Calf Raise</div><div class="os num">4 × 15 @ 60% · 60s</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note"><b>The single most important rule in this document.</b> Once you pick, the list does not sit there greyed out — it collapses into a normal user bubble reading "Lower", exactly as if you had typed it. Scroll back tomorrow and the thread reads as a plain conversation. The small undo glyph is the escape hatch: tap the bubble to re-open the picker and change your mind. §3 shows the two alternatives and why they lose.</p>
+  </div>
+
+  <!-- F5 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F5</span><span class="mock-name">Verb chips</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div style="display:flex;justify-content:flex-end"><div class="bub me tap">Lower <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div></div>
+        <div class="bub ai">Here's what's in it. Which exercise?</div>
+        <div style="display:flex;justify-content:flex-end"><div class="bub me tap">Deadlift <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div></div>
+        <div class="bub ai" style="max-width:100%">Deadlift, <span class="num">4 × 5 @ 80%</span>. Worth knowing before you decide: it's the one lift in this session that hasn't moved since May.</div>
+        <div class="wg">
+          <div class="wg-h"><span class="k">What do you want to do?</span></div>
+          <div class="chiprow">
+            <span class="chipbtn acc"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#e9d5ff" stroke-width="2.3" stroke-linecap="round"><path d="M16 3h5v5M21 3l-7 7M8 21H3v-5M3 21l7-7"/></svg>Swap it</span>
+            <span class="chipbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2.3" stroke-linecap="round"><path d="M4 21v-7M4 10V3M12 21v-9M12 8V3M20 21v-5M20 12V3M1 14h6M9 8h6M17 16h6"/></svg>Sets &amp; reps</span>
+            <span class="chipbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2.3" stroke-linecap="round"><path d="M5 12h14"/></svg>Remove</span>
+            <span class="chipbtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2.3" stroke-linecap="round"><path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/></svg>Reorder</span>
+          </div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Or describe it…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">Verbs as chips rather than another list — four short options do not need 56dp rows each. The sentence above them is the part that earns the "coach" name: <b>it volunteers the stall before you have asked</b>, because it already ran the analysis to build this screen. Swap is tinted as the recommended one, which is a soft steer rather than a default that acts on its own.</p>
+  </div>
+
+  <!-- F6 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F6</span><span class="mock-name">Suggestions, with a way out</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div style="display:flex;justify-content:flex-end"><div class="bub me tap">Swap it <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div></div>
+        <div class="bub ai" style="max-width:100%">These keep the hinge pattern. The first two cut spinal load, which is what your last three sessions struggled with.</div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z"/></svg><span class="k">Suggested</span></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Romanian Deadlift</div><div class="os">Same hinge, far less spinal load</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Hip Thrust</div><div class="os">Glute-dominant, easiest on the back</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="opt"><div class="ob" style="padding:9px 0"><div class="on">Trap Bar Deadlift</div><div class="os">Closest to what you have now</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+          <div class="srch"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Search all 214 exercises…</div>
+          <div style="height:11px"></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">Three reasoned suggestions, then <b>the whole library underneath</b>. That last row is what stops the assistant feeling like it is deciding for you — a picker offering only three options is a decision wearing a choice's clothes. Every suggestion carries its *why* on the subtitle line, so the ranking is arguable rather than magic.</p>
+  </div>
+
+  <!-- F7 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F7</span><span class="mock-name">Confirm, in the thread</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div style="display:flex;justify-content:flex-end"><div class="bub me tap">Romanian Deadlift <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div></div>
+        <div class="bub ai" style="max-width:100%">I've dropped the working percentage — the RDL is a different lift and 80% would be a wall.</div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg><span class="k">Confirm change · Lower</span></div>
+          <div class="dr"><div class="db"><div class="dn">Exercise</div><div class="dv"><span class="strike">Deadlift</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">Romanian Deadlift</span></div></div><div class="sw"></div></div>
+          <div class="dr"><div class="db"><div class="dn">Working %</div><div class="dv num"><span class="strike">80%</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">65%</span></div></div><div class="sw"></div></div>
+          <div class="dr"><div class="db"><div class="dn">Sets × reps</div><div class="dv num"><span class="strike">4 × 5</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">3 × 8</span></div></div><div class="sw"></div></div>
+          <div style="height:1px;background:rgba(255,255,255,.07);margin:2px 0"></div>
+          <div class="rip" style="padding-top:9px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" style="margin-top:2px;flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>Weekly <b>lower-back</b> sets <b class="num">11 → 4</b></span></div>
+          <div class="rip" style="padding-bottom:10px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2" style="margin-top:2px;flex:none"><circle cx="12" cy="12" r="9"/><path d="M12 8v4l3 2"/></svg><span>Your <b>140&nbsp;kg PR</b> is kept, stops progressing</span></div>
+          <div class="btnrow" style="padding-top:2px"><div class="btn gho">Cancel</div><div class="btn acc" style="flex:1.5">Apply</div></div>
+        </div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">Round 1's review screen, folded into the thread as the last widget instead of a pushed page — the flow never leaves the conversation. Everything survives the move: per-row switches, the consequence list, the amber flag on losing seven lower-back sets a week. <b>Tier 3 changes still push a full screen</b> (phase edits, deload); tier 1 and 2 confirm inline like this.</p>
+  </div>
+
+  <!-- F8 -->
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">F8</span><span class="mock-name">Specific ask skips the ladder</span></div>
+    <div class="canvas"><div class="phone">
+      <div class="status"><span>9:41</span><span>▮▮▮ 87%</span></div>
+      <div class="hdr"><div class="navbtn"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#9aa5b8" stroke-width="2" stroke-linecap="round"><path d="M15 18l-6-6 6-6"/></svg></div><div style="flex:1"><div class="ttl">AI Coach</div></div></div>
+      <div class="pad thread">
+        <div class="bub me">swap my deadlifts for RDLs</div>
+        <div class="bub ai" style="max-width:100%">Deadlift is only in Lower, so no ambiguity there. Here's the change.</div>
+        <div class="wg">
+          <div class="wg-h"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#d8b4fe" stroke-width="2.4" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg><span class="k">Confirm change · Lower</span></div>
+          <div class="dr"><div class="db"><div class="dn">Exercise</div><div class="dv"><span class="strike">Deadlift</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">Romanian Deadlift</span></div></div><div class="sw"></div></div>
+          <div class="dr"><div class="db"><div class="dn">Working %</div><div class="dv num"><span class="strike">80%</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">65%</span></div></div><div class="sw"></div></div>
+          <div class="btnrow"><div class="btn gho">Cancel</div><div class="btn acc" style="flex:1.5">Apply</div></div>
+        </div>
+        <div class="bub ai" style="max-width:100%">If you'd rather keep some heavy hinging, trap bar is the middle ground — say the word.</div>
+      </div>
+      <div class="composer"><div class="box">Message…</div><div class="send"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.2" stroke-linecap="round"><path d="M22 2L11 13M22 2l-7 20-4-9-9-4z"/></svg></div></div>
+    </div></div>
+    <p class="mock-note">The same intent, said precisely, and it renders <b>one widget instead of four</b>. Widgets exist to resolve ambiguity — where there is none, showing a picker is friction pretending to be helpfulness. It states why it skipped ("only in Lower") so the leap is auditable, and it offers the alternative in prose rather than another control. <em>This frame is the test</em>: if the built version still walks F2→F7 here, the feature became a menu system.</p>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════ §2 WIDGET CATALOGUE ═══════════════════════ -->
+<div class="sec-head"><span class="sec-num">§2</span><h2>The widget vocabulary</h2><p>Eight components the model can render. Each is a tool call with typed arguments — this list is the actual build spec.</p></div>
+
+<div class="prose">
+<p>The model does not emit markup. It calls a tool with a typed payload and the client renders a known component — the same discipline CLAUDE.md already requires of structured AI output. That means <b>the widget set is closed and reviewable</b>: an assistant that could invent arbitrary UI could also invent an Apply button that lies about what it does.</p>
+<p>Every widget resolves to a value, and every widget's value can also be produced by typing. If you cannot describe a widget's output as a sentence the user could have said, it does not belong in the vocabulary.</p>
+</div>
+
+<table>
+<tr><th>Widget</th><th>Renders</th><th>Resolves to</th><th>Used in</th></tr>
+<tr><td>ChoiceList</td><td>Rows with title, subtitle, optional icon</td><td>One id</td><td>Pick a session, exercise, phase, day</td></tr>
+<tr><td>VerbChips</td><td>2–5 short actions</td><td>One verb</td><td>Swap / adjust / remove / reorder</td></tr>
+<tr><td>SearchPicker</td><td>Suggested rows + search over a catalogue</td><td>One id</td><td>Exercise library, food items</td></tr>
+<tr><td>NumberDial</td><td>Value + detented track + delta from current</td><td>One number</td><td>Calories, %1RM, sets, rest — reuses <code>weight-dial</code></td></tr>
+<tr><td>MultiSelect</td><td>Rows with checkboxes and a count</td><td>Ids</td><td>Which days, which muscles, which exercises to drop</td></tr>
+<tr><td>ChangePreview</td><td>Per-field diff, switches, consequence list</td><td>Applied patch</td><td>Every write, without exception</td></tr>
+<tr><td>DataCard</td><td>Table, chart or ranked list</td><td>Nothing — it is output</td><td>Research answers, analysis answers</td></tr>
+<tr><td>Receipt</td><td>What was applied, with undo</td><td>Nothing</td><td>After any apply</td></tr>
+</table>
+
+<div class="gallery tight">
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W1</span><span class="mock-name">ChoiceList</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg">
+        <div class="wg-h"><span class="k">Your sessions</span><span class="cnt">3</span></div>
+        <div class="opt"><div class="ob"><div class="on">Upper</div><div class="os">Mon &amp; Fri · 6 exercises</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div class="opt"><div class="ob"><div class="on">Lower</div><div class="os">Wed · 5 exercises</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div class="opt"><div class="ob"><div class="on">Full Body</div><div class="os">Sat · 7 exercises</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+      </div>
+    </div></div>
+    <p class="mock-note">The workhorse. 56dp rows, subtitle carries whatever makes the options distinguishable. <b>Caps at six visible rows then scrolls inside itself</b> — a twelve-row widget pushes the composer off-screen and breaks the conversation feel.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W2</span><span class="mock-name">VerbChips</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg">
+        <div class="wg-h"><span class="k">What do you want to do?</span></div>
+        <div class="chiprow">
+          <span class="chipbtn acc">Swap it</span><span class="chipbtn">Sets &amp; reps</span><span class="chipbtn">Remove</span><span class="chipbtn">Reorder</span>
+        </div>
+      </div>
+    </div></div>
+    <p class="mock-note">For short mutually-exclusive verbs, where 56dp rows would be absurd. One chip may be tinted as recommended — <b>a steer, never a default that fires on its own</b>. Above five chips this should be a ChoiceList instead.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W3</span><span class="mock-name">SearchPicker</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg">
+        <div class="wg-h"><span class="k">Suggested</span></div>
+        <div class="opt"><div class="ob"><div class="on">Romanian Deadlift</div><div class="os">Same hinge, far less spinal load</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div class="opt"><div class="ob"><div class="on">Hip Thrust</div><div class="os">Glute-dominant, easiest on the back</div></div><svg class="oc" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2"><path d="M9 18l6-6-6-6"/></svg></div>
+        <div class="srch"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4.3-4.3"/></svg>Search all 214 exercises…</div>
+        <div style="height:11px"></div>
+      </div>
+    </div></div>
+    <p class="mock-note">A ChoiceList that admits it is a shortlist. The search row is <b>not optional</b> — it is what keeps a ranked suggestion from functioning as a decision. Every suggestion carries its reason on the subtitle.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W4</span><span class="mock-name">NumberDial</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg">
+        <div class="wg-h"><span class="k">Daily calories</span></div>
+        <div class="dial">
+          <div class="v">2,340</div><div class="u">kcal per day</div>
+          <div class="track"><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i></div>
+          <div class="delta">−200 from your current 2,540</div>
+        </div>
+        <div class="btnrow"><div class="btn gho">Cancel</div><div class="btn acc" style="flex:1.5">Set target</div></div>
+      </div>
+    </div></div>
+    <p class="mock-note">Reuses the existing <code>weight-dial</code> rather than a new control. The delta line is the whole point: <b>a number is meaningless without the one it replaces</b>. For tier-1 values like this, the dial and the confirmation are the same widget — no separate ChangePreview.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W5</span><span class="mock-name">MultiSelect</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg">
+        <div class="wg-h"><span class="k">Which days can you train?</span><span class="cnt">4 picked</span></div>
+        <div class="opt sel"><div class="ob"><div class="on">Monday</div></div><svg class="oc" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2.6" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="opt"><div class="ob"><div class="on">Tuesday</div></div><span class="oc" style="width:19px;height:19px;border-radius:6px;border:1.5px solid rgba(255,255,255,.18);display:block"></span></div>
+        <div class="opt sel"><div class="ob"><div class="on">Wednesday</div></div><svg class="oc" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2.6" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="opt sel"><div class="ob"><div class="on">Friday</div></div><svg class="oc" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2.6" stroke-linecap="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+        <div class="btnrow" style="padding-top:8px"><div class="btn acc">Continue with 4</div></div>
+      </div>
+    </div></div>
+    <p class="mock-note">The one widget that <b>needs an explicit submit</b> — with single-select the tap is the answer, but multi-select has no natural moment of completion. Button counts as you go so the state is never ambiguous.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W6</span><span class="mock-name">ChangePreview</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg">
+        <div class="wg-h"><span class="k">Confirm change · Lower</span></div>
+        <div class="dr"><div class="db"><div class="dn">Exercise</div><div class="dv"><span class="strike">Deadlift</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">Romanian Deadlift</span></div></div><div class="sw"></div></div>
+        <div class="dr"><div class="db"><div class="dn">Working %</div><div class="dv num"><span class="strike">80%</span> <span class="mut">→</span> <span style="color:#fff;font-weight:600">65%</span></div></div><div class="sw"></div></div>
+        <div class="rip" style="padding-top:9px"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fbbf24" stroke-width="2.2" style="margin-top:2px;flex:none"><path d="M12 9v4M12 17h.01M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>Weekly <b>lower-back</b> sets <b class="num">11 → 4</b></span></div>
+        <div class="btnrow"><div class="btn gho">Cancel</div><div class="btn acc" style="flex:1.5">Apply</div></div>
+      </div>
+    </div></div>
+    <p class="mock-note">The only widget that writes, and <b>every write goes through it</b> — no exceptions, no "small enough to skip". Per-field switches, before → after, consequences. Tier 3 renders the same payload as a pushed full screen with hold-to-confirm.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W7</span><span class="mock-name">DataCard</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg plain">
+        <div class="wg-h"><span class="k">Matched on calories</span></div>
+        <div style="padding:12px 13px 4px">
+          <table class="rt">
+            <tr><th>Instead of rice</th><th>kcal</th><th>P</th><th>C</th></tr>
+            <tr><td>Potato 150g</td><td class="num">116</td><td class="num">3</td><td class="num">26</td></tr>
+            <tr><td>Quinoa 100g</td><td class="num">120</td><td class="num">4</td><td class="num">21</td></tr>
+            <tr><td>Lentils 130g</td><td class="num">150</td><td class="num up">12</td><td class="num">26</td></tr>
+          </table>
+        </div>
+      </div>
+    </div></div>
+    <p class="mock-note">Output rather than input, so it takes the <b>neutral frame</b> — the purple wash is reserved for widgets that want something from you. That colour split is the fastest way to tell "this is an answer" from "this needs a tap" while scrolling.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id w">W8</span><span class="mock-name">Receipt</span></div>
+    <div class="canvas"><div class="wframe">
+      <div class="wg plain" style="border-color:rgba(52,211,153,.25);background:linear-gradient(180deg,rgba(52,211,153,.08),rgba(52,211,153,.02))">
+        <div style="display:flex;align-items:center;gap:10px;padding:13px">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" stroke-width="2.6" stroke-linecap="round" style="flex:none"><path d="M20 6L9 17l-5-5"/></svg>
+          <div style="flex:1"><div style="font-size:13px;font-weight:650">Lower updated</div><div class="dim" style="font-size:11.5px">Romanian Deadlift, 3 × 8 @ 65%</div></div>
+          <span class="chipbtn sm" style="min-height:40px">Undo</span>
+        </div>
+      </div>
+    </div></div>
+    <p class="mock-note">Confirmation that it actually happened, plus the undo. <b>Green, not purple</b> — the change is done and nothing here is asking for a tap. Undo stays live for the window decided in §4; after that it becomes a plain "changed on 8 Aug" line.</p>
+  </div>
+
+</div>
+
+<!-- ═══════════════════════ §3 THE RULES ═══════════════════════ -->
+<div class="sec-head"><span class="sec-num">§3</span><h2>Three rules that decide whether it feels like a conversation</h2><p>Cheap to get right now, structural to fix later.</p></div>
+
+<div class="prose"><p>The widget catalogue is the easy half. What actually separates "chatting with a coach" from "operating a menu" is what happens to a widget <b>after</b> you have used it, and whether the assistant knows when not to render one at all.</p></div>
+
+<div class="gallery">
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">R1</span><span class="mock-name">Resolved → your own reply <b style="color:#6ee7b7;font-weight:700;margin-left:4px">recommended</b></span></div>
+    <div class="canvas"><div class="wframe" style="width:412px">
+      <div class="thread">
+        <div class="bub ai">Which session?</div>
+        <div style="display:flex;justify-content:flex-end"><div class="bub me tap">Lower <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#0b1119" stroke-width="2.4" stroke-linecap="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg></div></div>
+        <div class="bub ai">Here's what's in it…</div>
+      </div>
+    </div></div>
+    <p class="mock-note">The picker vanishes and your choice becomes a normal user bubble. Scroll back a week later and the thread reads as a plain conversation — <b>the UI was scaffolding, and scaffolding comes down</b>. The undo glyph re-opens the picker, so nothing is lost by collapsing. This is the one I would build.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">R2</span><span class="mock-name">Resolved → stays, dimmed</span></div>
+    <div class="canvas"><div class="wframe" style="width:412px">
+      <div class="thread">
+        <div class="bub ai">Which session?</div>
+        <div class="wg" style="opacity:.55">
+          <div class="wg-h"><span class="k">Your sessions</span></div>
+          <div class="opt dis"><div class="ob"><div class="on">Upper</div><div class="os">Mon &amp; Fri</div></div></div>
+          <div class="opt sel"><div class="ob"><div class="on">Lower</div><div class="os">Wed</div></div><svg class="oc" width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg></div>
+          <div class="opt dis"><div class="ob"><div class="on">Full Body</div><div class="os">Sat</div></div></div>
+        </div>
+        <div class="bub ai">Here's what's in it…</div>
+      </div>
+    </div></div>
+    <p class="mock-note">Keeps the full context of what you were choosing between — genuinely useful once. <em>The problem is cumulative</em>: four widgets deep, the thread is mostly dimmed lists you have finished with, and finding the live control means scrolling past three dead ones. Loses on the fourth turn, which is exactly where your example ends up.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">R3</span><span class="mock-name">Resolved → summary chip</span></div>
+    <div class="canvas"><div class="wframe" style="width:412px">
+      <div class="thread">
+        <div class="bub ai">Which session?</div>
+        <div><span class="resolved"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#6ee7b7" stroke-width="2.6"><path d="M20 6L9 17l-5-5"/></svg>Session: <b>Lower</b><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#5f6a7d" stroke-width="2.2"><path d="M9 18l6-6-6-6"/></svg></span></div>
+        <div class="bub ai">Here's what's in it…</div>
+      </div>
+    </div></div>
+    <p class="mock-note">Compact and re-openable, and the label survives the collapse so you can see what the answer was <i>to</i>. But it reads as a form field with a value, not as something you said — <b>a filled-in slot, not a conversation</b>. Better than R2, still loses to R1 on the one thing you asked for.</p>
+  </div>
+
+  <div class="mock">
+    <div class="mock-head"><span class="mock-id">R4</span><span class="mock-name">Ambiguity, not ceremony</span></div>
+    <div class="canvas"><div class="wframe" style="width:412px">
+      <div class="thread">
+        <div class="bub me">bump my calories a bit</div>
+        <div class="bub ai" style="max-width:100%">How much is "a bit"? Your current target is <span class="num">2,540</span>.</div>
+        <div class="wg">
+          <div class="wg-h"><span class="k">Daily calories</span></div>
+          <div class="dial" style="padding-top:12px">
+            <div class="v">2,690</div><div class="u">kcal per day</div>
+            <div class="track"><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i><i></i><i></i><i class="maj"></i><i></i><i></i></div>
+            <div class="delta">+150 from your current 2,540</div>
+          </div>
+          <div class="btnrow"><div class="btn gho">Cancel</div><div class="btn acc" style="flex:1.5">Set target</div></div>
+        </div>
+      </div>
+    </div></div>
+    <p class="mock-note">The trigger rule, stated positively. <b>A widget appears where the sentence was genuinely under-specified</b> — "a bit" has no number in it, so it hands you a dial rather than guessing 150 or asking you to type. Say "bump my calories to 2700" and it goes straight to the confirmation. Same intent, different precision, different amount of UI.</p>
+  </div>
+
+</div>
+
+<div class="callout">
+<p><b>The stale-widget problem, which only shows up in a real thread.</b> A picker rendered three turns ago is still on screen and still tappable. If you scroll up and tap it, what happens?</p>
+<p>R1 makes this mostly moot — resolved widgets are gone, so the only live one is the newest. But a widget you <i>abandoned</i> (asked something else instead of answering) is still sitting there. The rule I would ship: <b>a widget goes inert the moment a newer turn exists</b>, rendering dimmed with a "no longer current" affordance rather than silently doing something surprising. Same class of bug as the stale-proposal problem from round 1, and it wants the same answer.</p>
+</div>
+
+<!-- ═══════════════════════ §4 ENTRY & NAME ═══════════════════════ -->
+<div class="sec-head"><span class="sec-num">§4</span><h2>Name and entry</h2><p>Both settled, with the reasoning kept so it does not get re-litigated.</p></div>
+
+<div class="prose">
+<p><b>Name: AI Coach.</b> Applied throughout this document. "AI Analysis" was already wrong once analysis became one of several things it does, and every description you gave of the behaviour was a trainer's.</p>
+<p><b>Entry: the Home sparkles button routes to a full page at <code>/coach</code>.</b> You suggested this and it is the right call for three reasons beyond convenience. Widgets need height — the current 78vh sheet leaves roughly 300dp of thread once header and composer are subtracted, and F7's confirmation alone is 260dp. A route gets Android back-button behaviour for free, which matters because a conversation is something you leave and return to. And it gives the thread somewhere to live: a sheet implies disposable, a page implies history.</p>
+<p>The cost, stated honestly: the assistant stops floating over the screen you were on. Today you can open it from the workout screen and keep your place. Mitigation is that the coach can deep-link back — the Receipt widget's "Lower updated" is tappable through to the program editor.</p>
+<p><b>The old overlay does not disappear on day one.</b> It is mounted on four screens (home, session-select, stats, done). Retiring it is a separate change, and the two coexisting briefly is fine — the route is the new front door, the overlay stays until its other entry points are repointed.</p>
+</div>
+
+<!-- ═══════════════════════ §5 OPEN ═══════════════════════ -->
+<div class="sec-head"><span class="sec-num">§5</span><h2>Still open</h2><p>Down to three, and the first is the one I would most like an answer to.</p></div>
+
+<ol class="q">
+<li><b>Does the thread persist between sessions?</b> Widgets change this question. A chat history is nice to have; a history containing <i>applied changes</i> is closer to a record — "when did I swap that lift, and why" is answerable from the thread and nowhere else. Persisting means a table and a scrollback UI. Not persisting means the receipt is the only trace and it disappears on close.</li>
+<li><b>Can it log things — food, a body weight?</b> Carried over unanswered from round 1. Widgets sharpen it, because a food logger is an obvious and satisfying widget. Still inclined to say no for v1, on the grounds that logs are records of the past and the coach's credibility rests on not having touched them.</li>
+<li><b>Undo window on the Receipt.</b> Minutes, a day, or until the next session that uses the changed program? The third is the most meaningful for training changes — undo stops being available once the change has actually affected a workout — and is not much harder than a timestamp.</li>
+</ol>
+
+<div class="sec-head"><span class="sec-num">§6</span><h2>Build order</h2><p>If this is the direction, the first PR is not a widget.</p></div>
+<div class="prose">
+<p><b>1. The widget protocol.</b> One tool per widget, typed args, a client registry that maps a widget name to a component, and the resolved-value round trip back into the conversation. Every mockup above is a renderer for this. Two widgets are enough to prove it — ChoiceList and ChangePreview.</p>
+<p><b>2. ChangePreview and the apply endpoint</b>, with re-validation against current state so a stale patch is refused rather than silently applied to moved ground. This is the piece that carries all the risk, and it is worth building before there are six widgets feeding it.</p>
+<p><b>3. The <code>/coach</code> route</b>, reusing the existing chat's streaming and the fourteen read-only tools it already has. Analysis and research work on day one because those tools already exist — the new surface just renders their output better.</p>
+<p><b>4. The rest of the vocabulary</b>, one widget per write domain, each landing with its ChangePreview shape.</p>
+<p>Round 1's §0 capability map still governs what step 4 is allowed to touch, and its tier column still decides which changes confirm inline and which push a screen.</p>
+</div>
+
+</div>

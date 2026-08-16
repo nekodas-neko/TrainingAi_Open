@@ -1,0 +1,56 @@
+diff --git a/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt b/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
+index 2953566eabb2d3ec1dddfbbffa2d8a3954b4b4b5..5a653ed62912fb7e58b08b5f98b4dfea0e367337 100644
+--- a/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
++++ b/android/src/main/java/com/devmaxime/capacitor/health/connect/RecordConverter.kt
+@@ -8,6 +8,8 @@ import androidx.health.connect.client.records.ExerciseSessionRecord
+ import androidx.health.connect.client.records.StepsRecord
+ import androidx.health.connect.client.records.SleepSessionRecord
+ import androidx.health.connect.client.records.RestingHeartRateRecord
++import androidx.health.connect.client.records.BodyFatRecord
++import androidx.health.connect.client.records.NutritionRecord
+ import androidx.health.connect.client.records.ExerciseSegment
+ import androidx.health.connect.client.records.ExerciseLap
+ import androidx.health.connect.client.records.ExerciseRoute
+@@ -96,7 +98,28 @@ fun convertRecordToJson(record: Record): Any {
+             obj.put("metadata", convertMetadataToJson(record.metadata))
+             obj
+         }
+-        // Add additional custom conversions for other record types here if needed.
++        is BodyFatRecord -> {
++            val obj = JSObject()
++            obj.put("time", record.time.toString())
++            obj.put("zoneOffset", record.zoneOffset?.toString() ?: "")
++            obj.put("percentage", record.percentage.value)
++            obj.put("metadata", convertMetadataToJson(record.metadata))
++            obj
++        }
++        is NutritionRecord -> {
++            val obj = JSObject()
++            obj.put("startTime", record.startTime.toString())
++            obj.put("startZoneOffset", record.startZoneOffset?.toString() ?: "")
++            obj.put("endTime", record.endTime.toString())
++            obj.put("endZoneOffset", record.endZoneOffset?.toString() ?: "")
++            obj.put("name", record.name ?: "")
++            record.energy?.let              { obj.put("calories", it.inKilocalories) }
++            record.protein?.let             { obj.put("proteinG",  it.inGrams) }
++            record.totalCarbohydrate?.let   { obj.put("carbsG",    it.inGrams) }
++            record.totalFat?.let            { obj.put("fatG",      it.inGrams) }
++            obj.put("metadata", convertMetadataToJson(record.metadata))
++            obj
++        }
+         else -> record.toString()
+     }
+ }
+diff --git a/dist/esm/definitions.d.ts b/dist/esm/definitions.d.ts
+index d0960a9ddc422de7191092996aadd41e5caed96f..7b2e02c24e076db5a102ace5dee517b104a0a068 100644
+--- a/dist/esm/definitions.d.ts
++++ b/dist/esm/definitions.d.ts
+@@ -37,7 +37,7 @@ export interface HealthConnectPlugin {
+     }): Promise<AggregateResponse>;
+ }
+ export declare type HealthConnectAvailability = 'Available' | 'NotSupported' | 'NotInstalled';
+-export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate';
++export declare type RecordType = 'Steps' | 'Weight' | 'ActivitySession' | 'SleepSession' | 'RestingHeartRate' | 'BodyFat' | 'Nutrition' | 'HeartRateVariabilitySdnn' | 'OxygenSaturation';
+ export declare type AggregateRecordType = 'Steps' | 'Distance' | 'TotalCaloriesBurned' | 'ActiveCaloriesBurned' | 'HeartRate';
+ export declare type AggregateGroupBy = 'day' | 'hour' | 'week' | 'month';
+ /**

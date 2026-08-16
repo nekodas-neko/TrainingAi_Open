@@ -1,0 +1,28 @@
+# Dependabot configuration.
+#
+# Purpose here is narrow: batch security fixes so a burst of vulnerability alerts
+# becomes ONE grouped PR instead of N separate ones. Proactive version-update PRs
+# are deliberately OFF (open-pull-requests-limit: 0) to avoid weekly dependency
+# churn — raise the limit to ~5 later if you want Dependabot to also keep deps
+# fresh (which reduces future alert inflow).
+#
+# Dependabot security updates themselves are toggled in the repo's
+# Settings -> Code security -> Dependabot (not in this file); this file only
+# controls how the resulting PRs are grouped and scheduled.
+version: 2
+updates:
+  - package-ecosystem: "npm" # also covers the pnpm-lock.yaml lockfile
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+    open-pull-requests-limit: 0 # version updates off; security updates are unaffected by this limit
+    commit-message:
+      prefix: "chore(deps)"
+      prefix-development: "chore(dev-deps)"
+    groups:
+      # Collapse all outstanding security fixes into a single PR per run.
+      security-fixes:
+        applies-to: security-updates
+        patterns:
+          - "*"

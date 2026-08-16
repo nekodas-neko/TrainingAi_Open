@@ -1,0 +1,431 @@
+<title>Score Row — Round 3, Minimal</title>
+<style>
+/* Deliberately single-theme: this page depicts a dark app screen, so every surface
+   is painted explicitly and no theme stamps are honoured. */
+:root{
+  --ground:#080b12;
+  --ground-2:#0c111b;
+  --surface:#111827;
+  --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075);
+  --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8;
+  --ink-2:#9aa5b8;
+  --ink-3:#5f6a7d;
+  --chrome:#38bdf8;
+  --readiness:#60a5fa;
+  --hr:#f87171;
+  --sleep:#a78bfa;
+  --activity:#f97316;
+  --band-high:#22c55e;
+  --band-mod:#f59e0b;
+  --band-low:#ef4444;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--app);
+  line-height:1.55;
+  font-size:15px;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 96px}
+
+/* ---------- masthead ---------- */
+header.mast{
+  padding:56px 0 28px;
+  border-bottom:1px solid var(--hair);
+  margin-bottom:36px;
+}
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--chrome);
+  margin:0 0 14px;
+}
+h1{
+  margin:0 0 16px;
+  font-size:clamp(30px,5.2vw,50px);
+  line-height:1.02;
+  letter-spacing:-.035em;
+  font-weight:800;
+  text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:64ch;color:var(--ink-2);font-size:16px}
+
+.constraint{
+  margin:26px 0 0;
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+.constraint span{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+  padding:6px 11px;border-radius:999px;
+  border:1px solid var(--hair-2);color:var(--ink-2);
+  background:var(--surface);
+}
+.constraint span b{color:var(--ink);font-weight:600}
+
+/* ---------- section ---------- */
+section{margin:0 0 20px;scroll-margin-top:20px}
+.sec-head{
+  display:flex;align-items:baseline;gap:14px;
+  padding:38px 0 18px;
+  border-top:1px solid var(--hair);
+  margin-top:36px;
+}
+.sec-head:first-child{border-top:0;margin-top:0}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+
+/* ---------- gallery ---------- */
+.gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:18px;
+}
+.mock{
+  border:1px solid var(--hair);
+  border-radius:16px;
+  background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.mock-head{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 15px 11px;
+  border-bottom:1px solid var(--hair);
+}
+.mock-id{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  color:var(--ground);background:var(--chrome);
+  padding:2px 6px;border-radius:5px;font-weight:700;
+}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{
+  padding:0 15px 13px;margin:11px 0 0;
+  color:var(--ink-2);font-size:12.5px;line-height:1.5;
+}
+.mock-note b{color:var(--ink);font-weight:600}
+/* the phone-truthful canvas: 412dp wide with the app's mx-4 gutters */
+.canvas{
+  background:
+    radial-gradient(120% 80% at 18% 0%,rgba(59,90,160,.28),transparent 62%),
+    radial-gradient(90% 70% at 88% 12%,rgba(120,70,170,.16),transparent 60%),
+    #05070d;
+  padding:22px 0;
+  display:flex;justify-content:center;
+  border-bottom:1px solid var(--hair);
+}
+.phone{width:412px;padding:0 16px;transform-origin:top center}
+@media(max-width:420px){.phone{transform:scale(.82)}.canvas{padding:16px 0}}
+
+/* ---------- shared cell primitives (mirroring the real component) ---------- */
+.strip.wide{gap:20px}
+.strip{display:flex;justify-content:space-between;gap:8px}
+.strip.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strip.stack{flex-direction:column;gap:8px}
+.cell{
+  flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.cell:focus-visible{outline:2px solid var(--chrome);outline-offset:3px;border-radius:12px}
+.dial{position:relative;width:100%;aspect-ratio:1;max-width:96px}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.num{font-weight:900;line-height:1;letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:#fff}
+.cap{font-size:11px;line-height:1;color:#9aa5b8}
+.ico{display:block}
+
+/* tiles */
+.tile{
+  flex:1;min-width:0;border-radius:16px;padding:11px 12px 12px;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+  display:flex;flex-direction:column;gap:7px;text-align:left;
+  color:inherit;font:inherit;cursor:pointer;
+}
+.tile-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+
+/* legend / meta */
+.legend{
+  display:flex;flex-wrap:wrap;gap:8px;padding:12px 15px;
+  border-top:1px solid var(--hair);
+}
+.tag{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+  padding:3px 8px;border-radius:6px;border:1px solid var(--hair-2);color:var(--ink-2);
+}
+.tag.live{border-color:rgba(56,189,248,.5);color:var(--chrome)}
+.tag.data{border-color:rgba(34,197,94,.45);color:#4ade80}
+.tag.risk{border-color:rgba(239,68,68,.45);color:#fca5a5}
+
+/* notes block */
+.callout{
+  border:1px solid var(--hair);border-left:3px solid var(--chrome);
+  background:var(--surface);border-radius:0 12px 12px 0;
+  padding:16px 18px;margin:22px 0 0;
+}
+.callout h3{margin:0 0 8px;font-size:14px;letter-spacing:-.01em}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+td b{font-weight:650}
+.tablewrap{overflow-x:auto}
+
+@media(prefers-reduced-motion:no-preference){
+  .cell,.tile{transition:transform .12s ease}
+  .cell:active,.tile:active{transform:scale(.95)}
+}
+
+/* round-2 additions */
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:6px}
+.pick{border:1px solid rgba(56,189,248,.3);background:rgba(56,189,248,.06);border-radius:12px;padding:11px 13px}
+.pick b{display:block;font-size:13.5px;margin-bottom:2px}
+.pick span{font-size:11.5px;color:var(--ink-2)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:20px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+</style>
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Home screen · score row · round three</p>
+  <h1>Minimal, meaning less <em>— not softer.</em></h1>
+  <p class="lede">Round two answered "what you liked" with atmosphere: glow, glass, blobs, rim
+  light. That was the wrong read. Adding light is still adding. Everything below works the other
+  way &mdash; the only moves are <b>type, alignment, hierarchy, spacing, and deletion</b>. No
+  glow, no fills, no arcs, no bars. Four of them have no decoration at all and are held together
+  purely by where things sit.</p>
+
+  <div class="read">
+    <div><h4>No fill of any kind</h4><p>You're right that a bar makes no sense for heart rate
+    &mdash; 52&nbsp;bpm isn't 52% of anything, and faking a denominator for it would have been the
+    one dishonest thing in the set. Nothing here fills, fractions, or ranks.</p></div>
+    <div><h4>The icon is the only colour</h4><p>In most of these it is also the only non-text
+    element on screen. That's the constraint doing real work: strip everything else and the glyph
+    stops being a badge and becomes punctuation.</p></div>
+    <div><h4>Whitespace counts as a design</h4><p>L5 and M4 change nothing but the gaps and the
+    rules. They're in here because at this level of restraint, spacing <i>is</i> the decision.</p></div>
+  </div>
+</header>
+
+<div class="sec-head" style="border-top:0;margin-top:0;padding-top:26px">
+  <span class="sec-num">✓</span>
+  <h2>Added since last round</h2>
+  <p>Both live in Settings → More → Home widgets → Score Card Style now.</p>
+</div>
+<div class="picks">
+  <div class="pick"><b>Overlap</b><span>F4 — the glyph breaks the numerals' edge. Frameless.</span></div>
+  <div class="pick"><b>Duotone rail</b><span>F2 × H4 — the rail bar, each glyph doubled large-faint and small-solid.</span></div>
+</div>
+
+<div id="app"></div>
+
+<div class="callout">
+  <h3>If you want one recommendation</h3>
+  <p><b>K2 Baseline</b> is the one I'd build. It is the only design in three rounds where the four
+  cells stop being four separate objects &mdash; a single horizontal line runs across the row and
+  the icons hang off it as marks. It deletes the most (no frame, no fill, no container, no
+  decoration), it survives the Samsung compositor with nothing to composite, and it's the shortest
+  non-compact option at ~86dp.</p>
+  <p>The honest counter-argument: it puts four unrelated numbers on one visual line, which implies
+  they're comparable. They aren't &mdash; 52&nbsp;bpm and 90 sleep have nothing to do with each
+  other. <b>M4 Divider</b> is the same restraint with that problem fixed, at the cost of three
+  hairlines.</p>
+</div>
+
+</div>
+
+<script>
+const ICONS = {
+  zap:   ['M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'],
+  heart: ['M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5','M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27'],
+  moon:  ['M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401'],
+  flame: ['M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z']
+};
+
+const M = [
+  {label:'Readiness',  short:'Ready', value:76, accent:'#60a5fa', icon:'zap'},
+  {label:'Heart Rate', short:'HR',    value:52, accent:'#f87171', icon:'heart'},
+  {label:'Sleep',      short:'Sleep', value:90, accent:'#a78bfa', icon:'moon'},
+  {label:'Activity',   short:'Move',  value:76, accent:'#f97316', icon:'flame'}
+];
+
+function icon(name, px, color, sw, op){
+  return `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="${color}"
+    stroke-width="${sw||2.2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    style="display:block;flex:none${op!=null?';opacity:'+op:''}">${ICONS[name].map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+}
+const aria = m => `aria-label="${m.label}: ${m.value}"`;
+/* One shared number style so the family differences are the *variables* being tested, not
+   incidental drift between mockups. */
+const N = (size, extra) => `font-variant-numeric:tabular-nums;line-height:1;color:#fff;font-size:${size};${extra||''}`;
+const CAP = 'font-size:11px;line-height:1;color:#8b94a7';
+
+const V = [];
+const add = (id,name,note,render,rowClass) => V.push({id,name,note,render,rowClass});
+
+/* ================= J · TYPE-LED ================= */
+
+add('J1','Display','The number at 3rem &mdash; a third bigger than today &mdash; with the icon dropped to 12px above it. The glyph stops competing and becomes punctuation, which is the only way a number this size doesn\'t look like it\'s shouting.',
+ m => `<button class="cell" style="gap:7px;padding:10px 0 4px" ${aria(m)}>
+    ${icon(m.icon,12,m.accent,2.6)}
+    <span style="${N('3rem','font-weight:800;letter-spacing:-.05em')}">${m.value}</span>
+    <span style="${CAP}">${m.label}</span></button>`);
+
+add('J2','Shoulder','The icon rides the top-right shoulder of the number, sized to the digits\' cap height. Nothing is centred against anything &mdash; the pair is one object, and the label hangs off its left edge.',
+ m => `<button class="cell" style="gap:6px;padding:16px 0 4px" ${aria(m)}>
+    <span style="display:flex;align-items:flex-start;gap:3px">
+      <span style="${N('2.5rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+      <span style="margin-top:3px">${icon(m.icon,13,m.accent,2.6)}</span></span>
+    <span style="${CAP}">${m.label}</span></button>`);
+
+add('J3','Light','The inverse of today: weight 300 instead of black, wider tracking, slightly larger. Thin numerals read as calm rather than urgent &mdash; appropriate for four figures you check, not four you act on.',
+ m => `<button class="cell" style="gap:8px;padding:14px 0 4px" ${aria(m)}>
+    ${icon(m.icon,17,m.accent,1.9)}
+    <span style="${N('2.4rem','font-weight:300;letter-spacing:.01em')}">${m.value}</span>
+    <span style="${CAP};letter-spacing:.04em">${m.label}</span></button>`);
+
+add('J4','Tight','Heavy, negatively tracked, and the label deleted &mdash; the icon is the label. Densest type in the set; the row loses a line and the four numbers become the whole composition.',
+ m => `<button class="cell" style="gap:5px;padding:14px 0 12px" ${aria(m)}>
+    ${icon(m.icon,16,m.accent,2.5)}
+    <span style="${N('2.6rem','font-weight:900;letter-spacing:-.075em')}">${m.value}</span></button>`);
+
+add('J5','Suffix','The label moves inline as a small lowercase word next to the number, so each cell is one horizontal phrase instead of a three-line stack. Shortest names used deliberately &mdash; "Heart Rate" doesn\'t fit and shouldn\'t be made to.',
+ m => `<button class="cell" style="padding:20px 0 16px" ${aria(m)}>
+    <span style="display:flex;align-items:baseline;justify-content:center;gap:3px;width:100%">
+      ${icon(m.icon,11,m.accent,2.7)}
+      <span style="${N('1.7rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+      <span style="font-size:9px;color:#8b94a7">${m.short}</span></span></button>`);
+
+/* ================= K · ALIGNMENT ================= */
+
+add('K1','Flush left','Everything left-aligned within its lane instead of centred. Four hard left edges give the row a vertical structure that four centred stacks never have &mdash; and the ragged right is what makes it read as designed rather than defaulted.',
+ m => `<button class="cell" style="align-items:flex-start;gap:6px;padding:14px 0 4px" ${aria(m)}>
+    ${icon(m.icon,16,m.accent,2.4)}
+    <span style="${N('2.25rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+    <span style="${CAP}">${m.label}</span></button>`);
+
+add('K2','Baseline','One horizontal line runs the width of the row; the numbers sit on it and the icons hang below it. Nothing is boxed, framed or contained &mdash; the alignment is the entire design, and it is the only thing holding the four together.',
+ m => `<button class="cell" style="gap:0;padding:18px 0 4px" ${aria(m)}>
+    <span style="${N('2.35rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+    <span style="height:1px;width:100%;background:rgba(255,255,255,.14);margin:7px 0 8px" aria-hidden></span>
+    ${icon(m.icon,15,m.accent,2.5)}
+    <span style="${CAP};margin-top:6px">${m.label}</span></button>`);
+
+add('K3','Label above','The name on top as a micro uppercase caption, the number beneath it. Reading order matches how you actually scan &mdash; you look for "Sleep" first and read its figure second, not the other way round.',
+ m => `<button class="cell" style="gap:6px;padding:12px 0 4px" ${aria(m)}>
+    <span style="font-size:9px;letter-spacing:.14em;text-transform:uppercase;color:#7d879a">${m.label}</span>
+    ${icon(m.icon,15,m.accent,2.5)}
+    <span style="${N('2.3rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span></button>`);
+
+add('K4','Footnote','The icon moves below the number, small, sitting beside the label like a footnote mark. Puts the figure at the top of the cell where the eye lands first, with everything identifying it demoted underneath.',
+ m => `<button class="cell" style="gap:7px;padding:18px 0 4px" ${aria(m)}>
+    <span style="${N('2.4rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+    <span style="display:flex;align-items:center;gap:4px">
+      ${icon(m.icon,12,m.accent,2.6)}<span style="${CAP}">${m.label}</span></span></button>`);
+
+/* ================= L · REDUCTION ================= */
+
+add('L1','No label','Labels deleted outright. A moon means sleep and a flame means activity &mdash; you have looked at these four for a year and the words have stopped being read. Saves a line; costs nothing but the first day.',
+ m => `<button class="cell" style="gap:7px;padding:20px 0 18px" ${aria(m)}>
+    ${icon(m.icon,20,m.accent,2.3)}
+    <span style="${N('2.3rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span></button>`);
+
+add('L2','Colour mark','The icon at 10px, inline, doing nothing but carrying the metric\'s colour next to its number. The smallest role the glyph can have while still being present &mdash; the row becomes four numbers with four coloured marks.',
+ m => `<button class="cell" style="padding:22px 0 20px" ${aria(m)}>
+    <span style="display:flex;align-items:center;justify-content:center;gap:5px">
+      ${icon(m.icon,10,m.accent,2.8)}
+      <span style="${N('2.2rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span></span></button>`);
+
+add('L3','Mono','Monospaced, medium weight, smaller, evenly spaced. Numerals that look measured rather than headlined &mdash; the row reads as an instrument panel without a single instrument being drawn.',
+ m => `<button class="cell" style="gap:8px;padding:16px 0 4px" ${aria(m)}>
+    ${icon(m.icon,15,m.accent,2.2)}
+    <span style="${N('1.85rem','font-weight:600;font-family:var(--mono);letter-spacing:-.02em')}">${m.value}</span>
+    <span style="${CAP};font-family:var(--mono);font-size:10px">${m.label}</span></button>`);
+
+add('L4','Quiet','The number dropped to 72% white and the icon left at full strength, so the glyph is the brightest thing in the cell. Pulls the row back from the foreground &mdash; useful given it sits above the card you actually act on.',
+ m => `<button class="cell" style="gap:7px;padding:14px 0 4px" ${aria(m)}>
+    ${icon(m.icon,18,m.accent,2.3)}
+    <span style="${N('2.3rem','font-weight:700;letter-spacing:-.04em;color:rgba(255,255,255,.72)')}">${m.value}</span>
+    <span style="${CAP};color:#6b7688">${m.label}</span></button>`);
+
+add('L5','Wide','Identical elements to Bare, everything shrunk, gaps doubled, side margins widened. Nothing added and nothing removed &mdash; only the spacing changed, which at this level of restraint is the whole design.',
+ m => `<button class="cell" style="gap:9px;padding:18px 0 4px" ${aria(m)}>
+    ${icon(m.icon,15,m.accent,2.3)}
+    <span style="${N('1.95rem','font-weight:800;letter-spacing:-.04em')}">${m.value}</span>
+    <span style="${CAP};font-size:10px">${m.label}</span></button>`, 'wide');
+
+/* ================= M · MARKS ================= */
+
+add('M1','Dot','A 3px dot of the identity colour under the number &mdash; the smallest mark that can exist. Present enough to give the cell a bottom edge, small enough that four of them read as punctuation rather than as status lights.',
+ m => `<button class="cell" style="gap:7px;padding:14px 0 4px" ${aria(m)}>
+    ${icon(m.icon,17,m.accent,2.3)}
+    <span style="${N('2.25rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+    <span style="width:3px;height:3px;border-radius:99px;background:${m.accent};margin-top:2px" aria-hidden></span>
+    <span style="${CAP};margin-top:4px">${m.label}</span></button>`);
+
+add('M2','Rule','A neutral hairline under each cell, lane width. Gives the row a floor without giving any cell a box &mdash; the least a framing device can do while still being a framing device.',
+ m => `<button class="cell" style="gap:7px;padding:14px 0 0" ${aria(m)}>
+    ${icon(m.icon,17,m.accent,2.3)}
+    <span style="${N('2.25rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+    <span style="${CAP};margin-top:1px">${m.label}</span>
+    <span style="width:100%;height:1px;background:rgba(255,255,255,.13);margin-top:9px" aria-hidden></span></button>`);
+
+add('M3','Accent rule','The same hairline in the identity colour. One extra place the metric\'s colour appears, at the cost of the row picking up four coloured lines &mdash; worth seeing next to M2 to judge whether that is one colour too many.',
+ m => `<button class="cell" style="gap:7px;padding:14px 0 0" ${aria(m)}>
+    ${icon(m.icon,17,m.accent,2.3)}
+    <span style="${N('2.25rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+    <span style="${CAP};margin-top:1px">${m.label}</span>
+    <span style="width:100%;height:1.5px;background:${m.accent};opacity:.8;margin-top:9px" aria-hidden></span></button>`);
+
+add('M4','Divider','Three vertical hairlines between the four lanes and nothing else &mdash; no frame, no container, no fill. Separates the metrics so they don\'t read as comparable, which is the one thing a bare row genuinely gets wrong.',
+ null, 'custom-divider');
+
+const ROWS = {
+  'custom-divider': () => `<div style="display:flex">
+    ${M.map((m,i)=>`<button class="cell" style="gap:7px;padding:12px 0 4px;${i?'border-left:1px solid rgba(255,255,255,.1)':''}" ${aria(m)}>
+      ${icon(m.icon,17,m.accent,2.3)}
+      <span style="${N('2.2rem','font-weight:800;letter-spacing:-.045em')}">${m.value}</span>
+      <span style="${CAP}">${m.label}</span></button>`).join('')}</div>`
+};
+
+const SECTIONS = [
+  {n:'J', title:'Type-led', blurb:'The number is the design; the glyph becomes punctuation.', ids:/^J/},
+  {n:'K', title:'Alignment', blurb:'Nothing added — only where things sit relative to each other.', ids:/^K/},
+  {n:'L', title:'Reduction', blurb:'Each one deletes something: the label, the icon\'s size, the contrast, the density.', ids:/^L/},
+  {n:'M', title:'Marks', blurb:'The smallest framing devices that still count as a decision.', ids:/^M/}
+];
+
+function mockHTML(v){
+  const row = v.rowClass && ROWS[v.rowClass] ? ROWS[v.rowClass]()
+    : `<div class="strip ${v.rowClass === 'wide' ? 'wide' : ''}">${M.map(v.render).join('')}</div>`;
+  return `<article class="mock">
+    <div class="mock-head"><span class="mock-id">${v.id}</span><span class="mock-name">${v.name}</span></div>
+    <div class="canvas"><div class="phone"${v.rowClass==='wide'?' style="padding:0 30px"':''}>${row}</div></div>
+    <p class="mock-note">${v.note}</p>
+  </article>`;
+}
+
+document.getElementById('app').innerHTML = SECTIONS.map(s=>`
+  <section>
+    <div class="sec-head"><span class="sec-num">${s.n}</span><h2>${s.title}</h2><p>${s.blurb}</p></div>
+    <div class="gallery">${V.filter(v=>s.ids.test(v.id)).map(mockHTML).join('')}</div>
+  </section>`).join('');
+
+</script>

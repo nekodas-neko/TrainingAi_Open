@@ -1,0 +1,5 @@
+[phases.install]
+cacheDirectories = ["/root/.local/share/pnpm/store", "node_modules"]
+
+[phases.build]
+cacheDirectories = [".next/cache"]

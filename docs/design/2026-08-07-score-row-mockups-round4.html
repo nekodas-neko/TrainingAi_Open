@@ -1,0 +1,441 @@
+<title>Score Row — Round 4, Hierarchy</title>
+<style>
+/* Deliberately single-theme: this page depicts a dark app screen, so every surface
+   is painted explicitly and no theme stamps are honoured. */
+:root{
+  --ground:#080b12;
+  --ground-2:#0c111b;
+  --surface:#111827;
+  --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075);
+  --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8;
+  --ink-2:#9aa5b8;
+  --ink-3:#5f6a7d;
+  --chrome:#38bdf8;
+  --readiness:#60a5fa;
+  --hr:#f87171;
+  --sleep:#a78bfa;
+  --activity:#f97316;
+  --band-high:#22c55e;
+  --band-mod:#f59e0b;
+  --band-low:#ef4444;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{
+  margin:0;
+  background:var(--ground);
+  color:var(--ink);
+  font-family:var(--app);
+  line-height:1.55;
+  font-size:15px;
+}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 96px}
+
+/* ---------- masthead ---------- */
+header.mast{
+  padding:56px 0 28px;
+  border-bottom:1px solid var(--hair);
+  margin-bottom:36px;
+}
+.eyebrow{
+  font-family:var(--mono);
+  font-size:11px;
+  letter-spacing:.22em;
+  text-transform:uppercase;
+  color:var(--chrome);
+  margin:0 0 14px;
+}
+h1{
+  margin:0 0 16px;
+  font-size:clamp(30px,5.2vw,50px);
+  line-height:1.02;
+  letter-spacing:-.035em;
+  font-weight:800;
+  text-wrap:balance;
+}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:64ch;color:var(--ink-2);font-size:16px}
+
+.constraint{
+  margin:26px 0 0;
+  display:flex;flex-wrap:wrap;gap:10px;
+}
+.constraint span{
+  font-family:var(--mono);font-size:11.5px;letter-spacing:.04em;
+  padding:6px 11px;border-radius:999px;
+  border:1px solid var(--hair-2);color:var(--ink-2);
+  background:var(--surface);
+}
+.constraint span b{color:var(--ink);font-weight:600}
+
+/* ---------- section ---------- */
+section{margin:0 0 20px;scroll-margin-top:20px}
+.sec-head{
+  display:flex;align-items:baseline;gap:14px;
+  padding:38px 0 18px;
+  border-top:1px solid var(--hair);
+  margin-top:36px;
+}
+.sec-head:first-child{border-top:0;margin-top:0}
+.sec-num{font-family:var(--mono);font-size:12px;color:var(--chrome);letter-spacing:.1em}
+.sec-head h2{margin:0;font-size:21px;letter-spacing:-.015em;font-weight:700}
+.sec-head p{margin:0;color:var(--ink-3);font-size:13.5px;flex:1;min-width:200px}
+
+/* ---------- gallery ---------- */
+.gallery{
+  display:grid;
+  grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
+  gap:18px;
+}
+.mock{
+  border:1px solid var(--hair);
+  border-radius:16px;
+  background:linear-gradient(180deg,var(--surface-2),var(--surface));
+  overflow:hidden;
+  display:flex;flex-direction:column;
+}
+.mock-head{
+  display:flex;align-items:center;gap:9px;
+  padding:13px 15px 11px;
+  border-bottom:1px solid var(--hair);
+}
+.mock-id{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;
+  color:var(--ground);background:var(--chrome);
+  padding:2px 6px;border-radius:5px;font-weight:700;
+}
+.mock-name{font-size:14px;font-weight:650;letter-spacing:-.01em}
+.mock-note{
+  padding:0 15px 13px;margin:11px 0 0;
+  color:var(--ink-2);font-size:12.5px;line-height:1.5;
+}
+.mock-note b{color:var(--ink);font-weight:600}
+/* the phone-truthful canvas: 412dp wide with the app's mx-4 gutters */
+.canvas{
+  background:
+    radial-gradient(120% 80% at 18% 0%,rgba(59,90,160,.28),transparent 62%),
+    radial-gradient(90% 70% at 88% 12%,rgba(120,70,170,.16),transparent 60%),
+    #05070d;
+  padding:22px 0;
+  display:flex;justify-content:center;
+  border-bottom:1px solid var(--hair);
+}
+.phone{width:412px;padding:0 16px;transform-origin:top center}
+@media(max-width:420px){.phone{transform:scale(.82)}.canvas{padding:16px 0}}
+
+/* ---------- shared cell primitives (mirroring the real component) ---------- */
+.strip{display:flex;justify-content:space-between;gap:8px}
+.strip.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.strip.stack{flex-direction:column;gap:8px}
+.cell{
+  flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;gap:6px;
+  background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer;
+  -webkit-tap-highlight-color:transparent;
+}
+.cell:focus-visible{outline:2px solid var(--chrome);outline-offset:3px;border-radius:12px}
+.dial{position:relative;width:100%;aspect-ratio:1;max-width:96px}
+.dial svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.face{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
+.num{font-weight:900;line-height:1;letter-spacing:-.045em;font-variant-numeric:tabular-nums;color:#fff}
+.cap{font-size:11px;line-height:1;color:#9aa5b8}
+.ico{display:block}
+
+/* tiles */
+.tile{
+  flex:1;min-width:0;border-radius:16px;padding:11px 12px 12px;
+  background:rgba(255,255,255,.035);border:1px solid rgba(255,255,255,.08);
+  display:flex;flex-direction:column;gap:7px;text-align:left;
+  color:inherit;font:inherit;cursor:pointer;
+}
+.tile-row{display:flex;align-items:center;justify-content:space-between;gap:6px}
+.bar{height:4px;border-radius:99px;background:rgba(255,255,255,.1);overflow:hidden}
+.bar i{display:block;height:100%;border-radius:99px}
+
+/* legend / meta */
+.legend{
+  display:flex;flex-wrap:wrap;gap:8px;padding:12px 15px;
+  border-top:1px solid var(--hair);
+}
+.tag{
+  font-family:var(--mono);font-size:10.5px;letter-spacing:.04em;
+  padding:3px 8px;border-radius:6px;border:1px solid var(--hair-2);color:var(--ink-2);
+}
+.tag.live{border-color:rgba(56,189,248,.5);color:var(--chrome)}
+.tag.data{border-color:rgba(34,197,94,.45);color:#4ade80}
+.tag.risk{border-color:rgba(239,68,68,.45);color:#fca5a5}
+
+/* notes block */
+.callout{
+  border:1px solid var(--hair);border-left:3px solid var(--chrome);
+  background:var(--surface);border-radius:0 12px 12px 0;
+  padding:16px 18px;margin:22px 0 0;
+}
+.callout h3{margin:0 0 8px;font-size:14px;letter-spacing:-.01em}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+td b{font-weight:650}
+.tablewrap{overflow-x:auto}
+
+@media(prefers-reduced-motion:no-preference){
+  .cell,.tile{transition:transform .12s ease}
+  .cell:active,.tile:active{transform:scale(.95)}
+}
+
+/* round-2 additions */
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:12px;margin-top:6px}
+.pick{border:1px solid rgba(56,189,248,.3);background:rgba(56,189,248,.06);border-radius:12px;padding:11px 13px}
+.pick b{display:block;font-size:13.5px;margin-bottom:2px}
+.pick span{font-size:11.5px;color:var(--ink-2)}
+.read{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:20px}
+.read div{border-top:2px solid var(--chrome);padding-top:11px}
+.read h4{margin:0 0 5px;font-size:13px;letter-spacing:-.01em}
+.read p{margin:0;font-size:12.5px;color:var(--ink-2);line-height:1.5}
+</style>
+<div class="wrap">
+
+<header class="mast">
+  <p class="eyebrow">Home screen · score row · round four</p>
+  <h1>Four equal cells was never a requirement <em>— it was an assumption.</em></h1>
+  <p class="lede">Three rounds, sixty-six mockups, and every single one kept the same skeleton:
+  four lanes, same width, same weight, same treatment. That's the thing Oura and Garmin both
+  refuse to do. <b>Oura's home is one score.</b> Everything else on that screen is context for it.
+  If this row is the first thing you see and it matters, then the strongest minimal move left
+  isn't another way to draw a number &mdash; it's deciding that one of the four is more important
+  than the other three.</p>
+
+  <div class="read">
+    <div><h4>Readiness is the hero</h4><p>It's the only one of the four that answers a question you
+    act on. Heart rate, sleep and activity are how it got there. Family N makes that structural
+    instead of leaving it for you to reconstruct every morning.</p></div>
+    <div><h4>Thin at scale</h4><p>Weight 200&ndash;300 numerals are the most recognisable thing
+    about Oura's interface, and they only work large. A hero row is the one place in this app
+    that has the size to carry them.</p></div>
+    <div><h4>Units answer "52 what?"</h4><p>Garmin labels every figure. O3 and P3 are the only
+    designs in four rounds that add information without adding a graphic &mdash; and they close a
+    gap the row has always had.</p></div>
+  </div>
+</header>
+
+<div class="sec-head" style="border-top:0;margin-top:0;padding-top:26px">
+  <span class="sec-num">✓</span>
+  <h2>Added since last round</h2>
+  <p>All four now live in Settings → More → Home widgets → Score Card Style.</p>
+</div>
+<div class="picks">
+  <div class="pick"><b>Footnote</b><span>K4 — number first, icon and name beneath.</span></div>
+  <div class="pick"><b>No label</b><span>L1 — icon and number only.</span></div>
+  <div class="pick"><b>Accent rule</b><span>M3 — a hairline in the metric's colour.</span></div>
+  <div class="pick"><b>Divider</b><span>M4 — hairlines between the lanes, nothing else.</span></div>
+</div>
+
+<div id="app"></div>
+
+<div class="callout">
+  <h3>The one real cost of the hierarchy designs</h3>
+  <p>N1, N3 and N4 give Readiness a much bigger tap target than the other three &mdash; and the
+  three secondary cells land at roughly 90&times;46dp, which is <b>under the 48dp floor</b>. They'd
+  need their padding opened up before shipping, which costs back some of the compactness that
+  makes them appealing. <b>N2 Weighted line</b> is the one that doesn't have this problem: every
+  cell stays full height, only the type scale changes.</p>
+  <p>The second cost is subtler. Making Readiness the hero is a claim that it's the most useful of
+  the four <i>every day</i>. On a morning after a bad night, the sleep score is the number you
+  want. A fixed hierarchy can't know that &mdash; and a hierarchy that reorders itself is no
+  longer minimal.</p>
+</div>
+
+</div>
+
+<script>
+const ICONS = {
+  zap:   ['M4 14a1 1 0 0 1-.78-1.63l9.9-10.2a.5.5 0 0 1 .86.46l-1.92 6.02A1 1 0 0 0 13 10h7a1 1 0 0 1 .78 1.63l-9.9 10.2a.5.5 0 0 1-.86-.46l1.92-6.02A1 1 0 0 0 11 14z'],
+  heart: ['M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5','M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27'],
+  moon:  ['M20.985 12.486a9 9 0 1 1-9.473-9.472c.405-.022.617.46.402.803a6 6 0 0 0 8.268 8.268c.344-.215.825-.004.803.401'],
+  flame: ['M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3-1.072-2.143-.224-4.054 2-6 .5 2.5 2 4.9 4 6.5 2 1.6 3 3.5 3 5.5a7 7 0 1 1-14 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 2.5 2.5z']
+};
+
+const M = [
+  {label:'Readiness',  short:'Ready', lower:'readiness',  unit:'',    value:76, accent:'#60a5fa', icon:'zap'},
+  {label:'Heart Rate', short:'HR',    lower:'heart rate', unit:'bpm', value:52, accent:'#f87171', icon:'heart'},
+  {label:'Sleep',      short:'Sleep', lower:'sleep',      unit:'',    value:90, accent:'#a78bfa', icon:'moon'},
+  {label:'Activity',   short:'Move',  lower:'activity',   unit:'',    value:76, accent:'#f97316', icon:'flame'}
+];
+const HERO = M[0], REST = M.slice(1);
+
+function icon(name, px, color, sw, op){
+  return `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none" stroke="${color}"
+    stroke-width="${sw||2.2}" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+    style="display:block;flex:none${op!=null?';opacity:'+op:''}">${ICONS[name].map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+}
+const aria = m => `aria-label="${m.label}: ${m.value}"`;
+const N = (size, w, ls, extra) => `font-variant-numeric:tabular-nums;line-height:1;color:#fff;font-size:${size};font-weight:${w||800};letter-spacing:${ls||'-.045em'};${extra||''}`;
+const CAP = 'font-size:11px;line-height:1;color:#8b94a7';
+const MICRO = 'font-size:8.5px;letter-spacing:.16em;text-transform:uppercase;color:#75808f;line-height:1';
+
+const V = [];
+const add = (id,name,note,row) => V.push({id,name,note,row});
+
+/* ============ N · HIERARCHY — one score leads ============ */
+
+add('N1','Hero','Oura\'s actual home model, which three rounds of four-equal-cells never tried: <b>Readiness is the screen, the other three are context.</b> If one of these numbers decides what you do today it is this one — giving all four the same weight is what makes the row forgettable.',
+ () => `<div style="display:flex;flex-direction:column;gap:18px">
+   <button class="cell" style="align-items:flex-start;gap:9px" ${aria(HERO)}>
+     <span style="display:flex;align-items:center;gap:7px">
+       ${icon(HERO.icon,15,HERO.accent,2.5)}<span style="${MICRO}">${HERO.label}</span></span>
+     <span style="${N('4rem',300,'-.04em')}">${HERO.value}</span>
+   </button>
+   <div style="display:flex;gap:8px">
+     ${REST.map(m=>`<button class="cell" style="align-items:flex-start;gap:6px" ${aria(m)}>
+       ${icon(m.icon,13,m.accent,2.5)}
+       <span style="${N('1.5rem',700,'-.04em')}">${m.value}</span>
+       <span style="${MICRO}">${m.short}</span></button>`).join('')}
+   </div></div>`);
+
+add('N2','Weighted line','Same single line you have now, but Readiness set at nearly twice the others. Keeps the row one gesture tall while still saying which number matters — the cheapest possible way to introduce hierarchy.',
+ () => `<div style="display:flex;align-items:flex-end;gap:10px">
+   <button class="cell" style="flex:1.7;align-items:flex-start;gap:7px" ${aria(HERO)}>
+     ${icon(HERO.icon,16,HERO.accent,2.4)}
+     <span style="${N('2.7rem',700,'-.05em')}">${HERO.value}</span>
+     <span style="${MICRO}">${HERO.label}</span></button>
+   ${REST.map(m=>`<button class="cell" style="align-items:flex-start;gap:6px;padding-bottom:2px" ${aria(m)}>
+     ${icon(m.icon,13,m.accent,2.5)}
+     <span style="${N('1.6rem',700,'-.045em')}">${m.value}</span>
+     <span style="${MICRO}">${m.short}</span></button>`).join('')}
+   </div>`);
+
+add('N3','Sidebar','Readiness holds the left third at display size; the other three stack down the right as a compact list. The most Garmin of the set — a glance widget with a primary field and three secondary rows.',
+ () => `<div style="display:flex;gap:20px;align-items:center">
+   <button class="cell" style="flex:none;align-items:flex-start;gap:8px;width:118px" ${aria(HERO)}>
+     ${icon(HERO.icon,16,HERO.accent,2.4)}
+     <span style="${N('3.3rem',300,'-.045em')}">${HERO.value}</span>
+     <span style="${MICRO}">${HERO.label}</span></button>
+   <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:11px">
+     ${REST.map(m=>`<button class="cell" style="flex-direction:row;align-items:center;gap:9px;width:100%" ${aria(m)}>
+       ${icon(m.icon,13,m.accent,2.5)}
+       <span style="${MICRO};flex:1;text-align:left">${m.label}</span>
+       <span style="${N('1.15rem',700,'-.03em')}">${m.value}</span></button>`).join('')}
+   </div></div>`);
+
+add('N4','Overline','Readiness alone on the first line with its name as an overline; the other three share the second at half the size, divided by hairlines. Two tiers of importance stated by position rather than by size alone.',
+ () => `<div style="display:flex;flex-direction:column;gap:15px">
+   <button class="cell" style="align-items:center;gap:8px" ${aria(HERO)}>
+     <span style="display:flex;align-items:center;gap:7px">
+       ${icon(HERO.icon,14,HERO.accent,2.5)}<span style="${MICRO}">${HERO.label}</span></span>
+     <span style="${N('3.4rem',300,'-.04em')}">${HERO.value}</span>
+   </button>
+   <div style="display:flex">
+     ${REST.map((m,i)=>`<button class="cell" style="gap:6px;${i?'border-left:1px solid rgba(255,255,255,.1)':''}" ${aria(m)}>
+       ${icon(m.icon,13,m.accent,2.5)}
+       <span style="${N('1.45rem',700,'-.04em')}">${m.value}</span>
+       <span style="${MICRO}">${m.short}</span></button>`).join('')}
+   </div></div>`);
+
+/* ============ O · TYPE — the Oura register ============ */
+
+add('O1','Hairline','Weight 200 at 2.8rem. Thin numerals at large sizes are the single most recognisable thing about Oura\'s interface, and they only work at scale — which is exactly the permission a home-screen hero row has.',
+ () => four(m => `<button class="cell" style="gap:10px;padding:12px 0 4px" ${aria(m)}>
+   ${icon(m.icon,15,m.accent,1.8)}
+   <span style="${N('2.8rem',200,'-.03em')}">${m.value}</span>
+   <span style="${MICRO}">${m.label}</span></button>`));
+
+add('O2','Lowercase','Labels in lowercase instead of title case, with the number at medium weight. Lowercase reads as spoken rather than announced — the difference between a dashboard label and something telling you how you slept.',
+ () => four(m => `<button class="cell" style="gap:8px;padding:14px 0 4px" ${aria(m)}>
+   ${icon(m.icon,15,m.accent,2.1)}
+   <span style="${N('2.3rem',500,'-.04em')}">${m.value}</span>
+   <span style="font-size:11px;color:#8b94a7;line-height:1">${m.lower}</span></button>`));
+
+add('O3','Unit','Garmin\'s convention: every figure carries its unit, and a bare number means a score. Answers the "52 what?" question the row has always quietly had — the only design in four rounds that adds information without adding a graphic.',
+ () => four(m => `<button class="cell" style="gap:9px;padding:14px 0 4px" ${aria(m)}>
+   ${icon(m.icon,15,m.accent,2.2)}
+   <span style="display:flex;align-items:baseline;gap:2px">
+     <span style="${N('2.2rem',600,'-.045em')}">${m.value}</span>
+     ${m.unit?`<span style="font-size:10px;color:#75808f;font-weight:600">${m.unit}</span>`:''}</span>
+   <span style="${MICRO}">${m.label}</span></button>`));
+
+add('O4','Caps','Labels as letterspaced micro-caps above the number rather than below it, at 8.5px. The most formal option here — it reads as a readout, and the wide tracking is what stops 8.5px from looking like an accident.',
+ () => four(m => `<button class="cell" style="gap:9px;padding:12px 0 4px" ${aria(m)}>
+   <span style="${MICRO}">${m.short}</span>
+   ${icon(m.icon,14,m.accent,2.2)}
+   <span style="${N('2.35rem',600,'-.045em')}">${m.value}</span></button>`));
+
+/* ============ P · STRUCTURE — one rule, not four ============ */
+
+add('P1','Band','A single hairline above and below the whole row, edge to edge past the gutters. The four become one band of the page instead of four objects floating on it — and the row gains a defined top and bottom without a single container.',
+ () => `<div style="margin:0 -16px">
+   <div style="height:1px;background:rgba(255,255,255,.12)"></div>
+   <div style="display:flex;padding:15px 16px 14px">
+     ${M.map(m=>`<button class="cell" style="gap:8px" ${aria(m)}>
+       ${icon(m.icon,15,m.accent,2.2)}
+       <span style="${N('2.1rem',700,'-.045em')}">${m.value}</span>
+       <span style="${MICRO}">${m.short}</span></button>`).join('')}
+   </div>
+   <div style="height:1px;background:rgba(255,255,255,.12)"></div></div>`);
+
+add('P2','Underline','One rule under the row only, full bleed. Half of P1 — it gives the row a floor to sit on and lets it bleed into the content above, which is the lighter of the two and probably the right one for a home screen.',
+ () => `<div style="margin:0 -16px">
+   <div style="display:flex;padding:4px 16px 15px">
+     ${M.map(m=>`<button class="cell" style="gap:8px" ${aria(m)}>
+       ${icon(m.icon,15,m.accent,2.2)}
+       <span style="${N('2.1rem',700,'-.045em')}">${m.value}</span>
+       <span style="${MICRO}">${m.short}</span></button>`).join('')}
+   </div>
+   <div style="height:1px;background:rgba(255,255,255,.12)"></div></div>`);
+
+add('P3','List','Four rows instead of four columns — Garmin Connect\'s glance list. Costs the most height of anything in four rounds and gives back the most: full names, room for units, and each metric on its own line where nothing is compared to anything.',
+ () => `<div style="display:flex;flex-direction:column">
+   ${M.map((m,i)=>`<button class="cell" style="flex-direction:row;align-items:center;gap:12px;padding:13px 2px;${i?'border-top:1px solid rgba(255,255,255,.08)':''}" ${aria(m)}>
+     ${icon(m.icon,16,m.accent,2.3)}
+     <span style="flex:1;text-align:left;font-size:12.5px;color:#c3cbd9">${m.label}</span>
+     <span style="display:flex;align-items:baseline;gap:3px">
+       <span style="${N('1.4rem',700,'-.035em')}">${m.value}</span>
+       ${m.unit?`<span style="font-size:9.5px;color:#75808f;font-weight:600">${m.unit}</span>`:''}</span>
+   </button>`).join('')}</div>`);
+
+/* ============ Q · AIR ============ */
+
+add('Q1','Air','Numbers at 1.8rem — smaller than today — with the gaps opened up and the whole row inset from the gutters. Restraint reads as confidence: a number that doesn\'t need to be big to be seen is a number you trust.',
+ () => `<div style="display:flex;gap:22px;padding:8px 14px 0">
+   ${M.map(m=>`<button class="cell" style="gap:11px" ${aria(m)}>
+     ${icon(m.icon,14,m.accent,2)}
+     <span style="${N('1.8rem',400,'-.02em')}">${m.value}</span>
+     <span style="${MICRO}">${m.short}</span></button>`).join('')}</div>`);
+
+add('Q2','Ragged','The row starts at the left gutter and stops short of the right one, so it never reads as a full-width strip that has to be balanced. Deliberately unequal spacing — the only asymmetric layout in four rounds.',
+ () => `<div style="display:flex;gap:26px;padding-top:10px">
+   ${M.map(m=>`<button class="cell" style="flex:none;align-items:flex-start;gap:8px" ${aria(m)}>
+     ${icon(m.icon,14,m.accent,2.2)}
+     <span style="${N('2rem',600,'-.045em')}">${m.value}</span>
+     <span style="${MICRO}">${m.short}</span></button>`).join('')}</div>`);
+
+const four = fn => `<div class="strip">${M.map(fn).join('')}</div>`;
+
+const SECTIONS = [
+  {n:'N', title:'Hierarchy', blurb:'Four equal cells is an assumption, not a requirement. Oura and Garmin both break it.', ids:/^N/},
+  {n:'O', title:'Type', blurb:'The Oura register — thin at scale, lowercase, micro-caps, units.', ids:/^O/},
+  {n:'P', title:'Structure', blurb:'One rule for the whole row, or no row at all.', ids:/^P/},
+  {n:'Q', title:'Air', blurb:'Smaller numbers, bigger gaps, deliberate asymmetry.', ids:/^Q/}
+];
+
+function mockHTML(v){
+  return `<article class="mock">
+    <div class="mock-head"><span class="mock-id">${v.id}</span><span class="mock-name">${v.name}</span></div>
+    <div class="canvas"><div class="phone">${v.row()}</div></div>
+    <p class="mock-note">${v.note}</p>
+  </article>`;
+}
+
+document.getElementById('app').innerHTML = SECTIONS.map(s=>`
+  <section>
+    <div class="sec-head"><span class="sec-num">${s.n}</span><h2>${s.title}</h2><p>${s.blurb}</p></div>
+    <div class="gallery">${V.filter(v=>s.ids.test(v.id)).map(mockHTML).join('')}</div>
+  </section>`).join('');
+
+</script>

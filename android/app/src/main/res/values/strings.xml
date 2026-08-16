@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">TrainingAi</string>
+    <string name="title_activity_main">TrainingAi</string>
+    <string name="package_name">com.trainingai.app</string>
+    <string name="custom_url_scheme">com.trainingai.app</string>
+</resources>

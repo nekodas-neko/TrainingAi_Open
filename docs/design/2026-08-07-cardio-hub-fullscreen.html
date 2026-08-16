@@ -1,0 +1,240 @@
+<title>Cardio Hub — Full Screen Comparison</title>
+<style>
+:root{
+  --ground:#080b12; --surface:#111827; --surface-2:#161f31;
+  --hair:rgba(255,255,255,.075); --hair-2:rgba(255,255,255,.14);
+  --ink:#eef2f8; --ink-2:#9aa5b8; --ink-3:#5f6a7d; --chrome:#38bdf8;
+  --cy:#22d3ee; --gr:#22c55e;
+  --mono:ui-monospace,"SF Mono","Cascadia Mono","Roboto Mono",Menlo,Consolas,monospace;
+  --app:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--app);line-height:1.55;font-size:15px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px 90px}
+header.mast{padding:52px 0 26px;border-bottom:1px solid var(--hair);margin-bottom:30px}
+.eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:.22em;text-transform:uppercase;color:var(--chrome);margin:0 0 13px}
+h1{margin:0 0 15px;font-size:clamp(28px,4.6vw,44px);line-height:1.03;letter-spacing:-.035em;font-weight:800;text-wrap:balance}
+h1 em{font-style:normal;color:var(--ink-3)}
+.lede{margin:0;max-width:64ch;color:var(--ink-2);font-size:16px}
+
+.pair{display:grid;grid-template-columns:repeat(auto-fit,minmax(430px,1fr));gap:24px;margin-top:8px}
+.col{border:1px solid var(--hair);border-radius:16px;background:linear-gradient(180deg,var(--surface-2),var(--surface));overflow:hidden}
+.col-head{padding:14px 16px 12px;border-bottom:1px solid var(--hair);display:flex;align-items:center;gap:9px}
+.col-id{font-family:var(--mono);font-size:10.5px;letter-spacing:.08em;color:var(--ground);background:var(--chrome);padding:2px 6px;border-radius:5px;font-weight:700}
+.col-name{font-size:14.5px;font-weight:650;letter-spacing:-.01em}
+.stagewrap{display:flex;justify-content:center;padding:22px 0;background:#05070d;border-bottom:1px solid var(--hair)}
+.col-note{padding:14px 16px;color:var(--ink-2);font-size:12.5px}
+.col-note b{color:var(--ink)}
+.measure{padding:0 16px 15px;display:flex;flex-wrap:wrap;gap:7px}
+.m{font-family:var(--mono);font-size:10.5px;padding:3px 8px;border-radius:6px;border:1px solid var(--hair-2);color:var(--ink-2)}
+.m.good{border-color:rgba(34,197,94,.45);color:#4ade80}
+.m.warn{border-color:rgba(245,158,11,.45);color:#fbbf24}
+
+/* ---- the phone: real flex, real dp, so spacing is computed not asserted ---- */
+.phone{
+  width:412px;height:891px;flex:none;
+  display:flex;flex-direction:column;
+  background:
+    radial-gradient(130% 55% at 20% 0%, #4a4a7e 0%, #55507f 26%, transparent 62%),
+    linear-gradient(180deg,#3d4a6b 0%,#6b5f9e 16%,#7a6b96 40%,#8b7d84 62%,#3a3238 80%,#0d0d10 100%);
+  border-radius:22px;overflow:hidden;transform-origin:top center;
+  font-size:16px;
+}
+@media(max-width:900px){.phone{transform:scale(.78)}}
+.status{flex:none;height:24px;display:flex;justify-content:space-between;align-items:center;padding:0 14px;font-size:11px;color:#e8ecf3;font-weight:600}
+.hdr{flex:none;padding:0 16px 12px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;align-items:flex-start;justify-content:space-between}
+.hdr h2{margin:0;font-size:20px;font-weight:700;letter-spacing:-.02em}
+.hdr p{margin:1px 0 0;font-size:14px;color:#b9c2d0}
+.body{flex:1;min-height:0;display:flex;flex-direction:column;padding:16px 0;gap:12px}
+.card{flex:1;min-height:0;margin:0 16px;border-radius:16px;border:1px solid rgba(190,160,255,.25);background:rgba(150,120,220,.17);padding:16px;display:flex;flex-direction:column;gap:12px;overflow:hidden}
+.card-top{flex:none;display:flex;justify-content:space-between;gap:10px}
+.sess{font-size:23px;font-weight:800;color:#c9a8ff;letter-spacing:-.02em;line-height:1.1}
+.chip{display:inline-block;background:var(--cy);color:#062a30;font-size:10px;font-weight:800;padding:2px 8px;border-radius:99px;margin-top:4px}
+.meta{font-size:12px;color:#c0c8d6;margin-top:5px}
+.right{text-align:right;font-size:12px;color:#c0c8d6;line-height:1.5;flex:none}
+.figs{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;gap:22px}
+.recov{flex:none;display:flex;gap:7px;align-items:center}
+.recov .lbl{font-size:9px;letter-spacing:.13em;color:#a9b2c0;flex:none}
+.recov .pill{flex:1;min-width:0;border:1px solid rgba(255,255,255,.2);border-radius:99px;padding:5px 4px;text-align:center;font-size:10.5px;color:#d5dbe5;white-space:nowrap;overflow:hidden}
+.recov .pill b{font-weight:800}
+.start{flex:none;border-radius:12px;background:var(--cy);color:#062a30;font-weight:800;font-size:14px;text-align:center;padding:12px}
+.dots{flex:none;height:24px;display:flex;justify-content:center;align-items:center;gap:8px}
+.dots span{width:7px;height:7px;border-radius:99px;background:rgba(255,255,255,.28)}
+.dots span.on{height:20px;background:var(--cy)}
+.slot{flex:none;padding:0 16px}
+.nav{flex:none;background:#000;padding:8px 0 22px;display:flex;justify-content:space-around;align-items:center}
+.nav span{font-size:10px;color:#7c8695;display:flex;flex-direction:column;align-items:center;gap:3px}
+.nav .cur{width:56px;height:44px;border-radius:14px;background:var(--cy);display:grid;place-items:center;color:#062a30;font-weight:800;font-size:10px}
+
+.callout{border:1px solid var(--hair);border-left:3px solid var(--chrome);background:var(--surface);border-radius:0 12px 12px 0;padding:16px 18px;margin:28px 0 0}
+.callout h3{margin:0 0 8px;font-size:14px}
+.callout p{margin:0 0 9px;color:var(--ink-2);font-size:13.5px}
+.callout p:last-child{margin:0}
+.callout code{font-family:var(--mono);font-size:12px;color:var(--chrome);background:rgba(56,189,248,.08);padding:1px 5px;border-radius:4px}
+table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13.5px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--hair)}
+th{font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--ink-3);font-weight:600}
+td:not(:first-child){font-variant-numeric:tabular-nums}
+.tablewrap{overflow-x:auto}
+</style>
+
+<div class="wrap">
+<header class="mast">
+  <p class="eyebrow">Workout screen · Cardio Hub · full-screen comparison</p>
+  <h1>B2 fits — it costs the card 26dp <em>and the muscle diagram absorbs all of it.</em></h1>
+  <p class="lede">Both screens below are built with the real component's flex structure at true S25
+  dimensions (412&times;891dp), so the spacing is <b>computed by the browser, not drawn by me</b>.
+  That matters for your question: the card is <code>flex-1 min-h-0</code>, so a taller row never
+  overflows the screen &mdash; it shrinks the card. And inside the card the muscle diagram is also
+  <code>flex-1</code>, so it is the only thing that gives way. The session name, recovery chips and
+  Start button are all <code>flex-none</code> and don't move.</p>
+</header>
+
+<div class="pair" id="pair"></div>
+
+<div class="tablewrap">
+<table>
+  <thead><tr><th>Measured</th><th>C1 Outlined</th><th>B2 Half card</th><th>Δ</th></tr></thead>
+  <tbody id="tbl"></tbody>
+</table>
+</div>
+
+<div class="callout">
+  <h3>The one thing to decide about C1</h3>
+  <p><b>Cyan is the Start Workout colour.</b> In the C1 screen above there are now two cyan
+  elements stacked ~70dp apart, and the outlined one sits <i>lower</i> — closer to the thumb, which
+  on a 6.9" screen is the more reachable position. The risk isn't that it looks bad; it's that the
+  eye lands on the wrong action first.</p>
+  <p>Two ways out if that bothers you on device: give Cardio Hub the walk modality's green
+  (<code>#22c55e</code>, already in use in the hub's own picker), or keep the cyan but drop the
+  border to 1px and the label to regular weight so it reads as clearly secondary. The mockup uses
+  1.5px and bold, which is the most aggressive version.</p>
+</div>
+
+<div class="callout">
+  <h3>What I could not check</h3>
+  <p>These are computed layouts in Chromium, not the APK. Safe-area is the specific unknown: the
+  nav bar here reserves 22dp of bottom inset, but on Android gesture-nav
+  <code>env(safe-area-inset-bottom)</code> often reports near zero, which is why this repo uses
+  floored utilities. Neither variant is bottom-anchored &mdash; both sit above the nav &mdash; so
+  neither is at risk, but the real clearance under the row is only visible on the device.</p>
+</div>
+</div>
+
+<script>
+const FIG = (front) => `
+<svg viewBox="0 0 84 190" width="84" height="190" aria-hidden="true" style="display:block">
+  <g fill="#2a2d33">
+    <ellipse cx="42" cy="15" rx="11" ry="13"/>
+    <rect x="36" y="27" width="12" height="7" rx="3"/>
+    <path d="M22 38q20-8 40 0l4 34q-24 7-48 0z"/>
+    <rect x="10" y="40" width="12" height="42" rx="6"/><rect x="62" y="40" width="12" height="42" rx="6"/>
+    <rect x="8" y="80" width="11" height="38" rx="5.5"/><rect x="65" y="80" width="11" height="38" rx="5.5"/>
+    <ellipse cx="13" cy="124" rx="7" ry="9"/><ellipse cx="71" cy="124" rx="7" ry="9"/>
+    <path d="M24 74h36l-2 34H26z"/>
+    <rect x="25" y="106" width="15" height="46" rx="7"/><rect x="44" y="106" width="15" height="46" rx="7"/>
+    <rect x="27" y="150" width="12" height="34" rx="6"/><rect x="45" y="150" width="12" height="34" rx="6"/>
+  </g>
+  <g fill="#22c55e">
+    ${front
+      ? `<rect x="34" y="46" width="16" height="30" rx="4"/>
+         <rect x="11" y="80" width="9" height="34" rx="4.5"/><rect x="64" y="80" width="9" height="34" rx="4.5"/>
+         <rect x="26" y="107" width="13" height="44" rx="6"/><rect x="45" y="107" width="13" height="44" rx="6"/>`
+      : `<path d="M26 100q16-7 32 0l-2 22q-14 6-28 0z"/>
+         <rect x="11" y="80" width="9" height="34" rx="4.5"/><rect x="64" y="80" width="9" height="34" rx="4.5"/>
+         <rect x="27" y="124" width="12" height="30" rx="6"/><rect x="45" y="124" width="12" height="30" rx="6"/>`}
+  </g>
+</svg>`;
+
+const ICON = (paths, px, color, sw) => `<svg viewBox="0 0 24 24" width="${px}" height="${px}" fill="none"
+  stroke="${color}" stroke-width="${sw||2}" stroke-linecap="round" stroke-linejoin="round"
+  aria-hidden="true" style="display:block;flex:none">${paths.split('|').map(d=>`<path d="${d}"/>`).join('')}</svg>`;
+
+const HEART = 'M2 9.5a5.5 5.5 0 0 1 9.591-3.676.56.56 0 0 0 .818 0A5.49 5.49 0 0 1 22 9.5c0 2.29-1.5 4-3 5.5l-5.492 5.313a2 2 0 0 1-3 .019L5 15c-1.5-1.5-3-3.2-3-5.5|M3.22 13H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27';
+const CHEV = 'm9 18 6-6-6-6';
+
+/* B2 — a sibling card. Same 16px radius and 16px inset as the workout card, cyan instead of purple. */
+const B2 = `
+<div style="border-radius:18px;background:linear-gradient(160deg,rgba(34,211,238,.20),rgba(34,211,238,.07));border:1px solid rgba(34,211,238,.30);padding:13px 14px;display:flex;align-items:center;gap:13px">
+  <span style="display:grid;place-items:center;width:42px;height:42px;border-radius:14px;background:rgba(34,211,238,.18);flex:none">${ICON(HEART,21,'#22d3ee')}</span>
+  <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:3px">
+    <span style="font-size:16px;font-weight:800;color:#fff;letter-spacing:-.02em">Cardio Hub</span>
+    <span style="font-size:12px;color:#c3cbd9">Run · Walk · Log anything</span></span>
+  ${ICON(CHEV,18,'#fff')}
+</div>`;
+
+/* C1 — same footprint as today's slab, cyan outline instead of grey fill. min-h-12 = 48dp. */
+const C1 = `
+<div style="min-height:48px;border:1.5px solid #22d3ee;background:transparent;border-radius:12px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px">
+  ${ICON(HEART,17,'#22d3ee')}<span style="font-size:14px;font-weight:800;color:#22d3ee">Cardio Hub</span>
+</div>`;
+
+function screen(slot, id){
+  return `<div class="phone" id="${id}">
+    <div class="status"><span>7:09</span><span>97</span></div>
+    <div class="hdr"><div><h2>Workout</h2><p>Choose a session to start</p></div>
+      <span style="color:#b9c2d0;font-size:17px;padding-top:4px">⟳</span></div>
+    <div class="body">
+      <div class="card" id="${id}-card">
+        <div class="card-top">
+          <div><div class="sess">Lower</div><span class="chip">Recommended today</span>
+            <div class="meta">📅 6 days ago</div></div>
+          <div class="right">5 exercises<br>~45 min</div>
+        </div>
+        <div class="figs" id="${id}-figs">${FIG(true)}${FIG(false)}</div>
+        <div class="recov">
+          <span class="lbl">RECOVERY</span>
+          <span class="pill"><b style="color:#22c55e">100%</b> Core</span>
+          <span class="pill"><b style="color:#f59e0b">79%</b> Glutes</span>
+          <span class="pill"><b style="color:#22c55e">84%</b> Hams</span>
+        </div>
+        <div class="start">Start Workout</div>
+      </div>
+      <div class="dots"><span></span><span></span><span></span><span></span><span class="on"></span></div>
+      <div class="slot" id="${id}-slot">${slot}</div>
+    </div>
+    <div class="nav">
+      <span>Home</span><span>Health</span><span class="cur">GYM</span><span>Nutrition</span><span>More</span>
+    </div>
+  </div>`;
+}
+
+document.getElementById('pair').innerHTML = `
+  <div class="col">
+    <div class="col-head"><span class="col-id">C1</span><span class="col-name">Outlined — same footprint</span></div>
+    <div class="stagewrap">${screen(C1,'c1')}</div>
+    <p class="col-note">Identical height to today's slab, so <b>nothing else on the screen moves</b>.
+    The grey fill becomes a cyan outline and the label goes to the accent. Lowest-risk change in the
+    set — and the one caveat is that cyan is already spoken for by Start Workout, 70dp above it.</p>
+    <div class="measure" id="c1-m"></div>
+  </div>
+  <div class="col">
+    <div class="col-head"><span class="col-id">B2</span><span class="col-name">Half card — a sibling</span></div>
+    <div class="stagewrap">${screen(B2,'b2')}</div>
+    <p class="col-note">Same corner radius and 16dp inset as the workout card, tinted cyan instead of
+    purple, with the icon in a rounded tile and a subtitle naming the three destinations.
+    <b>It fits.</b> The extra height comes out of the muscle diagram, which is the one element on
+    the screen designed to flex.</p>
+    <div class="measure" id="b2-m"></div>
+  </div>`;
+
+/* Measure the rendered layout rather than asserting numbers. */
+requestAnimationFrame(() => {
+  const px = el => Math.round(el.getBoundingClientRect().height);
+  const rows = [
+    ['Cardio Hub row', px(document.querySelector('#c1-slot')), px(document.querySelector('#b2-slot'))],
+    ['Workout card',   px(document.querySelector('#c1-card')), px(document.querySelector('#b2-card'))],
+    ['Muscle diagram', px(document.querySelector('#c1-figs')), px(document.querySelector('#b2-figs'))],
+  ];
+  document.getElementById('tbl').innerHTML = rows.map(([n,a,b]) => {
+    const d = b - a;
+    return `<tr><td>${n}</td><td>${a}dp</td><td>${b}dp</td><td style="color:${d===0?'#5f6a7d':d<0?'#fbbf24':'#4ade80'}">${d>0?'+':''}${d}dp</td></tr>`;
+  }).join('');
+
+  const tag = (id, items) => document.getElementById(id).innerHTML =
+    items.map(([t,c]) => `<span class="m ${c||''}">${t}</span>`).join('');
+  const c1h = px(document.querySelector('#c1-slot')), b2h = px(document.querySelector('#b2-slot'));
+  tag('c1-m', [[`row ${c1h}dp`,'good'], ['tap target 380×48dp','good'], ['card unchanged','good'], ['cyan collides with Start','warn']]);
+  tag('b2-m', [[`row ${b2h}dp`,'good'], [`tap target 380×${b2h}dp`,'good'], [`card −${b2h-c1h}dp`,'warn'], ['no colour collision','good']]);
+});
+</script>

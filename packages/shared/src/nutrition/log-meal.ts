@@ -1,0 +1,112 @@
+import type { FoodLogWithItem, SavedMeal, SavedMealItem } from '@trainingai/shared/types/nutrition'
+import { cancelMealReminder } from '@/lib/meal-reminders'
+import { getLocalStore } from '@/lib/local-store'
+import { pushMutations } from '@/lib/local-store/sync-engine'
+import { invalidateNutritionWrite } from '@/lib/cache-groups'
+import { oneServingItems } from './saved-meal-ingredients'
+
+function r1(n: number) { return Math.round(n * 10) / 10 }
+
+// Builds an optimistic FoodLogWithItem for one saved-meal component so the UI can
+// append it immediately (mirrors log-food.ts's toWithItem). The item's macros are
+// scaled by its per-item quantity multiplier.
+export function savedMealItemToWithItem(
+  item: SavedMealItem,
+  log: { id: string; date: string; mealTypeId: string; loggedAt: string },
+): FoodLogWithItem {
+  const q = item.quantityMultiplier
+  const fi = item.foodItem
+  return {
+    id: log.id,
+    userId: fi.userId,
+    date: log.date,
+    mealTypeId: log.mealTypeId,
+    foodItemId: item.foodItemId,
+    quantityMultiplier: q,
+    loggedAt: new Date(log.loggedAt),
+    foodItem: fi,
+    calories: Math.round(fi.calories * q),
+    proteinG: r1(fi.proteinG * q),
+    carbsG: r1(fi.carbsG * q),
+    fatG: r1(fi.fatG * q),
+  }
+}
+
+// Logs every component of a saved meal as its own food log. Uses the offline-first
+// local store when available and falls back to the API otherwise. Returns the
+// optimistic log entries for immediate UI updates (mirrors logFoodEntries) so the
+// caller can append them without a refetch that would blank the optimistic state.
+export async function logMealItems(
+  meal: SavedMeal,
+  date: string,
+  mealTypeId: string,
+  userId?: string,
+): Promise<FoodLogWithItem[]> {
+  const store = userId ? getLocalStore(userId) : null
+  const optimistic: FoodLogWithItem[] = []
+
+  if (store) {
+    try {
+      const now = new Date().toISOString()
+      for (const item of oneServingItems(meal)) {
+        // Mirror the item locally first — same as the single-food path — so
+        // getFoodLogsWithItems' local JOIN doesn't drop this row when the item
+        // isn't already cached (the original food-disappearing mechanism).
+        const fi = item.foodItem
+        await store.upsertFoodItem({
+          id: item.foodItemId, name: fi.name, brand: fi.brand ?? null,
+          servingSizeG: fi.servingSizeG, calories: fi.calories,
+          proteinG: fi.proteinG, carbsG: fi.carbsG, fatG: fi.fatG,
+          fiberG: fi.fiberG ?? null, sugarG: fi.sugarG ?? null,
+          sodiumMg: fi.sodiumMg ?? null, satFatG: fi.satFatG ?? null,
+          source: fi.source, updatedAt: now,
+        })
+        const logId = crypto.randomUUID()
+        await store.upsertFoodLog({
+          id: logId, date, mealTypeId, foodItemId: item.foodItemId,
+          quantityMultiplier: item.quantityMultiplier,
+          loggedAt: now, updatedAt: now, deletedAt: null, syncStatus: 'pending',
+        })
+        await store.queueMutation({
+          userId: userId!,
+          domain: 'food_logs',
+          date,
+          payload: { id: logId, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier, loggedAt: now },
+        })
+        optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: now }))
+      }
+      await cancelMealReminder(mealTypeId)
+      await invalidateNutritionWrite()
+      pushMutations(userId!).catch(() => {})
+      return optimistic
+    } catch (sqliteErr) {
+      console.error('Food log SQLite write failed, falling back to API:', sqliteErr)
+    }
+  }
+
+  // Web fallback: serial fetches with rollback on failure
+  const createdIds: string[] = []
+  try {
+    for (const item of oneServingItems(meal)) {
+      const res = await fetch('/api/nutrition/food-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier }),
+      })
+      if (!res.ok) throw new Error('Failed to log item')
+      const log = await res.json()
+      createdIds.push(log.id)
+      optimistic.push(savedMealItemToWithItem(item, {
+        id: log.id, date, mealTypeId, loggedAt: log.loggedAt ?? new Date().toISOString(),
+      }))
+    }
+    await cancelMealReminder(mealTypeId)
+    await invalidateNutritionWrite()
+    return optimistic
+  } catch (err) {
+    await Promise.all(createdIds.map(id =>
+      fetch(`/api/nutrition/food-logs/${id}`, { method: 'DELETE' }).catch(() => {})
+    ))
+    throw err
+  }
+}

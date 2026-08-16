@@ -1,0 +1,181 @@
+// Readiness composite using open_health's recovered Oura weights (Oura BLE Phase 5
+// addendum A4, R²=0.969): RHR ~17%, Previous Night ~15%, HRV Balance ~15%,
+// Temperature ~13%, Sleep Balance ~12%, Prev-Day Activity ~10%, Recovery Index
+// ~10%, Activity Balance ~7%. Used only when Oura Cloud's own readiness score isn't
+// available (the frozen-since-re-key path) — this is our own approximation built
+// from the personal baselines in oura_daily_summary (A3), not a reproduction of
+// Oura's proprietary model.
+//
+// Baseline-relative contributors (RHR, HRV Balance, Temperature, Sleep Balance) are
+// cold for the first ~14 nights of accrued history — those are flagged provisional
+// and fall back to a neutral 50, exactly as open_health does. Recovery Index has no
+// calibratable hours→score mapping (per the addendum), so it's always neutral/
+// provisional; its raw hours are surfaced separately for display, never scored.
+
+export const BASELINE_MIN_NIGHTS = 14
+
+// Weights recalibrated 2026-07-22 (core-cards overhaul, W-D): rebalanced to sum EXACTLY 1.00 (was
+// 0.99, so the old composite could never reach 100) and made room for a `checkin` contributor — the
+// user's morning mood/energy self-report — so a genuinely great day (great biometrics + a good
+// check-in) can reach a true 100. See docs/superpowers/plans/2026-07-22-core-score-cards-and-activity-overhaul.md.
+export const READINESS_WEIGHTS = {
+  restingHeartRate: 0.15,
+  previousNight:    0.16,
+  hrvBalance:        0.15,
+  temperature:       0.10,
+  sleepBalance:      0.10,
+  prevDayActivity:   0.09,
+  recoveryIndex:     0.09,
+  activityBalance:   0.06,
+  checkin:           0.10,
+} as const
+
+export interface ReadinessCompositeInputs {
+  /** Normalized deviation of tonight's resting HR from the personal baseline
+   *  (lower RHR than baseline = better). */
+  rhrZ: number | null
+  /** Normalized deviation of tonight's HRV from the personal baseline (higher = better). */
+  hrvZ: number | null
+  /** Normalized deviation of tonight's temperature from the personal baseline
+   *  (closer to baseline, either direction, = better — a fever/illness signal). */
+  tempZ: number | null
+  /** Normalized deviation of tonight's sleep duration from the personal baseline. */
+  sleepBalanceZ: number | null
+  /** Our own 0-100 sleep score for last night (lib/health/sleep-score.ts). */
+  previousNightScore: number | null
+  /** Our own 0-100 activity score for the day before last night. */
+  prevDayActivityScore: number | null
+  /** Our own 0-100 activity score for today. */
+  activityBalanceScore: number | null
+  /** The user's morning mood/energy check-in mapped to 0-100 (drained→30 … pumped→100). Null when
+   *  there's no check-in that day → neutral 50 (so a perfect 100 needs a logged good check-in). */
+  checkinScore?: number | null
+  /** Nights of baseline history accrued (oura_daily_summary.n_history). */
+  nHistory: number
+  /** Recovery Index — hours between the overnight HR minimum and wake
+   *  (lib/health/recovery-index.ts). More hours = HR settled earlier in the night = better. */
+  recoveryIndexHours?: number | null
+}
+
+export interface ReadinessContributor {
+  score: number // 0-100
+  /** True when this contributor fell back to neutral — either no signal, or the
+   *  baseline hasn't accrued the minimum history yet. */
+  provisional: boolean
+}
+
+export interface ReadinessCompositeResult {
+  score: number // 0-100, weighted composite
+  contributors: Record<keyof typeof READINESS_WEIGHTS, ReadinessContributor>
+}
+
+const NEUTRAL: ReadinessContributor = { score: 50, provisional: true }
+
+// Points added per z-unit around the neutral 50. Recalibrated 2026-07-22 (W-D): 50/1.5 ≈ 33.3, so a
+// contributor reaches a full 100 at +1.5σ (a realistically-great day) rather than the former +2.5σ
+// (which needed a 2.5-sigma day on every axis at once — statistically unreachable, capping readiness
+// ~86 even on a perfect day). Our own approximation; Oura's real curve isn't public.
+export const Z_POINTS_PER_UNIT = 50 / 1.5
+
+/**
+ * The morning check-in's energy level → 0-100 sub-score. Lives here, next to the weight it feeds,
+ * so the readiness route and the admin day-review audit can't map the same check-in differently.
+ */
+export const CHECKIN_ENERGY_SCORE: Record<string, number> = {
+  drained: 30, low: 50, ok: 72, good: 88, pumped: 100,
+}
+
+/** Map a logged energy level to its readiness sub-score; null when unrecognised or not logged. */
+export function checkinScoreFromEnergy(energyLevel: string | null | undefined): number | null {
+  if (!energyLevel) return null
+  return CHECKIN_ENERGY_SCORE[energyLevel] ?? null
+}
+
+/** Maps a personal-baseline z-score to a 0-100 sub-score. z is typically in
+ *  [-1.5, 1.5] for the mapped range; clamped at the edges.
+ *  - higher/lower-better: neutral 50 at baseline (z=0), a full 100 at ±1.5σ *in the good direction*.
+ *  - closer-better (temperature): 100 at baseline (a stable temp is ideal — no fever/illness) and
+ *    falling to 0 by ~1.5σ of deviation either way. (Previously it peaked at 50, which meant a
+ *    perfectly-stable temperature could only ever be "neutral" and structurally capped readiness ~95.) */
+function zToScore(
+  z: number | null,
+  direction: 'higher-better' | 'lower-better' | 'closer-better',
+  nHistory: number,
+): ReadinessContributor {
+  if (z == null || nHistory < BASELINE_MIN_NIGHTS) return NEUTRAL
+  const raw = direction === 'closer-better'
+    ? 100 - Math.abs(z) * (2 * Z_POINTS_PER_UNIT)
+    : 50 + (direction === 'higher-better' ? z : -z) * Z_POINTS_PER_UNIT
+  return { score: Math.max(0, Math.min(100, Math.round(raw))), provisional: false }
+}
+
+function plainScore(v: number | null): ReadinessContributor {
+  if (v == null) return NEUTRAL
+  return { score: Math.max(0, Math.min(100, Math.round(v))), provisional: false }
+}
+
+/** Oura's public guidance: a Recovery Index of ~6 hours or more (RHR reaching its low point in the
+ *  first half of the night) indicates good recovery. `hoursToSettle` is measured from the HR minimum
+ *  to wake, so MORE hours = earlier settle = better. */
+export const RECOVERY_INDEX_OPTIMAL_HOURS = 6
+
+/** Map Recovery-Index hours → a 0-100 sub-score with a documented monotone curve: linear from 0 at
+ *  0 h to 100 at `RECOVERY_INDEX_OPTIMAL_HOURS`, clamped. This is an APPROXIMATION anchored on Oura's
+ *  public "≥6 h = good recovery" statement (their exact hours→score curve isn't recovered), so it is
+ *  flagged `provisional`. Null hours (no overnight HR series) → neutral, never fabricated. */
+function recoveryIndexScore(hours: number | null | undefined): ReadinessContributor {
+  if (hours == null || !Number.isFinite(hours)) return NEUTRAL
+  const score = Math.max(0, Math.min(100, Math.round((hours / RECOVERY_INDEX_OPTIMAL_HOURS) * 100)))
+  return { score, provisional: true }
+}
+
+/**
+ * The readiness composite model in serialisable form — weights, the z→score slope, the baseline
+ * maturity gate and each contributor's direction. Exported so tooling (the admin day-review audit)
+ * can present a score alongside the exact model that produced it without copying any of it.
+ */
+export const READINESS_MODEL = {
+  weights: READINESS_WEIGHTS,
+  zPointsPerUnit: Z_POINTS_PER_UNIT,
+  baselineMinNights: BASELINE_MIN_NIGHTS,
+  recoveryIndexOptimalHours: RECOVERY_INDEX_OPTIMAL_HOURS,
+  checkinEnergyScore: CHECKIN_ENERGY_SCORE,
+  neutralScore: NEUTRAL.score,
+  directions: {
+    restingHeartRate: 'lower-better',
+    hrvBalance: 'higher-better',
+    temperature: 'closer-better',
+    sleepBalance: 'higher-better',
+    previousNight: 'passthrough',
+    prevDayActivity: 'passthrough',
+    recoveryIndex: 'hours-curve',
+    activityBalance: 'passthrough',
+    checkin: 'passthrough',
+  },
+} as const
+
+export function computeReadinessComposite(input: ReadinessCompositeInputs): ReadinessCompositeResult {
+  const contributors: ReadinessCompositeResult['contributors'] = {
+    restingHeartRate: zToScore(input.rhrZ, 'lower-better', input.nHistory),
+    hrvBalance:        zToScore(input.hrvZ, 'higher-better', input.nHistory),
+    temperature:       zToScore(input.tempZ, 'closer-better', input.nHistory),
+    sleepBalance:      zToScore(input.sleepBalanceZ, 'higher-better', input.nHistory),
+    previousNight:     plainScore(input.previousNightScore),
+    prevDayActivity:   plainScore(input.prevDayActivityScore),
+    // Calibrated from Recovery-Index hours (anchored on Oura's public "≥6 h = good recovery"),
+    // replacing the former dead NEUTRAL that made 10% of readiness a frozen 50. Flagged provisional
+    // (approximation) and falls back to neutral when there's no overnight HR series.
+    recoveryIndex:     recoveryIndexScore(input.recoveryIndexHours),
+    activityBalance:   plainScore(input.activityBalanceScore),
+    // Subjective morning check-in (mood/energy). Neutral 50 when not logged — so a perfect 100
+    // requires a good check-in, but skipping it doesn't tank readiness.
+    checkin:           plainScore(input.checkinScore ?? null),
+  }
+
+  const score = Math.round(
+    (Object.keys(READINESS_WEIGHTS) as (keyof typeof READINESS_WEIGHTS)[])
+      .reduce((sum, key) => sum + contributors[key].score * READINESS_WEIGHTS[key], 0)
+  )
+
+  return { score, contributors }
+}

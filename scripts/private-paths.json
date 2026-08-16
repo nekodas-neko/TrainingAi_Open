@@ -1,0 +1,94 @@
+{
+  "_comment": "Single source of truth for material that must NEVER be committed to this repository. Read by scripts/check-private-paths.js (the CI gate) and pinned by scripts/__tests__/private-paths.test.ts. Every entry is a third party's property in some form. Adding a path here is cheap; discovering one after a publish is not. NOTE ON WORDING: these descriptions are deliberately non-specific, because this file is public and an inventory that catalogues what it is protecting is itself a map to it. Say what an agent needs in order to classify a new file and refuse to commit it, and no more. The full detail is in the archived private repository. Do not restore it here, and do not reproduce it in a commit message, a code comment, a PR body or a summary of this list.",
+  "_kinds": {
+    "vendor-binary": "A third party's compiled or serialised artefacts. Not regenerable from this repository.",
+    "vendor-source": "A third party's own code, in any recovered form.",
+    "vendor-notes": "Our written analysis of the above. Publishing the analysis publishes the substance even when the payload itself is gone.",
+    "vendor-procedure": "Provenance notes. The most sensitive category and the one to be strictest about, because it is of use to a reader who holds none of the rest. Never quote or paraphrase its contents anywhere."
+  },
+  "_archive": {
+    "bucket": "Upload to the object-storage bucket (see scripts/upload-model-assets.js) before removing from the tree. Not recoverable from this repository once deleted and not regenerable here, so the upload is a prerequisite rather than a formality.",
+    "runtime-fetch": "Already served from object storage at runtime; the tree copy was a fallback and is gone."
+  },
+  "paths": [
+    {
+      "path": "lib/oura-models/weights/",
+      "kind": "vendor-binary",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "Third-party artefacts with no loader — archival only, nothing read them at runtime. Not regenerable from this repository, so removing them was a one-way door and re-committing them is never the answer."
+    },
+    {
+      "path": "lib/oura-models/onnx/",
+      "kind": "vendor-binary",
+      "importedByCode": true,
+      "archive": "runtime-fetch",
+      "reason": "Third-party artefacts the runtime loads. They come from object storage, there is no tree copy behind that any more, and the boot check fails production rather than quietly serving a degraded result. The exclusion is our own recorded test vectors, which are ours and stay public.",
+      "excludes": [
+        "lib/oura-models/onnx/__fixtures__/"
+      ]
+    },
+    {
+      "path": "lib/oura-models/constants/",
+      "kind": "vendor-binary",
+      "importedByCode": true,
+      "archive": "bucket",
+      "reason": "Third-party values, read at runtime from a directory delivered at boot rather than imported at build time — which is what let them stop being a repository dependency at all. The exclusions are our own code only: the loader, the type declarations that describe a format rather than any values, the tests and the README. One table the device needs is served from an authenticated route rather than bundled into the client.",
+      "excludes": [
+        "lib/oura-models/constants/index.ts",
+        "lib/oura-models/constants/steps-decoder-types.ts",
+        "lib/oura-models/constants/__tests__/",
+        "lib/oura-models/constants/README.md"
+      ]
+    },
+    {
+      "path": "docs/oura-models/",
+      "kind": "vendor-source",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "A third party's own code in recovered form, with our notes on it. Referenced only from code comments and never imported, which is what made it removable with no code change."
+    },
+    {
+      "path": "scripts/oura-models/_source/",
+      "kind": "vendor-source",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "A second copy of the same, kept beside the tooling that produced it. Referenced only from code comments, never imported."
+    },
+    {
+      "path": ".agents/skills/oura-models/",
+      "kind": "vendor-notes",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "Our written analysis of the material above. Written from it, so publishing this would publish the substance even once the payload itself is gone."
+    },
+    {
+      "path": "docs/superpowers/plans/2026-07-09-oura-ble-accurate-sleep-staging.md",
+      "kind": "vendor-procedure",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "The single most sensitive file that was ever in this repository. Its parked section is provenance detail of the kind the vendor-procedure note above describes. Do not restore it, and do not describe its contents anywhere — including in a summary of why it is on this list."
+    },
+    {
+      "path": "docs/oura-models-bundle.md",
+      "kind": "vendor-procedure",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "Provenance record for the bundle, carrying third-party identifiers and hashes that should not be public. Same handling as the entry above."
+    },
+    {
+      "path": "docs/oura-models-inventory.md",
+      "kind": "vendor-notes",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "An index of the whole archive — what exists and where each part of it lives. Useful precisely to the extent that it maps material that must not be public, which is the reason it cannot be."
+    },
+    {
+      "path": ".agents/skills/oura-native-ble/",
+      "kind": "vendor-notes",
+      "importedByCode": false,
+      "archive": "bucket",
+      "reason": "Our protocol knowledge base for the direct-Bluetooth pipeline. Owner decision, 2026-08-10: the port itself stays public — it is our own code and structurally cannot be split out — but the write-up does not. Be clear-eyed about what that buys. It raises the effort to reproduce the work; it does not make the subject unknowable from the published code, and nobody should plan as though it did."
+    }
+  ]
+}

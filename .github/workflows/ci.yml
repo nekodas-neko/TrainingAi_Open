@@ -1,0 +1,393 @@
+name: CI
+
+on:
+  # PRs always run CI: with all jobs as required status checks, skipping CI on a
+  # markdown-only PR would leave those checks "Expected" forever and block the
+  # merge. Cheap on a docs change; correctness over a few saved minutes.
+  #
+  # There is deliberately no `push: [main]` trigger. `main` is protected and only
+  # reached through an already-green PR, so re-running the full suite on the
+  # post-merge push is pure redundancy — ~11 billed minutes per merge for a result
+  # the PR run already produced. The only job that genuinely needs to run on push
+  # (publishing the rolling APK release) lives in android.yml, gated to native changes.
+  pull_request:
+    branches: [main]
+
+# Cancel an in-progress run when a newer commit is pushed to the same ref —
+# avoids burning CI minutes on superseded runs (e.g. rapid successive pushes).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm lint
+
+  # No dedicated Type Check job: `next build` (the Build job below) runs the full
+  # TypeScript check itself — next.config has no `typescript.ignoreBuildErrors`, so
+  # any type error already fails Build. A separate `tsc --noEmit` job was redundant
+  # enforcement. Type errors are caught faster and more precisely by `pnpm ci:local`
+  # (runs `tsc --noEmit` directly) before pushing.
+  test:
+    name: Tests
+    runs-on: ubuntu-latest
+    # A real Postgres lets the DB integration tests run — without DATABASE_URL they
+    # skipIf-skip (~20 files), leaving the rollup/repo DB behaviour with no CI coverage.
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trainingai_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Apply all migrations
+        run: node scripts/local-db/migrate.js
+      - run: pnpm test
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    env:
+      NODE_OPTIONS: --max-old-space-size=4096
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/ci
+      SESSION_SECRET: ci-placeholder-secret-must-be-32-chars
+      GOOGLE_CLIENT_ID: placeholder
+      GOOGLE_CLIENT_SECRET: placeholder
+      GOOGLE_REDIRECT_URI: http://localhost:3000/api/auth/callback/google
+      GOOGLE_GENERATIVE_AI_API_KEY: placeholder
+      HEALTH_CONNECT_INGEST_SECRET: placeholder
+      WEBHOOK_USER_ID: placeholder
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+  custom-rules:
+    name: Custom Rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: No unresolved conflict markers
+        run: node scripts/check-conflict-markers.js
+
+      - name: No UTC date slicing
+        run: |
+          FOUND=$(grep -rn --include='*.ts' --include='*.tsx' \
+            -e '\.toISOString()\.slice(0' \
+            -e "\.toISOString()\.split('T')" \
+            app/ lib/ components/ packages/ hooks/ types/ 2>/dev/null \
+            | grep -v 'lib/date-utils.ts' \
+            | grep -v 'packages/shared/src/date-utils.ts' || true)
+          if [ -n "$FOUND" ]; then
+            echo "Timezone violation — use todayInTz() from @/lib/date-utils instead:"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: No hardcoded PPL session names
+        run: |
+          FOUND=$(grep -rn --include='*.ts' --include='*.tsx' \
+            -e '"Push"' -e '"Pull"' -e '"Legs"' \
+            app/ lib/ components/ packages/ 2>/dev/null \
+            | grep -v '\.md:' \
+            | grep -v 'push\|pull' \
+            | grep -v 'app/api/generate-program/' \
+            | grep -v 'components/config/exercise-picker-sheet' \
+            | grep -Ei '"(Push|Pull|Legs)"' || true)
+          if [ -n "$FOUND" ]; then
+            echo "Hardcoded PPL session names detected — session names must come from the DB:"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: No hand-rolled safe-area insets
+        run: |
+          FOUND=$(grep -rn --include='*.tsx' 'safe-area-inset' \
+            app/ components/ 2>/dev/null \
+            | grep -v 'components/shell/bottom-nav.tsx' || true)
+          if [ -n "$FOUND" ]; then
+            echo "Safe-area violation — use pb-safe-action / pb-nav-safe / pb-safe from globals.css (or SheetFooter/BottomActionBar which own it):"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: No PRAGMAs in local SQLite upgrade statements
+        run: |
+          FOUND=$(grep -n 'PRAGMA' lib/sqlite/migrations.ts 2>/dev/null | grep -vE ':\s*//' || true)
+          if [ -n "$FOUND" ]; then
+            echo "PRAGMA found inside a local SQLite migration statement — Capacitor wraps upgrades in a transaction and SQLite rejects journal-mode changes there. Set pragmas post-open in sqlite-service.ts instead:"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: No pt-safe stacked with another pt- class
+        run: |
+          FOUND=$(grep -rnE \
+            'className=.[^"'"'"']*\bpt-safe(-or-4)?\b[^"'"'"']*\bpt-[0-9]|className=.[^"'"'"']*\bpt-[0-9][^"'"'"']*\bpt-safe(-or-4)?\b' \
+            app/ components/ --include='*.tsx' 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "pt-safe(-or-4) combined with another pt-* class in the same className, in either order — the later Tailwind class wins and the inset is silently lost:"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: No pb-safe* stacked with another pb-/py-/p- class
+        run: |
+          FOUND=$(grep -rnE \
+            'className=.[^"'"'"']*\b(pb-safe(-action(-lg)?)?|pb-nav-safe)\b[^"'"'"']*\b(pb|py|p)-[0-9]|className=.[^"'"'"']*\b(pb|py|p)-[0-9][^"'"'"']*\b(pb-safe(-action(-lg)?)?|pb-nav-safe)\b' \
+            app/ components/ --include='*.tsx' 2>/dev/null || true)
+          if [ -n "$FOUND" ]; then
+            echo "pb-safe/pb-safe-action/pb-safe-action-lg/pb-nav-safe combined with another pb-/py-/p- class in the same className, in either order — doubles or zeroes the inset depending on source order:"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: No fixed bottom-N outside bottom-nav.tsx
+        run: |
+          FOUND=$(grep -rnE 'fixed[^"'"'"']*\bbottom-[0-9]' app/ components/ --include='*.tsx' 2>/dev/null \
+            | grep -v 'components/shell/bottom-nav.tsx' || true)
+          if [ -n "$FOUND" ]; then
+            echo "Fixed element with a raw bottom-N offset — on nav-bearing screens this can render under the bottom nav / gesture bar. Use bottom-nav-safe / bottom-fab-safe from globals.css (or bottom-0 + pb-safe-action for navless screens):"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: Safe-area utility classes must be defined
+        run: |
+          USED=$(grep -rohE '\b(pt|pb)-[a-z0-9-]*safe[a-z0-9-]*' app/ components/ --include='*.tsx' 2>/dev/null | sort -u || true)
+          MISSING=""
+          for cls in $USED; do
+            if ! grep -qF ".$cls " app/globals.css && ! grep -qF ".$cls {" app/globals.css; then
+              MISSING="$MISSING $cls"
+            fi
+          done
+          if [ -n "$MISSING" ]; then
+            echo "Safe-area utility class(es) used but not defined in app/globals.css:$MISSING"
+            exit 1
+          fi
+
+      - name: No nested button inside a role=button wrapper
+        run: |
+          FOUND=$(grep -rn -A2 'role="button"' app/ components/ --include='*.tsx' 2>/dev/null | grep '<button' || true)
+          if [ -n "$FOUND" ]; then
+            echo "Nested <button> inside a role=\"button\" wrapper — the browser silently strips the inner button and breaks native long-press handling. Use a plain element (span/div) for the inner control instead:"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: No JSON.parse of free-text LLM output in AI routes
+        run: |
+          AI_ROUTES=$(grep -rl "@ai-sdk" app/api --include='*.ts' 2>/dev/null || true)
+          FOUND=""
+          for f in $AI_ROUTES; do
+            HIT=$(grep -n "JSON.parse" "$f" || true)
+            if [ -n "$HIT" ]; then FOUND="$FOUND\n$f: $HIT"; fi
+          done
+          if [ -n "$FOUND" ]; then
+            echo "Bare JSON.parse of LLM output detected — use generateObject/a response schema instead:"
+            echo -e "$FOUND"
+            exit 1
+          fi
+
+      - name: No hand-rolled invalidateCache outside lib/cache-groups.ts
+        run: |
+          FOUND=$(grep -rn 'invalidateCache(' app/ components/ lib/ packages/ --include='*.ts' --include='*.tsx' 2>/dev/null \
+            | grep -v 'lib/cache-groups.ts:' \
+            | grep -v 'lib/sqlite/cache.ts:' \
+            | grep -v '__tests__' \
+            | grep -vE '^[^:]+:[0-9]+:\s*//' || true)
+          if [ -n "$FOUND" ]; then
+            echo "Hand-rolled invalidateCache() call outside lib/cache-groups.ts — every mutation invalidates via a named group helper there (add one if it doesn't exist yet), never an ad-hoc key list at the write site (CLAUDE.md: Cache Invalidation):"
+            echo "$FOUND"
+            exit 1
+          fi
+
+      - name: Date-param Zod schemas accept both separators
+        run: node scripts/check-date-param-regex.js
+
+      - name: Numeric validators carry an upper bound
+        run: node scripts/check-numeric-bounds.js
+
+      - name: No inline sparklines bypassing the primitive
+        run: node scripts/check-sparkline-primitive.js
+
+      - name: Local columns reach upgraded devices
+        run: node scripts/check-local-column-upgrade-path.js
+
+      - name: No duplicate Postgres migration numbers
+        run: node scripts/check-migration-numbers.js
+
+      - name: No device-local date/time rendering
+        run: node scripts/check-timezone-rendering.js
+
+      - name: Theme tokens meet WCAG AA contrast
+        run: node scripts/check-contrast.js
+
+      - name: Icon-only controls have accessible names
+        run: node scripts/check-icon-button-names.js
+
+      - name: No stray backticks in an AI route prompt
+        run: node scripts/check-prompt-backticks.js
+
+      - name: No hue-shifting color-mix
+        run: node scripts/check-color-mix-hue.js
+
+      - name: Component files stay under the size limit
+        run: node scripts/check-component-size.js
+
+      - name: RECONCILE_TABLES/RECONCILE_COLUMNS completeness
+        run: node scripts/check-reconcile.js
+
+      - name: pushMutations delegates to shared repo functions
+        run: node scripts/check-push-mutations.js
+
+      - name: Every repository method taking userId actually uses it
+        run: node scripts/check-repository-user-scoping.js
+
+      - name: Sign-out wipes the device, not just the session
+        run: node scripts/check-sign-out-clears-device.js
+
+      - name: API responses stay out of the browser HTTP cache
+        run: node scripts/check-api-no-store.js
+
+      - name: One canonical TTL per cache key
+        run: node scripts/check-cache-ttl-divergence.js
+
+      - name: Hex colour literals do not increase
+        run: node scripts/check-hex-literals.js
+
+      - name: No two DB test files share a TEST_USER_ID
+        run: node scripts/check-test-user-ids.js
+
+      - name: No broken relative links in docs
+        run: node scripts/check-doc-links.js
+
+      - name: CLAUDE.md names only paths that exist
+        run: node scripts/check-claude-md-paths.js
+
+      - name: No dormant vendored model files
+        run: node scripts/check-oura-models-dormancy.js
+
+      - name: No app dependency on private (unpublishable) paths
+        run: node scripts/check-private-paths.js
+
+      - name: No vendor constants inlined into publishable source
+        run: node scripts/check-inlined-constants.js
+
+  migrations:
+    name: Migration Check
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trainingai_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Apply all migrations
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+        run: node scripts/local-db/migrate.js
+
+  e2e:
+    # Its own job, deliberately not folded into Tests: a browser job's runtime and failure modes
+    # (flake, timeout, a dev server that never came up) are different enough that mixing them makes
+    # a red CI ambiguous. It is also the only job here that runs the actual application.
+    name: E2E
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trainingai_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+      AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+      - run: pnpm install --frozen-lockfile
+      - name: Apply all migrations
+        run: node scripts/local-db/migrate.js
+      - name: Seed the test user and program
+        run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
+      # No PLAYWRIGHT_BROWSERS_PATH here: the runner has no pre-installed Chromium, so Playwright
+      # manages its own. playwright.config.ts only pins an executablePath when the sandbox's
+      # /opt/pw-browsers/chromium exists, which it does not on a GitHub runner.
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      - run: pnpm e2e
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

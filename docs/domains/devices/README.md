@@ -1,0 +1,146 @@
+# Devices — domain index
+
+**Owns:** every sensor and its transport — the Oura direct-BLE pipeline and reverse-engineered
+protocol, the on-device Oura models, the Polar H10 chest strap, the Renpho scale, Health Connect
+ingest, the native Kotlin plugins and foreground services, and the sync orchestration that drains
+them.
+
+**Does not own:** interpretation of what they measure. "The ring's step counter under-reports" is
+here; "the Activity Score is wrong" is [`activity`](../activity/README.md). This is the largest
+documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files).
+
+## Code
+
+| Area | Where |
+|---|---|
+| Oura direct BLE | `lib/oura-ble/` — `plugin.ts`, `sync.ts`, `decode.ts`, `clock.ts`, `raw-storage.ts`, `continuous-capture.ts`, `battery-soak.ts` |
+| On-device models | `lib/oura-models/`, `docs/oura-models/` |
+| Oura Cloud | **Removed 2026-08-13 (Q-224).** `lib/oura/` is local-only now: `ble-freshness.ts`, `cloud-freshness.ts` (the re-key constant), `contributors.ts`, `types.ts` |
+| Chest strap | `lib/polar-ble/` |
+| Scale | `lib/scale-ble/` |
+| Native bridge | `lib/native/`, `components/oura-ble/` |
+| Tables | `oura_raw_samples` (archival source of truth), `oura_daily`, `oura_daily_derived`; `oura_tokens` holds dead Cloud credentials, kept rather than dropped |
+
+## Reference docs — read in this order
+
+1. **[`docs/oura-ble-operations.md`](../../oura-ble-operations.md)** — the operations manual:
+   failure-point matrix, sync-cadence policy, protocol-maintenance playbook, data-integrity
+   runbook. **Read this before touching the pipeline**, and add a §1 matrix row for any new failure
+   signature in the same PR that handles it.
+2. [`docs/oura-ble-feature-playbook.md`](../../oura-ble-feature-playbook.md) — how to enable a new
+   ring feature over the wire.
+3. [`docs/oura-ble-remaining-work.md`](../../oura-ble-remaining-work.md) — what's left in the BLE
+   programme.
+4. [`docs/oura-ring-data-reference.md`](../../oura-ring-data-reference.md) — the Cloud v2 field
+   reference (still the authority for field *names*).
+5. [`docs/oura-ble-sleep-staging-findings.md`](../../oura-ble-sleep-staging-findings.md) ·
+   [`docs/oura-ble-open-oura-audit-2026-07-08.md`](../../oura-ble-open-oura-audit-2026-07-08.md) ·
+   the extracted-model inventory and bundle-provisioning docs (private archive — see
+   `scripts/private-paths.json`)
+6. [`docs/device-agnostic-source-architecture.md`](../../device-agnostic-source-architecture.md) —
+   the raw-capable vs computed source tiers, and
+   [`docs/overview/entries/2026-08-02-health-connect-source-tier.md`](../../overview/entries/2026-08-02-health-connect-source-tier.md)
+   for what tiers 1-2 actually landed as (Q-43): sleep has one write path with a required `source`,
+   Health Connect stage intervals become a `sleep_phase_5_min` hypnogram, and the readiness
+   composite runs without a ring. **Nothing in it has run against a real Health Connect provider.**
+7. Reviews: [`docs/reviews/2026-07-07-oura-ble-system-review.md`](../../reviews/2026-07-07-oura-ble-system-review.md),
+   [`docs/reviews/2026-08-03-cross-domain-bug-review.md`](../../reviews/2026-08-03-cross-domain-bug-review.md)
+   — Q-56 (open, investigation-first): real sensor data landed on `body_metrics`/`oura_daily` rows
+   dated up to 5 days in the future in production, `source_map` shows `oura_ble`/`scale_ble`
+   provenance; one row is still live and wrong as of 2026-08-03. Shared with `body`/`sleep`.
+7. Skills: **`oura-native-ble`** (protocol knowledge base), **`polar-h10-ble`**, **`oura-api`**
+8. Scale: [`docs/scale-ble-connect-latency.md`](../../scale-ble-connect-latency.md) — the "priming"
+   connect-latency investigation (open, parked 2026-08-01): what's already fixed (persistent
+   connection, #972), the hardware constraint that bounds it (scale doesn't advertise while idle),
+   on-device stage-timing data, and the parked Renpho-APK reverse-engineering angle.
+9. Chest strap: [`docs/superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md`](../../superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md)
+   — Workstream E: why the pairing card reads "Connecting…" permanently (the label is derived from
+   two booleans, and `active` is true all day because ambient mode runs all day), and why the
+   native service's `stopSelf()` after ~4 min of failed attempts is invisible to the WebView
+   (backlog Q-40). Task E3 is Kotlin — owner APK rebuild required.
+
+**The Oura on-device + own-analysis program (D0–D7, owner-directed 2026-07-21) is live, not
+historical — corrected 2026-07-30**, it was previously mislisted below as superseded alongside a
+genuinely-dead doc it itself supersedes. Entry point:
+[`docs/oura-ondevice-hybrid-handover.md`](../../oura-ondevice-hybrid-handover.md) (planning baton) →
+[`docs/oura-ondevice-hybrid-implementer-progress.md`](../../oura-ondevice-hybrid-implementer-progress.md)
+(live state, exact next tasks) →
+[`2026-07-21-oura-ondevice-hybrid-master-plan.md`](../../superpowers/plans/2026-07-21-oura-ondevice-hybrid-master-plan.md).
+~40% shipped (D0, D1, D5, D6, D2 Tasks 1–3); blocked on one owner action (on-device APK
+verification of D2 Tasks 2–3) since 2026-07-27. Also the load-bearing piece of
+[`docs/offline-first-target-architecture.md`](../../offline-first-target-architecture.md) — backlog
+Q-29.
+
+Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md` (the *audit* baton
+— superseded by the hybrid-handover doc above once the audit finished).
+
+- Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
+
+## Open issues
+
+```bash
+grep -n '^### .*\[devices\]' projectOverview.md   # 45 entries today
+grep -n '\[devices\]' docs/implementation-backlog.md   # 5 queue items today
+```
+
+Live at the time of writing (2026-07-30):
+
+- ⚠️ **Chest-strap auto-reconnect (v1.257.0) is not device-verified** — both strap paths give up on
+  an unreachable strap by design and nothing re-armed them, so a strap put on after launch needed
+  an app restart. Fixed via `retryAmbient()` + a foreground tick; the BLE half cannot be exercised
+  in the sandbox. See
+  [`docs/overview/entries/2026-08-05-more-tab-refresh-and-strap-retry.md`](../../overview/entries/2026-08-05-more-tab-refresh-and-strap-retry.md).
+- 🟠 **Sleep/HRV/breathing metrics changed scale at the BLE re-key** with no conversion — open.
+- 🟢 **Clock anchors are stamped at server batch-receive time, not ring-capture time (Q-71,
+  unblocked 2026-08-12)** — traced to `insertOuraRawSamples`'s `anchorUtc = new Date()`; the
+  already-shipped `resolveDsToMs` robust-offset fix (Q-139) tests clean against real sleep history
+  (uniform −3min) and just needs wiring to the sleep/HR/temperature converter. See
+  [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) I25 and
+  [`docs/overview/entries/2026-08-12-oura-ble-anchor-drain-lag-investigation.md`](../../overview/entries/2026-08-12-oura-ble-anchor-drain-lag-investigation.md).
+- 🟡 **Eight device-owned `oura_daily_derived` columns have no producer** (Q-7b) — open.
+- ⏳ **Ring clock anchors are append-only observations** — phase 1 of 2, currently inert.
+- The D1/D2 on-device restore and raw-store tracks are largely **shipped server-side but
+  device-gated**; most of this pillar's entries are unverified-on-device by nature.
+- **Chest-strap pairing card now shows a live link-status dot** (v1.246.4,
+  `components/settings/chest-strap-pairing.tsx` + `lib/live-hr/chest-strap-source.ts`'s
+  `getChestStrapLinkStatus()`, 1 Hz poll) — not yet confirmed on-device.
+
+## History
+
+- Handoffs: `ls docs/handoff-*-devices-*.md` — plus
+  [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
+  (Q-40 — the chest-strap card stuck on "Connecting…"), filed under `cross` because it spans five pillars and so is not matched by the glob above.
+  Also [`docs/handoff-2026-08-03-cross-owner-bug-batch-triage.md`](../../handoff-2026-08-03-cross-owner-bug-batch-triage.md)
+  (Q-64 — voice logging needs native STT on Android; Q-68 — ring-cadence auto-detection false positives),
+  same reason.
+- Journal: `grep -rl 'BLE\|oura\|strap\|scale' docs/overview/entries/`
+
+## Gotchas specific to this domain — all load-bearing
+
+
+- **A native service that stops must announce it.** `PolarStrapService` gave up after ~4 minutes
+  and called `stopSelf()` without emitting a status, so the WebView held its last-seen state
+  forever and the card claimed it was still connecting (Q-40, #997). Any foreground service with a
+  JS-facing state machine needs a final emit on every teardown path, including `onDestroy()`.
+- **Never derive a link label from `active` + `connected`.** Ambient mode keeps `active` true all
+  day, so that pair cannot tell "connecting" from "gave up". The label lives in
+  `lib/live-hr/strap-link-label.ts` and reads the service's own state.
+- **`measured_at` is indexed, so re-stamping it is never a HOT update.** `redecodeOuraRawSamples`
+  re-writes it unguarded per page, which is where `oura_raw_samples`' 306 MB of indexes came from
+  (740k rows, 1.3M updates, 19 HOT — measured against production 2026-08-02, backlog Q-46). Guard
+  any re-stamp with `IS DISTINCT FROM`, and never assume a no-op UPDATE is free on this table.
+- **The ring is on our own auth key; the Oura Cloud gets no new data from it, ever.** Never "fix"
+  staleness by re-onboarding the official Oura app — it can force a firmware update that changes
+  the BLE event encoding. Treat any re-onboard as a full protocol re-validation.
+- **Byte layouts come from the `open_oura` Rust source / the `oura-native-ble` skill** — never
+  memory, never Oura's public docs.
+- **`oura_raw_samples.body_hex` is the archival source of truth.** Never prune or mutate it;
+  protocol fixes ship as decoder changes plus a redecode pass.
+- **The history cursor may only advance past events that are durably ingested (server 2xx).**
+  Advancing on the ring's batch completion alone loses the drained span forever.
+- **Decoders are infallible** — unknown bodies return `null` and the raw row still stores.
+- **Kotlin changes need an owner APK rebuild** (`npx cap sync android && ./gradlew assembleDebug`)
+  and are compile-gated only in the sandbox. JS/server changes ship via Railway with no rebuild —
+  **state which half your PR touches.**
+- **Scan by name/manufacturer-id `0x02b2`, never MAC** (rotating RPA), and Samsung's stack does not
+  honour `autoConnect=true`.

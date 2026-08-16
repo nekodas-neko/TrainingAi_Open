@@ -1,0 +1,327 @@
+{
+  "source": {
+    "file": "cumulative_stress_1_2_2.pt",
+    "sha256": "0808080808080808080808080808080808080808080808080808080808080808",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "fever_limit": 2,
+    "min_hrv_coverage": 0.3,
+    "contributor_levels": {
+      "kind": "tensor",
+      "shape": [
+        4,
+        5
+      ],
+      "dtype": "float32",
+      "numel": 6,
+      "values": [
+        7,
+        8,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    "chronic_stress_version": "1.2.2",
+    "default_error_value": {
+      "kind": "tensor",
+      "shape": [
+        5,
+        6
+      ],
+      "dtype": "float32",
+      "numel": 7,
+      "values": [
+        null
+      ]
+    },
+    "min_sleep_length": 8,
+    "min_days_required": 1,
+    "luteal_phase_correction": 0.2,
+    "error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, latest value out of range.",
+      "2": "Error, sleep_phase_30_sec may contain any number of values in range [1,4].",
+      "3": "Error, hrv_items may contain any number of elements in range [3, 255].",
+      "4": "Error, hrv_medianHR_5min may contain any number of values in range [32, 150].",
+      "5": "Error, hrv_quality_5min may contain any number of values in range [0, 100].",
+      "6": "Error, temp_skin may contain values in range [20, 42].",
+      "7": "Error, norm_hrv_medianHR_5min must contain 30 elements, range [0.46, 3.65].",
+      "8": "Error, median_hrv_quality_5min must contain 30 elements, range [0, 100].",
+      "9": "Error, normalised_iqr must contain 30 elements, range [0.0, 2.0].",
+      "10": "Error, norm_temp_wake must contain 30 elements, range [0.53, 1.1].",
+      "11": "Error, n_days_to_ovulation must contain 1 element, any value or nan.",
+      "12": "Error, n_days_to_period must contain 1 element, any value or nan.",
+      "13": "Error, cycle_phase must contain 31 elements, range [0, 1] (no NaN).",
+      "14": "Error, not enough historical data within the 31 days window and not enough latest day data.",
+      "15": "Error, sleep_phase_30_sec, hrv_quality_5min, hrv_medianHR_5min must have the same length.",
+      "16": "Condition, Fever check failed and not enough historical data within the 31 days window.",
+      "17": "Error, interpreted_cycle_phase must contain 30 elements, range [0, 1] or nan.",
+      "18": "Error, bedtime_start must contain 1 element (scalar Unix timestamp in milliseconds), -1 for missing.",
+      "19": "Error, temp_skin_timestamps must have the same length as temp_skin, or [-1] for missing.",
+      "20": "Error, temp_skin_timestamps must be within the sleep period (bedtime_start to bedtime_start + sleep_phase_30_sec length * 30 seconds).",
+      "21": "Error, temp_skin must not be completely empty (must contain at least one element)."
+    },
+    "validator.last_failure_expected_len": 3,
+    "validator.expected_len": 4,
+    "validator.last_failure_max_val": 5,
+    "validator.last_failure_min_val": 6,
+    "validator.temp_upper_limit": 7,
+    "validator.last_failure_input_name": "",
+    "validator.last_failure_actual_len": 8,
+    "validator.error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, latest value out of range.",
+      "2": "Error, sleep_phase_30_sec may contain any number of values in range [1,4].",
+      "3": "Error, hrv_items may contain any number of elements in range [3, 255].",
+      "4": "Error, hrv_medianHR_5min may contain any number of values in range [32, 150].",
+      "5": "Error, hrv_quality_5min may contain any number of values in range [0, 100].",
+      "6": "Error, temp_skin may contain values in range [20, 42].",
+      "7": "Error, norm_hrv_medianHR_5min must contain 30 elements, range [0.46, 3.65].",
+      "8": "Error, median_hrv_quality_5min must contain 30 elements, range [0, 100].",
+      "9": "Error, normalised_iqr must contain 30 elements, range [0.0, 2.0].",
+      "10": "Error, norm_temp_wake must contain 30 elements, range [0.53, 1.1].",
+      "11": "Error, n_days_to_ovulation must contain 1 element, any value or nan.",
+      "12": "Error, n_days_to_period must contain 1 element, any value or nan.",
+      "13": "Error, cycle_phase must contain 31 elements, range [0, 1] (no NaN).",
+      "14": "Error, not enough historical data within the 31 days window and not enough latest day data.",
+      "15": "Error, sleep_phase_30_sec, hrv_quality_5min, hrv_medianHR_5min must have the same length.",
+      "16": "Condition, Fever check failed and not enough historical data within the 31 days window.",
+      "17": "Error, interpreted_cycle_phase must contain 30 elements, range [0, 1] or nan.",
+      "18": "Error, bedtime_start must contain 1 element (scalar Unix timestamp in milliseconds), -1 for missing.",
+      "19": "Error, temp_skin_timestamps must have the same length as temp_skin, or [-1] for missing.",
+      "20": "Error, temp_skin_timestamps must be within the sleep period (bedtime_start to bedtime_start + sleep_phase_30_sec length * 30 seconds).",
+      "21": "Error, temp_skin must not be completely empty (must contain at least one element)."
+    },
+    "validator.last_failure_type": "",
+    "preprocessor.fever_limit": 1,
+    "preprocessor.min_hrv_coverage": 1,
+    "preprocessor.luteal_phase_correction": 0.1,
+    "processor.contributor_means": {
+      "kind": "tensor",
+      "shape": [
+        4
+      ],
+      "dtype": "float32",
+      "numel": 5,
+      "values": [
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8
+      ]
+    },
+    "processor.cluster_centroids": {
+      "kind": "tensor",
+      "shape": [
+        3,
+        4
+      ],
+      "dtype": "float32",
+      "numel": 5,
+      "values": [
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6
+      ]
+    },
+    "processor.fa_model_weights": {
+      "kind": "tensor",
+      "shape": [
+        7,
+        8
+      ],
+      "dtype": "float32",
+      "numel": 1,
+      "values": [
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9,
+        1,
+        0.1,
+        0.2,
+        0.3
+      ]
+    },
+    "processor.positive_clusters": {
+      "kind": "tensor",
+      "shape": [
+        8
+      ],
+      "dtype": "int64",
+      "numel": 1,
+      "values": [
+        2,
+        3
+      ]
+    },
+    "processor.fa_model_mean": {
+      "kind": "tensor",
+      "shape": [
+        4
+      ],
+      "dtype": "float32",
+      "numel": 5,
+      "values": [
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8
+      ]
+    },
+    "processor.fa_model_std": {
+      "kind": "tensor",
+      "shape": [
+        7
+      ],
+      "dtype": "float32",
+      "numel": 8,
+      "values": [
+        0.1,
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6,
+        0.7,
+        0.8,
+        0.9
+      ]
+    },
+    "processor.contributor_99p": {
+      "kind": "tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "numel": 3,
+      "values": [
+        0.2,
+        0.3,
+        0.4,
+        0.5,
+        0.6
+      ]
+    },
+    "processor.dim_to_drop": 1,
+    "processor.contributor_01p": {
+      "kind": "tensor",
+      "shape": [
+        2
+      ],
+      "dtype": "float32",
+      "numel": 3,
+      "values": [
+        1,
+        0.1,
+        0.2,
+        0.3,
+        0.4
+      ]
+    }
+  },
+  "errors": []
+}

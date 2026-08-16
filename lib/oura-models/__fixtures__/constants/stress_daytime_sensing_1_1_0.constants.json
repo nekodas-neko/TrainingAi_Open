@@ -1,0 +1,52 @@
+{
+  "source": {
+    "file": "stress_daytime_sensing_1_1_0.pt",
+    "sha256": "2828282828282828282828282828282828282828282828282828282828282828",
+    "size_bytes": 1,
+    "version": null
+  },
+  "params_and_buffers": {},
+  "attributes": {
+    "target_level_limit": 0.2,
+    "scaled_level_limit": 0.3,
+    "daytime_stress_sensing_version": "1.1.0",
+    "error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, Ring MET is empty.",
+      "2": "Error, Ring MET must only have one observation.",
+      "3": "Silent Condition, Ring MET exceeded limit for activity.",
+      "4": "Error, DHRV timestamp value is empty.",
+      "5": "Error, Bedtime start and end timestamps have different shapes.",
+      "6": "Silent Condition, Sleep detected.",
+      "7": "Error, DHRV is empty",
+      "8": "Error, DHRV must only have one observation",
+      "9": "Error, DHRV is not a positive value",
+      "10": "Error, DHRV baseline is empty",
+      "11": "Error, DHRV baseline must only have one observation",
+      "12": "Error, DHRV is not a positive value",
+      "13": "Error, Night-time HRV baseline is empty",
+      "14": "Error, Night-time HRV baseline must only have one observation",
+      "15": "Error, Night-time HRV baseline is not a positive value"
+    },
+    "validator.ring_met_limit": 0.4,
+    "validator.error_code_to_message": {
+      "0": "No errors.",
+      "1": "Error, Ring MET is empty.",
+      "2": "Error, Ring MET must only have one observation.",
+      "3": "Silent Condition, Ring MET exceeded limit for activity.",
+      "4": "Error, DHRV timestamp value is empty.",
+      "5": "Error, Bedtime start and end timestamps have different shapes.",
+      "6": "Silent Condition, Sleep detected.",
+      "7": "Error, DHRV is empty",
+      "8": "Error, DHRV must only have one observation",
+      "9": "Error, DHRV is not a positive value",
+      "10": "Error, DHRV baseline is empty",
+      "11": "Error, DHRV baseline must only have one observation",
+      "12": "Error, DHRV is not a positive value",
+      "13": "Error, Night-time HRV baseline is empty",
+      "14": "Error, Night-time HRV baseline must only have one observation",
+      "15": "Error, Night-time HRV baseline is not a positive value"
+    }
+  },
+  "errors": []
+}

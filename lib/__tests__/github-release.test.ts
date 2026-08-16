@@ -1,0 +1,83 @@
+import { describe, it, expect, vi } from 'vitest'
+import { lookupLatestApkRelease, mapApkRelease, parseNativeReleaseSha, parseNativeReleaseVersion } from '@/lib/github-release'
+
+// The exact strings `.github/workflows/android.yml` publishes today.
+const NAME = 'Latest debug APK (v1.255.1)'
+const BODY =
+  'Auto-built from `main` @ 8ff51fa (v1.255.1). Debug build for sideloading on the S25 — download `app-debug.apk` below.'
+
+describe('parseNativeReleaseVersion', () => {
+  it('reads the version the workflow writes into the release title', () => {
+    expect(parseNativeReleaseVersion(NAME, BODY)).toBe('1.255.1')
+  })
+
+  it('falls back to the notes when the title has no version', () => {
+    expect(parseNativeReleaseVersion('Latest debug APK', BODY)).toBe('1.255.1')
+  })
+
+  it('returns null rather than guessing when neither carries one', () => {
+    // An unknown native version must leave the update card silent. Anything other than null
+    // here would make it assert something it does not know.
+    expect(parseNativeReleaseVersion('Latest debug APK', 'no version here')).toBeNull()
+    expect(parseNativeReleaseVersion(null, null)).toBeNull()
+    expect(parseNativeReleaseVersion(undefined, undefined)).toBeNull()
+  })
+
+  it('does not mistake a bare or partial version for a tagged one', () => {
+    expect(parseNativeReleaseVersion('v1.255.1', 'built from 1.255')).toBeNull()
+  })
+})
+
+describe('parseNativeReleaseSha', () => {
+  it('reads the short commit from the notes', () => {
+    expect(parseNativeReleaseSha(BODY)).toBe('8ff51fa')
+  })
+
+  it('returns null when the notes carry no commit', () => {
+    expect(parseNativeReleaseSha('Debug build for sideloading.')).toBeNull()
+    expect(parseNativeReleaseSha(null)).toBeNull()
+  })
+})
+
+describe('mapApkRelease', () => {
+  // The real `apk-latest` payload, captured from the GitHub API on 2026-08-04.
+  const REAL = {
+    name: NAME,
+    body: BODY,
+    published_at: '2026-08-04T09:20:07Z',
+    assets: [
+      { name: 'app-debug.apk', browser_download_url: 'https://github.com/nekodas-neko/TrainingAI/releases/download/apk-latest/app-debug.apk' },
+    ],
+  }
+
+  it('maps the live release payload to the four fields the callers use', () => {
+    expect(mapApkRelease(REAL)).toEqual({
+      version: '1.255.1',
+      sha: '8ff51fa',
+      publishedAt: '2026-08-04T09:20:07Z',
+      apkUrl: 'https://github.com/nekodas-neko/TrainingAI/releases/download/apk-latest/app-debug.apk',
+    })
+  })
+
+  it('nulls the APK url when the release carries no apk asset, rather than redirecting somewhere wrong', () => {
+    expect(mapApkRelease({ ...REAL, assets: [{ name: 'notes.txt', browser_download_url: 'https://x/notes.txt' }] }).apkUrl).toBeNull()
+    expect(mapApkRelease({ ...REAL, assets: undefined }).apkUrl).toBeNull()
+  })
+})
+
+describe('lookupLatestApkRelease', () => {
+  it('reports `unconfigured` without spending a request when the token is absent', async () => {
+    // The repo is private, so an unauthenticated call can only 404 — and "no token" is a Railway
+    // env var the owner can fix, while "unavailable" is not. They must not read the same.
+    const prev = process.env.GITHUB_RELEASES_TOKEN
+    delete process.env.GITHUB_RELEASES_TOKEN
+    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    try {
+      await expect(lookupLatestApkRelease()).resolves.toEqual({ release: null, status: 'unconfigured' })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    } finally {
+      fetchSpy.mockRestore()
+      if (prev !== undefined) process.env.GITHUB_RELEASES_TOKEN = prev
+    }
+  })
+})

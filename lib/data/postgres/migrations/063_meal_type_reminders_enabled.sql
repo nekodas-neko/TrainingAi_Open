@@ -1,0 +1,1 @@
+ALTER TABLE meal_types ADD COLUMN IF NOT EXISTS reminders_enabled BOOLEAN NOT NULL DEFAULT true;
