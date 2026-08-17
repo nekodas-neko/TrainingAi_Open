@@ -1,6 +1,6 @@
 # Handoff — 2026-08-17 · Context-usage warning fired at 22% of the real window
 
-_Domain: `platform` · Branch: `claude/claude-md-rules-context-uc2xpb` · PR: #19 (open at time of writing)_
+_Domain: `platform` · Branch: `claude/claude-md-rules-context-uc2xpb` · PR: #20_
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/platform/README.md`](domains/platform/README.md). This file covers only what *this*
@@ -17,7 +17,7 @@ while the context window still had most of its room. Find why, and stop it naggi
 |---|---|
 | Default context window raised 200k → 1M, so the 90/95% thresholds land at 900k/950k | `.claude/hooks/context-usage-warn.mjs:14` |
 
-That is the entire code change — one constant plus a comment recording why. PR #19.
+That is the entire code change — one constant plus a comment recording why. PR #20.
 
 **The diagnosis is the useful part.** The warning is **not** a CLAUDE.md rule, which is where the
 owner (reasonably) went looking for it. It is a `Stop` hook, `.claude/hooks/context-usage-warn.mjs`,
@@ -87,7 +87,7 @@ None. Nothing is waiting on the owner.
 
 ```
 This is a fresh session on the TrainingAi_Open repo. The previous session was a one-line platform
-fix and is fully closed — PR #19 raised the context-usage warning window from 200k to 1M in
+fix and is fully closed — PR #20 raised the context-usage warning window from 200k to 1M in
 .claude/hooks/context-usage-warn.mjs, so the wrap-up nag now fires at 900k/950k instead of 180k.
 Nothing is outstanding from it; do not re-open that work.
 

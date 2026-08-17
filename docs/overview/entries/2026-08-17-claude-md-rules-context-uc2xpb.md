@@ -18,7 +18,7 @@ and the wrap-up nag fired at roughly 180k, with ~82% of the window still free.
 
 One constant, `.claude/hooks/context-usage-warn.mjs:14` — the default window is now `1_000_000`, so
 the existing 90/95% thresholds land at **900k and 950k**. The `CONTEXT_WINDOW_TOKENS` env override
-still works for tightening it. PR #19.
+still works for tightening it. PR #20.
 
 Changing the default rather than setting the env var in `settings.json` keeps the correct value as
 the one you get for free, instead of leaving a wrong default in the file behind an override.
