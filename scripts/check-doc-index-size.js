@@ -24,9 +24,15 @@ const root = path.join(__dirname, '..');
 // Two new queue entries replacing one (Q-271 superseded by Q-500, plus Q-501) and one rewritten +
 // one new Known-Issues row. This is queue and open-issue content, which is what these two files are
 // for — the growth the ratchet exists to catch is narrative and dated notes, not entries.
+//
+// Raised 2026-08-17 (Review, Q-450…Q-455): backlog 5722 -> 5903, projectOverview 6382 -> 6428.
+// Six new queue entries from the failure-cells sweep and the one Known-Issues row that indexes
+// them. Same justification as above: entries, not narrative. The sweep's actual prose lives in
+// docs/reviews/2026-08-17-failure-cells-running-the-app.md, which this ratchet does not govern —
+// which is the split it is meant to enforce.
 const BASELINE = {
-  'projectOverview.md': 6382,
-  'docs/implementation-backlog.md': 5766,
+  'projectOverview.md': 6428,
+  'docs/implementation-backlog.md': 5945,
   'CLAUDE.md': 967,
 };
 

@@ -346,6 +346,127 @@ below threshold and left in place for next time.
      (not the early-deload-week path) and confirm the header still reads "Deload", weights are now
      reduced, and no PR badge/write fires for a submaximal set.
 
+### [activity][cardio] Q-450 — `/activity` reached without a type: Start works, Finish works, Save silently discards the activity
+
+- **Branch:** `fix/activity-untyped-entry-silent-save-loss`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens, **reproduced in a browser**) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** top of the queue below Q-310. This one **loses a completed activity with no error
+  message**, and the recording flow up to that point works perfectly, so the user has no reason to
+  suspect anything until the data is gone.
+- **Observed, not inferred.** Signed in against the seeded local DB, navigated to `/activity`, and
+  drove it through Playwright at 412×915:
+
+  | Step | Observed |
+  |---|---|
+  | Load `/activity` | Renders. Full text of the screen is **`"Title\nStart"`** — 58 KB of HTML, 11 characters of text |
+  | Tap **Start** | Works. Active screen, timer running (`0:05 / Pause / Finish`) |
+  | Tap **Finish** | Works. Summary renders (`0.1 / min / Discard / Save`) |
+  | Tap **Save** | **Nothing.** No toast, no error, no navigation, no state change, **zero network requests**. `select count(*) from activity_logs` = 0 afterwards |
+
+- **Root cause — `components/activity/done-activity-screen.tsx:167`:**
+  ```ts
+  async function handleSave() {
+    if (!activityType || !startMs || !endMs || !draftSummary) return
+  ```
+  With `activityType === null` this returns before `setSaving(true)` — before the local
+  `store.upsertActivityLog`, before the outbox `queueMutation`, and before the `/api/activity-logs`
+  web fallback. **Discard is the only working control on that screen.** This is the `CLAUDE.md`
+  *"No silent fallbacks on failure paths"* rule and the *"UI feedback fires synchronously"* rule
+  failing in the same guard.
+- **Why the untyped state is normal, not exotic.** `components/activity/activity-screen.tsx` renders
+  `PreActivityScreen` whenever `mode === 'pre'` with **no guard on `activityType`**. The store's
+  initial state (`lib/stores/activity-store.ts:71-74`) is `activityType: null, activityLabel: '',
+  activityIcon: ''`, and `resetSession()` (`:180`) restores exactly that — and `resetSession()` runs
+  **after every successful save** and **on the back button inside `PreActivityScreen` itself**
+  (`pre-activity-screen.tsx:24`). So this is where the store sits *between* activities.
+- **Why the screen gives no warning.** The `<h1>` and the type caption both bind `activityLabel`,
+  which is `''`; `getActivityIcon('')` falls through to a placeholder ellipsis glyph. The user sees a
+  back chevron, a dotted circle, an unlabelled "Title" field and a working Start button.
+- **Two in-app paths reach it.** `startActivity()` has exactly two callers repo-wide —
+  `components/workout/log-activity-sheet.tsx:42` (the picker) and
+  `components/running/running-plan-content.tsx:204` — and **both set the type correctly before
+  pushing**. The two that do not:
+  - `components/coach/handoff-card.tsx:16` — `log_activity: { href: "/activity", … }`, a plain
+    `<Link>` in the AI Coach's fixed destination map. Nothing sets a type.
+  - `components/guided-walk/walk-summary.tsx:286` —
+    `onClick={() => { onDone(); router.push('/activity') }}`, the only exit from the guided-walk
+    summary. `onDone` is the *guided-walk* store's reset; **nothing in `components/guided-walk/`
+    imports `useActivityStore`** (verified), so this lands on whatever the activity store last held.
+
+  Plus a cold open on `/activity`, `lib/native/run-status-chip.ts:73`'s
+  `window.location.assign('/activity')`, and any refresh of the URL.
+- **Fix shape (implementer's call, not prescribed here).** Either guard the entry — render a type
+  picker or redirect when `activityType == null` instead of a blank Pre screen — or make the two
+  offending navigations set a type first, or both. Whatever else changes, `handleSave`'s bail-out
+  must stop being silent: it is the last line of defence and it currently fails without a word.
+- **NOT device-verified.** Reproduced in the web build, where `getLocalStore` returns null and the
+  run took the web fallback. The `:167` guard sits above the local-store branch too, so on device the
+  bail-out is if anything earlier — but that is reasoning, not an observation.
+
+### [workouts][app-shell] Q-451 — a brand-new account's Workout tab is a giant empty card with a dead "Start Workout" button
+
+- **Branch:** `fix/workout-select-no-program-empty-state`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens, **reproduced in a browser**) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** high. This is the app's **primary tab and primary action**, on the **first-run
+  path**, and both the screen and the button are inert. Every other first-run screen tested was fine
+  — this is the one that fails, and the worst one to fail.
+- **Observed.** A second account with no program, no logs and no metrics, signed in and sent to
+  `/workout-select` (the `Workout` bottom-nav destination; `/workout` and `/session-select` both
+  resolve here). At 412×915 it renders a **~1,400 px tall empty peach card** with a lone 💪 in the
+  top-left corner and a full-width green **Start Workout** button at the bottom. Full rendered text
+  of the screen: `"Workout / Choose a session to start / 💪 / Start Workout / Cardio Hub / Run · Walk
+  · Log anything"`.
+- **The button is dead.** Tapped it: same URL, same DOM, no navigation, no toast, **no console error,
+  no `/api/` request**. `app/workout-select/workout-select-content.tsx:412`:
+  ```tsx
+  onClick={() => currentSession && handleStart(currentSession)}
+  ```
+  With no program there is no `currentSession`, so the expression short-circuits to `undefined`. The
+  button is **not `disabled`**, carries no empty state, and gives no hint that creating a program is
+  the missing prerequisite.
+- **The empty card is the session carousel painting a session that isn't there.** `:337` is
+  `{currentSession?.icon ?? p.emoji}` where `p = getPaletteEntry(currentSession?.position ?? 0)` — so
+  the 💪 is position-0's palette decoration standing in for absent content, and the card keeps its
+  full height. That is position-indexed, so the *No Hardcoded Session Names* rule is **not** violated
+  — but it is why the empty state reads as a rendering fault.
+- **The comparison that makes it a bug rather than a gap:** `/program` handles the same account
+  correctly — *"No programs yet. Create one to get started."* The screen a new user is actually
+  dropped on has no such affordance.
+- **Fix shape:** give the no-program case a real empty state that routes to `/program`, and disable
+  (or repurpose) the button rather than leaving an inert primary CTA. Worth checking the same
+  short-circuit pattern on sibling surfaces per the *Sibling-surface sweep* rule.
+- **NOT device-verified** (web build, browser only).
+
+### [app-shell][platform] Q-452 — the AI insight card runs an LLM over a prompt of literal "no data" strings, and tells a day-one user their inactivity is a "significant gap"
+
+- **Branch:** `fix/ai-insight-sufficiency-gate`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens, **rendered output quoted**) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** mid-queue. Not data loss, but it is **wrong user-facing copy shown to exactly the
+  users least able to discount it**, and it costs LLM calls that cannot carry signal.
+- **No sufficiency gate anywhere between the mount and the model.**
+  `components/health/ai-insight-card.tsx:44-48` fires `POST /api/ai/health-insight` on every mount,
+  unconditionally. `app/api/ai/health-insight/route.ts` builds its prompt by substituting the literal
+  string `"no data"` for every absent field (`:102, :105, :116-119, :125-126, :157-158`) and calls
+  `generateText` regardless.
+- **Rendered, as a zero-data account, on its first ever visit:**
+  - `/health/sleep` — *"Your current sleep dashboard is empty, which prevents us from identifying any patterns in your recovery or rest quality…"*
+  - `/health/readiness` — *"Your readiness data is currently unavailable, which prevents me from providing a specific assessment…"*
+  - `/health/activity` — *"Your activity tracker currently shows **zero movement and no strength sessions** toward your goal of five per week. **This inactivity creates a significant gap** in your ph…"*
+- **The third one is the actual bug.** Handed `Steps: no data`, the model does not report absence — it
+  asserts **zero**, then editorialises about it. A user on day one is told they have a significant
+  fitness gap. The model cannot distinguish "no data" from "measured zero" because **the prompt does
+  not distinguish them either**.
+- **Bounded but not free:** `rateLimit('ai-insight:${userId}', 10, 60*60*1000)` (`:64`) plus a 6 h
+  client cache caps it at four calls per new user per day. Cost is the aggravation, not the finding —
+  the six-round review already measured AI spend and recorded a decision not to optimise it. **This
+  entry is about correctness of what is said.**
+- **Fix shape:** gate the card on the section actually having data (return `{ insight: null }` and let
+  the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
+  than feeding a bare `"no data"` string the model reads as a measurement.
+
 ### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
 
 - **Branch:** `fix/publish-dry-run-build-gate`
@@ -803,6 +924,66 @@ session working from a temporarily restored copy.
   exercises and absent from `MUSCLE_LANDMARKS`, which looks like a silent fall-through to
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly.
+
+### [platform][readiness] Q-453 — `/api/training-stress` silently answers for *today* when handed a malformed date; its ten siblings all reject it
+
+- **Branch:** `fix/training-stress-date-param-validation`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens, **live request matrix**) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** lower-mid. Wrong-day data returned as if correct, but no client is known to send a
+  malformed date today.
+- **Measured.** All 11 `app/api` routes reading a `date`/`localDate` param, hit live with a real
+  session cookie. Nine reject `?date=not-a-date` with **400**. `/api/oura/hr-window` takes
+  `start`/`end`, not `date`, and 400s throughout. **`/api/training-stress` returns 200.**
+- **Cause — `app/api/training-stress/route.ts:22`:**
+  ```ts
+  const date = (raw ? normalizeDateParamIso(raw) : null) ?? todayInTz(tz)
+  ```
+  A malformed `date` normalises to `null` and falls through to *today*. The response carries **no echo
+  of which date it answered for**, so a caller asking for the 10th with a typo gets the 17th's numbers
+  with nothing indicating the substitution.
+- **This is not the `[-/]` separator class** — that came back clean (all 11 routes accept both
+  separators; see the review). It is the adjacent one: a normaliser whose `null` return is read as
+  "use the default" rather than "reject". Worth grepping for the same
+  `normalizeDateParam*(...) ?? today…` shape elsewhere when fixing.
+
+### [platform] Q-454 — two routes validate their params before checking auth, out of 122
+
+- **Branch:** `fix/auth-before-param-validation`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens, **all 122 GET routes called anonymously**) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** low. **No data leaks** — this is ordering, not a hole.
+- **Measured.** 122 `app/api` GET routes called with no session cookie. 120 reveal nothing about their
+  contract. Two answer the *parameter* question first:
+  - `GET /api/day-log` → `400 {"error":"Missing date"}`
+  - `GET /api/exercise-history` → `400 {"error":"Missing name"}`
+- **Verified not a leak.** Supply the missing param and both return `401 {"error":"Unauthorized"}`
+  (`/api/day-log?date=2026-08-14`, `/api/exercise-history?name=Bench%20Press` — both 401 anonymous).
+- **Why fix it anyway:** the stated rule is that security checks fail closed and fail *first*. Today
+  the pre-auth code only reads a search param; it is cheap to reorder now, and expensive the day
+  someone adds a param handler above the `auth()` call that touches the DB.
+- **Filed here rather than separately, same class:** `GET /api/push/subscribe` returns
+  `503 {"error":"Push not configured"}` to an anonymous caller, disclosing deployment configuration
+  before authentication. (Q-285/Q-286 already cover web push having no senders or subscribers; this is
+  only about the pre-auth answer.)
+
+### [platform][devices] Q-455 — an unhandled throw in a GET route returns a bodiless 500, not a JSON error
+
+- **Branch:** `fix/decoder-constants-json-error-shape`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** low.
+- **Observed.** `GET /api/oura-ble/decoder-constants` returned **500 with an empty body** — no JSON,
+  no `error` key — because a `JSON.parse(fs.readFileSync(...))` threw straight out of
+  `app/api/oura-ble/decoder-constants/route.ts:29` with nothing catching it.
+- **The trigger is environmental and is NOT what is being filed.** This sandbox cannot reach the
+  model-constants bucket (`SignatureDoesNotMatch (403)` at boot, logged by instrumentation) — the
+  already-recorded Known Issue *"The bucket download path for the model constants has never actually
+  run (2026-08-15)"*. In production with working credentials the read succeeds.
+- **What is filed is the shape.** `CLAUDE.md` requires routes to return a JSON error rather than
+  throwing; a client doing `res.json()` on this gets a parse exception stacked on top of the original
+  fault. The route has a deliberate boot-time check that turns this into a deploy failure rather than
+  a first-request one — but the first-request path still exists and still answers with nothing.
 
 ### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
 

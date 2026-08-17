@@ -83,6 +83,8 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-452 insight-over-no-data, Q-453 `/api/training-stress` accepts a malformed date). Findings Q-450…Q-455; four areas recorded **clean**.
+
 ## Open issues
 
 ```bash
