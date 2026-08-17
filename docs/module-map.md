@@ -17,7 +17,15 @@
 > API listing — link to the file and let the reader open it. If a row here is wrong,
 > the file wins; fix the row.
 
+> **Reading a PR number in these docs.** This repository begins at one commit — the 2026-08-16
+> snapshot of a private repo that had reached ~#1399. Every PR number cited below roughly **#1250 and
+> under refers to that archived repository**, `nekodas-neko/TrainingAI`, not to a pull request here,
+> and the numbering restarts from #1 in this one. The archived repo is read-only rather than deleted
+> precisely so those references stay resolvable. See [`NOTICE`](../NOTICE) for why the history could
+> not come across.
+
 ---
+
 
 ## 0. Recurring / scheduled / background work — READ THIS FIRST
 

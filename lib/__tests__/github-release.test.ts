@@ -66,18 +66,45 @@ describe('mapApkRelease', () => {
 })
 
 describe('lookupLatestApkRelease', () => {
-  it('reports `unconfigured` without spending a request when the token is absent', async () => {
-    // The repo is private, so an unauthenticated call can only 404 — and "no token" is a Railway
-    // env var the owner can fix, while "unavailable" is not. They must not read the same.
+  // Inverted when the repository went public (Q-49). It used to assert the opposite — that a missing
+  // token short-circuits to `unconfigured` without spending a request — which was right while an
+  // unauthenticated call to a private repo could only 404. Now the anonymous call is the normal
+  // path, and short-circuiting would leave the update card permanently dead for exactly the
+  // configuration production runs in.
+  it('still asks GitHub when no token is set, because the repository is public', async () => {
     const prev = process.env.GITHUB_RELEASES_TOKEN
     delete process.env.GITHUB_RELEASES_TOKEN
-    const fetchSpy = vi.spyOn(globalThis, 'fetch')
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ name: 'Latest debug APK (v9.9.9)', assets: [] }), { status: 200 }),
+    )
     try {
-      await expect(lookupLatestApkRelease()).resolves.toEqual({ release: null, status: 'unconfigured' })
-      expect(fetchSpy).not.toHaveBeenCalled()
+      const { status } = await lookupLatestApkRelease()
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(status).not.toBe('unconfigured')
+      // No Authorization header when there is no token — sending `Bearer undefined` would turn a
+      // working anonymous request into a 401.
+      const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+      expect(headers).not.toHaveProperty('Authorization')
     } finally {
       fetchSpy.mockRestore()
       if (prev !== undefined) process.env.GITHUB_RELEASES_TOKEN = prev
+    }
+  })
+
+  it('sends the token when one is set, for the higher rate limit', async () => {
+    const prev = process.env.GITHUB_RELEASES_TOKEN
+    process.env.GITHUB_RELEASES_TOKEN = 'test-token'
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ name: 'Latest debug APK (v9.9.9)', assets: [] }), { status: 200 }),
+    )
+    try {
+      await lookupLatestApkRelease()
+      const headers = (fetchSpy.mock.calls[0][1] as RequestInit).headers as Record<string, string>
+      expect(headers.Authorization).toBe('Bearer test-token')
+    } finally {
+      fetchSpy.mockRestore()
+      if (prev === undefined) delete process.env.GITHUB_RELEASES_TOKEN
+      else process.env.GITHUB_RELEASES_TOKEN = prev
     }
   })
 })

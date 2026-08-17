@@ -437,7 +437,15 @@ Management rule). Below threshold, skip it and take the top numbered item; the
 alerts accumulate until the next sweep. It is never removed — it's driven back
 below threshold and left in place for next time.
 
+> **Reading a PR number in these docs.** This repository begins at one commit — the 2026-08-16
+> snapshot of a private repo that had reached ~#1399. Every PR number cited below roughly **#1250 and
+> under refers to that archived repository**, `nekodas-neko/TrainingAI`, not to a pull request here,
+> and the numbering restarts from #1 in this one. The archived repo is read-only rather than deleted
+> precisely so those references stay resolvable. See [`NOTICE`](../NOTICE) for why the history could
+> not come across.
+
 ---
+
 
 ## [platform] Standing item — Dependabot vulnerability remediation (always top priority when triggered)
 
