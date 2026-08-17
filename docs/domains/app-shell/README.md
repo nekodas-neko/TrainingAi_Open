@@ -56,6 +56,8 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-457 — `lib/github-release.ts` defaults to the archived private repo, so the update card and More → Download APK break silently if the env var is ever unset). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
 
+- [`docs/reviews/2026-08-17-score-presentation-audit.md`](../../reviews/2026-08-17-score-presentation-audit.md) — **every surface rendering a pillar score, audited (Q-281), 2026-08-17.** Fourteen surfaces scored for contributors / trend / action: **nine render a score with no contributors and no trend**, and exactly one has all three. One real colour-only-state violation found and fixed (Home "accentring" band dot); `FactorBar` inspected and deliberately left alone. Also carries three corrections to **Q-278**'s premises — `score-audit/` has zero user-facing consumers, `scoreAvailability` has one, and daytime stress + resilience have no score surface at all.
+
 ## Open issues
 
 ```bash

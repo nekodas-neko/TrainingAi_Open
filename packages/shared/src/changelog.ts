@@ -13,6 +13,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.318.10",
+    date: "2026-08-17",
+    changes: [
+      "The “Accent ring” home screen style now spells out High, Moderate or Low next to its coloured dot. Before, that dot was the only thing saying which band a score fell into — unreadable if you have trouble telling those colours apart. Every other style is unchanged.",
+    ],
+  },
+  {
     version: "1.318.9",
     date: "2026-08-17",
     changes: [
