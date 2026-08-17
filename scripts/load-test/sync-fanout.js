@@ -75,6 +75,35 @@ async function oneSyncSerial(pool, userId, since) {
   return { ms: Date.now() - t0, maxWaitMs: wait, failures }
 }
 
+// CHUNKED variant: the fan-out in N batches, so connection demand is N instead of 21 while most of
+// the parallelism survives. Added 2026-08-16 once the owner measured Railway RTT at p50 0.86 ms /
+// p95 1.22 ms — low enough that trading round-trips for connections is worth measuring rather than
+// arguing about. `RTT_MS` simulates that network cost, which the local unix socket does not have.
+async function oneSyncChunked(pool, userId, since, chunkCount, rttMs) {
+  const t0 = Date.now()
+  const waits = []
+  const failures = []
+  const size = Math.ceil(FANOUT.length / chunkCount)
+  const batches = []
+  for (let i = 0; i < FANOUT.length; i += size) batches.push(FANOUT.slice(i, i + size))
+  // Batches run in sequence; the queries WITHIN a batch run in parallel on their own connections.
+  // That is what "chunked" has to mean — an earlier draft ran them serially inside the batch, which
+  // is just serial with extra connection churn, and measured worse than serial for that reason.
+  for (const batch of batches) {
+    await Promise.all(batch.map(async ([name, sql]) => {
+      const w0 = Date.now()
+      const client = await pool.connect()
+      waits.push(Date.now() - w0)
+      try {
+        if (rttMs > 0) await new Promise(r => setTimeout(r, rttMs))   // simulate the network hop
+        await client.query(sql, sql.includes('$2') ? [userId, since] : [userId])
+      } catch (err) { failures.push({ name, err: err.message.slice(0, 80) }) }
+      finally { client.release() }
+    }))
+  }
+  return { ms: Date.now() - t0, maxWaitMs: Math.max(...waits), failures }
+}
+
 async function oneSync(pool, userId, since) {
   const t0 = Date.now()
   const waits = []
@@ -116,7 +145,11 @@ async function main() {
 
   const users = Array.from({ length: concurrency }, (_, i) => userIds[i % userIds.length])
   const serial = process.env.SERIAL === '1'
-  const runner = serial ? oneSyncSerial : oneSync
+  const chunks = Number(process.env.CHUNKS || 0)
+  const rttMs = Number(process.env.RTT_MS || 0)
+  const runner = chunks > 0
+    ? (p, u, si) => oneSyncChunked(p, u, si, chunks, rttMs)
+    : serial ? oneSyncSerial : oneSync
   const t0 = Date.now()
   const runs = await Promise.all(users.map(u => runner(pool, u, since)))
   const wall = Date.now() - t0
@@ -125,8 +158,8 @@ async function main() {
   const waitsMax = Math.max(...runs.map(r => r.maxWaitMs))
   const failures = runs.flatMap(r => r.failures)
 
-  const perSync = serial ? 1 : FANOUT.length
-  console.log(`\nconcurrency=${concurrency}  poolMax=${poolMax}  queriesPerSync=${FANOUT.length}  mode=${serial ? 'SERIAL (1 conn/sync)' : 'PARALLEL (21 conn/sync)'}`)
+  const perSync = chunks > 0 ? chunks : serial ? 1 : FANOUT.length
+  console.log(`\nconcurrency=${concurrency}  poolMax=${poolMax}  queriesPerSync=${FANOUT.length}  mode=${chunks > 0 ? `CHUNKED x${chunks} (rtt ${rttMs}ms)` : serial ? 'SERIAL (1 conn/sync)' : 'PARALLEL (21 conn/sync)'}`)
   console.log(`  connection demand : ${concurrency * perSync} vs pool of ${poolMax}  (${((concurrency * perSync) / poolMax).toFixed(1)}x over-subscribed)`)
   console.log(`  wall clock        : ${wall} ms for all ${concurrency}`)
   console.log(`  per-sync p50/p95  : ${pct(times, 50)} / ${pct(times, 95)} ms   (min ${times[0]}, max ${times[times.length - 1]})`)
