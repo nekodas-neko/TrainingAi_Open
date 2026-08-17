@@ -1146,3 +1146,26 @@ should auto-disconnect the integration. On the Q-217 backlog entry.
 was deleted with the Oura Cloud integration, so the "owner, optional" action below is moot, and the
 "still open, separate" dead-token call on every workout completion was removed on 2026-08-13. Nothing
 is outstanding, which is what makes this archivable rather than resident.
+
+### [sleep][devices] ✅ 43 nights of sleep windows were 14.2 h wrong — fixed and confirmed (Q-536, 2026-08-17)
+
+- **Confirmed on the owner's device**, which is what let this leave `projectOverview.md`. After
+  migrations 189 + 190 (v1.318.2) and the 10:47 redecode, the midday cluster went **43 nights → 4**,
+  and 21:00–22:00 went from 25 nights to **62**. The four survivors are short daytime fragments, not
+  bedtimes — filed under Q-274, which now owns the only remaining deviation.
+- **Cause.** A 2026-08-17 re-pair made the ring re-drain days of buffered history;
+  `isClockEpochReset` read the replayed counter as a reset and opened a spurious epoch. Its offset is
+  estimated at the p10 of anchor lag, and >90% of a re-drain burst's anchors carry backlog, so it
+  landed **+14.16 h** out. `aggregateOuraRawSamples` resolves every ds against `currentEpoch`, so the
+  full redecode re-timed all of history. The ring clock never actually reset: minimum anchor lag
+  agreed across all four epochs to within 50 s.
+- **It took three deploys, and two of the three were my own mistakes.** v1.318.0's migration
+  relabelled 434,707 rows against a 15 s `statement_timeout` and rolled back on every boot, silently;
+  it was verified against an 8-row fixture that could not see scale. Then the redecode failed with an
+  unreadable error for two more rounds because the rollup worker flattened errors with
+  `err.message`, discarding Drizzle's `cause` and pg's `code` (fixed in v1.318.4).
+- **Still live: Q-314**, the misdetection that caused it. Every re-pair reopens this until it lands.
+- Journal: [`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](entries/2026-08-17-q536-clock-epoch-diagnosis.md) ·
+  [`entries/2026-08-17-q536-migration-statement-timeout.md`](entries/2026-08-17-q536-migration-statement-timeout.md) ·
+  [`entries/2026-08-17-rollup-worker-error-cause.md`](entries/2026-08-17-rollup-worker-error-cause.md)
+

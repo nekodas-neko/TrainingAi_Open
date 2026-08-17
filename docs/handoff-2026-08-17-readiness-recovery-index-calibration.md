@@ -48,8 +48,8 @@ under-scoring — the safe direction for a recovery signal.
 
 **Q-271 was re-measured rather than built on.** Its numbers reproduce exactly the eight days
 immediately before that review ran (2026-08-08 → 08-15 sorted is 13, 18, 20, 21, 22, 28, 43, 48 — the
-list it quotes). Over the full 41-day series the contributor exceeds 50 on 12 days, hits 100 on
-2026-07-17, and costs 0.71 readiness points/day rather than 2.2.
+list it quotes). Over the full 41-day series the contributor exceeds 50 on **13** days, hits 100 on
+2026-07-17, and costs **0.55** readiness points/day rather than 2.2.
 
 ## Gotchas and dead ends
 
@@ -99,7 +99,9 @@ in the review rather than attributed.
 - **Nothing on-device.** No APK, native path, safe-area or WebView surface was exercised — this is a
   data analysis over production rows.
 - **The fragment nights** (2026-07-10, 08-11, 08-13) were excluded from the fits, not investigated.
-  They belong to Q-274.
+  They belong to Q-274. **08-13 then resolved itself mid-session** on a re-rollup (6.08 → 8.17 h of
+  sleep, recovery index 1.20 → 5.78) — so those nights are not necessarily permanent, and re-checking
+  before treating one as a defect is worth the query. The other two were not re-checked.
 - **Oura's hours→score curve is still unrecovered.** The fit is against Oura's *outputs*, so if their
   curve is non-linear a linear anchor fitted to it is right on average and wrong at the tails —
   consistent with RMSE sitting at ~21 points at every anchor.
@@ -108,7 +110,15 @@ in the review rather than attributed.
 
 ## Blocked on the owner
 
-**Q-500 only.** One sentence: *the Recovery Index term in readiness is scored against a 6-hour target
+**Q-500 only.** The owner's answer on 2026-08-17 was *"keep working and leave that as a question for
+me. I dont understand the consequences of changing that yet"* — which is a finding in its own right:
+the proposal quantified the change in readiness points, and points are not the unit a decision gets
+made in. **§5.2 of the review was written in response and answers it**: 4 of 26 days cross a decision
+threshold (three tip rest-day guidance to "train hard", one moves Moderate → High), and nothing
+crosses the early-deload gate, the Low/Moderate line or the AI low-readiness line. Point them there
+rather than restating the points figure.
+
+One sentence: *the Recovery Index term in readiness is scored against a 6-hour target
 about an hour too high; fitting it against Oura's own version of the same contributor puts the target
 at 4.63 h, and moving it to 5 lifts 40 of the last 41 days by at most 1.4 readiness points and lowers
 none.*

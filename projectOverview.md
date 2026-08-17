@@ -37,9 +37,10 @@ and cold-start prompts are in [`docs/agents/README.md`](docs/agents/README.md). 
 than picking an item straight off the queue.
 
 **Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
-— the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is open and
-live**: 43 nights show wrong sleep windows from a ring clock-epoch collision the reinstall caused.
-**Do not run another full redecode** until it lands.
+— the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is CLOSED
+(2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread as a
+clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short daytime
+fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
 
 **Open at the time of writing:** PR #4 (APK release read without a token), PR #6 (session notes the
 public cut did not carry), PR #9 (the first write-path E2E spec). Check
@@ -155,36 +156,6 @@ differ — vacuum alone re-crosses it in ~5 days, with the index+row work ~7 wee
 **Owed:** the sizing work (see the storage research item) must now be framed as *how to get back
 under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
 **do not run another Full re-sync until this is resolved**; that is what triggered it.
-
-### [sleep][devices] 🔴 43 nights of sleep windows are 14.2 h wrong — diagnosed, repair needs sign-off (Q-536, 2026-08-17)
-
-- **Health shows midday bedtimes** (12:07 pm, 11:16 am) for every BLE-era night. Cause is measured,
-  not inferred: the 2026-08-17 re-pair made the ring re-drain days of buffered history, which
-  `isClockEpochReset` read as a clock reset and opened a **spurious epoch 3**. Its offset is
-  estimated at the p10 of anchor lag, and >90% of a re-drain burst's anchors carry backlog — so the
-  offset landed **+14.16 h** wrong. `aggregateOuraRawSamples` resolves every ds against the newest
-  epoch, so the full-history redecode re-timed all of it.
-- **The ring clock never reset.** Minimum anchor lag agrees across all four epochs to within 50 s,
-  and epoch 3's first new sample sits **18.6 s** after epoch 2's last. Epochs 1 and 3 are both
-  re-drain artefacts.
-- **The data is recoverable and nothing is lost.** Rows were correct when written (49 were rewritten
-  on 2026-08-17 by the redecode; every other night still carries its own write date), and all 44
-  nights recompute from stored `body_hex`. Subtracting 14 h 10 min puts every one of the 43 back
-  into a 20:00–00:00 bedtime distribution.
-- ⚠️ **v1.318.0 did not land the repair.** Migration 189 relabelled 434,707 sample rows in the same
-  transaction, hit the pool's 15 s `statement_timeout`, and rolled back on every boot — so the
-  owner's redecode faithfully reproduced the wrong times. **Fixed in v1.318.2**: 189 raises the
-  timeout and does the anchors only; the sample relabel is now 190, isolated because
-  `oura_raw_samples.epoch` is read by nothing and must not be able to roll back the half that works.
-- **Repaired by** migration **189** (owner-approved), which merges same-clock epochs, deciding what to
-  merge from measured evidence — two epochs are one clock when their *minimum* anchor lag agrees, a
-  criterion a genuine re-key fails by weeks. Merged production p10 lands 3 s from the clean offset.
-- ⚠️ **Still owed: a full-history Redecode after v1.318.2 deploys.** The one run against v1.318.0
-  did nothing, because the migration under it had rolled back — it has to be run again. The migration relabels; it does not
-  rewrite the 43 stored nights, and the rollup's 35-day window does not reach the oldest of them.
-  **Health stays wrong until that is run.** **Q-314** covers the detection defect that caused it;
-  until that lands, every re-pair reopens this.
-- Duration, HRV, average and lowest heart rate are unaffected — only the window boundaries.
 
 ### [devices][platform] 🔴 An app uninstall destroys the Oura ring key, and nothing warned about it (2026-08-17)
 
