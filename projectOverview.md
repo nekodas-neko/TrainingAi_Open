@@ -78,6 +78,52 @@ order.
   the S25 at the next engine-chosen deload: header "Deload", reduced weights, no PR badge. Local
   SQLite rows written during the bug window self-heal on the next pull; not observed on device.
 
+### [activity][workouts][app-shell] 🔴 The first sweep to RUN the app since the six-round review — two dead primary actions, one of which loses data (Q-450…Q-455, 2026-08-17)
+
+- **Why this found things six rounds of review did not.** The comprehensive review that closed the
+  same morning states its own limit: *"Nothing in six rounds was rendered — no device, emulator,
+  browser, or `pnpm dev` run."* This sweep took the **failure-cells** lens — the error path, the
+  empty state, the first-run path, the entry point reached out of order — against `pnpm dev` on the
+  seeded local Postgres, driven through the repo's Playwright harness at 412×915 and with `curl`
+  against a live session cookie. Full write-up, with every query and the reproduction:
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](docs/reviews/2026-08-17-failure-cells-running-the-app.md).
+- **🔴 Q-450 — `/activity` reached without a type silently discards a completed activity.** The Pre
+  screen renders with no guard on `activityType`; its entire rendered text is `"Title\nStart"`.
+  **Start works. Finish works. Save does nothing** — no toast, no error, no navigation, zero network
+  requests — because `done-activity-screen.tsx:167` bails on `!activityType` before the local write,
+  the outbox queue and the web fallback. `activity_logs` stayed empty. Discard is the only working
+  control. Two in-app paths reach it: the AI Coach's `log_activity` handoff card
+  (`coach/handoff-card.tsx:16`, a bare `<Link href="/activity">`) and the guided-walk summary's Done
+  button (`walk-summary.tsx:286`) — and `resetSession()` leaves the store untyped after **every**
+  successful save, so it is the state the store normally sits in.
+- **🔴 Q-451 — a brand-new account's Workout tab is a ~1,400 px empty card with a dead button.**
+  `/workout-select` with no program renders a lone 💪 and a **Start Workout** button that is not
+  disabled and does nothing when tapped (`workout-select-content.tsx:412` short-circuits on a missing
+  `currentSession`). No empty state, no pointer to create a program — while `/program` handles the
+  same account correctly (*"No programs yet. Create one to get started."*).
+- **🟠 Q-452 — the AI insight card runs an LLM over a prompt of literal `"no data"` strings.** No
+  sufficiency gate between mount and model. Rendered for a day-one account, `/health/activity` said:
+  *"Your activity tracker currently shows zero movement and no strength sessions toward your goal of
+  five per week. This inactivity creates a significant gap…"* — the model reads `Steps: no data` as a
+  measured zero and editorialises, because the prompt does not distinguish absent from zero.
+- **🟡 Q-453/454/455 — three low-severity ones,** filed mid-low: `/api/training-stress` silently
+  answers for *today* on a malformed `date` where its ten siblings all 400; `/api/day-log` and
+  `/api/exercise-history` validate params before checking auth (**no data leaks** — verified 401 once
+  the param is supplied); and an unhandled throw returns a **bodiless 500** rather than a JSON error.
+- **Four areas came back CLEAN and are recorded so the next sweep skips them.** (1) The `[-/]`
+  date-separator class — all 11 date-taking routes accept **both** separators live. (2) The
+  unauthenticated surface — 122 GET routes, **114 exact 401**, 3 admin 403, 2 deliberately public;
+  **no route served user data unauthenticated**. (3) A zero-data account against all 122 GET routes —
+  **exactly one route differs**, a clean `404 {"error":"No active program"}`. (4) 51 screen renders
+  (30 seeded + 21 zero-data) — **zero uncaught page errors, zero console errors, zero failing `/api/`
+  responses**, and the empty states are genuinely well built apart from Q-451.
+- **NOT device-verified, and structurally cannot be here.** This is the **web** build:
+  `getLocalStore()` returns null, so every offline-first domain took its web fallback and the device
+  branch — the canonical runtime — was never exercised. No safe-area, Samsung-WebView, native-plugin
+  or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
+- **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit at
+  the top of `docs/implementation-backlog.md` (Q-310 above them has since shipped and been removed).
+
 ### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
 
 - **The cause was not environmental and not the specs.** `components/weekly-recap-banner.tsx` POSTs
