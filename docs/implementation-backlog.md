@@ -2793,27 +2793,38 @@ session working from a temporarily restored copy.
 > §7. **The per-row bucketing was done from headings, not by reading each row** — re-check a row
 > before claiming a capability closes it.
 
-### [app-shell] Q-354 — a mouse click on Nutrition's action row does nothing, and only on that screen
+### [app-shell] Q-354 — the date-swipe `useDrag` swallows MOUSE clicks on Nutrition (touch is fine)
 
 - **Branch:** `fix/nutrition-mouse-click-swallowed`
-- **Added:** 2026-08-17 · the residue of Q-309, which was **refuted** and removed (see below)
-- **Priority: low, and the reason is the canonical runtime.** The supported target is a touch-only
-  APK. A real touch tap works (measured). This only affects mouse input, which no supported user
-  produces — it is filed because it is unexplained and screen-specific, not because it hurts anyone.
-- **What is measured.** On `/nutrition`, Playwright's `.click()` on the Water action row dispatches
-  `pointerdown → mousedown → pointerup → mouseup`, a click event reaches the element, and the sheet
-  **never opens** (DOM polled 20× over 2 s — not an open-then-close). `page.touchscreen.tap()` on the
-  same element dispatches the full touch sequence and opens it every time. `.click()` on a button
-  outside this screen (`/more` → Edit Profile) works normally.
-- **The Q-309 hypothesis is refuted, so do not start from it.** Q-309 blamed the date-swipe
-  `useDrag` (`filterTaps: true`, `pointer: { touch: true }`) swallowing the tap. It cannot be that:
-  the failing sequence produces **no touch events at all** for `filterTaps` to act on. `pull-to-sync`
-  is also ruled out — it binds only touch listeners and is not mounted on this screen.
-- **What is still unknown:** why a click event that reaches the element does not run the handler on
-  this screen when it does elsewhere. Worth one careful look with React DevTools or by bisecting the
-  screen's wrappers; not worth a gesture rewrite.
-- **Do not "fix" this by changing gesture code** without reproducing a *touch* failure first. The
-  touch path is verified working, and a speculative change there would risk the path that matters.
+- **Added:** 2026-08-17 as the residue of Q-309 · **cause located and proven 2026-08-17**
+- **Priority: low, and that is a considered position rather than a shrug.** The supported target is
+  a touch-only APK and **touch works** — verified repeatedly. No supported user produces mouse input.
+  This is filed because it is now *understood*, not because it needs doing.
+- **Proven cause: the date-swipe `useDrag` binding** on the scrolling container
+  (`nutrition-content.tsx:513`, spread at `:575`). Removing `{...bindDateSwipe()}` and re-running the
+  probe makes **every** input method work:
+
+  | Input | with binding | binding removed |
+  |---|---|---|
+  | `locator.click()` | ✗ | ✓ |
+  | raw `page.mouse.click()` | ✗ | ✓ |
+  | mouse down+up, 0 ms gap | ✗ | ✓ |
+  | `touchscreen.tap()` | ✓ | ✓ |
+  | `element.click()` in page context | ✓ | ✓ |
+
+- **This corrects Q-309's write-up, and the correction matters.** Q-309 blamed this binding;
+  the Q-309 closing note then said it could not be the cause, reasoning that the failing input
+  produces no touch events for `filterTaps` to filter. That reasoning was about the *touch* path.
+  `useDrag` also binds mouse/pointer, and the mouse path is what it breaks — so the original
+  suspect was the right component and the wrong mechanism. **Both halves are now measured**: touch
+  taps genuinely work, and the binding genuinely swallows mouse clicks.
+- **`pointer: { touch: true, mouse: false }` does NOT fix it** — tried, measured, reverted. All three
+  mouse paths still fail with it set. Whatever suppresses the click is not that switch, so a real fix
+  means going into use-gesture's tap/click-suppression behaviour or restructuring the binding.
+- **Recommendation: do not pursue without a reason.** The only working path is the one that matters,
+  a rewrite risks it, and there is no user on the supported runtime who benefits. Revisit if the app
+  ever gets genuine desktop use, or if an automated accessibility/interaction scanner (Q-282) starts
+  driving mouse input.
 
 ### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
 

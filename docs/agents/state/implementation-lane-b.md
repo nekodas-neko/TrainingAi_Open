@@ -47,10 +47,13 @@ Work the queue top-down and take the highest Lane-B-owned item, re-verifying its
 **Lane B's queue is drained.** What is left is one low-priority item this lane filed itself, and one
 blocked on the owner:
 
-1. **Q-354** — the mouse-click residue of Q-309. Low priority (no supported user produces mouse
-   input), and its entry says do **not** change gesture code without reproducing a *touch* failure
-   first — the touch path is verified working.
-2. **Q-531** — ⛔ blocked on an owner decision, see below.
+1. **Q-531** — ⛔ blocked on an owner decision, see below.
+
+**Q-354 is now diagnosed and deliberately parked** (not deleted): the date-swipe `useDrag` binding
+swallows mouse clicks on Nutrition — proven by removing it and watching every mouse path start
+working — while touch is unaffected. `pointer: { mouse: false }` does not fix it. No supported user
+produces mouse input, so a gesture rewrite is not justified; its entry carries the table and the
+recommendation.
 
 Everything else in the queue is Lane A's (Kotlin/BLE, sleep-window data, DB sizing, migrations,
 scoring) or was routed there by this lane: **Q-351** (activity `durationMin` 0 → 400) and **Q-353**
@@ -111,8 +114,10 @@ which is why the local/CI seeding asymmetry never arose.
 - **Q-450's guard belongs at the destination, not the call sites** — a cold open reaches `/activity`
   with no call site at all.
 - **`radiogroup` beat `group` + `aria-pressed`** for pick-one option sets (8 sites vs 1).
-- **Q-309's `filterTaps` hypothesis is refuted by measurement** — the failing input produces no
-  touch events at all. Do not re-derive it, and do not change gesture code off it.
+- **Q-309 is refuted as a *user-facing* bug** — touch taps work, measured many times. But the
+  `useDrag` binding **is** what swallows *mouse* clicks (Q-354), proven by removing it. An earlier
+  note here said the binding was not implicated; that was reasoning about the touch path only and it
+  was wrong. Both halves are now measured.
 - **`coach-content.tsx`'s `scrollIntoView` is correct** — no inner scroll container, so the page is
   genuinely its scroller.
 - **Q-452 gates in the client, not the route** — a client gate costs no request at all, where a
