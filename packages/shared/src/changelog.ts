@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.318.1",
+    version: "1.318.2",
     date: "2026-08-17",
     changes: [
       "The sleep-time fix in 1.318.0 did not actually apply \u2014 the database change behind it was too large to finish inside the time limit it runs under, so it was undone every time the app started, and re-decoding your history faithfully rebuilt the same wrong times. Split into two smaller steps, the important one first. **Run the re-decode again once this is live** \u2014 the previous run could not have worked.",
+    ],
+  },
+  {
+    version: "1.318.1",
+    date: "2026-08-17",
+    changes: [
+      "Fixed: an activity started from the Coach's \"Log an activity\" link, from the end of a guided walk, or by opening the activity screen directly is no longer thrown away when you save it. Those routes left the screen with no activity type — it still timed the activity and still offered Save, but Save quietly did nothing and the activity was gone. The screen now asks what you are doing first, and Save says so if anything is still missing.",
     ],
   },
   {

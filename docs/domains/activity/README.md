@@ -88,6 +88,16 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
+- **[`docs/overview/entries/2026-08-17-activity-untyped-entry.md`](../../overview/entries/2026-08-17-activity-untyped-entry.md)**
+  — 🆕 Q-450: `/activity` with no `activityType` recorded a full activity and discarded it on Save.
+  The typeless store is the **normal** between-activities state (`resetSession()` clears the type
+  after every save), so the guard belongs at the destination, not on the call sites — `/activity`
+  now renders `SelectActivityTypeScreen`. The picker grid is shared with the Log Activity sheet via
+  `components/activity/activity-type-grid.tsx`; keep both on it so the type lists cannot drift.
+  Guard: `e2e/activity-untyped-entry.spec.ts`. Left open as **Q-351** (Lane A): a sub-3-second
+  activity rounds `durationMin` to 0 and `ActivityLogBody.durationMin` is `.positive()`, so the POST
+  400s and the activity is lost behind a generic toast — the outbox parses the same schema.
+
 - Cross-domain, but the Activity Score change lives here:
   [`docs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
   (Q-183 — a lifting day's zero zone-minutes is no longer scored as a missed cardio target; carries

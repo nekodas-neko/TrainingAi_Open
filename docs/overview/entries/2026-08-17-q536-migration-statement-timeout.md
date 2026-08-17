@@ -1,4 +1,4 @@
-## 2026-08-17 — the Q-536 migration rolled back on every boot, so the redecode rebuilt the same wrong times (v1.318.1)
+## 2026-08-17 — the Q-536 migration rolled back on every boot, so the redecode rebuilt the same wrong times (v1.318.2)
 
 The owner deployed v1.318.0, ran the full-history redecode as asked, and sent a screenshot of Health
 still showing midday bedtimes — 10:45 am, 9:54 am, 12:30 pm.

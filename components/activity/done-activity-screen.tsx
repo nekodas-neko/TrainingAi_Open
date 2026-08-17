@@ -164,7 +164,16 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
   }
 
   async function handleSave() {
-    if (!activityType || !startMs || !endMs || !draftSummary) return
+    // Defence in depth, and it must speak. This used to be a bare `return`: with no activity type
+    // the whole save — local write, outbox, web fallback — was skipped and the user got no toast,
+    // no error and no navigation, so a completed activity vanished with the screen still looking
+    // normal (Q-450). The entry guard in `activity-screen.tsx` now makes a typeless recording
+    // unreachable, but a session already in flight when that JS lands still arrives here, and
+    // "silently discard the thing they just did" is never the right answer for it.
+    if (!activityType || !startMs || !endMs || !draftSummary) {
+      toast.error("This activity can't be saved — it has no activity type. Start it again from Log Activity.")
+      return
+    }
     setSaving(true)
     const store = userId ? getLocalStore(userId) : null
     const today = todayInTz()
