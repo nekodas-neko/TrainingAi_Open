@@ -7,8 +7,10 @@
 
 ## Now
 
-Two sweeps have run under this role, both on 2026-08-17. PR #16 (failure cells) is **merged**; the
-repo-migration sweep below is the second.
+Two sweeps have run under this role, both on 2026-08-17, and both are **merged** (#16, #38).
+**Four of the ten findings have already been implemented** by the Implementation lanes — Q-450 (#31),
+Q-451 (#33), Q-452 (#39), Q-457 (#44) — so a Q number missing from the backlog queue is finished, not
+dropped. Six remain open: Q-453, Q-454, Q-455, Q-456, Q-458, Q-459.
 
 ### Sweep 2 — the public/private boundary as an architectural property
 
@@ -16,13 +18,14 @@ Owner-requested: review the architecture specifically with respect to the repo m
 [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md).
 
 **Filed — Q-456 … Q-459.** Q-456/457 upper-mid (above Q-313), Q-458/459 low.
+**Status column checked against `main` on 2026-08-17 — do not trust it after that without re-checking.**
 
-| Q | | What |
-|---|---|---|
-| Q-456 | 🟠 | The owner's production user ID is baked into **18 committed migrations**, and `CLAUDE.md`'s "re-run the generator into a new migration" rule re-publishes it on every schema change. Not a credential; fix the generator, not the files. **Lane A.** |
-| Q-457 | 🟠 | `lib/github-release.ts:24` still defaults `APK_RELEASE_REPO` to the **archived private repo**. |
-| Q-458 | 🟡 | `.env.example` wrong both ways — 8 dead keys incl. `TOKEN_ENC_KEY` (names a security property the app lacks) and 5 Oura **Cloud** keys; 4 real vars undeclared. |
-| Q-459 | 🟡 | The rolling `apk-latest` release is delete-then-recreate → the public download URL 404s on every native merge. |
+| Q | | What | Status |
+|---|---|---|---|
+| Q-456 | 🟠 | The owner's production user ID is baked into **18 committed migrations**, and `CLAUDE.md`'s "re-run the generator into a new migration" rule re-publishes it on every schema change. Not a credential; fix the generator, not the files. **Lane A.** | **open** |
+| Q-457 | 🟠 | `lib/github-release.ts:24` defaulted `APK_RELEASE_REPO` to the **archived private repo**. | ✅ Lane B, #44 |
+| Q-458 | 🟡 | `.env.example` wrong both ways — 8 dead keys incl. `TOKEN_ENC_KEY` (names a security property the app lacks) and 5 Oura **Cloud** keys; 4 real vars undeclared. | **open** |
+| Q-459 | 🟡 | The rolling `apk-latest` release is delete-then-recreate → the public download URL 404s on every native merge. | **open** |
 
 **CLEAN — six areas, including the two that mattered most:**
 
@@ -69,14 +72,14 @@ had walked past repeatedly.**
 
 **Filed — Q-450 … Q-455** (Q-450/451 sit directly below Q-310 at the top of the queue):
 
-| Q | | What |
-|---|---|---|
-| **Q-450** | 🔴 | `/activity` reached without a type: Start works, Finish works, **Save silently discards the activity**. Two in-app paths reach it. |
-| **Q-451** | 🔴 | A no-program account's **Workout tab** is a ~1,400 px empty card with a **dead "Start Workout" button**. |
-| Q-452 | 🟠 | The AI insight card runs an LLM over a prompt of literal `"no data"` strings; tells a day-one user their inactivity is a "significant gap". |
-| Q-453 | 🟡 | `/api/training-stress` silently answers for *today* on a malformed `date`; its ten siblings all 400. |
-| Q-454 | 🟡 | Two routes validate params before checking auth (**no data leaks** — verified). |
-| Q-455 | 🟡 | An unhandled throw returns a **bodiless 500**, not a JSON error. |
+| Q | | What | Status |
+|---|---|---|---|
+| **Q-450** | 🔴 | `/activity` reached without a type: Start works, Finish works, **Save silently discards the activity**. Two in-app paths reach it. | ✅ #31 |
+| **Q-451** | 🔴 | A no-program account's **Workout tab** is a ~1,400 px empty card with a **dead "Start Workout" button**. | ✅ #33 |
+| Q-452 | 🟠 | The AI insight card runs an LLM over a prompt of literal `"no data"` strings; tells a day-one user their inactivity is a "significant gap". | ✅ #39 |
+| Q-453 | 🟡 | `/api/training-stress` silently answers for *today* on a malformed `date`; its ten siblings all 400. | **open** |
+| Q-454 | 🟡 | Two routes validate params before checking auth (**no data leaks** — verified). | **open** |
+| Q-455 | 🟡 | An unhandled throw returns a **bodiless 500**, not a JSON error. | **open** |
 
 **Came back CLEAN — a real result; do not re-cover without a reason:**
 
