@@ -1157,8 +1157,10 @@ session working from a temporarily restored copy.
   "fighting off an infection" from a temperature reading **and says it is advising without a
   readiness score**). One regex hit for train-through-illness was read and is a **false positive**.
   **A second fabricated superlative is now double-confirmed**: *"a perfect recovery index"*
-  (2026-07-05) — and **Q-271 measured that contributor has never exceeded 50 on any of 31 scored
-  days**, because its 6-hour anchor is unreachable. Working in [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §5.
+  (2026-07-05) — and the Recovery Index contributor scored **21 of 100** that day. (This line used to
+  cite Q-271's "never exceeded 50 on any of 31 scored days"; **Q-500 re-measured that over 41 days and
+  it is false** — the contributor exceeds 50 on 12 of them. The fabricated-superlative finding stands
+  on its own day's value regardless.) Working in [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §5.
 - **Scope note:** 8 of 117 insights were read closely. A systematic pass over the rest is the
   natural companion and would size the problem properly.
 
@@ -1391,10 +1393,10 @@ session working from a temporarily restored copy.
      Score already handles it)? The taper shape avoids re-normalising eight existing weights.
   2. Which load signal — session tonnage, ACWR, or a recovery-time estimate? **Note Q-279: ACWR's
      evidence base is weak**, so anchoring a second user-facing behaviour to it needs justifying.
-  3. Adding weight anywhere means every other weight moves. Re-check the §1.3 finding (Q-271) first
-     — there is a contributor currently costing ~2.2 points a day that should probably be fixed
-     before the weights are re-cut.
-- **Do not ship this and Q-271/Q-272 in the same PR.** Q-273 (model versioning) exists precisely so
+  3. Adding weight anywhere means every other weight moves. Settle **Q-500** first — it re-anchors
+     the Recovery Index contributor (measured cost 0.71 pts/day, not the 2.2 Q-271 claimed) and moves
+     40 of 41 days, so re-cutting the weights before it lands means doing it twice.
+- **Do not ship this and Q-500/Q-272 in the same PR.** Q-273 (model versioning) exists precisely so
   changes like this stay measurable; land that first or this change is unattributable.
 
 ### [readiness][platform] Q-273 — five scoring pillars, one `model_version`, no backfill: the history is not comparable to itself
@@ -1421,7 +1423,7 @@ session working from a temporarily restored copy.
      pattern is the closest existing analogue.
   3. A rule, in `CLAUDE.md` alongside *One Formula, One Place*: a correlation computed across a
      model change is not evidence.
-- **Do this before the calibration items (Q-271, Q-272, Q-277).** Each of those creates another
+- **Do this before the calibration items (Q-500, Q-272, Q-277).** Each of those creates another
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
 
 ### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
@@ -1458,34 +1460,56 @@ session working from a temporarily restored copy.
 - **Gate:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
   the before/after comparison is not interpretable.
 
-### [readiness] Q-271 — the Recovery Index contributor can never score above ~50; it only ever subtracts
+### [readiness] ⛔ Q-500 — re-anchor the Recovery Index curve, `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5
 
 - **Branch:** `fix/recovery-index-anchor`
+- **⛔ blocked: owner sign-off.** This changes a scoring constant and re-scores 40 days of readiness
+  history. Do not implement until the owner agrees.
+- **Added:** 2026-08-17 · Tuning agent · evidence:
+  [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md)
+- **Supersedes Q-271**, which this measurement found substantially wrong (see below).
+- **The change:** one constant in `packages/shared/src/health/readiness-composite.ts` —
+  `RECOVERY_INDEX_OPTIMAL_HOURS = 5` (was 6). **The estimator, smoothing window and 9% weight all
+  stay as they are.**
+- **Why 5.** Fitted against Oura's own `recovery_index` contributor over the 15 nights that carry both
+  it and an overnight HR series (2026-06-23 → 07-07), the zero-bias anchor is **4.63 h** (LOO
+  4.40–5.14) and RMSE is flat 4.5–5.25. **5** sits on that floor and keeps a small negative bias, so
+  it still errs toward under-scoring.
+- **Blast radius, all 41 days with stored hours:** 40 of 41 move (the other clamps at 100). Readiness
+  **mean +0.67 pts, max +1.44, none lower**. Days above 50 go 12 → 19; cost against neutral 50 falls
+  0.71 → 0.05 pts/day.
+- **What Q-271 got wrong** (it measured 8 days and generalised): "never above 50, ever" — the
+  contributor exceeds 50 on **12 of 41** days and hits **100 on 2026-07-17**; "~2.2 pts/day" — it is
+  **0.71**. Its eight quoted values are exactly 2026-08-08 → 08-15. **The estimator is sound** —
+  r = +0.712 vs Oura's, beating every stabilisation-style alternative tested (+0.636 best). That
+  hypothesis was tested and failed; do not change the estimator.
+- **Sequencing:** land **Q-273** (model versioning) first or stamp a readiness version in the same PR,
+  else 40 days of history become incomparable with no marker — the Q-501 problem. Also fix the stale
+  `lib/health/recovery-index.ts` paths (here + `adapter.ts:5518`); it lives in `packages/shared/src/health/`.
+- **Follow-up:** re-derive the anchor on ~15 BLE-era nights. The fit is Cloud-era, and BLE overnight HR
+  is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
+  that is a `devices` finding.
+
+### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
+
+- **Branch:** `fix/readiness-derived-recompute`
 - **Plan:** none yet
-- **Added:** 2026-08-15 · from the comprehensive review §1.3
-- **The constant.** `RECOVERY_INDEX_OPTIMAL_HOURS = 6` in
-  `packages/shared/src/health/readiness-composite.ts`, with the curve `hours / 6 × 100`, anchored on
-  Oura's public "≥ 6 h = good recovery" statement. Weight: **9%**.
-- **Measured against production.** `oura_daily_summary.recovery_index_hours`, n = 39: **min 0.35,
-  max 8.28, mean 2.58 — and exactly 1 of 39 days reaches the 6 h optimum.**
-- **Realised sub-scores across all 31 scored days: 13, 18, 20, 21, 22, 28, 43, 48 … never above 50,
-  on any day.** Against the neutral 50 that a missing contributor would supply, this term costs
-  roughly **2.2 readiness points every day**, and it is flagged `provisional` on **31 of 31** days,
-  so it permanently degrades the UI's own confidence signal too.
-- **Two candidate explanations, and the data to separate them is already stored:**
-  1. **The anchor is mis-specified for how this app measures the interval.** We measure hours from
-     the overnight HR minimum to wake (`lib/health/recovery-index.ts`). If the HR minimum typically
-     falls in the last third of the night, ~2.6 h is the normal result and 6 h is unreachable by
-     construction — in which case the fix is to re-anchor on this user's own distribution rather
-     than on Oura's published figure for a differently-computed metric.
-  2. **The interval is genuinely short.** Then the number is honest and the *curve* is still wrong,
-     because a contributor that saturates at the bottom carries no information either way.
-- **First action:** plot `recovery_index_hours` against the night's sleep-stage series for the
-  handful of days at each end of the range, and confirm which of the two it is **before** touching
-  the constant. Do not simply lower 6 to 3 — that converts a floor-saturated contributor into a
-  mid-saturated one without establishing what it measures.
-- **Sequencing:** this changes a readiness weight's realised range, so it interacts with Q-275.
-  Land Q-273 (model versioning) first.
+- **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
+  [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
+- **Measured.** Each persisted `oura_daily_derived.readiness_contributors->'recoveryIndex'->>'score'`
+  against the `oura_daily_summary.recovery_index_hours` it derives from: **5 of 33 disagree** —
+  2026-07-16 (0.89 h → expected 15, persisted 4), 07-20 (2.32 → 39, persisted 4), 07-21 (1.94 → 32,
+  persisted 23), 07-26 (0.97 → 16, persisted 13), 08-03 (3.21 → 54, persisted 29).
+- **Mechanism.** `oura_daily_summary` rows get recomputed (several updated 2026-08-13); the derived
+  readiness rows built from them are not recomputed in step, so the two drift apart silently.
+- **Why it matters.** `model_versions->>'readiness'` is **NULL on all 33 rows** too, so there is no way
+  to tell whether a past readiness score moved because its inputs changed or because the model did —
+  exactly what any calibration needs. The admin score-audit panel pairs a score with "the inputs that
+  produced it", and on these five days that pairing is false. **Same class as Q-273** — consider one
+  treatment for both.
+- **First action:** decide whether derived rows get recomputed with their summary, or store the input
+  values they actually used. The second is cheaper and self-describing; the first re-scores days
+  silently and needs Q-273's version stamp first either way.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
@@ -1650,7 +1674,7 @@ session working from a temporarily restored copy.
   shows (a) contributors, (b) trend, (c) an action. Then fix the ones failing the repo's own
   colour-only-state rule as a first pass, since `scoreBand()` colour without `scoreBand()` label is
   already a `CLAUDE.md` violation and is the cheapest subset.
-- **Sequencing:** this is presentation over numbers that Q-271/Q-272/Q-275/Q-277 are all about to
+- **Sequencing:** this is presentation over numbers that Q-500/Q-272/Q-275/Q-277 are all about to
   change. Do the **audit** now (it is cheap and its output is durable); hold the **UI work** until
   the model changes settle, or it gets done twice.
 

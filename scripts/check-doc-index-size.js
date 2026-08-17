@@ -19,9 +19,14 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
+//
+// Raised 2026-08-17 (Tuning, Q-500/Q-501): backlog 5698 -> 5722, projectOverview 6372 -> 6382.
+// Two new queue entries replacing one (Q-271 superseded by Q-500, plus Q-501) and one rewritten +
+// one new Known-Issues row. This is queue and open-issue content, which is what these two files are
+// for — the growth the ratchet exists to catch is narrative and dated notes, not entries.
 const BASELINE = {
-  'projectOverview.md': 6372,
-  'docs/implementation-backlog.md': 5698,
+  'projectOverview.md': 6382,
+  'docs/implementation-backlog.md': 5722,
   'CLAUDE.md': 962,
 };
 
