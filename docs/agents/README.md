@@ -177,6 +177,14 @@ So numbers are **not** taken one at a time from the pointer. Each agent owns a b
 | BugFix | **387 – 449** |
 | Review | **450 – 499** |
 | Tuning | **500 – 529** |
+| *One-off planning session, 2026-08-17 (DB storage / raw-sample retention)* | **530 – 539** |
+
+A session that is **not** one of the five standing agents — a one-off planning or investigation run
+started directly by the owner — does not have a band. It claims the next block from the "Next
+unallocated Q band" pointer in [`docs/implementation-backlog.md`](../implementation-backlog.md),
+records it in this table the way the 2026-08-17 row above does, and bumps that pointer in the same
+PR. `scripts/check-backlog-pointers.js` fails the Custom Rules job if a Q number in use sits at or
+above the pointer, so an unrecorded block cannot merge.
 
 Take numbers from your own band and you never need to read the pointer or write to it — which also
 removes the shared-line edit at the top of the backlog that would otherwise conflict five ways.

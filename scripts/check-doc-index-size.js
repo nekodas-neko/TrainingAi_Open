@@ -38,12 +38,20 @@ const root = path.join(__dirname, '..');
 // and roughly a third of the rest was showing the work. Intake adds an entry per report, so this
 // ceiling will be pushed regularly — the answer is a periodic sweep moving *cleared* entries out,
 // not a standing allowance for verbose ones.
+//
+// Raised 2026-08-17 (one-off DB-storage planning session, Q-530…Q-535): backlog 5972 -> 6106,
+// projectOverview 6461 -> 6482. Six queue entries and one Known-Issues row — entries, per the same
+// split as the raises above. The analysis itself (the measurements, the five costed options, the
+// D4 prerequisite audit) is in docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md,
+// which this ratchet does not govern. Two of the six entries are blocked on an owner decision and
+// carry the "what this irreversibly gives up" summary inline deliberately: an implementer must not
+// have to open the plan to discover that the item is a one-way door.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6461,
-  'docs/implementation-backlog.md': 5972,
+  'projectOverview.md': 6482,
+  'docs/implementation-backlog.md': 6106,
   'CLAUDE.md': 988,
 };
 

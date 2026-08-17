@@ -261,6 +261,27 @@ order.
   confirm both that the card flips immediately and that the log reaches the server afterwards.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
 
+### [devices][platform] 🟠 `oura_raw.db` is growing without bound on the phone, and nobody has ever seen how big it is (Q-530, 2026-08-17)
+
+The documented "14-day rolling buffer" for on-device raw frames (owner retention decision,
+2026-08-02) **has not shipped**. `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
+`rawStats` and all four are exposed on the plugin bridge, but **a repo-wide grep finds no caller for
+any of them**. Two independent causes, and fixing the first does not fix the second: nothing invokes
+`pruneRaw`, and its predicate needs `rolled_up = 1`, which is set only by the WebView rollup consumer
+(**D2 Task 5, not built**) — so wiring the prune tomorrow would delete zero rows.
+
+The store has therefore accumulated everything drained since 2026-07-27 at roughly 2–3 MB/day. This
+can wedge the drain: ops-doc **I21** holds the cursor on `SQLITE_FULL`.
+
+- **Not measured, and cannot be from here:** the actual size of the file on the owner's S25. The admin
+  console has no `rawStats()` panel — the fields are wired in `lib/oura-ble/plugin.ts` and rendered
+  nowhere. Building that panel is the first step of Q-530 and the only way to see this.
+- **Related, and load-bearing for the D4 decision:** `AndroidManifest.xml:14` sets
+  `allowBackup="true"` with no `dataExtractionRules`. Android Auto Backup's cloud quota is 25 MB/app
+  and this file passed it within two weeks, so **the device raw store has no working backup.**
+- Detail and the five costed options:
+  [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md).
+
 ### [platform][devices] 🟢 Q-308 RESOLVED — serialise the sync fan-out; owner-measured RTT settled it (2026-08-16)
 
 The owner measured Railway per-query RTT from the app service — **p50 0.86 ms · p95 1.22 ms · min

@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **530** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **540** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -395,6 +395,140 @@ below threshold and left in place for next time.
 - **Fix shape:** gate the card on the section actually having data (return `{ insight: null }` and let
   the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
   than feeding a bare `"no data"` string the model reads as a measurement.
+
+### [devices][platform] Q-530 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
+- **Branch:** `fix/oura-raw-device-store-visibility`
+- **Added:** 2026-08-17 · **Placement:** above the storage-policy items because it is true and getting
+  worse under every option in that plan, and it is the one that can wedge the drain (ops-doc I21,
+  `SQLITE_FULL` → cursor held).
+- **What's actually on `main`:** `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
+  `rawStats`, all four exposed as `@PluginMethod`s and declared in `lib/oura-ble/plugin.ts:90-99`.
+  **A repo-wide grep finds no caller for any of them** outside that interface declaration. The
+  documented "14-day rolling window" (owner retention decision, 2026-08-02) is a plan, not shipped
+  behaviour.
+- **Two independent causes, and fixing the first does not fix the second:** (1) nothing invokes
+  `pruneRaw`; (2) the predicate is `rolled_up = 1 AND synced = 1 AND measured_at < ?`, and `rolled_up`
+  is set only by `markRolledUp`, which is called only by the WebView rollup consumer — **D2 Task 5,
+  not built**. Wiring the prune tomorrow would delete zero rows.
+- **Consequence:** the store has accumulated everything drained since 2026-07-27 at ~2–3 MB/day, with
+  no bound and no visible failure state — exactly what the retention decision warned about (*"a rollup
+  that silently falls behind turns Tier 1 into unbounded growth"*).
+- **Do first, it is cheap and unblocks measurement:** build the missing `rawStats()` panel in
+  `app/admin/oura-ble/` (already a known gap — `rawStoreOpen`/`lowDisk`/`totalRows`/`unrolledRows` are
+  wired in the plugin and rendered nowhere). **Nobody has ever observed the real size of this file.**
+  Then the bound + failure state; the full prune needs D2 Task 5.
+- **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
+  Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
+  **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-535).
+
+### [devices][platform] Q-532 — index audit on `oura_raw_samples`: 106 MB for 5,129 lifetime scans
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 A
+- **Branch:** `perf/oura-raw-index-audit`
+- **Added:** 2026-08-17 · **Placement:** highest-value reversible storage work. Gives up nothing, and
+  the Railway volume ceiling is ~60 days out.
+- **Measured in production 2026-08-17** (`pg_stat_user_indexes`, system-wide, and
+  `pg_stat_database.stats_reset` is `NULL` so scan counts are lifetime, not a recent window):
+  `oura_raw_samples` is 360 MB of which **208 MB is indexes against 152 MB of heap**.
+  `oura_raw_samples_user_tag_ts` is **60 MB / 1,789 scans**; `idx_oura_raw_samples_user_measured` is
+  **46 MB / 3,340 scans**.
+- **The lead:** `user_tag_ts` was built for the per-tag read pattern that **Q-213/I19 deliberately
+  removed** when it collapsed the rollup's ten tag reads into one query partitioned in memory. It may
+  be paying rent on a query shape that no longer exists.
+- **Do not drop on the strength of a scan count.** `EXPLAIN` the rollup (`aggregateOuraRawSamples`),
+  the redecode path and the admin tester reads first. Reclaiming the file needs `VACUUM FULL`
+  (ops-doc I17 — a drop does not shrink it by itself).
+- **Same shape, smaller:** `oura_heartrate` is 25 MB of indexes on 6.7 MB of heap;
+  `oura_heartrate_pkey` has **zero** lifetime scans on a table that already has a `(user_id,
+  timestamp)` unique constraint. **Keep `oura_heartrate_user_updated`** despite its zero — migration
+  130 added it for Track-B sync, which is not wired yet.
+
+### [platform] Q-531 — one repeating fault cost 49 MB because the error dedupe is defeated by parameterised SQL
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §7
+- **Branch:** `fix/error-events-dedupe-key`
+- **Added:** 2026-08-17 · **Placement:** small and self-contained, but below the two above because the
+  49 MB **clears itself** by ~2026-09-12 and no space is at stake — only the next incident.
+- **The prune is fine and the bug is already fixed — this entry is about neither.** `error_events` is
+  49 MB / 13,196 rows. The 30-day prune (`adapter.ts:4416`) runs correctly (owner's oldest row is
+  exactly 31 days old). 5,771 of the owner's 6,222 rows are one fault — the `oura_heartrate`
+  `cardinality_violation` **fixed by Q-214 on 2026-08-13**, whose last occurrence was that same day.
+- **Defect 1 — the dedupe key varies when the information does not.** `shouldRecordRequestError`
+  suppresses same-route+same-message repeats inside 60 s, which should have capped this at ~1,440
+  rows/day; it recorded ~2,600. Drizzle's failure message embeds the whole generated `VALUES` list, so
+  a different batch size is a different message. **Measured: 5,771 rows, 18 distinct messages, 1
+  distinct 60-character prefix.** Dedupe bypassed 18-fold. Fix shape: key the dedupe on a normalised
+  message (strip the parameter list / collapse `($N, ...)` runs), not the raw string.
+- **Defect 2 — 2 kB of boilerplate stored per row.** Every one of the 5,771 messages is truncated to
+  exactly 2,000 chars (`avg = max = 2000`) and is almost entirely `(default, $N, $N, $N, $N),`
+  repeated. The caps at `request-error.ts:153` work as written; they are just far too generous for a
+  message whose information ends at character 60.
+- Either fix alone would have made this incident cost single-digit MB.
+
+### [devices][platform] Q-533 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
+- **Branch:** `perf/oura-raw-row-narrowing`
+- **Added:** 2026-08-17
+- ⛔ **blocked: owner decision (Q-535).** Master-plan decision **O1** makes `bytea` and the D4 raw drop
+  mutually exclusive — *"do not do both"*, with D4 preferred. If D4 is not the chosen path that
+  exclusion lapses and this is back on. The `event_name` half is **not** covered by O1 and could be
+  taken independently.
+- **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
+  from `tag`** — the Kotlin/TS cross-language parity test already pins that mapping. `text` → `bytea`
+  is a lossless re-encoding that halves `body_hex` (26 MB → ~13 MB) and shrinks the 78 MB dedup index
+  with it. Together: ~45–50 MB, and ~328 B/row → ~270 B/row.
+- Needs `VACUUM FULL` to reclaim (ops-doc I17).
+
+### [devices][platform] Q-534 — repack raw frames: ~20× smaller, byte-for-byte lossless
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C
+- **Branch:** `perf/oura-raw-frame-packing`
+- **Added:** 2026-08-17
+- ⛔ **blocked: owner decision (Q-535).** This is the option the current archival rule does not
+  consider, and the only one that makes the growth curve sustainable without deleting anything or
+  depending on the phone.
+- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
+  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
+  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
+  difference is representation, not information.
+- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
+  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
+  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
+  50 MB.
+- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
+  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
+  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
+
+### [devices][platform] Q-535 — OWNER DECISION: raw-retention policy (two of the five options are one-way doors)
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6
+- **Added:** 2026-08-17
+- ⛔ **blocked: owner.** Do not implement §6 D or §6 E without an explicit decision. Both are
+  irreversible and neither can be walked back.
+- **The reframing the decision rests on:** the archival rule in `CLAUDE.md` protects `body_hex`, which
+  is **26 MB of the 360 MB table — 7.3%**. The other 334 MB is indexes and row overhead, all of it
+  reversible. Dropping raw to the device buys 360 MB, of which only ~50–80 MB is unreachable by the
+  reversible options A+B+C together.
+- **Option D (bounded server re-decode window)** permanently gives up re-decoding anything older than
+  the window. The project has used that capability twice already — the I23 sleep-bout fix and the
+  Q-71/I25 clock-math correction were both back-filled from stored hex, the latter **five weeks**
+  after the affected nights. Note a 90-day window at today's row cost is ~676 MB, *larger than the
+  table is now* — D only helps combined with A/B/C.
+- **Option E (full D4 cutover)** gives up server-side re-decode permanently and for all history, gives
+  up the D3 rollback (no server raw to re-derive from if the device rollup is later found wrong), and
+  makes raw history single-copy on one phone that **has no working backup** (Q-530). D4 is gated on
+  D1+D2+D3; D1's restore has never been device-verified, D2 Tasks 4–6 are unbuilt or unmerged, D3 is
+  not started, and none of D4's four gate artifacts exist.
+- **Do not let the volume ceiling force E.** `lib/observability/request-error.ts` records the Railway
+  volume as 1 GB; at 464 MB and ~7.5–8.7 MB/day that is ~60–70 days out. **E is the only option that
+  cannot be delivered in that window**, and A+B+C buy years. (Confirm the 1 GB figure with the owner —
+  it is a code comment, not a measurement.)
+- **Also settle:** the 2026-08-02 retention decision justified the 14-day device tier *because* the
+  server keeps `body_hex` forever. D4 invalidates that premise and the device tier would have to
+  become full-history (~1.2 GB/year, un-backed-up). No existing doc reconciles this.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 

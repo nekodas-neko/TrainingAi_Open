@@ -76,6 +76,15 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](../../superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md)
+  — **where the 464 MB actually is, and what each way of shrinking it forecloses (2026-08-17).** The
+  headline: `body_hex` — the thing the archival rule protects — is **26 MB of the 360 MB
+  `oura_raw_samples` table (7.3%)**; 208 MB is indexes and ~106 MB is row overhead. Also establishes
+  that the device's "14-day rolling window" **has not shipped** (`pruneRaw` has no caller and
+  `rolled_up` is never set, so `oura_raw.db` is unbounded), and that it has **no working backup**
+  (Auto Backup's 25 MB quota). Five options costed, two of them irreversible; **owner decision
+  pending — Q-535**. Backlog Q-530…Q-535.
+
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-455 — a bodiless 500 from `/api/oura-ble/decoder-constants` when the constants read throws). Findings Q-450…Q-455; four areas recorded **clean**.
 
 ## Open issues
