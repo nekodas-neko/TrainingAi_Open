@@ -123,6 +123,29 @@ order.
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
 - **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit at
   the top of `docs/implementation-backlog.md` (Q-310 above them has since shipped and been removed).
+### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
+
+- Owner: stock ring lasts 7 days; on our build it loses ~20% overnight and needs charging every 2
+  days. That is ~50%/day against a ~14%/day stock baseline.
+- `OuraProtocol.kt:123-127` — `enableMeasurementSequence()` sets **DAYTIME_HR + SPO2 + REAL_STEPS →
+  AUTOMATIC** on *every* connect, unconditionally, with **no user toggle**, re-asserted on each
+  reconnect. On stock, blood-oxygen sensing is opt-in and the vendor warns it costs battery.
+- **Production (owner's rows, 7 days):** `spo2_r_pi_event` is the largest source at **53,412** rows,
+  and **~75% of it lands between 22:00 and 09:00** — precisely the window the owner is losing 20% in.
+  Green-PPG adds a steady daytime load. Daily totals stepped 5,378 → ~24,000 on **2026-08-04** and
+  held; **unexplained, and confounded** — this counts *ingested* events, so better draining looks
+  identical to more sensing. Resolving that comes first.
+- **Separate latent trap (not today's cause):** `reqBleFastHrMode(false)` and `EXERCISE_HR →
+  AUTOMATIC` exist only in `liveHrStopSequence()`; the connect-time sequence resets neither. A
+  live-HR session that never reaches `stopLiveHr()` — app killed mid-workout, or the tester's
+  **Live HR** button without **Stop HR** — leaves continuous fast-HR sampling on permanently, healed
+  by no reconnect or restart. Production shows it is *not* firing now (`ehr_trace` is zero 21:00–08:00).
+- **Nothing has measured ring power draw, because nothing records it** — the keepalive polls battery
+  every 5 min and `parseBattery` decodes it, but it is never persisted. Everything above is
+  code-traced or inferred from event counts. Persisting that poll is the prerequisite for a real fix.
+- **Q-388** holds the trace, the hourly table and the fix directions. **Device-gated** — needs an APK
+  and a wear cycle. **Not fixed; not started.**
+
 ### [nutrition] 🟠 A half-logged day feeds the calibrated maintenance as if it were complete (Q-387, 2026-08-17)
 
 - Owner asked what stops the tuner treating "breakfast + lunch, skipped dinner" as a whole day.

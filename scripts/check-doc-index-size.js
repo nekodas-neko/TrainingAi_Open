@@ -39,8 +39,19 @@ const root = path.join(__dirname, '..');
 // ceiling will be pushed regularly — the answer is a periodic sweep moving *cleared* entries out,
 // not a standing allowance for verbose ones.
 //
-// Raised 2026-08-17 (one-off DB-storage planning session, Q-530…Q-535): backlog 5972 -> 6106,
-// projectOverview 6461 -> 6482. Six queue entries and one Known-Issues row — entries, per the same
+// Raised 2026-08-17 (BugFix intake, Q-388): backlog 5972 -> 6057, projectOverview 6461 -> 6484.
+// One owner-reported queue entry, and a deliberately larger one: ~20 of its 85 lines are measured
+// production tables (7-day event counts by tag, and by hour of day) behind an owner-scoped
+// claude_ro view that **prunes at 30 days**. Re-deriving them after that window is impossible, so
+// they are preserved in the entry rather than cited. The prose around them was cut from a first
+// draft 100 over. If a later sweep moves this entry out, the tables go with it.
+//
+// Raised 2026-08-17 (one-off DB-storage planning session, Q-530…Q-535): backlog 6057 -> 6191,
+// projectOverview 6484 -> 6505 — this session added 134 and 21 lines respectively, and the two
+// raises landed the same day, so these numbers are the sum rather than either branch's figure.
+// Both were recomputed from the merged files rather than spliced from the conflict hunks, which is
+// how a merge of two same-day ratchet raises silently drops one side. Six queue entries and one
+// Known-Issues row — entries, per the same
 // split as the raises above. The analysis itself (the measurements, the five costed options, the
 // D4 prerequisite audit) is in docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md,
 // which this ratchet does not govern. Two of the six entries are blocked on an owner decision and
@@ -50,8 +61,8 @@ const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6482,
-  'docs/implementation-backlog.md': 6106,
+  'projectOverview.md': 6505,
+  'docs/implementation-backlog.md': 6191,
   'CLAUDE.md': 988,
 };
 
