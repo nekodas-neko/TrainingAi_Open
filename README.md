@@ -4,6 +4,12 @@ Personal AI-powered gym training tracker and health dashboard. Logs workouts, tr
 metrics, sleep, mood and biometrics, ingests Oura Ring data, and provides AI-driven periodization
 and analysis via Gemini.
 
+> **No third-party model weights are included in this repository.** A clone will build, start and
+> pass its test suite, and the Oura-derived health figures will be unavailable until a source for
+> them is configured — the application fetches them at runtime and fails the boot in production
+> rather than serving a degraded result quietly. See [`NOTICE`](./NOTICE) for what that means, and
+> `lib/oura-models/constants/README.md` for the mechanics.
+
 Runs as an offline-first PWA (with a Capacitor Android shell) on a Samsung Galaxy S25 Ultra.
 Deployed on Railway, auto-deploys from `main`.
 
