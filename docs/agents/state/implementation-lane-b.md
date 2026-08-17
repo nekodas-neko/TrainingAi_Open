@@ -6,7 +6,12 @@
 **Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **355**)
 
 ## Now
-Nothing in flight. Six items closed today:
+Nothing in flight. Seven items closed today:
+
+- **Q-352** — the E2E harness now has a zero-data account (`e2e/zero-data.setup.ts`), and Q-451 and
+  Q-452 are guarded by `e2e/first-run-empty-states.spec.ts`. Carries a **correction** to yesterday's
+  Q-452 claim about the heart-rate fields.
+  [Journal](../../overview/entries/2026-08-17-zero-data-e2e-fixture.md).
 
 - **Q-309 REFUTED** — a real touch tap on Nutrition works; `.click()` sends a mouse sequence with no
   touch events, so the suspected `filterTaps` tap-swallowing cannot be it. Spec now uses
@@ -32,10 +37,7 @@ Work the queue top-down and take the highest Lane-B-owned item, re-verifying its
 
 Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B candidates in order:
 
-1. **Q-352** — the zero-data E2E fixture. Touches `scripts/local-db/`, which is neither lane's;
-   claim it in this baton first. Read the trap in its entry before starting. **Two dependants now**
-   (Q-451 and Q-452 both shipped verified-but-unguarded for want of it).
-2. **Q-350** — the radiogroup keyboard sweep. Low priority.
+1. **Q-350** — the radiogroup keyboard sweep. Low priority.
 3. **Q-354** — the mouse-click residue of Q-309. Low priority, and its entry says do **not** change
    gesture code without reproducing a *touch* failure first.
 4. **Q-531** — ⛔ blocked, see below.
@@ -49,15 +51,14 @@ Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B can
 - **A TalkBack pass on the S25** (Q-261) over More → Goals and More → Edit Profile.
 - **A drain run on the S25** (Q-532) confirming `/admin/oura-ble` holds still while the log streams.
 - **Q-450's device path** — the E2E run took the web fallback, not SQLite+outbox.
-- **Q-451 and Q-452 have no committed guard** — both observed working against a temporary zero-data
-  account, then removed. Q-352 is what fixes that.
+- ~~Q-451/Q-452 unguarded~~ — **closed by Q-352**; both now have mutation-checked specs.
 
 ## Q numbers used from the band
 - **Q-350** — eight `role="radiogroup"`s, none with arrow-key navigation. Wants one shared primitive.
 - **Q-351** — **Lane A's to fix.** A sub-3-second activity rounds `durationMin` to 0 and
   `ActivityLogBody.durationMin` is `.positive()`, so the POST 400s and the activity is lost behind a
   generic toast. Measured (2 s → 400, 5 s → 201). The outbox parses the same schema.
-- **Q-352** — the E2E harness has no zero-data account, so no first-run bug can be guarded.
+- **Q-352** — DONE. Zero-data E2E account + first-run guards.
 - **Q-354** — a mouse click on Nutrition's action row reaches the element and the handler does not
   run, this screen only. Touch works. Low priority on a touch-only target.
 - **Q-353** — **Lane A's to fix.** The health-insight prompt substitutes the literal `"no data"` for
@@ -87,9 +88,10 @@ None beyond the lane list in [`docs/agents/README.md`](../README.md) §3. **Q-35
   genuinely its scroller.
 - **Q-452 gates in the client, not the route** — a client gate costs no request at all, where a
   server-side `{ insight: null }` still pays one.
-- **The heart-rate `hasData` gate uses the trend series, NOT `data.hrMin`/`data.recentHrv`.** Those
-  look right and are live-ring-only, so they are null for an account with months of recorded RHR;
-  using them hid the card from the seeded user. Measured. Don't "simplify" it back.
+- **The heart-rate `hasData` gate uses the trend series** because that mirrors what the *prompt*
+  reads (`body_metrics`). **Not** because `data.hrMin`/`recentHrv` are broken — an earlier note here
+  claimed they were live-ring-only and null, and that was wrong (`recentHrv` is 65 for the seeded
+  user). The `card=0` reading behind it was a cold-compile timing artifact. Corrected 2026-08-17.
 
 ## Gotchas worth carrying
 - **`scripts/check-doc-index-size.js` is a shrink-only baseline** on `projectOverview.md`,
@@ -113,4 +115,10 @@ None beyond the lane list in [`docs/agents/README.md`](../README.md) §3. **Q-35
 - **There is no component-test infrastructure** — both vitest projects are `environment: 'node'` and
   `@testing-library/react` is absent. E2E is the only automated route to UI behaviour.
 - **Mutation-check every guard you add** — revert the fix, watch the spec go red (Q-259's lesson).
+  Q-452's first guard **passed** under mutation and had to be rewritten to assert on the *request*
+  rather than on what rendered. Asserting "the card is absent" is not a guard when the card is absent
+  either way.
+- **A fixed short wait is not a measurement on a cold dev server.** A 6 s probe read a not-yet-loaded
+  `/api/readiness-score` as "no data" and produced a wrong, confidently-stated finding. Use `toPass`
+  with a real budget; `SKELETON_TIMEOUT_MS` is 20 s and `goal-round-trip` records 39.7 s cold.
 - **`pnpm check:rules` ran 38 of 38 on 2026-08-17.** Quote the count, never "pass" — it moves.

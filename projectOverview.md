@@ -266,15 +266,15 @@ the next device change.
 - **✅ Q-451 FIXED (v1.318.3) — a new account's Workout tab was a ~1,400 px empty card with a dead
   button** whose onClick short-circuited on the missing `currentSession`. Now "No program yet" + a
   **Create a program** CTA; the inert button is gone rather than disabled, and a `programLoaded` flag
-  separates "no program" from "still loading" so it cannot flash. **Observed working** against an
-  ad-hoc zero-data account, but **not guarded** — the harness's one seeded account has a program, so
-  no committed spec reaches a first-run state (filed as **Q-352**). Home's syntactic sibling is
-  guarded upstream and is not a bug. [Journal](docs/overview/entries/2026-08-17-workout-select-empty-state.md).
+  separates "no program" from "still loading" so it cannot flash. **Now guarded** by
+  `e2e/first-run-empty-states.spec.ts` against the zero-data account Q-352 added (mutation-checked).
+  Home's syntactic sibling is guarded upstream and is not a bug.
+  [Journal](docs/overview/entries/2026-08-17-workout-select-empty-state.md).
 - **✅ Q-452 HALF-FIXED (v1.318.6)** — the AI insight card ran an LLM over literal `"no data"` strings,
   telling a day-one account *"…shows zero movement… this inactivity creates a significant gap"*.
-  `AiInsightCard` now takes a required `hasData` and neither fetches nor renders without it; measured
-  both ways (all four sections show for the seeded user, none for a zero-data one). **The prompt half
-  is Lane A's — Q-353**: a scored section missing one field still feeds the model a `"no data"` line.
+  `AiInsightCard` now takes a required `hasData` and neither fetches nor renders without it. **Now
+  guarded** by `e2e/first-run-empty-states.spec.ts`, which asserts on the *request* (asserting on the
+  rendered card passes with the gate deleted). **Prompt half is Lane A's — Q-353.**
 - **🟡 Q-453/454/455 — three low-severity ones,** filed mid-low: `/api/training-stress` silently
   answers for *today* on a malformed `date` where its ten siblings all 400; `/api/day-log` and
   `/api/exercise-history` validate params before checking auth (**no data leaks** — verified 401 once

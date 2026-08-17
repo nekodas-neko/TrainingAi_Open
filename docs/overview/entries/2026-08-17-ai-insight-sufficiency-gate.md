@@ -36,32 +36,33 @@ zero, and it lives in `app/api/**` — Lane A. A section that *has* a score but 
 still hands the model a `"no data"` line, which is the common case for anyone without a ring rather
 than an edge case. Filed as **Q-353** with the fix shape.
 
-## The gotcha, which only showed up by running it
+## A claim in the first draft of this entry was wrong — corrected 2026-08-17
 
-My first heart-rate gate was `data?.hrMin != null || data?.recentHrv != null`. Those are the fields
-the page's own stat tiles and `HrFactorsCard` use, so they look exactly right.
+The original version of this entry said the heart-rate gate had to avoid `data.hrMin`/`data.recentHrv`
+because those are "live-ring-only and therefore null for an account with months of recorded resting
+HR", and cited a measurement showing the card hidden from the seeded user.
 
-They are wrong. `hrMin`/`hrCurrent`/`recentHrv` come from **live ring readings**, which an account
-with months of recorded resting HR and no ring simply does not have. Measured against the seeded
-user, who has `restingHeartRate` 58 and `hrvMs` 65 in `body_metrics`:
-
-```
-SEEDED /health/heart-rate -> card=0     ← my gate hid it from a user who has the data
-SEEDED /health/readiness  -> card=1
-SEEDED /health/sleep      -> card=1
-SEEDED /health/activity   -> card=1
-```
-
-The gate has to mirror what the *prompt* reads, which is `body_metrics.restingHeartRate` and
-`hrvMs`. The client-side view of exactly those two columns is the trend series (`rhrBpm` ←
-`restingHeartRate`). After the correction:
+**That is not true.** Re-measured directly against `/api/readiness-score` for the seeded user:
 
 ```
-SEEDED   /health/{heart-rate,readiness,sleep,activity} -> card=1  (all four)
-ZERODATA /health/{heart-rate,readiness,sleep,activity} -> card=0  (all four)
+hrMin: null   hrCurrent: null   recentHrv: 65   baselineHrv: 65
 ```
 
-Reading the code would not have caught this. The wrong field name is the plausible one.
+`recentHrv` is populated, so `hrMin != null || recentHrv != null` is **true** and that gate would
+have worked. The earlier `card=0` observation was a **cold-compile timing artifact** — the probe
+waited 6 s, and `/api/readiness-score` had not resolved yet on a first visit, so `data` was still
+null. Confirmed by mutation: putting the old gate back and running the seeded-user spec with a 30 s
+budget **passes**.
+
+The shipped code is unchanged, because the trend-series gate is still the better choice — it mirrors
+what the *prompt* actually reads (`body_metrics.restingHeartRate` / `hrvMs`) rather than a different
+API's fields that happen to correlate. But it was chosen for that reason, **not** because the
+alternative was broken, and the earlier entry asserted a measurement that does not hold.
+
+The real lesson is the one worth keeping: **a 6-second wait is not a measurement on a cold dev
+server.** Two of this repo's own rules already say so — `SKELETON_TIMEOUT_MS` is 20 s and
+`goal-round-trip.spec.ts` documents a 39.7 s cold run against a 7.6 s warm one — and I walked into it
+anyway.
 
 ## Verified, not guarded
 

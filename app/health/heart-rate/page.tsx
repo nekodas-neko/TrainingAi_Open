@@ -169,10 +169,14 @@ export default function HeartRateDetailPage() {
 
         {/* The route's heart-rate prompt reads `body_metrics.restingHeartRate` and `hrvMs`; with
             neither, every line it builds is the literal string "no data" (Q-452). The trend series
-            is the client-side view of exactly those two columns (`rhrBpm` ← `restingHeartRate`).
-            Deliberately NOT `data.hrMin`/`data.recentHrv`, which look like the right fields and are
-            not: those come from live ring readings, so they are null for an account with months of
-            recorded RHR and no ring — measured, and it hid the card from the seeded user. */}
+            is the client-side view of exactly those two columns (`rhrBpm` ← `restingHeartRate`),
+            which is why the gate reads it rather than `data.hrMin`/`data.recentHrv`.
+            **Correction to an earlier claim in this file's history:** those two were reported as
+            "live-ring-only, therefore null for an account with recorded RHR". That is wrong —
+            measured, `recentHrv` is 65 for the seeded user (only `hrMin` is null), so that gate
+            would have worked too. The earlier `card=0` reading was a cold-compile timing artifact,
+            not a difference in the fields. This gate is preferred because it mirrors the prompt's
+            actual inputs, not because the alternative was broken. */}
         <AiInsightCard
           section="heart-rate"
           date={today}

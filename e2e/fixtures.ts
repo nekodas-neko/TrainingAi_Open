@@ -8,6 +8,25 @@ export const SEED_PASSWORD = 'testpass123'
 export const STORAGE_STATE = join(__dirname, '.auth', 'seed-user.json')
 
 /**
+ * A second account with no program, no logs and no metrics (Q-352).
+ *
+ * Every other spec runs as the seeded user, who has all three — so before this existed **no
+ * first-run or empty state was reachable from the harness at all**, which is exactly where the
+ * 2026-08-17 failure-cells sweep found the app broken (Q-451's dead primary action on the primary
+ * tab, Q-452's AI copy). Both shipped verified-by-hand and unguarded for want of it.
+ *
+ * **Created by `zero-data.setup.ts` rather than by `scripts/local-db/seed.sql`, deliberately.**
+ * `setup.sh` skips the seed entirely when `users` is non-empty, so a developer's existing local
+ * database would never gain the account while CI (fresh every run) always would — a spec that
+ * assumed it would pass in CI and fail locally, which is the wrong way round for a regression
+ * guard. Creating it from the setup project makes local and CI identical.
+ *
+ * Use it per-file: `test.use({ storageState: ZERO_DATA_STORAGE_STATE })`.
+ */
+export const ZERO_DATA_EMAIL = 'zero@local.dev'
+export const ZERO_DATA_STORAGE_STATE = join(__dirname, '.auth', 'zero-data-user.json')
+
+/**
  * Visit a route twice and return only after the second visit has painted.
  *
  * The first visit fills the caches; the second is the one the instant-paint rule is about — a

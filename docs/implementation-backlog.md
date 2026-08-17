@@ -669,28 +669,6 @@ below threshold and left in place for next time.
   `ActivityLogBody`, so a sub-3-second activity queued offline is a poison-pill candidate, not just
   a failed web POST. Check it against the "one bad mutation must never wedge the queue" rule.
 
-### [platform][app-shell] Q-352 — the E2E harness has no zero-data account, so no first-run bug can be guarded
-
-- **Branch:** `feat/e2e-zero-data-fixture`
-- **Added:** 2026-08-17 · found shipping Q-451, which could not be guarded without it
-- **The gap.** `e2e/auth.setup.ts` signs in one seeded user who has a program, logs and metrics.
-  Every spec runs as that user, so **no first-run or empty state is reachable from the harness** —
-  and first-run is exactly where the 2026-08-17 failure-cells sweep found the app broken (Q-451's
-  dead primary action on the primary tab, and Q-452's AI copy).
-- **Q-451 shipped observed-but-unguarded because of this.** It was verified by inserting an ad-hoc
-  `fresh@local.dev` row into the local DB and driving a throwaway spec — which worked, and proves the
-  fixture is straightforward — but nothing committed can re-run it, so the empty state can regress
-  silently.
-- **What to build.** A second seeded account with no program/logs/metrics in
-  `scripts/local-db/seed.sql`, plus a second Playwright project (or a `storageState` fixture) signed
-  in as it, so a spec can opt into the zero-data user per test.
-- **The one real trap:** `scripts/local-db/setup.sh` will not re-seed a database whose `users` table
-  is non-empty, so an existing local DB never gains the account while CI (fresh each run) always has
-  it — a spec that assumes it will pass in CI and fail locally, which is the wrong way round for
-  something meant to catch regressions. Either make the spec skip loudly when the account is absent
-  (the `claude-ro-readonly-role.test.ts` precedent), or add an idempotent top-up step to `db:local`.
-- **`scripts/local-db/` belongs to neither lane** — claim it in the implementing lane's baton first.
-
 ### [platform] Q-353 — the health-insight prompt says "no data" where it means "absent", and the model reads it as zero
 
 - **Branch:** `fix/ai-insight-prompt-absent-vs-zero`
