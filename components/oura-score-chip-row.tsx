@@ -14,11 +14,11 @@ interface Props {
   readiness: ReadinessScoreResponse;
 }
 
-// State cue for a 0–100 score card (Readiness / Sleep / Activity). The colour is only rendered for
-// the "accentring" style's dot (every other style dropped the dot — colour lives on the icon
-// instead, where it identifies the metric rather than its state); the word always feeds the
-// aria-label so the live good/moderate/low read stays available to screen readers regardless of
-// which visual style is active.
+// State cue for a 0–100 score card (Readiness / Sleep / Activity). Only the "accentring" style
+// renders it visually (every other style dropped the cue — their colour lives on the icon, where it
+// identifies the metric rather than its state); the word always feeds the aria-label so the live
+// good/moderate/low read stays available to screen readers regardless of which visual style is
+// active.
 function scoreCue(value: number | null): { color: string; word: string } | null {
   if (value == null) return null;
   const b = scoreBand(value);
@@ -172,7 +172,16 @@ function ScoreCircle(props: CellProps) {
             >
               {display}
             </span>
-            {geo.showDot && props.cue && <span className="mt-1.5 h-[8px] w-[8px] rounded-full" style={{ background: props.cue.color }} aria-hidden />}
+            {/* The dot alone carried the band, which is the colour-only-state violation the repo
+                rule names (Q-281 audit — the one real instance of it). The word rides beside it so
+                the band survives a red/green deficit; it is set small enough that the cue's height
+                is unchanged and the row does not grow. */}
+            {geo.showDot && props.cue && (
+              <span className="mt-1.5 flex items-center gap-[3px]" style={{ color: props.cue.color }} aria-hidden>
+                <span className="h-[8px] w-[8px] flex-none rounded-full" style={{ background: props.cue.color }} />
+                <span className="text-[7.5px] font-bold uppercase leading-none tracking-[0.08em]">{props.cue.word}</span>
+              </span>
+            )}
           </span>
         )}
       </span>

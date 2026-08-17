@@ -142,8 +142,24 @@ const BASELINE = {
   // cut from 12 lines to 7). The two it is over are the two the original entry had no reason to
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
-  'projectOverview.md': 6679,
-  'docs/implementation-backlog.md': 6735,
+  //
+  // Raised 2026-08-17 (Q-281, Lane B): projectOverview 6679 -> 6689, backlog 6735 -> 6770. Same
+  // shape as the two raises above and the same reason: a shipped fix owing a device check cannot go
+  // to the resolved archive. The ratchet was right to catch the first draft at 20 over — the audit's
+  // findings, the FactorBar judgement call and the Q-278 corrections all moved to
+  // docs/reviews/2026-08-17-score-presentation-audit.md, which this file does not govern. What is
+  // left is the owed check (a 7.5px band word, verified only in a browser harness, on a style the
+  // owner selects) and the one pointer that stops Q-278 being planned on premises this audit
+  // refuted. Two stale lines were corrected in the same pass: the version, four minors out of date,
+  // and an open-PR snapshot naming three PRs of which two had long since closed. The backlog half is
+  // Q-281's audit result folded into its entry plus the two refuted premises annotated onto Q-278 —
+  // a correction to an existing entry, which is cheaper here than an implementer discovering it.
+  //
+  // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
+  // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
+  // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
+  'projectOverview.md': 6689,
+  'docs/implementation-backlog.md': 6770,
   'CLAUDE.md': 1010,
 
 };
