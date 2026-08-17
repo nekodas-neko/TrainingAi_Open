@@ -11,7 +11,10 @@
 
 import fs from "node:fs";
 
-const WINDOW = Number(process.env.CONTEXT_WINDOW_TOKENS || 200_000);
+// 1M, not 200k: sessions run on a 1M-token window, so the old default reported
+// ~111% at 222k tokens (22% of the real window) and fired the wrap-up warning
+// while there was still most of a session left.
+const WINDOW = Number(process.env.CONTEXT_WINDOW_TOKENS || 1_000_000);
 // Warn at each of these once; later thresholds re-fire even after an earlier one.
 const THRESHOLDS = [90, 95];
 
