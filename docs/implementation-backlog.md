@@ -2184,6 +2184,13 @@ session working from a temporarily restored copy.
      `daytime_stress_scaled` exists on 22 of 40 days; neither reaches the battery model today.
 - **Gate:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
   the before/after comparison is not interpretable.
+- **⚠️ Read [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md)
+  (Q-502) before starting. It re-measured this entry (still true — 5.6× on 14 v5 days now) and found
+  two things that change how to work it:** (a) **direction #1 above is refuted** — the charge window
+  is reachable on a median 6.7% of waking samples (0.8% on 2026-08-14), so raising `CHARGE_RATE`
+  scales a term that is barely active; `REST_THRESHOLD`/the reserve is the lever. (b) The stored
+  snapshots are **partial days** (two of 14 carry under 3% of their available samples), and since rest
+  is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
 
 ### [readiness] ⛔ Q-500 — re-anchor the Recovery Index curve, `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5
 
@@ -2220,6 +2227,30 @@ session working from a temporarily restored copy.
 - **Follow-up:** re-derive the anchor on ~15 BLE-era nights. The fit is Cloud-era, and BLE overnight HR
   is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
+
+### [readiness][body] Q-502 — Body Battery's tuning substrate is a biased sample of each day
+
+- **Branch:** `fix/body-battery-end-of-day-snapshot`
+- **Added:** 2026-08-17 · Tuning agent ·
+  [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md) §3
+- **Not blocked on the owner** — this is a data-capture fix, not a scoring change.
+- **Measured.** `GET /api/body-battery` computes on read and writes through, so each
+  `body_battery_daily` row is as of the last time the app was opened that day. Comparing
+  `hr_sample_count` against the samples actually in `oura_heartrate` for the same waking window:
+  2026-08-04 **74 of 3,991 (1.9%)**, 08-16 **64 of 2,656 (2.4%)**, 08-11 125 of 1,451 (8.6%), against
+  08-05 at 88% and 08-14 at 62%. Not `preferStrapBuckets` thinning — that cannot turn 3,991 into 74.
+- **Why it matters.** Draining spreads across the waking day; the charge window is concentrated in
+  genuine rest, which is back-loaded into the evening. A midday snapshot therefore captures more of
+  the day's drain than its charge, so **every charge/drain ratio computed from this table is biased
+  upward by an unknown amount** — including Q-272's headline 5.6×, and including the v1/v4 rows it is
+  compared against. No constant can be fitted against a target that moves with when the app was opened.
+- **The fix is already named** in [`docs/body-battery-tuning.md`](body-battery-tuning.md)'s caveats —
+  a scheduled end-of-day recompute — but recorded there as optional ("if rigour demands it") and
+  scoped only to `end_value`. It applies to `total_charged`/`total_drained` too, and it is a
+  prerequisite for Q-272 rather than a nicety. **Note there is no cron layer** (see
+  [`docs/module-map.md`](module-map.md) §0), so this needs a mechanism decision, not just a job.
+- **Sequencing:** do this **before** Q-272. Tuning constants against a biased substrate produces a
+  constant fitted to the owner's app-opening habits.
 
 ### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
 
