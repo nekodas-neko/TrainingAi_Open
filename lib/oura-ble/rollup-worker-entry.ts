@@ -57,9 +57,35 @@ export type WorkerReply =
 // sweep racing it from a worker is a hazard, not a safety net.
 const repo = new PostgresWorkoutRepository()
 
-// Errors cross the thread boundary as data — an Error instance does not survive structured clone
-// with its prototype, and the caller only needs the message to report.
-const msg = (err: unknown) => (err instanceof Error ? err.message : String(err))
+/**
+ * Errors cross the thread boundary as data — an Error instance does not survive structured clone
+ * with its prototype, so it has to be flattened to a string here.
+ *
+ * **Walk the cause chain, and do not stop at `.message`.** Drizzle wraps every driver failure in a
+ * `DrizzleQueryError` whose message is only `Failed query: <sql>\nparams: …` — the reason lives in
+ * `.cause`, and `pg` puts the discriminating part in `.code`. Taking the message alone therefore
+ * reported *which* query failed and never *why*, which is a permanent blind spot on the heaviest
+ * operation in the app: on 2026-08-17 a redecode failed three times in a row and the only thing
+ * recoverable from the report was the SQL text. A statement timeout, a dead pooled connection, a
+ * permissions error and a constraint violation were all indistinguishable.
+ */
+export function msg(err: unknown): string {
+  const parts: string[] = []
+  let cur: unknown = err
+  const seen = new Set<unknown>()
+  while (cur != null && !seen.has(cur)) {
+    seen.add(cur)
+    if (cur instanceof Error) {
+      const code = (cur as { code?: unknown }).code
+      parts.push(code != null ? `${cur.message} [${String(code)}]` : cur.message)
+      cur = (cur as { cause?: unknown }).cause
+    } else {
+      parts.push(String(cur))
+      break
+    }
+  }
+  return parts.length > 0 ? parts.join('\n  caused by: ') : String(err)
+}
 
 async function handle(job: WorkerJob): Promise<WorkerReply> {
   if (job.kind === 'redecode') {

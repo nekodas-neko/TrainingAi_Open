@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.3",
+    date: "2026-08-17",
+    changes: [
+      "Admin: when a re-decode fails it now says why. It was reporting which database query failed and never the reason, so a timeout, a dropped connection and a permissions problem all looked identical \u2014 which is why the sleep-time re-decode failed three times without anyone being able to tell what was wrong.",
+    ],
+  },
+  {
     version: "1.318.2",
     date: "2026-08-17",
     changes: [
