@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Image from 'next/image'
 import { toast } from 'sonner'
 import { ChevronLeft, ChevronDown, ChevronUp, Send, Loader2, CheckCircle2, Plus, Dumbbell, TriangleAlert } from 'lucide-react'
@@ -12,6 +12,7 @@ import { AddExerciseSheet } from '@/components/exercises/add-exercise-sheet'
 import { WeeklyMuscleSetsCard } from '@/components/health/weekly-muscle-sets-card'
 import { goalRange, formatGoalRange } from '@trainingai/shared/ai-periodization/goal-ranges'
 import { Switch } from '@/components/ui/switch'
+import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom'
 import type { MuscleSetsEntry } from '@/app/api/weekly-muscle-sets/route'
 
 interface Props {
@@ -136,7 +137,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
     }
     return Object.fromEntries(phases.map((_, i) => [i, scaled[i]]))
   })
-  const chatEndRef = useRef<HTMLDivElement>(null)
+  const chatScrollRef = useScrollToBottom<HTMLDivElement>(chatMessages)
   const [exerciseMedia, setExerciseMedia] = useState<Record<string, { gif: string | null; img: string | null }>>({})
   const [failedSrcs, setFailedSrcs] = useState<Set<string>>(new Set())
 
@@ -166,10 +167,6 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
       .then(r => r.ok ? r.json() : null)
       .then(data => { if (data?.exercises) setExerciseLibrary(data.exercises) })
   }, [])
-
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [chatMessages])
 
   // Give every exercise a stable client id so reorder/swap key on identity, not array
   // index — otherwise deleting or moving a row leaks the row-below's transient state
@@ -642,7 +639,7 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
         {/* Chat */}
         <div className="px-4 pb-3 space-y-2">
           <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Chat with AI</p>
-          <div className="rounded-xl bg-muted p-3 space-y-2 max-h-48 overflow-y-auto">
+          <div ref={chatScrollRef} className="rounded-xl bg-muted p-3 space-y-2 max-h-48 overflow-y-auto">
             {chatMessages.map((msg, i) => (
               <div key={i} className={cn('text-xs', msg.role === 'user' ? 'text-right' : '')}>
                 <span className={cn(
@@ -660,7 +657,6 @@ export default function BuilderReview({ program, inputs, onBack, onSaved, onProg
                 </span>
               </div>
             )}
-            <div ref={chatEndRef} />
           </div>
           <div className="flex gap-2">
             <input
