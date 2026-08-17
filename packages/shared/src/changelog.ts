@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.1",
+    date: "2026-08-17",
+    changes: [
+      "Fixed: an activity started from the Coach's \"Log an activity\" link, from the end of a guided walk, or by opening the activity screen directly is no longer thrown away when you save it. Those routes left the screen with no activity type — it still timed the activity and still offered Save, but Save quietly did nothing and the activity was gone. The screen now asks what you are doing first, and Save says so if anything is still missing.",
+    ],
+  },
+  {
     version: "1.318.0",
     date: "2026-08-17",
     changes: [
