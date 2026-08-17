@@ -68,6 +68,21 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][devices] ⚠️ Q-532 FIXED — a streaming panel no longer scrolls the page; NOT device-verified (v1.317.6, 2026-08-17)
+
+- **Cause:** `scrollIntoView` on a sentinel inside the log panel's `overflow-y-auto` box. It scrolls
+  **every** scrollable ancestor up to the document, so each log line during a drain moved the whole
+  `/admin/oura-ble` page — on the one screen where a mistimed tap can hit Clear key. Both call sites
+  now use `lib/hooks/use-scroll-to-bottom.ts` (`scrollTop` on the container, which cannot escape it).
+  The sibling sweep found a second, unreported instance: the workout-builder AI chat.
+- **NOT device-verified and not reproducible here** — the sandbox cannot run a BLE scan, so the
+  mechanism is identified but the symptom was never seen to disappear. **Owner check: run a drain,
+  confirm the page holds still.**
+- **No regression guard exists** — a capability gap: both vitest projects are `environment: 'node'`
+  with no `@testing-library/react`, and the route needs admin plus a live radio, so neither a
+  component test nor an E2E spec can reach it. Reintroducing the bug would fail nothing.
+- Detail: [`entries/2026-08-17-scroll-panel-page-jump.md`](docs/overview/entries/2026-08-17-scroll-panel-page-jump.md).
+
 ### [platform][devices] 🔴 Production hit `disk_full` during a full re-sync — and the indexes, not the data, are the bulk (2026-08-17)
 
 **Live fault, mitigated by raising the volume; the underlying sizing is unresolved.** During the
@@ -102,6 +117,40 @@ touch `body_hex`, so it does not collide with the rule that the server archive i
 truth and must never be pruned. Replacing the payload in that index with a hash would preserve
 dedup semantics on a fraction of the bytes. That may get under 500 MB without deleting anything,
 which is a very different proposition from the retention question.
+
+**⚠️ Correction to (3), measured after recovery — do not chase an autovacuum misconfiguration.** At
+08:04 and 08:45 UTC this table reads `last_autovacuum = 2026-08-17T07:57:35Z` and
+`n_live_tup = 1,097,626`. **Autovacuum has run, twice, today.** The never/0 reading was taken while
+the statistics were still empty: an unclean shutdown makes Postgres discard the stats file on
+recovery, and `stats_reset` stays `NULL` because only an explicit `pg_stat_reset()` sets it — so
+freshly-zeroed counters look exactly like "never". `error_events` showed the same artifact, reading
+`n_live_tup = 0` while holding 6,222 rows. **Every counter on this table is now "since ~07:42", not
+lifetime** — which also means index `idx_scan` counts are a short window, not evidence of disuse.
+
+**What actually consumed the space, proven.** `n_tup_ins = 0`, `n_tup_upd = 681,005`,
+**`n_tup_hot_upd = 0`**. The re-sync was the *trigger* (a catch-up drain, whose re-POSTed events all
+dedup to zero inserts); the *mechanism* is the full-table `measured_at` re-stamp that ops-doc I14/I25
+tells the owner to run after one. The table went 360 → 666 MB — and the DB 464 → 771 MB — while live
+rows went **down** by 557 and `body_hex`/`event_name` did not move at all. **Zero new data; ~306 MB
+of pure bloat.**
+
+**The fourth finding, and the one with leverage.** `measured_at` is indexed, so **no update that
+changes it can ever be HOT** — each rewrites a heap tuple plus an entry in all four indexes — and it
+is the *only* indexed column such a re-stamp changes. **Dropping `idx_oura_raw_samples_user_measured`
+makes the whole operation HOT-eligible**, so it is both a space win and the fix for the mechanism.
+Q-46's `IS DISTINCT FROM` guard is present and correct (`adapter.ts:4954`) and **is not the bug** —
+it can only skip a re-stamp writing back the same value, and the Q-71/I25 clock fix changed every
+row's derived value. The durable hazard: the operations manual prescribes Redecode as the remedy for
+**five** failure modes (I12, I14, I19, I20, I25), so the documented fix procedure is a disk-fill
+hazard until that index goes and the route gains a free-space pre-flight check.
+
+**Is 500 MB reachable without touching retention? Yes — measured, not estimated.** `VACUUM FULL`
+→ ~465 MB; + the index work → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB.
+**The owner chose A+B+C on 2026-08-17 and declined both irreversible options** (Q-542), so the
+archival rule stands unchanged. Caveat worth keeping separate: *reaching* 500 MB and *holding* it
+differ — vacuum alone re-crosses it in ~5 days, with the index+row work ~7 weeks, and **with Q-541
+(repack) ~3 years**. Sequencing, and the owner's own runbook, in
+[`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0/§0a.
 
 **Owed:** the sizing work (see the storage research item) must now be framed as *how to get back
 under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
@@ -347,6 +396,28 @@ the next device change.
 - **The device check that would close this:** trigger a sync pull, log readiness mid-pull, and
   confirm both that the card flips immediately and that the log reaches the server afterwards.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
+
+
+### [devices][platform] 🟠 `oura_raw.db` is growing without bound on the phone, and nobody has ever seen how big it is (Q-538, 2026-08-17)
+
+The documented "14-day rolling buffer" for on-device raw frames (owner retention decision,
+2026-08-02) **has not shipped**. `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
+`rawStats` and all four are exposed on the plugin bridge, but **a repo-wide grep finds no caller for
+any of them**. Two independent causes, and fixing the first does not fix the second: nothing invokes
+`pruneRaw`, and its predicate needs `rolled_up = 1`, which is set only by the WebView rollup consumer
+(**D2 Task 5, not built**) — so wiring the prune tomorrow would delete zero rows.
+
+The store has therefore accumulated everything drained since 2026-07-27 at roughly 2–3 MB/day. This
+can wedge the drain: ops-doc **I21** holds the cursor on `SQLITE_FULL`.
+
+- **Not measured, and cannot be from here:** the actual size of the file on the owner's S25. The admin
+  console has no `rawStats()` panel — the fields are wired in `lib/oura-ble/plugin.ts` and rendered
+  nowhere. Building that panel is the first step of Q-530 and the only way to see this.
+- **Related, and load-bearing for the D4 decision:** `AndroidManifest.xml:14` sets
+  `allowBackup="true"` with no `dataExtractionRules`. Android Auto Backup's cloud quota is 25 MB/app
+  and this file passed it within two weeks, so **the device raw store has no working backup.**
+- Detail and the five costed options:
+  [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md).
 
 ### [platform][devices] 🟢 Q-308 RESOLVED — serialise the sync fan-out; owner-measured RTT settled it (2026-08-16)
 

@@ -54,12 +54,34 @@ const root = path.join(__dirname, '..');
 // The backlog half also carries Q-530's ordered step list and the new optional `Lane:` field on
 // Q-530/Q-288 — routing an implementer to the right lane and flagging a shared unlisted path, which
 // is queue mechanics rather than narrative and is exactly what this file governs.
+// Raised 2026-08-17 (one-off DB-storage planning session, Q-530…Q-535): backlog 6057 -> 6191,
+// projectOverview 6484 -> 6505 — this session added 134 and 21 lines respectively, and the two
+// raises landed the same day, so these numbers are the sum rather than either branch's figure.
+// Both were recomputed from the merged files rather than spliced from the conflict hunks, which is
+// how a merge of two same-day ratchet raises silently drops one side. Six queue entries and one
+// Known-Issues row — entries, per the same
+// split as the raises above. The analysis itself (the measurements, the five costed options, the
+// D4 prerequisite audit) is in docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md,
+// which this ratchet does not govern. Two of the six entries are blocked on an owner decision and
+// carry the "what this irreversibly gives up" summary inline deliberately: an implementer must not
+// have to open the plan to discover that the item is a one-way door.
+//
+// Raised 2026-08-17 (DB-storage planning, renumbered to Q-538…Q-542 on merge): -> 6594 / 6597.
+// Five queue entries plus an amendment folding two more into a concurrent session's Q-534 rather
+// than filing duplicates of it. The amendment is longer than a cross-reference because it corrects
+// a measured claim in that entry (autovacuum had run; the null reading was a post-crash statistics
+// artifact) and a wrong correction is more expensive than a long one.
+//
+// Raised again 2026-08-17 for the disk_full incident (Q-536): backlog -> 6235, projectOverview -> 6534.
+// A live production outage entry and its Known-Issues row. Both carry the proven mechanism inline
+// (n_tup_upd=681,005 with n_tup_hot_upd=0) rather than citing it, because the counters reset at
+// crash recovery and cannot be re-derived later — the same reasoning as the Q-388 raise above.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6552,
-  'docs/implementation-backlog.md': 6417,
+  'projectOverview.md': 6623,
+  'docs/implementation-backlog.md': 6584,
   'CLAUDE.md': 1010,
 };
 
