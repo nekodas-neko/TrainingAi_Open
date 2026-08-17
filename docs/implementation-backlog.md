@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **536** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **537** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -276,6 +276,65 @@ below threshold and left in place for next time.
 
 
 ### [devices][platform] Q-530 — the ring key has one copy and no way to back it up
+### [sleep][devices] Q-536 — every BLE-era sleep window is timezone double-converted: 43 nights show midday bedtimes
+
+- **Branch:** `fix/ble-sleep-window-timezone`
+- **Added:** 2026-08-17, found while verifying the post-re-sync Health screen.
+- **The symptom.** Health lists bedtimes like **12:07 pm – 8:31 pm** and **11:16 am – 10:26 pm**.
+  Measured across all 82 stored sessions, start hours are **bimodal**: ~36 in a plausible 19:00–02:00
+  band, and **43 clustered at 10:00–14:00** Brisbane, which is not a bedtime.
+> **⚠️ DIAGNOSIS CORRECTED, same day.** The entry below hypothesised a timezone
+> double-conversion. **That is superseded.** The measured cause is a **ring clock-epoch collision**:
+>
+> | epoch | anchors | anchor_utc span | anchor_ds range |
+> |---|---|---|---|
+> | 2 | 3,666 | 2026-07-30 04:18 → **2026-08-17 06:42** | 17,412,570 – **37,112,321** |
+> | **3** | 695 | **2026-08-17 06:58 → 07:38** | **33,006,208 – 37,146,216** |
+>
+> **Epoch 3 was created at 06:58 on 2026-08-17 — the moment the app was reinstalled and the ring
+> re-paired** — and its `ds` range *overlaps* epoch 2's. `CLAUDE.md` states the constraint
+> directly: `ring_timestamp_ds` is a counter since the ring's own epoch, which **resets on
+> re-key or dead battery**, and wall-clock comes from a `(ringDs ↔ utc)` anchor. With two epochs
+> holding the same ds values, a resolution that picks the wrong anchor set shifts every derived
+> timestamp.
+>
+> `toDate(ds)` in `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:5087`) calls
+> `resolveDsToMs(ds, anchors)` over the anchor set, and the rollup elsewhere uses
+> `currentEpoch(anchors)`. **Establish whether raw rows carry their own epoch and whether the
+> resolver is epoch-scoped per row** — if it is not, every pre-reinstall sample is now being
+> resolved against a post-reinstall anchor. That is the fix, and it is also why the full redecode
+> reproduced the fault instead of correcting it.
+>
+> Two things this reframes: the ds→UTC path is **not** generally broken (the newest `measured_at`
+> is 07:38 UTC = 17:38 Brisbane, matching the device drain log exactly), and **the uninstall caused
+> this**, which links it to Q-530 — the ring key hazard was not the only cost of that reinstall.
+> Whether the pre-existing 2026-07-04→08-16 rows were already wrong or were rewritten wrong by
+> today's redecode is **not yet established** and must be, before any corrective pass.
+
+- **The display is innocent.** For 2026-08-17, `sleep_start` is stored as `02:07 UTC`, which
+  genuinely *is* 12:07 pm Brisbane — the UI renders the stored instant correctly. A real 22:07
+  Brisbane sleep should store as `12:07 UTC`; `02:07 UTC` is what you get if that correct UTC
+  value is then treated as a Brisbane wall-clock time and converted **a second time**. This is the
+  double-conversion shape, not a rendering bug, so do not go looking in the component.
+- **It correlates with the pipeline, not the data.** Broken rows span **2026-07-04 → 2026-08-17**;
+  plausible rows are predominantly **2026-05-26 → 2026-08-14** and are the Oura Cloud era. The BLE
+  re-key was 2026-07-07. So the **direct-BLE sleep aggregation** carries the fault while the Cloud
+  writer did not.
+- **The redecode did not cause it, which is the useful part.** A full-history redecode on 2026-08-17
+  recomputed every row from raw frames and produced **the same wrong windows**. The bug is therefore
+  in the aggregation logic, reachable from stored `body_hex` — so a corrected decoder can fix all
+  43 nights by re-running, with no data loss and nothing to reconstruct.
+- **What is NOT affected:** duration, HRV, average and lowest heart rate all look right. It is
+  specifically the window boundaries.
+- **Where to look.** The path that turns `ring_timestamp_ds` into wall-clock via the
+  `(ringDs ↔ utc)` anchor in `oura_ble_clock_anchors`, and whatever converts that into
+  `sleep_start`/`sleep_end`. `CLAUDE.md`'s Timezone section names this exact class as the most
+  repeated bug in the project. Suspect an anchor already in UTC being passed through a
+  `todayInTz`-style conversion, or a `Date` built from a UTC string and then offset.
+- **Verification:** a boundary test at 23:59 and 00:01 Brisbane, plus re-running the aggregation
+  over a known night and asserting the window matches the owner's account of it. **Do not fix from
+  reading alone** — this is the class that has shipped wrong three times.
+
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 
 - **Branch:** `fix/redecode-async-job`
