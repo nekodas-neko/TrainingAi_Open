@@ -23,7 +23,7 @@ across six modules opened the files during the build. With them deleted the buil
 ... energy-expenditure-features.json` at *Failed to collect page data for /api/achievements* — a
 failed Railway deploy, had it been merged blind. Those modules now read on first use, and parity
 against the real vendor values was re-proven either side of the change. `publish-dry-run.js` runs no
-build gate; that is **Q-311**.
+build gate; that is **Q-313**.
 
 **2. The 16-file list was 17.** It was measured by moving `constants/` aside, which never exercised
 the `.onnx` deletion. `oura-ble-rollup-worker.test.ts` compares *durations*, and with no models the
@@ -202,7 +202,7 @@ Constraints you would otherwise rediscover:
 - Rollback stays available throughout. The old repo remains a working Railway target until the
   final step, and that step archives rather than deletes it.
 - publish-dry-run runs no `next build` gate. That gap is what let a real build-time dependency
-  through in A4b (Q-311). If you change anything about what the published tree contains, run
+  through in A4b (Q-313). If you change anything about what the published tree contains, run
   `next build` yourself; the dry-run's green does not cover it.
 - Session sandboxes hold placeholder storage credentials that reject with SignatureDoesNotMatch.
   Anything bucket-shaped cannot be exercised here, only in a deploy.

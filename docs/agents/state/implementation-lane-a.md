@@ -1,6 +1,6 @@
 # Implementation Lane A — baton
 
-**Updated:** 2026-08-17 · **By:** the session that stood the agent model up · **Q band:** 313–349 (next free: 313)
+**Updated:** 2026-08-17 · **By:** the session that stood the agent model up · **Q band:** 314–349 (next free: 314)
 
 ## Now
 Nothing in flight. This is the seed baton — no session has run as Implementation Lane A yet.

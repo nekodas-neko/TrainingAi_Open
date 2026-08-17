@@ -24,7 +24,7 @@ the domain-math directories under `lib/`, the BLE and device pipelines, auth/sec
 `android/**`. Lane B owns the screens and components. If you need a path neither lane lists, claim
 it in your baton before touching it, and check Lane B's baton first.
 
-**Your Q band is 313–349.** Take new numbers from it directly. Do not read or write the backlog's
+**Your Q band is 314–349.** Take new numbers from it directly. Do not read or write the backlog's
 next-free pointer — that is what the bands exist to avoid. Postgres migration numbers and local
 SQLite versions are yours alone; no other agent takes one.
 

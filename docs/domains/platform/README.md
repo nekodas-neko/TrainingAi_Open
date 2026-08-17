@@ -26,6 +26,10 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Reference docs
 
+- [`docs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`](../../handoff-2026-08-17-cross-comprehensive-review-six-rounds.md)
+  — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
+  the Q-number collision and the conflict-markers-on-`main` incident. **Also records that PR #1401 did
+  not make the public-repo migration** and how to port it.
 - [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](../../reviews/2026-08-16-goal-invalidation-audit.md)
   — Q-262: does `invalidateGoalRecommendations()` do anything? **No, for all six keys.** Establishes
   the method for auditing any cache group: an invalidation can only change a *settled* value where a
@@ -320,7 +324,7 @@ Live at the time of writing (2026-07-30):
 - [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoff-2026-08-16-platform-public-repo-cut-a4b.md)
   — Q-49 public-repo cut. **Updated at the Phase B boundary:** A4b has shipped, Oura's material is
   out of the tree, and the handoff now carries what A4b cost beyond the plan — the constants were
-  still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-311), the
+  still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-313), the
   measured blast radius was 17 files not 16, and the guards had to go finer than per-`describe`.
   Runbook: [`public-repo-cut-runbook.md`](../../public-repo-cut-runbook.md), steps 8–14 remain.
 - [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](../../overview/entries/2026-08-16-public-repo-cut-a4b.md)

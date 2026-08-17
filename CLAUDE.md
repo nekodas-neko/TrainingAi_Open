@@ -45,7 +45,7 @@ code — which is what keeps the collision surface to Lane A against Lane B.
 
 - **A path neither lane lists is claimed in the claiming lane's baton before it is touched**, and
   the other lane checks batons before starting an item. First claim wins for that item's duration.
-- **Q numbers come from per-agent bands, never from the next-free pointer.** Lane A 313–349 ·
+- **Q numbers come from per-agent bands, never from the next-free pointer.** Lane A 314–349 ·
   Lane B 350–386 · BugFix 387–449 · Review 450–499 · Tuning 500–529. The pointer is a floor that
   cannot see an unmerged PR; taking numbers one at a time from it caused six collisions in three
   days, and left two live duplicates (Q-306, Q-307) sitting in the backlog until 2026-08-17. Q
@@ -580,10 +580,11 @@ Kotlin, runs the JVM protocol tests, and builds a debug APK on every PR touching
 merge to `main` it publishes that build to a single rolling release at a stable URL:
 
 ```
-https://github.com/nekodas-neko/TrainingAI/releases/download/apk-latest/app-debug.apk
+https://github.com/nekodas-neko/TrainingAi_Open/releases/download/apk-latest/app-debug.apk
 ```
 
-Always the newest `main` build, non-expiring, no login required. For an unmerged PR the APK is a
+Always the newest `main` build, non-expiring, and genuinely no login required — verified in a
+logged-out browser on 2026-08-17, which is the entire point of the public-repo migration (Q-49). For an unmerged PR the APK is a
 workflow artifact (`app-debug-apk`) on that PR's Android run, kept 14 days.
 
 Note the workflow is **path-gated** on `android/**`, `capacitor.config.ts`, `package.json`,
@@ -945,11 +946,16 @@ Optional:
   it can read that user's health history, so treat it as a credential: generate with
   `openssl rand -hex 32`, never commit it, rotate by changing the Railway var. Leave it unset and the
   route is session-only.
-- `GITHUB_RELEASES_TOKEN` — a GitHub PAT (fine-grained, read-only on Contents for this repo) that
-  `GET /api/download-apk` sends as `Authorization: Bearer …` when calling the GitHub Releases API.
-  Required while the repo is **private** — an unauthenticated call 404s. Once the repo goes public
-  this var can be left unset; the route already omits the header when it's absent and public-repo
-  reads work unauthenticated (rate-limited to 60 req/hr per IP, a non-issue for a single-user app).
+- ~~`GITHUB_RELEASES_TOKEN`~~ — **no longer needed (Q-49, 2026-08-17).** It was required while the
+  releases lived in a private repo, where an unauthenticated call could only 404. The repo is public,
+  so `lib/github-release.ts` now sends the `Authorization` header only when a token happens to be
+  set, and works without one. **It had been unset in Railway since 2026-08-04**, which is why the
+  update card and More → Download APK were dead for two weeks — going public is what revived them.
+  Setting it is still harmless and buys a higher rate limit (5,000 req/hr against 60 per IP), but
+  neither limit is close, so treat it as an optimisation and never as a dependency.
   The route queries `/releases/tags/apk-latest` (not `/releases/latest`) because
   `.github/workflows/android.yml` publishes the rolling APK release with `--prerelease`, which the
   `/latest` endpoint excludes regardless of repo visibility.
+- `APK_RELEASE_REPO` — which repo `lib/github-release.ts` reads releases from. Set to
+  `nekodas-neko/TrainingAi_Open`. The code falls back to the pre-cut repo, which is archived, so
+  leaving it unset means reading a release whose version never changes again.

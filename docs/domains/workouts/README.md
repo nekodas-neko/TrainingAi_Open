@@ -134,6 +134,17 @@ Live at the time of writing (2026-07-30):
   via a real production "Upper" session that had been auto-flipped to `dismissed` with no user
   action. Generation also moved from session-completion to pre-workout-open, so a prescription is
   never more than minutes stale by the time it drives load.
+- 🔴 **Q-310 (open) — an ai_dynamic deload phase that fell into the generic `workout-data` fallback
+  branch is a deload in name only.** `phaseName` correctly title-cases `aiPeriodizationState.phase`
+  into `"Deload"` for display, but `isDeloadActive`/`phaseType` are hardcoded `false`/`'normal'` in
+  that same branch (two identical copies) — so weight prescription stays full-intensity and the
+  `shouldCountTowardPr` PR gate never engages, meaning a genuine `personal_records` row can be
+  written from what should be submaximal work. Owner-reported 2026-08-17. This is a third,
+  distinct gap in the same area as the two entries below it — not a duplicate of either.
+- ~~The warm-up timer's denominator always read "10:00" regardless of the session's real
+  budget-scaled warm-up goal~~ **fixed 2026-08-15 (PR #1350)** — a hardcoded literal string in
+  `warmup-screen.tsx`, one line, `formatTime(warmupGoalSec)`. The numerator and completion state
+  were already correct; only the label lied.
 
 ## History
 
@@ -144,6 +155,11 @@ Live at the time of writing (2026-07-30):
   lives inside `if (aiDrivesLoad)`, so an exercise the prescription does not name is not reduced by
   either entry point).
 - Handoffs: `ls docs/handoff-*-workouts-*.md` — most recently
+  [`docs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](../../handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md)
+  (Q-310 root-caused and queued — the ai_dynamic generic fallback's hardcoded `isDeloadActive:
+  false`; also shipped the warm-up timer label fix, PR #1350. Q-245/246/247/248, filed earlier in
+  the same owner-bug-batch thread, were picked up and shipped by other sessions before this handoff
+  was written — see #1375/v1.317.0 and v1.317.1). Before that,
   [`docs/handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md`](../../handoff-2026-08-05-workouts-measured-warmup-preset-scaling.md)
   (Q-83 **built** — the measured warmup median is now capped at 20% of the budget, but only when
   today's budget is below the session's own configured length; carries the sandbox traps for probing

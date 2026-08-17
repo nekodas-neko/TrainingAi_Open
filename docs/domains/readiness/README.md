@@ -97,6 +97,20 @@ Live at the time of writing (2026-07-30):
   shared with `devices`.
 - Chronic-stress rollup and stress-resilience are wired but compute null in the sandbox; neither
   is device-verified end to end.
+- ~~Logging Exercise Readiness on Home could show "saved" while the screen stayed on the pre-save
+  prompt~~ **fixed 2026-08-15 (Q-248, v1.317.1)** — the callback that flips `moodLog` was gated
+  behind an awaited local-store write already documented as able to stall for minutes under sync
+  contention; a new `onOptimisticSave` callback now fires on the same beat as the toast/close, while
+  `onSaved` (the prescription refetch) deliberately stays behind the write to protect the
+  session-164 cache-ordering rule. **⚠️ Not device-reproduced** — the fix addresses the cause the
+  code evidences; if readiness later goes missing from the server under real sync contention, that
+  is a second, still-open cause. See
+  [`docs/overview/history-2026-08-15.md`](../../overview/history-2026-08-15.md).
+- 🔴 **Q-310 (open, shared with `workouts`) — an ai_dynamic deload phase reached via the generic
+  fallback branch never actually reduces load or gates PRs**, despite the header correctly labeling
+  it "Deload." See the `workouts` domain entry for the traced root cause; readiness-relevant because
+  the underlying signal that triggers the AI's deload decision never gets resolved, so another
+  deload gets recommended right after.
 
 ## History
 

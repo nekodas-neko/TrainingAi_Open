@@ -20,7 +20,7 @@ number.
 | Next unallocated Q band | **530** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
-> 313–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
+> 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
 > its own, so no agent needs to read or write this table for a routine finding. The bands exist
 > because a shared next-free pointer is a *floor*, not an authority: it cannot see an unmerged PR,
 > and a number can be claimed and merged inside a single session without ever appearing in an open
@@ -107,7 +107,15 @@ Management rule). Below threshold, skip it and take the top numbered item; the
 alerts accumulate until the next sweep. It is never removed — it's driven back
 below threshold and left in place for next time.
 
+> **Reading a PR number in these docs.** This repository begins at one commit — the 2026-08-16
+> snapshot of a private repo that had reached ~#1399. Every PR number cited below roughly **#1250 and
+> under refers to that archived repository**, `nekodas-neko/TrainingAI`, not to a pull request here,
+> and the numbering restarts from #1 in this one. The archived repo is read-only rather than deleted
+> precisely so those references stay resolvable. See [`NOTICE`](../NOTICE) for why the history could
+> not come across.
+
 ---
+
 
 ## [platform] Standing item — Dependabot vulnerability remediation (always top priority when triggered)
 
@@ -338,7 +346,7 @@ below threshold and left in place for next time.
      (not the early-deload-week path) and confirm the header still reads "Deload", weights are now
      reduced, and no PR badge/write fires for a submaximal set.
 
-### [platform] Q-311 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
+### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
 
 - **Branch:** `fix/publish-dry-run-build-gate`
 - **Found:** 2026-08-16, while doing A4b.
@@ -1939,6 +1947,38 @@ session working from a temporarily restored copy.
 > [`docs/reviews/2026-08-14-app-ui-flow-ia-review.md`](reviews/2026-08-14-app-ui-flow-ia-review.md)
 > §7. **The per-row bucketing was done from headings, not by reading each row** — re-check a row
 > before claiming a capability closes it.
+
+### [nutrition][app-shell] Q-309 — a touch tap on Nutrition's action row does not activate the button; a synthesised click does
+
+- **Branch:** `fix/nutrition-tap-swallowed-by-date-swipe`
+- **Added:** 2026-08-16 · found by the Q-297 water write-path E2E spec, which could not open the
+  water sheet by tapping.
+- **Measured, and the two cases differ cleanly.** The E2E context runs
+  `devices['Galaxy S9+']` (`hasTouch`, `isMobile`), so Playwright's `.click()` dispatches a real
+  **touch** sequence. That sequence **never** opens the sheet — 20 s of waiting, and the failure
+  screenshot shows the plain Nutrition screen with the Water button visible and untouched. A
+  `dispatchEvent('click')`, which skips the pointer sequence entirely and invokes the React handler,
+  opens it **immediately**. Same element, same selector, same run.
+- **The obvious suspect is the date-swipe binding.** `app/nutrition/nutrition-content.tsx:513`
+  `useDrag(..., { axis: 'x', filterTaps: true, pointer: { touch: true } })`, spread onto the
+  scrolling container at line 575 that contains the whole action row. `filterTaps: true` is meant to
+  let a tap through; something about a zero-movement synthetic tap is not clearing it.
+- **This is a known class in this repo, which is why it is worth taking seriously.** CLAUDE.md
+  records pull-to-sync swallowing normal scrolling **twice** (sessions 150, 152) before a
+  movement-threshold lock was added, and the standing rule is that custom gesture handlers must
+  direction-lock before capturing. `components/pull-to-sync.tsx` is also mounted on this screen and
+  has not been ruled out.
+- **⚠️ What is NOT established: whether a human finger on the S25 reproduces this.** A synthetic
+  touch sequence has zero movement and near-zero duration, which is not identical to a real thumb.
+  It is entirely possible the harness is the anomaly. **Do not ship a gesture change off this
+  entry alone** — reproduce on the device first, or with a slower/jittered synthetic tap, and say
+  which. If it does reproduce on device it is a live bug on the owner's most-used write path.
+- **Whatever the verdict, the spec should stop needing `dispatchEvent`.** `e2e/water-log-write-path.spec.ts`
+  carries the workaround with this number in a comment; a spec that cannot tap the way a user taps is
+  testing something adjacent to the product.
+- **Check the sibling surfaces in the same pass** — Health and the day-detail screen carry the same
+  `useDrag` date-swipe pattern (`app/health/day/day-detail-content.tsx` copies it deliberately), so
+  if this is real it is not one screen.
 
 ### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
 
@@ -4183,6 +4223,27 @@ aimed somewhere other than the owner's complaint, and the roadmap says so in its
 **Explicitly not in scope:** Compose, Phase 3, and any architecture change. If 1–3 close the gap,
 that is a result worth having *before* committing to Stage 5/6, and it is exactly the measurement
 the goal layout's §7 off-ramp says is missing.
+
+### [platform] Q-311 — the E2E CI job puts a credential-shaped literal in a file that is about to be public (Q-49 blocker-adjacent)
+
+- **Branch:** `chore/e2e-auth-secret-before-public-cut`
+- **Added:** 2026-08-16 · found while writing the Q-249 handoff against Q-49's constraints.
+- **`.github/workflows/ci.yml:367`** sets `AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job`
+  inline. It is genuinely a dummy: NextAuth needs *some* signing key or the credentials callback
+  returns `?error=Configuration`, and this value signs nothing outside that ephemeral job against an
+  ephemeral database that is dropped with the runner.
+- **The problem is not the value, it is the reader.** Q-49's own constraint is *"CI stays offline and
+  holds no credential"*, and someone reading a public repo cannot tell a dummy from a leak by
+  looking. A plausible-looking secret in a workflow file is exactly the thing that gets reported.
+- **Decide before the cut, and it is a two-minute job either way:** move it to a repository secret
+  (costs nothing, removes the question entirely), **or** keep it inline and add a one-line comment
+  in the workflow stating explicitly that it is a throwaway signing key for an ephemeral job. Do not
+  leave it bare and unexplained.
+- **While you are there:** the seeded test user (`test@local.dev` / `testpass123`, in
+  `scripts/local-db/seed.sql`, used by `e2e/fixtures.ts`) is also public-safe by design but will
+  read as a leak to a stranger. One sentence in the public README covers it.
+- **Small, and it has a deadline rather than a priority** — it only matters at the moment the repo
+  goes public, and it is much cheaper to settle now than to answer afterwards.
 
 ### [platform] 🔴 Q-49 — public repo migration (Phase A: model delivery · Phase B: the cut)
 

@@ -172,7 +172,7 @@ So numbers are **not** taken one at a time from the pointer. Each agent owns a b
 
 | Agent | Q band |
 |---|---|
-| Implementation Lane A | **313 – 349** |
+| Implementation Lane A | **314 – 349** |
 | Implementation Lane B | **350 – 386** |
 | BugFix | **387 – 449** |
 | Review | **450 – 499** |
@@ -184,7 +184,7 @@ When a band runs out, claim the next block of 50 above 529, record it in this ta
 your handoff.
 
 Q numbers are identifiers, not priorities. Priority is queue position. A Q-451 sitting above a
-Q-314 is correct and expected.
+Q-315 is correct and expected.
 
 **Postgres migration numbers and local SQLite versions belong to Lane A alone.** No other agent
 takes one. If work outside Lane A turns out to need a schema change, stop and hand it to Lane A

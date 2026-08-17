@@ -63,6 +63,49 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
+
+- **The cause was not environmental and not the specs.** `components/weekly-recap-banner.tsx` POSTs
+  `/api/weekly-digest` on every Home mount; that route returns **502 by design** when the model call
+  fails, which it always does in CI because the E2E job sets no `GOOGLE_GENERATIVE_AI_API_KEY`.
+  `tabs-instant-paint.spec.ts` counts any `/api/` 5xx as a page-load failure, and whether the POST
+  returns before the assertion is a race — so the Home tab was one lost race from red on every run.
+  Two runs eleven minutes apart on identical code went one each way.
+- **Fixed** in `TrainingAi_Open` #5 with a *named* exclusion (`EXPECTED_5XX = ['/api/weekly-digest']`),
+  not a blanket "ignore 502" — a 502 from any other route is still a finding, and so is a 500 from
+  this one.
+- **Correcting the old entry's suggested next step:** downloading the `playwright-report` artifact
+  cannot work. `playwright.config.ts` uses the `github`/`list` reporters, which never write that
+  directory, so the `if: failure()` upload always produces an empty artifact.
+  **What does work:** `actions_get` → `get_workflow_run_logs_url` and download the zip.
+  `get_job_logs` genuinely cannot reach the Playwright output — it caps at 5,000 lines and the
+  Postgres container dump consumes all of them.
+- **The `FATAL: role "root" does not exist` lead was not the cause** and was not pursued further. It
+  is present while the suite passes, so it is noise for this purpose rather than a finding — but
+  nobody has explained it, and it should not be re-chased as an E2E failure cause.
+- Context: [`docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
+
+### [workouts][readiness] 🔴 An ai_dynamic deload phase reached via the generic fallback branch runs at full weight and can mint a wrong PR (Q-310, 2026-08-17)
+
+- **Owner-reported, live, unfixed.** A session labeled "Pull · Deload" in the header showed weight
+  climbing set-to-set, and the exercise summary right after fired a "New Personal Record!" badge —
+  during what the app itself called a deload.
+- **Root cause, confirmed by reading the code, in two identical copies:**
+  `app/api/workout-data/route.ts`'s ai_dynamic generic fallback branch title-cases
+  `aiPeriodizationState.phase` into the correct display name ("Deload") but hardcodes
+  `isDeloadActive: false` / `phaseType: 'normal'` — so weight prescription and the
+  `shouldCountTowardPr` PR gate (`packages/shared/src/workout/log-exercise.ts`) both treat the
+  session as normal. This is not the separate `earlyDeloadWeek` mechanism, which already sets the
+  flag correctly; it's the AI's own accumulated-fatigue-triggered `phase: 'deload'` falling through
+  to a branch that doesn't check for it.
+- **Consequence: a genuine `personal_records` row can already have been written from submaximal
+  work**, and whatever signal made the AI want a deload never gets addressed since none actually
+  happened — plausibly why the owner saw another deload recommended right after this one.
+- **Not yet fixed** — queued as Q-310, near the top of `docs/implementation-backlog.md` given its
+  severity. Needs a production data check (any already-wrong `personal_records` rows from this
+  path) before or alongside the code fix. Full trace:
+  [`docs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md`](docs/handoff-2026-08-17-workouts-owner-bug-batch-deload-fallback.md).
+
 ### [platform] ✅ The repo can now run its own app — E2E harness shipped (Q-249, 2026-08-15)
 
 - **466 test files, none of which opened a browser** — until now. `playwright.config.ts`, `e2e/`,
@@ -2718,6 +2761,16 @@ and `main` red on E2E for ten hours of every day from a UTC-vs-Brisbane seed bug
 repo cannot be set from a session (no MCP tool for it). Rollback stays available throughout — the old
 repo remains a working Railway target until the final step, and that step archives rather than
 deletes it.
+
+**Update 2026-08-17 — `main` kept moving after the snapshot, and that is expected, not a problem.**
+The pushed snapshot is `main` at `c9df8db`, frozen at that instant. Work on this (old) repo has
+continued normally since — including the owner bug-batch session that produced Q-310 (a real
+prescription/data-correctness bug, see the Known Issues entry above) and four other queued items.
+This repo stays the canonical working copy until the final archive step, so that is correct: new
+work belongs here, not in the empty snapshot. **Whoever runs the remaining Phase B steps should
+either take a fresh snapshot at archive time (capturing everything landed since `c9df8db`) or
+explicitly decide the gap is acceptable** — don't assume the two repos are in sync just because the
+first push happened.
 
 **Update 2026-08-15 (#1353):** the CI story is solved — the model tests replay from recorded
 fixtures, so the suite passes with all ten `.onnx` files absent, and the constants resolve from the
