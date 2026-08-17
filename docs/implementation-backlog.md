@@ -416,6 +416,30 @@ below threshold and left in place for next time.
 
 ### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
 
+> **⚠️ SUPERSEDED IN ITS HEADLINE, same day — read
+> [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0 first.**
+> This entry says the dedup index stores the payload twice and cites **291 MB of index against a
+> 175 MB heap** as the evidence. **That measurement was taken mid-incident and is not a steady
+> state.** The storage research session measured the same indexes at **208 MB before** the event
+> and **421 MB after**, and identified the mechanism: the redecode re-stamps `measured_at`, which
+> is indexed (`idx_oura_raw_samples_user_measured`), so every updated row writes new index tuples.
+> **~306 MB of what I called index size is bloat**, produced by the redecode this session ran —
+> not a property of the schema.
+>
+> **Finding 2 is also wrong, and is already corrected further down this entry** — autovacuum *had*
+> run; the null reading was a post-crash statistics artifact. That correction was written by the
+> storage session and is the authority; do not re-raise it from the original text above.
+>
+> **What survives is finding 3** (`work_mem` at 4 MB against a 1.1M-row sort), which is independent
+> of the mechanism. **Finding 1 needs re-measuring after the bloat is reclaimed** before anyone
+> touches an index definition — hashing the payload out of the dedup key may still be worth doing,
+> but the 291 MB number is not the argument for it.
+>
+> Two of this entry's three original findings were mine and both were wrong, from a single snapshot
+> taken during an active incident. The measurements that corrected them came from re-reading the
+> same counters minutes apart. Worth remembering before trusting any single reading of
+> `pg_stat_user_tables` taken near a crash or a bulk write.
+
 - **Branch:** `fix/oura-raw-samples-index-and-vacuum`
 - **Added:** 2026-08-17, from the live `disk_full` incident (see the `projectOverview.md`
   Known-Issues row for the measurements).
