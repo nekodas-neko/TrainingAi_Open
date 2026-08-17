@@ -7,6 +7,16 @@
 **Migrations:** 189 and 190 taken (Q-536); next free is **191**. Local SQLite unchanged at v22.
 
 ## Now
+**Q-536 is NOT finished and the owner is blocked.** Migrations 189 + 190 applied cleanly at
+10:33:52 / 10:34:11 and the clock is repaired — all 5,383 anchors are epoch 0, merged p10 lands 3 s
+from clean. But the **redecode that rewrites the 43 stored nights fails**, three attempts, always at
+`getOuraClockAnchor` (`adapter.ts:4530`), and the cause was unknowable because the rollup worker
+flattened errors with `err.message` alone. v1.318.4 fixes that reporting
+([`entries/2026-08-17-rollup-worker-error-cause.md`](../../overview/entries/2026-08-17-rollup-worker-error-cause.md)).
+**Next Lane A session: ask the owner for the new error text, then diagnose.** Ruled out already —
+query speed (34 ms), connection exhaustion (11 of 500), the migration itself, and the worker as a
+whole (the ingest rollup succeeded through it at 10:21:58).
+
 Nothing in flight. **Q-536 diagnosed and half-repaired** (v1.318.0, migration 189). The 43 midday bedtimes are a
 spurious clock epoch, not a timezone bug: a 2026-08-17 re-pair made the ring re-drain buffered
 history, `isClockEpochReset` read that as a reset, and the new epoch's offset — estimated at the p10
