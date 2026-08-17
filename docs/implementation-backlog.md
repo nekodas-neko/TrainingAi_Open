@@ -276,7 +276,49 @@ below threshold and left in place for next time.
 
 
 ### [devices][platform] Q-530 — the ring key has one copy and no way to back it up
+
+- **Branch:** `feat/ring-key-export`
+- **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
+- **What it is.** The 32-hex ring key exists only in Android SharedPreferences
+  (`OuraBlePlugin.kt`, `key_hex`). Deliberately — its own comment reads *"the key never leaves
+  SharedPreferences; never logged"* — and that is the right call for a credential. But it means the
+  key has **exactly one copy**, on one device, with no export, no backup, and no warning before the
+  operations that destroy it.
+- **Why it matters.** An uninstall or a device change silently makes the ring unreachable: the BLE
+  service logs `no key stored`, refuses to start, and the Devices screen keeps showing the ring as
+  healthy because that card reads server data. Worse, the intuitive recovery — re-onboarding the
+  official Oura app — re-keys the ring and can force a firmware update that changes the BLE event
+  encoding, which is precisely what the frozen firmware exists to prevent. **A recoverable
+  credential problem turns into a protocol re-validation.** This happened on 2026-08-17 and was only
+  recovered because the original `open_oura` `key.hex` still existed on the owner's machine.
+- **What to do.** The minimum is an *export* affordance in `/admin/oura-ble` — reveal the stored key
+  so it can be copied somewhere durable — plus a confirm-with-warning before `clearKey`. Consider a
+  "key present" indicator on the Devices card, so a keyless state is visible where the ring is
+  managed rather than only in the admin console.
+- **Placement, reported separately.** The owner also asks that the key field be nested behind
+  something deliberate rather than sitting in the open — *"so it cant accidently be used"*. That is
+  the same subject and is best solved with Q-531, which is re-deciding where these screens live;
+  the export/backup half below stands on its own.
+- **What NOT to do.** Do not sync the key to the server to "solve" this. It is device-only on
+  purpose, and moving it server-side widens the blast radius of every other credential path in the
+  app. This is a *backup and visibility* problem, not a storage-location problem.
+- **Verification:** the affordance must be shown to work while the key is present, and the warning
+  shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
+
 ### [sleep][devices] Q-536 — every BLE-era sleep window is timezone double-converted: 43 nights show midday bedtimes
+
+> **→ HANDED TO IMPLEMENTATION LANE A, 2026-08-17.** This is engine work — the fault is in
+> `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:5087`) and the clock-anchor resolution
+> beneath it, squarely inside Lane A's ownership. It is **top of queue**: it is a live
+> data-correctness fault on displayed health values, it was caused today, and every further
+> redecode may compound it.
+>
+> **Read the corrected diagnosis below before the original text** — the first hypothesis
+> (timezone double-conversion) is superseded by the epoch-collision evidence.
+>
+> **Do not run a corrective pass until the open question is settled:** whether the 2026-07-04 →
+> 08-16 rows were already wrong, or were rewritten wrong by the 2026-08-17 redecode. Those need
+> opposite responses, and 43 nights of the owner's sleep history are the blast radius.
 
 - **Branch:** `fix/ble-sleep-window-timezone`
 - **Added:** 2026-08-17, found while verifying the post-re-sync Health screen.
@@ -457,34 +499,6 @@ below threshold and left in place for next time.
 - **Verification:** reproduce on-device with a scan actually running; a static screenshot will not
   show it, and the sandbox cannot scan at all.
 
-
-- **Branch:** `feat/ring-key-export`
-- **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
-- **What it is.** The 32-hex ring key exists only in Android SharedPreferences
-  (`OuraBlePlugin.kt`, `key_hex`). Deliberately — its own comment reads *"the key never leaves
-  SharedPreferences; never logged"* — and that is the right call for a credential. But it means the
-  key has **exactly one copy**, on one device, with no export, no backup, and no warning before the
-  operations that destroy it.
-- **Why it matters.** An uninstall or a device change silently makes the ring unreachable: the BLE
-  service logs `no key stored`, refuses to start, and the Devices screen keeps showing the ring as
-  healthy because that card reads server data. Worse, the intuitive recovery — re-onboarding the
-  official Oura app — re-keys the ring and can force a firmware update that changes the BLE event
-  encoding, which is precisely what the frozen firmware exists to prevent. **A recoverable
-  credential problem turns into a protocol re-validation.** This happened on 2026-08-17 and was only
-  recovered because the original `open_oura` `key.hex` still existed on the owner's machine.
-- **What to do.** The minimum is an *export* affordance in `/admin/oura-ble` — reveal the stored key
-  so it can be copied somewhere durable — plus a confirm-with-warning before `clearKey`. Consider a
-  "key present" indicator on the Devices card, so a keyless state is visible where the ring is
-  managed rather than only in the admin console.
-- **Placement, reported separately.** The owner also asks that the key field be nested behind
-  something deliberate rather than sitting in the open — *"so it cant accidently be used"*. That is
-  the same subject and is best solved with Q-531, which is re-deciding where these screens live;
-  the export/backup half below stands on its own.
-- **What NOT to do.** Do not sync the key to the server to "solve" this. It is device-only on
-  purpose, and moving it server-side widens the blast radius of every other credential path in the
-  app. This is a *backup and visibility* problem, not a storage-location problem.
-- **Verification:** the affordance must be shown to work while the key is present, and the warning
-  shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
 
 ### [activity][cardio] Q-450 — `/activity` reached without a type: Start works, Finish works, Save silently discards the activity
 
