@@ -9,8 +9,8 @@ phase branch existed as two verbatim copies that both hardcoded `isDeloadActive:
 title-casing the *same* `aiPeriodizationState.phase` field into the header label "Deload". Both now
 call `aiDynamicFallbackPhaseStatus()` in `packages/shared/src/workout/session-data.ts`.
 
-Full local gate green — `tsc` clean, lint 0 errors, `pnpm build` green, `pnpm check:rules` **Ran 36
-of 36**, suite 477 files / 3,893 tests, and both fixed copies exercised on a running `pnpm dev`
+Full local gate green — `tsc` clean, lint 0 errors, `pnpm build` green, `pnpm check:rules` **Ran 38
+of 38**, suite 477 files / 3,893 tests, and both fixed copies exercised on a running `pnpm dev`
 against a seeded deload phase. Numbers and method are in
 [`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](../../overview/entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md).
 Standard bug fix, not destructive — drive it to green and merge without asking.
