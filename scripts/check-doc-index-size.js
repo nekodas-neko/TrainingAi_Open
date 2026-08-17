@@ -123,6 +123,10 @@ const root = path.join(__dirname, '..');
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
 // an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
 // composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
+// Raised 2026-08-17 (Q-530 secret settled): backlog 6770 -> 6781. Q-530's step-3 gate flipped from
+// "blocked on the owner" to the settled decision, plus the two operational notes that stop the next
+// session misreading it — a stale container reading the variable as absent, and the fact that
+// nothing can verify either copy until the route exists.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -158,7 +162,9 @@ const BASELINE = {
   // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
-  // Raised 2026-08-17 (Q-389 planning, Lane B): backlog 6770 -> 6780. Three corrections folded into
+  // Raised 2026-08-17 (Q-389 planning, Lane B): backlog 6781 -> 6791. Recomputed from the merged
+  // file — this collided with a concurrent raise to 6781, exactly the same-day collision this file
+  // keeps warning about, and splicing would have silently un-done that side. Three corrections folded into
   // the existing Q-389 entry rather than filed separately, per the "a wrong correction is more
   // expensive than a long one" precedent above: its QR module maths was ~16% optimistic (a 21x21
   // code cannot hold a UUID at all — v1 holds 17 bytes, so the floor is v2 25x25 and the pitch is
@@ -168,7 +174,7 @@ const BASELINE = {
   // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
   // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
   'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6780,
+  'docs/implementation-backlog.md': 6791,
   'CLAUDE.md': 1010,
 
 };

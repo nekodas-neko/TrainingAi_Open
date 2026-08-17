@@ -1165,8 +1165,19 @@ session working from a temporarily restored copy.
      restore per plan §5.
   5. Docs — `CLAUDE.md` env-var row, `docs/module-map.md` row, and a
      `docs/runbooks/db-backup-restore.md` section distinguishing this from `pg_dump`.
-- **⛔ Step 3 is blocked on the owner** until `ADMIN_SNAPSHOT_SECRET` is agreed and set in Railway —
-  secret handling is confirm-first. Steps 1, 2 and 4 do not depend on it and can land first.
+- **✅ Step 3 is unblocked. `ADMIN_SNAPSHOT_SECRET` was approved as a separate secret and set by the
+  owner on 2026-08-17**, in both places it is needed: Railway (so the server accepts the token) and
+  the Claude Code environment (so a session can send it). Reusing `ADMIN_EXPORT_SECRET` was
+  considered and rejected — day-review returns 31 days of derived scores, this returns the database,
+  so a leak of one must not be a leak of both.
+  - **A session started before that change cannot see the variable** — the environment is injected at
+    container start. If `echo ${#ADMIN_SNAPSHOT_SECRET}` prints 0, that is a stale container, not a
+    missing secret; start a fresh session.
+  - **Nothing has verified the Railway half yet, and nothing can until step 3 ships**, because no
+    code reads the variable. The first real check is
+    `curl -si …/api/admin/db-snapshot -H "Authorization: Bearer $ADMIN_SNAPSHOT_SECRET"` returning a
+    200 and a manifest line. A 401 there means the two copies disagree; treat it as configuration
+    before suspecting the route.
 - **Placement:** below the four live user-facing bugs above it and below the two CI-integrity items,
   above everything else — it is a capability every later item borrows (rehearse a migration against
   prod-shaped rows, run `pnpm dev` against real data), and it is the first thing that touches
