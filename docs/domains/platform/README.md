@@ -320,7 +320,7 @@ Live at the time of writing (2026-07-30):
 - [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoff-2026-08-16-platform-public-repo-cut-a4b.md)
   — Q-49 public-repo cut. **Updated at the Phase B boundary:** A4b has shipped, Oura's material is
   out of the tree, and the handoff now carries what A4b cost beyond the plan — the constants were
-  still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-306), the
+  still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-311), the
   measured blast radius was 17 files not 16, and the guards had to go finer than per-`describe`.
   Runbook: [`public-repo-cut-runbook.md`](../../public-repo-cut-runbook.md), steps 8–14 remain.
 - [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](../../overview/entries/2026-08-16-public-repo-cut-a4b.md)
