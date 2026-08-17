@@ -4,18 +4,17 @@
 
 ## Now
 
-**⛔ PR #16 is OPEN and NOT merged. Check it before starting anything.** The sweep below is complete
-and pushed; only the merge is outstanding. **CI stalled rather than failed** — Lint, Custom Rules and
-Migration Check went green in under a minute, and **Tests, Build and E2E sat `in_progress` for 70+
-minutes with no output**, `pnpm test` alone accounting for all of it. **This is not the diff:** PR #15
-(a different agent, opened six minutes earlier) shows the identical signature at the identical
-timestamps — three fast jobs green, the same three long jobs pinned. Three agent PRs opened within
-eight minutes; treat it as runner contention or an infra stall on the base until proven otherwise.
-Logs are not retrievable while a job is in progress, so the cause was not pinned down.
+**PR #16 carries this sweep.** If it is still open, merge it once green — docs-only, no ceremony.
 
-First action for the next session: re-check #16's checks. If green, merge it (docs-only, no
-ceremony). If the run is genuinely dead, push an empty commit to re-trigger rather than diagnosing a
-failure that has no evidence. **Do not merge on a stalled check** — that guardrail does not relax.
+> **A method warning worth more than the finding it came from.** This session spent a long stretch
+> convinced CI had stalled: Lint/Custom Rules/Migration Check went green in under a minute while
+> Tests/Build/E2E sat `in_progress`, and repeated polls kept showing no movement. It looked like a
+> 70-minute hang and was written up as one. It was not. **The sandbox's backgrounded `sleep` calls
+> are throttled and batched** — several fired at once, long after they should have — so the polls
+> were minutes apart in wall-clock terms, not the hour they felt like. `date -u` settled it: five
+> minutes had passed, and CI was running perfectly normally (the sibling PR completed all six checks
+> in 4.5 minutes). **Check `date -u` before concluding anything is slow or hung here.** Elapsed time
+> inferred from your own polling cadence is not evidence.
 
 **Lens run: the failure cells, exercised live** — the error path, the empty state, the first-run
 path, the entry point reached out of order. Write-up:
