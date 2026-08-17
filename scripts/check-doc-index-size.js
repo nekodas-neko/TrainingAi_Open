@@ -123,15 +123,20 @@ const root = path.join(__dirname, '..');
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
 // an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
 // composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
+// Raised 2026-08-17 (Q-530 secret settled): backlog 6770 -> 6781. Q-530's step-3 gate flipped from
+// "blocked on the owner" to the settled decision, plus the two operational notes that stop the next
+// session misreading it — a stale container reading the variable as absent, and the fact that
+// nothing can verify either copy until the route exists.
 //
-// Raised 2026-08-17 (BugFix intake, Q-389 multi-style): the owner wants all four label styles to
-// ship with the user cycling between them, which is a different build from "pick one" — the
-// renderer becomes template-lookup rather than one baked-in layout, and it is cheap designed-in and
-// expensive retrofitted. Records that, plus the three consequences an implementer would otherwise
-// hit late: where the style choice is stored (one option needs a Lane A migration), the four-font
-// embedding cost, and that the smallest style's code sets the scannability floor for the whole set.
-// Rebuilt from origin/main's numbers on merge rather than spliced, so the concurrent Lane B raise
-// in the same file is not silently dropped.
+// Raised 2026-08-17 (BugFix intake, Q-389 multi-style + default): all four label styles ship with
+// the user cycling between them, black band as the owner's default, and the write-on line loses its
+// MADE word on every style. The build consequence is the part worth carrying: the renderer becomes
+// template-lookup rather than one baked-in layout, which is cheap designed-in and expensive
+// retrofitted. Also records where the style choice could be stored (one option needs a Lane A
+// migration), the four-font embedding cost, and that the default is now also the smallest code in
+// the set, so one test print settles scannability for all four.
+// Rebuilt from origin/main's numbers on merge rather than spliced — this file conflicted twice in
+// one evening with concurrent lane raises, and splicing is how one side gets silently dropped.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -168,7 +173,7 @@ const BASELINE = {
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
   'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6789,
+  'docs/implementation-backlog.md': 6800,
   'CLAUDE.md': 1010,
 
 };
