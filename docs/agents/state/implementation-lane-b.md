@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **356**)
+**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **357**)
 
 ## Now
 Nothing in flight. Nine items closed today:
@@ -57,6 +57,14 @@ scoring) or was routed there by this lane: **Q-351** (activity `durationMin` 0 �
 (the health-insight prompt's "no data"). If a new Lane B item has not appeared, the useful next move
 is to pick up Q-354 or Q-355 rather than to reach into Lane A's band.
 
+## ⚠️ Blocking everyone, not just this lane
+- **Q-356** — `lib/data/postgres/__tests__/periodization-soft-delete.test.ts` fails **14:00–16:00 UTC
+  every day, on any branch**: it inserts a session at `now() - 1 hour` (UTC) and queries a
+  Brisbane-local day window, so just after Brisbane midnight the fixture lands on the previous local
+  day and all five assertions see zero sets. Reproduced against a fresh seed; measured at 14:35 UTC.
+  **Lane A's file.** Until it lands, no PR can merge in that window — the required Tests check is
+  genuinely red, and merging past it is not an option.
+
 ## Blocked
 - **Q-531** `[app-shell][devices]` — needs an owner decision, annotated in the backlog. It asks for
   the premise of a shipped IA decision (Q-234) to be re-litigated; do not pick the new structure
@@ -71,6 +79,7 @@ is to pick up Q-354 or Q-355 rather than to reach into Lane A's band.
 ## Q numbers used from the band
 - **Q-350** — DONE (v1.318.7).
 - **Q-355** — DONE (v1.318.7), fixed alongside Q-350 rather than left half-shipped.
+- **Q-356** — filed for **Lane A**: a daily 14:00–16:00 UTC CI failure in a periodization test.
 - **Q-351** — **Lane A's to fix.** A sub-3-second activity rounds `durationMin` to 0 and
   `ActivityLogBody.durationMin` is `.positive()`, so the POST 400s and the activity is lost behind a
   generic toast. Measured (2 s → 400, 5 s → 201). The outbox parses the same schema.
