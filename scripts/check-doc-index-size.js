@@ -20,7 +20,10 @@ const root = path.join(__dirname, '..');
 
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
 const BASELINE = {
-  'projectOverview.md': 6372,
+  // +15 on 2026-08-17 for Q-310's Known-Issues row: a shipped fix that still owes a device check,
+  // which is exactly what this section is for — the archive only takes an entry when nothing is
+  // still owed. The evidence lives in the journal entry; only the outstanding part is here.
+  'projectOverview.md': 6387,
   'docs/implementation-backlog.md': 5698,
   'CLAUDE.md': 962,
 };
