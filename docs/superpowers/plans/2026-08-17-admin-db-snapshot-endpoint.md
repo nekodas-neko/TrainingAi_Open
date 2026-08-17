@@ -115,6 +115,13 @@ pattern in this repo:
 returns the database. Different value warrants a different key and an independent rotation cadence,
 and it keeps a leak of one from being a leak of both.
 
+> **Settled 2026-08-17.** The owner approved the separate secret and set `ADMIN_SNAPSHOT_SECRET` in
+> both Railway and the Claude Code environment. Neither copy has been exercised, and neither can be
+> until this route exists — no code reads the variable yet. The first verification is a `200` plus a
+> manifest line from
+> `curl -si …/api/admin/db-snapshot -H "Authorization: Bearer $ADMIN_SNAPSHOT_SECRET"`; a `401`
+> there means the two copies disagree rather than that the route is wrong.
+
 ### 3.2 Parameters
 
 | Param | Default | Effect |

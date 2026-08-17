@@ -123,6 +123,10 @@ const root = path.join(__dirname, '..');
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
 // an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
 // composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
+// Raised 2026-08-17 (Q-530 secret settled): backlog 6770 -> 6781. Q-530's step-3 gate flipped from
+// "blocked on the owner" to the settled decision, plus the two operational notes that stop the next
+// session misreading it — a stale container reading the variable as absent, and the fact that
+// nothing can verify either copy until the route exists.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -159,7 +163,7 @@ const BASELINE = {
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
   'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6770,
+  'docs/implementation-backlog.md': 6781,
   'CLAUDE.md': 1010,
 
 };
