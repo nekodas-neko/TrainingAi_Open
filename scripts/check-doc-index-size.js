@@ -26,8 +26,8 @@ const root = path.join(__dirname, '..');
 // for — the growth the ratchet exists to catch is narrative and dated notes, not entries.
 const BASELINE = {
   'projectOverview.md': 6382,
-  'docs/implementation-backlog.md': 5722,
-  'CLAUDE.md': 962,
+  'docs/implementation-backlog.md': 5766,
+  'CLAUDE.md': 967,
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;

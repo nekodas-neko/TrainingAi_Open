@@ -197,6 +197,27 @@ rather than taking a number.
 Each agent is a continuing role, not a session. When a session's context runs long, or the owner
 calls a reset, the agent writes its baton and a successor picks it up **under the same name**.
 
+### The names are fixed — copy them exactly
+
+A successor session must be created with the **same title** as the one it replaces, character for
+character, emoji included. That title is how the owner tells five concurrent sessions apart at a
+glance, so a renamed successor is a lost thread even when its baton is perfect.
+
+| Session title | Baton | Prompt |
+|---|---|---|
+| **Implementation Agent (A) 🚧** | `state/implementation-lane-a.md` | `prompts/implementation-lane-a.md` |
+| **Implementation Agent (B) 🚧** | `state/implementation-lane-b.md` | `prompts/implementation-lane-b.md` |
+| **BugFix Intake Agent 🪲** | `state/bugfix.md` | `prompts/bugfix.md` |
+| **Tuning Agent 🎶** | `state/tuning.md` | `prompts/tuning.md` |
+| **Review Agent 📖** | `state/review.md` | `prompts/review.md` |
+
+The two Implementation lanes deliberately share an emoji and differ only by the `(A)` / `(B)`
+suffix — they are one role in two lanes, and the suffix is the part that carries meaning. Do not
+invent a per-lane emoji to tell them apart.
+
+Every handoff states its successor's title explicitly, rather than leaving it to be inferred from
+the baton's filename.
+
 ### The baton: `docs/agents/state/<agent>.md`
 
 One file per agent, at a stable path, **overwritten** at every handoff. This is the first thing a
