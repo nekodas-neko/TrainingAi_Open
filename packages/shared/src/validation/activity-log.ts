@@ -53,7 +53,22 @@ export const ActivityLogBody = z.object({
   title:           z.string().min(1).max(120),
   startTime:       z.string().regex(/^\d{2}:\d{2}$/).optional(),
   endTime:         z.string().regex(/^\d{2}:\d{2}$/).optional(),
-  durationMin:     z.number().positive().max(MAX_ACTIVITY_DURATION_MIN).optional(),
+  // `.nonnegative()`, not `.positive()` (Q-351). `activity-store.ts` rounds to one decimal, so an
+  // activity under **3 real seconds** becomes exactly `0` — and `.positive()` then rejected it, the
+  // route answered a bare `400 {"error":"Invalid body"}`, and the UI reported "Failed to save
+  // activity". The recording was discarded and the user was told the save failed rather than that
+  // the activity was too short to measure. Measured on the Q-450 E2E spec: 2 s → 400 with
+  // `activity_logs` still empty, 5 s → 201 with `duration_min = 0.1`.
+  //
+  // Accepting the zero is the honest outcome: the user pressed Start and Finish, so the activity
+  // happened, and a row saying it lasted ~0 minutes is worth more than silence plus a wrong error.
+  // It also removes the same failure from the **offline** path — `pushMutations` parses with this
+  // schema, and a sub-3-second activity queued offline was landing in `errors[]` and being dropped.
+  //
+  // Safe by construction, not by luck: the cross-field rate checks below already skip a zero
+  // duration (`plausibility.ts:115` sets `mins = null` and returns before any division), which is
+  // what the comment on `.superRefine` has always said. Every other field stays bounded on its own.
+  durationMin:     z.number().nonnegative().max(MAX_ACTIVITY_DURATION_MIN).optional(),
   distanceKm:      z.number().positive().max(MAX_ACTIVITY_DISTANCE_KM).optional(),
   caloriesBurned:  z.number().positive().max(MAX_ACTIVITY_KCAL).optional(),
   notes:           z.string().max(1000).optional(),
