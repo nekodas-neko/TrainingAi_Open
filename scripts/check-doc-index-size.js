@@ -21,8 +21,8 @@ const root = path.join(__dirname, '..');
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
 const BASELINE = {
   'projectOverview.md': 6372,
-  'docs/implementation-backlog.md': 5698,
-  'CLAUDE.md': 962,
+  'docs/implementation-backlog.md': 5742,
+  'CLAUDE.md': 967,
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;

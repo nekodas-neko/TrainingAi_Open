@@ -1,4 +1,7 @@
-# BugFix agent — baton
+# BugFix Intake Agent 🪲 — baton
+
+> **Successor sessions are titled `BugFix Intake Agent 🪲`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
+> successor is a lost thread even with a perfect baton.
 
 The standing intake role. Owner reports (screenshots, descriptions, "why is this doing that")
 come in; each leaves as a traced backlog entry in `docs/implementation-backlog.md`, landed and
