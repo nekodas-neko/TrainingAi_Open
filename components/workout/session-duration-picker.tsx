@@ -2,6 +2,7 @@
 
 import { ClockIcon } from "lucide-react";
 import { cn } from "@trainingai/shared/utils";
+import { useRovingRadioGroup } from "@/lib/hooks/use-roving-radio-group";
 import { budgetForPreset, type DurationPreset } from "@trainingai/shared/workout/duration-model";
 
 interface SessionDurationPickerProps {
@@ -31,6 +32,8 @@ const OPTIONS: Array<{ preset: DurationPreset; label: string }> = [
 export function SessionDurationPicker({
   value, standardMin, estimatedMin, disabled = false, hideHeader = false, onChange,
 }: SessionDurationPickerProps) {
+  // Always one of the presets, so `hasSelection` is unconditionally true.
+  const lengthGroup = useRovingRadioGroup(true);
   return (
     <div className="mb-4">
       {!hideHeader && (
@@ -45,18 +48,17 @@ export function SessionDurationPicker({
       </div>
       )}
       <div
-        role="radiogroup"
+        {...lengthGroup.groupProps}
         aria-label="Session length for today"
         className="grid grid-cols-3 gap-1 rounded-xl bg-muted/60 p-1"
       >
-        {OPTIONS.map(opt => {
+        {OPTIONS.map((opt, i) => {
           const active = opt.preset === value;
           return (
             <button
               key={opt.preset}
               type="button"
-              role="radio"
-              aria-checked={active}
+              {...lengthGroup.getRadioProps(active, i)}
               disabled={disabled}
               onClick={() => { if (!active) onChange(opt.preset); }}
               className={cn(

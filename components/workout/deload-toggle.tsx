@@ -2,6 +2,7 @@
 
 import { TrendingDownIcon } from "lucide-react";
 import { cn } from "@trainingai/shared/utils";
+import { useRovingRadioGroup } from "@/lib/hooks/use-roving-radio-group";
 
 interface DeloadToggleProps {
   value: boolean;
@@ -24,6 +25,8 @@ interface DeloadToggleProps {
  * `?aiDeload=1` did; the difference is that it is now reversible without leaving the screen.
  */
 export function DeloadToggle({ value, disabled = false, recommended = false, onChange }: DeloadToggleProps) {
+  // Always one of Full/Deload, so `hasSelection` is unconditionally true.
+  const intensityGroup = useRovingRadioGroup(true);
   return (
     <div className="mb-4">
       <div className="mb-2 flex items-center justify-between">
@@ -38,21 +41,20 @@ export function DeloadToggle({ value, disabled = false, recommended = false, onC
         )}
       </div>
       <div
-        role="radiogroup"
+        {...intensityGroup.groupProps}
         aria-label="Intensity for today"
         className="grid grid-cols-2 gap-1 rounded-xl bg-muted/60 p-1"
       >
         {[
           { on: false, label: "Full", sub: "As prescribed" },
           { on: true, label: "Deload", sub: "Lighter loads" },
-        ].map(opt => {
+        ].map((opt, i) => {
           const active = opt.on === value;
           return (
             <button
               key={opt.label}
               type="button"
-              role="radio"
-              aria-checked={active}
+              {...intensityGroup.getRadioProps(active, i)}
               disabled={disabled}
               onClick={() => { if (!active) onChange(opt.on); }}
               className={cn(

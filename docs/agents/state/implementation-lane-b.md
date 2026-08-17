@@ -3,10 +3,14 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **355**)
+**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **356**)
 
 ## Now
-Nothing in flight. Eight items closed today:
+Nothing in flight. Nine items closed today:
+
+- **Q-350** (v1.318.7) — all eight radiogroups now share `lib/hooks/use-roving-radio-group.ts` for
+  arrow keys and a roving tabindex. A **hook**, not the component the entry proposed.
+  [Journal](../../overview/entries/2026-08-17-radiogroup-keyboard-nav.md).
 
 - **Q-457** — `lib/github-release.ts` defaulted `APK_RELEASE_REPO` to the archived private repo.
   Now defaults to the public one, guarded by a test on the URL actually requested.
@@ -39,12 +43,20 @@ Nothing in flight. Eight items closed today:
 Work the queue top-down and take the highest Lane-B-owned item, re-verifying its premise against
 `main` first. **The queue re-prioritises daily** — re-read it rather than trusting this list.
 
-Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B candidates in order:
+**Lane B's queue is essentially drained.** What is left is two low-priority items this lane filed
+itself, and one blocked on the owner:
 
-1. **Q-350** — the radiogroup keyboard sweep. Low priority.
-3. **Q-354** — the mouse-click residue of Q-309. Low priority, and its entry says do **not** change
-   gesture code without reproducing a *touch* failure first.
-4. **Q-531** — ⛔ blocked, see below.
+1. **Q-354** — the mouse-click residue of Q-309. Low priority (no supported user produces mouse
+   input), and its entry says do **not** change gesture code without reproducing a *touch* failure
+   first — the touch path is verified working.
+2. **Q-355** — `disabled={saving}` ejects keyboard focus from the three goal radiogroups. Low
+   priority for the same reason Q-350 was.
+3. **Q-531** — ⛔ blocked on an owner decision, see below.
+
+Everything else in the queue is Lane A's (Kotlin/BLE, sleep-window data, DB sizing, migrations,
+scoring) or was routed there by this lane: **Q-351** (activity `durationMin` 0 → 400) and **Q-353**
+(the health-insight prompt's "no data"). If a new Lane B item has not appeared, the useful next move
+is to pick up Q-354 or Q-355 rather than to reach into Lane A's band.
 
 ## Blocked
 - **Q-531** `[app-shell][devices]` — needs an owner decision, annotated in the backlog. It asks for
@@ -58,7 +70,9 @@ Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B can
 - ~~Q-451/Q-452 unguarded~~ — **closed by Q-352**; both now have mutation-checked specs.
 
 ## Q numbers used from the band
-- **Q-350** — eight `role="radiogroup"`s, none with arrow-key navigation. Wants one shared primitive.
+- **Q-350** — DONE (v1.318.7).
+- **Q-355** — selecting a goal disables the group mid-save, which ejects keyboard focus. Affects 3 of
+  the 8 radiogroups. Low priority; found writing Q-350's guard.
 - **Q-351** — **Lane A's to fix.** A sub-3-second activity rounds `durationMin` to 0 and
   `ActivityLogBody.durationMin` is `.positive()`, so the POST 400s and the activity is lost behind a
   generic toast. Measured (2 s → 400, 5 s → 201). The outbox parses the same schema.

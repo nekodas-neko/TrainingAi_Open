@@ -2512,27 +2512,27 @@ session working from a temporarily restored copy.
   `check-hex-literals.js`, so the existing violations are recorded rather than blocking, and the
   count can only go down.
 
-### [app-shell] Q-350 — eight `role="radiogroup"`s in the app, none with arrow-key navigation
+### [app-shell] Q-355 — selecting a goal disables the group mid-save, which ejects keyboard focus
 
-- **Branch:** `fix/radiogroup-keyboard-nav`
-- **Plan:** none needed
-- **Added:** 2026-08-17 · found implementing Q-261, which added five of the eight
-- **The gap.** The ARIA authoring practices for `radiogroup` expect arrow keys to move between
-  options with a roving `tabindex`, so the group is one tab stop rather than N. None of the eight
-  sites does this — `Tab` walks every option individually and arrow keys do nothing.
-  - Pre-existing: `components/workout/deload-toggle.tsx`,
-    `components/workout/session-duration-picker.tsx`, `components/more/home-widgets-section.tsx`.
-  - Added by Q-261: `components/profile/goal-targets-section.tsx`,
-    `components/profile/required-info-section.tsx` (×2), `components/profile/edit-profile-sheet.tsx` (×2).
-- **Q-261 matched the existing three deliberately rather than fixing them** — a roving tabindex for
-  five sites inside a labelling fix would have been an unrequested refactor, and five sites with
-  keyboard nav beside three without is worse than eight consistent ones.
-- **Genuinely low priority**: the canonical runtime is a touch-only APK with no keyboard, and
-  TalkBack navigates by swipe, so the affected population on the supported target is near zero
-  today. It sits next to Q-282 because an accessibility scanner is what will force it.
-- **Do it as one sweep with a shared `components/ui/` primitive** taking
-  `{ options, value, onChange, label }`, not eight hand-rolled copies — eight is well past the
-  "any pattern at ≥2 sites gets extracted" rule.
+- **Branch:** `fix/goal-group-focus-on-save`
+- **Added:** 2026-08-17 · found implementing Q-350's arrow-key navigation, which exposed it
+- **Priority: low** — same reasoning as Q-350. The canonical runtime is a touch-only APK, so the
+  affected population today is close to zero. Filed because it half-defeats a feature that just
+  shipped, not because anyone is hitting it.
+- **The mechanism.** The three goal groups (Fitness Goal, Biological Sex, Activity Level) pass
+  `disabled={saving}`, and their handlers call `patchProfile`, which sets `saving` for the duration
+  of the PATCH. A browser **drops focus from an element that becomes disabled** — so an arrow keypress
+  moves the selection correctly and then ejects the user from the group, every press.
+- **Measured**, not inferred: an E2E spec asserting focus follows the arrow passes on Food Region
+  (which writes `localStorage` and never disables) and fails on Fitness Goal. That asymmetry is why
+  `e2e/radiogroup-keyboard.spec.ts` drives Food Region for the full contract and asserts only
+  selection movement on Fitness Goal.
+- **Affects 3 of the 8 radiogroups.** The workout pickers, the two Edit Profile strips and the
+  home-widgets style list do not disable on change.
+- **Fix shape:** either stop disabling the group for a debounced background PATCH (the save is
+  already optimistic — the UI does not wait for it), or restore focus after the disable clears. The
+  first is likely correct and is also the better UX: disabling a control for a save the user was not
+  told about is what makes the group feel unresponsive on touch too.
 
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
