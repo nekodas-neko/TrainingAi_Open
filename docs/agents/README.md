@@ -177,6 +177,11 @@ So numbers are **not** taken one at a time from the pointer. Each agent owns a b
 | BugFix | **387 – 449** |
 | Review | **450 – 499** |
 | Tuning | **500 – 529** |
+| *(one-off planning sessions)* | **530** taken 2026-08-17 for Q-530 — not a standing band |
+
+A session that is not one of the five standing agents — a one-off planning session started from its
+own prompt — has no band. It takes the next numbers from the pointer in the backlog and bumps that
+row, which is what the pointer is for.
 
 Take numbers from your own band and you never need to read the pointer or write to it — which also
 removes the shared-line edit at the top of the backlog that would otherwise conflict five ways.

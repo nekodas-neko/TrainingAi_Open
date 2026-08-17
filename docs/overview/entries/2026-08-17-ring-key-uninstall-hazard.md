@@ -42,7 +42,7 @@ That is why this is now documented in three places rather than one.
   storage location, why it is correct, what destroys it, how to recover, and what not to try.
 - **A `projectOverview.md` Known-Issues row**, open — because the mitigation so far is prose. The
   app still has no backup, no export, and no warning.
-- **Q-530** — give the key an export affordance and a confirm-with-warning on `clearKey`, plus a
+- **Q-537** — give the key an export affordance and a confirm-with-warning on `clearKey`, plus a
   key-present indicator on the Devices card so a keyless state is visible where the ring is managed.
   Explicitly **not** by syncing the key to the server: it is device-only on purpose, and this is a
   backup-and-visibility problem rather than a storage-location one.
@@ -63,9 +63,9 @@ That is why this is now documented in three places rather than one.
 
 ### A process note worth keeping
 
-Q-530 was first filed as **Q-314**, from Implementation Lane A's band — and Lane A's baton showed a
+Q-537 was first filed as **Q-314**, from Implementation Lane A's band — and Lane A's baton showed a
 session had already started under that name. Taking a number from a live lane's block is precisely
-the collision the bands exist to prevent, so it was renumbered to Q-530 from the unallocated
+the collision the bands exist to prevent, so it was renumbered from the unallocated
 pointer and Lane A's baton was left untouched. The bands worked; what nearly broke them was reaching
 for the "obviously relevant" lane instead of the one this session actually belonged to.
 

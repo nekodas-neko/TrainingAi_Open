@@ -45,12 +45,21 @@ const root = path.join(__dirname, '..');
 // claude_ro view that **prunes at 30 days**. Re-deriving them after that window is impossible, so
 // they are preserved in the entry rather than cited. The prose around them was cut from a first
 // draft 100 over. If a later sweep moves this entry out, the tables go with it.
+//
+// Raised 2026-08-17 (Q-530 planning): backlog 6057 -> 6154, projectOverview 6484 -> 6488.
+// One queue entry for the planned snapshot endpoint, plus a re-measurement folded into the existing
+// Q-288 rather than filed as a second entry. The projectOverview half is three lines correcting a
+// wrong number already in the index (/api/export covers 26 of 82 tables, not 27 of 80) and naming a
+// defect that changes how it must be fixed — a correction to an existing row, not new narrative.
+// The backlog half also carries Q-530's ordered step list and the new optional `Lane:` field on
+// Q-530/Q-288 — routing an implementer to the right lane and flagging a shared unlisted path, which
+// is queue mechanics rather than narrative and is exactly what this file governs.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6543,
-  'docs/implementation-backlog.md': 6320,
+  'projectOverview.md': 6547,
+  'docs/implementation-backlog.md': 6417,
   'CLAUDE.md': 1010,
 };
 

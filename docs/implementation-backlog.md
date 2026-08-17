@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **537** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **538** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -46,6 +46,16 @@ number.
 > per-pillar sweep, so `scripts/check-backlog-pointers.js` fails on one. Read that pillar's index
 > (`docs/domains/<pillar>/README.md`) before starting: it carries the pillar's reference docs, open
 > known issues and gotchas.
+
+## The optional `Lane:` field
+
+> Most entries have no lane line, and that is correct — **lane ownership is decided by the file
+> paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md), which is the
+> authority. An entry states a lane only when the answer is worth writing down: the item spans paths
+> that are **unlisted** in §3 and therefore need a baton claim, it needs a Postgres migration number
+> or local SQLite version (**Lane A alone**), or two queued entries share a path and must not run
+> concurrently. Introduced 2026-08-17 on Q-530/Q-288, which are all three at once. Do not read the
+> absence of the field as "unassigned" — read it as "§3 already answers it".
 
 ## Before you start any item
 
@@ -275,7 +285,7 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
 
 
-### [devices][platform] Q-530 — the ring key has one copy and no way to back it up
+### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
 - **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
@@ -349,7 +359,7 @@ below threshold and left in place for next time.
 >
 > Two things this reframes: the ds→UTC path is **not** generally broken (the newest `measured_at`
 > is 07:38 UTC = 17:38 Brisbane, matching the device drain log exactly), and **the uninstall caused
-> this**, which links it to Q-530 — the ring key hazard was not the only cost of that reinstall.
+> this**, which links it to Q-537 — the ring key hazard was not the only cost of that reinstall.
 > Whether the pre-existing 2026-07-04→08-16 rows were already wrong or were rewritten wrong by
 > today's redecode is **not yet established** and must be, before any corrective pass.
 
@@ -477,8 +487,8 @@ below threshold and left in place for next time.
   a real user's task in hand: what does someone actually *do* on these screens, start to finish, and
   where should that live. The answer may be that diagnostics belong back under `/admin`, or that
   the split is right but the destination is wrong. Decide it deliberately and write down why.
-- **Related:** Q-530 (ring key has one copy) and Q-532 (the scan auto-recentre) both live on these
-  screens. Q-530's placement half — the key field should be nested behind something deliberate so it
+- **Related:** Q-537 (ring key has one copy) and Q-532 (the scan auto-recentre) both live on these
+  screens. Q-537's placement half — the key field should be nested behind something deliberate so it
   cannot be edited by accident — is best solved as part of this, not separately.
 - **Verification:** device-only. None of it is checkable from the sandbox.
 
@@ -913,6 +923,67 @@ session working from a temporarily restored copy.
 > The others may well contain load-bearing keys — `cache-groups.ts`'s own comments flag
 > `freshWithinTtl` entries inside them — and Q-263 files that.
 > Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/entries/2026-08-16-invalidation-audit.md).
+
+### [platform] Q-530 — an admin snapshot endpoint, so a migration's first real run is not production
+
+- **Branch:** `feat/admin-db-snapshot`
+- **Plan:** [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)
+- **Lane: A**, and not splittable — `app/api/**`, `lib/data/postgres/migrations/`, and a Postgres
+  migration number, which belongs to Lane A alone. No Lane B surface is touched at all.
+  ⚠️ **Two of the paths are unlisted in the lane contract and must be claimed in Lane A's baton
+  before starting**: `scripts/` (the generator and the restore command) and `lib/export/` — neither
+  appears in §3 of [`docs/agents/README.md`](agents/README.md), and `lib/export/` is shared with
+  Q-288 below, so the two items must not run concurrently in different sessions.
+- **Added:** 2026-08-17 · planning session against the rescoped Q-251
+- **Steps, in order — the plan carries the detail, this is the slot list:**
+  1. `scripts/generate-claude-ro-views.js` — emit `_meta_excluded_tables` and
+     `_meta_withheld_columns`; regenerate into **migration 189** (a new number, never overwriting an
+     applied file) and re-point the filename pin in `claude-ro-readonly-role.test.ts` *in the same
+     commit*.
+  2. `lib/export/db-snapshot.ts` — view enumeration, the drift gate, PK discovery from `pg_index`,
+     keyset chunking, the manifest. All the tests live here.
+  3. `app/api/admin/db-snapshot/route.ts` — copy `day-review`'s `authorize()` verbatim; `bulk` and
+     `tables` params; NDJSON via `ReadableStream`; audit row into `db_query_log`.
+  4. `scripts/local-db/snapshot.js` + `pnpm db:snapshot` — local-target guard **first**, then
+     restore per plan §5.
+  5. Docs — `CLAUDE.md` env-var row, `docs/module-map.md` row, and a
+     `docs/runbooks/db-backup-restore.md` section distinguishing this from `pg_dump`.
+- **⛔ Step 3 is blocked on the owner** until `ADMIN_SNAPSHOT_SECRET` is agreed and set in Railway —
+  secret handling is confirm-first. Steps 1, 2 and 4 do not depend on it and can land first.
+- **Placement:** below the four live user-facing bugs above it and below the two CI-integrity items,
+  above everything else — it is a capability every later item borrows (rehearse a migration against
+  prod-shaped rows, run `pnpm dev` against real data), and it is the first thing that touches
+  `CLAUDE.md`'s standing root cause *"a bug that reproduces in prod but not locally: suspect prod
+  data drift vs the fresh local seed"*.
+- **This is Q-251 shape (a), designed.** Q-251 stays open for shape (b), the second Railway service,
+  which remains deferred. Read Q-251 first for the decision history; read the plan for what to build.
+- **It is much smaller than Q-251 implies, and the reason is the finding to carry into the work:**
+  `claude_ro` already *is* the export — 80 views, one user, default-deny, 9 columns withheld, served
+  by a role with no write grants. The endpoint paginates `SELECT *` over that schema. **No new
+  scoping map is written**, so there is no second copy to drift, which is the property this could not
+  survive losing.
+- **What happens when a table is added and the views are not regenerated: the export fails, naming
+  it.** The gate is a runtime set difference — `public` base tables minus `claude_ro` views minus a
+  generator-emitted exclusion view — computed from `pg_catalog`, which the `claude_readonly` role can
+  read for `public` despite holding no `SELECT` there (verified against production: 83 tables, 944
+  columns). Column-level, not just table-level. The existing CI parity test stays but does not cover
+  this: it is a count rather than a set of names, it is column-blind, its migration pin **went stale
+  silently between 181 and 185**, and it checks the *local* schema.
+- **Volume, measured 2026-08-17.** The DB is 477 MB and `oura_raw_samples` is 360 MB of it —
+  **1,098,005 of its 1,098,183 rows are the owner's**, so scoping to one user removes 0.02% of the
+  volume. Scoping is a consent fix, never a size fix. The shaped data that rehearsal actually needs
+  is a few MB, so the default export omits the four bulk tables and `?bulk=<days>` opts a window
+  back in.
+- **Ships with a first-class round-trip** (`pnpm db:snapshot`), guarded to refuse any target that is
+  not the local DB. Two verified constraints: `push_subscriptions` **cannot** round-trip (all three
+  withheld columns are `NOT NULL`) and is skipped and declared in the manifest; `users.password_hash`
+  is withheld and nullable, so the restore stamps the seed's known bcrypt hash or nobody can log in.
+- **⚠️ New secret — `ADMIN_SNAPSHOT_SECRET`, not a reuse of `ADMIN_EXPORT_SECRET`.** Secret handling
+  is confirm-first per `CLAUDE.md`; the owner has approved the endpoint's existence, but confirm the
+  variable before it is added to Railway. Leak analysis is in the plan §6: total health-data
+  disclosure for one person, **no** account takeover, no write path, no third-party rows — and the
+  marginal risk over today is small, because `CLAUDE_DB_QUERY_SECRET` already reads exactly this data
+  through the same views and the same role.
 
 ### [platform] Q-263 — audit the remaining cache groups the way Q-262 audited one
 
@@ -1754,6 +1825,9 @@ session working from a temporarily restored copy.
 
 - **Branch:** `fix/export-completeness`
 - **Plan:** none needed
+- **Lane: A** — `lib/export/full-export.ts`, `app/api/export/`. ⚠️ `lib/export/` is unlisted in the
+  lane contract and is **shared with Q-530**; claim it in Lane A's baton, and do not run the two
+  items concurrently in different sessions.
 - **Added:** 2026-08-15 · from the uncovered-lenses review §4
 - **Measured:** `lib/export/full-export.ts` exports 17 `DIRECT_DOMAINS` + 9 `JOINED_DOMAINS` +
   `goals` = **27**. `schema.ts` declares **80** `pgTable`s.
@@ -1776,6 +1850,22 @@ session working from a temporarily restored copy.
 - **Decide explicitly on the big ones:** `oura_raw_samples` (1M rows, 341 MB) probably should *not*
   stream into a user download; that is a legitimate exclusion, but it should be **written down** as
   one rather than absent by accident.
+- **Re-measured 2026-08-17** (Q-530's planning session, checking whether the snapshot endpoint could
+  extend this route instead of adding one — it can't; the two have different auth models and opposite
+  needs on ops tables). Two corrections and one new defect:
+  - **The count is 26 of 82 tables**, not 27 of 80. The old 27 counted `goals`, which is a repository
+    call rather than a table. `oura_raw_samples` is now **1,098,183 rows / 360 MB** in production.
+  - Also missing beyond the list above: the user's own **`users` profile row**,
+    `saved_meal_items`, `meal_plan_variants`, `plan_meal_answers`, `user_dietary_restrictions`,
+    `scale_raw_samples`, `oura_workouts`, `user_stats`, `session_periodization`,
+    `exercise_estimates`.
+  - **⚠️ The route cannot stream a large table today, and its comment says it can.** `exportUserData`
+    calls `pool.query` per table, which buffers the entire result set; the route comment claims it
+    streams "rather than buffering the whole export in memory", and only the per-table `ReadableStream`
+    enqueue is true. Harmless across 26 small tables, an OOM the moment a bulk table is added — so
+    **fixing coverage without fixing this is strictly worse than the bug.** Use keyset pagination by
+    primary key (every prod table has one, verified) per
+    [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md) §3.3.
 
 ### [platform] Q-295 — Coach is 8% of AI calls, 52% of tokens, and the slowest surface in the app
 
@@ -2647,6 +2737,13 @@ session working from a temporarily restored copy.
 
 - **Branch:** `feat/staging-environment`
 - **Added:** 2026-08-14 · same owner ask
+- **✅ Shape (a) is now planned and split out as [Q-530](#platform-q-530--an-admin-snapshot-endpoint-so-a-migrations-first-real-run-is-not-production)**
+  (2026-08-17), which sits higher in the queue. It came out smaller than shape (a) describes below:
+  `pg_dump` is the wrong transport, because the consumer is the agent sandbox and Railway's Postgres
+  port is blocked there — only 80/443 are open. So it is an HTTPS endpoint reading the `claude_ro`
+  views, which already carry the one-user scoping, the default-deny and the column withholding.
+  Scrubbing turned out not to be needed at all: filtering to one consenting user replaces it.
+  **This entry stays open for shape (b) only** — the second Railway service, still deferred.
 - **The gap:** every Postgres migration, every destructive write path and every sync-engine change
   is exercised against a **freshly-seeded local DB** and then against **production**. `CLAUDE.md`
   names the consequence as a standing root cause: *"A bug that reproduces in prod but not locally:

@@ -640,9 +640,13 @@ a metric user. `CLAUDE.md` forbids an LLM number *gating an action*; it does not
 *displayed as fact*, and it should.
 
 **🟠 Two Play Store gates are unmet (Q-287/Q-288).** No self-service account deletion exists (admin
-route only) — required in-app and on web since 2024. And `/api/export` covers **27 domains against
-80 tables**, silently omitting the user's heart rate, derived scores, AI conversations and nutrition
-plans. Deletion is **⛔ owner-sign-off-first**; it is destructive and irreversible.
+route only) — required in-app and on web since 2024. And `/api/export` covers **26 of 82 tables**
+(re-measured 2026-08-17; the old "27 of 80" counted `goals`, a repository call rather than a table),
+silently omitting the user's own profile row, their heart rate, derived scores, AI conversations and
+nutrition plans. Deletion is **⛔ owner-sign-off-first**; it is destructive and irreversible.
+⚠️ **The route also cannot stream a large table while its comment claims it can** — `exportUserData`
+buffers each table via `pool.query`, so closing the coverage gap without fixing that first is an OOM
+the moment `oura_raw_samples` (1,098,183 rows / 360 MB) joins the list. Both halves ship together.
 
 **The rest:** `ai_health_insights.context_hash` is NULL on **109 of 117** rows, so the
 regeneration-avoidance key is written by one section of fourteen (Q-293). Coach is **8% of AI calls
