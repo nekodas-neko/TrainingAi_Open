@@ -35,7 +35,7 @@ const BASELINE = {
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
   'projectOverview.md': 6463,
-  'docs/implementation-backlog.md': 5945,
+  'docs/implementation-backlog.md': 5969,
   'CLAUDE.md': 1010,
 };
 

@@ -219,7 +219,12 @@ skipped):
 1. `/admin/oura-ble` → Advanced → **Full re-sync** (drains the ring's entire buffer from
    cursor 0). Loss-free and idempotent: the server dedups on
    `(user, ring_ts, tag, body)`.
-2. Watch the drain finish (`drain complete`) with **no upload-error line**, and the
+2. **The drain does not need the screen — or the app — open.** `OuraRingService` is a foreground
+   service that drains on connect, re-drains hourly, and POSTs each batch itself (v1.119.0+). Watch
+   it only if you want to see it happen; a full re-sync of a months-old backlog is thousands of
+   events at 255/batch and takes a while. What is missing is the *ending*: completion is only
+   `log()`ged, never notified (Q-533), so if you leave the screen you must come back and check.
+   Watch the drain finish (`drain complete`) with **no upload-error line**, and the
    "service uploaded N (M new)" counter settle (uploads can finish shortly after the
    drain). If an error shows, the cursor held — fix the cause, tap Sync now (or wait ≤5
    min for the automatic retry).

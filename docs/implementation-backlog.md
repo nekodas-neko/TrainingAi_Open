@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **533** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **534** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -276,6 +276,30 @@ below threshold and left in place for next time.
 
 
 ### [devices][platform] Q-530 — the ring key has one copy and no way to back it up
+### [devices][app-shell] Q-533 — the drain runs unattended but only reports completion to a screen nobody should have to watch
+
+- **Branch:** `feat/drain-complete-notification`
+- **Added:** 2026-08-17, owner report during a full re-sync: *"this is very lengthy. We shouldn't do
+  any testing that involves this ever again unless it can do it silently in the background."*
+- **The premise is half wrong, and that is the finding.** The drain **already runs in the
+  background**: `OuraRingService` is a foreground service, it auto-drains on connect and re-drains
+  hourly (`DRAIN_INTERVAL_MS`), and since v1.119.0 it POSTs each batch itself rather than needing
+  the tester screen to forward frames. Nothing about a drain requires the UI.
+- **What is actually missing is the ending.** `onDrainBatchComplete` only `log()`s
+  `drain complete` (`OuraRingService.kt:400`). The service posts exactly one notification in its
+  whole lifetime — low battery — so a user who starts a full re-sync has no way to learn it
+  finished except by staring at the admin log. That is what makes a background operation feel like
+  a foreground one.
+- **What to do.** Notify on drain completion, at least for a full re-sync (`fromZero=true`), with
+  the batch count and whether uploads settled cleanly. Reuse the existing notification channel
+  pattern. Consider a quiet progress notification for long drains, since a full re-sync of a
+  months-old backlog is thousands of events at 255/batch.
+- **Also fix the instructions.** `docs/oura-ble-operations.md` §4 step 2 says *"watch the drain
+  finish"*, which reads as a requirement and is only a verification convenience. It should say the
+  drain continues unattended and name what to check afterwards.
+- **Verification:** device-only. Start a full re-sync, leave the screen, confirm the drain completes
+  and the notification arrives.
+
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
 - **Branch:** `fix/device-console-ia`
