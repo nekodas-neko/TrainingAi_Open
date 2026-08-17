@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.6",
+    date: "2026-08-17",
+    changes: [
+      "Fixed: a very short activity is saved instead of being thrown away. Anything under three seconds rounded to a duration of zero, which the server refused \u2014 so the recording vanished and you were told \u201cFailed to save activity\u201d, which was not what had happened. It now saves, and the same fix covers activities recorded offline, which were being dropped the same way.",
+    ],
+  },
+  {
     version: "1.318.7",
     date: "2026-08-17",
     changes: [
