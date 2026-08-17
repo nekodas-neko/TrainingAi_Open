@@ -70,6 +70,17 @@ with the real module (6 partial days of 14 → 514 kcal low, all gates passing, 
 Queued below the three live user-facing bugs (Q-450/451/452) and above the tooling items, since
 it is a prescription-correctness bug that is not firing *yet*. Known-Issues row added.
 
+**`check-doc-index-size.js` will fail every intake PR you write — plan for it.** New as of
+2026-08-17: a shrink-only ratchet on `projectOverview.md`, `docs/implementation-backlog.md` and
+`CLAUDE.md`. Intake adds an entry per report, so it trips every time. The precedent set by the
+other lanes (read the comments above `BASELINE`) is to **raise the baseline in the same PR** with a
+written justification, because queue entries and Known-Issues rows are what these files are *for* —
+the growth it exists to catch is narrative and dated notes. But treat the failure as a real signal
+first: Q-387's first draft was 24/48 lines over and trimming it to 18/27 cost nothing an implementer
+needed. Budget ~30 lines per queue entry, ~15 per Known-Issues row. Run `pnpm check:rules` locally
+before pushing — it caught this and quotes its own count (**38 of 38** on 2026-08-17); nothing else
+counts as the custom-rules gate.
+
 **Rebase note for next time:** `main` moved twice during a single ~30-minute intake. Q-310 shipped
 and left the queue, and Q-306 was renumbered to Q-313, both inside the window between reading the
 file and committing. The rebase conflicted on the renumbered heading I had anchored to. Resolution
