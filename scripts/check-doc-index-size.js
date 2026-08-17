@@ -54,6 +54,15 @@ const root = path.join(__dirname, '..');
 // The backlog half also carries Q-530's ordered step list and the new optional `Lane:` field on
 // Q-530/Q-288 — routing an implementer to the right lane and flagging a shared unlisted path, which
 // is queue mechanics rather than narrative and is exactly what this file governs.
+//
+// Raised 2026-08-17 (Lane A, Q-536 diagnosis): backlog 6417 -> 6474. The Q-536 rewrite (+19) replaces
+// a refuted diagnosis with the measured one and keeps the refuted text folded in a <details>, which
+// is the cheapest way to stop it being re-derived; Q-314 (+38) is the new queue entry for the root
+// cause, +8 more when Q-536's repair shipped and its entry had to say which half is done. Entries
+// and a corrected entry, per the same split as the raises above. projectOverview
+// 6547 -> 6568 for Q-536's Known-Issues row: a live, unrepaired data-correctness fault on displayed
+// health values, which is exactly what that section indexes. +3 more when the repair shipped, to
+// say which half is done and which is still owed — the distinction the row exists to carry.
 // Raised 2026-08-17 (one-off DB-storage planning session, Q-530…Q-535): backlog 6057 -> 6191,
 // projectOverview 6484 -> 6505 — this session added 134 and 21 lines respectively, and the two
 // raises landed the same day, so these numbers are the sum rather than either branch's figure.
@@ -76,6 +85,12 @@ const root = path.join(__dirname, '..');
 // A live production outage entry and its Known-Issues row. Both carry the proven mechanism inline
 // (n_tup_upd=681,005 with n_tup_hot_upd=0) rather than citing it, because the counters reset at
 // crash recovery and cannot be re-derived later — the same reasoning as the Q-388 raise above.
+//
+// Raised 2026-08-17 (Lane A, Q-536): projectOverview 6618 -> 6642, backlog 6584 -> 6649. The Q-536
+// entry rewrite replaces a refuted diagnosis with the measured one and says which half of the repair
+// shipped and which is still owed; Q-314 is the new queue entry for the root cause; the
+// projectOverview row is a live, unrepaired fault on displayed health values. Entries and a
+// corrected entry, per the same split as the raises above.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -88,11 +103,11 @@ const BASELINE = {
   // neither vitest (node-only, no @testing-library/react) nor the E2E harness (needs admin + a live
   // radio) can reach the code. The mechanism, the five-site sibling sweep and the CI-rule option
   // that was considered and declined all stayed in the journal entry.
-  'projectOverview.md': 6618,
-  'docs/implementation-backlog.md': 6584,
+  'projectOverview.md': 6642,
+  'docs/implementation-backlog.md': 6649,
   'CLAUDE.md': 1010,
-  'projectOverview.md': 6618,
-  'docs/implementation-backlog.md': 6584,
+  'projectOverview.md': 6642,
+  'docs/implementation-backlog.md': 6649,
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;
