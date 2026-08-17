@@ -29,9 +29,14 @@ echo '--- reachability: the emulator must see the host server ---'
 adb wait-for-device
 # 10.0.2.2 is the emulator's alias for the host loopback. If this fails the APK would fall back to
 # an error page and never open the local DB, which would read as a migration failure.
-adb shell 'curl -s -o /dev/null -w "%{http_code}" http://10.0.2.2:3000/api/version' 2>/dev/null \
-  | grep -qE '^(200|401|404)$' \
-  || echo 'WARN: could not confirm host reachability from inside the emulator (curl may be absent); continuing'
+#
+# Any HTTP status counts as reachable — `/` redirects to /sign-in, which proves the hop works.
+# Deliberately not /api/version: it awaits an outbound GitHub Releases call before responding, so
+# it can time out against a perfectly healthy server.
+adb shell 'curl -s -o /dev/null -w "%{http_code}" --max-time 5 http://10.0.2.2:3000/' 2>/dev/null \
+  | tr -d '\r' | grep -qE '^[1-5][0-9][0-9]$' \
+  && echo 'host reachable from inside the emulator' \
+  || echo 'WARN: could not confirm host reachability (curl may be absent from this image); continuing'
 
 echo '--- install ---'
 adb install -r -g "$APK"
