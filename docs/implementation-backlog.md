@@ -315,125 +315,15 @@ below threshold and left in place for next time.
 - **Verification:** the affordance must be shown to work while the key is present, and the warning
   shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
 
-### [sleep][devices] Q-536 — a re-drain opened a spurious clock epoch, and the redecode re-timed 43 nights by +14.2 h
-
-> **→ LANE A, diagnosis complete 2026-08-17. The fix below is NOT the one this entry originally
-> proposed.** Both blocking questions are settled from production, and two earlier hypotheses are
-> refuted. **Read this block; the historical text is kept below it only so the refuted reasoning is
-> not re-derived.**
->
-> **What is actually wrong.** The ring clock never reset. `oura_ble_clock_anchors` holds four
-> epochs, and the *minimum* lag (`anchor_utc − anchor_ds×100`, which is bounded below by the true
-> clock offset) agrees across all four to within **50 seconds** over three weeks and 5,368 anchors:
->
-> | epoch | anchors | min lag | p10 lag, vs epoch 2 | created |
-> |---|---|---|---|---|
-> | 0 | 312 | −5 s | **−0.01 h** | (default) |
-> | 1 | 695 | +44 s | **+12.17 h** | 2026-07-30, 28-min burst |
-> | 2 | 3,666 | 0 s | 0.00 h | 2026-07-30 |
-> | 3 | 695 | +45 s | **+14.16 h** | 2026-08-17, 40-min burst |
->
-> Epochs **1 and 3 are artefacts of a history re-drain**, not resets. After a re-pair the app has no
-> sync cursor, so the ring replays days of buffered events; the replayed `ds` values look like a
-> counter regression and `isClockEpochReset` opens a new epoch. The ds counter is in fact
-> **continuous**: epoch 3's first sample above epoch 2's ceiling is ds 37,112,507 against epoch 2's
-> last at 37,112,321 — a gap of **18.6 seconds**. Nothing dropped to near zero, which is what
-> `clock.ts` itself says a real reset does.
->
-> **Why that shifts every timestamp.** `robustOffsetMs` estimates the epoch's offset at the **p10**
-> of lag, justified by a steady-state measurement (its comment: n=99, p0→p10 spans 1.4 min). In a
-> re-drain that assumption fails outright — over 90% of the burst's anchors carry backlog lag, so
-> p10 lands 14.16 h inside it. Epoch 3 then became `currentEpoch(anchors)`, and
-> `aggregateOuraRawSamples`'s `toDate` (`adapter.ts:5088`) calls `resolveDsToMs(ds, anchors)` **with
-> no epoch**, which defaults to the newest. Every historical sample was re-timed by +14.16 h.
->
-> **+14.16 h is the whole error, and it reconciles exactly.** Subtracting 14 h 10 min from the 43
-> wrong `sleep_start` values moves every one of them into a bedtime distribution — 2 at 20:00, 15 at
-> 21:00, 23 at 22:00, 2 at 23:00, 1 at 00:00 Brisbane. Nothing else is needed to explain them.
->
-> **Q1 — were the rows already wrong, or rewritten wrong? Rewritten, by the 2026-08-17 redecode.**
-> `sleep_sessions.updated_at` shows **49 nights** written on 2026-08-17 covering 2026-07-08 →
-> 2026-08-17; every other night was last written on its own day. Before the reinstall
-> `currentEpoch` was 2, whose offset matches epoch 0's to within 48 s — so those rows were **correct
-> when written** and the full-history redecode destroyed them. Nothing needs reconstructing.
->
-> **Q2 — is the resolver epoch-scoped per row? No, and making it so is NOT the fix.** The samples do
-> carry `oura_raw_samples.epoch` (migration 161), and `ds → epoch` is very nearly a function (3
-> collisions in ~1.09 M rows). But epoch 3 contains **5,756 re-drained rows below epoch 2's
-> ceiling**, interleaved with their epoch-2 originals across ds 33.0 M–37.11 M. Resolving those
-> per-row would split one span across two offsets 14 h apart — worse than the uniform shift it
-> replaces. **Per-row epoch resolution repairs nothing on its own, because the epoch labels
-> themselves are wrong.**
-
-- **Branch:** `fix/ble-sleep-window-timezone`
-- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`, and a Postgres migration.
-- **⚠️ v1.318.0's migration 189 FAILED IN PRODUCTION AND CHANGED NOTHING. Fixed in v1.318.2.**
-  The owner deployed, ran the full redecode, and Health still showed midday bedtimes. Cause: 189
-  relabelled `oura_raw_samples` in the same transaction — **434,707 rows on the 667 MB table** —
-  and the pool sets `statement_timeout = 15s` (`client.ts:39`). It timed out (`57014`), the whole
-  implicit transaction rolled back, `ensureSchema` logged it and carried on, and production stayed
-  on four epochs. **The tell was that the migration was absent from `schema_migrations` while
-  `/api/version` reported 1.318.0**, and `oura_rollup_state` still read `epoch: 3`. It had been
-  failing on every boot since.
-  **Two changes:** 189 now carries `SET LOCAL statement_timeout` and does the anchors only; the
-  sample relabel moved to **190**, because `oura_raw_samples.epoch` is written at ingest
-  (`adapter.ts:4888`) and **read by nothing** — so the expensive half is inert and must not be able
-  to roll back the cheap half that actually repairs the clock. `SET LOCAL` was verified to take
-  effect under `pool.query()`'s implicit transaction, in both directions.
-- **Step 1 (migrations 189 + 190, owner-approved 2026-08-17):**
-  It merges same-clock epochs on `oura_ble_clock_anchors` and `oura_raw_samples`, and drops the
-  affected `oura_rollup_state` watermark so the next rollup re-derives. It decides what to merge
-  from **measured evidence, not a user id or an epoch number**: two epochs are the same ring clock
-  when their *minimum* anchor lag agrees (within 10 min). A re-drain leaves that minimum untouched —
-  the drain's newest anchor is as prompt as any — while a re-key moves the ring's origin by weeks.
-  Verified on merged production values: p10 across all 5,374 anchors lands **3 s** from the clean
-  epoch-2 offset. A genuine re-key is left alone, and that half is mutation-checked.
-- ⚠️ **STILL OWED after deploy: a full-history Redecode.** The migration relabels; it does not
-  rewrite the 43 stored nights. The rollup's incremental window is 35 days and the damage spans 44
-  (2026-07-04 → 2026-08-17), so clearing the watermark does not reach the oldest nights. **This is
-  the step that actually makes Health right, and it has not been run.** (Note Q-535: Redecode
-  reports a spurious "failed: 502" for work that succeeded.)
-- **Then verify** a known night's window against the owner's account of it, and re-run the start-hour
-  histogram: the 43 rows at 10:00–14:00 Brisbane should land in the 20:00–00:00 band.
-- **The misdetection is still live** — **Q-314**. It needs a design decision (how to tell a re-drain
-  from a genuine re-key) and cannot repair rows that already carry the bad labels. Until it lands,
-  **every re-pair reopens this**, and the migration would have to be re-run.
-- **Do NOT "fix" `robustOffsetMs` by lowering the percentile.** Measured: on a drained epoch even
-  **p1 is already contaminated** (+1.28 h), and only the *two* smallest anchors are clean — too thin
-  to estimate from. On a healthy epoch p0→p10 spans 7 s and 50 s, so the estimator is fine. The
-  defect is the spurious epoch, not the statistic.
-- **Verification:** a boundary test at 23:59 and 00:01 Brisbane, plus asserting a known night's
-  window against the owner's account of it. **Do not fix from reading alone** — `CLAUDE.md` names
-  this class as the most repeated bug in the project.
-
-<details>
-<summary>Original entry text (both hypotheses refuted above — kept so they are not re-derived)</summary>
-
-- **Added:** 2026-08-17, found while verifying the post-re-sync Health screen.
-- **The symptom.** Health lists bedtimes like **12:07 pm – 8:31 pm** and **11:16 am – 10:26 pm**.
-  Measured across all 82 stored sessions, start hours are **bimodal**: ~36 in a plausible 19:00–02:00
-  band, and **43 clustered at 10:00–14:00** Brisbane, which is not a bedtime.
-- **Refuted hypothesis 1 — timezone double-conversion.** The shape looked like a correct UTC value
-  re-read as Brisbane wall-clock. It is not: the error is a single +14.16 h offset from a
-  contaminated anchor set, and 14.16 h is not any Brisbane offset.
-- **Refuted hypothesis 2 — epoch *collision*.** The overlapping ds ranges are real, but the failure
-  is not an ambiguous lookup picking the wrong anchor set; it is that the newest epoch's offset is
-  itself wrong by 14.16 h and every ds was resolved against it.
-- **The display is innocent.** The UI renders the stored instant correctly — do not look in the
-  component.
-- **The redecode reproduces it**, so the bug is reachable from stored `body_hex` and a corrected
-  pass fixes all 43 nights with no data loss. *(Confirmed — and it is also what caused them.)*
-- **What is NOT affected:** duration, HRV, average and lowest heart rate. Only the window boundaries.
-
-</details>
-
 ### [devices][platform] Q-314 — a history re-drain is detected as a ring-clock reset, and every re-pair reopens Q-536
 
 - **Branch:** `fix/ble-clock-reset-vs-redrain`
 - **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts` (the ingest anchor path
   around `isClockEpochReset`).
-- **Added:** 2026-08-17, from the Q-536 diagnosis. Q-536 repairs the damage; this is the mechanism
-  that caused it, and it will cause it again on the next re-pair.
+- **Added:** 2026-08-17, from the Q-536 diagnosis. **Q-536 is now shipped and confirmed on the
+  owner's device** (v1.318.2 + the 10:47 redecode: the midday cluster went 43 nights → 4, and the
+  survivors are short daytime fragments, not bedtimes). This entry is the mechanism that caused it,
+  it is **still live**, and it will do the same thing again on the next re-pair.
 - **What happens.** `isClockEpochReset(batchMaxDs, epochMaxDs)` (`clock.ts`) opens a new clock epoch
   whenever a batch's max `ds` regresses more than `EPOCH_REGRESSION_TOLERANCE_DS` (36,000 ds = 1 h)
   below the epoch's high-water mark. After a re-pair the app holds no sync cursor, so the ring
@@ -2158,6 +2048,12 @@ session working from a temporarily restored copy.
   the work, not the test. Do not start this as a standalone item.
 
 ### [sleep][devices] Q-274 — fragment "nights" reach the sleep score, and on two dates the fragment is the ONLY record
+
+> **Fresh evidence, 2026-08-17.** After Q-536's clock repair the sleep table is clean apart from
+> exactly **10 rows**, and all ten are this: daytime fragments of 0.0–1.4 h stored as sleep sessions
+> (14:39–14:59 · 0.1 h; 11:03–11:33 · 0.0 h; 09:33–11:11 · 0.1 h; 16:47–18:32 · 1.4 h; …). They are
+> the entire remaining deviation from a 19:00–23:00 bedtime distribution across 82 nights, so this
+> entry is now the only thing standing between the sleep list and being correct end to end.
 
 - **Branch:** `fix/sleep-fragment-nights`
 - **Plan:** none yet — needs a scoping pass first (see below)
