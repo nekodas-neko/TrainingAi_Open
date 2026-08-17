@@ -102,6 +102,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-17-profile-group-labelling.md`](../../overview/entries/2026-08-17-profile-group-labelling.md)**
+  — 🆕 Q-261, the tail of the Q-258 sweep: the six `<Label>`s in `components/profile/` that front
+  button groups rather than controls. Five became `role="radiogroup"` + `aria-labelledby` following
+  the three sites that already used that shape; Timezone dropped `<Label>` entirely because nothing
+  was being labelled. Guarded by `e2e/profile-group-labelling.spec.ts`, whose two assertions were
+  each proven lethal by mutation. Left open as **Q-350**: none of the app's eight radiogroups
+  implements arrow-key navigation, which wants one shared primitive rather than eight copies.
 - **[`docs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md`](../../handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md)**
   — 🆕 what came after the IA cluster: 6 PRs closing Q-255, Q-232-followup, Q-258, Q-259, Q-260 and
   Q-262. **Q-260 is the substantive fix** — `user-goals` was fetched by the Progress tab's group

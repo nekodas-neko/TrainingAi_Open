@@ -532,30 +532,6 @@ session working from a temporarily restored copy.
 > The brittle selector was the symptom, so deleting it is the proof.
 > Journal: [`entries/2026-08-16-goal-label-association.md`](overview/entries/2026-08-16-goal-label-association.md).
 
-### [app-shell][platform] Q-261 — six `<Label>`s in `components/profile/` label button groups, not controls
-
-- **Branch:** `fix/profile-group-labelling`
-- **Plan:** none needed
-- **Added:** 2026-08-16 · found finishing Q-258, which fixed the neighbouring case
-- **Q-258 fixed every `<Label>`/`<Input>` pair. These six are a different shape** and were
-  deliberately not bundled with it: they front **button groups or static text**, not form controls,
-  so `htmlFor` does not apply and there is no `id` to point at.
-  - `goal-targets-section.tsx:60` Fitness Goal · `required-info-section.tsx:160` Biological Sex,
-    `:200` Activity Level · `edit-profile-sheet.tsx:181` Timezone, `:202` Weight Units, `:223` Food
-    Region.
-- **The open design question, which is why this is not a one-liner:** `<Label>` renders
-  `@radix-ui/react-label`, whose whole job is associating text with a control. Pointed at a
-  `<div>` of buttons it is the wrong element, not merely an unfinished one. Either wrap each group
-  in `role="group"` + `aria-labelledby` and keep the visual style, or drop `<Label>` for a plain
-  styled element where nothing is being labelled at all (Timezone and Weight Units front a value
-  and a button, not a group of options — those two may not want group semantics either).
-- **Not urgent and not a regression** — it has been this way since the components were written. It
-  is filed because Q-258 swept the same directory and stopping at the input pairs without recording
-  the rest would leave the sweep looking complete when it is not.
-- Verify with a screen reader or an accessibility-tree dump, not by eye: the failure mode is an
-  unnamed group, which is invisible visually.
-
-
 > **Q-259 CLOSED as not achievable, 2026-08-16 — and the measurement is the point.** The entry asked
 > for a guard that fails when Q-240's `invalidateGoalRecommendations()` is deleted. **No such guard
 > can exist for this path**, established by building it and measuring rather than by argument:
@@ -1906,6 +1882,28 @@ session working from a temporarily restored copy.
   **shrink-only baseline** pattern the repo already uses for `check-component-size.js` and
   `check-hex-literals.js`, so the existing violations are recorded rather than blocking, and the
   count can only go down.
+
+### [app-shell] Q-350 — eight `role="radiogroup"`s in the app, none with arrow-key navigation
+
+- **Branch:** `fix/radiogroup-keyboard-nav`
+- **Plan:** none needed
+- **Added:** 2026-08-17 · found implementing Q-261, which added five of the eight
+- **The gap.** The ARIA authoring practices for `radiogroup` expect arrow keys to move between
+  options with a roving `tabindex`, so the group is one tab stop rather than N. None of the eight
+  sites does this — `Tab` walks every option individually and arrow keys do nothing.
+  - Pre-existing: `components/workout/deload-toggle.tsx`,
+    `components/workout/session-duration-picker.tsx`, `components/more/home-widgets-section.tsx`.
+  - Added by Q-261: `components/profile/goal-targets-section.tsx`,
+    `components/profile/required-info-section.tsx` (×2), `components/profile/edit-profile-sheet.tsx` (×2).
+- **Q-261 matched the existing three deliberately rather than fixing them** — a roving tabindex for
+  five sites inside a labelling fix would have been an unrequested refactor, and five sites with
+  keyboard nav beside three without is worse than eight consistent ones.
+- **Genuinely low priority**: the canonical runtime is a touch-only APK with no keyboard, and
+  TalkBack navigates by swipe, so the affected population on the supported target is near zero
+  today. It sits next to Q-282 because an accessibility scanner is what will force it.
+- **Do it as one sweep with a shared `components/ui/` primitive** taking
+  `{ options, value, onChange, label }`, not eight hand-rolled copies — eight is well past the
+  "any pattern at ≥2 sites gets extracted" rule.
 
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 

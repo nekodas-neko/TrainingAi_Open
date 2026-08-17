@@ -178,11 +178,12 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
             {/* Timezone */}
             <div className="flex items-center gap-3 px-4 py-3">
               <div className="flex-1 min-w-0">
-                <Label className="text-xs text-muted-foreground">Timezone</Label>
+                <p className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Timezone</p>
                 <p className="text-sm font-medium mt-0.5 truncate">{timezone}</p>
               </div>
               <button
                 type="button"
+                aria-label="Auto-detect timezone"
                 onClick={() => {
                   const detected = Intl.DateTimeFormat().resolvedOptions().timeZone
                   setTimezone(detected)
@@ -199,17 +200,21 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
             {/* Weight Units */}
             <div className="flex items-center justify-between px-4 py-3">
               <div>
-                <Label className="text-xs text-muted-foreground">Weight Units</Label>
+                <p id="ep-units-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Weight Units</p>
                 <p className="text-sm font-medium mt-0.5">Kg / Lbs</p>
               </div>
-              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold">
+              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold" role="radiogroup" aria-labelledby="ep-units-label">
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={units === 'kg'}
                   onClick={() => setUnits('kg')}
                   className={`rounded-lg px-3 py-1.5 transition ${units === 'kg' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
                 >kg</button>
                 <button
                   type="button"
+                  role="radio"
+                  aria-checked={units === 'lbs'}
                   onClick={() => setUnits('lbs')}
                   className={`rounded-lg px-3 py-1.5 transition ${units === 'lbs' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
                 >lbs</button>
@@ -220,13 +225,15 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
 
             {/* Food Region */}
             <div className="px-4 py-3 space-y-2">
-              <Label className="text-xs text-muted-foreground">Food Region</Label>
+              <p id="ep-foodRegion-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Food Region</p>
               <p className="text-[10px] text-muted-foreground">Used to bias AI food analysis toward local brands.</p>
-              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border">
+              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border" role="radiogroup" aria-labelledby="ep-foodRegion-label">
                 {['AU', 'US', 'UK', 'NZ'].map(r => (
                   <button
                     key={r}
                     type="button"
+                    role="radio"
+                    aria-checked={foodRegion === r}
                     onClick={() => { setFoodRegion(r); localStorage.setItem('ta_food_region', r) }}
                     className={`rounded-lg px-4 py-1.5 transition ${foodRegion === r ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
                   >{r}</button>

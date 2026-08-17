@@ -57,14 +57,16 @@ export function GoalTargetsSection({
 
       {/* Fitness Goal */}
       <div className="px-4 py-3 space-y-2">
-        <Label className="text-xs text-muted-foreground">Fitness Goal</Label>
-        <div className="space-y-1.5">
+        <p id="goals-fitnessGoal-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Fitness Goal</p>
+        <div className="space-y-1.5" role="radiogroup" aria-labelledby="goals-fitnessGoal-label">
           {FITNESS_GOALS.map(goal => {
             const active = fitnessGoal === goal
             return (
               <button
                 key={goal}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 disabled={saving}
                 onClick={() => onFitnessGoalChange(active ? null : goal)}
                 className={[
