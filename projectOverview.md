@@ -3395,6 +3395,25 @@ journal.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] ⚠️ PR #1390 is OPEN with a red E2E job nobody has seen the cause of (Q-297/Q-309, 2026-08-16)
+
+- **Five required checks green** (Lint, Tests, Build, Custom Rules, Migration Check); the **E2E job
+  is red** on run `31973027001`. Failed jobs were re-queued — check that result before anything else.
+- **The specs are not the problem, and this was measured rather than assumed.** A fresh
+  `trainingai_e2e_fresh` database was created, migrated, seeded from `scripts/local-db/seed.sql` —
+  CI's exact condition — and the whole suite run against it: **12 of 12 pass in 4.3 min**, the new
+  water spec fastest at 7.3 s. So the CI failure is environmental. **Do not delete a spec to make
+  the job green.**
+- **The blocker is tooling, not the app.** `get_job_logs` returns only the Postgres *service
+  container* stream for this job, on both the `job_id` form and `run_id` + `failed_only` — the spec
+  names appear nowhere in the 24 KB it returns. **The untried path: download the `playwright-report`
+  artifact** via `list_workflow_run_artifacts`.
+- **One live lead:** `FATAL: role "root" does not exist` repeats every ~10 s through the whole run —
+  something connects without the `DATABASE_URL` credentials and falls back to the runner's OS user.
+  Whether it also appears in the three earlier *passing* E2E runs has not been checked; check that
+  before chasing it.
+- Full context: [`docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md`](docs/handoff-2026-08-16-platform-e2e-harness-and-backlog-run.md).
+
 ### [platform] ✅ The repo can now run its own app — E2E harness shipped (Q-249, 2026-08-15)
 
 - **466 test files, none of which opened a browser** — until now. `playwright.config.ts`, `e2e/`,

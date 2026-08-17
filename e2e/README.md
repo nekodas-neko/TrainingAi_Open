@@ -75,6 +75,14 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
   found rather than shipped.
 - Specs run serially against one seeded database and one signed-in user. Parallelism would buy
   seconds and cost reproducibility.
+- **Assert a direction, not a figure, for anything a rerun changes.** The water spec asserts the
+  total *increased*; an absolute litre value would pass on the first run and fail on the second,
+  since the seeded DB is shared and not reset between runs.
+- **If a tap does nothing, suspect a gesture handler before you suspect hydration.** On Nutrition a
+  real touch sequence does not open the water sheet while a synthesised `click` event does — filed
+  as Q-309, with the workaround and its reasoning in `water-log-write-path.spec.ts`. A spec that
+  cannot tap the way a user taps is testing something adjacent to the product, so it is a finding to
+  chase rather than a pattern to copy.
 
 ## Layout
 
@@ -86,4 +94,5 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
 | `health-tabs-instant-paint.spec.ts` | The same, per Health panel (Training / Body / Progress) |
 | `goal-round-trip.spec.ts` | A goal edit reaches the server and shows on another tab (guards Q-260) |
 | `goal-invalidation.spec.ts` | A steps-goal edit reaches Health's Progress panel client-side. Its header records why a Q-240 cache-invalidation guard is **not possible** here — measured, after two attempts |
+| `water-log-write-path.spec.ts` | A logged value appears on the screen that triggered it, no reload |
 | `.auth/` | Generated session state — git-ignored, never commit it |
