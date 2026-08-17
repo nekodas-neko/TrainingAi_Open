@@ -16,26 +16,32 @@ was defeated by Drizzle embedding the generated `VALUES` list in its message, so
 reopens it. It needs an owner design call and I have asked for one (see Blocked).
 
 ## Next
-Work the queue top-down, taking the highest item in Lane A's ownership. As of this writing:
+Queue is re-read as of the end of this session. Q-450/451 have shipped (Lane B); Q-536 and Q-539 are
+done and removed.
 
-0. **Q-537** `[devices][platform]` is above Q-536 and is **not** takeable as-is: it is credential
-   handling (reveal/export the ring key) and its own verification line says nothing is checkable
-   from the sandbox. Needs owner sign-off before anyone builds it.
-1. **Q-314** `[devices][platform]` — filed this session, the root cause behind Q-536. Reset
-   detection treats a re-drain as a re-key. **Read its open-design-question block first**: there is
-   no observed true reset in the data, so any threshold is unvalidated against the case it exists
-   for, and missing a real re-key is worse and quieter than the current failure.
-2. **Q-450** `[activity][cardio]` and **Q-451** `[workouts][app-shell]`: both root-cause into
-   `components/` (`done-activity-screen.tsx`, the Workout empty state) — **Lane B's**, skip them.
-3. **Q-452** `[app-shell][platform]` — the AI insight card runs an LLM over literal "no data" strings.
-   Read it before claiming: the fix may sit in the route (Lane A) or the card (Lane B), and the
-   entry does not settle which.
-4. **Q-313** `[platform]` — a `next build` gate for `scripts/publish-dry-run.js`. `scripts/` is in
-   neither lane's list, so **claim it in this file before touching it** and check Lane B's baton.
-   Heed the entry's own note: a build is minutes, so gate it behind `--all`.
-5. **Q-312** `[platform]` — the synthetic MET table is physiologically impossible, ~9 tests in CI.
-6. **Q-263** `[platform]` — audit the remaining cache groups the way Q-262 audited one
-   (`lib/cache-groups.ts`). Lane A.
+1. **Q-537** `[devices][platform]` — top of queue and **owner-gated**: credential handling (reveal/
+   export the ring key), and its own verification line says nothing about it is checkable from the
+   sandbox. Do not build it without sign-off.
+2. **Q-314** `[devices][platform]` — **owner-gated on a design call that has been asked and not yet
+   answered.** Re-drain-as-reset misdetection; the recommendation put to the owner was to make a
+   re-key *explicit* rather than inferred from counter shape. Read its open-question block: there is
+   **no observed true reset in the data**, so any threshold is unvalidated against the case it
+   exists for, and missing a real re-key fails silently — worse than the current failure.
+3. **Q-535** `[platform][devices]` — the redecode holds the request open through the heaviest pair of
+   calls in the app and 502s at the gateway, inviting a retry of a full-table rewrite. Premise
+   re-verified this session: `await runRedecodeOffLoop(...)` in the route, and its own comment says
+   "the caller still waits". **Split across lanes** — returning a job id is Lane A, the client poller
+   is Lane B. Worth agreeing the seam before starting.
+4. **Q-540** `[devices][platform]` — **the `event_name` half is takeable now and gives up nothing**
+   (20 MB, 30 values fully derivable from `tag`, already pinned by the Kotlin/TS parity test). Take
+   the `bytea` half only if Q-541 is not imminent. ⚠️ It is a migration over 1.1 M rows — read the
+   `statement_timeout` note under Method notes **before** writing it.
+5. **Q-534** `[platform]` — **not the one-step index drop it reads as.** This session established
+   the index has two live consumers; order is rewrite both call sites to be ds-keyed, prove
+   equivalence, then drop. See its entry.
+6. **Q-312** / **Q-263** `[platform]` — the synthetic MET table, and the cache-group audit.
+
+**Q-313** touches `scripts/`, which neither lane lists — claim it here first and check Lane B's baton.
 
 ## Blocked
 - **Q-536 owes a full-history Redecode after v1.318.0 deploys.** Nothing in the queue depends on
@@ -43,6 +49,10 @@ Work the queue top-down, taking the highest item in Lane A's ownership. As of th
   10:00–14:00 Brisbane should move into the 20:00–00:00 band.
 - **Q-537 needs owner sign-off** before anyone builds it: it is credential handling, and its own
   verification line says nothing about it is checkable from the sandbox.
+
+**Session ended on context, not on completion.** Q-540's `event_name` half was available and
+deliberately not started: it is a 1.1 M-row migration, and starting one with little context left is
+exactly how this session's three-deploy Q-536 detour began.
 
 One thing **owed** rather than blocked: the device check on Q-310, filed as a Known-Issues row in
 `projectOverview.md` rather than left implicit. Server/JS only, so it reached the APK via the
