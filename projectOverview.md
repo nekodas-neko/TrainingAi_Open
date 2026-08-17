@@ -239,11 +239,13 @@ the next device change.
   **Not device-verified** — the web fallback ran, not SQLite+outbox. The spec exposed a second defect
   the bail-out was masking, filed as **Q-351** (Lane A): a sub-3-second activity rounds `durationMin`
   to 0, which `.positive()` rejects as a bare 400. [Journal](docs/overview/entries/2026-08-17-activity-untyped-entry.md).
-- **🔴 Q-451 — a brand-new account's Workout tab is a ~1,400 px empty card with a dead button.**
-  `/workout-select` with no program renders a lone 💪 and a **Start Workout** button that is not
-  disabled and does nothing when tapped (`workout-select-content.tsx:412` short-circuits on a missing
-  `currentSession`). No empty state, no pointer to create a program — while `/program` handles the
-  same account correctly (*"No programs yet. Create one to get started."*).
+- **✅ Q-451 FIXED (v1.318.3) — a new account's Workout tab was a ~1,400 px empty card with a dead
+  button** whose onClick short-circuited on the missing `currentSession`. Now "No program yet" + a
+  **Create a program** CTA; the inert button is gone rather than disabled, and a `programLoaded` flag
+  separates "no program" from "still loading" so it cannot flash. **Observed working** against an
+  ad-hoc zero-data account, but **not guarded** — the harness's one seeded account has a program, so
+  no committed spec reaches a first-run state (filed as **Q-352**). Home's syntactic sibling is
+  guarded upstream and is not a bug. [Journal](docs/overview/entries/2026-08-17-workout-select-empty-state.md).
 - **🟠 Q-452 — the AI insight card runs an LLM over a prompt of literal `"no data"` strings.** No
   sufficiency gate between mount and model. Rendered for a day-one account, `/health/activity` said:
   *"Your activity tracker currently shows zero movement and no strength sessions toward your goal of
@@ -264,8 +266,8 @@ the next device change.
   `getLocalStore()` returns null, so every offline-first domain took its web fallback and the device
   branch — the canonical runtime — was never exercised. No safe-area, Samsung-WebView, native-plugin
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
-- **Q-450 has since shipped (Lane B, v1.318.2) and is struck above; the other five stay queued**, with
-  Q-451 now the top one in `docs/implementation-backlog.md`.
+- **Q-450 and Q-451 have since shipped (Lane B, v1.318.1/v1.318.3) and are struck above; the other
+  four stay queued**, with Q-452 now the top one in `docs/implementation-backlog.md`.
 ### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
 
 - Owner: stock ring lasts 7 days; on our build it loses ~20% overnight and needs charging every 2
