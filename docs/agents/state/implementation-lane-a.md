@@ -3,7 +3,7 @@
 **Updated:** 2026-08-17 · **By:** the first session to run as Lane A · **Q band:** 314–349 (next free: 314 — none taken)
 
 ## Now
-**Q-310 is built and its PR is open** on `fix/ai-dynamic-deload-fallback-not-flagged` (v1.317.4).
+**Q-310 is built and its PR is open** on `fix/ai-dynamic-deload-fallback-not-flagged` (v1.317.5).
 An engine-chosen ai_dynamic deload was prescribing full weights: `/api/workout-data`'s catch-all
 phase branch existed as two verbatim copies that both hardcoded `isDeloadActive: false` while
 title-casing the *same* `aiPeriodizationState.phase` field into the header label "Deload". Both now

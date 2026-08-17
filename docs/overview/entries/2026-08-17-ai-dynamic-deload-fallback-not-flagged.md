@@ -1,4 +1,4 @@
-## 2026-08-17 — an ai_dynamic deload that fell into the catch-all branch was a deload in name only (Q-310, v1.317.4)
+## 2026-08-17 — an ai_dynamic deload that fell into the catch-all branch was a deload in name only (Q-310, v1.317.5)
 
 **Owner report (2026-08-17), two screenshots:** an active Sumo Deadlift set headed
 "Pull · Deload · S2 · Ex 1/5", and the exercise summary right after it showing a
@@ -75,7 +75,7 @@ Full local gate on `pnpm dev` against the local Postgres, with the seeded progra
   has `estimated_1rm = 0`, `exercise_deloaded = t`, `phase_type = deload`, and the pre-existing
   Barbell Deadlift PR (160 kg) is untouched.
 - `npx tsc --noEmit` clean · `pnpm lint` 0 errors (122 pre-existing warnings, none in the touched
-  files) · `pnpm build` green · `pnpm check:rules` **Ran 36 of 36** · full suite 477 files /
+  files) · `pnpm build` green · `pnpm check:rules` **Ran 38 of 38** · full suite 477 files /
   3,893 tests passed, 2 files / 54 tests skipped.
 
 ### Not exercised

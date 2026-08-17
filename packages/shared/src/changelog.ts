@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.317.5",
+    date: "2026-08-17",
+    changes: [
+      "Fixed: a deload the coach decides on its own now actually lightens the session. It was labelled \"Deload\" on the workout header while prescribing full weights, which is why one kept getting recommended \u2014 nothing about the training had changed, so the fatigue that triggered it never cleared. Sets now drop to the lighter deload prescription, and the session no longer flashes a \"New Personal Record!\" on submaximal work. Your recorded personal bests were never affected: the server has always refused to store a PR from a deload, so the badge was showing a record that was not being kept.",
+    ],
+  },
+  {
     version: "1.317.4",
     date: "2026-08-17",
     changes: [
-      "Fixed: a deload the coach decides on its own now actually lightens the session. It was labelled \"Deload\" on the workout header while prescribing full weights, which is why one kept getting recommended — nothing about the training had changed, so the fatigue that triggered it never cleared. Sets now drop to the lighter deload prescription, and the session no longer flashes a \"New Personal Record!\" on submaximal work. Your recorded personal bests were never affected: the server has always refused to store a PR from a deload, so the badge was showing a record that was not being kept.",
+      "Accessibility: the option groups on More — Fitness Goal, Biological Sex, Activity Level, Weight Units and Food Region — now announce what they are and which option is selected. A screen reader previously read the buttons as a loose run with no indication of what they were choosing between. The Auto-detect button on the Timezone row now says what it detects.",
     ],
   },
   {
