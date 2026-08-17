@@ -7,9 +7,24 @@ import { getCached, setCached, readCacheSync } from '@/lib/sqlite/cache'
 interface Props {
   section: 'readiness' | 'sleep' | 'heart-rate' | 'activity'
   date: string
+  /**
+   * Does this section actually have something to be insightful about? (Q-452)
+   *
+   * Required rather than defaulted, so a new call site has to answer it. The route substitutes the
+   * literal string `"no data"` for every absent field and calls the model anyway — and handed
+   * `Steps: no data` the model does not report absence, it asserts **zero** and editorialises. A
+   * day-one account was told *"your activity tracker currently shows zero movement… this inactivity
+   * creates a significant gap"* on its first ever visit.
+   *
+   * Gating here rather than server-side is deliberate: it costs no request at all, where returning
+   * `{ insight: null }` would still pay one. It does **not** fix the partial case — a section with
+   * a score but a missing field still feeds the model a `"no data"` line — because that lives in
+   * the prompt, which this component cannot reach. Filed as Q-353.
+   */
+  hasData: boolean
 }
 
-export function AiInsightCard({ section, date }: Props) {
+export function AiInsightCard({ section, date, hasData }: Props) {
   const [insight, setInsight] = useState<string | null>(null)
   const [error, setError] = useState(false)
 
@@ -42,10 +57,15 @@ export function AiInsightCard({ section, date }: Props) {
   // first-ever insight loads, render nothing (the card returns null below) rather
   // than a full-card Loader2 — an insight is supplementary, not load-bearing.
   useEffect(() => {
+    if (!hasData) return
     const seed = readCacheSync<string>(`ai-health-insight:${section}:${date}`)
     if (seed) setInsight(seed)
     fetchInsight()
-  }, [section, date]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [section, date, hasData]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Nothing to be insightful about, so render nothing — not an error line and not an empty card.
+  // Checked before the error branch: with no fetch there can be no failure to report.
+  if (!hasData) return null
 
   // Distinguish a genuine fetch failure (show an error line) from "nothing to show" —
   // no insight generated (AI declined / insufficient data) or rate-limited (hide silently,

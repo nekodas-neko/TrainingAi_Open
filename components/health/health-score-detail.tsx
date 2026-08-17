@@ -246,7 +246,9 @@ export function HealthScoreDetail({
           <TrendSparkline trends={trends.trends} field={trendField} label={`${title} Score`} color={sparklineColor} unit="" />
         )}
 
-        <AiInsightCard section={aiSection} date={today} />
+        {/* No score for this section means nothing measured today, and the model turns that into
+            an assertion of zero rather than absence (Q-452). */}
+        <AiInsightCard section={aiSection} date={today} hasData={score != null} />
 
         {!data && (
           <div className="space-y-3">
