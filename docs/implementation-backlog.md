@@ -396,6 +396,125 @@ below threshold and left in place for next time.
   the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
   than feeding a bare `"no data"` string the model reads as a measurement.
 
+### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
+
+- **Branch:** `fix/tdee-partial-day-completeness`
+- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
+  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
+  the rest? does it assume thats all I had for the day and tune around that? Need some control
+  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
+  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
+  that the owner's suspicion is correct.
+- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
+  There is no completeness concept anywhere in the path.
+
+**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
+"logged day" is with a bare non-zero test:
+
+```ts
+const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
+```
+
+A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
+and it enters `meanIntakeKcal`, which is the entire left-hand term of the estimate
+(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built in
+`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
+
+**Two partial-day protections already exist, and neither one covers this.** That is what makes it
+easy to miss:
+1. A day with *nothing* logged is `intakeKcal: null` — excluded from the mean, still counted in
+   the window length. Correct, and deliberate.
+2. **Today** is excluded from the window entirely. The comment at `energy-balance-service.ts:146-150`
+   spells out exactly this bug and then solves only the in-progress case: *"a day in progress has
+   only part of its food logged, so including it drags the mean intake down and the calibration
+   would report a lower maintenance every morning… Same partial-day trap as the Oura `wornHours`
+   mistake."*
+
+A **past** day the user abandoned halfway is byte-for-byte identical to a completed light day. The
+author saw the trap, fixed the version of it that self-corrects by evening, and the version that
+never self-corrects went unguarded.
+
+**Measured, using the real module** (`estimateMaintenance`, 14-day window; a user whose true
+maintenance is 2600, eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" =
+breakfast+lunch at 1400, dinner never logged):
+
+```
+partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
+0            14          2600        2600         medium      null
+2            14          2429        2429         medium      null
+4            14          2257        2257         medium      null
+6            14          2086        2086         medium      null
+8            14          1914        1914         medium      null
+10           14          1743        1743         medium      null
+14           14          1400        1400         medium      null
+```
+
+Every row **passes every gate**: `daysLogged: 14`, `excludedReason: null`, `confidence: medium`.
+The estimate slides linearly, 86 kcal per partial day, and nothing anywhere reports a problem. At a
+realistic 6-of-14 the number is **514 kcal low** and looks exactly as trustworthy as a correct one.
+`MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires — even 14-of-14 partial lands at 1400, comfortably
+"plausible".
+
+**Why this is worse than a wrong number on a card.** `energy-balance-service.ts:180` feeds it to
+`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
+inherits the full error**, and on a cut `goalDeltaKcal` is negative on top of it. The failure mode
+is the app telling a user who under-logs to eat several hundred kcal less than their real
+maintenance — the same direction of harm the module's own header comment calls "actively harmful
+advice", arriving through the one door the gates do not watch. `restingBaseKcal`
+(`energy-balance-service.ts:172-174`) is derived from it too, so the Balance card's "burned" figure
+is dragged down in step.
+
+- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module but the opposite
+  concern — the gate is invisible when it *blocks*; this is the gate passing when it should not.
+  **Q-303** is the AI coaching on sparse days, not the calibration input. `projectOverview.md`'s
+  2026-08-11 entry describes protections (1) and (2) above as the complete story, which is the claim
+  this entry corrects. Nothing in the backlog covers completeness.
+- **Currently latent for the owner, and about to stop being latent.** Per Q-302's production
+  measurement, 0 of the last 30 rolling windows clear `MIN_LOGGED_DAYS`, so the calibration is
+  dormant and no wrong number is being shown today. It goes live the moment the owner does the exact
+  thing this question is about — logging consistently enough to switch tuning on. Filed high for
+  that reason: it is a prescription-correctness bug armed and waiting on the user's own success.
+- **Evidence that would confirm it end-to-end** (not yet gathered): seed a local window of 14 days
+  where ~6 carry only breakfast+lunch, run `/api/health/energy-balance` (or whatever route wraps
+  `computeEnergyBalance`), and read `maintenance.kcal` / `target.recommendedKcal` against the same
+  window with those days fully logged. The delta should be ≈500 kcal with `confidence: 'medium'`
+  and no `gapMessage` on either run.
+
+**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
+
+1. **Explicit "complete day" marker** (owner's first option) — sound, unambiguous, and it is the
+   only one that can be *right* rather than probably-right. The cost is adoption: an unmarked day
+   becomes a gap, and the gate already fails for the owner at 1–4 logged days per 14, so requiring
+   a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach. **This interacts with Q-302 and
+   the two should be designed together** — the "you have 4 of 10 days" copy Q-302 asks for is also
+   the natural place to say "3 of those aren't marked complete". A hook already exists: `day_checkins`
+   has an `evening` phase (`lib/data/postgres/schema.ts:447-451`), so the prompt need not be a new
+   surface.
+2. **"x% below expected ⇒ not completed"** (owner's second option) — **do not ship this as
+   specified.** Two problems. First it is circular: "expected" is the calorie target, which is
+   derived *from* maintenance, which is the number being estimated — a low estimate lowers the
+   threshold and admits more partial days next window. Second and worse, a genuinely low-intake day
+   (fasting, illness, a hard deliberate deficit) is precisely the observation the calibration most
+   needs, and discarding it biases maintenance **high**, trading one wrong direction for another.
+   If a threshold is used at all it must key off something outside the loop — the formula baseline,
+   not the adaptive target.
+3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
+   and `loggedAt` (`schema.ts:554-563`). "Did this day's logs span the user's usual meal types, and
+   did logging continue past their usual last-meal hour" is answerable per-day from data already
+   stored, needs no marker, and is not circular. Weaker than an explicit marker; strictly better
+   than a kcal threshold. Worth costing before choosing 1, since it can also *seed* option 1's
+   default so the user is confirming rather than authoring.
+
+- **What would count as fixed:** a day the user did not finish logging can no longer enter
+  `meanIntakeKcal` as though it were complete — by marker, by inference, or by both — and the
+  measured table above collapses so that partial days move `maintenanceKcal` toward `null`
+  (an honest "not enough data") rather than toward a confident wrong number. Whatever mechanism is
+  chosen, `adaptive-tdee.test.ts` gets the partial-day case it currently has **zero** coverage of;
+  the module is well-tested for empty days and has never been tested for half-full ones.
+- **Surface:** neither device nor production data required. Pure shared-module logic plus a service
+  wrapper — reproducible in `pnpm dev` against the seeded DB, and unit-testable directly. The only
+  device-dependent part is whatever UI a "complete day" control lands in, if option 1 is chosen.
+
 ### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
 
 - **Branch:** `fix/publish-dry-run-build-gate`

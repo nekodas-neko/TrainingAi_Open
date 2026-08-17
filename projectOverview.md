@@ -123,6 +123,30 @@ order.
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
 - **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit at
   the top of `docs/implementation-backlog.md` (Q-310 above them has since shipped and been removed).
+### [nutrition] 🟠 A half-logged day feeds the calibrated maintenance as if it were complete (Q-387, 2026-08-17)
+
+- **Owner question, and the answer is the one they suspected:** log breakfast and lunch, skip
+  dinner, and the adaptive-TDEE calibration treats that as everything you ate and tunes around it.
+- `packages/shared/src/nutrition/adaptive-tdee.ts:96` counts a logged day as any day with
+  `intakeKcal > 0`, so one apple is a logged day. Measured with the real module: on a 14-day window
+  for a weight-stable user whose true maintenance is 2600, six partial days return **2086 kcal** —
+  514 low — with `daysLogged: 14`, `excludedReason: null` and `confidence: 'medium'`. Every gate
+  passes; the error is 86 kcal per partial day and nothing reports it. The `MIN_PLAUSIBLE_MAINTENANCE`
+  floor of 1000 never fires.
+- **It reaches the prescription**, not just a card: `energy-balance-service.ts:180` feeds it to
+  `targetFromMaintenance`, so the recommended daily target carries the full error, and on a cut the
+  goal delta stacks on it.
+- **Two partial-day guards already exist and neither covers this** — an unlogged day is a gap, and
+  *today* is excluded from the window. The comment at `energy-balance-service.ts:146-150` names this
+  exact trap and solves only the in-progress case; an abandoned **past** day never self-corrects.
+  The 2026-08-11 journal entry below describes those two guards as the whole story, which this
+  corrects.
+- **Latent right now, and armed.** Per Q-302, 0 of the last 30 rolling windows clear the logged-days
+  gate, so nothing wrong is being displayed today. It fires the moment logging becomes consistent
+  enough to switch tuning on — i.e. on success, not on failure.
+- Backlog **Q-387** carries the trace, the measured table, and an assessment of the owner's two
+  proposed controls (the "% below expected" one is circular and biases the other way — do not ship
+  as specified). Needs neither device nor prod data. **Not fixed; not started.**
 
 ### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
 

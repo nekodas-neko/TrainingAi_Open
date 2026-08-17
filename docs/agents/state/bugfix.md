@@ -60,5 +60,33 @@ independently — no reconciliation was needed.
 - Read: `projectOverview.md` (structure + Known-Issues index), `CLAUDE.md`,
   `docs/implementation-backlog.md` (protocol, queue headings, Q-310 as the format reference).
 - Created this file. `docs/agents/` did not exist.
-- **Reports received: none.** Nothing mid-triage, nothing unfiled, nothing blocked.
-- Q band 387–449 untouched — next intake session starts at **Q-387**.
+
+**Filed: Q-387** — `[nutrition]` adaptive-TDEE counts a partially-logged day as complete.
+Owner asked what stops the tuner treating "breakfast + lunch, skipped dinner" as the whole day;
+the answer is nothing. Traced to the `intakeKcal > 0` filter at `adaptive-tdee.ts:96`, measured
+with the real module (6 partial days of 14 → 514 kcal low, all gates passing, `confidence:
+'medium'`), and the error reaches the recommended calorie target via
+`energy-balance-service.ts:180`. Latent today because the Q-302 gate is not passing.
+Queued below the three live user-facing bugs (Q-450/451/452) and above the tooling items, since
+it is a prescription-correctness bug that is not firing *yet*. Known-Issues row added.
+
+**Rebase note for next time:** `main` moved twice during a single ~30-minute intake. Q-310 shipped
+and left the queue, and Q-306 was renumbered to Q-313, both inside the window between reading the
+file and committing. The rebase conflicted on the renumbered heading I had anchored to. Resolution
+that worked: `git checkout --ours <file>` to take `main` whole, then re-insert the new entry by
+script against a *fresh* anchor. Do not hand-splice these two files — queue position is priority,
+so a bad splice silently reprioritises someone else's work.
+
+**Two things learned that are worth reusing:**
+- The probe pattern is cheap and much stronger than argument: import the real shared module in a
+  scratch `.ts`, run it with `npx vite-node <file>` from the repo root, print a table. `tsx` is not
+  installed; `vitest run` ignores a file that has no test in it. Write the probe **inside** the repo
+  (imports resolve) and delete it before committing.
+- When a module already has a guard against a *related* case, read that guard's comment before
+  assuming it covers yours. Both Q-387 protections were real, deliberate and documented — and the
+  documented rationale is what proved the gap, because it named the trap and then handled only the
+  self-correcting half of it.
+
+**Nothing mid-triage. Nothing received-but-unfiled. Nothing blocked.**
+
+Next intake session starts at **Q-388** (band 387–449; 387 is now taken).
