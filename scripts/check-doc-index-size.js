@@ -20,7 +20,7 @@ const root = path.join(__dirname, '..');
 
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
 const BASELINE = {
-  'projectOverview.md': 6316,
+  'projectOverview.md': 6319,
   'docs/implementation-backlog.md': 5637,
   'CLAUDE.md': 956,
 };

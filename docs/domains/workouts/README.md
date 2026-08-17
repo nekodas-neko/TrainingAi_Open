@@ -60,7 +60,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 - Plans: `ls docs/superpowers/plans/*workout*` (7 today) and `*prescription*`.
 - [`docs/superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md`](../../superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md)
   — Workstream D (**shipped**, #995 / v1.250.1, see
-  [`docs/overview/entries/2026-08-02-prescription-phase-transition-regen.md`](../../overview/history-2026-07-30.md)):
+  [`docs/../overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
   accepting a phase transition emptied the prescription card permanently, because `advancePhase`
   writes `prescriptionStatus: 'none'` and every recovery path (the "Preparing" placeholder, the
   bounded poll, the client-side regeneration trigger) keys on `'consumed'`. The status a transition
@@ -108,13 +108,13 @@ Live at the time of writing (2026-07-30):
   (Q-87, v1.267.2)** — an "Up Next" card (name + planned starting weight via the shared
   `computeInitialWeights` formula) now renders on the rest countdown, null-safe at the last
   exercise of a session. Outcome:
-  [`entries/2026-08-06-exercise-summary-up-next.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - ~~The header refresh button on the pre-workout screen flashed "done" while an AI regeneration
   was still in flight underneath it~~ **fixed 2026-08-06 (Q-86, v1.267.3)** — a decoupled-feedback
   bug, not a caching bug: the button was bound only to its own unrelated re-fetch's loading flag.
   Now bound to `prescriptionPending` too, so it stays disabled/spinning for the whole generation
   window. Outcome:
-  [`entries/2026-08-06-duration-preset-refresh-feedback.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - 🟡 **Q-11 (shared with `heart-rate`)** — the two attribution-timing defects are fixed (v1.257.2,
   v1.266.1); a device-side coverage-quality question remains, to be re-measured now that new
   sessions attribute same-day.
@@ -165,17 +165,17 @@ Live at the time of writing (2026-07-30):
   (Q-63 — skip button needs a confirm; Q-64 — voice logging dead on the APK; Q-65 — PiP missing the
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including
-  [`entries/2026-07-30-ai-dynamic-phase-labels-and-layout-shift.md`](../../overview/history-2026-07-28.md)
-  and [`entries/2026-08-07-sore-muscle-picker-whole-session-banner.md`](../../overview/history-2026-08-07.md)
+  [`docs/../overview/history-2026-07-28.md`](../../overview/history-2026-07-28.md)
+  and [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-115-followup — the sore-muscle check-in now predicts and warns about a whole-session deload
   escalation instead of always promising a narrow one).
-  Also [`entries/2026-08-07-manual-deload-ai-prescription-wiring.md`](../../overview/history-2026-08-07.md)
+  Also [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-109 — Home's manual Deload choice now actually reduces the prescribed load on an AI-dynamic
   session instead of only tagging cosmetic metadata).
-  Also [`entries/2026-08-07-recommendation-card-last-trained-memo.md`](../../overview/history-2026-08-07.md)
+  Also [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-106 — the home "Recommended Today" card's memo now recomputes once the `workout-data:all`
   batch actually populates its `workout-card:<id>` cache entry, instead of freezing on "Last: —").
-  Also [`entries/2026-08-07-deload-injury-invalidation.md`](../../overview/history-2026-08-04.md)
+  Also [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-117 — confirming an early deload and logging an injury both now invalidate the caches that
   hold today's plan, and the injury fingerprint reaches the server-side re-evaluation skip check
   too; previously up to 6 hours stale on both counts).
@@ -209,7 +209,7 @@ Live at the time of writing (2026-07-30):
   exclude its sets unconditionally, which `useFor1rm` alone cannot express — use `estimateOneRm`'s
   explicit `deloaded` option instead (short-circuits to a zero estimate before either formula runs).
   Found because the obvious `useFor1rm: !presc.deloaded` fix silently didn't work (Q-115,
-  [`entries/2026-08-07-deload-1rm-inflation-fix.md`](../../overview/history-2026-08-04.md)).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)).
 - **A deload signal set on `AiPrescriptionExercise` needs to reach `estimateOneRm`'s `deloaded`
   option at every construction site** — `buildWholeSessionDeloadPrescription` once built exercises
   with no per-exercise `deloaded` flag at all (only a prescription-level boolean nothing downstream
@@ -224,7 +224,7 @@ Live at the time of writing (2026-07-30):
   the toggle on every AI-dynamic session (the normal state for this program). Fixed by reading
   `aiDeload` inside the `aiDrivesLoad` branch and applying `deloadOverrideForGoal()` directly, skipped
   when the exercise is already auto-deloaded (`p.deloaded`) so the two reductions don't compound
-  (Q-109, [`entries/2026-08-07-manual-deload-ai-prescription-wiring.md`](../../overview/history-2026-08-07.md)).
+  (Q-109, [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)).
   Any future manual override of AI-driven behaviour needs the same check: does the flag actually
   reach the branch that's live, or only a parallel mechanism that AI-dynamic mode bypasses?
 - **…and there are TWO deload-confirmation entry points, so fixing one leaves the bug alive.** The
@@ -234,7 +234,7 @@ Live at the time of writing (2026-07-30):
   *week* still produced full-intensity numbers for seven days. `isEarlyDeloadWeek()` now answers the
   window without a phase, both `workout-data` paths surface it, and the builder reads
   `aiDeload || isDeloadActive` (Q-175,
-  [`entries/2026-08-11-early-deload-week-ai-dynamic.md`](../../overview/history-2026-08-08.md)).
+  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)).
   **Still open (Q-185):** the reduction lives inside `if (aiDrivesLoad)`, so an exercise the
   prescription does not name — every accessory, and every session with an expired prescription — is
   not reduced by either entry point.

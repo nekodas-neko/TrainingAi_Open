@@ -66,7 +66,7 @@ Live at the time of writing (2026-08-05):
   20min–2h wide.** Shipped only at the home widget call site; the other three `HrDayChart`
   consumers keep the smoother default bucket but no backfill. Not verified against the real
   `localStorage`-gated home widget toggle — see
-  [`docs/overview/entries/2026-08-06-hr-day-chart-smoothing-backfill.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 
 ## History
 

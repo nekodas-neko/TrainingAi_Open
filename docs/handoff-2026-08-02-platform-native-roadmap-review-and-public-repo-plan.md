@@ -65,7 +65,7 @@ code was intended or written.
 |---|---|---|
 | Roadmap review | [`docs/reviews/2026-08-02-native-convergence-roadmap-review.md`](reviews/2026-08-02-native-convergence-roadmap-review.md) | Eight findings (F1–F8) against the native-convergence goal layout and the docs feeding it |
 | Migration plan | [`docs/superpowers/plans/2026-08-02-public-repo-migration-roadmap.md`](superpowers/plans/2026-08-02-public-repo-migration-roadmap.md) | Backlog **Q-49**. Phase A (model delivery) + Phase B (the cut) |
-| Journal entry | [`docs/overview/entries/2026-08-02-app-review-native-roadmap.md`](overview/history-2026-07-30.md) | The session record |
+| Journal entry | [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md) | The session record |
 
 Backlog and doc changes in the same PR:
 

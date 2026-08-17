@@ -138,7 +138,7 @@ below threshold and left in place for next time.
 > through `PipView`). **Q-70** removed — **refuted by measurement**, not deferred: the owner's second
 > device capture measured `/workout?session` four times at a 115.4 ms median, warm 4 / cold 0, so
 > there is no cold payload fetch for a prefetch to remove. Evidence in
-> [`docs/overview/entries/2026-08-05-navigation-measured-on-device.md`](overview/history-2026-08-04.md);
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md);
 > do not re-add it without a capture showing a cold session tap. **Q-74** removed — done: the
 > session-start orientation in `CLAUDE.md` now includes an `error_events` read, with the query
 > inline and the "stopped ≠ fixed" rule attached. Its optional second half (keeping a rolled-up
@@ -150,7 +150,7 @@ below threshold and left in place for next time.
 > question that is now **answered and shipped** (v1.259.0): the owner asked for the ring and strap
 > notifications to be quieted like the scale's, **but with a low-battery exception** — a one-shot
 > alert below 35%, hysteresis re-arming at 40%. See
-> [`docs/overview/entries/2026-08-05-device-notifications-battery-aware.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 >
 > _Superseded:_ **What is left in the owner bug batch (Q-64, Q-65, Q-67) is native/Kotlin and needs an APK** —
 > the JS-only half of that batch is done.
@@ -194,7 +194,7 @@ below threshold and left in place for next time.
 > report.** The one that doesn't — `scale-ble/pending/[id]/confirm` — returns a 500 from a data-shape
 > guard rather than a catch; reporting a validation branch would be wrong, and whether that case
 > should be a 500 at all is a separate question. See
-> [`docs/overview/entries/2026-08-04-self-handled-500s.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 
 > **Cross-domain bug review, 2026-08-03 (Q-53 … Q-56).** Four review agents plus a production
 > DB-integrity pass turned up five findings across workouts and the BLE/scale ingest pipeline; full
@@ -202,43 +202,43 @@ below threshold and left in place for next time.
 > **Q-56 shipped 2026-08-04 (v1.255.1)** and its entry is removed — the step path now resolves ring
 > time against the anchor nearest each frame and drops anything still dated in the future, rather
 > than storing it. The sibling paths it did *not* cover are queued as **Q-71** below; see
-> [`docs/overview/entries/2026-08-04-future-dated-step-frames.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > Q-54 is a workout-prescription regression from the last two days of shipped work.
 > **Q-53 shipped 2026-08-03 (v1.252.6)** and its entry is removed — its finding (c) was investigated
 > and is unreachable, so no code was written for it; see
-> [`docs/overview/entries/2026-08-03-prescription-cache-staleness.md`](overview/history-2026-07-30.md).
+> [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
 > **Q-55 shipped 2026-08-03 (v1.252.5)** and its entry is removed — see
-> [`docs/overview/entries/2026-08-03-bodyweight-target-preview-sheet.md`](overview/history-2026-07-30.md).
+> [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
 > **Q-76 shipped 2026-08-05 (v1.261.0)** and its entry is removed. The `isAnalysableNight()`
 > predicate it proposed was **not built** — `nightSessions()` in
 > `packages/shared/src/health/sleep-night.ts` already did both halves of the work (circadian
 > nap/night split, then gap-merge), so the fix was routing eleven read sites through the existing
 > helper rather than adding a second rule beside it. Group C (2026-06-01, 2026-06-04) and the
 > 2026-06-02/03 coverage gap are recorded as Known Issues in `projectOverview.md`; see
-> [`docs/overview/entries/2026-08-05-sleep-nights-not-rows.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > **Q-77 shipped 2026-08-05 (v1.262.0)** and its entry is removed — the `bedtime-sleep` view is live
 > on the Health screen, minutes-from-noon coded, with a test that goes red under raw-clock-hour
 > coding (it reproduces the review's r = +0.75 inversion). The **deep-sleep** half of the finding was
 > deliberately **not** built: at p = 0.038 it does not survive Bonferroni across the ~60 pairs the
 > review tested, and the bucket bars carry one value per bucket. See
-> [`docs/overview/entries/2026-08-05-bedtime-sleep-cost-view.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > **Q-78 shipped 2026-08-05 (v1.263.0)** and its entry is removed — the `hrv-volume` view is live,
 > HRV coded as percent-of-28-day-baseline (matching its sibling) and tonnage summed per DAY, not per
 > session. Its "candidate second use" — an input to the prescription engine — was **deliberately not
 > built** and remains correct advice: n = 30 does not survive Bonferroni, so re-measure at n ≥ 60
 > before anything automates on it. See
-> [`docs/overview/entries/2026-08-05-hrv-volume-coupling-view.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > **Q-79 shipped 2026-08-05 (v1.264.0)** and its entry is removed — an admin panel under Day Review,
 > beside the Sleep Score calibration and sharing its engine (`model-report-calibration.ts`) and card.
 > **The pairing was measured, not assumed:** the causally appealing "rating the next morning" lag
 > finds nothing (r = +0.115, p = 0.52); only same-date reproduces the review's r = −0.400. See
-> [`docs/overview/entries/2026-08-05-battery-recovery-calibration.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > **With that, Q-75…Q-79 — the whole data-analysis review batch — is closed.**
 > **Q-84 shipped 2026-08-05 (v1.265.0)** and its entry is removed — cadence now reaches all three
 > fast/slow surfaces, and **leads** the pace it used to be missing beside, falling back to pace when
 > no cadence source was connected. `walkEffortDisplay()` owns that choice so the three sites cannot
 > drift. See
-> [`docs/overview/entries/2026-08-05-guided-walk-cadence.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > **Q-71 and Q-73 were skipped as ⛔ blocked** (owner decision / device capture) and annotated in
 > place. **Q-73 is no longer blocked** — the 2026-08-07 full-app review found and reproduced its root
 > cause without a device; the "needs a device capture" gate was itself based on a wrong premise. See
@@ -247,7 +247,7 @@ below threshold and left in place for next time.
 > capped at 20% of the budget when today's budget is *below* the session's own configured length,
 > which is the only case where the double-charge exists. It stays uncapped at the standard and long
 > presets, so no existing plan changes. See
-> [`docs/overview/entries/2026-08-05-measured-warmup-scale-with-preset.md`](overview/history-2026-08-04.md).
+> [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > **It also produced Q-85 below:** the warmup fix recovers 3 working minutes, but the trimmer's
 > exercise-count thresholds are ~6–7 minutes apart, and rest — not warmup — is what dominates a
 > short budget.
@@ -1835,21 +1835,21 @@ session working from a temporarily restored copy.
 > invalidation missing on two Coach surfaces the entry did not name, and exposed a third bug —
 > clearing a goal never worked, in the editor and in the route — which had to be fixed in the same
 > PR because making the server authoritative is what would have made it visible. Journal:
-> [`entries/2026-08-14-goals-server-source-of-truth.md`](overview/history-2026-08-12.md).
+> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
 > **Q-238 is done (2026-08-14, v1.307.2)** — resolved by deleting the mechanism, not by building the
 > customiser. Git history the entry did not carry decided it: the UI existed (`0376da61`, toggles in
 > More → Settings), was removed on purpose the next day (`4e9ecffd`), and the orphaned file was swept
 > as dead on 2026-06-28 (`73d6d0c3`) while the helpers and every reader stayed. Deleting the readers
 > too also fixes a hidden half — a card hidden during that one-day window could never be un-hidden.
 > Journal:
-> [`entries/2026-08-14-health-card-order-dead-mechanism.md`](overview/history-2026-08-12.md).
+> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
 > **Q-242 is done (2026-08-15, v1.307.3)** — and it was not the one-line item it was filed as. The
 > whole-repo scan its own text asked for found `day-log:` at **three** sites (not two) and two more
 > divergent keys, one of them with **unequal values**: `hr-profile` was `HR_PROFILE_TTL` (6 h) at
 > seven sites and a raw `TTL_MEDIUM` (30 min) at the eighth. Three divergences under a rule that has
 > a constants file built for it is the finding, so the scan shipped as
 > `scripts/check-cache-ttl-divergence.js` in the Custom Rules job (34 steps now). Journal:
-> [`entries/2026-08-15-one-ttl-per-cache-key-mechanised.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > **Q-236 is done (2026-08-15, no version bump)** — `/overview`, `components/overview-screen.tsx`
 > and the now-orphaned `components/readiness-card.tsx` are gone, along with the `'overview'`
 > background palette the entry did not mention (`dynamic-background.tsx`, the `ScreenPaletteKey`
@@ -1857,21 +1857,21 @@ session working from a temporarily restored copy.
 > shims were NOT deleted** — the owner decided to keep them on 2026-08-10 (Q-136), and that decision
 > is theirs to revisit; the overview shim is repointed at `/` instead of a route that no longer
 > exists. Why the shims' stated rationale has expired is filed as **Q-255**. Journal:
-> [`entries/2026-08-15-overview-screen-deleted.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > **Q-244 is done (2026-08-15, no version bump)** — `scripts/check-hex-literals.js` in the Custom
 > Rules job (35 steps now): a **per-file** shrink-only baseline, not a single total, because a total
 > lets one file grow while another shrinks — which is what "the trend looks fine" looked like on
 > 2026-08-09. A row for a file that reaches zero must be deleted, or the baseline decays into an
 > allowlist. The existing 471 are **not** swept, per the entry. Mutation-verified three ways.
 > CLAUDE.md's count is corrected to 471 and now records the reversal itself. Journal:
-> [`entries/2026-08-15-hex-literal-ratchet.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > **Q-233 is done (2026-08-15, v1.309.0)** — `/more/devices`, step 1 of the plan's build order. Three
 > things the plan did not anticipate: all four cards already render their own heading (so the wrapper
 > section headers were a heading above a heading and are gone), `BackgroundLocationCard` returns null
 > off-device (so a "Permissions" heading sat above nothing), and the size ratchet fired at 850 lines
 > — fixed by extracting `components/more/more-row.tsx` rather than raising the number, which is the
 > grouped-list primitive the rest of the plan needs. Journal:
-> [`entries/2026-08-15-devices-screen.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > **Q-232 step 2 of 3 shipped (2026-08-15, v1.310.0)** — `/more/data` and `/more/about`, splitting
 > the block where Sync now / Restore from cloud / Export my data sat under an *About* heading beside
 > the version string. `profile-tab.tsx` is **697** lines, down from 845 at the start of the cluster,
@@ -1879,12 +1879,12 @@ session working from a temporarily restored copy.
 > copy). **Settings is deliberately step 3 rather than part of this one** — it is an independent
 > block, and About/Data had to split from each other in one commit because they were one block.
 > Journal:
-> [`entries/2026-08-15-data-and-about-split.md`](overview/history-2026-08-12.md).
+> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
 > **Q-232 step 3 shipped, and the umbrella's own restructure is done (2026-08-15, v1.311.0)** —
 > `/more/settings`. `components/more/profile-tab.tsx` is **465 lines**, from 845, and **its
 > `check-component-size.js` BASELINE row is deleted** (5 hotspots left) — no artificial split, four
 > screens carved along the seams the IA already implied. Journal:
-> [`entries/2026-08-15-settings-screen.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > **What remains under Q-232 is the rows the other items own** — Program (Q-235), Admin (Q-234) —
 > plus the optional `/more/achievements` + `/more/goals` split, which is now cosmetic rather than
 > load-bearing since the file is under the limit. Q-234 is unblocked: `/more/settings` exists.
@@ -1897,7 +1897,7 @@ session working from a temporarily restored copy.
 > testing caught it (it checked that `searchParams`/`URLSearchParams` *appear*, which a mutation
 > setting the suffix to `''` passed while dropping every param); it now calls the route and reads the
 > `NEXT_REDIRECT` digest. Journal:
-> [`entries/2026-08-15-program-route.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > **Q-234 is done (2026-08-15, v1.313.0)** — `/admin` keeps user administration (9 tabs → 5,
 > 476 → 395 lines); diagnostics are **Settings → Developer**, with the three device consoles as rows
 > rather than buttons inside a tab inside a console. `exercises`/`activities` stayed on `/admin`
@@ -1905,14 +1905,14 @@ session working from a temporarily restored copy.
 > diagnostics. Both sides of the admin gate were exercised by flipping the local user's `is_admin`
 > and re-logging in (note `isAdminUser(id, flag)` returns the **JWT** flag when it is a boolean, so
 > a DB flip alone changes nothing). Journal:
-> [`entries/2026-08-15-admin-split-by-audience.md`](overview/history-2026-08-12.md).
+> [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
 > **Q-237 is done (2026-08-15, v1.314.0)** — Water and Saved Meals moved to a row directly under the
 > macro ring, above every meal card, so their position no longer depends on how many meals the day
 > has. **End of Day deliberately stayed put** (Q-112 owns merging it with Home's Day in Review) and
 > **"Log Food" was not added** — the plan's row names it, but no global log-food action exists and
 > creating one needs a meal-type rule this placement change should not invent; filed as **Q-257**.
 > Journal:
-> [`entries/2026-08-15-nutrition-action-row.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > **That closes the 2026-08-14 review cluster's implementation items.** Q-243 (the remaining caching
 > item) is still open, and Q-239 stays until Q-234's promotion is confirmed on device. The five IA
 > items (Q-232 … Q-237) share one target structure and **must not be worked one-at-a-time from
@@ -2219,7 +2219,7 @@ session working from a temporarily restored copy.
 > window", but its eleven filters are all in the HR-attribution *work-list* queries over
 > workout_sessions/exercise_logs/set_logs — the same fixture shape as the rest, and no rollup
 > anywhere. See
-> [`docs/overview/entries/2026-08-11-oura-workout-soft-delete-coverage.md`](overview/history-2026-08-08.md).
+> [`docs/overview/overview/history-2026-08-08.md`](overview/history-2026-08-08.md).
 
 ### [platform] ✅ Q-213 — production stalls: all three stages SHIPPED 2026-08-13 (entry kept only until the production numbers confirm it)
 
@@ -2267,7 +2267,7 @@ session working from a temporarily restored copy.
   and forces a full-window pass once per process so a cold start cannot inherit a gap.
   **Measured 10,560 ms → 930 ms (11.4×)** on a seeded 35-day table; production has ~40× the rows and
   the narrowed cost does not scale with history. Journal:
-  [`entries/2026-08-13-oura-rollup-incremental-window.md`](overview/history-2026-08-12.md).
+  [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
   ⚠️ Not device-verified. **The cold-start full-window pass this originally left in place cost six
   minutes of a pegged thread per deploy and is fixed in v1.303.2** — the watermark is persisted in
   `oura_rollup_state` (migration 184) rather than held in process memory.
@@ -2280,7 +2280,7 @@ session working from a temporarily restored copy.
   falls back to in-process, i.e. to the previous behaviour**, proven by deleting the bundle and
   watching the correctness test still pass. Measured: main-thread lag during a rollup **185 ms of a
   262 ms in-process run → 4 ms of a 439 ms worker run**. Journal:
-  [`entries/2026-08-13-rollup-off-the-request-loop.md`](overview/history-2026-08-12.md).
+  [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
   ⚠️ **Production is where this claim settles** — watch Railway CPU for the sustained 1.0–1.6
   plateaus and `/api/version` latency. Both of the outage session's confident cost predictions were
   wrong, and only production caught them.
@@ -2465,12 +2465,12 @@ session working from a temporarily restored copy.
   `pushMutations` branch sharing the web route's functions, and `/api/nutrition/plan-meal-answers`.
   Only *declines* are stored — "ate it" stays derivable from the food log, and unconfirmed prefills
   never enter `food_logs`, so none of its 23 readers change. Journal:
-  [`entries/2026-08-14-plan-meal-answers-table-and-sync.md`](overview/history-2026-08-12.md).
+  [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
 - **✅ Second UI slice SHIPPED 2026-08-15 (v1.315.0): a planned meal can be declined.** The dismiss
   button sits beside "I ate this", hides once the meal is logged (that answer is derived from the
   food), and undoes in one tap. Declining writes nothing to `food_logs`, with a test on the day's
   food rather than on row counts. Journal:
-  [`entries/2026-08-15-plan-meal-decline.md`](overview/history-2026-08-15.md).
+  [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 - **⏭️ What is left: automatic prefill only** — the plan's step 4, deliberately last because an
   automatic prefill that guesses wrong trains the owner to ignore it. Its recommendation is an
   explicit "fill my day" action rather than filling on open.
@@ -2481,7 +2481,7 @@ session working from a temporarily restored copy.
 - **✅ First slice SHIPPED 2026-08-12 (v1.299.0): one-tap "I ate this" on the plan card.** The plan
   now does something on the day it is for. What remains here is only the *automatic* half — the
   prefill and its per-meal yes/no, which is what forces the "prefilled but unconfirmed" state into
-  existence. See [`entries/2026-08-12-log-planned-meal.md`](overview/history-2026-08-12.md);
+  existence. See [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md);
   the shared write path is `packages/shared/src/nutrition/log-plan-meal.ts`.
 
 - **Branch:** `feat/meal-plan-prefill`
@@ -2595,7 +2595,7 @@ session working from a temporarily restored copy.
 > the chart half missing, so the user got a *legend for a chart that does not exist*, as tappable rows
 > that do nothing. Coach now has a `renderChart` widget; measured on the same prompt, it returns a
 > real line series. See
-> [`docs/overview/entries/2026-08-11-coach-chart-widget.md`](overview/history-2026-08-08.md).
+> [`docs/overview/overview/history-2026-08-08.md`](overview/history-2026-08-08.md).
 > **Not covered by that fix, and deliberately not filed as a new entry:** the dead `/chat` surface
 > itself. It is unreachable rather than broken, and deleting it belongs with the "old pair is
 > deleted" cleanup already described in `app/api/coach/route.ts`.
@@ -2983,7 +2983,7 @@ measured, not the ~3,300-test full suite.
 - **Skip this when working the queue top-down.** It is a dated re-check, not a task.
 - **Added:** 2026-08-08 · [review §2](reviews/2026-08-08-running-app-review.md) ·
   **investigated and refuted 2026-08-08**, see
-  [`docs/overview/entries/2026-08-08-signin-hydration-refuted.md`](overview/history-2026-08-07.md)
+  [`docs/overview/overview/history-2026-08-07.md`](overview/history-2026-08-07.md)
 - **As filed:** `/sign-in` carries a second, still-live React #418 hydration mismatch, and Q-73 closed
   only the home instance, so the highest-count production error stays open. Three measurements say
   otherwise.
@@ -3084,7 +3084,7 @@ measured, not the ~3,300-test full suite.
      as new anchors get added to that pool — one new anchor among thousands can't swing the p10 by
      tens of minutes the way replacing "the one anchor in use" could. The instability is structurally
      gone, not just smaller on this sample.
-  Full session writeup: [`entries/2026-08-12-oura-ble-anchor-drain-lag-investigation.md`](overview/history-2026-08-12.md).
+  Full session writeup: [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
 
 - **What this does NOT fix, and can't from the server side.** The root defect is that `anchorUtc` is
   stamped at server batch-receive time, not true ring-capture time — no math on top of that recovers
@@ -3095,7 +3095,7 @@ measured, not the ~3,300-test full suite.
 
 - **Branch:** `fix/rollup-nearest-anchor-sweep`
 - **Added:** 2026-08-04, split out of Q-56 rather than folded into it (see
-  [`docs/overview/entries/2026-08-04-future-dated-step-frames.md`](overview/history-2026-08-04.md)).
+  [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md)).
 - **The gap:** Q-56 converted the **step** path to nearest-anchor resolution (`resolveDsToMs`) plus a
   future guard. `toDate` in `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:4696`) is still
   `measuredAtMs(ds, newestAnchorDs, newestAnchorUtc)` — bare, unbounded linear extrapolation from
@@ -3402,7 +3402,7 @@ per-field merge where an AI write has no honest source rank to claim.
   persist is unverified (the dev seed gates before the write — re-read the column before relying on
   it), and there is **no backfill**, so the historical days stay empty. A load lane can use the
   forward series; it cannot train or calibrate on history that does not exist. Journal:
-  [`entries/2026-08-15-training-stress-warmed.md`](overview/history-2026-08-15.md).
+  [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 - **Design questions to settle first:** MET-minutes (WHO's ~500–1,000 MET-min/wk equivalence gives
   an absolute anchor) vs a Banister-style TRIMP; whether it *replaces* `zoneMinutes` and the dead
   `activeEnergy` or sits alongside them; and what value equals 100, which is the same
@@ -3426,7 +3426,7 @@ per-field merge where an AI write has no honest source rank to claim.
 > unproven locally (the seed has no `ble-derived` readiness, so the route gates before the write).
 > **Re-read `training_load_ots` in a day or two**; if it is still 0, the diagnosis was incomplete.
 > **This unblocks Q-204**, whose design assumes the column is most of its input. Journal:
-> [`entries/2026-08-15-training-stress-warmed.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 > Original entry below.
 
 #### (original) Q-270 — `training_load_ots` has a producer and is still 0 of 89 days in production
@@ -3651,7 +3651,7 @@ first, so the output is a design discussion, not a patch:
   than this entry assumed: there is no version that is both worthwhile and safe for the main lift,
   and "leave it" is a better answer than compressing the compound. The plan's §4 is the question.
 - **Added:** 2026-08-05, measured while implementing Q-83 (see
-  [`docs/overview/entries/2026-08-05-measured-warmup-scale-with-preset.md`](overview/history-2026-08-04.md)).
+  [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md)).
 - **JS-only — no APK needed** (server-side AI-periodization math).
 - **The gap:** Q-83 fixed the warmup double-charge and recovered 3 working minutes at Quick, which
   on the owner's real Push session was enough to give back one exercise. It is not enough in
@@ -3937,7 +3937,7 @@ first, so the output is a design discussion, not a patch:
 > explainer now says how far along the baseline is, as its own line rather than as a deload
 > *reason* — `temperatureBaselineProgress` returns `number | null`, not a `Signal`, so it cannot
 > join that list. Journal:
-> [`entries/2026-08-15-temperature-baseline-progress.md`](overview/history-2026-08-15.md).
+> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
@@ -3993,7 +3993,7 @@ first, so the output is a design discussion, not a patch:
 > real disrupted night: does not want `sleep_quality_feel` driving the score at all, wants it kept
 > independent for backlog/model calibration (i.e. keeps the Q-16 decision this entry would have
 > reversed). Asked for an objective awake-time criterion instead, which shipped as a separate
-> mechanism — see [`entries/2026-08-06-sleep-fragmentation-cap.md`](overview/history-2026-08-04.md).
+> mechanism — see [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 > Do not implement this entry without the owner explicitly reopening it.
 >
 > **Also moot on separate grounds** (found 2026-08-06, same session as Q-113): `sleepQualityFeel`'s
@@ -4132,7 +4132,7 @@ aimed somewhere other than the owner's complaint, and the roadmap says so in its
 **Tasks, cheapest first — do 3 before deciding anything downstream of it.**
 
 1. ⚠️ **PARTLY DONE 2026-08-02 (#1023)** — see
-   [`docs/overview/entries/2026-08-02-home-sheet-chunks.md`](overview/history-2026-07-30.md).
+   [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
    Seven interaction-gated sheets were code-split out of the initial bundle: **home First Load JS
    326 kB → 312 kB**, measured with `pnpm build`, no behaviour change.
    **The file itself is NOT split — still 1,417 lines, still over the ~800-line rule.**
@@ -4144,7 +4144,7 @@ aimed somewhere other than the owner's complaint, and the roadmap says so in its
    bundle has run out of easy give.
    Splitting the file for **readability** is still worth doing, just not as a performance claim.
 2. ✅ **DONE 2026-08-02 (v1.251.2, #1022)** — see
-   [`docs/overview/entries/2026-08-02-tab-chunk-prefetch.md`](overview/history-2026-07-30.md).
+   [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
    Verified against a control run: 0 tab modules fetched on load before, 4 after. **It adds 22 chunk
    requests to load**, deferred to idle — whether that is a net win is exactly what Task 3 measures.
    If it is not, stagger the imports or cut to the two most-used tabs before reverting.
@@ -4334,7 +4334,7 @@ the goal layout's §7 off-ramp says is missing.
 > local copies and flipping the boot check to fatal**), `incomplete` (something is missing or
 > zero-length — re-run the upload script, delete nothing), or `unreachable` (could not talk to the
 > bucket, so its contents are unknown). See
-> [`docs/overview/entries/2026-08-03-model-asset-bucket-report.md`](overview/history-2026-07-30.md).
+> [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
 > **⛔ CORRECTED 2026-08-04 — a `complete` verdict is NOT sufficient to delete the local files, and
 > this entry previously said it was.** The owner ran the check today and it reads `complete`, so the
 > *production* half is proven: the bucket really can serve every model. But **the repo-tree copies
@@ -4379,8 +4379,8 @@ the goal layout's §7 off-ramp says is missing.
 > vendored constants stay in git until it is done. Size it before promising Phase B a date.
 >
 > Journal:
-> [`docs/overview/entries/2026-08-02-model-asset-boot-check.md`](overview/history-2026-07-30.md).
-> Journal: [`docs/overview/entries/2026-08-02-oura-models-dormancy-sweep.md`](overview/history-2026-07-30.md).
+> [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
+> Journal: [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
 
 - **Runbook (start here):** [`public-repo-cut-runbook.md`](public-repo-cut-runbook.md) — the
   ordered checklist, who does each step, and how each one is checked.
@@ -4474,7 +4474,7 @@ passes and the inventory is explicit rather than forgotten.
 > Phase 2 alone.
 
 - ✅ **Phase 1 (user-visible copy) shipped 2026-08-02, v1.250.12** — eight strings, see
-  [`docs/overview/entries/2026-08-02-de-oura-user-copy.md`](overview/history-2026-07-30.md).
+  [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
   That was the whole owner-facing goal; the app no longer presents as an Oura client on any
   non-admin, non-pairing surface. **Two exemptions are deliberate and must not be "finished" by a
   later sweep:** `app/admin/**` + `components/admin/**` (diagnostic — the vendor is the subject) and
@@ -4719,7 +4719,7 @@ ported the current `insertOuraRawSamples` epoch/reset logic instead. **Not devic
 [`2026-07-21-oura-raw-on-device-phase-1.md`](superpowers/plans/2026-07-21-oura-raw-on-device-phase-1.md).
 
 > **Task 5 groundwork landed 2026-08-03** — see
-> [`docs/overview/entries/2026-08-03-night-vitals-extraction.md`](overview/history-2026-07-30.md).
+> [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
 > Task 5's Step 3 says to "port the binning verbatim in structure", which taken literally produces a
 > **second implementation** of the night's HRV / resting HR / average HR. Those three are now
 > `packages/shared/src/health/night-vitals.ts`, called by `adapter.ts`, with 18 unit tests and a
@@ -4813,7 +4813,7 @@ exclusive. Recommendation: drop; bytea only if D4 slips."**
 chose the cheap, decision-independent path instead — Q-35. **Q-35 has since been retired**
 (2026-08-02): measured against production, its Finding 1 was already done by Lever 1 and its
 Finding 4 would have made the table *bigger* — see
-[`docs/overview/entries/2026-08-02-oura-raw-samples-footprint-remeasured.md`](overview/history-2026-07-30.md).
+[`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
 **Q-46** replaced it and **has shipped** (#1003, v1.250.6) — the guard that stops the bloat
 re-accumulating. The remaining half is the one-time `REINDEX` (~130 MB of the table's 306 MB of
 indexes), a Railway-console action on the owner checklist.
@@ -4970,7 +4970,7 @@ Two independent findings, both low-urgency:
   it carries no separating information for this ring, confirmed empirically, not assumed. Do not
   revisit this specific approach without new evidence it's more informative than that. What
   shipped instead: an awake-TIME-fraction fragmentation cap (not an awakenings-count term) — see
-  [`entries/2026-08-06-sleep-fragmentation-cap.md`](overview/history-2026-08-04.md).
+  [`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
   Closed.
 - **(b) `chronic-stress-assembly.ts:65`'s `gotUps` two-scale concern — RE-INVESTIGATED
   2026-07-30, does not reproduce on current `main`.** Traced the full input chain:
@@ -5071,11 +5071,11 @@ the `lfhf` epoch field and `W_LFHF = 0.5` are all on `main`.
 
 - ✅ **Item 1 (LF/HF)** — already on `main`, nothing to build.
 - ✅ **Item 3 (SpO₂ variability)** — shipped 2026-08-02, v1.251.0, see
-  [`docs/overview/entries/2026-08-02-sleep-staging-spo2-variability.md`](overview/history-2026-07-30.md).
+  [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
   ⛔ Its verdict is blocked on a device check (is the `spo2V` debug column even populated, and does
   it separate?) — on the owner checklist. Do not tune `W_SPO2` before that answer exists.
 - ✅ **Item 2 (ultradian ~95-min cycle prior)** — shipped 2026-08-02, v1.251.1, see
-  [`docs/overview/entries/2026-08-02-sleep-staging-ultradian-prior.md`](overview/history-2026-07-30.md).
+  [`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
   Added alongside the linear `W_TIME` term, not replacing it; `W_CYCLE = 0.15`. The plan's
   instruction to anchor the clock to `onsetEpoch` was **not followable** — onset trimming is step 4,
   the scoring loop is step 3, so the real onset does not exist yet; `sleepIdx[0]` is the anchor.
@@ -5258,7 +5258,7 @@ calls now go through `reportServerError`, and the previously button-less
 `/api/oura-ble/backfill-hr-stats` has an Admin → Tools card.
 
 **Defect B — four recent sessions have ZERO `set_hr_stats` rows. FIXED 2026-08-05, v1.266.1.** See
-[`docs/overview/entries/2026-08-05-fix-hr-attribution-completion-trigger.md`](overview/history-2026-08-04.md).
+[`docs/overview/overview/history-2026-08-04.md`](overview/history-2026-08-04.md).
 `POST /api/complete-workout` now fires a best-effort fire-and-forget HR compute/upsert at completion
 (closes the gap outright for a live chest strap already in `oura_heartrate`), and
 `listSessionsMissingSetHrStats`/`listSessionsMissingHrStats` are now coverage-aware — a session whose
@@ -5339,7 +5339,7 @@ sandbox.
 criterion that is the low end, not the five-figure case, and it is a one-time path — so the
 refactor is not worth taking on the code with the worst data-loss history in the repo yet. Full
 numbers:
-[`docs/overview/entries/2026-08-02-applydelta-restore-sized.md`](overview/history-2026-07-30.md).
+[`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md).
 
 > **⚠️ TRIPWIRE — read this before adding any timeseries domain to the sync delta.**
 > `oura_heartrate` is **37,950 rows** in production and *is* mirrored in the local SQLite schema,
@@ -5529,7 +5529,7 @@ twice on disk (see the migration-number note at the top of this file).
 > the phase name as the label. Per-phase color was investigated and not built — no color hook exists
 > on the reused bridge, and the phase name already satisfies the no-color-only-state rule. **Not
 > verified on device** — compile-gated only in the sandbox, no APK rebuild available this session.
-> Entry: [`docs/overview/entries/2026-07-29-guided-walk-android-chip.md`](overview/history-2026-07-28.md).
+> Entry: [`docs/overview/overview/history-2026-07-28.md`](overview/history-2026-07-28.md).
 
 - **Phase E** — reactive walk/jog nudge notifications from live speed + HR.
   Foreground-only v1. Depends on live pace-tracking (shipped) + live-HR verified

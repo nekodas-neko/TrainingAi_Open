@@ -41,7 +41,7 @@ matches that remain are the decoder's own property accesses, not the data — wo
 reading that grep as a failure.) **This does not hide the numbers from a signed-in user and cannot**;
 it closes *publication*. ⚠️ **NOT device-verified** — a cold offline launch is the case the caching
 exists for and it cannot run in the sandbox. Journal:
-[`entries/2026-08-13-decoder-table-off-the-client.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-15 — Nutrition gets its Log Food action, and its deferred decision was already made
 (Q-257, v1.316.0).** Q-237 shipped the row as Water · Saved Meals; the third was deferred because a
@@ -54,7 +54,7 @@ Snack 21-24`). **The size gate forced the right shape** — the button took `nut
 device-verified, and the live check could not show the button**: the whole row is client-gated on
 `selectedDate`, and *Water* and *Saved Meals* are absent from the fetched HTML too — the control that
 proves it is client-rendering rather than a bug. Journal:
-[`entries/2026-08-15-nutrition-log-food-action.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — logging water stopped invalidating five caches for nothing (Q-243).** Taken after
 the IA lane closed and released file ownership. `water-log-sheet` already invalidated on both write
@@ -78,7 +78,7 @@ prefills and no answers reporting identical totals to a plan-off day — holds s
 nothing unconfirmed enters `food_logs` and none of its **23 readers** changed. ⚠️ **Not
 device-verified**; local SQLite v26 has still never run on a phone, so if the plan card comes up
 blank, revert rather than debug forward. Automatic prefill is deliberately still unbuilt. Journal:
-[`entries/2026-08-15-plan-meal-decline.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — Q-270 fixed forward: the training-stress route is warmed on launch.** The column
 was empty because nothing called the route — it persists only as a side effect of being rendered, on
@@ -87,7 +87,7 @@ deliberately off the BLE ingest path** that Q-213 traced a multi-week outage to 
 layer to fall back on). ⚠️ **Forward only — the 89 empty days stay empty**, and the persist is
 unproven locally because the dev seed gates before the write. **Re-read `training_load_ots` in a day
 or two; if still 0, the diagnosis was incomplete.** Unblocks Q-204. Journal:
-[`entries/2026-08-15-training-stress-warmed.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — Q-270 diagnosed: `training_load_ots` is computable every day and simply never
 computed.** All four gates of `computeTrainingStress` measured against production rather than
@@ -113,7 +113,7 @@ a bundle regression nothing else did:** importing the threshold from `ai-dynamic
 `node:path` (Q-230) and the decoder table. tsc, lint and all 3,899 tests passed with it in place.
 Both temperature constants moved to the import-free `deload-constants.ts` and re-exported. ⚠️ Not
 device-verified, and the state itself is unreachable on the owner's account. Journal:
-[`entries/2026-08-15-temperature-baseline-progress.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-14 — Q-107 measured and closed: the batching fix would have changed nothing.** The entry
 said to read `error_events` in production before building, because #1149 made the Postgres codes
@@ -154,7 +154,7 @@ same shared database — more of exactly the pressure isolation would relieve �
 *tighter*. The named trigger (two files failing on each other's rows, distinct ids, no migration) has
 not fired. Kept as ⏳ watch-only rather than removed: it is not finishable, and deleting it would lose
 the trigger's definition. Journal:
-[`entries/2026-08-14-q181-deferral-remeasured.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — Q-180 decided: keep `getOuraTimeseriesDelta`, and make the code say why.** Q-136's
 route deletion left a keyset-cursor implementation and 142 lines of passing tests with no caller, and
@@ -165,7 +165,7 @@ by no other path, and the owner's 2026-08-02 retention decision makes the device
 exists server-side. **The entry's real cost was the audit paragraph, not the code**, so that is what
 was fixed: the method and its test file now carry the decision and its evidence, and the queue no
 longer holds it. No behaviour change. Journal:
-[`entries/2026-08-14-timeseries-delta-decision.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — the meal-plan prefill's table and sync path, with nothing reading it (Q-187 phase 2,
 slice 1).** A prefilled meal is *suggested*, not eaten, so a prefilled row reaching `food_logs` would
@@ -185,7 +185,7 @@ TCP, and treat a nonzero skip count as something to explain. ⚠️ **Not device
 risk than most**: local SQLite v25 has never run on a phone and v26 stacks on it — if Saved Meals or
 the plan card comes up blank after this ships, **revert rather than debug forward**. The prefill UI
 is deliberately still owed, held until the Q-237 nutrition-screen work lands. Journal:
-[`entries/2026-08-14-plan-meal-answers-table-and-sync.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — goals stop being two disagreeing copies (Q-240, Q-241).** Editing a goal PATCHed
 the server and invalidated nothing, so Health rendered the previous goal for up to the `user-goals`
@@ -205,7 +205,7 @@ detected Coach writers by a string this fix itself introduced, so it recognised 
 carrying the fix; and matching the goals URL and `PATCH` separately flagged `health-content.tsx`,
 which only reads that endpoint. ⚠️ **Not device-verified** — JS-only, so it reaches the phone on the
 next deploy, but "a second device sees the first one's goals" is by definition a two-device check.
-Journal: [`entries/2026-08-14-goals-server-source-of-truth.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-15 — Nutrition's actions stop depending on scroll depth (Q-237, v1.314.0), closing the
 2026-08-14 review cluster.** Saved Meals is a library, not an action, and it sat **below every meal
@@ -222,7 +222,7 @@ Filed as **Q-257**. Water's three `WaterLogSheet` mounts stay three mounts; thei
 invalidation is **Q-243**, still open, and is a behaviour fix rather than a layout one. ⚠️ **Not
 device-verified** — two-column tap targets at 412 px are the case the S25 decides (the row is
 `min-h-[48px]` with `gap-3`, meeting 48 dp / 8 dp on paper). Journal:
-[`entries/2026-08-15-nutrition-action-row.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — the admin console splits by audience (Q-234, v1.313.0).** `/admin` had nine tabs,
 three sub-consoles reachable only from inside the Tools tab, and a nested "Additional tools"
@@ -242,7 +242,7 @@ flag whenever it is a boolean and only hits the DB when it is undefined — so f
 `users.is_admin` does nothing until a fresh login stamps a new token. ⚠️ **Not device-verified** —
 four more navless takeovers on `pb-safe-action-lg`, and the consoles behind these rows are APK-only
 by nature. Journal:
-[`entries/2026-08-15-admin-split-by-audience.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-15 — the Program Builder gets a route, and a dead deep link comes back (Q-235, Q-256,
 v1.312.0).** The app had a bottom-nav tab called **Workout** and, inside More, a second tab *also*
@@ -266,7 +266,7 @@ first failed on my own comments** (prose describing the very bugs they guard) �
 comments now, the same shape as the Custom Rules safe-area step failing on a comment two PRs ago.
 ⚠️ **Not device-verified** — `/program` is a navless takeover on `pb-safe-action-lg` and the Builder
 ends in tappable controls. Journal:
-[`entries/2026-08-15-program-route.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — Settings gets a screen, and `profile-tab.tsx` leaves the size baseline (Q-232 step
 3, v1.311.0).** Preferences (six switches), Theme & Appearance and Home Widgets were three
@@ -283,7 +283,7 @@ whole, having been checked as read *only* inside the moving block — every valu
 `pb-safe-action-lg` clearance on four navless sub-screens, the push toggle (needs a real
 service-worker registration and permission prompt), and whether the *native* status-bar pill reads
 those flags correctly: the write side is proven here, the read side is not. Journal:
-[`entries/2026-08-15-settings-screen.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — "Restore from cloud" stops living under the version number (Q-232 step 2,
 v1.310.0).** One block on More → Profile held the version, update check, SW status, APK download and
@@ -302,7 +302,7 @@ comment rather than touching the check, which is the right trade for a rule with
 400 ms. ⚠️ **Not device-verified** — the `pb-safe-action-lg` clearance on three navless screens, and
 the *native* branches of both moved handlers (`pullDelta` and `restoreFromCloud` both return null
 without SQLite, so only the fallback path runs here; Restore has never run in the sandbox at all).
-Journal: [`entries/2026-08-15-data-and-about-split.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-15 — the Devices screen (Q-233, v1.309.0).** Ring, chest strap, scale and the
 background-location permission were four cards stacked between "Goals" and "Settings" in the More
@@ -324,7 +324,7 @@ because the check refused the lazy option. One string changed inside a moved com
 trailing padding is `pb-safe-action-lg` rather than a bare `pb-safe`, every card ends in a tappable
 pairing control, and the sandbox renders insets as 0; `BackgroundLocationCard` cannot render here at
 all, so the Permissions half has never been seen. Journal:
-[`entries/2026-08-15-devices-screen.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — the More-tab IA plan is written, and it found a dead deep link (Q-232, Q-239,
 Q-256).** Q-232's entry forbids executing it from the entry — the five IA items share one target
@@ -345,7 +345,7 @@ next reachability sweep does not re-open it. **Q-256 found on the way:**
 so the sheet never opens and the action silently degrades to "open the Program Builder". Measured
 live, second instance of Q-223's class, deliberately left for Q-235 to fix since that item rewrites
 these redirects anyway. Docs-only, no version bump. Journal:
-[`entries/2026-08-15-more-tab-ia-plan.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — the theme-token rule gets a ratchet, and the trend it was recording was backwards
 (Q-244).** Hex literals under `app/`+`components/` `.tsx`: 455 on 2026-08-07, 430 on 2026-08-09,
@@ -363,7 +363,7 @@ swept** — that is separate and much larger. Mutation-verified three ways: a li
 baselined file, one added to a file with no row, and a baselined file stripped clean. CLAUDE.md's
 count is corrected and now records the reversal itself. Nothing device-shaped here — one CI script,
 one workflow step, two doc lines, no runtime code. Journal:
-[`entries/2026-08-15-hex-literal-ratchet.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — the second Home screen is deleted, and one shim decision goes back to the owner
 (Q-236).** `/overview` was 543 lines with its own fetches and cache reads and **zero** in-app links —
@@ -384,7 +384,7 @@ no longer exists. **Getting that target right needed the browser:** the first at
 `/session-select` — which is named like Home and is even the manifest's `start_url` — and it is a
 legacy redirect that lands on the **Workout tab**. ⚠️ **Not device-verified** — CSS-variable-only
 palette removal, no layout or safe-area change, but unseen on the S25. Journal:
-[`entries/2026-08-15-overview-screen-deleted.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-15 — one TTL per cache key is now a CI check, not a request (Q-242).** The entry was the
 review's smallest item — `day-log:` fetched with a literal `TTL_MEDIUM` at one site and `DAY_LOG_TTL`
@@ -406,7 +406,7 @@ comment beside an argument as part of the expression. Mutation-verified against 
 hydration-mismatch class — now seeded in the effect. That is the user-visible half and what the
 version bump is for. ⚠️ **Not device-verified**, and note the hydration fix is precisely what
 `pnpm dev` cannot prove either way (one process, one timezone). Journal:
-[`entries/2026-08-15-one-ttl-per-cache-key-mechanised.md`](history-2026-08-15.md).
+[`docs/overview/history-2026-08-15.md`](history-2026-08-15.md).
 
 **🆕 2026-08-14 — the Health tab's card customiser is gone, not rebuilt (Q-238).** `saveHealthCardOrder`
 and `saveHiddenHealthCards` had no caller outside their own test while the readers ran on every
@@ -424,7 +424,7 @@ nine gates were already constant `true`. ⚠️ **Not device-verified** — no l
 geometry changed (the removed wrappers were `{flag && (…)}` around cards that always rendered), and
 all three Health tabs were exercised in `pnpm dev` at 412×915 with zero console errors, but this has
 not been seen on the S25. Journal:
-[`entries/2026-08-14-health-card-order-dead-mechanism.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — a walk records the steps and calories it always could have (Q-230).** Owner: *"we
 [have] spm we should be able to get steps count right? as well as a burned calorie number"*. Right on
@@ -450,7 +450,7 @@ because it sliced from the handler's `Unauthorized` early return. Both are gone 
 server-side. ⚠️ **Not device-verified**: the step
 estimate's inputs come from a live strap over BLE, so the arithmetic and wiring are proven but not
 that a real walk reports something a pedometer would recognise. Journal:
-[`entries/2026-08-14-walk-steps-and-calories.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — a failed local write now falls through to the server (Q-216).** #1292 made
 `runSQL` throw when the local DB is not open, so a silently-failing local write became a loudly
@@ -466,7 +466,7 @@ best-effort, POST primary). The size gate pushed the quantity maths out of `save
 `saved-meal-qty.ts`, where it finally has tests. ⚠️ **The failure itself is not exercisable here** —
 `getLocalStore` returns null in the sandbox, so the branch being fixed cannot run; only the S25
 reaches it, which is why these survived #1292's sweep. Journal:
-[`entries/2026-08-14-local-write-failures-reach-the-server.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — the check-in's suggested soreness can no longer survive an open (Q-226).** The owner
 opened Exercise Readiness to five selected muscles and a whole-session-deload warning, closed it, and
@@ -480,7 +480,7 @@ about**: a CDP browser harness (Chromium over node's WebSocket, no new dependenc
 the fault — fixed and unfixed code produced identical output — so this rests on reading the source,
 not on observing the fix work. Both stale reads are real and neither is defensible on its own terms,
 but the owner's sequence is unconfirmed. Journal:
-[`entries/2026-08-14-checkin-suggestions-cannot-survive-an-open.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — Coach asks about pain instead of logging an injury off it (Q-227).** The owner asked
 *"lower back pain from some of my excercises what donyou think it is?"* and got back only a **"Log
@@ -495,7 +495,7 @@ proposal omits one, and the literal is named once so the promise and the write c
 ⚠️ **The prompt half is unverifiable here** — proving the model obeys it needs a real conversation, so
 what is proven is that the instruction is present and specific. Worth reporting back next time pain
 comes up. Journal:
-[`entries/2026-08-14-coach-asks-before-logging-an-injury.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — a deloaded log can no longer become a prescription basis (Q-228).** The owner was
 prescribed **72.5 kg on Incline Bench Press (83% of an 86.25 kg 1RM)** against a last session of
@@ -517,7 +517,7 @@ and the row now reads `estimated_1rm = 0`, `target_80 = 0` with the flag still t
 the owner's history now have `exercise_deloaded = true AND estimated_1rm > 0`. (Worth knowing: a query
 run seconds after the merge still showed 85.75/44.5 — `ensureSchema` applies on cold start, so read
 the deploy as landed only once `/api/version` reports the new version.) Journal:
-[`entries/2026-08-14-deload-poisoned-prescription-basis.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — AI prescriptions actually expire (Q-229).** `prescriptionExpiresAt` was written at
 generation and read in exactly one place — the emergency-deload suppression, which only asks whether
@@ -537,7 +537,7 @@ refutation: it self-clears on use and only bites in the gap between runs. Live p
 server**, not just in unit tests: a seeded 9-day-old `auto_applied` prescription at a flat 52% was
 replaced, on one `workout-data` read, by a real regeneration at 84% 4×4 with a fresh 7-day expiry.
 Journal:
-[`entries/2026-08-14-prescriptions-actually-expire.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — the Oura Cloud integration is gone (Q-224).** The automatic calls went on
 2026-08-13; this is the rest — the OAuth/PAT flow, the sync route, the webhook receiver, the HTTP
@@ -554,7 +554,7 @@ including a source sweep over 1,000+ files that fails if any Cloud call returns.
 device-verified** — both rewritten surfaces are canonical-runtime screens, and the Ring section's
 visibility now depends on an `oura_raw_samples` query; the check is "open More → Profile and the
 Health tab, confirm the ring still reports battery and a last-seen time". Journal:
-[`entries/2026-08-14-oura-cloud-integration-removed.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-14 — the Warm Up countdown reads the session's own budget (Q-212).** Owner, on a 30-min
 Quick session: *"its still giving 10minutes warmup … should of been only 5minutes"*. They were right,
@@ -570,7 +570,7 @@ so the whole duration-preset concern moved into `components/workout/use-duration
 file ends **smaller** than it started. ⚠️ **NOT device-verified** — the arithmetic is covered, but
 seeing a 5-minute countdown, and the notification-shade chip agreeing with it, is a device
 observation. Journal:
-[`entries/2026-08-14-warmup-timer-scales-with-the-session.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-13 — `/config` opens the Program Builder again (Q-223).** The shortcut redirected to
 `/more?tab=config`, but `more-content.tsx` parses `profile | friends | workout` and silently drops
@@ -580,7 +580,7 @@ surfaced it: the session-select recommendation card has had the same `href="/con
 Observed fixed on the dev server (`307 → /more?tab=workout` with a session). The guard pins both that
 the tab is *parseable* and that it is the tab `ConfigScreen` actually mounts under — `profile` would
 satisfy the first and still strand you. Journal:
-[`entries/2026-08-13-config-shortcut-lands-on-the-builder.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-13 — the app stops calling the Oura Cloud (owner decision), and two fixes are confirmed
 in production.** Owner: *"get rid of oura cloud references we dont use it."* The two **automatic**
@@ -591,7 +591,7 @@ each one spent a request earning a 401. **Deliberately left, and not tidiness:**
 one component, so deleting it would remove the ring battery display — it needs surgery, filed as
 **Q-224** with the rest of the surface. **Historical Cloud data stays** (`oura_daily` and friends are
 health history, read by health-trends/day-timeline/More). Journal:
-[`entries/2026-08-13-stop-calling-oura-cloud.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 **Confirmed from production, not predicted:** a ring sync at 13:20:25 logged
 `[oura-ble] rollup worker ready` — Q-213 Stage 2 is genuinely off the request loop — and the
 v1.304.3 boot log is 13 lines, all `info`, zero errors, where the previous one opened with two
@@ -607,7 +607,7 @@ Railway artifact — `console.warn` goes to stderr. The import-time warning is g
 was genuinely **silent** now reports: `decryptToken` handing back ciphertext when the key vanished,
 which Oura rejects as "malformed" and sends you hunting the credential instead of the key. Setting
 the variable is now optional, not blocking. Journal:
-[`entries/2026-08-13-token-enc-key-boot-log.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-13 — Q-213 is fully shipped, and a live barcode report is recorded as unexplained.**
 Stage 3 replaced a coalescing predicate that meant "any batch" with a trailing-edge debounce, and the
@@ -617,7 +617,7 @@ up (200 in 0.86 s) and nothing barcode-shaped reached production**, but the caus
 because `/api/nutrition/barcode` only `console.error`'d and never called `reportServerError` — the
 same gap Q-218 closed for its sibling scan route and stopped there. That route now reports; **12
 other `app/api/nutrition/*` routes still do not.** Recorded as unexplained, not fixed. Journal:
-[`entries/2026-08-13-rollup-debounce-and-redecode-off-loop.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-13 — the resolved Known Issues moved out of the orientation read (Q-220 Lever 1).**
 Every session reads this file before it can start, and 68% of it was Known Issues. 53 fully-resolved
@@ -631,7 +631,7 @@ and stayed. A sweep keyed on the tick alone would have archived the sign-out-wip
 handoff is still chasing. Conservation was proved rather than claimed: 885 non-blank lines out, 885
 in, identical and in order; 284 headings → 231 + 53. **Lever 2 — routing the 207 open entries to
 their pillar docs — is untouched and is the one that changes the number.** Journal:
-[`entries/2026-08-13-known-issues-archive.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-13 — the BLE rollup runs in a worker thread, so it cannot starve a request (Q-213
 Stage 2).** The last piece of the outage. Stage 1 plus the watermark took a real ring sync from
@@ -644,7 +644,7 @@ bundle because the repository reaches `onnxruntime-node`, which webpack cannot b
 missing bundle falls back to in-process**, so a broken worker degrades to the previous behaviour
 rather than dropping a rollup (proven by deleting the bundle and watching the correctness test still
 pass). **Production is the only place the claim settles**; watch CPU and `/api/version`. Journal:
-[`entries/2026-08-13-rollup-off-the-request-loop.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-13 — the local custom-rules gate runs all 31 steps and prints the count (Q-206).**
 `pnpm check:rules` parses `.github/workflows/ci.yml`, takes the job named *Custom Rules*, and runs
@@ -658,7 +658,7 @@ in, so the glob everyone blamed ran 65%, not 11%. The weak gate was `pnpm ci:loc
 reach, and they hold the `invalidateCache`, UTC-date-slicing, safe-area, nested-button and
 LLM-`JSON.parse` rules. Both of those were mutation-probed: a planted violation of each FAILs the
 named step and exits 1. Journal:
-[`entries/2026-08-13-local-custom-rules-runner.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-13 — the production stalls are fixed, and the cause was not what it looked like.** Ten
 PRs (#1295–#1304). The app was re-processing **35 days of raw ring data on every sync** — 986,959 rows,
@@ -701,7 +701,7 @@ agreement with their own morning ratings did not move (r −0.220 → −0.226),
 and the correlation target is itself unreliable, since 33 of 39 ratings are a "2" or a "3". The
 old baseline broke **zero** tests when reverted, because every existing case used identical nights;
 four drift-sensitive tests now cover it, all mutation-verified. Journal:
-[`entries/2026-08-13-sleep-autonomic-baseline-rolling.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — the unreachable chat surface is deleted, and read-aloud with it (Q-189,
 v1.302.0).** `app/chat/`, `app/sheet/[id]/chat/`, `components/chat.tsx` and `app/api/ai-chat/`
@@ -715,7 +715,7 @@ the only one and the device checklist was corrected in the same PR; and `parseCh
 already-dead `chart-error-boundary.tsx` were removed, while the chart schema Coach depends on stays.
 The CLAUDE.md path checker caught a stale `components/chat.tsx` reference that would otherwise have
 shipped — one of the 31 inline steps, not the four scripts (Q-206). Journal:
-[`entries/2026-08-12-remove-legacy-chat-surface.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — a deload week lightens every exercise (Q-185, v1.301.0).** Every deload reduction
 lived inside `if (aiDrivesLoad)` and keyed off a prescription entry, so an exercise the AI does not
@@ -731,7 +731,7 @@ surfaced a real pre-existing contradiction now filed as **Q-211**: the AI deload
 *baseline* lift to 50% while `estimateOneRm`/`shouldCountTowardPr` both exempt baseline as a genuine
 max effort — so the app prescribes half weight and records the result as a max test. ⚠️ Not
 device-verified. Journal:
-[`entries/2026-08-12-ai-dynamic-deload-covers-all-exercises.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-12 — the prescription follows your last real session (Q-202, v1.300.0).** The owner
 lowered their weights deliberately to work on form and the app kept prescribing from a lift months
@@ -749,7 +749,7 @@ was found while verifying and fixed here**: `target80` also reads 0 on a deload 
 deload the target showed **0 kg** and the weight dial started every set at zero. Measured
 end-to-end: 98 → 72 with the PR untouched at 98. ⚠️ Not device-verified — the dial's pre-filled
 value is an on-device behaviour. Journal:
-[`entries/2026-08-12-prescription-basis-last-real-session.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 **🆕 2026-08-12 — a planned meal can be logged in one tap (v1.299.0, Q-187 first slice).** Until this
 a plan told you what to eat and then played no part in the day. This is deliberately the half that
 needs **none** of phase 2's machinery: the automatic prefill forces a "prefilled but unconfirmed"
@@ -761,7 +761,7 @@ stored**, because inventing a per-day row to remember a button press is the star
 design phase 2 must do properly. Verified end-to-end: the plan card's protein bar moved 29.3% → 62.6%
 on tap. ⚠️ Not device-verified — `logFoodEntries` takes the local-store branch on the APK and the web
 POST branch here, so the branch that matters on the phone did not run.
-Journal: [`entries/2026-08-12-log-planned-meal.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — macro targets that say when they do not add up (v1.297.0, closes Q-191).** Four
 independent fields with nothing keeping them in agreement: the seeded account holds 150P/180C/60F
@@ -772,7 +772,7 @@ because a saved row is never silently rewritten. **The test found a second bug:*
 flagging *its own helper's output* — `carbsFromRemainder` rounds to a whole gram (4 kcal) against a
 ±1 kcal tolerance, so the new one-tap fix would have produced a row the meal-plan review immediately
 called drifted. `MACRO_RECONCILE_TOLERANCE_KCAL` is now named, documented and pinned.
-Journal: [`entries/2026-08-12-nutrition-target-consistency.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — the plan card shows the day, not just the plan (v1.296.0, closes Q-200).** Its three
 macro bars were drawn `w-full` inside the track — **always 100% full regardless of the number beside
@@ -782,7 +782,7 @@ with a symbol rather than colour alone, and an unlogged day shows *empty* bars r
 **Q-201 deliberately left open** — a plan's meal time is a "time to eat" prompt while the existing
 reminders are a "you didn't log this" catch-up at a meal *type's* end hour, and the two are not 1:1;
 that fork wants an owner decision, not a guess shipped to an unverifiable notification surface.
-Journal: [`entries/2026-08-12-plan-card-progress.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — a plan can add food to your meal, not just shrink it (v1.295.0, closes Q-210).**
 Putting a saved meal into a slot only ever resized what was already in it. **The mechanism was worse
@@ -797,7 +797,7 @@ Verified end-to-end: the ice cream into a 644/50/57/24 slot came back **639/50/5
 banana added**. Scaling also moved server-side, because the edit sheet scaled on the client and would
 have skipped the top-up on the exact path the complaint travelled. ⚠️ Not device-verified; plan
 generation is now slower when a meal needs topping up.
-Journal: [`entries/2026-08-12-meal-plan-top-up.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — tell a meal what to change, and move it earlier or later (v1.294.0, closes
 Q-208/Q-209).** An instruction box on a plan meal ("make it vegetarian", "swap the rice for potato")
@@ -810,7 +810,7 @@ gets a different target — **verified live, a meal moved to slot 0 went from a 
 38 g.** Non-permutations rejected with 400. Up/down buttons, not drag. The measured vegetarian
 rewrite also shows what is still missing: protein came back 31.8 g against a 45 g target, which is
 Q-210. ⚠️ Not device-verified.
-Journal: [`entries/2026-08-12-meal-plan-edit-and-reorder.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — one offline-first way to create a food, and a warning on food-database rows
 (v1.293.0, closes Q-197/Q-199/Q-196).** The meal builder created a `food_item` three ways and none of
@@ -825,7 +825,7 @@ calories by >15% now says so — **measured, 4 of 20 live results**, including a
 against 164 by Atwater. The two thresholds share one place and a test asserts warn-before-rewrite.
 ⚠️ Not device-verified, and note the shape of that: the branch this work is *about* is the local-store
 one, which the sandbox cannot run.
-Journal: [`entries/2026-08-12-food-item-writes-and-off-quality.md`](history-2026-08-08.md).
+Journal: [`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-12 — sleep/HR/temperature clock conversion wired to the robust offset (Q-71,
 v1.292.1).** Follow-up to the same-day anchor-drain-lag investigation: owner reviewed the real-data
@@ -840,7 +840,7 @@ anchor the old and new math are identical) plus the full repo suite (3,186 passi
 typecheck/lint. **Only fixes future rollups** — historical `sleep_sessions` rows are unchanged until
 an admin Redecode runs, which needs the owner's own session (no bearer-token path exists for that
 route). Full writeup:
-[`entries/2026-08-12-wire-sleep-clock-to-robust-offset.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — a saved meal can be a batch (v1.292.0).** A recipe that fills two bowls was stored
 as if the whole batch were one meal, so a meal plan put the entire tub in one slot.
@@ -851,7 +851,7 @@ with all three parts (ALTER + CREATE body + `RECONCILE_COLUMNS`). Stated on purp
 count **changes what that meal's Log button does**, so the card and builder both say "per serving".
 ⚠️ Not device-verified — the v25 ALTER has never run on a phone holding v24. First of four slices in
 [`plans/2026-08-12-meal-plan-portions-and-editing.md`](../superpowers/plans/2026-08-12-meal-plan-portions-and-editing.md).
-Journal: [`entries/2026-08-12-saved-meal-servings.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — "Milk" returns milk, and quantities take servings again (v1.291.0).** Four owner
 reports from the S25 against v1.290.0, **two of them corrections to it**. Open Food Facts matches
@@ -866,7 +866,7 @@ grams-only quantity field broke "two scoops", so each ingredient has a srv/g swi
 servings. **The lesson worth keeping:** both regressions were measurable in the sandbox and simply
 were not measured — one asserted a fix instead of reading the results, the other read a 503 as
 someone else's flakiness. ⚠️ Not device-verified.
-Journal: [`entries/2026-08-12-food-search-relevance-and-serving-units.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — building a saved meal can search a real food database (v1.290.0).** Ingredient
 search could only see food items this user had already created, so the library could never grow past
@@ -881,7 +881,7 @@ to move to an inner wrapper — and then the size was wrong too, because the clo
 from `SheetContent`'s edge while the padding is per-call-site. Also fixed a **pre-existing barcode
 bug** found while verifying: `"1 glass (200 ml)"` matched the "g" of "glass" and returned a one-gram
 serving, dividing every macro by a hundred. ⚠️ Not device-verified — see the Known Issues row.
-Journal: [`entries/2026-08-12-saved-meals-search-and-sheet-header.md`](history-2026-08-12.md).
+Journal: [`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — More/Profile's ring battery stops lying (Q-205, v1.290.2).** The Oura card on
 More read `batteryLevel`/`batteryStale` from `/api/oura/token` — the **Cloud** value, frozen since
@@ -894,7 +894,7 @@ above) and never gave the battery. Two things the change exposed are fixed with 
 (now in `invalidateOuraSync()`, which fixes the Health card too), and the card's tab-show refresh
 would have served the cached battery forever. ⚠️ Not device-verified, and the literal "Not live"
 rendering can't be reproduced locally — see the Known Issues row. Journal:
-[`entries/2026-08-12-more-profile-dead-battery-badge.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — the ring-battery chip leaves Home (Q-203, v1.290.1).** Fourth round on the same
 owner report: Q-169 shipped "move it and simplify it" on 2026-08-10, and the identical *"move it or
@@ -907,7 +907,7 @@ a permanent grey **"Not live"** badge. The surface that actually preserves the l
 the same cache key. Removal is safe — for a different reason than the entry gave. The dead
 More/Profile badge is now filed as **Q-205**. ⚠️ Not device-verified — see the Known Issues row.
 Journal:
-[`entries/2026-08-12-ring-battery-chip-remove-from-home.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — the ownership guards on tables with no `user_id` are covered (Q-155, test-only).**
 Q-155's 246-predicate mutation sweep was structurally blind to **13 tables that have no `user_id`
@@ -921,7 +921,7 @@ invisible to **both** the sweep and `scripts/check-repository-user-scoping.js`. 
 class is now closed for all 13 tables; what keeps Q-155 open is exact per-predicate attribution and
 the fact that only the DB tests have ever been measured. **These tests do not run in CI** (no
 `DATABASE_URL` there) — the evidence is local by construction. Journal:
-[`entries/2026-08-12-ownership-precheck-remaining-tables.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-12 — sleep bed/wake-time drift traced to its exact source, and the fix already exists
 (docs-only, unblocks Q-71).** Owner report ("displayed bedtime keeps changing") led to finding the
@@ -937,7 +937,7 @@ nights. Re-scoped and unblocked **Q-71** with this evidence; still needs an expl
 rewriting stored history vs. fix-forward-only before it ships. No code changed this session — every
 finding here was tested against real production data via the read-only admin endpoint and the real
 shipped functions, never assumed. Full writeup:
-[`entries/2026-08-12-oura-ble-anchor-drain-lag-investigation.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **🆕 2026-08-11 — direction B's two gates measured, and one of my own warnings was wrong (Q-204,
 docs only).** The HR-derived load lane was held *gated, not queued* on two questions. **Gate 2
@@ -967,7 +967,7 @@ knowing generally — **`tsconfig` excludes `**/__tests__/**`, so a fixture miss
 field compiled fine and surfaced as `NaN` through the score.** Defining regression test: the same
 week now scores identically for a beginner, the owner and an advanced lifter. ⚠️ **Fourth change to
 this score today** — use a post-Q-188 baseline. 3635 tests green.
-[`docs/overview/entries/2026-08-11-volume-lane-absolute-anchor.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-11 — move-hours counted a 24-hour day against a 15-hour goal (Q-188, v1.285.0).**
 `computeMovedHours` counted any hour in **0–23**; `moveHoursGoal()` divides by waking hours. The two
@@ -983,7 +983,7 @@ tests, all mutation-verified, led by the invariant `movedHours ≤ moveHoursGoal
 was weakened by the change and repaired rather than left** — its 3am fixture would have returned 0
 for the wrong reason. ⚠️ **Third change to this score today** (Q-183 +5, Q-137/A lower, this lower):
 compare against a fresh baseline, not any figure quoted earlier today. 3632 tests green.
-[`docs/overview/entries/2026-08-11-move-hours-window-mismatch.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-11 — one number, two frozen contributors (Q-137/A, v1.284.0).**
 `DEFAULT_STRENGTH_FREQ_GOAL` 3 → 5, and that is the whole change. `strengthFreq` (weight **25**, the
@@ -998,7 +998,7 @@ deliberately — the ACWR taper already penalises over-reaching, so a goal of 6 
 the model rewarding what another punishes. ⚠️ **Expect the score to sit lower than before** — that is
 the intended effect, and **Q-183 (+5 points, shipped earlier today) pushed the other way**, so any
 before/after needs a post-Q-183 baseline. 3628 tests green.
-[`docs/overview/entries/2026-08-11-strength-freq-goal-calibration.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-11 — calories in vs out is one calibrated number (v1.280.0).** The owner asked why the
 planned energy-balance work was never visible. It had **never rendered on any tab**: the card's
@@ -1023,7 +1023,7 @@ here), and options are current when the widget renders rather than when the mode
 an unanswered tool call in the thread, and the provider refuses that — so every following turn
 returned *"Something went wrong"* and asking again could not help. Permanently dead, not
 transiently.
-[`docs/overview/entries/2026-08-10-coach-sourced-pickers.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 
 **Last updated:** 2026-08-10.
@@ -1082,7 +1082,7 @@ guards are now held in place by reject/permit pairs, each verified by mutation.
 `ensureWorkoutSession` is the one that matters most: a caller that adopted another user's session id
 goes on to write `exercise_logs` and `set_logs` into it, and **neither table has a `user_id` to stop
 it**. ⚠️ **2 of 13 tables — the class is sampled, not closed**, and Q-155 stays open. 3461 tests green.
-[`docs/overview/entries/2026-08-10-ownership-precheck-coverage.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-10 — the server and the device disagreed about deleted mood logs (Q-178, no version
 bump).** `mood_logs` carries `deleted_at` on the server *and* locally, and the local store filters
@@ -1097,7 +1097,7 @@ sync read keeps a comment and a test holds the two apart. **Both directions muta
 removing the filter fails the user-facing test, *and* adding it to the sync read fails the tombstone
 test. Verified live: `GET /api/mood` → **null** after a hand-stamped `deleted_at`, while
 `/api/sync/pull` still carries the row with `deletedAt` set. 3457 tests green.
-[`docs/overview/entries/2026-08-10-mood-log-soft-delete-filter.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09/10 — a review-only session mutation-tested the data layer's invariants (10 PRs, almost
 no application code).** Handoff:
@@ -1129,7 +1129,7 @@ local `meal_types` table is a read-only mirror fully replaced from a GET, not a 
 domain, which is what kept this small. The `activity_types` twin is admin-only and left as filed.
 Verified end-to-end against `pnpm dev`: 409 → delete the log → **200** → gone from the list, with
 the row still present and `deleted_at` set. 3455 tests green.
-[`docs/overview/entries/2026-08-10-meal-type-soft-delete.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-10 — DB test isolation: measured first, and the measurement changed the work (Q-177, no
 version bump).** The brief was a schema per vitest worker. The baseline said the shared database was
@@ -1149,7 +1149,7 @@ going to **0/12**. It also claimed to need no database while one test reaches th
 instead of skipping without `DATABASE_URL`. **The per-worker isolation was deliberately not built** —
 all three instabilities found so far have specific causes that isolation would have hidden rather
 than fixed; filed as **Q-181** with the trigger that should start it. 3453 tests green.
-[`docs/overview/entries/2026-08-10-db-test-isolation-measured.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-10 — API responses stop asking to be cached, and a standing rule is reversed (Q-166, no
 version bump).** Owner decision, because it **contradicts a CLAUDE.md rule**: the SWR-header rule
@@ -1168,7 +1168,7 @@ back, mutation-tested by putting the header back; one exemption, `/api/version`,
 the script. **Both bypass halves stay** — they fail independently, and the comments now say so.
 Verified against the running server: 21 routes, all `200` + `private, no-store`; a
 POST/DELETE round-trip on `phase-sets` reflects immediately. 3458 tests green.
-[`docs/overview/entries/2026-08-10-api-responses-no-store.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-10 — the rest of the dead-code sweep, and the cascade it exposed (Q-136, docs + deletions,
 no version bump).** The four decisions Q-136 had left for the owner came back as *delete three, keep
@@ -1184,7 +1184,7 @@ the only caller of `repo.getOuraTimeseriesDelta`, leaving its keyset-cursor impl
 delegate and **142 lines of passing DB tests** orphaned. That cascade was **not** taken unilaterally —
 the owner answered a question about *routes* — so it is filed as **Q-180** with the question that
 decides it. 3451 tests green.
-[`docs/overview/entries/2026-08-10-dead-code-sweep-part-2.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-10 — signing out left the previous account's data on the device (Q-172, v1.277.3).**
 Two of three sign-out buttons cleared nothing. Reading the one that "worked" before copying it found
@@ -1200,7 +1200,7 @@ a sweep when the sign-in screen mounts took it to **24 keys before, 0 after**. S
 (redirects, and `/health` bounces). ⚠️ **The local-store half was never actually run** —
 `clearLocalStoreData()` is a no-op on web, so the seven-table fix is unverified off-device.
 3456 tests green.
-[`docs/overview/entries/2026-08-10-sign-out-clears-device.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-10 — two completed backlog entries had come back from the dead (docs only).** A queue
 read on fresh `main` found **Q-173** restored in full and a bare **Q-174** heading with no body —
@@ -1222,7 +1222,7 @@ five different correct remedies across ten users, and what decides each is the c
 nearest interactive neighbour. **My own entry's number was wrong**: it said the pill was "about
 16 px" from reading CSS; measured, it was 21. A test pins that the pill must *not* get a
 `tap-target-*` class, so a later tidy-up cannot reintroduce the overlap. 3444 tests green.
-[`docs/overview/entries/2026-08-10-remaining-tap-dense-hit-areas.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-10 — the flaky cable test was another migration rewriting its fixture (Q-171 fixed).**
 `cable-exercise-merge-migration.test.ts` failed ~1 run in 3 under the full suite and passed alone.
@@ -1238,7 +1238,7 @@ second acquirer blocks, then completes the instant the first releases), and the 
 fix destabilized the suite** — a blocking `pg_advisory_lock` parks the waiter's pooled connection, which tipped an unrelated 3.3 s test over the 5 s timeout in 2 of 5 runs; polling `pg_try_advisory_lock` and releasing between attempts fixed it. The separate **`deadlock detected`** in `planned-pct-bodyweight-migration.test.ts` is
 covered by the same lock. ⚠️ The suite-wide half (every DB test shares one database;
 two files still unlocked) is filed as **Q-177**. 3437 tests green.
-[`docs/overview/entries/2026-08-10-migration-test-serialization.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — Coach is ~3× faster, and the chip moved (Q-169 + Q-170, v1.277.1).** The chip is
 now an icon in Home's right-hand icon row rather than a percentage pill on the date line. **Q-170 is
@@ -1250,7 +1250,7 @@ render a ~400-token widget**, the rest reasoning nobody sees. One line
 against a baseline median of 8.2 s, with quality checked on the three-turn swap,
 create-an-exercise, and a six-tool analysis. **Measure output tokens before optimising an LLM
 route** — wall clock cannot tell reasoning from generation.
-[`docs/overview/entries/2026-08-09-chip-move-and-latency.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-09 — every icon-only control now has an accessible name (Q-161 + Q-162, v1.276.2).**
 
@@ -1276,7 +1276,7 @@ Q-155's exact mutation. **It catches an omitted scope, not a wrong one** — tha
 script's own header, and Q-155 stays open. Two earlier versions of the detector were wrong (29 false
 positives from a multi-line return type, then 73 from an over-tight rule), both caught by checking a
 known-good method first. 3438 tests green.
-[`docs/overview/entries/2026-08-09-repository-user-scoping-check.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — the "Fatigue detected" card now says why (Q-173, v1.277.0).** Owner: *"today it
 recommended emergency deload but wouldn't tell me why."* The card fired on `score < 45 && acwr > 1.2`
@@ -1289,7 +1289,7 @@ asserts it holds neither literal. Both bounds are now named constants, and one p
 inside the optimal band because it is paired with a low score, so "unifying" them would change who
 sees it. ⚠️ The render was verified by patching the response in-page (the seeded DB has `acwr: null`);
 **the real trigger path is unproven end-to-end**, and nothing is device-verified. 3434 tests green.
-[`docs/overview/entries/2026-08-09-early-deload-card-reason.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — half the "inline sparklines" were time-axis charts (Q-154, docs + classification).**
 Q-154 said six files hand-roll a `<polyline>` instead of using the primitive; convert them. Reading
@@ -1305,7 +1305,7 @@ primitive that has those features (`sparkline-chart.tsx`) is chart.js and must n
 workout screen. Also renamed `health-metric-sheet.tsx`'s **local component also called
 `Sparkline`**, which made a violating file look like a compliant caller to `grep`. **No conversions
 done** — Q-154 stays open with the exact prop list. 3429 tests green.
-[`docs/overview/entries/2026-08-09-sparkline-classification.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — 48px hit areas would have made the carousel dots *harder* to hit (Q-160, v1.276.4).**
 The entry prescribed padding the 7×7 px dots to a 48px hit area. Measured first: the row runs on a
@@ -1317,7 +1317,7 @@ entry named two screens; there are **four** dot rows, three byte-identical — n
 inside where a 48px neighbour would have reached) selects **index 0**. The `tap-dense` audit the
 entry asked for is done — 4 of 6 users are correct, 2 filed as **Q-176**. ⚠️ Tap targets are the one
 thing a desktop browser cannot vouch for; **not device-verified**. 3426 tests green.
-[`docs/overview/entries/2026-08-09-carousel-dot-hit-area.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — a cache `invalidateCache()` could not reach (v1.276.3).** Q-166 asked for SWR
 headers on 12 more GET routes; measuring the header first stopped the sweep and found a live bug
@@ -1331,7 +1331,7 @@ comment described an intent the code did not implement. Both now send `cache: 'n
 is on hold, rewritten with the measurement** — with the service worker bypassing, the header governs
 almost nothing on the canonical runtime, and the option the evidence favours contradicts a standing
 CLAUDE.md rule. ⚠️ **Service-worker change, NOT device-verified.** 3422 tests green.
-[`docs/overview/entries/2026-08-09-http-cache-layer-bypass.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 **Q-166 was decided 2026-08-10** — the owner took the option the evidence favoured; see the entry at
 the top of this section.
 
@@ -1344,7 +1344,7 @@ composer. `scripts/check-icon-button-names.js` is the durable half — deliberat
 self-closing icon inside a button), because a check that cries wolf gets exempted away. It found
 **nine more** on screens the browser pass never reached, all fixed, so it ships with **no grandfather
 list**. Verified both ways.
-[`docs/overview/entries/2026-08-09-accessible-names.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — an HR chart that had never rendered, found by triaging Q-165 (v1.276.1).** Q-165
 counted 62 bare-`fetch` client GETs and named ~24 as "genuine render-path reads", flagging that the
@@ -1358,7 +1358,7 @@ activity detail sheet has ever made was rejected before the handler, and its HR 
 breakdown and HR-coloured route line have never rendered for any activity. Fixed, with a route test
 proven to fail against the old regex. Q-165 closed; **Q-172** filed (two sign-out buttons in
 `components/chat.tsx` clear neither cache nor local store). 3419 tests green.
-[`docs/overview/entries/2026-08-09-q165-cache-seeded-reads.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — Coach can add an exercise the app has never heard of (v1.276.0).** Owner ask, after
 the repaired swap flow worked on device: *"I want to add in Jefferson curls to swap with bent over
@@ -1370,14 +1370,14 @@ A plain swap to an unknown name still refuses, so a typo creates nothing. **Foun
 shipped this morning:** undo restored the exercise *name* but not its catalogue **link**, leaving the
 row displaying the old name while pointing at the replacement. Fixed, with a test that asserts the
 join rather than the string. 3397 tests green.
-[`docs/overview/entries/2026-08-09-coach-create-on-swap.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — light-theme small text now meets AA (Q-167, v1.275.3).** `--muted-foreground` was
 **4.34:1** on `--muted`, under the 4.5:1 bar, across nine full-opacity chips and pill badges at
 10–12 px. `oklch(0.556)` → `oklch(0.546)` gives **4.52:1** there and 4.94:1 on white. One line,
 because `scripts/check-contrast.js` had already done the measuring — and it closed its own loop by
 failing until the now-passing pair was removed from `GRANDFATHERED`. **20 pairs, 0 grandfathered.**
-[`docs/overview/entries/2026-08-09-muted-foreground-contrast.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-09 — the first on-device AI Coach session found three things (v1.275.0).** The owner
 asked Coach to change an exercise, picked one, and **nothing happened** — it asked in prose with no
@@ -1389,7 +1389,7 @@ names at the end of an answer — forbidden in the prompt *and* stripped on rend
 "instruct the model not to" already failed once here. Latency was **measured, not fixed**: 7–11 s to
 the first widget, two of eight runs at 49 s and 121 s, and grounding is not the cause — filed as
 **Q-170**. Also ✅ **Q-158**. 3387 tests green.
-[`docs/overview/entries/2026-08-09-coach-swap-dead-end.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-09 — AI Coach can start your deload week (Q-168 partly, v1.274.0).** A sixth write
 domain, `early_deload`: say you are beaten up and Coach proposes starting the deload now, or
@@ -1400,7 +1400,7 @@ user's timezone). The preview states the cost that nobody expects: flagged sessi
 from every cycle count, so anything logged today stops advancing the block. Also fixes a **Q number
 that landed on `main` twice** — phase 3b and #1194 both filed as Q-166; the Coach follow-ups are now
 **Q-168**. 3351 tests green.
-[`docs/overview/entries/2026-08-09-coach-early-deload.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **2026-08-09 — AI Coach is complete (Q-157 phase 3b, v1.273.0).** Five write domains, eight
 widgets, three confirmation tiers, history and undo. This last part adds **`program_phase`** — the
@@ -1413,7 +1413,7 @@ the chart-pairing rule. **A Phase 2 claim is corrected here:** `/api/ai-chat` wa
 unreferenced and deletable — it is not, `app/chat/page.tsx` uses it, and the earlier check looked for
 overlay imports rather than route callers. Caught because the deletion was verified rather than
 assumed. 3345 tests green. Details in
-[`docs/overview/entries/2026-08-09-ai-coach-tier3-and-widgets.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 ⚠️ **Still not device-verified** — two navless full-screen routes with bottom-anchored controls now;
 the Known-Issues row and the checklist cover both. Follow-ups (cardio goals, deload handoff) are
 **Q-168**.
@@ -1432,7 +1432,7 @@ exercises" toggle was a second implementation and is deliberately not built. **F
 verifying:** the affected-exercise count read zero for every side-qualified injury (the program
 stores `shoulders`, a person says `left shoulder`), which looked identical to "nothing trains this";
 fixed and tested. 421 files / 3329 tests green. Details in
-[`docs/overview/entries/2026-08-09-ai-coach-write-domains.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 **Phase 3b** is the tier-3 pushed confirm (phase/deload), the NumberDial and Handoff widgets, cardio
 goals and the chart-pairing rule.
 
@@ -1453,7 +1453,7 @@ that silently returned 0. ⚠️ **Not device-verified** — a navless full-scre
 bottom-anchored composer is the exact shape that has regressed 11+ times; see the new AI Coach
 section in [`docs/device-smoke-checklist.md`](../device-smoke-checklist.md). 420 files / 3316 tests
 green; details in
-[`docs/overview/entries/2026-08-09-ai-coach-route-and-thread.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **🆕 2026-08-09 — Home's "Today's Timeline" sleep card had the same stale-refetch gap Q-91 fixed
 elsewhere (v1.270.32).** Owner reported last night's bed/wake time looked ~30 min off on first
@@ -1465,7 +1465,7 @@ three readers of the `'sleep-sessions'` cache key, but `components/home-day-time
 certainly the first screen seen — reads a different key (`'home-day-timeline'`) that Q-91's trace
 never covered. The cache entry was already being invalidated correctly on sync; only the
 already-mounted screen's refetch was missing. Fixed with the same listener pattern, mirrored
-exactly. Full writeup: [`entries/2026-08-09-home-timeline-sleep-refetch.md`](history-2026-08-08.md).
+exactly. Full writeup: [`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 **Not verified**: the live client-side refetch in a browser (no Playwright tooling in this
 session) or on-device.
 
@@ -1486,7 +1486,7 @@ attempts were malformed and rejected by the schema — which is precisely the ar
 extending the in-text `<sheet_chart>` block pattern to input widgets. ⚠️ **Nothing device-verified —
 no UI is reachable.** Phase 2 (the `/coach` route) carries that gate. Full suite 417 files / 3300
 tests green; details in
-[`docs/overview/entries/2026-08-08-ai-coach-widget-protocol.md`](history-2026-08-07.md).
+[`docs/overview/history-2026-08-07.md`](history-2026-08-07.md).
 
 **🆕 2026-08-08 — the ring-battery chip was reading a source that froze a month ago (Q-111 ring
 half, v1.270.30).** `oura-battery-chip.tsx` existed but fetched `batteryLevel` from
@@ -2111,7 +2111,7 @@ override values, revert-UI compatibility, non-compounding with an already-auto-d
 goal-specific override). The owner's separate request to move the Deload toggle off Home onto the
 pre-workout screen was split into Q-109-followup and **has since shipped** (v1.270.28, see the entry
 at the top of this file). Full detail:
-[`entries/2026-08-07-manual-deload-ai-prescription-wiring.md`](history-2026-08-07.md).
+[`docs/overview/history-2026-08-07.md`](history-2026-08-07.md).
 
 **🆕 2026-08-07 — the sore-muscle check-in warns before a whole-session deload, not just a narrow
 one (Q-115-followup, v1.267.12).** Split off from Q-115 after its 1RM-inflation half shipped.
@@ -2126,7 +2126,7 @@ directly to predict the escalation and switch banner text — reusing the exact 
 of re-deriving it. Verified with Playwright in both themes against the seeded 3-exercise Push
 session: selecting 2 of 3 exercises' sore muscles correctly showed the whole-session warning;
 deselecting back to 1 correctly reverted to the narrow phrasing. Full detail:
-[`entries/2026-08-07-sore-muscle-picker-whole-session-banner.md`](history-2026-08-07.md).
+[`docs/overview/history-2026-08-07.md`](history-2026-08-07.md).
 
 **🆕 2026-08-07 — Morning Check-in stops score-based pre-filling; Motivation replaced with an
 illness/context flag (Q-113, v1.267.11).** Root cause: `prefillMorningScales()` seeded
@@ -2159,7 +2159,7 @@ a pre-existing sandbox/dev-server limitation rather than a regression, but it me
 on-screen chip picker and neutral-default sliders were verified by code review and the underlying
 data flow, not a live screenshot. No on-device S25 verification — JS-only, no native/safe-area
 involvement. Full detail:
-[`entries/2026-08-07-morning-checkin-prefill-illness-flag.md`](history-2026-08-07.md).
+[`docs/overview/history-2026-08-07.md`](history-2026-08-07.md).
 
 **🆕 2026-08-07 — Running screen carousel gets per-type imagery, Skip button removed
 (Q-98-followup, v1.267.10).** A scoped subset of the owner's suggested redesign: each carousel
@@ -2173,7 +2173,7 @@ that panel carries content (AI rationale, gate-softening warnings, Push badge) t
 cleanly onto a small carousel slide, and duplicating a Start button per-slide alongside a
 persistent external one would be redundant. Kept one external Start button driven by whichever
 slide is currently showing. Full detail:
-[`entries/2026-08-06-running-screen-carousel-imagery.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-07 — deloaded sets no longer inflate the 1RM estimate or mint bogus PRs (Q-115,
 v1.267.9).** `prescriptionStyleForExercise()` unconditionally set `useFor1rm: true` on every
@@ -2199,7 +2199,7 @@ exact reported numbers (estimated1rm: 0, isPR: false) and a control case with ge
 (estimated1rm: 79, isPR: true, unaffected). The sore-muscle-picker's "will be lightened" banner
 still doesn't account for the whole-session escalation — split off as **Q-115-followup** (needs
 per-exercise muscle-role data threaded through several component layers, out of scope for this fix).
-Full detail: [`entries/2026-08-07-deload-1rm-inflation-fix.md`](history-2026-08-04.md).
+Full detail: [`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-07 — the "Today's Timeline" wakeup/sleep cards are tappable → that night's sleep
 detail (Q-93-followup sleep half, v1.267.8).** The blocker that scoped these out of Q-93 was real
@@ -2212,7 +2212,7 @@ night. Wired on both timeline renderers. Verified with Playwright in both themes
 card to render today) — confirmed the sheet opens straight to that night's stage breakdown, not the
 list. The workout card remains unwired — it needs a historical HR-chart/exercise-detail screen that
 doesn't exist yet at all; Q-93-followup's backlog entry is scoped down to just that piece. Full
-detail: [`entries/2026-08-07-sleep-timeline-detail-deeplink.md`](history-2026-08-07.md).
+detail: [`docs/overview/history-2026-08-07.md`](history-2026-08-07.md).
 
 **🆕 2026-08-06 — Running-plan overrides now write through the local store, fixing a real
 APK-only skip-then-dead-end bug (Q-98 bug-fix half, v1.267.7). ⚠️ NOT device-verified.**
@@ -2229,7 +2229,7 @@ the actual fix has not been exercised on a real device.** Verified only that the
 regressions. Needs a real on-device swipe-to-pick-a-different-run-type check before this can be
 marked confirmed. The redesign half of Q-98 (per-run-type imagery, folding Start into carousel
 slides) was not attempted — split off as **Q-98-followup** in the backlog. Full detail:
-[`entries/2026-08-06-running-plan-override-local-write.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-06 — Guided Walk's preset picker is now Long / Short / Custom (Q-99, v1.267.6).**
 Content/state change only — the carousel mechanics were already shared with the Running screen and
@@ -2244,7 +2244,7 @@ content derivation; (2) the autosave initially only wrote `customConfig` on a *s
 after the flip-to-custom, leaving the Custom slide's own preview text stale until a second stepper
 touch — fixed by saving in the same effect pass that detects the flip. Both caught by an actual
 Playwright screenshot, not by reasoning about the code. Full detail:
-[`entries/2026-08-06-guided-walk-long-short-custom-presets.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-06 — Zone 1 minutes now get lazy-day credit on the Cardiovascular screen (Q-88,
 v1.267.5).** Reopens D-10 (`docs/superpowers/specs/2026-07-26-cardio-system-spec.md:60-82`) without
@@ -2257,7 +2257,7 @@ logged cardio/guided-walk session, reusing the existing lightweight `getDayExerc
 `trainedToday` boolean, no new zone-minutes query needed since `dayQuota` already carries the Zone 1
 row. Verified with Playwright against seeded local HR data in both themes: card renders with a real
 Zone 1 minute count on a no-workout day, disappears the moment a workout is logged that day. Full
-detail: [`entries/2026-08-06-zone1-lazy-day-credit.md`](history-2026-08-04.md).
+detail: [`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-06 — the pre-workout header refresh button no longer flashes "done" mid-generation
 (Q-86, v1.267.3).** Not a caching bug — the duration-preset switch correctly forces a real,
@@ -2269,7 +2269,7 @@ generation window and can't fire a redundant request mid-flight. Verified agains
 `ai_dynamic` prescription with the actual `/prescribe` call intercepted and delayed (no LLM key
 configured in this sandbox), confirming the disabled/spin state holds via direct DOM attribute
 checks, not just a screenshot. Full detail:
-[`entries/2026-08-06-duration-preset-refresh-feedback.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-06 — the exercise-summary/rest screen shows what's up next (Q-87, v1.267.2).** Cheap,
 traced to source — `effectiveExercises[store.currentIdx + 1]` at the exact call site that already
@@ -2279,7 +2279,7 @@ screen's "last time" line, which is last-*logged* weight and can read differentl
 Next" card between the rest timer and the sets table; `null` at the last exercise of a session, no
 broken/empty state. Verified end-to-end with a real Playwright run through the actual Log Set /
 rest-skip UI against seeded local data, in both themes. Full detail:
-[`entries/2026-08-06-exercise-summary-up-next.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-06 — the Sleep screen gains phase-hours/bedtime/wake-time trend charts + skin
 temperature (Q-90, v1.267.1).** The plan flagged one real ambiguity — "toggle between, or
@@ -2318,7 +2318,7 @@ next:** the specific night that motivated this (2026-08-06) was re-queried mid-s
 final read — under the corrected numbers that particular night's z-score (0.99) falls just short of
 the cap threshold. The mechanism is correct and proven on other real nights; this specific night
 just turned out milder than the ring's still-catching-up numbers first suggested. Full detail:
-[`entries/2026-08-06-sleep-fragmentation-cap.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **🆕 2026-08-06 — the sleep hypnogram no longer looks "stuck missing" after a sync/redecode
 (Q-91, v1.266.11).** Measured production first: no recent night was actually missing hypnogram
@@ -2493,7 +2493,7 @@ doesn't scale down with a shorter preset — Quick loses 30% of its budget to wa
 and Long's 10%, for the identical learned warmup value. **Q-84:** the guided-walk summary shows
 pace, not cadence, for fast/slow intervals — cadence is already computed per interval and
 persisted, it's just dropped at the fast/slow rollup and never rendered. Plans + backlog entries:
-[`docs/overview/entries/2026-08-05-time-budget-cadence-backlog-planning.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 **Renumbered from Q-75/Q-76** — a same-day PR (#1078) claimed those numbers first for an unrelated
 data-analysis review, below.
 
@@ -2615,7 +2615,7 @@ trained them with the stored phase still saying accumulation. Fixed in v1.252.0:
 auto-applies only when the model earned it (`canAutoApplyTransition`), deloads and ceiling-forced
 transitions still ask, and an auto-applied transition now carries a deterministic evidence-cited
 rationale. See
-[`docs/overview/entries/2026-08-03-exercise-deload-scoping.md`](history-2026-07-30.md).
+[`docs/overview/history-2026-07-30.md`](history-2026-07-30.md).
 
 **🆕 2026-08-02 — the roadmap was reviewed against the native endpoint, and the public-repo cut moved
 to the front of the queue.** Review:
@@ -3093,7 +3093,7 @@ other live-HR consumer (`useLiveHr`, the walk/fitness-test/run screens) only rea
 the ring's native BLE burst loop fires, which cannot be observed in the sandbox; needs an owner
 smoke test (start a workout with the strap connected, confirm ring battery doesn't move) on the
 S25. Entry:
-[`docs/overview/entries/2026-07-28-ring-deescalation-when-strap-covers.md`](history-2026-07-28.md).
+[`docs/overview/history-2026-07-28.md`](history-2026-07-28.md).
 
 **Previous feature:** (v1.229.0) **Direct-BLE Renpho ES-20M scale integration.** Pairs the owner's
 Renpho scale directly over Bluetooth from Profile settings — bypasses Health Connect entirely,
@@ -3118,7 +3118,7 @@ battery/notification cost. ⚠️ **Not yet device-verified** — see Known Issu
 Kotlin layer (BLE connect/handshake/decode, the foreground service, the background notification)
 cannot be exercised in the sandbox (no Android SDK, Gradle proxy-blocked, no Bluetooth hardware)
 and needs an owner APK rebuild + on-device smoke test before this is fully trusted. Entry:
-[`docs/overview/entries/2026-07-27-renpho-ble-scale-integration.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Previous feature:** (v1.228.2) **Skip the "all sets logged, tap Complete" screen — go straight to
 the exercise summary, with the rest countdown moved onto it.** Owner-reported: after the last set,
@@ -3138,7 +3138,7 @@ summary screen appears immediately with no intermediate screen, the ring visibly
 (90s → 87s over 3 real seconds), and tapping "Next Exercise" clears it cleanly with no stale
 countdown on exercise 2's ready screen. Superset/buffered-exercise handoff paths were verified by
 code review only (the seeded local program has no supersets to drive through). Entry:
-[`docs/overview/entries/2026-07-28-exercise-summary-rest-timer.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Previous feature:** (v1.228.0) **Intervals goal (Norwegian 4×4) — cardio batch, last item in the
 running-system backlog sweep.** A fifth selectable running-plan goal, running the well-known 4×4-
@@ -3146,7 +3146,7 @@ minute high-intensity interval protocol (capped at 2 sessions/week, easy/long fi
 TypeScript — the prescription engine's swappable `RunFramework` interface was explicitly built for
 this exact extension and had never been used until now. Fully verified in the sandbox (unit tests +
 end-to-end Playwright + `psql` confirmation), no device-only surface. Entry:
-[`docs/overview/entries/2026-07-27-cardio-intervals-goal.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Previous feature:** (v1.227.2) **Run status-bar chip — cardio batch.** Live runs now show their
 actual goal's progress in the Android status-bar pill: distance-so-far/target for a distance-goal
@@ -3155,7 +3155,7 @@ the same native chip mechanism the lifting rest timer already has. Toggle from P
 Preferences → Run in Status Bar. **Not verified on-device** — the native chip itself (the entire
 payoff) cannot be exercised in the web/dev sandbox; needs an owner APK rebuild + smoke test. See the
 Known Issues row below. Entry:
-[`docs/overview/entries/2026-07-27-cardio-run-status-chip.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Previous feature:** (v1.227.1) **Max-HR resolver consolidation.** Max HR was resolved three
 different ways that could silently disagree; `resolveHrProfile` is now the only resolver, with
@@ -3175,7 +3175,7 @@ shape) plus a new `ActivityLog.elevationProfile` field threaded through the full
 validation, adapter, `activity-store.ts`'s `finish()`, all `done-activity-screen.tsx` save paths,
 and the offline sync chain. **Not verified on-device** — the local-SQLite write→sync→pull path and
 real GPS elevation data were both only exercised via a manually-seeded row in the sandbox. Entry:
-[`docs/overview/entries/2026-07-27-cardio-elevation-profile.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Previous feature:** (v1.222.0) **Dedicated run execution screen — cardio batch.** Runs get their
 own live tracking screen (`RunActiveScreen`) instead of the generic activity screen: a live HR +
@@ -3183,7 +3183,7 @@ zone hero (the first place `lib/live-hr/` is wired into the activity flow, not j
 screen), splits-so-far and elevation-so-far, a live map, and cadence — and if today's run has a
 prescription, the hero shows whether the current zone is on target. No new stored data, no new API
 route. **Not verified on-device** — live HR needs a real strap/ring. Entry:
-[`docs/overview/entries/2026-07-27-cardio-run-execution-screen.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Also recently:** (v1.220.1) **D5 — own daytime-HRV.** Replaces Oura's `dhrv_imputation` ONNX
 model with a per-user linear regression (`ln(rmssd) = a + b·hr + c·temp`, closed-form OLS) fit from
@@ -3201,7 +3201,7 @@ validation gate. This is the master plan's **D6 → D5 → D2** sequencing — D
 raw store + on-device rollup) next. ⚠️ **Cold-start**: the model needs a few days of real overnight
 ring wear post-merge before it produces anything (same "not enough data" outcome as before); **not
 yet device-verified** — no real H10 spot-check has been run on this console. See Known Issues.
-Entry: [`docs/overview/entries/2026-07-27-d5-own-daytime-hrv.md`](history-2026-07-23.md).
+Entry: [`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Also recently:** (v1.220.0) **Naps no longer drag down your sleep quality trend or your weekly
 recap's average sleep score.** A 20-minute afternoon doze was being scored as if it were a night's
@@ -3213,7 +3213,7 @@ gave it the next morning.
 match how I slept" bug — F-1/Q-1/Q-18 — is closed; see Known Issues. One shared module now decides
 which sleep was the night, by circadian position (with a length override so non-nocturnal sleep still
 counts) rather than by whichever row ended last, and reassembles a night broken by a wake-up. Entry:
-[`docs/overview/entries/2026-07-27-night-selection-f1-q1-q18.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Previous feature:** (v1.218.0) **Baseline anchors + push sessions — cardio batch, density-progression
 item (split plan 2 of 2).** A new `running_baselines` table freezes a fitness/pace snapshot (VO2max,
@@ -3226,21 +3226,21 @@ treadmill result never corrupts an outdoor comparison — nothing new is stored 
 table itself, per the "derive, or reconcile on read" rule. **Not verified:** a real 5-session push
 cadence over genuine calendar time (checked via seeded DB rows instead) or on-device. Completes the
 density-progression backlog item (both split plans now shipped). Entry:
-[`docs/overview/entries/2026-07-27-feat-cardio-baseline-anchors.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Previous feature:** (v1.217.0) **Density-progression running framework + two prescription bug
 fixes.** Running plans can now hold their session time fixed (20/30/45/60 min) and grow the distance
 target ~3%/week instead of growing the time itself. Also fixed two pre-existing bugs that silently
 blocked every framework's week-over-week growth (`weekIndex` hardcoded to `0`; `ctx.goal` a hardcoded
 fake) and the Running screen's "Start run" button (never called `startActivity()`). Entry:
-[`docs/overview/entries/2026-07-27-feat-cardio-density-progression.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Also recently:** (v1.216.0) **Cardio trends surface — cardio batch item 1 (renumbered).** New
 `/api/cardio-trends` route + a Trends card on `/cardio` with a three-pill view picker: weekly
 heart-rate zone stacks (`bucketZoneMinutesByWeek` over `getZoneMinutesRange`), a pace-vs-HR
 efficiency curve for GPS runs (dual-axis, reversed pace axis matching the session-visuals item's
 convention), and a cadence trend. Entry:
-[`docs/overview/entries/2026-07-27-cardio-trends.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Also recently:** (v1.215.0) **Sleep Score gains an autonomic axis.** Owner-directed, from the
 data-quality review's case study of the night of 2026-07-25 — a night rated 5/5 "Terrible" that
@@ -3253,7 +3253,7 @@ autonomic state is 28 of 110 rather than 12 of 100. That night now scores **71**
 and 5 clear of the 3rd, where it used to sit 5th and indistinguishable from ordinary nights — while
 the top of the range is unmoved and a perfect night still reaches 100 (pinned by a test).
 **Historical scores change meaning**, and the two new contributor bars are **not device-verified**.
-Entry: [`docs/overview/entries/2026-07-27-sleep-score-autonomic-axis.md`](history-2026-07-23.md).
+Entry: [`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Also recently:** (v1.214.0) **Cardio session visuals — cardio batch item 1.** The per-session
 `ActivityDetailSheet` gained a hero interactive HR/pace scrub chart (drag across it and the route
@@ -3264,7 +3264,7 @@ callouts from `bestEfforts` (computed and stored since GPS tracking shipped, nev
 now), a time-in-zone donut beside the existing zone-breakdown bar list, and a proper bordered
 splits table. ⚠️ **Not yet device-verified** — the `touch-none` scroll-guard on the hero chart's
 touch-drag scrub is untested on a real Samsung WebView gesture. Entry:
-[`docs/overview/entries/2026-07-27-cardio-session-visuals.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Also recently:** (v1.213.0) **Cardio session picker — cardio batch item 1 (renumbered).** The
 Cardiovascular hub's modality picker gained a "How much time do you have?" flow: pick 15/30/45/60
@@ -3272,7 +3272,7 @@ minutes and it recommends Run, Guided walk, or Other activity — recommending R
 the running program's own recovery-gate reason, e.g. easing off after a heavy leg day) only when
 today's pending prescription actually fits the time budget, otherwise recommending a walk to close
 whichever training zone (Z2-Z5, Z1 excluded per D-10) has the most minutes outstanding. Entry:
-[`docs/overview/entries/2026-07-27-cardio-session-picker.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 **Latest fixes:** (v1.208.2) added a time-in-zone + Session Load breakdown to the guided walk's
 summary screen, reusing the same `ZoneBreakdown` component regular activities already have.

@@ -35,12 +35,12 @@ canonical-display-source table in the same section).
 - [`docs/reviews/2026-08-05-data-analysis-opportunities.md`](../../reviews/2026-08-05-data-analysis-opportunities.md)
   — **14 of 66 sleep rows are under 4 h and every analysis consumer eats them** (Q-76, consumer side
   of Q-10) — **fixed 2026-08-05, v1.261.0**, see
-  [`entries/2026-08-05-sleep-nights-not-rows.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
   Also the strongest measured relationship in the dataset: later bedtime costs 0.70 h of
   sleep per hour (Q-77) — and the midnight-wrap coding trap that makes a naive version of that
   analysis report the exact opposite. **Q-77 shipped 2026-08-05, v1.262.0** as the `bedtime-sleep`
   trends view, with a test that goes red under raw-clock-hour coding; see
-  [`entries/2026-08-05-bedtime-sleep-cost-view.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - [`docs/reviews/2026-08-03-cross-domain-bug-review.md`](../../reviews/2026-08-03-cross-domain-bug-review.md)
   — Q-56 (open, investigation-first, shared with `devices`/`body`): one `oura_daily` row landed
   dated 5 days in the future in the same write batch as the `body_metrics` finding. Also: a
@@ -66,13 +66,13 @@ Live at the time of writing (2026-07-30) — always re-run the grep rather than 
   now uses Q-139's robust per-epoch offset instead of single-newest-anchor extrapolation. Only future
   rollups get the fix; existing stored nights need an owner-triggered Redecode. See
   [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) I25 and
-  [`docs/overview/entries/2026-08-12-oura-ble-anchor-drain-lag-investigation.md`](../../overview/history-2026-08-12.md).
+  [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md).
 - 🟠 **A sleep session can get stuck on a stale, narrower window with no self-heal (Q-225, found
   2026-08-13/14)** — a different bug from the above: verified via a full local reproduction that
   `aggregateOuraRawSamples` computes the *correct* window from real raw data, but a production row
   didn't match it. Leading theory ties it to `platform`'s DB-pool-contention fault (Q-107), not
   confirmed. See
-  [`docs/overview/entries/2026-08-14-sleep-stale-window-and-pool-contention.md`](../../overview/history-2026-08-12.md).
+  [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md).
 - 🟠 **`respiratory_rate` is persisted from an estimator its own docs call uncalibrated** — queue
   item Q-4.
 - 🟡 ~~Degenerate sleep rows are stored~~ **fixed 2026-08-02 (v1.250.8)**; what is left of Q-10 is only the nice-to-have of persisting a session `type`.
@@ -92,7 +92,7 @@ Live at the time of writing (2026-07-30) — always re-run the grep rather than 
   `session-select-content.tsx` all now refetch `'sleep-sessions'` when a BLE drain settles or an
   admin Redecode completes, while already mounted — previously only a fresh navigate/remount
   would show the update. See
-  [`docs/overview/entries/2026-08-06-sleep-screen-oura-sync-refetch.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
   **Deferred, filed separately:** the BLE ingest route's own background rollup still emits no
   invalidation signal at all for the ordinary (non-manual) flow — `docs/implementation-backlog.md`
   Q-91-followup.
@@ -101,7 +101,7 @@ Live at the time of writing (2026-07-30) — always re-run the grep rather than 
   request was resolved as a segmented control (`SegmentedTabs`) over one shared chart area, per
   the plan's explicit "don't guess silently" flag. Bedtime plots on the noon-shifted axis
   (`minutesFromNoon`) to avoid the midnight-wrap trap this domain has hit before. See
-  [`docs/overview/entries/2026-08-06-sleep-screen-trend-cards.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 
 The nap-scored-instead-of-the-night bug (F-1/Q-1/Q-18) **is fixed** — v1.217.1 gave every consumer
 one answer to "which row is the night?". A duplicate "OPEN" row

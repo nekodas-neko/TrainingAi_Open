@@ -186,7 +186,7 @@ Live at the time of writing (2026-07-30):
   than reading code — see the journal entry for why that distinction matters. Plan:
   [`plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md`](../../superpowers/plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md).
   **Stage 2 shipped 2026-08-13** — the rollup now runs in a `worker_threads` realm; see
-  [`entries/2026-08-13-rollup-off-the-request-loop.md`](../../overview/history-2026-08-12.md)
+  [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)
   for the worker-bundle constraint (`onnxruntime-node` cannot be webpack-bundled, so it needs its own
   esbuild output) and the in-process fallback that keeps a broken bundle harmless.
 
@@ -231,7 +231,7 @@ Live at the time of writing (2026-07-30):
   shape decision before anyone starts it, and that Q-7b/Q-104/Q-114 are device-gated despite an
   earlier handoff listing them as ready.
 
-- **[`docs/overview/entries/2026-08-14-sleep-stale-window-and-pool-contention.md`](../../overview/history-2026-08-12.md)**
+- **[`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)**
   — 🆕 much sharper burst evidence for the standing Q-107 DB-pool-contention fault (two ~20-minute
   bursts hitting 15-20+ unrelated routes at once, a cleaner signature than the 2026-08-08
   measurement), found while diagnosing an unrelated `[sleep]` bug (Q-225) via a full local

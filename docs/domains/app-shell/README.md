@@ -83,7 +83,7 @@ Live at the time of writing (2026-07-30):
   permanently mounted, so mount effects never re-run. More was missed by the original plan and
   never refreshed at all until v1.257.0; use `useRefreshOnTabShow()` or thread `epoch` in any new
   tab-resident card. See
-  [`docs/overview/entries/2026-08-05-more-tab-refresh-and-strap-retry.md`](../../overview/history-2026-08-04.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - **Edge-swipe tab navigation stays live on the four health detail screens** — open.
 - **Screen transition timing + prefetch** (v1.241.1) — not device-verified.
 - **Q-1, the native-feel performance push, is the live owner-directed initiative** — the network
@@ -95,8 +95,8 @@ Live at the time of writing (2026-07-30):
   pre-selects that night in `HealthMetricSheet`'s sleep sheet (not `/health/sleep`, which has no
   date-selection UI). Workout stays non-interactive — no historical HR-chart/exercise-detail screen
   exists yet — tracked as the remainder of backlog item Q-93-followup. See
-  [`docs/overview/entries/2026-08-06-timeline-meal-tap-navigation.md`](../../overview/history-2026-08-04.md)
-  and [`docs/overview/entries/2026-08-07-sleep-timeline-detail-deeplink.md`](../../overview/history-2026-08-07.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
+  and [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md).
 
 ## History
 
@@ -135,10 +135,10 @@ Live at the time of writing (2026-07-30):
   `cross` because it also covers `platform`-territory items.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
-  [`entries/2026-08-07-home-hydration-mismatch.md`](../../overview/history-2026-08-04.md)
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-73 — the home header's date string mismatched between server (UTC) and client (Australia/Brisbane)
   for 42% of every day; fixed with a fixed-timezone formatter instead of either side's ambient tz).
-  Also [`entries/2026-08-07-navless-safe-area-sweep.md`](../../overview/history-2026-08-07.md)
+  Also [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-118 — 6 navless takeover screens used the un-floored `pb-safe-action` instead of
   `pb-safe-action-lg`, the same on-device gesture-bar-overlap class already fixed once for workout
   screens; NOT device-verified).

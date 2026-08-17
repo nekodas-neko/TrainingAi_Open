@@ -62,7 +62,7 @@ nothing will ever answer it, and an unanswered client-side tool call wedges the 
 itself on render, and it never collapses into a spent-form bubble the way the input widgets do.
 Verified end to end against the live model, including the follow-up turn that would wedge if the
 self-resolve were wrong. Journal:
-[`entries/2026-08-11-coach-chart-widget.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **⚠️ Not device-verified.** The chart renders on canvas in Samsung's WebView, which is where this
 app's chart and gradient rendering has misbehaved before. Treat the visual as unverified until seen
@@ -81,7 +81,7 @@ holds it, so a lifter was marked down permanently for the shape of their trainin
 32 of those were lifting days**, so the exclusion keys off an exact zero with no invented threshold.
 Deliberately narrow: a zero on a *rest* day still scores 0, because there it does mean no moderate
 activity happened. Live A/B on the same data: **33 → 38**. Journal:
-[`entries/2026-08-11-zone-minutes-structural-zero.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **Carry into Q-137:** with 40 of 45 days at zero, `zoneMinutes` carries almost no information for
 this user either way — worth knowing before its goal is re-anchored.
@@ -102,7 +102,7 @@ paths (single-tab *and* `?tab=all`) surface it, and `buildWorkoutExercises` read
 `aiDeload || isDeloadActive` so both entry points converge on the one `deloadOverrideForGoal`
 mechanism. Measured on the dev server: 82.5% × 4 sets → **50% × 2 sets** on confirming, back to
 82.5% × 4 on day 8, and the Q-109 toggle path unregressed. Journal:
-[`entries/2026-08-11-early-deload-week-ai-dynamic.md`](history-2026-08-08.md).
+[`docs/overview/history-2026-08-08.md`](history-2026-08-08.md).
 
 **⚠️ What it exposed and did not fix — Q-185.** The reduction lives inside `if (aiDrivesLoad)`, so
 an exercise the AI prescription does not name is not reduced at all: measured on the same run, an
@@ -698,7 +698,7 @@ Verified end-to-end against `pnpm dev`: a completed session with live HR data al
 `oura_heartrate` got both snapshot rows immediately; a completed session with no HR data got neither,
 stayed on the missing-list, and was correctly picked up once HR data was added and a backfill pass
 ran. See
-[`docs/overview/entries/2026-08-05-fix-hr-attribution-completion-trigger.md`](history-2026-08-04.md).
+[`docs/overview/history-2026-08-04.md`](history-2026-08-04.md).
 
 **Still open (residual, tracked as the remainder of Q-11):** of the rows that exist, a large share
 have `coverage_ok=false`/null `peak_bpm` — possibly genuine strap dropout during lifting, possibly
@@ -816,7 +816,7 @@ Postgres` is required.
 strictly stronger, so no duplicate pair could already exist, and nothing queries the table by
 `oura_id` (it is a dedup guard, never a lookup key). A DB-backed test asserts two users can hold the
 same ring-derived id, checked against the old constraint where it fails. Details in
-[`docs/overview/entries/2026-08-02-sleep-oura-id-user-scope.md`](history-2026-07-30.md).
+[`docs/overview/history-2026-07-30.md`](history-2026-07-30.md).
 The original description follows.
 
 
@@ -861,11 +861,11 @@ confirmed working on-device:
   collapsing the whole route to one zone's color; fixed by using the unambiguous multi-argument
   `Date` constructor instead (same pattern the server's own date+`HH:MM`→UTC conversion already
   uses). Entries:
-  [`docs/overview/entries/2026-07-28-thunderforest-atlas-style.md`](history-2026-07-28.md),
-  [`docs/overview/entries/2026-07-28-hide-map-attribution.md`](history-2026-07-23.md),
-  [`docs/overview/entries/2026-07-28-hr-zone-colored-route-map.md`](history-2026-07-23.md),
-  [`docs/overview/entries/2026-07-29-hr-zone-map-coverage.md`](history-2026-07-28.md),
-  [`docs/overview/entries/2026-07-29-zone-map-ambiguous-date-fix.md`](history-2026-07-28.md).
+  [`docs/overview/history-2026-07-28.md`](history-2026-07-28.md),
+  [`docs/overview/history-2026-07-23.md`](history-2026-07-23.md),
+  [`docs/overview/history-2026-07-23.md`](history-2026-07-23.md),
+  [`docs/overview/history-2026-07-28.md`](history-2026-07-28.md),
+  [`docs/overview/history-2026-07-28.md`](history-2026-07-28.md).
 
 ### [cardio] ✅ Activity route map blank-tile bug — root cause confirmed and fixed (v1.230.2, 2026-07-28)
 
@@ -880,7 +880,7 @@ never did). Confirmed via a real online-state DevTools console capture showing t
 violation on `sw.js:162`. Fixed by adding both tile providers to `connect-src` in `next.config.ts`.
 The prior candidate fix (v1.230.1, a Leaflet compositor CSS promotion) was a plausible but incorrect
 hypothesis and has been reverted — the CSP finding fully explains the bug on its own. Entry:
-[`docs/overview/entries/2026-07-28-thunderforest-connect-src-csp-fix.md`](history-2026-07-28.md).
+[`docs/overview/history-2026-07-28.md`](history-2026-07-28.md).
 
 ### [devices] ✅ D2 Tasks 2+3 — native `oura_raw.db` + cursor gate — device-verified 2026-07-30
 The Oura history cursor no longer advances on the server's 2xx. It advances when the drained batch
@@ -986,7 +986,7 @@ the whole history instead of a +40% rally. Both phantom PRs were re-derived from
 (Pull-Up 114.5 → **118.0** @ 2026-06-21, Hanging Leg Raise 123.25 → **128.0** @ 2026-06-23), and every
 display surface now renders bodyweight strength as a rep max via the shared `displayOneRm` helpers in
 `lib/1rm.ts`. Journal:
-[`entries/2026-07-27-bodyweight-1rm-reps.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 ⚠️ Not verified on device — none of the reworked cards have been seen on the S25.
 
 ### [workouts][platform] ✅ Local store now mirrors `exercise_library` — bodyweight exercises type correctly offline (fixed by v1.234.2)
@@ -1008,7 +1008,7 @@ below that, rank decides. **Blast radius measured first and it is zero**: the er
 frames**, so the ring produces no total for the days Health Connect still owns inside the 35-day
 window. Real but latent — a correctness change, not a data change. Q-22 §3 (preview/rollup duplicate)
 also verified already-fixed and struck. Journal:
-[`entries/2026-07-29-step-merge-rank-over-magnitude.md`](history-2026-07-28.md).
+[`docs/overview/history-2026-07-28.md`](history-2026-07-28.md).
 
 ### [activity][devices] ✅ The ring's step model is device-verified accurate (2026-07-29)
 Guided-walk check: app **3,716** vs Samsung Health **3,759** — a **1.1%** difference over ~28 minutes
@@ -1031,7 +1031,7 @@ second row; production holds **15 overlapping pairs**, one cluster crediting 375
 that should credit 301. Now deduped greedily (can only lower a total). (c) A **midnight-crossing
 window was counted twice** — credited whole to the start day while the next day's model windows over
 the same minutes were never dropped. Now split pro-rata via the shared `dateStrMidnightInTz`. Journal:
-[`entries/2026-07-28-step-counting-three-more-faults.md`](history-2026-07-28.md).
+[`docs/overview/history-2026-07-28.md`](history-2026-07-28.md).
 
 ### [activity] ✅ Step counts no longer inflated by impossible live windows (v1.229.2, 2026-07-28)
 Owner-reported: the app showed **4,903 steps** while Samsung Health showed **911**. Running the real
@@ -1045,7 +1045,7 @@ impossible (289, 190 and **1,145** steps/min), one per affected day. Shipped: sh
 `isPlausibleStepWindow` derived from the detector's own band edge, enforced at both ingest routes
 (reject, never clamp) and inside `mergeStepCounterWithLive` so already-stored bad rows stop
 suppressing the model. Journal:
-[`entries/2026-07-28-step-cadence-plausibility-gate.md`](history-2026-07-28.md).
+[`docs/overview/history-2026-07-28.md`](history-2026-07-28.md).
 
 ### [activity] ✅ Root cause: the posted step window came from a different stream than the count (v1.228.5, 2026-07-28)
 Proven, and it is the **window**, not the count. `StepPeakCounter` applies its 350 ms refractory *in
@@ -1073,7 +1073,7 @@ untouched and **suppress the derived value** until `BASELINE_MIN_NIGHTS` (14), g
 derivation in `computeDailySummaries` so no future reader can inherit a cold value. Migration 155
 cleared the **11 of 22** stored rows below that threshold; the baseline *state* columns are left
 alone, since the fold resumes from them. Journal:
-[`entries/2026-07-27-cold-baseline-temp-deviation.md`](history-2026-07-23.md).
+[`docs/overview/history-2026-07-23.md`](history-2026-07-23.md).
 
 ### [workouts] ✅ Lifetime totals now count finished workouts only (v1.218.1, 2026-07-27)
 Owner decision on audit finding Q-8. `user_stats` used two different definitions of "a workout" in
@@ -1132,7 +1132,7 @@ stderr as error.
 `decryptToken` handing back a `v1:` ciphertext because the key vanished, which Oura then rejects as
 "malformed", sending you to inspect the credential rather than the key. `encryptToken` still throws;
 the fail-closed property is unchanged. Both directions mutation-verified. Journal:
-[`entries/2026-08-13-token-enc-key-boot-log.md`](history-2026-08-12.md).
+[`docs/overview/history-2026-08-12.md`](history-2026-08-12.md).
 
 **⚠️ Owner, optional not blocking:** setting `TOKEN_ENC_KEY` (`openssl rand -hex 32`) is only needed
 to connect an Oura Cloud credential again.
