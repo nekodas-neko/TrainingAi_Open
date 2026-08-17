@@ -134,6 +134,8 @@ layer**) through §16. Read it before building any shared helper.
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-453/454/455 — date-param fallback, auth-after-validation, bodiless 500; plus the clean sweeps: 122 GET routes anonymous, 122 as a zero-data user, 51 screen renders). Findings Q-450…Q-455; four areas recorded **clean**.
 
+- [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-456 the owner user ID in 18 committed migrations, Q-457 the archived-repo release default, Q-458 `.env.example` drift both ways, Q-459 the APK 404 window). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
+
 ## Open issues
 
 ```bash

@@ -69,6 +69,59 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟠 The repo migration reviewed as an architecture change — no credentials leaked, CI posture correct, four leftovers filed (Q-456…Q-459, 2026-08-17)
+
+- **The lens.** Going public was not a hosting change. It altered three architectural properties at
+  once: vendor material had to leave the tree (turning build-time imports into a **runtime dependency
+  on private object storage**), every configuration and documentation surface silently changed
+  audience from one owner to the public, and **CI became triggerable from outside the project**. This
+  sweep checked all three plus the leftovers still pointing at the archived repo. Full write-up with
+  the method and its limits:
+  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](docs/reviews/2026-08-17-repo-migration-architecture.md).
+- **✅ The two answers that mattered most are both good.** **No credentials were published** — no
+  GitHub/Google/OpenAI-shaped keys, no PEM private keys, no `.env` (only `.env.example`, values all
+  empty), no keystores, no tracked build output, and no third-party personal data (the only real
+  emails in the tree belong to bundled library authors). And **the CI posture is correct for a public
+  repo**: all three workflows trigger on `pull_request`, **not `pull_request_target`**, so fork PRs
+  get no secrets; `ci.yml` uses no secrets at all; and the APK publish is gated on
+  `github.event_name == 'push'`, which a fork cannot reach.
+- **🟠 Q-456 — the owner's production user ID is in 18 committed migrations, and the documented
+  process re-publishes it on every schema change.** `fe481797-…` is baked in by
+  `scripts/generate-claude-ro-views.js` as the row-scoping predicate. **Not a credential** and not
+  exploitable alone (`/api/admin/db-query` needs the secret *and* `requireAdmin`) — but it is one half
+  of the `WEBHOOK_USER_ID`/`ADMIN_EXPORT_USER_ID` pairs, cannot be rotated cheaply, and `CLAUDE.md`'s
+  "re-run the generator into a **new** migration" rule means every future schema change adds another
+  public copy. Fix the generator, not the 18 files.
+- **🟠 Q-457 — `lib/github-release.ts:24` still defaults `APK_RELEASE_REPO` to the archived private
+  repo.** Wrong in two directions: a deployment that ever loses the env var reads a frozen release and
+  fails *silently-looking* (a 404 surfacing as "Could not fetch release info"), and a public clone
+  points at a repo it cannot read. **Not verified against Railway** — this is about the default being
+  a trap, not a live outage. The same surface has already been dead for two weeks once.
+- **🟡 Q-458 — `.env.example` is wrong in both directions.** Eight declared keys are read by no code,
+  including **`TOKEN_ENC_KEY`, which names a security property the app does not have** (an operator
+  will set it and conclude tokens are encrypted at rest; nothing reads it), and five Oura **Cloud**
+  keys inviting a contributor to configure the one integration `CLAUDE.md` forbids re-adding. Four
+  real config vars are undeclared.
+- **🟡 Q-459 — the rolling APK release is delete-then-recreate,** so the advertised public download
+  URL 404s during every native merge. Known trade-off in the workflow's own comment; the migration is
+  what made it matter, since that URL is now the documented distribution path.
+- **Also came back clean:** a fresh clone's test suite genuinely works (synthetic constants are
+  committed and `vitest.config.ts` falls back to them when the real `MANIFEST.json` is absent — the
+  path CI takes every run, so `NOTICE`'s claim holds); the `AWS_*`/`STORAGE_*` split is a deliberate
+  alias chain rather than two competing schemes (**checked and cleared — a near-miss worth recording
+  so it is not re-raised**); and `private-paths.json` is well built, down to descriptions deliberately
+  written non-specifically so the inventory is not itself a map to what it protects.
+- **The one structural gap, noted rather than filed:** `private-paths.json` protects a third party's
+  IP and nothing plays that role for **this project's own users' identifiers**. Q-456 is the single
+  instance found, and it reached a public repo because no gate was looking. Whether that wants a
+  second list or a widening of the first is a design decision, not a review finding.
+- **Method limits.** Static inspection of the tracked tree at `8a1bf82`, not a clean clone built from
+  scratch; **nothing checked against the deployment**; secret detection was pattern-based, so it is
+  strong evidence of absence for conventional formats and not proof for a bespoke one. Git history was
+  not swept and does not need to be — the public repo begins at a single snapshot commit with no
+  pre-migration history — but that reasoning does not transfer to the archived private repo.
+- **Nothing was fixed.** All four are queued.
+
 ### [app-shell][devices] ⚠️ Q-532 FIXED — a streaming panel no longer scrolls the page; NOT device-verified (v1.317.6, 2026-08-17)
 
 - **Cause:** `scrollIntoView` on a sentinel inside the log panel's `overflow-y-auto` box. It scrolls
@@ -217,7 +270,7 @@ the next device change.
   ad-hoc zero-data account, but **not guarded** — the harness's one seeded account has a program, so
   no committed spec reaches a first-run state (filed as **Q-352**). Home's syntactic sibling is
   guarded upstream and is not a bug. [Journal](docs/overview/entries/2026-08-17-workout-select-empty-state.md).
-- **✅ Q-452 HALF-FIXED (v1.318.5)** — the AI insight card ran an LLM over literal `"no data"` strings,
+- **✅ Q-452 HALF-FIXED (v1.318.6)** — the AI insight card ran an LLM over literal `"no data"` strings,
   telling a day-one account *"…shows zero movement… this inactivity creates a significant gap"*.
   `AiInsightCard` now takes a required `hasData` and neither fetches nor renders without it; measured
   both ways (all four sections show for the seeded user, none for a zero-data one). **The prompt half

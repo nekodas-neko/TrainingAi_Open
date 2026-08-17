@@ -8,7 +8,7 @@
 ## Now
 Nothing in flight. Five items shipped today:
 
-- **Q-452** (v1.318.5) — the AI insight card commented on data that did not exist. `AiInsightCard`
+- **Q-452** (v1.318.6) — the AI insight card commented on data that did not exist. `AiInsightCard`
   now takes a required `hasData`. **Client half only — the prompt half is Q-353, Lane A's.**
   [Journal](../../overview/entries/2026-08-17-ai-insight-sufficiency-gate.md).
 - **Q-451** (v1.318.3) — a new account's Workout tab was an empty card with a dead Start button.

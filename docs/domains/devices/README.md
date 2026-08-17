@@ -97,6 +97,8 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-455 — a bodiless 500 from `/api/oura-ble/decoder-constants` when the constants read throws). Findings Q-450…Q-455; four areas recorded **clean**.
 
+- [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-459 — the rolling `apk-latest` release is delete-then-recreate, so the advertised APK download URL 404s during every native merge). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
+
 ## Open issues
 
 ```bash
