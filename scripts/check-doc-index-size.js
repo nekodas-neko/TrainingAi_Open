@@ -91,6 +91,12 @@ const root = path.join(__dirname, '..');
 // shipped and which is still owed; Q-314 is the new queue entry for the root cause; the
 // projectOverview row is a live, unrepaired fault on displayed health values. Entries and a
 // corrected entry, per the same split as the raises above.
+//
+// Raised 2026-08-17 (Lane A): backlog 6649 -> 6671. Two measured corrections onto Q-534 — its
+// finding 4 is not a drop-in index drop (the index has two live consumers that would become
+// sequential scans of the largest table), and the redecode's own re-stamp cost, which that entry
+// gates but did not quantify. Both are corrections to an existing entry, which is cheaper to carry
+// here than to have an implementer discover by dropping the index in production.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -104,7 +110,7 @@ const BASELINE = {
   // radio) can reach the code. The mechanism, the five-site sibling sweep and the CI-rule option
   // that was considered and declined all stayed in the journal entry.
   'projectOverview.md': 6647,
-  'docs/implementation-backlog.md': 6649,
+  'docs/implementation-backlog.md': 6671,
   'CLAUDE.md': 1010,
 
 };
