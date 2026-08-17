@@ -881,6 +881,74 @@ too, so the Balance card's "burned" figure is dragged down in step.
   reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
   control, if option 1 is chosen, would need a device check.
 
+### [nutrition][app-shell] Q-389 — printable food labels for saved meals, scannable back into the app
+
+- **Branch:** `feat/saved-meal-printable-label`
+- **Added:** 2026-08-17 · owner: *"for saved meals; I wanna be able to click the meal and have an
+  image generated that shows the meal name + servings + macros so I can print onto a food label will
+  probably need some mockups. but this way I cam create a saved meal; print the label put it on the
+  meals and then scan/send photo of it to the app and it will know."*
+- **A feature request, not a defect.** Filed here so it is not lost, but per *Backlog-driven
+  implementation* it wants a planning session to produce a spec in `docs/superpowers/plans/` before
+  anyone builds. This entry is the intake record and the design decisions found while tracing — it
+  is **not** the implementation plan.
+
+**Two halves, and the second one is nearly free — if it is built the right way.**
+
+*Half 1 — generate the label.* `saved_meals` (`lib/data/postgres/schema.ts:566-574`) has `id`,
+`name` and `servings`; macros come from `saved_meal_items` → `food_items`. Everything the owner
+asked to print already exists.
+
+*Half 2 — "scan/send photo of it to the app and it will know".* The owner framed this as a photo,
+but the app **already has a scanner that reads QR codes today**:
+- `@capacitor-community/barcode-scanner` v4 is installed (`package.json:52`) and
+  `components/nutrition/barcode-scanner.tsx:82` calls `CapScanner.startScan()` with **no format
+  restriction**, so ML Kit returns QR alongside EAN.
+- The web fallback uses `BrowserMultiFormatReader` (`@zxing/browser`) — also multi-format.
+- `capture-step.tsx:138` `handleBarcode(code)` already receives the decoded string and routes it to
+  `/api/nutrition/barcode`. Adding a saved-meal branch there is a single conditional.
+
+**So the recommendation is a QR code carrying the saved-meal id, not a photo the AI reads.** A
+scanned QR returns the exact `uuid` — no model call, no latency, no cost, and no failure mode on a
+label that is smudged, frozen, curled or photographed at an angle. Vision/OCR of printed macros can
+misread a digit and log the wrong food, which is the one outcome this feature must not have. Keep
+the photo path as a later fallback if the owner wants it for labels printed before this shipped;
+do not make it the primary mechanism. (Precedent for the shape: `food_items.barcode` already exists
+so a rescan matches an item — Q-131.)
+
+**Do NOT generate the label with an image model.** `lib/exercise-image-gen.ts` uses `@google/genai`
+and is the obvious thing to reach for; it is the wrong tool here. A label is exact typography and
+exact numbers — an image model will garble both. Render deterministically (canvas or SVG → PNG),
+which also makes it testable and works offline.
+
+**Three decisions the spec has to make, all of which can go wrong quietly:**
+1. **Per-serving or whole-batch macros?** `servings` exists precisely because a batch makes N
+   portions (its own comment cites the owner's protein ice cream making two). A label reading
+   "Protein 60 g" is dangerously ambiguous on a tub of two. The label should state both the serving
+   count and which basis the macros are on, and the scan-back should log **one serving** by default,
+   not the whole recipe.
+2. **Print is outside this app's design system.** Every UI rule in `CLAUDE.md` is about screen
+   theme tokens on a dark-first app. A label is ink on white paper, often greyscale on a home or
+   thermal printer. It needs its own small palette-free treatment and must stay legible with **no
+   colour at all** — do not reach for `--accent-*` here.
+3. **A saved meal can change after a label is printed.** Editing the recipe leaves a physical label
+   claiming stale macros on a real tub of food. Decide: version the label (encode a revision in the
+   QR and warn on scan when it has moved), or accept it and show the *current* macros on scan. This
+   is the one genuinely hard question in the feature.
+
+- **Open questions for the owner** (worth answering before the spec): should the label carry a
+  **made-on / use-by date**? — not requested, but it is the standard reason to label stored food and
+  the freezer case is exactly the owner's. What **label stock** — pre-cut sheets, thermal label
+  printer, or cut from A4? That sets the physical dimensions the mockups should target.
+- **What would count as done:** from a saved meal, produce a printable label carrying name, serving
+  count, macros on a stated basis, and a QR code; scanning that QR in the existing nutrition scanner
+  resolves to that saved meal and logs it without a network round-trip to an AI service; the label
+  is legible printed in greyscale.
+- **Surface: needs the device for the scan half.** QR decoding runs through the Capacitor plugin,
+  which is inert in the web sandbox (the `@zxing/browser` fallback can prove the *encoding* in
+  `pnpm dev`, but not the native path). Printing and legibility can only be judged on paper.
+  Generation and the label renderer are testable in the sandbox.
+
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
 - **Branch:** `fix/claude-ro-owner-id-out-of-committed-migrations`

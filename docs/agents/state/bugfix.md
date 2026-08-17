@@ -87,6 +87,21 @@ both refuted it and pointed at SpO₂. Also: event counts from `oura_raw_samples
 which is sensing **and** drain success — an unexplained 2026-08-04 step change is in the entry as an
 open question for exactly that reason, not as a finding.
 
+**Filed: Q-389** — `[nutrition][app-shell]` printable food labels for saved meals, scannable back
+into the app. Owner feature request, not a defect. The intake value was in tracing half two: the
+app **already** reads QR — `CapScanner.startScan()` is called with no format restriction
+(`components/nutrition/barcode-scanner.tsx:82`) and the web fallback is `BrowserMultiFormatReader`
+— so a QR carrying the saved-meal id makes "scan it back" exact and free, versus the
+photo/OCR path the owner assumed. Entry also steers away from `lib/exercise-image-gen.ts` for the
+label itself: an image model cannot be trusted to render exact macros. Mockups delivered as a design
+canvas (four directions at true print size); **not committed to the repo** — they live in the
+session scratchpad, so re-seed from the artifact if they are needed again. No projectOverview row:
+Known Issues is for defects and risks in shipped features, and a feature request is neither.
+
+**When a report is a feature request, not a bug:** still file it (it would otherwise be lost), but
+say so in the entry and point at the planning-session requirement — intake does not write the
+implementation plan. Q-389 is the shape to copy.
+
 **`check-doc-index-size.js` will fail every intake PR you write — plan for it.** New as of
 2026-08-17: a shrink-only ratchet on `projectOverview.md`, `docs/implementation-backlog.md` and
 `CLAUDE.md`. Intake adds an entry per report, so it trips every time. The precedent set by the
