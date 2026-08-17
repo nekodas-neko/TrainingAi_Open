@@ -939,9 +939,14 @@ which also makes it testable and works offline.
 - **✅ SETTLED by the owner, 2026-08-17 — the two open questions are answered, build to this:**
   - **Label size is 50 × 50 mm**, square. At 96 dpi that is **189 × 189 px** — the whole design
     budget. Every earlier rectangular sketch is superseded.
-  - **Payload is name + calories + scanning code.** Macros are *not* required. They do fit as three
-    boxed figures, but they cost the code ~3 mm and the name a point size — a variant showing
-    exactly that tradeoff is in the mockups, so this is a decision made with the cost visible.
+  - **Payload is name + calories + P/C/F macros + scanning code.** The owner first asked for
+    name + calories + code with macros optional, then chose the with-macros layout once shown what
+    macros cost (~3 mm off the code, a point size off the name). **Macros are IN** — build to that,
+    and note the code lands at ~16–17 mm as a result, which is the floor this design can take.
+  - **Typeface is a real dependency, not a detail.** The label renderer must **embed** whatever face
+    it uses — the candidates are Google Fonts (Geist, Archivo, Instrument Serif) and none can be
+    assumed present wherever the PNG/PDF is generated. A silently-substituted fallback changes the
+    metrics and the layout is tight enough that it will reflow.
   - **The made-on date is a blank ruled line the owner writes on**, not a rendered date. This
     removes a whole question: the label no longer has to know when it was printed.
   - Calories are stated **per serving with the serving count beside them** ("312 kcal · 1 of 2").

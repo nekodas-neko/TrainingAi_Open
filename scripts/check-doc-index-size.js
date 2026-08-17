@@ -112,7 +112,7 @@ const root = path.join(__dirname, '..');
 // which is the intended cycle working: entries land, cleared ones leave, the number does not ratchet
 // on every single filing.
 //
-// Raised 2026-08-17 (BugFix intake, Q-389 amendment): backlog 6700 -> 6716. The owner settled the
+// Raised 2026-08-17 (BugFix intake, Q-389 amendment): backlog 6700 -> 6721. The owner settled the
 // two questions the entry was waiting on (50x50mm label; name + calories + code, macros optional;
 // handwritten date line), so the "open questions" block became a spec. +16 net for replacing four
 // lines of questions with the answers plus the QR quiet-zone/payload constraint the mockups
@@ -137,7 +137,7 @@ const BASELINE = {
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
   'projectOverview.md': 6679,
-  'docs/implementation-backlog.md': 6716,
+  'docs/implementation-backlog.md': 6721,
   'CLAUDE.md': 1010,
 
 };
