@@ -253,9 +253,29 @@ Live at the time of writing (2026-07-30):
   window without a phase, both `workout-data` paths surface it, and the builder reads
   `aiDeload || isDeloadActive` (Q-175,
   [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)).
-  **Still open (Q-185):** the reduction lives inside `if (aiDrivesLoad)`, so an exercise the
-  prescription does not name — every accessory, and every session with an expired prescription — is
-  not reduced by either entry point.
+  **Q-185 is closed** (this line previously said "still open"): the un-prescribed branch below the
+  `if (aiDrivesLoad)` block reduces an exercise the prescription does not name — every accessory,
+  and every session with an expired prescription — verified in source and on the dev server
+  2026-08-17.
+- **…and there is a THIRD deload path, which no user confirms at all.** The two above are both
+  things the owner *chose*. The AI periodization engine also picks `phase: 'deload'` itself off
+  accumulated fatigue, and because nobody confirms it, it reaches neither branch — it lands in
+  `/api/workout-data`'s ai_dynamic catch-all, which hardcoded `isDeloadActive: false` while
+  title-casing the *same* `aiPeriodizationState.phase` field into the header label "Deload". So the
+  session announced a deload and prescribed full weights, and the fatigue that triggered it never
+  cleared, so another deload kept being recommended. Both copies of that branch now call
+  `aiDynamicFallbackPhaseStatus()` (Q-310,
+  [`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](../../overview/entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md)).
+  Two lessons worth carrying: a **catch-all branch whose comment says what it cannot see** is where
+  to look first — the comment above this one read "not baseline, not deload" — and a phase **label**
+  derived from the same field as a phase **flag** will not disagree visibly, so the label is not
+  evidence the flag is right.
+- **The server's PR gate does not depend on `/api/workout-data` being right.** `logExerciseFromPayload`
+  reads `session_periodization` itself and stamps `currentPhaseType = 'deload'` independently, so a
+  wrong `isDeloadActive` on the route corrupts the **client's** optimistic 1RM/PR badge and the local
+  SQLite copy, not `personal_records`. When triaging a "phantom PR" report, check which of the two
+  you are looking at before reaching for a corrective migration — Q-310's production check found the
+  server side clean.
 - **A `memo`'d component that does its own `readCacheSync('workout-card:<id>')` read inside render
   goes stale the moment `workout-data:all`'s batch fetch seeds that cache key — three independent
   sites have shipped this exact bug (Q-89 `workout-select-content.tsx`, Q-91 a sibling card, Q-106

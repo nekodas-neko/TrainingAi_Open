@@ -63,6 +63,21 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][readiness] ✅ An engine-chosen deload prescribed full weights — fixed, device check owed (Q-310, 2026-08-17)
+
+- **Fixed in v1.317.5.** `/api/workout-data`'s ai_dynamic catch-all — two verbatim copies —
+  hardcoded `isDeloadActive: false` while title-casing the *same* `aiPeriodizationState.phase` into
+  the header label, so an engine-chosen deload (nobody confirms it, so it reaches no earlier branch)
+  read "Deload" and prescribed full intensity. Both copies now call `aiDynamicFallbackPhaseStatus()`.
+  Detail and evidence: [`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](docs/overview/entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md).
+- **`personal_records` was never corrupted and no migration is needed** — `logExerciseFromPayload`
+  gates independently; both production deload sessions carry `max(estimated_1rm) = 0` and no PR row.
+  The badge the owner saw was the client's optimistic display. (Owner-scoped `claude_ro` read.)
+- **Owed: the device check.** Server/JS only, so it reaches the APK via the Railway deploy with no
+  rebuild, but the client half was verified from the route's response, not on hardware. Confirm on
+  the S25 at the next engine-chosen deload: header "Deload", reduced weights, no PR badge. Local
+  SQLite rows written during the bug window self-heal on the next pull; not observed on device.
+
 ### [activity][workouts][app-shell] 🔴 The first sweep to RUN the app since the six-round review — two dead primary actions, one of which loses data (Q-450…Q-455, 2026-08-17)
 
 - **Why this found things six rounds of review did not.** The comprehensive review that closed the
@@ -106,8 +121,8 @@ order.
   `getLocalStore()` returns null, so every offline-first domain took its web fallback and the device
   branch — the canonical runtime — was never exercised. No safe-area, Samsung-WebView, native-plugin
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
-- **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit
-  directly below Q-310 at the top of `docs/implementation-backlog.md`.
+- **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit at
+  the top of `docs/implementation-backlog.md` (Q-310 above them has since shipped and been removed).
 
 ### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
 

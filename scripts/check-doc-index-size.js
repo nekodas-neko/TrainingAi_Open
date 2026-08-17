@@ -31,7 +31,10 @@ const root = path.join(__dirname, '..');
 // docs/reviews/2026-08-17-failure-cells-running-the-app.md, which this ratchet does not govern —
 // which is the split it is meant to enforce.
 const BASELINE = {
-  'projectOverview.md': 6428,
+  // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
+  // check, so it belongs here rather than in the resolved archive, which only takes an entry when
+  // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
+  'projectOverview.md': 6443,
   'docs/implementation-backlog.md': 5945,
   'CLAUDE.md': 967,
 };
