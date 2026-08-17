@@ -3146,7 +3146,18 @@ suppression window at `emergency-deload.ts:19` should change too, since it reads
 
 ---
 
-## Task 49 (Q-246 / Q-247) — deload-day bar styling, and the day-detail screen's missing calorie summary
+## Task 49 (Q-246 / Q-247) — SHIPPED 2026-08-15, #1375, v1.317.0 — deload-day bar styling, and the day-detail screen's missing calorie summary
+
+> **Shipped as investigated, plus one bug this investigation didn't catch: a pure testing day was
+> also rendering the amber "D" (`isDeloadSession` matched `'testing'` too), now fixed alongside it.**
+> The deload day's real volume travels as a new `deloadVolume` field rather than overloading
+> `volume`, so the week's headline total stays correct. The day screen now calls the existing
+> `/api/nutrition/energy-balance` route rather than duplicating `computeActiveEnergy`, and Activity
+> rows render the fields the data model already had (distance, calories, HR, pace, elevation).
+> **⚠️ Not device-verified** — the striped-bar CSS mask in particular is an unobserved Samsung
+> WebView question. Full detail:
+> [`entries/2026-08-15-nutrition-day-guard-and-deload-bar.md`](../../overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md).
+> The investigation below is kept as the historical record of what was found before implementation.
 
 - **Branch:** `fix/health-day-detail-energy-and-deload-bar`
 - **Reported:** owner-reported, 2026-08-14, two screenshots (Health → Training bar chart; Health →
@@ -3205,7 +3216,17 @@ screen. `ActivitySection` (`components/health/day-detail/day-sections.tsx:123-14
 
 ---
 
-## Task 50 (Q-245) — swiping to a previous day and back on Nutrition fills a fresh "today" with the previous day's food
+## Task 50 (Q-245) — SHIPPED 2026-08-15, #1375, v1.317.0 — swiping to a previous day and back on Nutrition fills a fresh "today" with the previous day's food
+
+> **Shipped in the same PR as Task 49, with one addition the fix direction below didn't call for:
+> a `drop` case.** The original direction said a fetch for a different date must always overwrite —
+> right for the reported bug, wrong for a response that resolves *after* the user has swiped away
+> (which would paint one day's food under another day's header, the same bug from the other side).
+> The decision now lives in one pure function, `app/nutrition/food-log-application.ts`, returning
+> `drop`/`keep`/`replace`. **⚠️ Not device-verified** — the swipe gesture itself was never driven in
+> a browser (Playwright isn't a dependency here); the decision function is unit-tested, the gesture
+> wiring around it is not. Full detail:
+> [`entries/2026-08-15-nutrition-day-guard-and-deload-bar.md`](../../overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md).
 
 - **Branch:** `fix/nutrition-stale-day-swipe-food-logs`
 - **Reported:** owner-reported, 2026-08-14 (screenshot: Nutrition page, fresh today, `Eaten 0`): "on
@@ -3259,7 +3280,17 @@ occurrences together — one bug, not three.
 
 ---
 
-## Task 51 (Q-248) — logging Exercise Readiness on Home shows "saved" but the screen doesn't progress
+## Task 51 (Q-248) — SHIPPED 2026-08-15, v1.317.1 — logging Exercise Readiness on Home shows "saved" but the screen doesn't progress
+
+> **The step-1 device repro this entry called for did not happen — no device in the implementing
+> session either — so what shipped fixes the cause the code evidences, not one confirmed against
+> the observed failure.** A new `onOptimisticSave` callback fires on the same beat as the toast/close
+> now; `onSaved` (the prescription refetch) deliberately stays behind the local write to protect the
+> session-164 cache-ordering rule this entry's own fix direction flagged. **The stall theory itself
+> remains unconfirmed**, and a second possible cause stays open: if `onSaved` was never firing at all
+> (not just delayed), the card now flips regardless but the underlying write could still be failing
+> silently — watch for a readiness log that never reaches the server. Full detail:
+> [`entries/2026-08-15-readiness-card-optimistic-flip.md`](../../overview/entries/2026-08-15-readiness-card-optimistic-flip.md).
 
 - **Branch:** `fix/readiness-card-stuck-after-save`
 - **Reported:** owner-reported, 2026-08-15 (screenshot: Home, readiness sheet just closed): "add
@@ -3305,6 +3336,84 @@ how long it takes.
       simulated sync pull (should no longer visibly stall, or should show a clear pending state).
 - [ ] Run tests + lint. Remove this task's entry (Q-248) from `docs/implementation-backlog.md`, add
       the journal entry + `projectOverview.md` update in the same PR.
+
+---
+
+## Task 52 (Q-310) — an ai_dynamic deload phase in the generic fallback runs at full weight with no PR gate
+
+- **Branch:** `fix/ai-dynamic-deload-fallback-not-flagged`
+- **Reported:** owner-reported, 2026-08-17, two screenshots (an active Sumo Deadlift set showing
+  "Pull · Deload · S2 · Ex 1/5" with weight climbing set-to-set; the exercise summary right after,
+  showing a "New Personal Record!" badge and the estimated 1RM up +15.5 kg): "it still reccomended
+  deload again - and the weights are increasing the PR."
+
+### Confirmed root cause, in two identical copies
+
+`app/api/workout-data/route.ts` has a generic ai_dynamic fallback (per-session-summary loop
+~line 255, duplicated verbatim in the single-session-detail path ~line 450) that runs when
+`sessionPhaseStatus` wasn't already set by the earlier baseline/early-deload-week branches and
+`aiPeriodizationState` exists. It title-cases `aiPeriodizationState.phase` into the phase's display
+name (correctly producing `"Deload"`) but hardcodes `isDeloadActive: false` / `phaseType: 'normal'`
+regardless of what the phase actually is. The comment directly above the branch says "not baseline,
+not deload" — the author believed this branch couldn't see a deload phase, but
+`aiPeriodizationState.phase === 'deload'` (the AI's own accumulated-fatigue-triggered decision,
+distinct from the separate owner-confirmed `earlyDeloadWeek` mechanism the branches above already
+handle) is exactly the case that falls through uncaught.
+
+**One bug, three visible symptoms:**
+1. **Weights don't drop** — `buildWorkoutExercises` reads `isDeloadActive` for full-vs-reduced
+   prescription; `false` here means full intensity regardless of the "Deload" label.
+2. **The PR gate never engages** — `isAnyDeload` (`workout-screen.tsx`) derives from this same
+   flag and feeds `shouldCountTowardPr` (`log-exercise.ts`), the gate that exists specifically so
+   deload work never enters `personal_records`. With the flag wrongly `false`, a genuine PR row
+   gets written from what should be submaximal work — not just a misleading badge.
+3. **The deload never resolves** — whatever fatigue signal triggered `phase: 'deload'` never gets
+   addressed since no real reduction happened, consistent with another deload being recommended
+   right after this one.
+
+Also flagged: `exercise-summary-screen.tsx`'s "New Personal Record!" badge (`isNewPR`) is a naive
+client-side comparison with no deload awareness of its own — worth the same gate even after the
+flag above is fixed, since a correctly-flagged deload set's submaximal-adjusted 1RM can still
+exceed the stored bar.
+
+### Fix direction
+
+1. In both copies of the fallback branch, derive `isDeloadActive`/`phaseType` from
+   `aiPeriodizationState.phase === 'deload'` instead of hardcoding `false`/`'normal'`.
+2. Give the exercise-summary PR badge the same deload gate `shouldCountTowardPr` uses.
+3. Query production for `personal_records` rows already written this way before deciding whether a
+   corrective migration is needed (same shape as the historical
+   `168_q115_whole_session_deload_pr_correction.sql`).
+
+### Tasks
+
+- [ ] Fix both copies of the fallback branch.
+- [ ] Gate the PR badge the same way.
+- [ ] Query production for already-affected `personal_records` rows; decide on a corrective
+      migration if any are found.
+- [ ] Verify locally: force `aiPeriodizationState.phase = 'deload'` via the generic-fallback path
+      and confirm the header still reads "Deload", weights are reduced, and no PR fires.
+- [ ] Run tests + lint. Remove this task's entry (Q-310) from `docs/implementation-backlog.md`, add
+      the journal entry + `projectOverview.md` update in the same PR.
+
+---
+
+## Task 53 (warm-up timer label) — SHIPPED 2026-08-15, PR #1350
+
+- **Branch:** `fix/warmup-timer-label-hardcoded-10min` (merged)
+- **Reported:** owner-reported, 2026-08-15 (screenshot: Lower warm-up screen showing "✓ Warm up
+  complete" with a fully green bar but "9:00 / 10:00"): "why does it only go to 9/10 minutes."
+- **Root cause, confirmed and fixed same session:** `components/workout/warmup-screen.tsx`'s
+  progress bar, completion check and elapsed-time numerator all correctly used the session's real,
+  budget-scaled `warmupGoalSec` — but the `/ 10:00` denominator next to it was a hardcoded literal
+  string that never read that value, so any session whose real warm-up target wasn't exactly 10
+  minutes displayed a mismatched fraction at completion.
+- **Fix:** one-line change to `formatTime(warmupGoalSec)`. Verified: `duration-presets.test.ts`
+  (12/12), eslint clean, `tsc --noEmit` clean on the touched file. **Not exercised**: on-device
+  visual confirmation of the corrected label — a pure display fix with no logic change, flagged per
+  CLAUDE.md's device-verification note rather than silently assumed.
+- No backlog entry was needed — implemented directly in the same session it was reported, per the
+  "small fixes the user explicitly asks to have done in-session" exemption.
 
 ---
 

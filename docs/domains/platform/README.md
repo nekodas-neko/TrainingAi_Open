@@ -26,6 +26,10 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Reference docs
 
+- [`docs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`](../../handoff-2026-08-17-cross-comprehensive-review-six-rounds.md)
+  — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
+  the Q-number collision and the conflict-markers-on-`main` incident. **Also records that PR #1401 did
+  not make the public-repo migration** and how to port it.
 - [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](../../reviews/2026-08-16-goal-invalidation-audit.md)
   — Q-262: does `invalidateGoalRecommendations()` do anything? **No, for all six keys.** Establishes
   the method for auditing any cache group: an invalidation can only change a *settled* value where a
