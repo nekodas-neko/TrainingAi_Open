@@ -6,7 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.318.6",
+    version: "1.318.9",
+    date: "2026-08-17",
+    changes: [
+      "The goal and profile pickers no longer grey themselves out for the moment it takes to save a change. That was interrupting keyboard use \u2014 the browser drops focus from a control that becomes disabled, so each arrow keypress moved the selection and then jumped you out of the group. The protection against double-saving is unchanged.",
+    ],
+  },
+  {
+    version: "1.318.8",
     date: "2026-08-17",
     changes: [
       "Fixed: a very short activity is saved instead of being thrown away. Anything under three seconds rounded to a duration of zero, which the server refused \u2014 so the recording vanished and you were told \u201cFailed to save activity\u201d, which was not what had happened. It now saves, and the same fix covers activities recorded offline, which were being dropped the same way.",
@@ -16,7 +23,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "1.318.7",
     date: "2026-08-17",
     changes: [
-      "Accessibility: the option groups across the app \u2014 intensity and session length on Workout, the goal and profile pickers, the home score-card style \u2014 now respond to the arrow keys and act as a single stop when tabbing, instead of making you tab through every option one at a time. The goal pickers also stop greying themselves out for the moment it takes to save, which was interrupting keyboard use. Nothing changes for touch.",
+      "Accessibility: the option groups across the app \u2014 intensity and session length on Workout, the goal and profile pickers, the home score-card style \u2014 now respond to the arrow keys and act as a single stop when tabbing, instead of making you tab through every option one at a time. Nothing changes for touch.",
     ],
   },
   {

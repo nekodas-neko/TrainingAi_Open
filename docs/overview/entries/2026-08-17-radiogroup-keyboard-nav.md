@@ -1,6 +1,6 @@
 # 2026-08-17 — Q-350: arrow keys for the eight radiogroups
 
-**Branch:** `claude/implementation-lane-b-0o7kb9` · **Version:** v1.318.7 (Q-350 + Q-355) · **Lane:** Implementation B
+**Branch:** `claude/implementation-lane-b-0o7kb9` · **Version:** v1.318.7 (Q-350) + v1.318.9 (Q-355) · **Lane:** Implementation B
 
 ## What was missing
 
@@ -55,8 +55,10 @@ focus was gone. That is not the hook. `handleFitnessGoalChange` calls `patchProf
 becomes disabled**. So on the three goal groups, an arrow keypress moves the selection and then
 ejects the user from the group.
 
-Filed as **Q-355 — and then fixed in the same PR**, because a keyboard feature that ejects you on
-every press is not worth shipping half-done. The three goal groups now use `aria-disabled={saving}`
+Filed as **Q-355 — and then fixed straight after**, because a keyboard feature that ejects you on
+every press is not worth shipping half-done. It ships as **v1.318.9**, its own entry, because
+v1.318.7 had already merged and deployed by then; amending a shipped version's notes would have
+described a change users did not yet have. The three goal groups now use `aria-disabled={saving}`
 with the in-flight guard moved into the handler (`if (saving) return`). That keeps exactly the
 double-submit protection `disabled` gave — CLAUDE.md is explicit that submit paths need an in-flight
 guard — while leaving the button focusable. `useRovingRadioGroup` skips `aria-disabled` options, so
