@@ -323,6 +323,12 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-17-platform-context-warning-window.md`](../../handoff-2026-08-17-platform-context-warning-window.md)
+  — the wrap-up warning fired at ~111% while the window was 22% full. It is a `Stop` hook
+  (`.claude/hooks/context-usage-warn.mjs`), **not** a CLAUDE.md rule — worth knowing before hunting
+  for it in the wrong file. Its window constant was 200k against a real 1M, now corrected so the
+  thresholds land at 900k/950k. Records that the transcript exposes no window size, so the hook
+  cannot self-calibrate and this constant goes stale silently.
 - [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoff-2026-08-16-platform-public-repo-cut-a4b.md)
   — Q-49 public-repo cut. **Updated at the Phase B boundary:** A4b has shipped, Oura's material is
   out of the tree, and the handoff now carries what A4b cost beyond the plan — the constants were
