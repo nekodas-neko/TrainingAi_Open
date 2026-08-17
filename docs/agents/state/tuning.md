@@ -1,4 +1,7 @@
-# Tuning — baton
+# Tuning Agent 🎶 — baton
+
+> **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
+> successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-17 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 502)
 

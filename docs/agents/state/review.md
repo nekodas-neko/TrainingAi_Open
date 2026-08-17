@@ -1,4 +1,7 @@
-# Review — baton
+# Review Agent 📖 — baton
+
+> **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
+> successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-17 · **By:** the session that stood the agent model up · **Q band:** 450–499 (next free: 450)
 

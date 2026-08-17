@@ -29,8 +29,8 @@ const BASELINE = {
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
   'projectOverview.md': 6397,
-  'docs/implementation-backlog.md': 5722,
-  'CLAUDE.md': 962,
+  'docs/implementation-backlog.md': 5766,
+  'CLAUDE.md': 967,
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;
