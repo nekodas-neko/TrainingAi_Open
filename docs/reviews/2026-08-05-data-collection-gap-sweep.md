@@ -67,7 +67,7 @@ either: `getOuraRawSamplesForTags` filtered on `decoded IS NOT NULL`, and that c
 consumer decodes on the fly. The filter matched nothing, so `rows.length === 0` was ALWAYS true and
 the refit bailed on the first line. `/api/oura-ble/device-metrics` returning `{"days": []}` was the
 same cause. Full writeup:
-[`2026-08-05-raw-samples-decoded-column.md`](../overview/entries/2026-08-05-raw-samples-decoded-column.md).
+[`2026-08-05-raw-samples-decoded-column.md`](../overview/history-2026-08-04.md).
 
 Worth noting how the wrong diagnosis happened: the tag counts above proved the *inputs* existed, and
 that was read as proving the *query* returned them. Counting rows in a table says nothing about

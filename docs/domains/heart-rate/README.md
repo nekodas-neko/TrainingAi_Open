@@ -48,7 +48,7 @@ Live at the time of writing (2026-08-05):
   v1.276.1). `/api/oura/hr-window` gated its time params on `HH:MM` while the sheet sends the
   Postgres `time` column verbatim (`HH:MM:SS`), so every call from that sheet 400'd before the
   handler and the chart/zone breakdown/route colouring stayed empty. See
-  [`the journal entry`](../../overview/entries/2026-08-09-q165-cache-seeded-reads.md).
+  [`the journal entry`](../../overview/history-2026-08-08.md).
 
 - 🟡 **Q-11 — attribution timing fixed, device-side coverage question still open.**
   `workout_hr_stats` being empty (Defect A) and a session never getting attributed unless its recap
@@ -66,7 +66,7 @@ Live at the time of writing (2026-08-05):
   20min–2h wide.** Shipped only at the home widget call site; the other three `HrDayChart`
   consumers keep the smoother default bucket but no backfill. Not verified against the real
   `localStorage`-gated home widget toggle — see
-  [`docs/overview/entries/2026-08-06-hr-day-chart-smoothing-backfill.md`](../../overview/entries/2026-08-06-hr-day-chart-smoothing-backfill.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 
 ## History
 

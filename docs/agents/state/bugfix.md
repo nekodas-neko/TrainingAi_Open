@@ -37,13 +37,16 @@ Rewrite this file **in full** — never append — before the session ends or co
   and pruned at 30 days** — every count from it is "the owner's, recently", never "the system's".
   Write findings that way.
 
-## Missing framework docs (flagged to owner 2026-08-17, not invented)
+## Framework docs — resolved 2026-08-17
 
-`docs/agents/README.md` does not exist in this repository — the multi-agent operating model doc
-(§1 role definitions, §2 authority) was never created here. The BugFix role brief names it as
-required reading. Orientation this session came from `projectOverview.md` and `CLAUDE.md` instead.
-If a later session is told to read it again and it is still absent, that is expected, not a
-broken checkout. Creating it is an owner/coordinator decision, not an intake one.
+The previous version of this baton recorded that `docs/agents/README.md` did not exist, and that
+orientation had to come from `projectOverview.md` and `CLAUDE.md` instead. **It exists now** — the
+operating model landed the same day. Read it: §1 defines this role, §2 is the authority table, §4
+is the handoff ritual this file is part of. The cold-start prompt for the role is
+[`docs/agents/prompts/bugfix.md`](../prompts/bugfix.md).
+
+The Q band recorded above (387–449) matches the band table in that document, which was written
+independently — no reconciliation was needed.
 
 ---
 
