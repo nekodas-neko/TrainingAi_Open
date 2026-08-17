@@ -8,7 +8,7 @@
 ## Now
 Nothing in flight. Four items shipped today:
 
-- **Q-451** (v1.318.2) — a new account's Workout tab was an empty card with a dead Start button.
+- **Q-451** (v1.318.3) — a new account's Workout tab was an empty card with a dead Start button.
   Now an empty state with a Create-a-program CTA.
   [Journal](../../overview/entries/2026-08-17-workout-select-empty-state.md).
 - **Q-450** (v1.318.1) — `/activity` with no type recorded an activity and discarded it on Save.
