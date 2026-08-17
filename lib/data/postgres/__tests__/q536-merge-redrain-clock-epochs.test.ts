@@ -20,10 +20,14 @@ const canRun = !!process.env.DATABASE_URL
 const REDRAIN_USER = '00000000-0000-4000-8000-0000000536a1'
 const REKEY_USER = '00000000-0000-4000-8000-0000000536a2'
 
-const MIGRATION = readFileSync(
-  join(process.cwd(), 'lib/data/postgres/migrations/189_q536_merge_redrain_clock_epochs.sql'),
-  'utf8',
-)
+const mig = (f: string) =>
+  readFileSync(join(process.cwd(), 'lib/data/postgres/migrations', f), 'utf8')
+// 189 merges the anchors (cheap, load-bearing); 190 relabels the samples (expensive, inert). They
+// are separate files because the pool's 15 s statement_timeout made the combined version roll back
+// on every boot — see either file's header. Applied together here, in order, as a deploy would.
+const MIG_189 = mig('189_q536_merge_redrain_clock_epochs.sql')
+const MIG_190 = mig('190_q536_relabel_raw_sample_epochs.sql')
+const MIGRATION = MIG_189
 
 const RING_ORIGIN_SEC = 1_783_237_659
 
@@ -152,11 +156,37 @@ describe.skipIf(!canRun)('migration 189 — merging re-drain clock epochs (Q-536
   it('collapses the four re-drain epochs into one, on anchors and samples alike', async () => {
     expect(await epochsOf('oura_ble_clock_anchors', REDRAIN_USER)).toHaveLength(4)
 
-    await pool.query(MIGRATION)
+    await pool.query(MIG_189)
+    await pool.query(MIG_190)
 
-    const anchors = await epochsOf('oura_ble_clock_anchors', REDRAIN_USER)
-    expect(anchors).toEqual([{ epoch: 0, n: REDRAIN_ANCHORS.length }])
+    expect(await epochsOf('oura_ble_clock_anchors', REDRAIN_USER))
+      .toEqual([{ epoch: 0, n: REDRAIN_ANCHORS.length }])
     expect(await epochsOf('oura_raw_samples', REDRAIN_USER)).toHaveLength(1)
+  })
+
+  // 189 alone must fix the clock, because 190 is the half that can time out on real data. If this
+  // ever needs 190 to pass, the split has stopped protecting anything.
+  it('189 alone repairs the anchors — the sample relabel is not load-bearing', async () => {
+    await pool.query(MIG_189)
+
+    expect(await epochsOf('oura_ble_clock_anchors', REDRAIN_USER))
+      .toEqual([{ epoch: 0, n: REDRAIN_ANCHORS.length }])
+    const probeDs = 30_000_000
+    const trueMs = (RING_ORIGIN_SEC + probeDs / 10) * 1000
+    const after = resolveDsToMs(probeDs, await anchorsOf(REDRAIN_USER))!
+    expect(Math.abs(after - trueMs)).toBeLessThan(60_000)
+  })
+
+  // The hazard 190 introduces that 189 does not have: it re-derives the mapping from the anchors
+  // AFTER they were merged, and the obvious re-derivation (MIN(epoch) per user) would also collapse
+  // a user 189 deliberately left split.
+  it('190 leaves a genuine re-key\'s sample labels alone', async () => {
+    await pool.query(MIG_189)
+    await pool.query(MIG_190)
+
+    expect(await epochsOf('oura_raw_samples', REKEY_USER)).toEqual([
+      { epoch: 0, n: 1 }, { epoch: 1, n: 1 },
+    ])
   })
 
   // The half that must not regress. A migration that merged everything would also pass the test
@@ -183,11 +213,15 @@ describe.skipIf(!canRun)('migration 189 — merging re-drain clock epochs (Q-536
     expect(rows).toEqual([])
   })
 
-  it('is idempotent — a second run changes nothing', async () => {
-    await pool.query(MIGRATION)
-    const after1 = await epochsOf('oura_ble_clock_anchors', REDRAIN_USER)
-    await pool.query(MIGRATION)
-    expect(await epochsOf('oura_ble_clock_anchors', REDRAIN_USER)).toEqual(after1)
+  it('is idempotent — a second run of either changes nothing', async () => {
+    await pool.query(MIG_189)
+    await pool.query(MIG_190)
+    const anchors1 = await epochsOf('oura_ble_clock_anchors', REDRAIN_USER)
+    const samples1 = await epochsOf('oura_raw_samples', REDRAIN_USER)
+    await pool.query(MIG_189)
+    await pool.query(MIG_190)
+    expect(await epochsOf('oura_ble_clock_anchors', REDRAIN_USER)).toEqual(anchors1)
+    expect(await epochsOf('oura_raw_samples', REDRAIN_USER)).toEqual(samples1)
   })
 
   // The point of the whole exercise: before the merge, a ds resolves against the newest epoch,

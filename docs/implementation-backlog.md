@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **190** | `lib/data/postgres/migrations/` (head: `189_q536_merge_redrain_clock_epochs.sql`) |
+| Next free Postgres migration | **191** | `lib/data/postgres/migrations/` (head: `190_q536_relabel_raw_sample_epochs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -367,7 +367,20 @@ below threshold and left in place for next time.
 
 - **Branch:** `fix/ble-sleep-window-timezone`
 - **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`, and a Postgres migration.
-- **Step 1 SHIPPED (owner-approved 2026-08-17): migration `189_q536_merge_redrain_clock_epochs.sql`.**
+- **⚠️ v1.318.0's migration 189 FAILED IN PRODUCTION AND CHANGED NOTHING. Fixed in v1.318.2.**
+  The owner deployed, ran the full redecode, and Health still showed midday bedtimes. Cause: 189
+  relabelled `oura_raw_samples` in the same transaction — **434,707 rows on the 667 MB table** —
+  and the pool sets `statement_timeout = 15s` (`client.ts:39`). It timed out (`57014`), the whole
+  implicit transaction rolled back, `ensureSchema` logged it and carried on, and production stayed
+  on four epochs. **The tell was that the migration was absent from `schema_migrations` while
+  `/api/version` reported 1.318.0**, and `oura_rollup_state` still read `epoch: 3`. It had been
+  failing on every boot since.
+  **Two changes:** 189 now carries `SET LOCAL statement_timeout` and does the anchors only; the
+  sample relabel moved to **190**, because `oura_raw_samples.epoch` is written at ingest
+  (`adapter.ts:4888`) and **read by nothing** — so the expensive half is inert and must not be able
+  to roll back the cheap half that actually repairs the clock. `SET LOCAL` was verified to take
+  effect under `pool.query()`'s implicit transaction, in both directions.
+- **Step 1 (migrations 189 + 190, owner-approved 2026-08-17):**
   It merges same-clock epochs on `oura_ble_clock_anchors` and `oura_raw_samples`, and drops the
   affected `oura_rollup_state` watermark so the next rollup re-derives. It decides what to merge
   from **measured evidence, not a user id or an epoch number**: two epochs are the same ring clock
@@ -1145,7 +1158,7 @@ session working from a temporarily restored copy.
 - **Added:** 2026-08-17 · planning session against the rescoped Q-251
 - **Steps, in order — the plan carries the detail, this is the slot list:**
   1. `scripts/generate-claude-ro-views.js` — emit `_meta_excluded_tables` and
-     `_meta_withheld_columns`; regenerate into **migration 190** (a new number, never overwriting an
+     `_meta_withheld_columns`; regenerate into **migration 191** (a new number, never overwriting an
      applied file) and re-point the filename pin in `claude-ro-readonly-role.test.ts` *in the same
      commit*.
   2. `lib/export/db-snapshot.ts` — view enumeration, the drift gate, PK discovery from `pg_index`,

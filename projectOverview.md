@@ -171,10 +171,16 @@ under 500 MB safely*, not *whether growth will eventually matter* — it already
   on 2026-08-17 by the redecode; every other night still carries its own write date), and all 44
   nights recompute from stored `body_hex`. Subtracting 14 h 10 min puts every one of the 43 back
   into a 20:00–00:00 bedtime distribution.
-- **Half repaired.** Migration **189** (owner-approved) merges same-clock epochs, deciding what to
+- ⚠️ **v1.318.0 did not land the repair.** Migration 189 relabelled 434,707 sample rows in the same
+  transaction, hit the pool's 15 s `statement_timeout`, and rolled back on every boot — so the
+  owner's redecode faithfully reproduced the wrong times. **Fixed in v1.318.2**: 189 raises the
+  timeout and does the anchors only; the sample relabel is now 190, isolated because
+  `oura_raw_samples.epoch` is read by nothing and must not be able to roll back the half that works.
+- **Repaired by** migration **189** (owner-approved), which merges same-clock epochs, deciding what to
   merge from measured evidence — two epochs are one clock when their *minimum* anchor lag agrees, a
   criterion a genuine re-key fails by weeks. Merged production p10 lands 3 s from the clean offset.
-- ⚠️ **Still owed: a full-history Redecode after deploy.** The migration relabels; it does not
+- ⚠️ **Still owed: a full-history Redecode after v1.318.2 deploys.** The one run against v1.318.0
+  did nothing, because the migration under it had rolled back — it has to be run again. The migration relabels; it does not
   rewrite the 43 stored nights, and the rollup's 35-day window does not reach the oldest of them.
   **Health stays wrong until that is run.** **Q-314** covers the detection defect that caused it;
   until that lands, every re-pair reopens this.
@@ -224,7 +230,7 @@ the next device change.
   seeded local Postgres, driven through the repo's Playwright harness at 412×915 and with `curl`
   against a live session cookie. Full write-up, with every query and the reproduction:
   [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](docs/reviews/2026-08-17-failure-cells-running-the-app.md).
-- **✅ Q-450 FIXED (v1.318.1) — `/activity` without a type recorded an activity and discarded it on
+- **✅ Q-450 FIXED (v1.318.2) — `/activity` without a type recorded an activity and discarded it on
   Save**, with no toast, error or network request, because `done-activity-screen.tsx` bailed on
   `!activityType` before the local write, the outbox and the web fallback alike. Reached from the
   Coach handoff, the guided-walk Done button, a cold open or a refresh — and `resetSession()` leaves
@@ -233,7 +239,7 @@ the next device change.
   **Not device-verified** — the web fallback ran, not SQLite+outbox. The spec exposed a second defect
   the bail-out was masking, filed as **Q-351** (Lane A): a sub-3-second activity rounds `durationMin`
   to 0, which `.positive()` rejects as a bare 400. [Journal](docs/overview/entries/2026-08-17-activity-untyped-entry.md).
-- **✅ Q-451 FIXED (v1.318.2) — a new account's Workout tab was a ~1,400 px empty card with a dead
+- **✅ Q-451 FIXED (v1.318.3) — a new account's Workout tab was a ~1,400 px empty card with a dead
   button** whose onClick short-circuited on the missing `currentSession`. Now "No program yet" + a
   **Create a program** CTA; the inert button is gone rather than disabled, and a `programLoaded` flag
   separates "no program" from "still loading" so it cannot flash. **Observed working** against an
@@ -260,7 +266,7 @@ the next device change.
   `getLocalStore()` returns null, so every offline-first domain took its web fallback and the device
   branch — the canonical runtime — was never exercised. No safe-area, Samsung-WebView, native-plugin
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
-- **Q-450 and Q-451 have since shipped (Lane B, v1.318.1/v1.318.2) and are struck above; the other
+- **Q-450 and Q-451 have since shipped (Lane B, v1.318.1/v1.318.3) and are struck above; the other
   four stay queued**, with Q-452 now the top one in `docs/implementation-backlog.md`.
 ### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
 

@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.318.2",
+    version: "1.318.3",
     date: "2026-08-17",
     changes: [
       "The Workout tab now tells a new account what to do instead of showing an empty card with a Start Workout button that did nothing. Before you have a program it says so and offers to create one; cardio and one-off activities were always available and still are.",
+    ],
+  },
+  {
+    version: "1.318.2",
+    date: "2026-08-17",
+    changes: [
+      "The sleep-time fix in 1.318.0 did not actually apply \u2014 the database change behind it was too large to finish inside the time limit it runs under, so it was undone every time the app started, and re-decoding your history faithfully rebuilt the same wrong times. Split into two smaller steps, the important one first. **Run the re-decode again once this is live** \u2014 the previous run could not have worked.",
     ],
   },
   {
