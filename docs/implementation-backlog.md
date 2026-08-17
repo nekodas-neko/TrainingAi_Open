@@ -400,6 +400,7 @@ below threshold and left in place for next time.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0
 - **Branch:** `fix/oura-raw-restamp-bloat`
+- **Lane A.** Server/JS only — `app/api/oura-ble/**`, `lib/data/**`, `lib/observability/**`. Steps 1–2 of its task list are **owner actions**, not agent work.
 - **Added:** 2026-08-17 · **Top of queue:** this is a live production incident, currently masked by a
   temporary volume raise (500 MB → 5 GB) that the owner wants reverted to stock 500 MB.
 - **What happened:** production hit `[pg 53100] disk_full` at ~07:42 UTC. The volume was **500 MB**,
@@ -436,6 +437,7 @@ below threshold and left in place for next time.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 A
 - **Branch:** `perf/oura-raw-index-audit`
+- **Lane A.** One migration + an `EXPLAIN` audit. No client change.
 - **Added:** 2026-08-17 · **Placement: second only to the incident that made it urgent (Q-536).**
   Two independent grounds now, not one: it is the largest reversible space win **and** it is the fix
   for the bloat mechanism behind the `disk_full` outage. `measured_at` is the only *indexed* column a
@@ -550,6 +552,7 @@ ehr     0     0     0     0   648   208   128   556     0
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
 - **Branch:** `fix/oura-raw-device-store-visibility`
+- **Lane B.** `app/admin/oura-ble/**` + `components/oura-ble/**` only — it calls plugin-bridge methods Lane A already shipped, so it needs nothing from Lane A and can run fully in parallel.
 - **Added:** 2026-08-17 · **Placement:** above the storage-policy items because it is true and getting
   worse under every option in that plan, and it is the one that can wedge the drain (ops-doc I21,
   `SQLITE_FULL` → cursor held).
@@ -575,8 +578,11 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [devices][platform] Q-534 — repack raw frames: ~20× smaller, byte-for-byte lossless
 
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C
+- **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
+  — full implementation plan, written 2026-08-17. Decision context in
+  [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
 - **Branch:** `perf/oura-raw-frame-packing`
+- **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
 - **Added:** 2026-08-17
 - ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-535).** This is the option the current
   archival rule does not consider, and the only one that makes the growth curve sustainable without
@@ -589,13 +595,23 @@ ehr     0     0     0     0   648   208   128   556     0
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-533** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
-- ⚠️ **This needs its own implementation plan before an implementer takes it.** §6 C of the retention
-  doc is a costed *option*, not a task breakdown — it settles that repacking is right and roughly what
-  it buys, and leaves open the three things an implementer would have to decide anyway: where the
-  dedup key goes (it currently includes `body_hex`, and it is what makes re-sends free — ops-doc I8),
-  how the rollup reader and redecode consume blobs instead of rows, and how one migration rewrites
-  1.1M rows without repeating Q-536. **Route this to a planning session first**; the implementer
-  session is the PR after that.
+- ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
+  plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
+  and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
+  failure mode; **(b)** every reader becomes "cold blobs ∪ hot rows", which is one shared helper rather
+  than a per-call-site rewrite, because nearly every read is already the same
+  `user_id + tag IN (…) + ds BETWEEN` shape; **(c)** the migration adds a table and moves data with a
+  packer that only deletes a hot row after re-reading its blob and proving the frames equal.
+- **Measured shape (production 2026-08-17):** **968 blobs replace 1,098,956 rows — 1,135×.** 22.5
+  blobs/day, mean 1,135 frames each, 13 MB of raw payload for all history. Projected steady state
+  **~70 MB** (hot 7 days ~52 MB + cold ~16–20 MB) growing ~117 MB/year, against ~7.5 MB/day today.
+- **The bucket key is `(user_id, epoch, tag, ring_timestamp_ds/864000)` — NOT a calendar day.** Wall
+  time is derived through anchors and that derivation changes (Q-71/I25), so a calendar-day partition
+  would need re-partitioning on every clock fix, reintroducing exactly the failure this removes.
+  `epoch` is load-bearing and the data proves it: the four epochs' ds ranges overlap heavily.
+- **Task 0 first** — check whether any rows share `(user_id, ring_timestamp_ds, tag, body_hex)` across
+  different epochs. The existing unique constraint omits `epoch`; given the overlap that is worth
+  ruling out before relying on the key. Cheap, and it could change the design.
 - **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
   stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
   days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
@@ -634,6 +650,7 @@ ehr     0     0     0     0   648   208   128   556     0
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
 - **Branch:** `perf/oura-raw-row-narrowing`
+- **Lane A.** Migration + `lib/data/**`.
 - **Added:** 2026-08-17
 - ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
   lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table

@@ -76,6 +76,14 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](../../superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
+  — **Q-534 implementation plan (2026-08-17).** Two tiers: `oura_raw_samples` stays exactly as it is
+  for a 7-day hot window, a new `oura_raw_packed` holds everything older as sealed `bytea` blobs keyed
+  `(user_id, epoch, tag, ds/864000)` — **ds, never a calendar day**, because wall time is derived
+  through anchors and that derivation changes. **968 blobs replace 1,098,956 rows**; projected steady
+  state ~70 MB against ~7.5 MB/day today. Ingest is untouched, so the cursor path takes no new failure
+  mode, and the packer deletes a hot row only after re-reading its blob and proving the frames equal.
+
 - [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](../../superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md)
   — **where the 464 MB actually is, and what each way of shrinking it forecloses (2026-08-17).** The
   headline: `body_hex` — the thing the archival rule protects — is **26 MB of the 360 MB

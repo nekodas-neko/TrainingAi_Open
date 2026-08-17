@@ -1,0 +1,229 @@
+# Q-534 — Pack raw BLE frames into per-bucket blobs (implementation plan)
+
+_Planning session, 2026-08-17. Implements option **§6 C** of
+[`2026-08-17-db-storage-raw-samples-retention.md`](2026-08-17-db-storage-raw-samples-retention.md),
+which the owner chose (A+B+C) and which is the only step that makes the stock 500 MB volume hold._
+
+**Nothing here deletes a frame.** `body_hex` moves from one physical representation to another,
+byte for byte. The `CLAUDE.md` archival rule stands unchanged and this plan does not touch it.
+
+---
+
+## 1. Why, in one paragraph
+
+The database spends **~328 bytes per row to store 12 bytes of ring frame** — a 27× overhead — and
+that overhead, not the data, is 93% of the largest table in the database. It is also what caused the
+2026-08-17 `disk_full` outage: a full `measured_at` re-stamp rewrote 681,005 rows with **zero** HOT
+updates, doubling the table without adding a single frame. Packing removes both problems at once,
+because a packed table has ~23 rows/day instead of ~22,910 and stops storing `measured_at` per frame
+at all.
+
+## 2. The measured shape (production, 2026-08-17)
+
+Grouping the owner's 1,098,956 frames by `(epoch, tag, ring_timestamp_ds / 864000)` — 864,000 ds is
+one day:
+
+| | |
+|---|---:|
+| Blobs replacing 1,098,956 rows | **968** |
+| Row reduction | **1,135×** |
+| Blobs per day | **22.5** |
+| Frames per blob — mean / max | 1,135 / 9,236 |
+| Raw frame payload, all history | **13 MB** |
+
+Every blob is comfortably over Postgres's 2 kB TOAST threshold, so they compress on top of this.
+
+**Projected steady state: ~70 MB total** (see §4), growing at **~320 kB/day ≈ 117 MB/year** — against
+~7.5 MB/day today. From that baseline the 500 MB volume is roughly **3.7 years** away.
+
+## 3. The architecture decision: two tiers, not an in-place repack
+
+**Do not repack `oura_raw_samples` in place.** The ingest path is the one thing in this pipeline that
+must never break — the history cursor's safety rests on it, and a botched change silently loses drained
+spans forever (ops-doc I18, I21). A read-modify-write blob upsert on the ingest path would put a row
+lock and an O(blob) merge in front of every batch, and would rewrite the dedup semantics that make
+re-sends free (I8).
+
+Instead:
+
+| Tier | Table | Contents | Written by |
+|---|---|---|---|
+| **Hot** | `oura_raw_samples` — **unchanged schema, unchanged ingest** | last ~7 days of frames | ingest, exactly as today |
+| **Cold** | `oura_raw_packed` — new | everything older, as sealed blobs | a background packer, never ingest |
+
+**Properties this buys:**
+
+- **Ingest does not change at all.** No new failure mode on the cursor path. The `ON CONFLICT DO
+  NOTHING` dedup and the `(user_id, ring_timestamp_ds, tag, body_hex)` unique key stay exactly as they
+  are, just over a much smaller table.
+- **Cold blobs are append-only and sealed.** Once written they are never updated, so they can never
+  bloat — which is the property the current table lacks.
+- **The hot table's indexes shrink with it.** At ~160k rows the 78 MB dedup index becomes ~11 MB.
+- **Deleting a hot row is not data loss**, because the packer only deletes what it has already proven
+  is in a sealed blob (§6). That is the safety argument the whole plan rests on, and it is checkable.
+
+### Why the bucket key is `(user_id, epoch, tag, ds_bucket)` and not a calendar day
+
+This is the design decision most likely to be got wrong, so it is stated first.
+
+`ring_timestamp_ds` is a monotonic decisecond counter since the *ring's own* epoch. Wall-clock time is
+derived from it through clock anchors — and **that derivation changes**: correcting it is exactly what
+the Q-71/I25 fix did, and what the re-stamp that caused the outage was applying. A blob partitioned by
+calendar day would therefore need **re-partitioning every time the clock math is corrected**, which
+reintroduces the failure this plan exists to remove.
+
+`ds_bucket = ring_timestamp_ds / 864000` is a pure function of a stored, immutable column. It never
+moves.
+
+**`epoch` is load-bearing in that key, and the data proves it** — the ds ranges of the four epochs
+overlap heavily:
+
+| epoch | rows | ds range |
+|---:|---:|---|
+| 0 | 664,939 | 1,396,593 – 21,444,831 |
+| 1 | 464 | 17,391,049 – 21,469,936 |
+| 2 | 426,356 | 21,470,017 – 37,112,321 |
+| 3 | 7,197 | 33,001,730 – 37,190,091 |
+
+Bucketing on ds without `epoch` would merge frames recorded months apart into one blob.
+
+> **Latent issue found while establishing this, not introduced by it:** the *existing* unique
+> constraint is `(user_id, ring_timestamp_ds, tag, body_hex)` and **does not include `epoch`**. Given
+> the overlapping ranges above, two genuinely distinct frames from different epochs sharing a ds, tag
+> and body would be deduplicated into one. Identical bodies make a real collision unlikely and no
+> instance has been demonstrated — this is filed as a thing to check, not a claimed data loss. See
+> Task 0.
+
+## 4. Sizing the hot window
+
+The hot tier needs to be long enough for two things and no longer:
+
+1. **Ingest dedup** — must cover any re-drain. Re-drains span hours to a few days (ops-doc §2: hourly
+   drains, and a Full re-sync of the ring's finite buffer).
+2. **Nothing else.** The rollup does *not* need it: reading all 968 cold blobs is cheaper than reading
+   35 days of hot rows, so the rollup reads both tiers (§5) and does not care where a frame lives.
+
+**7 days**, as a named constant, with generous margin over the drain cadence.
+
+| | Rows | Est. size |
+|---|---:|---:|
+| Hot (`oura_raw_samples`, 7 days) | ~160,000 | ~52 MB incl. indexes |
+| Cold (`oura_raw_packed`, all history) | ~968 + ~23/day | ~16–20 MB |
+| **Total** | | **~70 MB** |
+
+## 5. Blob format
+
+Self-describing, versioned, decoder-agnostic. `bytea`, one per bucket:
+
+```
+byte 0        format version (0x01)
+varint        frame count
+varint        base_ds (the bucket's lowest ring_timestamp_ds)
+then per frame, ordered by ds ascending:
+  varint      ds delta from the previous frame (first is delta from base_ds)
+  varint      body length in bytes
+  bytes       body (the decoded-from-hex bytes of body_hex)
+```
+
+- **Store bytes, not hex.** The blob is `bytea`, so `body_hex` is halved on the way in. This is where
+  Q-533's `bytea` half is absorbed — **do not also run the standalone `text` → `bytea` migration**, it
+  would be the same rewrite twice.
+- **`event_name` is not stored.** It is a pure function of `tag` (30 distinct values, already pinned by
+  the Kotlin/TS cross-language parity test) and `tag` is a column on the blob row.
+- **`measured_at` is not stored.** It is derived at read time via `resolveDsToMs` over the anchor list,
+  which is already how the rollup resolves time (Q-71). **This is what deletes the re-stamp
+  operation** — a future clock correction changes a derivation, not 1.1M rows.
+- **`decoded` is not stored.** Already `NULL` on every row (Lever 1a/1b); decoding happens in memory
+  from the body.
+
+Row: `(user_id, epoch, tag, ds_bucket, frame_count, min_ds, max_ds, body_sha256, blob, packed_at)`,
+primary key `(user_id, epoch, tag, ds_bucket)`.
+
+## 6. The packer's safety contract — the part to get right
+
+The packer runs in three phases per bucket, and **must be fail-closed at each**:
+
+1. **Seal.** A bucket is eligible only when `ds_bucket` is entirely older than the hot window *and* no
+   row in it has been written recently. Never pack a bucket the ring might still deliver into.
+2. **Write and verify.** Insert the blob, then **read it back and prove equivalence**: unpack it and
+   assert the multiset of `(ring_timestamp_ds, body)` matches the hot rows exactly, and that
+   `frame_count` and `body_sha256` agree. Any mismatch → leave the blob, delete nothing, log, stop.
+3. **Delete.** Only then delete the hot rows for that bucket, scoped to
+   `(user_id, epoch, tag, ds_bucket)`.
+
+Phases 2 and 3 must not run in one transaction with phase 1's read — verify against what is actually
+committed, not against what was intended.
+
+**The delete is the only destructive statement in this plan**, and it is gated on a proven-equal
+re-read of the same frames. That is what keeps the archival guarantee intact.
+
+## 7. Tasks
+
+**Task 0 — investigate the epoch/dedup question (§3 note).** Determine whether any two rows share
+`(user_id, ring_timestamp_ds, tag, body_hex)` across different epochs. If the answer is "none", record
+it and move on; if not, that is a separate finding and gets its own entry rather than being folded in
+here. **Do this first — it is cheap and it could change the bucket key.**
+
+**Task 1 — migration: `oura_raw_packed`.** Table + PK per §5. Lane A owns the number; the pointer says
+**189** but re-check it at implementation time. No change to `oura_raw_samples`.
+
+**Task 2 — the codec** (`lib/oura-ble/frame-pack.ts`): `pack(frames) → bytea` and
+`unpack(blob) → frames`, pure and dependency-free. **Property-test it** — round-trip an arbitrary frame
+list and assert equality, including empty bodies, maximum-length bodies (1,024 bytes, the Zod ceiling),
+and large ds gaps. Pin at least one vector from real production hex.
+
+**Task 3 — the two-tier reader.** Every read in §8 becomes "cold blobs ∪ hot rows for this ds range".
+The read shapes are already uniform — nearly all of them are
+`WHERE user_id = ? AND tag IN (…) AND ring_timestamp_ds BETWEEN ? AND ? ORDER BY ring_timestamp_ds` —
+so this is one helper, not a rewrite per call site. Put it beside the existing rollup reader so both
+tiers are always read together and no call site can forget one.
+
+**Task 4 — the packer**, per §6. Admin-triggered first (a button beside Redecode/VACUUM), bounded per
+call, idempotent, resumable. **Not automatic on deploy**, same posture as Lever 1b/1c.
+
+**Task 5 — backfill.** Run the packer over all history in bounded batches. 968 blobs is small; the
+delete side is 1.1M rows, so batch it and **`VACUUM FULL` after**, not during.
+
+**Task 6 — hot-window prune.** Only after Task 5 has verified clean: a throttled prune matching the
+existing `shouldPrune` pattern in `adapter.ts`, deleting hot rows whose bucket is sealed and packed.
+
+**Task 7 — measured_at range queries.** `idx_oura_raw_samples_user_measured` is dropped by Q-532; any
+surviving read that filters by wall-clock converts its range to a ds range through the anchors first.
+Confirm the set is empty or convert it.
+
+## 8. Call sites this touches
+
+Reads (all the same shape, all in `adapter.ts` unless noted): the rollup's tag scan and its
+`ROLLUP_TAGS` read, the SpO₂/temperature/debug reads, `sleepnet-assemble.ts`, `step-features.ts`, the
+admin tester's summary/raw readers (`components/oura-ble/`), `app/api/oura-ble/db-stats/route.ts`.
+
+Writes: **none change.** `insertOuraRawSamples` is untouched.
+
+Deletions of dead weight this enables: the redecode `event_name` refresh and `measured_at` re-stamp
+(`adapter.ts` ~4928–4960) lose their reason to exist for packed data.
+
+## 9. Gates
+
+- Codec property tests + a pinned production vector.
+- **A verified backfill on a copy of production before the real one** — the local dev DB is seeded, not
+  drifted, and this is exactly the class of bug `CLAUDE.md` warns reproduces only against real data.
+- Equivalence assertion (§6 phase 2) green for every bucket, fail-closed.
+- Post-backfill: the rollup produces **identical** `sleep_sessions` / `body_metrics` output over a
+  sample of historical days, read from blobs instead of rows. This is the real gate — packing is
+  correct exactly when nothing downstream notices.
+- `pnpm check:rules`, full suite, `pnpm dev` pass.
+
+## 10. What this plan does NOT do
+
+- **It does not delete any frame**, and it does not amend the archival rule.
+- **It does not touch the device**, `oura_raw.db`, or any Kotlin. Server/JS only — ships via Railway,
+  no APK.
+- **It does not implement D4**, and it does not make D4 harder: a packed table pulls to the device as
+  well as an unpacked one, arguably better.
+- **It does not replace Q-532.** The index audit is separate, lands first, and is what makes the
+  interim (pre-packing) table survivable.
+
+**Failure surfaces not exercised:** planning only, no code written. All sizing is projected from
+production measurements taken 2026-08-17 while the table was mid-re-stamp — the blob counts and payload
+totals come from `claude_ro` (owner-scoped, and the owner is 99.98% of this table), the physical sizes
+from `pg_stat_user_tables` (system-wide). Nothing here has been run.

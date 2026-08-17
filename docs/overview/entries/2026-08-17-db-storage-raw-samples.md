@@ -92,6 +92,32 @@ lapses O1 and unblocks the `bytea` work; stock 500 MB is the target, not the tem
 visibility-first on the device store. Q-536 filed at the top of the queue for the incident; the queue
 re-ranked around it.
 
+## The repack got its own implementation plan
+
+`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`. The retention doc costed the option;
+this one answers the three questions an implementer would hit on day one.
+
+**The design decision that matters: two tiers, not an in-place repack.** `oura_raw_samples` and the
+whole ingest path are left exactly as they are for a 7-day hot window, and a new `oura_raw_packed`
+holds everything older as sealed blobs. The cursor path is the one thing here that must never break —
+a botched change loses drained spans forever — so it takes no new failure mode at all, the dedup key
+never moves, and cold blobs are append-only and therefore cannot bloat, which is precisely what the
+current table lacks.
+
+**The bucket key is `(user_id, epoch, tag, ring_timestamp_ds/864000)` — ds, never a calendar day.**
+Wall time is derived through anchors and that derivation changes; a calendar-day partition would need
+re-partitioning on every clock correction, reintroducing the failure this removes. `epoch` is
+load-bearing and the data proves it: the four epochs' ds ranges overlap heavily. Establishing that also
+surfaced a latent issue — the existing unique constraint omits `epoch` — filed as Task 0 to rule out
+rather than asserted as a live bug.
+
+**Measured: 968 blobs replace 1,098,956 rows, 1,135×.** 22.5 blobs/day, 13 MB of payload for all
+history, projected steady state ~70 MB. Better than the ~50 MB table estimate in the retention doc's
+§6 C, which was arithmetic rather than measurement.
+
+The reads turned out to be the easy part: nearly every one is already
+`user_id + tag IN (…) + ds BETWEEN … ORDER BY ds`, so the two-tier reader is one shared helper.
+
 **Failure surfaces not exercised:** measurement and planning only — no code changed, nothing ran on
 the device, and the device findings are static analysis (grep for callers, the prune predicate, the
 manifest). The real size of `oura_raw.db` on the S25 remains unobserved. **The `VACUUM FULL` has not
