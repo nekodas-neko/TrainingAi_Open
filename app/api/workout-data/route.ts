@@ -15,6 +15,7 @@ import { moodMuscleMatches } from "@trainingai/shared/muscles";
 import type { AiPrescription } from "@trainingai/shared/types/ai-periodization";
 import {
   buildWorkoutExercises,
+  aiDynamicFallbackPhaseStatus,
   type WorkoutExercise,
   type PhaseStatus,
   type PerSessionPhaseStatus,
@@ -253,22 +254,7 @@ async function handleWorkoutData(req: NextRequest) {
       }
 
       if (isAiDynamic && !sessionPhaseStatus && aiPeriodizationState) {
-        const phaseName = aiPeriodizationState.phase.charAt(0).toUpperCase() + aiPeriodizationState.phase.slice(1)
-        sessionPhaseStatus = {
-          phase: { id: '', phaseSetId: '', position: 0, name: phaseName, durationCycles: 1, phaseType: 'normal' } as ProgramPhase,
-          cycleInPhase: 1,
-          totalPhaseCycles: 1,
-          completedCycles: aiPeriodizationState.sessionsInPhase,
-          totalProgramCycles: 0,
-          sessionsPerCycle: 1,
-          sessionsInCurrentCycle: 0,
-          blockComplete: false,
-          approxWeeksRemaining: null,
-          isDeloadActive: false,
-          isBaseline: false,
-          openEnded: true,
-          phaseSessionNumber: aiPeriodizationState.sessionsInPhase + 1,
-        }
+        sessionPhaseStatus = aiDynamicFallbackPhaseStatus(aiPeriodizationState)
       }
 
       const aiPrescription = isAiDynamic && !isBaselinePhase && aiPeriodizationState?.prescription
@@ -444,26 +430,12 @@ async function handleWorkoutData(req: NextRequest) {
     sessionPhaseStatus = { ...sessionPhaseStatus, isDeloadActive: true }
   }
 
-  // For AI dynamic programs not already handled above (not baseline, not deload),
-  // still return a non-null phaseStatus with isBaseline:false so the client always
-  // receives an explicit signal and can clear any stale baseline state from cache.
+  // For AI dynamic programs not already handled above (not baseline, not a user-confirmed
+  // deload), still return a non-null phaseStatus with isBaseline:false so the client always
+  // receives an explicit signal and can clear any stale baseline state from cache. The
+  // engine-chosen `phase: 'deload'` lands here too — see aiDynamicFallbackPhaseStatus.
   if (isAiDynamic && !sessionPhaseStatus && aiPeriodizationState) {
-    const phaseName = aiPeriodizationState.phase.charAt(0).toUpperCase() + aiPeriodizationState.phase.slice(1)
-    sessionPhaseStatus = {
-      phase: { id: '', phaseSetId: '', position: 0, name: phaseName, durationCycles: 1, phaseType: 'normal' } as ProgramPhase,
-      cycleInPhase: 1,
-      totalPhaseCycles: 1,
-      completedCycles: aiPeriodizationState.sessionsInPhase,
-      totalProgramCycles: 0,
-      sessionsPerCycle: 1,
-      sessionsInCurrentCycle: 0,
-      blockComplete: false,
-      approxWeeksRemaining: null,
-      isDeloadActive: false,
-      isBaseline: false,
-      openEnded: true,
-      phaseSessionNumber: aiPeriodizationState.sessionsInPhase + 1,
-    }
+    sessionPhaseStatus = aiDynamicFallbackPhaseStatus(aiPeriodizationState)
   }
 
   // AI Dynamic: when a prescription is in effect (accepted/auto-applied, or a pending

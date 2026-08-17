@@ -3395,6 +3395,30 @@ journal.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][readiness] ✅ An engine-chosen deload prescribed full weights — fixed, not device-verified (Q-310, 2026-08-17)
+
+- **Fixed in v1.317.4.** `/api/workout-data`'s ai_dynamic catch-all branch — two verbatim copies —
+  hardcoded `isDeloadActive: false` / `phaseType: 'normal'` while title-casing the *same*
+  `aiPeriodizationState.phase` field into the header label. An AI-engine-chosen `phase: 'deload'`
+  (nobody confirms it, so it reaches no earlier branch) therefore read "Deload" and prescribed full
+  intensity. Both copies now go through `aiDynamicFallbackPhaseStatus()` in
+  `packages/shared/src/workout/session-data.ts`, so they cannot disagree again. Journal:
+  [`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](docs/overview/entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md).
+- **`personal_records` was never corrupted — measured, and no migration is needed.**
+  `logExerciseFromPayload` reads `session_periodization` independently of this route, so the server
+  zeroed the estimate and refused the PR the whole time. Both production deload sessions
+  (2026-08-09, 2026-08-16) carry `max(estimated_1rm) = 0` and no PR row on either date. The
+  "New Personal Record!" the owner saw was the **client's** optimistic badge, computed from this
+  route's wrong flag. That check is owner-scoped (`claude_ro`) — it says nothing about other
+  accounts.
+- **Still owed: the device check.** Server/JS only, so it reaches the APK through the Railway
+  deploy with no rebuild — but the client half (`workout-screen.tsx` reading
+  `phaseStatus.isDeloadActive`, and the summary badge going quiet) was verified from the route's
+  response, not on hardware. Confirm on the S25 the next time an engine-chosen deload comes up:
+  header reads "Deload", weights are reduced, no PR badge.
+- **Local SQLite rows written during the bug window** hold an inflated `estimated1rm`. They self-heal
+  on the next pull (`applyDelta` overwrites once `sync_status` is `synced`); not observed on device.
+
 ### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
 
 - **The cause was not environmental and not the specs.** `components/weekly-recap-banner.tsx` POSTs

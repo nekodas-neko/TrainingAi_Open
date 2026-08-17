@@ -34,6 +34,45 @@ export interface PhaseStatus {
   phaseSessionNumber?: number
 }
 
+/**
+ * Phase status for an ai_dynamic session that none of the earlier, more specific branches in
+ * /api/workout-data claimed — not the AMRAP baseline, and not a deload week the user confirmed
+ * themselves (the `?aiDeload=1` toggle or Home's "Take deload week now" card).
+ *
+ * Q-310: this catch-all lived as two verbatim copies in that route, and both hardcoded
+ * `isDeloadActive: false` / `phaseType: 'normal'` on the belief that a deload could only arrive
+ * through one of the branches above. It also arrives here — when the AI periodization engine
+ * chooses `phase: 'deload'` off accumulated fatigue, nobody confirms anything, so this is the
+ * only branch left to catch it. The phase NAME title-cased correctly to "Deload" from the same
+ * field the flag ignored, which is why the owner saw a session labelled Deload prescribing full
+ * weights. One helper, one place, so the two call sites cannot disagree again.
+ */
+export function aiDynamicFallbackPhaseStatus(
+  state: { phase: string; sessionsInPhase: number },
+): PhaseStatus {
+  const isDeload = state.phase === 'deload'
+  return {
+    phase: {
+      id: '', phaseSetId: '', position: 0,
+      name: state.phase.charAt(0).toUpperCase() + state.phase.slice(1),
+      durationCycles: 1,
+      phaseType: isDeload ? 'deload' : 'normal',
+    } as ProgramPhase,
+    cycleInPhase: 1,
+    totalPhaseCycles: 1,
+    completedCycles: state.sessionsInPhase,
+    totalProgramCycles: 0,
+    sessionsPerCycle: 1,
+    sessionsInCurrentCycle: 0,
+    blockComplete: false,
+    approxWeeksRemaining: null,
+    isDeloadActive: isDeload,
+    isBaseline: false,
+    openEnded: true,
+    phaseSessionNumber: state.sessionsInPhase + 1,
+  }
+}
+
 export interface WorkoutExercise {
   name: string;
   // session_exercises row id — the stable identity AI prescriptions key by (AiPrescriptionExercise
