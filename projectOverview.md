@@ -92,11 +92,11 @@ order.
   of the `WEBHOOK_USER_ID`/`ADMIN_EXPORT_USER_ID` pairs, cannot be rotated cheaply, and `CLAUDE.md`'s
   "re-run the generator into a **new** migration" rule means every future schema change adds another
   public copy. Fix the generator, not the 18 files.
-- **🟠 Q-457 — `lib/github-release.ts:24` still defaults `APK_RELEASE_REPO` to the archived private
-  repo.** Wrong in two directions: a deployment that ever loses the env var reads a frozen release and
-  fails *silently-looking* (a 404 surfacing as "Could not fetch release info"), and a public clone
-  points at a repo it cannot read. **Not verified against Railway** — this is about the default being
-  a trap, not a live outage. The same surface has already been dead for two weeks once.
+- **✅ Q-457 FIXED (Lane B, 2026-08-17)** — `lib/github-release.ts` defaulted `APK_RELEASE_REPO` to the
+  archived private repo; it now defaults to `nekodas-neko/TrainingAi_Open`, so an unset variable
+  degrades to correct rather than to a frozen release failing as "Could not fetch release info".
+  **Guarded** by a test on the URL actually requested, which fails when the default is flipped back —
+  the fixtures the entry flagged proved nothing about which repo is *asked*. Never a live outage.
 - **🟡 Q-458 — `.env.example` is wrong in both directions.** Eight declared keys are read by no code,
   including **`TOKEN_ENC_KEY`, which names a security property the app does not have** (an operator
   will set it and conclude tokens are encrypted at rest; nothing reads it), and five Oura **Cloud**
