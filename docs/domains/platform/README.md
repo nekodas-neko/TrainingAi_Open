@@ -87,6 +87,13 @@ layer**) through §16. Read it before building any shared helper.
   seven live imports (not the two Q-31 claims), one dead module deletable today, a
   replace/gitignore/delete verdict per module, and the fresh-repo-vs-history question that blocks
   the gitignore half.
+- [`docs/superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md`](../../superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)
+  — backlog **Q-530**, the designed half of Q-251. A prod-shaped snapshot for local migration
+  rehearsal, built by paginating over the **existing** `claude_ro` views rather than writing a second
+  scoping map. Carries the production volume measurements (**477 MB DB; `oura_raw_samples` is 360 MB
+  and 99.98% of it is the owner's, so scoping is a consent fix and never a size fix**), the runtime
+  drift gate that makes an unregenerated view schema **fail the export** rather than omit a table,
+  and the leak analysis for the new secret.
 - [`docs/module-map.md`](../../module-map.md) — what exists and where, for all infrastructure.
 - [`docs/db-volume-cleanup-handover.md`](../../db-volume-cleanup-handover.md) — the Postgres volume
   investigation (approaching 1 GB for one user); structural fix still pending. **Its recommended
