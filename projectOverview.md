@@ -284,6 +284,35 @@ order.
   confirm both that the card flips immediately and that the log reaches the server afterwards.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
 
+### [devices][platform] 🔴 INCIDENT — production `disk_full` at 583 MB; masked by a temporary 5 GB volume (Q-536, 2026-08-17)
+
+Production hit `[pg 53100] disk_full` at ~07:42 UTC. **The volume was 500 MB, not the 1 GB asserted in
+a `lib/observability/request-error.ts` code comment** — so at the 464 MB measured hours earlier the
+database was already at **93% of capacity**. The volume has been raised 500 MB → 5 GB as temporary
+mitigation; **the owner's target is a return to stock 500 MB**, so this stays open until that holds.
+
+**It was not growth.** Measured 22 minutes after recovery: `oura_raw_samples` went 360 MB → **666 MB**
+while live rows went **down** by 557 and `body_hex`/`event_name` did not move. All 306 MB is bloat.
+`n_tup_ins = 0`, `n_tup_upd = 681,005`, **`n_tup_hot_upd = 0`** — a full-table `measured_at` re-stamp,
+and because `measured_at` is indexed **no such update can ever be HOT**, so each writes a new heap
+tuple plus an entry in all four indexes.
+
+**This is not the Q-46 bug and must not be "re-fixed".** That `IS DISTINCT FROM` guard is present and
+working (`adapter.ts:4954`); it can only skip a re-stamp writing back the *same* value, and the
+Q-71/I25 clock correction changed every row's derived value. The operation was legitimate.
+
+- **The durable finding:** this table cannot be re-stamped without roughly doubling, and
+  [`docs/oura-ble-operations.md`](docs/oura-ble-operations.md) prescribes Redecode as the remedy for
+  **five** failure modes (I12, I14, I19, I20, I25). The documented fix procedure is a disk-fill hazard
+  for every future decoder or clock correction.
+- **No retention change is needed and none was chosen.** `VACUUM FULL` reclaims the 306 MB
+  non-destructively (~465 MB); the index audit and repack take it to ~260 MB and hold it. Owner chose
+  A+B+C on 2026-08-17 — every step preserves `body_hex`, so the archival rule stands unchanged.
+- **Still owed:** the `VACUUM FULL` after the re-stamp completes, then Q-532 (which also makes future
+  re-stamps HOT-eligible), a pre-flight free-space guard on the redecode route, and replacing that
+  1 GB comment with the real provisioned size.
+- Detail: [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
+
 ### [devices][platform] 🟠 `oura_raw.db` is growing without bound on the phone, and nobody has ever seen how big it is (Q-530, 2026-08-17)
 
 The documented "14-day rolling buffer" for on-device raw frames (owner retention decision,

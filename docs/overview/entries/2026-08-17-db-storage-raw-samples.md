@@ -57,6 +57,43 @@ non-standing session claims a block.
 E additionally gives up the D3 rollback and leaves raw history single-copy on an un-backed-up phone.
 That is the owner's call.
 
-**Failure surfaces not exercised:** measurement and planning only — nothing ran on the device, and the
-device findings are static analysis (grep for callers, the prune predicate, the manifest). The real
-size of `oura_raw.db` on the S25 remains unobserved.
+## Mid-session: it became an incident, and the diagnosis changed
+
+Production hit `[pg 53100] disk_full` at ~07:42 UTC while this was being written. **The volume was
+500 MB, not the 1 GB the code comment claimed** — the check I had flagged as needed was the right
+instinct, and the figure was wrong by 2× in the dangerous direction. At the 464 MB measured hours
+earlier the database was already at 93% of capacity; the runway was hours, not 60 days.
+
+**The cause was not growth.** Re-measured 22 minutes after recovery, `oura_raw_samples` had gone
+360 MB → 666 MB while live rows went **down** by 557 and `body_hex`/`event_name` did not move at all.
+`n_tup_ins = 0`, `n_tup_upd = 681,005`, `n_tup_hot_upd = 0` — a full-table `measured_at` re-stamp,
+non-HOT by construction because `measured_at` is indexed, so each update rewrote a heap tuple plus an
+entry in all four indexes. All four roughly doubled in step.
+
+**It is not the Q-46 bug**, and saying so mattered: that `IS DISTINCT FROM` guard is present and
+working. It can only skip a re-stamp writing back the same value, and the Q-71/I25 clock correction
+changed every row's derived value, so nothing could be skipped. The operation was legitimate — which
+is the actual finding: **this table cannot be re-stamped without roughly doubling, and the operations
+manual prescribes exactly that as the remedy for five separate failure modes.**
+
+Two things only visible after the incident. Dropping `idx_oura_raw_samples_user_measured` is not just
+a space win — `measured_at` is the only *indexed* column a re-stamp changes, so removing that index
+makes a full re-stamp **HOT-eligible**. And repacking removes the operation entirely, because a packed
+table stops storing `measured_at` per frame at all.
+
+**The answer to "does the non-destructive half alone reach 500 MB" is yes, and nothing irreversible is
+needed.** `VACUUM FULL` reclaims ~306 MB to ~465 MB; the index audit and row narrowing reach ~260 MB.
+The distinction worth keeping: *reaching* 500 MB and *holding* it are different. `VACUUM FULL` alone
+re-crosses it in ~5 days, A+B in ~7 weeks, repacking in ~3 years. So repacking is load-bearing under
+the owner's 500 MB target, not optional polish — and it is non-destructive, so it costs no capability.
+
+**Owner decisions recorded:** A+B+C (no D, no E); D4 stays the destination with no deadline, which
+lapses O1 and unblocks the `bytea` work; stock 500 MB is the target, not the temporary 5 GB;
+visibility-first on the device store. Q-536 filed at the top of the queue for the incident; the queue
+re-ranked around it.
+
+**Failure surfaces not exercised:** measurement and planning only — no code changed, nothing ran on
+the device, and the device findings are static analysis (grep for callers, the prune predicate, the
+manifest). The real size of `oura_raw.db` on the S25 remains unobserved. **The `VACUUM FULL` has not
+been run and the re-stamp was still in progress at last measurement** — every post-vacuum figure here
+is projected from the pre-incident measurement at the same row count, not observed.

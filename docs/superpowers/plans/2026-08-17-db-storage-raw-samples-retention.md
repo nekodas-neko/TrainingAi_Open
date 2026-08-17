@@ -16,6 +16,120 @@ recovered. Every other option on the table gets most of the space back and gives
 
 ---
 
+## 0. Incident update — 2026-08-17 ~07:42 UTC, and it changes the conclusion
+
+**Production hit `[pg 53100] disk_full`.** The volume was 500 MB — not the 1 GB the code comment
+claimed, which this document had already flagged as unverified. At the 464 MB measured in §1 the
+database was therefore already at **93% of its volume**, and the runway was hours, not 60 days. The
+volume has been raised 500 MB → 5 GB as a temporary mitigation; **the target is to return to the
+stock 500 MB.**
+
+**The cause is not growth.** Re-measured at 08:04 UTC, ~22 minutes after crash recovery:
+
+| | Earlier today | After the crash | Change |
+|---|---:|---:|---|
+| `oura_raw_samples` total | 360 MB | **666 MB** | +306 MB |
+| — heap | 152 MB | 245 MB | +93 MB |
+| — indexes | 208 MB | **421 MB** | +213 MB |
+| Live rows | 1,098,183 | 1,097,626 | **−557** |
+| `body_hex` (owner) | 26 MB | **26 MB** | **unchanged** |
+| `event_name` (owner) | 20 MB | **20 MB** | **unchanged** |
+| Whole database | 464 MB | **771 MB** | +307 MB |
+
+**The table nearly doubled while the row count went down and the payload did not move at all.** Every
+byte of that 306 MB is bloat.
+
+### The mechanism, proven rather than inferred
+
+`pg_stat_user_tables` since crash recovery:
+
+```
+oura_raw_samples   n_tup_ins = 0   n_tup_upd = 681,005   n_tup_hot_upd = 0   n_dead_tup = 82,139
+```
+
+**681,005 updates in ~22 minutes, zero of them HOT, and zero inserts.** A full-table `measured_at`
+re-stamp is running. `measured_at` is indexed (`idx_oura_raw_samples_user_measured`), so **no update
+that changes it can ever be HOT** — each one writes a new heap tuple *and* a new entry in all four
+indexes. Index growth confirms it: the dedup key 78 → 155 MB, `user_measured` 46 → 117 MB,
+`user_tag_ts` 60 → 102 MB, `pkey` 24 → 47 MB — everything roughly doubled, in step.
+
+At ~62% through 1.1M rows, the completed pass should produce **~490 MB of bloat** and leave the table
+near 850 MB before any vacuum.
+
+### This is not the Q-46 bug, and that distinction matters
+
+Q-46's `IS DISTINCT FROM` guard **is present and correct** on the redecode re-stamp path
+(`adapter.ts:4954`), with a comment explaining exactly this hazard. It is working.
+
+But that guard can only skip a re-stamp that would write back **the same value**. The Q-71/I25 clock
+fix changed how `measured_at` is derived, so every row's computed value genuinely differs and nothing
+*can* be skipped — and the ops manual explicitly prescribes this operation: *"Tap Redecode (full, not
+`dump`) … to rewrite historical `sleep_sessions` rows with the corrected clock math"* (I25).
+
+> **The structural finding: this table cannot be re-stamped without roughly doubling in size, and the
+> operations manual prescribes re-stamping it as the remedy for five separate failure modes (I12,
+> I14, I19, I20, I25).** The documented fix procedure is a disk-fill hazard. Every future decoder or
+> clock correction carries the same cost. That is a permanent property of one-row-per-frame plus an
+> index on `measured_at` — not a bug anyone introduced.
+
+### Two consequences that were not visible before the incident
+
+1. **Dropping `idx_oura_raw_samples_user_measured` is not only a space win — it is the fix for the
+   bloat mechanism.** `measured_at` is the only *indexed* column a re-stamp changes; the other three
+   indexes cover `id`, `user_id`, `ring_timestamp_ds`, `tag` and `body_hex`, none of which move.
+   Remove that one index and a full re-stamp becomes **HOT-eligible**, which collapses both the index
+   writes and most of the heap bloat. That index is 117 MB carrying **1 scan** since recovery (3,340
+   lifetime). This makes §6 A the highest-value item in the document, on two independent grounds.
+2. **Repacking (§6 C) removes the operation entirely.** A packed table holds ~30 rows/day instead of
+   22,910, and `measured_at` stops being a stored per-frame column at all — it is derived at decode
+   time from the anchor. A clock correction then re-stamps nothing. **C is not just a storage win; it
+   deletes the failure mode that caused this outage.**
+
+### Does the non-destructive half alone reach 500 MB? Yes.
+
+| Step | Table | Whole DB | Nature |
+|---|---:|---:|---|
+| Now (mid-re-stamp) | 666 MB | 771 MB | — |
+| `VACUUM FULL` after the pass completes | ~360 MB | **~465 MB** | non-destructive |
+| **+ §6 A** — drop `user_measured` + `user_tag_ts` | ~250 MB | ~355 MB | non-destructive |
+| **+ §6 B** — drop `event_name`, `body_hex` → `bytea` | ~200 MB | ~305 MB | non-destructive |
+| **+ `error_events` self-clearing** (~2026-09-12, §7) | — | **~260 MB** | automatic |
+| **+ §6 C** — repack | ~50 MB | **~110 MB** | non-destructive |
+
+**Answer to the question this section was asked: no retention change is needed. Nothing irreversible
+is needed.** Every step above preserves every byte of `body_hex`.
+
+**But "reaches 500 MB" and "holds 500 MB" are different claims, and only one of them is safe:**
+
+| After | Growth rate | Time from that baseline back to 500 MB |
+|---|---:|---:|
+| `VACUUM FULL` alone | ~7.5 MB/day | **~5 days** |
+| + A + B | ~5.0 MB/day | **~7 weeks** |
+| + C (repack) | **~0.37 MB/day** | **~3 years** |
+
+`VACUUM FULL` alone gets under the stock volume and then loses it again within a week. A+B buys about
+seven weeks. **C is what makes 500 MB a permanent home rather than a place the database passes
+through** — and C is non-destructive, so choosing it costs no capability at all.
+
+### Revised sequencing
+
+1. **Let the re-stamp finish**, then `VACUUM FULL` (the existing admin `POST /api/oura-ble/samples/vacuum`,
+   Lever 1c). Non-destructive, reclaims ~306 MB, and is the only thing that has to happen today.
+2. **§6 A immediately after** — it is both the largest reversible win and the fix for the mechanism.
+3. **§6 B**, then **§6 C** on its own schedule. Only C makes the 500 MB target hold.
+4. **Do not use the temporary 5 GB volume as licence to skip C**, and do not let the incident push a
+   decision on §6 D or E. The incident is a bloat event; neither D nor E would have prevented it, and
+   §6 A would have.
+
+> **Numbering note.** The instruction that prompted this section referred to "Q-534 … the
+> non-destructive half (indexes 291 MB against a 175 MB heap)". In this document the index audit is
+> **Q-532** and the repack is **Q-534**; both are non-destructive, as is Q-533. The 291/175 figures
+> match neither the pre-crash reading (208/152) nor the post-crash one (421/245) and sit between them,
+> consistent with a sample taken while the re-stamp was running. Flagged rather than silently
+> reconciled.
+
+---
+
 ## 1. What was measured, and how far it generalises
 
 All figures from production on **2026-08-17** via `POST /api/admin/db-query`.
@@ -107,14 +221,23 @@ partway through; the 14-day figure is the forward-looking one.
 **The irreplaceable data grows at 205 MB/year. The table grows at 2.7 GB/year.** The 2.5 GB difference
 is representation, not information.
 
-### The deadline is real even though the framing was wrong
+### The deadline was not 60 days — it was hours ⚠️ SUPERSEDED BY §0
 
-`lib/observability/request-error.ts` records the Railway volume as **1 GB** in a code comment. At
-464 MB and ~7.5–8.7 MB/day, that ceiling arrives in **roughly 60–70 days — late October 2026**. The
-urgency in the owner's instinct is correct; only the target is misidentified.
+This section originally read: *"`lib/observability/request-error.ts` records the Railway volume as
+**1 GB**… that ceiling arrives in roughly 60–70 days"*, with an owner check attached because the
+figure was a code comment rather than a measurement.
 
-> **Owner check needed:** confirm the 1 GB figure. It is a code comment, not a measurement, and every
-> deadline in this document depends on it.
+**The check was the right instinct and the figure was wrong. The volume was 500 MB.** At the 464 MB
+measured below, the database was already at **93% of its volume**, and it hit `disk_full` the same
+day — see §0. The correction is kept visible rather than edited away, because the lesson is the
+transferable part: **a capacity figure that lives only in a code comment is not a measurement, and
+this one was off by 2× in the dangerous direction.**
+
+- **Fix in the same pass as any of §6:** replace that comment with the real provisioned size, or
+  better, stop asserting it in prose — `pg_database_size()` against the actual volume is the only
+  honest source.
+- **Current state:** volume temporarily raised to 5 GB; **target is a return to the stock 500 MB**
+  (owner, 2026-08-17). All arithmetic in §0 is against 500 MB.
 
 ---
 
@@ -363,7 +486,35 @@ constraint is a straightforward candidate. Same reversibility as §6 A: nothing 
 
 ---
 
+## 7b. Owner decisions — recorded 2026-08-17
+
+Taken after §1–§7 were presented and before §0's incident was known; §0 strengthens all four rather
+than disturbing any of them.
+
+| Question | Decision |
+|---|---|
+| Retention policy | **A + B + C — repack, keep everything.** No option D, no option E. |
+| Is D4 (device-primary, server raw dropped) still the destination? | **Yes, but no deadline.** This lapses master-plan decision **O1**, which vetoed `bytea` on the grounds that the table was about to be dropped — a drop that is years out cannot veto a cheap reversible win today. **Q-533 is therefore unblocked in full**, not just its `event_name` half. |
+| Volume ceiling | **Stock 500 MB is the target**, not the temporary 5 GB. |
+| Device raw store | **Visibility first** — build the `rawStats()` panel, measure, then set retention. |
+
+**Nothing irreversible was chosen, and after §0 nothing irreversible is needed.** The 500 MB target
+is reachable and holdable entirely with non-destructive work.
+
+**One consequence worth stating plainly:** C is the only step that makes 500 MB stable (§0), so under
+this decision C is **load-bearing, not optional polish**. A and B buy roughly seven weeks between
+them; C buys years and removes the re-stamp failure mode that caused the outage.
+
+**Note that C subsumes B's `bytea` half** — a packed blob *is* `bytea`. If C is taken promptly, Q-533
+reduces to dropping `event_name` alone, and the standalone `text` → `bytea` migration should be
+skipped rather than done twice.
+
+---
+
 ## 8. What this session recommends *procedurally* (not which option to take)
+
+> **Superseded in part by §7b** — the owner has now chosen A+B+C. Point 1 is kept for the record;
+> points 2–4 still stand, and §0 adds the vacuum-first sequencing ahead of all of them.
 
 1. **The owner picks from §6.** Options A, B and C give up nothing and can start immediately. D and E
    are one-way doors and this document exists so that door is opened deliberately or not at all.

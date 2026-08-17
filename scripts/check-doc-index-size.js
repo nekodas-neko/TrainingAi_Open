@@ -57,12 +57,17 @@ const root = path.join(__dirname, '..');
 // which this ratchet does not govern. Two of the six entries are blocked on an owner decision and
 // carry the "what this irreversibly gives up" summary inline deliberately: an implementer must not
 // have to open the plan to discover that the item is a one-way door.
+//
+// Raised again 2026-08-17 for the disk_full incident (Q-536): backlog -> 6235, projectOverview -> 6534.
+// A live production outage entry and its Known-Issues row. Both carry the proven mechanism inline
+// (n_tup_upd=681,005 with n_tup_hot_upd=0) rather than citing it, because the counters reset at
+// crash recovery and cannot be re-derived later — the same reasoning as the Q-388 raise above.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6505,
-  'docs/implementation-backlog.md': 6191,
+  'projectOverview.md': 6534,
+  'docs/implementation-backlog.md': 6235,
   'CLAUDE.md': 988,
 };
 

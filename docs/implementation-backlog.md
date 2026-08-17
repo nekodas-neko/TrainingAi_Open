@@ -396,6 +396,71 @@ below threshold and left in place for next time.
   the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
   than feeding a bare `"no data"` string the model reads as a measurement.
 
+### [devices][platform] Q-536 — INCIDENT: `disk_full` at 583 MB; a full `measured_at` re-stamp doubles this table, and the ops manual prescribes it
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0
+- **Branch:** `fix/oura-raw-restamp-bloat`
+- **Added:** 2026-08-17 · **Top of queue:** this is a live production incident, currently masked by a
+  temporary volume raise (500 MB → 5 GB) that the owner wants reverted to stock 500 MB.
+- **What happened:** production hit `[pg 53100] disk_full` at ~07:42 UTC. The volume was **500 MB**,
+  not the 1 GB asserted in a `lib/observability/request-error.ts` code comment — so at the 464 MB
+  measured hours earlier the database was already at **93% of capacity**.
+- **It was not growth.** Measured 22 min after recovery: the table went 360 MB → **666 MB** while live
+  rows went **down** by 557 and `body_hex`/`event_name` did not move at all. All 306 MB is bloat.
+- **Mechanism, proven not inferred:** `n_tup_ins = 0`, `n_tup_upd = 681,005`, **`n_tup_hot_upd = 0`**.
+  A full-table `measured_at` re-stamp is running; `measured_at` is indexed, so **no such update can
+  ever be HOT** — each writes a new heap tuple plus an entry in all four indexes. Every index roughly
+  doubled in step (dedup 78→155 MB, `user_measured` 46→117 MB, `user_tag_ts` 60→102 MB, pkey 24→47 MB).
+- **This is NOT the Q-46 bug — do not "re-fix" it.** Q-46's `IS DISTINCT FROM` guard is present and
+  correct at `adapter.ts:4954`. It can only skip a re-stamp writing back the *same* value, and the
+  Q-71/I25 clock correction changed every row's derived value, so nothing can be skipped. The
+  operation is legitimate.
+- **The real finding:** this table cannot be re-stamped without roughly doubling, and
+  `docs/oura-ble-operations.md` prescribes Redecode as the remedy for **five** failure modes (I12,
+  I14, I19, I20, I25). **The documented fix procedure is a disk-fill hazard**, permanently, for every
+  future decoder or clock correction.
+- **Tasks, in order:**
+  1. Let the re-stamp finish, then run the existing admin `POST /api/oura-ble/samples/vacuum`
+     (Lever 1c). Non-destructive; reclaims ~306 MB and gets the DB to ~465 MB, under stock.
+  2. **Q-532 next, and treat it as the mechanism fix, not just space** — dropping
+     `idx_oura_raw_samples_user_measured` makes a full re-stamp **HOT-eligible**, because
+     `measured_at` is the only *indexed* column such an update changes.
+  3. Add a pre-flight guard to the redecode route: refuse to start a full re-stamp when free volume
+     is under (rows × ~300 B). A prescribed remedy must not be able to fill the disk.
+  4. Replace the 1 GB code comment with the real provisioned size, or delete the assertion —
+     `pg_database_size()` is the only honest source.
+- **Do not let this incident force a retention decision.** It is a bloat event; neither §6 D nor E
+  would have prevented it, and §6 A would have.
+
+### [devices][platform] Q-532 — index audit on `oura_raw_samples`: 106 MB for 5,129 lifetime scans
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 A
+- **Branch:** `perf/oura-raw-index-audit`
+- **Added:** 2026-08-17 · **Placement: second only to the incident that made it urgent (Q-536).**
+  Two independent grounds now, not one: it is the largest reversible space win **and** it is the fix
+  for the bloat mechanism behind the `disk_full` outage. `measured_at` is the only *indexed* column a
+  full re-stamp changes, so dropping `idx_oura_raw_samples_user_measured` makes such a re-stamp
+  **HOT-eligible** and collapses both the index writes and most of the heap bloat.
+- **⚠️ The scan counts below are pre-incident.** Re-measured after the crash the same indexes read
+  117 MB / 1 scan (`user_measured`) and 102 MB / 16 scans (`user_tag_ts`) — inflated by the running
+  re-stamp, and on counters that reset at recovery. **Re-measure after the `VACUUM FULL` in Q-536
+  step 1**, before deciding anything; do not act on either set of numbers taken mid-re-stamp.
+- **Measured in production 2026-08-17** (`pg_stat_user_indexes`, system-wide, and
+  `pg_stat_database.stats_reset` is `NULL` so scan counts are lifetime, not a recent window):
+  `oura_raw_samples` is 360 MB of which **208 MB is indexes against 152 MB of heap**.
+  `oura_raw_samples_user_tag_ts` is **60 MB / 1,789 scans**; `idx_oura_raw_samples_user_measured` is
+  **46 MB / 3,340 scans**.
+- **The lead:** `user_tag_ts` was built for the per-tag read pattern that **Q-213/I19 deliberately
+  removed** when it collapsed the rollup's ten tag reads into one query partitioned in memory. It may
+  be paying rent on a query shape that no longer exists.
+- **Do not drop on the strength of a scan count.** `EXPLAIN` the rollup (`aggregateOuraRawSamples`),
+  the redecode path and the admin tester reads first. Reclaiming the file needs `VACUUM FULL`
+  (ops-doc I17 — a drop does not shrink it by itself).
+- **Same shape, smaller:** `oura_heartrate` is 25 MB of indexes on 6.7 MB of heap;
+  `oura_heartrate_pkey` has **zero** lifetime scans on a table that already has a `(user_id,
+  timestamp)` unique constraint. **Keep `oura_heartrate_user_updated`** despite its zero — migration
+  130 added it for Track-B sync, which is not wired yet.
+
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
 - **Branch:** `fix/ring-measurement-power-budget`
@@ -508,27 +573,33 @@ ehr     0     0     0     0   648   208   128   556     0
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-535).
 
-### [devices][platform] Q-532 — index audit on `oura_raw_samples`: 106 MB for 5,129 lifetime scans
+### [devices][platform] Q-534 — repack raw frames: ~20× smaller, byte-for-byte lossless
 
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 A
-- **Branch:** `perf/oura-raw-index-audit`
-- **Added:** 2026-08-17 · **Placement:** highest-value reversible storage work. Gives up nothing, and
-  the Railway volume ceiling is ~60 days out.
-- **Measured in production 2026-08-17** (`pg_stat_user_indexes`, system-wide, and
-  `pg_stat_database.stats_reset` is `NULL` so scan counts are lifetime, not a recent window):
-  `oura_raw_samples` is 360 MB of which **208 MB is indexes against 152 MB of heap**.
-  `oura_raw_samples_user_tag_ts` is **60 MB / 1,789 scans**; `idx_oura_raw_samples_user_measured` is
-  **46 MB / 3,340 scans**.
-- **The lead:** `user_tag_ts` was built for the per-tag read pattern that **Q-213/I19 deliberately
-  removed** when it collapsed the rollup's ten tag reads into one query partitioned in memory. It may
-  be paying rent on a query shape that no longer exists.
-- **Do not drop on the strength of a scan count.** `EXPLAIN` the rollup (`aggregateOuraRawSamples`),
-  the redecode path and the admin tester reads first. Reclaiming the file needs `VACUUM FULL`
-  (ops-doc I17 — a drop does not shrink it by itself).
-- **Same shape, smaller:** `oura_heartrate` is 25 MB of indexes on 6.7 MB of heap;
-  `oura_heartrate_pkey` has **zero** lifetime scans on a table that already has a `(user_id,
-  timestamp)` unique constraint. **Keep `oura_heartrate_user_updated`** despite its zero — migration
-  130 added it for Track-B sync, which is not wired yet.
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C
+- **Branch:** `perf/oura-raw-frame-packing`
+- **Added:** 2026-08-17
+- ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-535).** This is the option the current
+  archival rule does not consider, and the only one that makes the growth curve sustainable without
+  deleting anything or depending on the phone.
+- **It is load-bearing, not polish.** Against the stock 500 MB target: `VACUUM FULL` alone re-crosses
+  500 MB in ~5 days, A+B in ~7 weeks, **C in ~3 years** (~0.37 MB/day vs ~7.5 today). C is the only
+  step that makes 500 MB a home rather than somewhere the database passes through.
+- **It also deletes the failure mode behind the Q-536 outage.** A packed table holds ~30 rows/day
+  instead of 22,910, and `measured_at` stops being a stored per-frame column — it is derived at decode
+  time from the anchor — so a clock correction re-stamps nothing at all.
+- **Supersedes the `bytea` half of Q-533** — a packed blob *is* `bytea`. If C is taken promptly, skip
+  the standalone `text` → `bytea` migration rather than doing the work twice.
+- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
+  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
+  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
+  difference is representation, not information.
+- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
+  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
+  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
+  50 MB.
+- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
+  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
+  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
 
 ### [platform] Q-531 — one repeating fault cost 49 MB because the error dedupe is defeated by parameterised SQL
 
@@ -557,63 +628,36 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
 - **Branch:** `perf/oura-raw-row-narrowing`
 - **Added:** 2026-08-17
-- ⛔ **blocked: owner decision (Q-535).** Master-plan decision **O1** makes `bytea` and the D4 raw drop
-  mutually exclusive — *"do not do both"*, with D4 preferred. If D4 is not the chosen path that
-  exclusion lapses and this is back on. The `event_name` half is **not** covered by O1 and could be
-  taken independently.
+- ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
+  lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
+  was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
+- **Take the `event_name` half regardless. Take the `bytea` half only if Q-534 is NOT imminent** — a
+  packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
 - **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
   from `tag`** — the Kotlin/TS cross-language parity test already pins that mapping. `text` → `bytea`
   is a lossless re-encoding that halves `body_hex` (26 MB → ~13 MB) and shrinks the 78 MB dedup index
   with it. Together: ~45–50 MB, and ~328 B/row → ~270 B/row.
 - Needs `VACUUM FULL` to reclaim (ops-doc I17).
 
-### [devices][platform] Q-534 — repack raw frames: ~20× smaller, byte-for-byte lossless
+### [devices][platform] Q-535 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
 
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C
-- **Branch:** `perf/oura-raw-frame-packing`
-- **Added:** 2026-08-17
-- ⛔ **blocked: owner decision (Q-535).** This is the option the current archival rule does not
-  consider, and the only one that makes the growth curve sustainable without deleting anything or
-  depending on the phone.
-- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
-  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
-  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
-  difference is representation, not information.
-- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
-  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
-  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
-  50 MB.
-- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
-  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
-  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6, §7b
+- **Added:** 2026-08-17 · **Answered the same day.** No longer blocking anything.
+- **The owner chose A + B + C — index audit, row narrowing, repack. Options D and E are declined.**
+  Nothing irreversible is being done: every chosen step preserves `body_hex` byte for byte, so the
+  `CLAUDE.md` archival rule stands unchanged and needs no rewrite.
+- **The reframing the decision rested on:** the archival rule protects `body_hex`, which is **26 MB of
+  the 360 MB table — 7.3%**. The rest is indexes and row overhead, all reversible. So the expensive
+  thing and the irreplaceable thing were never the same thing.
+- **The `disk_full` incident (Q-536) did not change this and must not be read as forcing it.** That
+  was a bloat event from a full `measured_at` re-stamp, not growth; **§6 A would have prevented it and
+  neither D nor E would have.** Against the stock 500 MB target the non-destructive path alone reaches
+  ~260 MB and, with C, holds it for years.
+- **Also settled:** D4 remains the destination with **no deadline**, which lapses decision O1 and
+  unblocks Q-533. The 2026-08-02 retention decision justified the 14-day device tier *because* the
+  server keeps `body_hex` forever — that premise now holds indefinitely, so the tier needs no revision.
+- **Remove this entry** once Q-532/Q-533/Q-534 are all closed; it carries no work of its own.
 
-### [devices][platform] Q-535 — OWNER DECISION: raw-retention policy (two of the five options are one-way doors)
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6
-- **Added:** 2026-08-17
-- ⛔ **blocked: owner.** Do not implement §6 D or §6 E without an explicit decision. Both are
-  irreversible and neither can be walked back.
-- **The reframing the decision rests on:** the archival rule in `CLAUDE.md` protects `body_hex`, which
-  is **26 MB of the 360 MB table — 7.3%**. The other 334 MB is indexes and row overhead, all of it
-  reversible. Dropping raw to the device buys 360 MB, of which only ~50–80 MB is unreachable by the
-  reversible options A+B+C together.
-- **Option D (bounded server re-decode window)** permanently gives up re-decoding anything older than
-  the window. The project has used that capability twice already — the I23 sleep-bout fix and the
-  Q-71/I25 clock-math correction were both back-filled from stored hex, the latter **five weeks**
-  after the affected nights. Note a 90-day window at today's row cost is ~676 MB, *larger than the
-  table is now* — D only helps combined with A/B/C.
-- **Option E (full D4 cutover)** gives up server-side re-decode permanently and for all history, gives
-  up the D3 rollback (no server raw to re-derive from if the device rollup is later found wrong), and
-  makes raw history single-copy on one phone that **has no working backup** (Q-530). D4 is gated on
-  D1+D2+D3; D1's restore has never been device-verified, D2 Tasks 4–6 are unbuilt or unmerged, D3 is
-  not started, and none of D4's four gate artifacts exist.
-- **Do not let the volume ceiling force E.** `lib/observability/request-error.ts` records the Railway
-  volume as 1 GB; at 464 MB and ~7.5–8.7 MB/day that is ~60–70 days out. **E is the only option that
-  cannot be delivered in that window**, and A+B+C buy years. (Confirm the 1 GB figure with the owner —
-  it is a code comment, not a measurement.)
-- **Also settle:** the 2026-08-02 retention decision justified the 14-day device tier *because* the
-  server keeps `body_hex` forever. D4 invalidates that premise and the device tier would have to
-  become full-history (~1.2 GB/year, un-backed-up). No existing doc reconciles this.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
