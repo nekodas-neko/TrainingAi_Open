@@ -6048,7 +6048,7 @@ entries now carry that reason, so they are visible and awaiting a decision rathe
 would become public the moment history is pushed. **Decide before the push — once public, it is
 public.**
 
-### [platform] ⚠️ Q-49 A4b has shipped — Oura's material is out of the tree; Phase B (the cut) is what remains
+### [platform] ✅ Q-49 COMPLETE — the repository is public, and this is it (2026-08-17)
 
 The owner ran `GET /api/admin/model-assets` and it returned **`complete`**, which the backlog, the
 admin card and `bucket-report.ts`'s own summary string all described as the gate for deleting the
@@ -6088,11 +6088,19 @@ email in two docs (#1393), a private-path manifest that catalogued what it was p
 and `main` red on E2E for ten hours of every day from a UTC-vs-Brisbane seed bug (#1397). Journal:
 [`entries/2026-08-16-public-repo-snapshot-pushed.md`](docs/overview/entries/2026-08-16-public-repo-snapshot-pushed.md).
 
-**What remains is Phase B steps 9–14**, and all but one are the owner's:
-[`docs/public-repo-cut-runbook.md`](docs/public-repo-cut-runbook.md). Branch protection on the new
-repo cannot be set from a session (no MCP tool for it). Rollback stays available throughout — the old
-repo remains a working Railway target until the final step, and that step archives rather than
-deletes it.
+**Update 2026-08-17 — the migration is DONE.** Every runbook step is closed. This repository is
+`nekodas-neko/TrainingAi_Open`, it is what Railway deploys, and the private `nekodas-neko/TrainingAI`
+is **archived and read-only**. Do not open pull requests there; five that were open when it was
+archived had to be rescued by hand.
+
+What was verified rather than assumed: `check-private-paths` reports `total tracked: 0.0 MB` from a
+*fresh clone of the published repo*; the `apk-latest` download works in a logged-out browser;
+production served this repo's snapshot commit, which — because both boot checks are fatal in
+production — is itself the proof that the bucket download ran, a path that had never executed
+anywhere before.
+
+Full record, including the three findings worth more than the migration:
+[`docs/handoff-2026-08-17-platform-public-repo-migration-complete.md`](docs/handoff-2026-08-17-platform-public-repo-migration-complete.md).
 
 **Update 2026-08-17 — `main` kept moving after the snapshot, and that is expected, not a problem.**
 The pushed snapshot is `main` at `c9df8db`, frozen at that instant. Work on this (old) repo has
