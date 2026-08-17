@@ -1426,10 +1426,36 @@ session working from a temporarily restored copy.
   1.30**. Mildly push-dominant, common in self-directed training, generally worth correcting toward
   1.0 and well short of pathological. **Nothing in the app computes or surfaces it.** Same surface
   and same fix as the landmark display above; do them together rather than as two cards.
-- **⚠️ One week of one user is a small sample and a light week is not a defect.** Before building
-  anything, re-run the query over 4–8 weeks to see whether calves/lats/upper-back are persistently
-  under MEV or whether this was one quiet week. The entry is about the missing surface either way;
-  the specific muscles are illustrative.
+- **✅ The 4–8 week re-measurement this entry asked for, done 2026-08-17 (Lane B) — and it changes
+  the finding.** 56 days of `exercise_logs` × `set_logs`, soft-deletes excluded, compared against the
+  landmarks **as the app actually computes them**: the active program *Shikai* is `powerbuilding`, so
+  `GOAL_MULTIPLIER` scales the table by **×0.8**. The §3 table above compared against the raw
+  hypertrophy row (×1.0), which is not what any user is measured against.
+
+  | muscle | sets/wk (8 wk) | MEV | MAV | MRV | verdict |
+  |---|---|---|---|---|---|
+  | glutes | 22.1 | 3 | 8 | 14 | **158% of MRV** |
+  | hamstrings | 21.6 | 5 | 10 | 14 | **154% of MRV** |
+  | triceps | 20.3 | 5 | 10 | 16 | **127% of MRV** |
+  | shoulders | 14.9 | 6 | 13 | 18 | above MAV |
+  | biceps | 14.0 | 5 | 11 | 18 | above MAV |
+  | lower back | 9.4 | 3 | 6 | 10 | above MAV |
+  | lats | 9.3 | 8 | 13 | 18 | **in range** |
+  | upper back | 6.3 | 6 | 11 | 16 | **in range** |
+  | calves | 2.8 | 6 | 11 | 16 | **47% of MEV** |
+
+  **Two corrections to §3.** (a) It is not a quiet week — the pattern is persistent over eight. (b)
+  **lats and upper back are NOT below MEV**; they only looked that way against the unscaled table.
+  Calves are the one genuine deficit, and they are worse than a "quarter of MEV" reads once scaled.
+- **The story is over-volume, not under-volume, and that is the opposite of how §3 framed it.**
+  Three muscles sit above *max recoverable* volume and one sits below minimum effective. A surface
+  built to say "you are not doing enough calves" would miss the larger half.
+- **Push:pull replicates.** legs 458 (34%), push 382 (29%), pull 286 (22%), other 202 (15%) over the
+  same 56 days — **push:pull 1.34**, against the 1.30 recorded over 60 days. Consistent, and the
+  same mild push dominance rather than anything pathological.
+- **Still open, and still the actual work:** the surface itself, plus the design question of whether
+  Q-278 / Q-302 / Q-305 share one treatment. Nothing was built — this entry gated building on the
+  re-measurement, and that is what was delivered.
 - **Where it likely belongs:** the same screen that already shows weekly volume, rather than a new
   destination — see the IA cluster (Q-232…Q-239) before adding a surface.
 - **A related check that came back CLEAN, recorded so it is not re-investigated:** `core` is tagged on
