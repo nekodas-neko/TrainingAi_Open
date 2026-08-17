@@ -642,33 +642,6 @@ below threshold and left in place for next time.
   cannot be edited by accident — is best solved as part of this, not separately.
 - **Verification:** device-only. None of it is checkable from the sandbox.
 
-### [activity][platform] Q-351 — an activity under 3 seconds is rejected by the API and lost, with a bare "Failed to save activity"
-
-- **Branch:** `fix/activity-zero-duration-reject`
-- **Lane:** **A** — the schema is `packages/shared/src/validation/activity-log.ts` and the route is
-  `app/api/activity-logs/route.ts`, both Lane A. Lane B found it and is not taking it.
-- **Added:** 2026-08-17 · found by the Q-450 E2E spec, **measured, not inferred**
-- **The mechanism, end to end.** `activity-store.ts:136` computes
-  `durationMin = Math.round((activeMs / 60000) * 10) / 10` — one decimal place. Anything under
-  **3 real seconds** therefore rounds to exactly `0`. `ActivityLogBody.durationMin` is
-  `z.number().positive()`, so `0` fails validation, the route returns a bare
-  `400 {"error":"Invalid body"}`, and `done-activity-screen.tsx`'s catch shows
-  `toast.error('Failed to save activity')`. The recording is discarded.
-- **Measured both sides.** The Q-450 spec recorded 2 s and got `POST /api/activity-logs 400`, with
-  `activity_logs` still empty; at 5 s the identical path returned `201` and the row landed with
-  `duration_min = 0.1`. The spec now waits 5 s and says why.
-- **Why it is worth fixing even though 3 seconds is a mis-tap.** The user is told the save
-  *failed*, not that the activity was too short, and there is no way back to the data — the same
-  "your activity is gone" outcome as Q-450, one layer down and behind a generic message. It is also
-  the shape that hides: any future rounding change to `durationMin` widens the dead zone silently.
-- **Fix shape (Lane A's call).** Either clamp/floor `durationMin` to the schema's minimum before it
-  is sent, or relax `.positive()` to `.nonnegative()` on a field that is already `.optional()`, or
-  refuse the save in the UI with a message that names the reason. Whichever is chosen, the generic
-  toast must stop standing in for "too short to record".
-- **Note the outbox path shares this schema** — `pushMutations` parses with the same
-  `ActivityLogBody`, so a sub-3-second activity queued offline is a poison-pill candidate, not just
-  a failed web POST. Check it against the "one bad mutation must never wedge the queue" rule.
-
 ### [platform] Q-353 — the health-insight prompt says "no data" where it means "absent", and the model reads it as zero
 
 - **Branch:** `fix/ai-insight-prompt-absent-vs-zero`

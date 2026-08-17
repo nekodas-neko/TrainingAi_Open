@@ -7,13 +7,12 @@
 **Migrations:** 189 and 190 taken (Q-536); next free is **191**. Local SQLite unchanged at v22.
 
 ## Now
-Nothing in flight. **Q-536 CLOSED and confirmed on device** (midday cluster 43 → 4; survivors are
-short daytime fragments, now Q-274's). **Q-539 shipped** (v1.318.5) — the `error_events` dedupe key
-was defeated by Drizzle embedding the generated `VALUES` list in its message, so one fault wrote
-5,771 rows and 49 MB; the key is normalised now and the stored message cap halved.
+Nothing in flight. Shipped this session: **Q-310**, **Q-536** (closed, confirmed on device),
+**Q-539**, **Q-351**. **Q-314** filed.
 
-**Q-314 is the live one** — the re-drain-as-reset misdetection behind Q-536. Every ring re-pair
-reopens it. It needs an owner design call and I have asked for one (see Blocked).
+**Q-314 is the live one** and is owner-gated — the re-drain-as-reset misdetection behind Q-536.
+Every ring re-pair reopens it. The recommendation put to the owner is to make a re-key *explicit*
+rather than inferred from counter shape.
 
 ## Next
 Queue is re-read as of the end of this session. Q-450/451 have shipped (Lane B); Q-536 and Q-539 are
@@ -27,19 +26,23 @@ done and removed.
    re-key *explicit* rather than inferred from counter shape. Read its open-question block: there is
    **no observed true reset in the data**, so any threshold is unvalidated against the case it
    exists for, and missing a real re-key fails silently — worse than the current failure.
-3. **Q-535** `[platform][devices]` — the redecode holds the request open through the heaviest pair of
+3. **Q-353** `[platform]` — the health-insight prompt substitutes the literal `"no data"` for an
+   absent field at ten sites, and the model reads that as **zero** and editorialises. Lane A,
+   `app/api/ai/health-insight/route.ts` only, and the entry names the exact line numbers. This is
+   the smallest genuinely-available item — take it first.
+4. **Q-535** `[platform][devices]` — the redecode holds the request open through the heaviest pair of
    calls in the app and 502s at the gateway, inviting a retry of a full-table rewrite. Premise
    re-verified this session: `await runRedecodeOffLoop(...)` in the route, and its own comment says
    "the caller still waits". **Split across lanes** — returning a job id is Lane A, the client poller
    is Lane B. Worth agreeing the seam before starting.
-4. **Q-540** `[devices][platform]` — **the `event_name` half is takeable now and gives up nothing**
+5. **Q-540** `[devices][platform]` — **the `event_name` half is takeable now and gives up nothing**
    (20 MB, 30 values fully derivable from `tag`, already pinned by the Kotlin/TS parity test). Take
    the `bytea` half only if Q-541 is not imminent. ⚠️ It is a migration over 1.1 M rows — read the
    `statement_timeout` note under Method notes **before** writing it.
-5. **Q-534** `[platform]` — **not the one-step index drop it reads as.** This session established
+6. **Q-534** `[platform]` — **not the one-step index drop it reads as.** This session established
    the index has two live consumers; order is rewrite both call sites to be ds-keyed, prove
    equivalence, then drop. See its entry.
-6. **Q-312** / **Q-263** `[platform]` — the synthetic MET table, and the cache-group audit.
+7. **Q-312** / **Q-263** `[platform]` — the synthetic MET table, and the cache-group audit.
 
 **Q-313** touches `scripts/`, which neither lane lists — claim it here first and check Lane B's baton.
 
