@@ -71,25 +71,25 @@ Live at the time of writing (2026-07-30):
   shows Zone 1 minutes moved on days with no dedicated workout/cardio session — a new, separate
   signal, not a change to D-10's existing exclusion of Zone 1 from the training quota or the
   Activity Score's active minutes (both untouched). Outcome:
-  [`entries/2026-08-06-zone1-lazy-day-credit.md`](../../overview/entries/2026-08-06-zone1-lazy-day-credit.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - **Q-99 shipped 2026-08-06 (v1.267.6):** Guided Walk's preset carousel is now Long / Short /
   Custom — Custom persists the lifter's own sets/fast/slow setup, and editing a stepper away from
   Long/Short now correctly shows Custom selected instead of silently misreporting the old preset.
   Outcome:
-  [`entries/2026-08-06-guided-walk-long-short-custom-presets.md`](../../overview/entries/2026-08-06-guided-walk-long-short-custom-presets.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - **Q-98 bug-fix half shipped 2026-08-06 (v1.267.7), ⚠️ NOT device-verified:** `applyOverride`
   (Running screen swipe-to-pick-a-different-run-type) now writes through the local store the same
   way `markRun` does — fixes a real APK-only race where a stale `'skipped'` row clobbered the
   reset back after a swipe, invisible on web. The failing path is unreachable in this sandbox (no
   native SQLite here); only the unaffected web path was verified. Outcome:
-  [`entries/2026-08-06-running-plan-override-local-write.md`](../../overview/entries/2026-08-06-running-plan-override-local-write.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - **Q-98-followup (redesign) shipped 2026-08-07 (v1.267.10):** the run-type carousel now shows a
   themed icon + HR-zone-coloured badge per type (reusing `HR_ZONE_META`, no new illustration
   assets), and the separate Skip button/`markRun` machinery is gone — swiping to a different type
   already resets status via `applyOverride`. Deliberately did not fold Start into every slide or
   remove `PrescribedRunCard` — that panel's AI-rationale/gate-warning content doesn't map onto a
   small slide, and a Start button per slide alongside a persistent one would be redundant. Outcome:
-  [`entries/2026-08-06-running-screen-carousel-imagery.md`](../../overview/entries/2026-08-06-running-screen-carousel-imagery.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - **Q-84 shipped 2026-08-05 (v1.265.0):** the guided-walk summary's fast/slow cards, per-interval
   table and history card now show cadence, and it **leads** the pace it used to be missing beside —
   falling back to pace when no strap was connected. `avgCadenceSpm` was already computed per segment
@@ -97,7 +97,7 @@ Live at the time of writing (2026-07-30):
   (`lib/walk/segment-stats.ts`) is the one place that decides which of the pair headlines** — three
   surfaces render it, so do not restate the rule at a call site. Plan:
   [`2026-08-05-guided-walk-cadence-in-summary.md`](../../superpowers/plans/2026-08-05-guided-walk-cadence-in-summary.md);
-  outcome: [`entries/2026-08-05-guided-walk-cadence.md`](../../overview/entries/2026-08-05-guided-walk-cadence.md).
+  outcome: [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
   **Not verified with a real strap walk, and the rendered layout was not observed** — see the
   `projectOverview.md` Known-Issues row.
 

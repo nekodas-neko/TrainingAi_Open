@@ -312,6 +312,12 @@ jobs:
       - name: No vendor constants inlined into publishable source
         run: node scripts/check-inlined-constants.js
 
+      - name: Backlog pointers and Q numbers are accurate
+        run: node scripts/check-backlog-pointers.js
+
+      - name: Orientation docs stay within their baselines
+        run: node scripts/check-doc-index-size.js
+
   migrations:
     name: Migration Check
     runs-on: ubuntu-latest

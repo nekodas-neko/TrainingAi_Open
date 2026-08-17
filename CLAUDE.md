@@ -7,6 +7,7 @@
 - **Always test on the local dev server before merging.** Before merging (or presenting work for confirmation on a destructive change), spin up `pnpm dev` and exercise every changed API route and UI flow against the local non-prod database. TypeScript and lint passing is not sufficient — runtime errors, broken validation, and cache bugs only surface when the server actually runs. If something breaks during testing, fix it before asking to merge.
 - **The local custom-rules gate is `pnpm check:rules` — nothing else counts as "custom rules pass".** It parses `.github/workflows/ci.yml`, runs every step of the job named *Custom Rules*, and prints how many it ran (`Ran N of N …`); quote that count rather than the word "pass". **Do not hardcode N anywhere** — it was 31 on 2026-08-13 and 33 by the end of the same day; the runner reads it from the YAML, which is the point. Globbing `scripts/check-*.js` reaches only the steps that invoke a script (22 of 33 today) and `pnpm ci:local` used to run 3, and both report clean while the 11 inline grep rules — UTC date slicing, hardcoded session names, safe-area stacking, local-SQLite PRAGMAs, nested buttons, `JSON.parse` of LLM output, hand-rolled `invalidateCache` — never execute. That gap shipped a component-level `invalidateCache()` call through a green local gate (#1279). `pnpm ci:local` now runs it.
 - **Docs/plans/low-risk changes merge with zero ceremony.** **Documentation-only** changes (`.md` files like `projectOverview.md`, `CLAUDE.md`), **implementation plans / planning docs** (`docs/superpowers/plans/`), and **bug fixes for features already on `main`** never need confirmation and are exempt even from the destructive-change carve-out above (they can't be destructive by nature). They still need a feature branch + green CI — that's the only path now. Note: a *markdown-only* PR still runs CI (the `pull_request` trigger has no `paths-ignore`) so required checks report and it can merge.
+- **At the start of every session, work out which standing agent you are** — read [`docs/agents/README.md`](docs/agents/README.md). Four roles run against this repo (Implementation in two lanes, BugFix, Tuning, Review), up to five sessions concurrently, and that file is the contract between them: who owns which files, which Q-number band you take from, what you may merge without asking, and how you hand your role to a successor. If you were started from one of the prompts in `docs/agents/prompts/`, read your own baton at `docs/agents/state/<agent>.md` before anything else — it is the state your predecessor left you.
 - **At the start of every session**, read `projectOverview.md` first — it is a lean index holding current status, the live Known Issues & Risks tables, and the **What's Left To Do** list. Use it to orient before doing anything. The session journal lives in `docs/overview/entries/` (recent, one file per PR) and the batched `docs/overview/history-*.md` archives (see the Document Map at the bottom of `projectOverview.md`) — only open those when you need history.
 - **Also at session start, read `error_events` in production** — it is the only view of faults that never reach a human, and **it prunes at 30 days**, so a fault that stops on its own vanishes unrecorded. The first read of that table (2026-08-04) found three faults, **two of which had already stopped before anyone looked**. One query via the admin endpoint:
   ```
@@ -25,6 +26,47 @@
 - **Keep plan-generation prompts small.** When turning a design spec into an implementation plan (`docs/superpowers/plans/`), don't hand a sub-agent the entire spec plus the full task breakdown in one massive prompt — it can time out. Investigate the relevant files first (small, scoped Explore calls), then write the plan directly. If a spec covers many independent areas (DB/backend, sync, UI, admin), consider splitting it into multiple smaller plan documents rather than one giant one.
 - **Backlog-driven implementation — plan now, build later, two PRs total.** New features, upgrades, and non-trivial fixes are split across sessions. **PR 1 (docs-only, planning session):** writes the implementation plan to `docs/superpowers/plans/` and inserts an entry into `docs/implementation-backlog.md` at the priority it judges right (queue position = priority) — it does **not** implement. **PR 2 (implementer session, later):** works the queue top-down following the protocol at the top of the backlog file, implements the change, removes the backlog entry, and appends the journal/`projectOverview.md` update — all in that **one** PR (see the end-of-session rule above); a finished item must never linger in the queue, and the notes must never describe work that isn't in that same diff. Exempt: small fixes the user explicitly asks to have done in-session.
   - **Before implementing, re-verify the plan against current `main`** — plans can go stale while they sit in the queue (the feature got built another way, the code it targets moved, it's no longer needed). If the plan no longer matches reality, don't implement it blindly: reconcile first, and if it's superseded or already done, remove the backlog entry via a docs-only PR with a one-line note on why, instead of forcing a mismatched implementation just to clear the queue.
+
+---
+
+## The Standing Agents — five sessions, one repo
+
+Full contract: [`docs/agents/README.md`](docs/agents/README.md). The rules below are the ones that
+must bind even if that file is never opened.
+
+**The roles.** **Implementation** runs in two lanes and is the only role that writes code — Lane A
+owns the engine (`lib/data/**` including every migration, `lib/local-store/**`, `lib/sqlite/**`,
+`lib/cache-groups.ts`, `app/api/**`, `packages/shared/**` except `changelog.ts`, the domain-math and
+device pipelines, auth/security, `android/**`), Lane B owns the surface (`app/**` except
+`app/api/**`, `components/**`, `app/globals.css`, `lib/hooks/**`, `lib/stores/**`). **BugFix** turns
+owner reports into backlog entries. **Tuning** turns lived feedback into calibration proposals.
+**Review** sweeps weekly and files what it finds. Those three end at a docs-only PR and never write
+code — which is what keeps the collision surface to Lane A against Lane B.
+
+- **A path neither lane lists is claimed in the claiming lane's baton before it is touched**, and
+  the other lane checks batons before starting an item. First claim wins for that item's duration.
+- **Q numbers come from per-agent bands, never from the next-free pointer.** Lane A 314–349 ·
+  Lane B 350–386 · BugFix 387–449 · Review 450–499 · Tuning 500–529. The pointer is a floor that
+  cannot see an unmerged PR; taking numbers one at a time from it caused six collisions in three
+  days, and left two live duplicates (Q-306, Q-307) sitting in the backlog until 2026-08-17. Q
+  numbers are identifiers, not priorities — priority is queue position, so a Q-451 above a Q-314 is
+  correct.
+- **Postgres migration numbers and local SQLite versions belong to Lane A alone.** Any other agent
+  that finds it needs a schema change stops and hands the item to Lane A.
+- **Tuning proposes; it never ships a scoring change.** Scoring drives every recommendation the app
+  makes and a bad calibration is hard to notice from inside, so the owner signs off and Lane A
+  implements. A proposal is incomplete until it states **how many other days the change moves** —
+  a tuning fitted to one bad night that silently re-scores months of history is a rewrite.
+- **Re-merge `origin/main` immediately before opening each PR *and* again before merging**, and
+  re-confirm CI green on the updated head. Self-merge authority is unchanged; what concurrency
+  changes is that a green check goes stale while you work. Never merge a stale green.
+- **`get_check_runs` returning `total_count: 0` several minutes after opening a PR means a stale
+  base, not slow CI.** Real CI reports queued checks within about a minute. Fetch, merge, push.
+- **Handing over:** land everything first — the container is ephemeral, so an uncommitted baton is a
+  lost baton — then **rewrite** `docs/agents/state/<agent>.md` in full. Never append; a baton that is
+  half last week's is worse than none, because it gets trusted. The dated
+  `docs/handoff-YYYY-MM-DD-<domain>-<title>.md` still carries the narrative when a cluster closes;
+  the baton carries state only, which is what stops it accreting.
 
 ---
 
