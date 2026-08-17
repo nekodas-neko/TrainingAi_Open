@@ -47,6 +47,16 @@ number.
 > (`docs/domains/<pillar>/README.md`) before starting: it carries the pillar's reference docs, open
 > known issues and gotchas.
 
+## The optional `Lane:` field
+
+> Most entries have no lane line, and that is correct — **lane ownership is decided by the file
+> paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md), which is the
+> authority. An entry states a lane only when the answer is worth writing down: the item spans paths
+> that are **unlisted** in §3 and therefore need a baton claim, it needs a Postgres migration number
+> or local SQLite version (**Lane A alone**), or two queued entries share a path and must not run
+> concurrently. Introduced 2026-08-17 on Q-530/Q-288, which are all three at once. Do not read the
+> absence of the field as "unassigned" — read it as "§3 already answers it".
+
 ## Before you start any item
 
 > **⚠️ Re-verify the premise against current `main`.** Entries are leads, not specs, and this queue
@@ -693,7 +703,28 @@ session working from a temporarily restored copy.
 
 - **Branch:** `feat/admin-db-snapshot`
 - **Plan:** [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)
+- **Lane: A**, and not splittable — `app/api/**`, `lib/data/postgres/migrations/`, and a Postgres
+  migration number, which belongs to Lane A alone. No Lane B surface is touched at all.
+  ⚠️ **Two of the paths are unlisted in the lane contract and must be claimed in Lane A's baton
+  before starting**: `scripts/` (the generator and the restore command) and `lib/export/` — neither
+  appears in §3 of [`docs/agents/README.md`](agents/README.md), and `lib/export/` is shared with
+  Q-288 below, so the two items must not run concurrently in different sessions.
 - **Added:** 2026-08-17 · planning session against the rescoped Q-251
+- **Steps, in order — the plan carries the detail, this is the slot list:**
+  1. `scripts/generate-claude-ro-views.js` — emit `_meta_excluded_tables` and
+     `_meta_withheld_columns`; regenerate into **migration 189** (a new number, never overwriting an
+     applied file) and re-point the filename pin in `claude-ro-readonly-role.test.ts` *in the same
+     commit*.
+  2. `lib/export/db-snapshot.ts` — view enumeration, the drift gate, PK discovery from `pg_index`,
+     keyset chunking, the manifest. All the tests live here.
+  3. `app/api/admin/db-snapshot/route.ts` — copy `day-review`'s `authorize()` verbatim; `bulk` and
+     `tables` params; NDJSON via `ReadableStream`; audit row into `db_query_log`.
+  4. `scripts/local-db/snapshot.js` + `pnpm db:snapshot` — local-target guard **first**, then
+     restore per plan §5.
+  5. Docs — `CLAUDE.md` env-var row, `docs/module-map.md` row, and a
+     `docs/runbooks/db-backup-restore.md` section distinguishing this from `pg_dump`.
+- **⛔ Step 3 is blocked on the owner** until `ADMIN_SNAPSHOT_SECRET` is agreed and set in Railway —
+  secret handling is confirm-first. Steps 1, 2 and 4 do not depend on it and can land first.
 - **Placement:** below the four live user-facing bugs above it and below the two CI-integrity items,
   above everything else — it is a capability every later item borrows (rehearse a migration against
   prod-shaped rows, run `pnpm dev` against real data), and it is the first thing that touches
@@ -1569,6 +1600,9 @@ session working from a temporarily restored copy.
 
 - **Branch:** `fix/export-completeness`
 - **Plan:** none needed
+- **Lane: A** — `lib/export/full-export.ts`, `app/api/export/`. ⚠️ `lib/export/` is unlisted in the
+  lane contract and is **shared with Q-530**; claim it in Lane A's baton, and do not run the two
+  items concurrently in different sessions.
 - **Added:** 2026-08-15 · from the uncovered-lenses review §4
 - **Measured:** `lib/export/full-export.ts` exports 17 `DIRECT_DOMAINS` + 9 `JOINED_DOMAINS` +
   `goals` = **27**. `schema.ts` declares **80** `pgTable`s.
