@@ -39,6 +39,37 @@ cannot be opened at all (I22).
 
 ---
 
+## 0. The ring key — the single-copy credential
+
+**The 32-hex ring key exists in exactly one place: Android SharedPreferences on the phone.**
+`OuraBlePlugin.kt` stores it under `key_hex` and its own comment states the intent — *"the key never
+leaves SharedPreferences; never logged"*. It is not on the server, not in this repository, and not
+in any log or crash report. That is the right design for a credential and it has one consequence
+worth stating loudly:
+
+> **Uninstalling the app destroys it.** The BLE service then logs `no key stored`, refuses to start,
+> and the ring is unreachable — while the Devices screen still shows the ring as fine, because that
+> card reads server data.
+
+**Recovery is the `key.hex` file from the original `open_oura` re-key** (§ the Phase-0 runbook), on
+whichever machine ran it. There is no other copy. Paste the 32 hex characters into
+`/admin/oura-ble` → **Ring key** → Save → Start.
+
+**Do not re-onboard the official Oura app to "fix" a lost key.** It re-keys the ring and can force a
+firmware update that changes the BLE event encoding — the exact thing the frozen firmware protects
+against. A lost credential becomes a full protocol re-validation, and the reverse-engineered
+decoders may not survive it.
+
+**Before any uninstall or device change:** confirm `key.hex` is in hand *first*. Observed
+2026-08-17 — an uninstall was required to move to a stably-signed APK, the "what you lose" list
+covered only the JS local store, and the ring went dark until the key file was found. Two other
+things the same uninstall clears: the 14-day local raw window (harmless, the server holds the
+archive and a Full re-sync re-drains) and any unsynced outbox mutation (**flush first** — pull-to-
+refresh on More pushes the outbox; the Data & Sync "Sync now" button pulls only and flushes
+nothing).
+
+---
+
 ## 1. Failure-point matrix (ring → radio → link → drain → ingest → DB)
 
 Each row: what breaks → how the system handles it automatically → the manual contingency
@@ -188,7 +219,12 @@ skipped):
 1. `/admin/oura-ble` → Advanced → **Full re-sync** (drains the ring's entire buffer from
    cursor 0). Loss-free and idempotent: the server dedups on
    `(user, ring_ts, tag, body)`.
-2. Watch the drain finish (`drain complete`) with **no upload-error line**, and the
+2. **The drain does not need the screen — or the app — open.** `OuraRingService` is a foreground
+   service that drains on connect, re-drains hourly, and POSTs each batch itself (v1.119.0+). Watch
+   it only if you want to see it happen; a full re-sync of a months-old backlog is thousands of
+   events at 255/batch and takes a while. What is missing is the *ending*: completion is only
+   `log()`ged, never notified (Q-533), so if you leave the screen you must come back and check.
+   Watch the drain finish (`drain complete`) with **no upload-error line**, and the
    "service uploaded N (M new)" counter settle (uploads can finish shortly after the
    drain). If an error shows, the cursor held — fix the cause, tap Sync now (or wait ≤5
    min for the automatic retry).

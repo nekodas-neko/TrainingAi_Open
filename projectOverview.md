@@ -63,6 +63,65 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][devices] 🔴 Production hit `disk_full` during a full re-sync — and the indexes, not the data, are the bulk (2026-08-17)
+
+**Live fault, mitigated by raising the volume; the underlying sizing is unresolved.** During the
+2026-08-17 ring re-sync, `/admin/oura-ble` returned a Server Components render error and two API
+routes failed with **`[pg 53100]`** — PostgreSQL's `disk_full`. Both failing queries read
+`oura_raw_samples`; one is a `SELECT DISTINCT ON (tag)` over 1.1M rows, which must sort, and with
+`work_mem` at 4 MB it spills to temp disk. There was no room. Confirmed in `error_events`
+(`GET /api/oura-ble/device-metrics`, `GET /api/oura-ble/samples/summary`).
+
+**Measured at the time of failure:**
+
+| | |
+|---|---|
+| Database total | **583 MB**, up ~110 MB in one hour |
+| `oura_raw_samples` heap | 175 MB |
+| `oura_raw_samples` **indexes** | **291 MB** — 1.66× the heap |
+| That one table | **80% of the database** |
+| `last_autovacuum` / `last_analyze` | **never** — `n_live_tup` reads 0 |
+
+**Three things stack, and only one of them is the archival data.**
+1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation; **the stated target
+   is to return to the stock 500 MB** once the bulk is dealt with.
+2. **Indexes exceed the table.** The dedup index covers
+   `(user_id, ring_timestamp_ds, tag, body_hex)` — it indexes the raw payload itself, so it grows
+   faster than the rows do. **291 MB of the 466 MB is index, not data.**
+3. **Autovacuum has never run on this table**, so there are no statistics either. The planner has
+   been working blind on the largest table in the database; that same `DISTINCT ON` takes 6.5 s
+   even with disk available.
+
+**Why (2) matters more than it looks.** Reclaiming index space is *non-destructive* — it does not
+touch `body_hex`, so it does not collide with the rule that the server archive is the source of
+truth and must never be pruned. Replacing the payload in that index with a hash would preserve
+dedup semantics on a fraction of the bytes. That may get under 500 MB without deleting anything,
+which is a very different proposition from the retention question.
+
+**Owed:** the sizing work (see the storage research item) must now be framed as *how to get back
+under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
+**do not run another Full re-sync until this is resolved**; that is what triggered it.
+
+### [devices][platform] 🔴 An app uninstall destroys the Oura ring key, and nothing warned about it (2026-08-17)
+
+The 32-hex ring key lives **only** in Android SharedPreferences. `OuraBlePlugin.kt` says so in its
+own comment — *"the key never leaves SharedPreferences; never logged"* — so it is not on the server,
+not in this repository, and not in any log. Correct for a credential, and it means **an uninstall
+makes the ring unreachable**: the BLE service logs `no key stored` and refuses to start, while the
+Devices screen still shows the ring as healthy because that card reads server data.
+
+Hit live on 2026-08-17. The uninstall was necessary (moving to a stably-signed APK, #19), and the
+"what you lose" list given beforehand covered only the JS local store — the native side was never
+checked. Recovered from the `key.hex` the original `open_oura` re-key produced; **there is no
+other copy**, and if it had been lost the only apparent fix — re-onboarding the official Oura app —
+is the one that can force a firmware update and break the reverse-engineered protocol outright.
+
+Documented in `CLAUDE.md`'s APK section and as §0 of
+[`docs/oura-ble-operations.md`](docs/oura-ble-operations.md). **Still open** because the mitigation
+is prose, not a mechanism: nothing in the app backs the key up, warns before an uninstall, or lets
+the owner export it. Worth a backlog entry for an explicit "export/ring key" affordance before
+the next device change.
+
 ### [workouts][readiness] ✅ An engine-chosen deload prescribed full weights — fixed, device check owed (Q-310, 2026-08-17)
 
 - **Fixed in v1.317.5.** `/api/workout-data`'s ai_dynamic catch-all — two verbatim copies —

@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **531** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **538** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -283,6 +283,231 @@ below threshold and left in place for next time.
 > `main`**, and passes again restored. The extraction was made *after* that first proof, so the
 > whole fix/revert/restore cycle was re-run against the final code.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
+
+
+### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
+
+- **Branch:** `feat/ring-key-export`
+- **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
+- **What it is.** The 32-hex ring key exists only in Android SharedPreferences
+  (`OuraBlePlugin.kt`, `key_hex`). Deliberately — its own comment reads *"the key never leaves
+  SharedPreferences; never logged"* — and that is the right call for a credential. But it means the
+  key has **exactly one copy**, on one device, with no export, no backup, and no warning before the
+  operations that destroy it.
+- **Why it matters.** An uninstall or a device change silently makes the ring unreachable: the BLE
+  service logs `no key stored`, refuses to start, and the Devices screen keeps showing the ring as
+  healthy because that card reads server data. Worse, the intuitive recovery — re-onboarding the
+  official Oura app — re-keys the ring and can force a firmware update that changes the BLE event
+  encoding, which is precisely what the frozen firmware exists to prevent. **A recoverable
+  credential problem turns into a protocol re-validation.** This happened on 2026-08-17 and was only
+  recovered because the original `open_oura` `key.hex` still existed on the owner's machine.
+- **What to do.** The minimum is an *export* affordance in `/admin/oura-ble` — reveal the stored key
+  so it can be copied somewhere durable — plus a confirm-with-warning before `clearKey`. Consider a
+  "key present" indicator on the Devices card, so a keyless state is visible where the ring is
+  managed rather than only in the admin console.
+- **Placement, reported separately.** The owner also asks that the key field be nested behind
+  something deliberate rather than sitting in the open — *"so it cant accidently be used"*. That is
+  the same subject and is best solved with Q-531, which is re-deciding where these screens live;
+  the export/backup half below stands on its own.
+- **What NOT to do.** Do not sync the key to the server to "solve" this. It is device-only on
+  purpose, and moving it server-side widens the blast radius of every other credential path in the
+  app. This is a *backup and visibility* problem, not a storage-location problem.
+- **Verification:** the affordance must be shown to work while the key is present, and the warning
+  shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
+
+### [sleep][devices] Q-536 — every BLE-era sleep window is timezone double-converted: 43 nights show midday bedtimes
+
+> **→ HANDED TO IMPLEMENTATION LANE A, 2026-08-17.** This is engine work — the fault is in
+> `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:5087`) and the clock-anchor resolution
+> beneath it, squarely inside Lane A's ownership. It is **top of queue**: it is a live
+> data-correctness fault on displayed health values, it was caused today, and every further
+> redecode may compound it.
+>
+> **Read the corrected diagnosis below before the original text** — the first hypothesis
+> (timezone double-conversion) is superseded by the epoch-collision evidence.
+>
+> **Do not run a corrective pass until the open question is settled:** whether the 2026-07-04 →
+> 08-16 rows were already wrong, or were rewritten wrong by the 2026-08-17 redecode. Those need
+> opposite responses, and 43 nights of the owner's sleep history are the blast radius.
+
+- **Branch:** `fix/ble-sleep-window-timezone`
+- **Added:** 2026-08-17, found while verifying the post-re-sync Health screen.
+- **The symptom.** Health lists bedtimes like **12:07 pm – 8:31 pm** and **11:16 am – 10:26 pm**.
+  Measured across all 82 stored sessions, start hours are **bimodal**: ~36 in a plausible 19:00–02:00
+  band, and **43 clustered at 10:00–14:00** Brisbane, which is not a bedtime.
+> **⚠️ DIAGNOSIS CORRECTED, same day.** The entry below hypothesised a timezone
+> double-conversion. **That is superseded.** The measured cause is a **ring clock-epoch collision**:
+>
+> | epoch | anchors | anchor_utc span | anchor_ds range |
+> |---|---|---|---|
+> | 2 | 3,666 | 2026-07-30 04:18 → **2026-08-17 06:42** | 17,412,570 – **37,112,321** |
+> | **3** | 695 | **2026-08-17 06:58 → 07:38** | **33,006,208 – 37,146,216** |
+>
+> **Epoch 3 was created at 06:58 on 2026-08-17 — the moment the app was reinstalled and the ring
+> re-paired** — and its `ds` range *overlaps* epoch 2's. `CLAUDE.md` states the constraint
+> directly: `ring_timestamp_ds` is a counter since the ring's own epoch, which **resets on
+> re-key or dead battery**, and wall-clock comes from a `(ringDs ↔ utc)` anchor. With two epochs
+> holding the same ds values, a resolution that picks the wrong anchor set shifts every derived
+> timestamp.
+>
+> `toDate(ds)` in `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:5087`) calls
+> `resolveDsToMs(ds, anchors)` over the anchor set, and the rollup elsewhere uses
+> `currentEpoch(anchors)`. **Establish whether raw rows carry their own epoch and whether the
+> resolver is epoch-scoped per row** — if it is not, every pre-reinstall sample is now being
+> resolved against a post-reinstall anchor. That is the fix, and it is also why the full redecode
+> reproduced the fault instead of correcting it.
+>
+> Two things this reframes: the ds→UTC path is **not** generally broken (the newest `measured_at`
+> is 07:38 UTC = 17:38 Brisbane, matching the device drain log exactly), and **the uninstall caused
+> this**, which links it to Q-537 — the ring key hazard was not the only cost of that reinstall.
+> Whether the pre-existing 2026-07-04→08-16 rows were already wrong or were rewritten wrong by
+> today's redecode is **not yet established** and must be, before any corrective pass.
+
+- **The display is innocent.** For 2026-08-17, `sleep_start` is stored as `02:07 UTC`, which
+  genuinely *is* 12:07 pm Brisbane — the UI renders the stored instant correctly. A real 22:07
+  Brisbane sleep should store as `12:07 UTC`; `02:07 UTC` is what you get if that correct UTC
+  value is then treated as a Brisbane wall-clock time and converted **a second time**. This is the
+  double-conversion shape, not a rendering bug, so do not go looking in the component.
+- **It correlates with the pipeline, not the data.** Broken rows span **2026-07-04 → 2026-08-17**;
+  plausible rows are predominantly **2026-05-26 → 2026-08-14** and are the Oura Cloud era. The BLE
+  re-key was 2026-07-07. So the **direct-BLE sleep aggregation** carries the fault while the Cloud
+  writer did not.
+- **The redecode did not cause it, which is the useful part.** A full-history redecode on 2026-08-17
+  recomputed every row from raw frames and produced **the same wrong windows**. The bug is therefore
+  in the aggregation logic, reachable from stored `body_hex` — so a corrected decoder can fix all
+  43 nights by re-running, with no data loss and nothing to reconstruct.
+- **What is NOT affected:** duration, HRV, average and lowest heart rate all look right. It is
+  specifically the window boundaries.
+- **Where to look.** The path that turns `ring_timestamp_ds` into wall-clock via the
+  `(ringDs ↔ utc)` anchor in `oura_ble_clock_anchors`, and whatever converts that into
+  `sleep_start`/`sleep_end`. `CLAUDE.md`'s Timezone section names this exact class as the most
+  repeated bug in the project. Suspect an anchor already in UTC being passed through a
+  `todayInTz`-style conversion, or a `Date` built from a UTC string and then offset.
+- **Verification:** a boundary test at 23:59 and 00:01 Brisbane, plus re-running the aggregation
+  over a known night and asserting the window matches the owner's account of it. **Do not fix from
+  reading alone** — this is the class that has shipped wrong three times.
+
+### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
+
+- **Branch:** `fix/redecode-async-job`
+- **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
+- **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
+  no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
+  moved that work off the event loop into the rollup worker, which is why the rest of the process
+  survives it, but the route's own comment is explicit that *"the caller still waits for the
+  result"*. On real data that exceeds the platform's request timeout, so Railway returns **502**
+  and the tester prints `redecode failed`.
+- **The work had completed.** Measured this session: `scanned=1098158`, `updated=0`, and every
+  `sleep_sessions` row carried `updated_at = 07:58:44` — after the request had already 502'd.
+  The aggregate that the UI reported as failed is the one that produced the night the owner was
+  trying to see.
+- **Why it matters beyond the cosmetics.** A false failure invites a retry, and a retry is another
+  full-history walk of the heaviest pair of calls in the app — the same operation whose own comment
+  names it as *"the event-loop starvation that took production down on 2026-08-13"*. The UI is
+  actively encouraging the thing most likely to hurt. It also cost real diagnostic time here: the
+  502 was investigated as a crash before the data showed the write had landed.
+- **What to do.** Return a job id immediately and let the client poll, rather than holding the
+  request open. The work is already off-loop, so this is a response-shape change rather than an
+  architectural one. While in there, consider whether a date-scoped redecode is worth having —
+  `fullHistory` is correct after a decoder change, and overkill for "re-aggregate last night",
+  which is what it is usually reached for.
+- **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
+  row. Do not run a full redecode while those are open.
+
+### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
+
+- **Branch:** `fix/oura-raw-samples-index-and-vacuum`
+- **Added:** 2026-08-17, from the live `disk_full` incident (see the `projectOverview.md`
+  Known-Issues row for the measurements).
+- **This is deliberately the non-destructive half.** The retention question — what `body_hex` is
+  for and how long the server must keep it — is a separate, owner-gated decision with an
+  irreversible edge. Everything here reclaims space **without deleting a single row**, and should be
+  done first, because it may be sufficient on its own.
+- **Three findings, in order of likely payoff:**
+  1. **The dedup index stores the payload a second time.** It covers
+     `(user_id, ring_timestamp_ds, tag, body_hex)`, so `body_hex` is in both the heap and the
+     index — which is why indexes are **291 MB against a 175 MB heap**. Indexing a hash of the
+     payload instead (generated column, or an expression index) preserves the dedup guarantee on a
+     fraction of the bytes. **Verify the uniqueness semantics survive** before proposing it: a hash
+     collision would silently drop a distinct event, which is exactly the loss the dedup exists to
+     prevent, so the column must remain part of the equality check even if it leaves the index.
+  2. **Autovacuum has never run on this table.** `last_autovacuum` and `last_analyze` are both
+     null and `n_live_tup` reads 0. Find out why — the default thresholds scale with table size,
+     so a table that grew fast from empty can outrun them. No statistics also means the planner has
+     been guessing on the largest table in the database; the `DISTINCT ON` that triggered the
+     incident takes 6.5 s even with disk available.
+  3. **`work_mem` is 4 MB** and the failing query sorts 1.1M rows. Raising it for that path, or
+     giving the query an index that avoids the sort, removes the temp-disk dependency that turned a
+     full volume into a user-visible error.
+- **The target is concrete:** the owner raised the volume 500 MB → 5 GB as a temporary mitigation
+  and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
+  estimating, and say whether 500 MB is reachable without touching retention.
+- **Do not run a Full re-sync while this is open** — that is what triggered the incident.
+
+### [devices][app-shell] Q-533 — the drain runs unattended but only reports completion to a screen nobody should have to watch
+
+- **Branch:** `feat/drain-complete-notification`
+- **Added:** 2026-08-17, owner report during a full re-sync: *"this is very lengthy. We shouldn't do
+  any testing that involves this ever again unless it can do it silently in the background."*
+- **The premise is half wrong, and that is the finding.** The drain **already runs in the
+  background**: `OuraRingService` is a foreground service, it auto-drains on connect and re-drains
+  hourly (`DRAIN_INTERVAL_MS`), and since v1.119.0 it POSTs each batch itself rather than needing
+  the tester screen to forward frames. Nothing about a drain requires the UI.
+- **What is actually missing is the ending.** `onDrainBatchComplete` only `log()`s
+  `drain complete` (`OuraRingService.kt:400`). The service posts exactly one notification in its
+  whole lifetime — low battery — so a user who starts a full re-sync has no way to learn it
+  finished except by staring at the admin log. That is what makes a background operation feel like
+  a foreground one.
+- **What to do.** Notify on drain completion, at least for a full re-sync (`fromZero=true`), with
+  the batch count and whether uploads settled cleanly. Reuse the existing notification channel
+  pattern. Consider a quiet progress notification for long drains, since a full re-sync of a
+  months-old backlog is thousands of events at 255/batch.
+- **Also fix the instructions.** `docs/oura-ble-operations.md` §4 step 2 says *"watch the drain
+  finish"*, which reads as a requirement and is only a verification convenience. It should say the
+  drain continues unattended and name what to check afterwards.
+- **Verification:** device-only. Start a full re-sync, leave the screen, confirm the drain completes
+  and the notification arrives.
+
+### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
+
+- **Branch:** `fix/device-console-ia`
+- **Added:** 2026-08-17, from an owner report while running the Oura re-sync runbook.
+- **This is feedback on a shipped change, not a new idea.** Q-234 landed 2026-08-15 (v1.313.0):
+  `/admin` kept user administration, diagnostics moved to **Settings → Developer**, and the three
+  device consoles became rows there. Its journal records that as done and correct. The owner, using
+  it under real conditions for the first time, reports the opposite: *"it was moved away from the
+  admin section to the diagnostic section = bad"*, and *"everything is spread out sporadically,
+  needs organisation"*.
+- **Why the disagreement is the useful part.** Q-234's reasoning was taxonomic — device diagnostics
+  are not user administration, so they belong apart. That is sound on paper and appears to be wrong
+  in use, because the operations these screens support (drain, re-sync, verify) are a **single task**
+  that now spans two locations. Re-litigate the premise before re-arranging anything; a second
+  reorganisation chosen the same way will land in the same place.
+- **What to do.** Read the Q-234 entry and its journal first, then treat this as an IA question with
+  a real user's task in hand: what does someone actually *do* on these screens, start to finish, and
+  where should that live. The answer may be that diagnostics belong back under `/admin`, or that
+  the split is right but the destination is wrong. Decide it deliberately and write down why.
+- **Related:** Q-537 (ring key has one copy) and Q-532 (the scan auto-recentre) both live on these
+  screens. Q-537's placement half — the key field should be nested behind something deliberate so it
+  cannot be edited by accident — is best solved as part of this, not separately.
+- **Verification:** device-only. None of it is checkable from the sandbox.
+
+### [app-shell][devices] Q-532 — the BLE screen re-centres itself while a scan runs, making buttons hard to hit
+
+- **Branch:** `fix/ble-scan-scroll-jump`
+- **Added:** 2026-08-17, owner report during the Oura re-sync runbook.
+- **What it is.** *"The screen constantly moves to the centre while a scan is running — making it
+  hard to click buttons."* While a BLE scan/drain is active on `/admin/oura-ble`, the view keeps
+  scrolling back, so a control the user is aiming at moves out from under the tap.
+- **Where to look first.** The screen re-renders on every status/log update during a scan, so the
+  likely causes are a `scrollIntoView` / auto-scroll on new log lines, or a keyed remount that
+  resets scroll position on each poll. `components/oura-ble/oura-ble-debug.tsx` holds the log and
+  frame panels that update most frequently.
+- **Why it matters more than it sounds.** This screen is only ever used during a live drain — the
+  one situation where a mistimed tap can hit **Clear key** or interrupt a sync. An unstable layout
+  on a destructive control set is a safety problem, not just an annoyance.
+- **Verification:** reproduce on-device with a scan actually running; a static screenshot will not
+  show it, and the sandbox cannot scan at all.
 
 
 ### [activity][cardio] Q-450 — `/activity` reached without a type: Start works, Finish works, Save silently discards the activity
@@ -2421,6 +2646,44 @@ session working from a temporarily restored copy.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+> **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
+> Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
+> in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
+> it could never have succeeded:
+>
+> > **`getLocalStore(userId)` requires a signed-in user** (`lib/local-store/index.ts`). The app
+> > launches to the sign-in screen, so the local SQLite database is never created, and
+> > `scripts/ci/emulator-local-db-smoke.sh` polls 90 seconds for a file that cannot appear.
+>
+> **What *is* proven, on a real runner, and should not be rebuilt:** the app builds; the server
+> starts (after fixing a readiness probe that hit `/api/version`, the one route that makes an
+> outbound GitHub call before responding); the APK assembles against `http://10.0.2.2:3000` with a
+> fail-closed guard so it can never be built pointed at production; KVM enables; the emulator boots.
+> Steps 1–14 of 15 pass. Only the assertion fails.
+>
+> **The job is now `workflow_dispatch`-only** (`.github/workflows/android-emulator.yml`), not
+> deleted. It failed every run while enabled, and a permanently-red check is worse than no check —
+> it trains everyone to ignore the signal, so the next red, which would be a genuine migration
+> failure, goes unread.
+>
+> **To finish it: add Maestro.** A declarative YAML flow that launches the app, signs in, and waits
+> for the app shell; the existing `PRAGMA user_version` assertion then runs unchanged. Two things
+> make this cheaper than it sounds: the job already runs a **seeded local Postgres containing
+> `test@local.dev` / `testpass123`**, so no credentials or secrets are needed — Maestro just types
+> into the form — and the job is non-required, so iteration costs nothing but time. Restore the
+> `pull_request` trigger in the same PR. Expect several CI rounds: **none of this is runnable in a
+> Claude session** (no `/dev/kvm`, Firecracker microVM), so a UI flow can only be iterated by
+> pushing.
+>
+> Once sign-in works, the rest of this entry's deferred scope becomes reachable for the first time:
+> offline cold start, the service-worker `/api/` passthrough, deep-link cold launch, the hardware
+> back-button guard, local notifications, and PiP.
+>
+> ---
+>
+> **The 2026-08-17 note below is superseded in its headline claim and accurate in its detail.** Kept
+> because its reasoning about the production-URL trap is what the next session most needs.
+>
 > **PARTIALLY SHIPPED 2026-08-17 — the local-SQLite half is in.**
 > `.github/workflows/android-emulator.yml` + `scripts/ci/emulator-local-db-smoke.sh`: boots an
 > emulator, installs the debug APK, and asserts `PRAGMA user_version` read **off the device**
