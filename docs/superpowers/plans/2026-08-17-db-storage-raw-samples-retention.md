@@ -111,6 +111,53 @@ is needed.** Every step above preserves every byte of `body_hex`.
 seven weeks. **C is what makes 500 MB a permanent home rather than a place the database passes
 through** — and C is non-destructive, so choosing it costs no capability at all.
 
+### §0a. Runbook — exact steps, in order
+
+**State at 08:45 UTC:** `n_tup_upd` frozen at 681,005 for 40+ minutes → **the re-stamp is no longer
+running.** Table 666 MB, DB 771 MB, volume temporarily 5 GB.
+
+> **Do not revert the volume to 500 MB until step 5.** Steps 1–2 can still write hundreds of MB of
+> bloat, and a 500 MB volume during either is a second outage.
+
+**Step 1 — OWNER. Confirm the re-stamp actually finished. `/admin/oura-ble` → Redecode (full, not `dump`).**
+It stopped, but "stopped" is not "finished" — it may have aborted when the disk filled at ~07:42,
+which would leave the table in a **mixed clock-math state** (some rows on the Q-71/I25 derivation,
+some on the old one) and sleep history inconsistent across the boundary.
+- The Q-46 `IS DISTINCT FROM` guard makes this **safe and idempotent**: already-correct rows are
+  scanned and skipped, not rewritten.
+- **Read the response's `restamped` field.** `restamped: 0` (or near it) → it finished, go to step 2.
+  A large number → it had aborted; let this run complete on the 5 GB volume, then go to step 2.
+- The 681,005 figure is consistent with a *completed* pass (~417k done pre-crash, 681k after, guard
+  skipping the rest), so `0` is the expected answer — but it is a prediction, not an observation, and
+  this step is how it becomes one.
+
+**Step 2 — OWNER. `/admin/oura-ble` → § Data → VACUUM FULL** (`POST /api/oura-ble/samples/vacuum`,
+Lever 1c). Non-destructive; reclaims ~306 MB. Takes an `ACCESS EXCLUSIVE` lock for seconds-to-a-minute
+at this size, so the app is briefly unavailable — pick a moment.
+- **Expected: table 666 → ~360 MB, DB 771 → ~465 MB.** Confirm before continuing.
+- **Do not stop here.** ~465 MB re-crosses 500 MB in ~5 days.
+
+**Step 3 — AGENT (Lane A). Q-532, the index audit.** Already queued at position 2. This is the
+mechanism fix as well as the space win — dropping `idx_oura_raw_samples_user_measured` makes every
+future re-stamp HOT-eligible. **Re-measure scan counts after step 2**, never mid-re-stamp.
+- Expected: table ~250 MB, DB ~355 MB.
+
+**Step 4 — AGENT (Lane A). Q-536 steps 3–4**, in the same PR as step 3 if convenient: a pre-flight
+free-space guard on the redecode route, and replace the 1 GB comment with the real provisioned size.
+
+**Step 5 — OWNER. Revert the Railway volume 5 GB → 500 MB.** Only now. After steps 2–4 the DB is
+~355 MB with a re-stamp that can no longer double the table.
+
+**Step 6 — AGENT (Lane A). Q-533 `event_name`, then Q-534 the repack.** Q-534 is what makes 500 MB
+hold (~3 years of headroom vs ~7 weeks). Skip Q-533's `bytea` half if Q-534 is imminent.
+
+**Step 7 — AGENT (Lane B). Q-530**, the `rawStats()` admin panel — independent of all of the above and
+the only way to see the device store's real size.
+
+**Unrelated but noticed, check it:** no raw sample has been ingested since **07:38:52** (67 minutes at
+time of writing). That may just be the hourly drain cadence plus a disconnected ring — but it starts
+immediately after the crash, so confirm the BLE pipeline actually recovered rather than assuming it.
+
 ### Revised sequencing
 
 1. **Let the re-stamp finish**, then `VACUUM FULL` (the existing admin `POST /api/oura-ble/samples/vacuum`,
