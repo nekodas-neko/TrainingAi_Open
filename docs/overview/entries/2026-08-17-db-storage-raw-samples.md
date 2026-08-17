@@ -47,11 +47,29 @@ it, so a different batch size is a different key — **5,771 rows, 18 distinct m
 counts, unlike every `claude_ro` view. `pg_stat_database.stats_reset` is `NULL`, so a "0 scans"
 reading means never.
 
-**Filed:** Q-530 (device store unbounded) · Q-532 (index audit, 106 MB / 5,129 lifetime scans) ·
-Q-531 (error dedupe) · Q-533 (row narrowing) · Q-534 (frame repacking) · Q-535 (**owner decision** —
-two of the five options are one-way doors). Q numbers taken as a block 530–539 from the unallocated
-pointer, recorded in the band table, pointer bumped to 540; `docs/agents/README.md` now states how a
-non-standing session claims a block.
+**Filed:** Q-538 (device store unbounded) · Q-539 (error dedupe) · Q-540 (row narrowing) ·
+Q-541 (repack, with its own implementation plan) · Q-542 (retention policy, answered).
+
+**Renumbered from Q-530…Q-536 on merge, and it is worth recording why.** This session took its block
+from a pointer reading 530 while a *concurrent* planning session held Q-530…Q-537 unmerged. The
+pointer cannot see an unmerged PR — which is precisely the failure the standing per-agent bands
+exist to prevent, and a one-off session has no band. The band table now carries that lesson and the
+instruction to re-check the block against `origin/main` immediately before opening the PR, not only
+when claiming it.
+
+**Two of the entries were folded rather than filed.** That concurrent session had already filed its
+own disk-full entry (its Q-534, "the safe half"), so this session's index-audit and incident entries
+went *into* it as amendments instead of becoming duplicates of it. Same for the `projectOverview.md`
+Known-Issues row — theirs was kept, mine deleted, and the mechanism folded in. Two live duplicate Q
+numbers survived in this repo until yesterday; adding two more would have been a poor trade for the
+convenience of not reading their entry.
+
+**Their entry also carried one claim the measurements refute**, and correcting it mattered: it read
+`last_autovacuum` and `n_live_tup` as *never* and *0* and concluded autovacuum has never run on the
+table. Both were post-crash statistics artifacts — an unclean shutdown discards the stats file, and
+`stats_reset` stays `NULL` because only an explicit reset sets it, so freshly-zeroed counters are
+indistinguishable from "never". Autovacuum had in fact run twice that morning. Uncorrected, that
+finding would have sent an implementer hunting a misconfiguration that does not exist.
 
 **Deliberately not done:** no option was chosen. Options D and E permanently give up re-decoding, and
 E additionally gives up the D3 rollback and leaves raw history single-copy on an un-backed-up phone.
@@ -89,8 +107,8 @@ the owner's 500 MB target, not optional polish — and it is non-destructive, so
 
 **Owner decisions recorded:** A+B+C (no D, no E); D4 stays the destination with no deadline, which
 lapses O1 and unblocks the `bytea` work; stock 500 MB is the target, not the temporary 5 GB;
-visibility-first on the device store. Q-536 filed at the top of the queue for the incident; the queue
-re-ranked around it.
+visibility-first on the device store. The incident's own queue entry is the concurrent session's
+Q-534, amended rather than duplicated.
 
 ## The repack got its own implementation plan
 

@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **540** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -46,6 +46,16 @@ number.
 > per-pillar sweep, so `scripts/check-backlog-pointers.js` fails on one. Read that pillar's index
 > (`docs/domains/<pillar>/README.md`) before starting: it carries the pillar's reference docs, open
 > known issues and gotchas.
+
+## The optional `Lane:` field
+
+> Most entries have no lane line, and that is correct — **lane ownership is decided by the file
+> paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md), which is the
+> authority. An entry states a lane only when the answer is worth writing down: the item spans paths
+> that are **unlisted** in §3 and therefore need a baton claim, it needs a Postgres migration number
+> or local SQLite version (**Lane A alone**), or two queued entries share a path and must not run
+> concurrently. Introduced 2026-08-17 on Q-530/Q-288, which are all three at once. Do not read the
+> absence of the field as "unassigned" — read it as "§3 already answers it".
 
 ## Before you start any item
 
@@ -275,6 +285,408 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
 
 
+### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
+
+- **Branch:** `feat/ring-key-export`
+- **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
+- **What it is.** The 32-hex ring key exists only in Android SharedPreferences
+  (`OuraBlePlugin.kt`, `key_hex`). Deliberately — its own comment reads *"the key never leaves
+  SharedPreferences; never logged"* — and that is the right call for a credential. But it means the
+  key has **exactly one copy**, on one device, with no export, no backup, and no warning before the
+  operations that destroy it.
+- **Why it matters.** An uninstall or a device change silently makes the ring unreachable: the BLE
+  service logs `no key stored`, refuses to start, and the Devices screen keeps showing the ring as
+  healthy because that card reads server data. Worse, the intuitive recovery — re-onboarding the
+  official Oura app — re-keys the ring and can force a firmware update that changes the BLE event
+  encoding, which is precisely what the frozen firmware exists to prevent. **A recoverable
+  credential problem turns into a protocol re-validation.** This happened on 2026-08-17 and was only
+  recovered because the original `open_oura` `key.hex` still existed on the owner's machine.
+- **What to do.** The minimum is an *export* affordance in `/admin/oura-ble` — reveal the stored key
+  so it can be copied somewhere durable — plus a confirm-with-warning before `clearKey`. Consider a
+  "key present" indicator on the Devices card, so a keyless state is visible where the ring is
+  managed rather than only in the admin console.
+- **Placement, reported separately.** The owner also asks that the key field be nested behind
+  something deliberate rather than sitting in the open — *"so it cant accidently be used"*. That is
+  the same subject and is best solved with Q-531, which is re-deciding where these screens live;
+  the export/backup half below stands on its own.
+- **What NOT to do.** Do not sync the key to the server to "solve" this. It is device-only on
+  purpose, and moving it server-side widens the blast radius of every other credential path in the
+  app. This is a *backup and visibility* problem, not a storage-location problem.
+- **Verification:** the affordance must be shown to work while the key is present, and the warning
+  shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
+
+### [sleep][devices] Q-536 — every BLE-era sleep window is timezone double-converted: 43 nights show midday bedtimes
+
+> **→ HANDED TO IMPLEMENTATION LANE A, 2026-08-17.** This is engine work — the fault is in
+> `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:5087`) and the clock-anchor resolution
+> beneath it, squarely inside Lane A's ownership. It is **top of queue**: it is a live
+> data-correctness fault on displayed health values, it was caused today, and every further
+> redecode may compound it.
+>
+> **Read the corrected diagnosis below before the original text** — the first hypothesis
+> (timezone double-conversion) is superseded by the epoch-collision evidence.
+>
+> **Do not run a corrective pass until the open question is settled:** whether the 2026-07-04 →
+> 08-16 rows were already wrong, or were rewritten wrong by the 2026-08-17 redecode. Those need
+> opposite responses, and 43 nights of the owner's sleep history are the blast radius.
+
+- **Branch:** `fix/ble-sleep-window-timezone`
+- **Added:** 2026-08-17, found while verifying the post-re-sync Health screen.
+- **The symptom.** Health lists bedtimes like **12:07 pm – 8:31 pm** and **11:16 am – 10:26 pm**.
+  Measured across all 82 stored sessions, start hours are **bimodal**: ~36 in a plausible 19:00–02:00
+  band, and **43 clustered at 10:00–14:00** Brisbane, which is not a bedtime.
+> **⚠️ DIAGNOSIS CORRECTED, same day.** The entry below hypothesised a timezone
+> double-conversion. **That is superseded.** The measured cause is a **ring clock-epoch collision**:
+>
+> | epoch | anchors | anchor_utc span | anchor_ds range |
+> |---|---|---|---|
+> | 2 | 3,666 | 2026-07-30 04:18 → **2026-08-17 06:42** | 17,412,570 – **37,112,321** |
+> | **3** | 695 | **2026-08-17 06:58 → 07:38** | **33,006,208 – 37,146,216** |
+>
+> **Epoch 3 was created at 06:58 on 2026-08-17 — the moment the app was reinstalled and the ring
+> re-paired** — and its `ds` range *overlaps* epoch 2's. `CLAUDE.md` states the constraint
+> directly: `ring_timestamp_ds` is a counter since the ring's own epoch, which **resets on
+> re-key or dead battery**, and wall-clock comes from a `(ringDs ↔ utc)` anchor. With two epochs
+> holding the same ds values, a resolution that picks the wrong anchor set shifts every derived
+> timestamp.
+>
+> `toDate(ds)` in `aggregateOuraRawSamples` (`lib/data/postgres/adapter.ts:5087`) calls
+> `resolveDsToMs(ds, anchors)` over the anchor set, and the rollup elsewhere uses
+> `currentEpoch(anchors)`. **Establish whether raw rows carry their own epoch and whether the
+> resolver is epoch-scoped per row** — if it is not, every pre-reinstall sample is now being
+> resolved against a post-reinstall anchor. That is the fix, and it is also why the full redecode
+> reproduced the fault instead of correcting it.
+>
+> Two things this reframes: the ds→UTC path is **not** generally broken (the newest `measured_at`
+> is 07:38 UTC = 17:38 Brisbane, matching the device drain log exactly), and **the uninstall caused
+> this**, which links it to Q-537 — the ring key hazard was not the only cost of that reinstall.
+> Whether the pre-existing 2026-07-04→08-16 rows were already wrong or were rewritten wrong by
+> today's redecode is **not yet established** and must be, before any corrective pass.
+
+- **The display is innocent.** For 2026-08-17, `sleep_start` is stored as `02:07 UTC`, which
+  genuinely *is* 12:07 pm Brisbane — the UI renders the stored instant correctly. A real 22:07
+  Brisbane sleep should store as `12:07 UTC`; `02:07 UTC` is what you get if that correct UTC
+  value is then treated as a Brisbane wall-clock time and converted **a second time**. This is the
+  double-conversion shape, not a rendering bug, so do not go looking in the component.
+- **It correlates with the pipeline, not the data.** Broken rows span **2026-07-04 → 2026-08-17**;
+  plausible rows are predominantly **2026-05-26 → 2026-08-14** and are the Oura Cloud era. The BLE
+  re-key was 2026-07-07. So the **direct-BLE sleep aggregation** carries the fault while the Cloud
+  writer did not.
+- **The redecode did not cause it, which is the useful part.** A full-history redecode on 2026-08-17
+  recomputed every row from raw frames and produced **the same wrong windows**. The bug is therefore
+  in the aggregation logic, reachable from stored `body_hex` — so a corrected decoder can fix all
+  43 nights by re-running, with no data loss and nothing to reconstruct.
+- **What is NOT affected:** duration, HRV, average and lowest heart rate all look right. It is
+  specifically the window boundaries.
+- **Where to look.** The path that turns `ring_timestamp_ds` into wall-clock via the
+  `(ringDs ↔ utc)` anchor in `oura_ble_clock_anchors`, and whatever converts that into
+  `sleep_start`/`sleep_end`. `CLAUDE.md`'s Timezone section names this exact class as the most
+  repeated bug in the project. Suspect an anchor already in UTC being passed through a
+  `todayInTz`-style conversion, or a `Date` built from a UTC string and then offset.
+- **Verification:** a boundary test at 23:59 and 00:01 Brisbane, plus re-running the aggregation
+  over a known night and asserting the window matches the owner's account of it. **Do not fix from
+  reading alone** — this is the class that has shipped wrong three times.
+
+### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
+
+- **Branch:** `fix/redecode-async-job`
+- **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
+- **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
+  no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
+  moved that work off the event loop into the rollup worker, which is why the rest of the process
+  survives it, but the route's own comment is explicit that *"the caller still waits for the
+  result"*. On real data that exceeds the platform's request timeout, so Railway returns **502**
+  and the tester prints `redecode failed`.
+- **The work had completed.** Measured this session: `scanned=1098158`, `updated=0`, and every
+  `sleep_sessions` row carried `updated_at = 07:58:44` — after the request had already 502'd.
+  The aggregate that the UI reported as failed is the one that produced the night the owner was
+  trying to see.
+- **Why it matters beyond the cosmetics.** A false failure invites a retry, and a retry is another
+  full-history walk of the heaviest pair of calls in the app — the same operation whose own comment
+  names it as *"the event-loop starvation that took production down on 2026-08-13"*. The UI is
+  actively encouraging the thing most likely to hurt. It also cost real diagnostic time here: the
+  502 was investigated as a crash before the data showed the write had landed.
+- **What to do.** Return a job id immediately and let the client poll, rather than holding the
+  request open. The work is already off-loop, so this is a response-shape change rather than an
+  architectural one. While in there, consider whether a date-scoped redecode is worth having —
+  `fullHistory` is correct after a decoder change, and overkill for "re-aggregate last night",
+  which is what it is usually reached for.
+- **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
+  row. Do not run a full redecode while those are open.
+
+### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
+
+- **Branch:** `fix/oura-raw-samples-index-and-vacuum`
+- **Added:** 2026-08-17, from the live `disk_full` incident (see the `projectOverview.md`
+  Known-Issues row for the measurements).
+- **This is deliberately the non-destructive half.** The retention question — what `body_hex` is
+  for and how long the server must keep it — is a separate, owner-gated decision with an
+  irreversible edge. Everything here reclaims space **without deleting a single row**, and should be
+  done first, because it may be sufficient on its own.
+- **Three findings, in order of likely payoff:**
+  1. **The dedup index stores the payload a second time.** It covers
+     `(user_id, ring_timestamp_ds, tag, body_hex)`, so `body_hex` is in both the heap and the
+     index — which is why indexes are **291 MB against a 175 MB heap**. Indexing a hash of the
+     payload instead (generated column, or an expression index) preserves the dedup guarantee on a
+     fraction of the bytes. **Verify the uniqueness semantics survive** before proposing it: a hash
+     collision would silently drop a distinct event, which is exactly the loss the dedup exists to
+     prevent, so the column must remain part of the equality check even if it leaves the index.
+  2. **Autovacuum has never run on this table.** `last_autovacuum` and `last_analyze` are both
+     null and `n_live_tup` reads 0. Find out why — the default thresholds scale with table size,
+     so a table that grew fast from empty can outrun them. No statistics also means the planner has
+     been guessing on the largest table in the database; the `DISTINCT ON` that triggered the
+     incident takes 6.5 s even with disk available.
+  3. **`work_mem` is 4 MB** and the failing query sorts 1.1M rows. Raising it for that path, or
+     giving the query an index that avoids the sort, removes the temp-disk dependency that turned a
+     full volume into a user-visible error.
+- **The target is concrete:** the owner raised the volume 500 MB → 5 GB as a temporary mitigation
+  and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
+  estimating, and say whether 500 MB is reachable without touching retention.
+- **Do not run a Full re-sync while this is open** — that is what triggered the incident.
+
+- **⚠️ Finding 2 above is a measurement artifact — do not chase it.** Re-measured at 08:04 and 08:45
+  UTC, `oura_raw_samples` reads `last_autovacuum = 2026-08-17T07:57:35Z` and
+  `n_live_tup = 1,097,626`. **Autovacuum has run, twice, today.** The null/zero reading was taken
+  while the statistics were still empty: an unclean shutdown makes Postgres discard the stats file
+  on recovery, and `stats_reset` stays `NULL` because only an explicit `pg_stat_reset()` sets it —
+  so freshly-zeroed counters are indistinguishable from "never" unless you know the crash happened.
+  The same artifact showed on `error_events`, which read `n_live_tup = 0` while really holding 6,222
+  rows. **Every counter on this table is "since ~07:42 recovery", not lifetime** — which matters for
+  finding 1, since index `idx_scan` counts are now a ~1-hour window, not evidence of disuse.
+- **What actually consumed the space, proven:** `n_tup_ins = 0`, `n_tup_upd = 681,005`,
+  **`n_tup_hot_upd = 0`**. A full-table `measured_at` re-stamp — the Full re-sync was the *trigger*,
+  a catch-up drain, and the re-stamp it prompts (ops-doc I14/I25) is the *mechanism*. The table went
+  360 → 666 MB while live rows went **down** by 557 and `body_hex`/`event_name` did not move at all.
+  Zero new data; ~306 MB of pure bloat.
+- **This makes a fourth finding, and it is the one with leverage.** `measured_at` is indexed, so **no
+  update that changes it can ever be HOT** — each rewrites a heap tuple plus an entry in all four
+  indexes. `measured_at` is also the *only* indexed column such a re-stamp changes. **Dropping
+  `idx_oura_raw_samples_user_measured` (117 MB, and it exists to serve range queries that can be
+  expressed as ds ranges instead) makes the whole operation HOT-eligible** — so it is both a space
+  win and the fix for the mechanism. Q-46's `IS DISTINCT FROM` guard is present and correct at
+  `adapter.ts:4954`; **it is not the bug and must not be "re-fixed"** — it can only skip a re-stamp
+  writing back the same value, and the Q-71/I25 clock correction changed every row's derived value.
+- **Two more, for sequencing:** (a) the owner must run `VACUUM FULL` (existing admin button) once the
+  re-stamp is confirmed finished — it reclaims the ~306 MB and gets the DB to ~465 MB, under stock;
+  (b) **do not revert the volume to 500 MB until the `measured_at` index is dropped**, or the next
+  prescribed re-stamp refills it. Add a pre-flight free-space guard to the redecode route: the
+  operations manual prescribes Redecode as the remedy for five failure modes (I12, I14, I19, I20,
+  I25), so the documented fix procedure is itself a disk-fill hazard.
+- **Answering this entry's own closing question — is 500 MB reachable without touching retention?
+  Yes, and it is now measured rather than estimated.** `VACUUM FULL` → ~465 MB; + the index work
+  → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB. **No retention change is
+  needed, and the owner has chosen none** (Q-542). The one caveat is that *reaching* 500 MB and
+  *holding* it differ: vacuum alone re-crosses it in ~5 days, this entry plus Q-540 in ~7 weeks, and
+  **Q-541 (repack) in ~3 years**. Full analysis:
+  [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
+
+
+### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
+- **Branch:** `fix/oura-raw-device-store-visibility`
+- **Lane B.** `app/admin/oura-ble/**` + `components/oura-ble/**` only — it calls plugin-bridge methods Lane A already shipped, so it needs nothing from Lane A and can run fully in parallel.
+- **Added:** 2026-08-17 · **Placement:** above the storage-policy items because it is true and getting
+  worse under every option in that plan, and it is the one that can wedge the drain (ops-doc I21,
+  `SQLITE_FULL` → cursor held).
+- **What's actually on `main`:** `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
+  `rawStats`, all four exposed as `@PluginMethod`s and declared in `lib/oura-ble/plugin.ts:90-99`.
+  **A repo-wide grep finds no caller for any of them** outside that interface declaration. The
+  documented "14-day rolling window" (owner retention decision, 2026-08-02) is a plan, not shipped
+  behaviour.
+- **Two independent causes, and fixing the first does not fix the second:** (1) nothing invokes
+  `pruneRaw`; (2) the predicate is `rolled_up = 1 AND synced = 1 AND measured_at < ?`, and `rolled_up`
+  is set only by `markRolledUp`, which is called only by the WebView rollup consumer — **D2 Task 5,
+  not built**. Wiring the prune tomorrow would delete zero rows.
+- **Consequence:** the store has accumulated everything drained since 2026-07-27 at ~2–3 MB/day, with
+  no bound and no visible failure state — exactly what the retention decision warned about (*"a rollup
+  that silently falls behind turns Tier 1 into unbounded growth"*).
+- **Do first, it is cheap and unblocks measurement:** build the missing `rawStats()` panel in
+  `app/admin/oura-ble/` (already a known gap — `rawStoreOpen`/`lowDisk`/`totalRows`/`unrolledRows` are
+  wired in the plugin and rendered nowhere). **Nobody has ever observed the real size of this file.**
+  Then the bound + failure state; the full prune needs D2 Task 5.
+- **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
+  Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
+  **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
+
+
+### [platform] Q-539 — one repeating fault cost 49 MB because the error dedupe is defeated by parameterised SQL
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §7
+- **Branch:** `fix/error-events-dedupe-key`
+- **Added:** 2026-08-17 · **Placement:** small and self-contained, but below the two above because the
+  49 MB **clears itself** by ~2026-09-12 and no space is at stake — only the next incident.
+- **The prune is fine and the bug is already fixed — this entry is about neither.** `error_events` is
+  49 MB / 13,196 rows. The 30-day prune (`adapter.ts:4416`) runs correctly (owner's oldest row is
+  exactly 31 days old). 5,771 of the owner's 6,222 rows are one fault — the `oura_heartrate`
+  `cardinality_violation` **fixed by Q-214 on 2026-08-13**, whose last occurrence was that same day.
+- **Defect 1 — the dedupe key varies when the information does not.** `shouldRecordRequestError`
+  suppresses same-route+same-message repeats inside 60 s, which should have capped this at ~1,440
+  rows/day; it recorded ~2,600. Drizzle's failure message embeds the whole generated `VALUES` list, so
+  a different batch size is a different message. **Measured: 5,771 rows, 18 distinct messages, 1
+  distinct 60-character prefix.** Dedupe bypassed 18-fold. Fix shape: key the dedupe on a normalised
+  message (strip the parameter list / collapse `($N, ...)` runs), not the raw string.
+- **Defect 2 — 2 kB of boilerplate stored per row.** Every one of the 5,771 messages is truncated to
+  exactly 2,000 chars (`avg = max = 2000`) and is almost entirely `(default, $N, $N, $N, $N),`
+  repeated. The caps at `request-error.ts:153` work as written; they are just far too generous for a
+  message whose information ends at character 60.
+- Either fix alone would have made this incident cost single-digit MB.
+
+
+### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
+- **Branch:** `perf/oura-raw-row-narrowing`
+- **Lane A.** Migration + `lib/data/**`.
+- **Added:** 2026-08-17
+- ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
+  lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
+  was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
+- **Take the `event_name` half regardless. Take the `bytea` half only if Q-541 is NOT imminent** — a
+  packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
+- **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
+  from `tag`** — the Kotlin/TS cross-language parity test already pins that mapping. `text` → `bytea`
+  is a lossless re-encoding that halves `body_hex` (26 MB → ~13 MB) and shrinks the 78 MB dedup index
+  with it. Together: ~45–50 MB, and ~328 B/row → ~270 B/row.
+- Needs `VACUUM FULL` to reclaim (ops-doc I17).
+
+
+### [devices][platform] Q-541 — repack raw frames: ~20× smaller, byte-for-byte lossless
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
+  — full implementation plan, written 2026-08-17. Decision context in
+  [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
+- **Branch:** `perf/oura-raw-frame-packing`
+- **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
+- **Added:** 2026-08-17
+- ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
+  archival rule does not consider, and the only one that makes the growth curve sustainable without
+  deleting anything or depending on the phone.
+- **It is load-bearing, not polish.** Against the stock 500 MB target: `VACUUM FULL` alone re-crosses
+  500 MB in ~5 days, A+B in ~7 weeks, **C in ~3 years** (~0.37 MB/day vs ~7.5 today). C is the only
+  step that makes 500 MB a home rather than somewhere the database passes through.
+- **It also deletes the failure mode behind the Q-534 outage.** A packed table holds ~30 rows/day
+  instead of 22,910, and `measured_at` stops being a stored per-frame column — it is derived at decode
+  time from the anchor — so a clock correction re-stamps nothing at all.
+- **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
+  the standalone `text` → `bytea` migration rather than doing the work twice.
+- ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
+  plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
+  and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
+  failure mode; **(b)** every reader becomes "cold blobs ∪ hot rows", which is one shared helper rather
+  than a per-call-site rewrite, because nearly every read is already the same
+  `user_id + tag IN (…) + ds BETWEEN` shape; **(c)** the migration adds a table and moves data with a
+  packer that only deletes a hot row after re-reading its blob and proving the frames equal.
+- **Measured shape (production 2026-08-17):** **968 blobs replace 1,098,956 rows — 1,135×.** 22.5
+  blobs/day, mean 1,135 frames each, 13 MB of raw payload for all history. Projected steady state
+  **~70 MB** (hot 7 days ~52 MB + cold ~16–20 MB) growing ~117 MB/year, against ~7.5 MB/day today.
+- **The bucket key is `(user_id, epoch, tag, ring_timestamp_ds/864000)` — NOT a calendar day.** Wall
+  time is derived through anchors and that derivation changes (Q-71/I25), so a calendar-day partition
+  would need re-partitioning on every clock fix, reintroducing exactly the failure this removes.
+  `epoch` is load-bearing and the data proves it: the four epochs' ds ranges overlap heavily.
+- **Task 0 first** — check whether any rows share `(user_id, ring_timestamp_ds, tag, body_hex)` across
+  different epochs. The existing unique constraint omits `epoch`; given the overlap that is worth
+  ruling out before relying on the key. Cheap, and it could change the design.
+- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
+  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
+  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
+  difference is representation, not information.
+- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
+  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
+  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
+  50 MB.
+- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
+  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
+  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
+
+
+### [devices][platform] Q-542 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6, §7b
+- **Added:** 2026-08-17 · **Answered the same day.** No longer blocking anything.
+- **The owner chose A + B + C — index audit, row narrowing, repack. Options D and E are declined.**
+  Nothing irreversible is being done: every chosen step preserves `body_hex` byte for byte, so the
+  `CLAUDE.md` archival rule stands unchanged and needs no rewrite.
+- **The reframing the decision rested on:** the archival rule protects `body_hex`, which is **26 MB of
+  the 360 MB table — 7.3%**. The rest is indexes and row overhead, all reversible. So the expensive
+  thing and the irreplaceable thing were never the same thing.
+- **The `disk_full` incident (Q-534) did not change this and must not be read as forcing it.** That
+  was a bloat event from a full `measured_at` re-stamp, not growth; **§6 A would have prevented it and
+  neither D nor E would have.** Against the stock 500 MB target the non-destructive path alone reaches
+  ~260 MB and, with C, holds it for years.
+- **Also settled:** D4 remains the destination with **no deadline**, which lapses decision O1 and
+  unblocks Q-540. The 2026-08-02 retention decision justified the 14-day device tier *because* the
+  server keeps `body_hex` forever — that premise now holds indefinitely, so the tier needs no revision.
+- **Remove this entry** once Q-534/Q-540/Q-541 are all closed; it carries no work of its own.
+
+
+
+### [devices][app-shell] Q-533 — the drain runs unattended but only reports completion to a screen nobody should have to watch
+
+- **Branch:** `feat/drain-complete-notification`
+- **Added:** 2026-08-17, owner report during a full re-sync: *"this is very lengthy. We shouldn't do
+  any testing that involves this ever again unless it can do it silently in the background."*
+- **The premise is half wrong, and that is the finding.** The drain **already runs in the
+  background**: `OuraRingService` is a foreground service, it auto-drains on connect and re-drains
+  hourly (`DRAIN_INTERVAL_MS`), and since v1.119.0 it POSTs each batch itself rather than needing
+  the tester screen to forward frames. Nothing about a drain requires the UI.
+- **What is actually missing is the ending.** `onDrainBatchComplete` only `log()`s
+  `drain complete` (`OuraRingService.kt:400`). The service posts exactly one notification in its
+  whole lifetime — low battery — so a user who starts a full re-sync has no way to learn it
+  finished except by staring at the admin log. That is what makes a background operation feel like
+  a foreground one.
+- **What to do.** Notify on drain completion, at least for a full re-sync (`fromZero=true`), with
+  the batch count and whether uploads settled cleanly. Reuse the existing notification channel
+  pattern. Consider a quiet progress notification for long drains, since a full re-sync of a
+  months-old backlog is thousands of events at 255/batch.
+- **Also fix the instructions.** `docs/oura-ble-operations.md` §4 step 2 says *"watch the drain
+  finish"*, which reads as a requirement and is only a verification convenience. It should say the
+  drain continues unattended and name what to check afterwards.
+- **Verification:** device-only. Start a full re-sync, leave the screen, confirm the drain completes
+  and the notification arrives.
+
+### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
+
+- **Branch:** `fix/device-console-ia`
+- **Added:** 2026-08-17, from an owner report while running the Oura re-sync runbook.
+- **This is feedback on a shipped change, not a new idea.** Q-234 landed 2026-08-15 (v1.313.0):
+  `/admin` kept user administration, diagnostics moved to **Settings → Developer**, and the three
+  device consoles became rows there. Its journal records that as done and correct. The owner, using
+  it under real conditions for the first time, reports the opposite: *"it was moved away from the
+  admin section to the diagnostic section = bad"*, and *"everything is spread out sporadically,
+  needs organisation"*.
+- **Why the disagreement is the useful part.** Q-234's reasoning was taxonomic — device diagnostics
+  are not user administration, so they belong apart. That is sound on paper and appears to be wrong
+  in use, because the operations these screens support (drain, re-sync, verify) are a **single task**
+  that now spans two locations. Re-litigate the premise before re-arranging anything; a second
+  reorganisation chosen the same way will land in the same place.
+- **What to do.** Read the Q-234 entry and its journal first, then treat this as an IA question with
+  a real user's task in hand: what does someone actually *do* on these screens, start to finish, and
+  where should that live. The answer may be that diagnostics belong back under `/admin`, or that
+  the split is right but the destination is wrong. Decide it deliberately and write down why.
+- **Related:** Q-537 (ring key has one copy) and Q-532 (the scan auto-recentre) both live on these
+  screens. Q-537's placement half — the key field should be nested behind something deliberate so it
+  cannot be edited by accident — is best solved as part of this, not separately.
+- **Verification:** device-only. None of it is checkable from the sandbox.
+
+### [app-shell][devices] Q-532 — the BLE screen re-centres itself while a scan runs, making buttons hard to hit
+
+- **Branch:** `fix/ble-scan-scroll-jump`
+- **Added:** 2026-08-17, owner report during the Oura re-sync runbook.
+- **What it is.** *"The screen constantly moves to the centre while a scan is running — making it
+  hard to click buttons."* While a BLE scan/drain is active on `/admin/oura-ble`, the view keeps
+  scrolling back, so a control the user is aiming at moves out from under the tap.
+- **Where to look first.** The screen re-renders on every status/log update during a scan, so the
+  likely causes are a `scrollIntoView` / auto-scroll on new log lines, or a keyed remount that
+  resets scroll position on each poll. `components/oura-ble/oura-ble-debug.tsx` holds the log and
+  frame panels that update most frequently.
+- **Why it matters more than it sounds.** This screen is only ever used during a live drain — the
+  one situation where a mistimed tap can hit **Clear key** or interrupt a sync. An unstable layout
+  on a destructive control set is a safety problem, not just an annoyance.
+- **Verification:** reproduce on-device with a scan actually running; a static screenshot will not
+  show it, and the sandbox cannot scan at all.
+
+
 ### [activity][cardio] Q-450 — `/activity` reached without a type: Start works, Finish works, Save silently discards the activity
 
 - **Branch:** `fix/activity-untyped-entry-silent-save-loss`
@@ -396,73 +808,6 @@ below threshold and left in place for next time.
   the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
   than feeding a bare `"no data"` string the model reads as a measurement.
 
-### [devices][platform] Q-536 — INCIDENT: `disk_full` at 583 MB; a full `measured_at` re-stamp doubles this table, and the ops manual prescribes it
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0
-- **Branch:** `fix/oura-raw-restamp-bloat`
-- **Lane A.** Server/JS only — `app/api/oura-ble/**`, `lib/data/**`, `lib/observability/**`. Steps 1–2 of its task list are **owner actions**, not agent work.
-- **Added:** 2026-08-17 · **Top of queue:** this is a live production incident, currently masked by a
-  temporary volume raise (500 MB → 5 GB) that the owner wants reverted to stock 500 MB.
-- **What happened:** production hit `[pg 53100] disk_full` at ~07:42 UTC. The volume was **500 MB**,
-  not the 1 GB asserted in a `lib/observability/request-error.ts` code comment — so at the 464 MB
-  measured hours earlier the database was already at **93% of capacity**.
-- **It was not growth.** Measured 22 min after recovery: the table went 360 MB → **666 MB** while live
-  rows went **down** by 557 and `body_hex`/`event_name` did not move at all. All 306 MB is bloat.
-- **Mechanism, proven not inferred:** `n_tup_ins = 0`, `n_tup_upd = 681,005`, **`n_tup_hot_upd = 0`**.
-  A full-table `measured_at` re-stamp is running; `measured_at` is indexed, so **no such update can
-  ever be HOT** — each writes a new heap tuple plus an entry in all four indexes. Every index roughly
-  doubled in step (dedup 78→155 MB, `user_measured` 46→117 MB, `user_tag_ts` 60→102 MB, pkey 24→47 MB).
-- **This is NOT the Q-46 bug — do not "re-fix" it.** Q-46's `IS DISTINCT FROM` guard is present and
-  correct at `adapter.ts:4954`. It can only skip a re-stamp writing back the *same* value, and the
-  Q-71/I25 clock correction changed every row's derived value, so nothing can be skipped. The
-  operation is legitimate.
-- **The real finding:** this table cannot be re-stamped without roughly doubling, and
-  `docs/oura-ble-operations.md` prescribes Redecode as the remedy for **five** failure modes (I12,
-  I14, I19, I20, I25). **The documented fix procedure is a disk-fill hazard**, permanently, for every
-  future decoder or clock correction.
-- **Tasks, in order:**
-  1. Let the re-stamp finish, then run the existing admin `POST /api/oura-ble/samples/vacuum`
-     (Lever 1c). Non-destructive; reclaims ~306 MB and gets the DB to ~465 MB, under stock.
-  2. **Q-532 next, and treat it as the mechanism fix, not just space** — dropping
-     `idx_oura_raw_samples_user_measured` makes a full re-stamp **HOT-eligible**, because
-     `measured_at` is the only *indexed* column such an update changes.
-  3. Add a pre-flight guard to the redecode route: refuse to start a full re-stamp when free volume
-     is under (rows × ~300 B). A prescribed remedy must not be able to fill the disk.
-  4. Replace the 1 GB code comment with the real provisioned size, or delete the assertion —
-     `pg_database_size()` is the only honest source.
-- **Do not let this incident force a retention decision.** It is a bloat event; neither §6 D nor E
-  would have prevented it, and §6 A would have.
-
-### [devices][platform] Q-532 — index audit on `oura_raw_samples`: 106 MB for 5,129 lifetime scans
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 A
-- **Branch:** `perf/oura-raw-index-audit`
-- **Lane A.** One migration + an `EXPLAIN` audit. No client change.
-- **Added:** 2026-08-17 · **Placement: second only to the incident that made it urgent (Q-536).**
-  Two independent grounds now, not one: it is the largest reversible space win **and** it is the fix
-  for the bloat mechanism behind the `disk_full` outage. `measured_at` is the only *indexed* column a
-  full re-stamp changes, so dropping `idx_oura_raw_samples_user_measured` makes such a re-stamp
-  **HOT-eligible** and collapses both the index writes and most of the heap bloat.
-- **⚠️ The scan counts below are pre-incident.** Re-measured after the crash the same indexes read
-  117 MB / 1 scan (`user_measured`) and 102 MB / 16 scans (`user_tag_ts`) — inflated by the running
-  re-stamp, and on counters that reset at recovery. **Re-measure after the `VACUUM FULL` in Q-536
-  step 1**, before deciding anything; do not act on either set of numbers taken mid-re-stamp.
-- **Measured in production 2026-08-17** (`pg_stat_user_indexes`, system-wide, and
-  `pg_stat_database.stats_reset` is `NULL` so scan counts are lifetime, not a recent window):
-  `oura_raw_samples` is 360 MB of which **208 MB is indexes against 152 MB of heap**.
-  `oura_raw_samples_user_tag_ts` is **60 MB / 1,789 scans**; `idx_oura_raw_samples_user_measured` is
-  **46 MB / 3,340 scans**.
-- **The lead:** `user_tag_ts` was built for the per-tag read pattern that **Q-213/I19 deliberately
-  removed** when it collapsed the rollup's ten tag reads into one query partitioned in memory. It may
-  be paying rent on a query shape that no longer exists.
-- **Do not drop on the strength of a scan count.** `EXPLAIN` the rollup (`aggregateOuraRawSamples`),
-  the redecode path and the admin tester reads first. Reclaiming the file needs `VACUUM FULL`
-  (ops-doc I17 — a drop does not shrink it by itself).
-- **Same shape, smaller:** `oura_heartrate` is 25 MB of indexes on 6.7 MB of heap;
-  `oura_heartrate_pkey` has **zero** lifetime scans on a table that already has a `(user_id,
-  timestamp)` unique constraint. **Keep `oura_heartrate_user_updated`** despite its zero — migration
-  130 added it for Track-B sync, which is not wired yet.
-
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
 - **Branch:** `fix/ring-measurement-power-budget`
@@ -547,141 +892,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Surface: device required.** Every claim here is code-traced or from ingested-event counts;
   **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
   and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
-
-### [devices][platform] Q-530 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
-- **Branch:** `fix/oura-raw-device-store-visibility`
-- **Lane B.** `app/admin/oura-ble/**` + `components/oura-ble/**` only — it calls plugin-bridge methods Lane A already shipped, so it needs nothing from Lane A and can run fully in parallel.
-- **Added:** 2026-08-17 · **Placement:** above the storage-policy items because it is true and getting
-  worse under every option in that plan, and it is the one that can wedge the drain (ops-doc I21,
-  `SQLITE_FULL` → cursor held).
-- **What's actually on `main`:** `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
-  `rawStats`, all four exposed as `@PluginMethod`s and declared in `lib/oura-ble/plugin.ts:90-99`.
-  **A repo-wide grep finds no caller for any of them** outside that interface declaration. The
-  documented "14-day rolling window" (owner retention decision, 2026-08-02) is a plan, not shipped
-  behaviour.
-- **Two independent causes, and fixing the first does not fix the second:** (1) nothing invokes
-  `pruneRaw`; (2) the predicate is `rolled_up = 1 AND synced = 1 AND measured_at < ?`, and `rolled_up`
-  is set only by `markRolledUp`, which is called only by the WebView rollup consumer — **D2 Task 5,
-  not built**. Wiring the prune tomorrow would delete zero rows.
-- **Consequence:** the store has accumulated everything drained since 2026-07-27 at ~2–3 MB/day, with
-  no bound and no visible failure state — exactly what the retention decision warned about (*"a rollup
-  that silently falls behind turns Tier 1 into unbounded growth"*).
-- **Do first, it is cheap and unblocks measurement:** build the missing `rawStats()` panel in
-  `app/admin/oura-ble/` (already a known gap — `rawStoreOpen`/`lowDisk`/`totalRows`/`unrolledRows` are
-  wired in the plugin and rendered nowhere). **Nobody has ever observed the real size of this file.**
-  Then the bound + failure state; the full prune needs D2 Task 5.
-- **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
-  Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
-  **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-535).
-
-### [devices][platform] Q-534 — repack raw frames: ~20× smaller, byte-for-byte lossless
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
-  — full implementation plan, written 2026-08-17. Decision context in
-  [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
-- **Branch:** `perf/oura-raw-frame-packing`
-- **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
-- **Added:** 2026-08-17
-- ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-535).** This is the option the current
-  archival rule does not consider, and the only one that makes the growth curve sustainable without
-  deleting anything or depending on the phone.
-- **It is load-bearing, not polish.** Against the stock 500 MB target: `VACUUM FULL` alone re-crosses
-  500 MB in ~5 days, A+B in ~7 weeks, **C in ~3 years** (~0.37 MB/day vs ~7.5 today). C is the only
-  step that makes 500 MB a home rather than somewhere the database passes through.
-- **It also deletes the failure mode behind the Q-536 outage.** A packed table holds ~30 rows/day
-  instead of 22,910, and `measured_at` stops being a stored per-frame column — it is derived at decode
-  time from the anchor — so a clock correction re-stamps nothing at all.
-- **Supersedes the `bytea` half of Q-533** — a packed blob *is* `bytea`. If C is taken promptly, skip
-  the standalone `text` → `bytea` migration rather than doing the work twice.
-- ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
-  plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
-  and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
-  failure mode; **(b)** every reader becomes "cold blobs ∪ hot rows", which is one shared helper rather
-  than a per-call-site rewrite, because nearly every read is already the same
-  `user_id + tag IN (…) + ds BETWEEN` shape; **(c)** the migration adds a table and moves data with a
-  packer that only deletes a hot row after re-reading its blob and proving the frames equal.
-- **Measured shape (production 2026-08-17):** **968 blobs replace 1,098,956 rows — 1,135×.** 22.5
-  blobs/day, mean 1,135 frames each, 13 MB of raw payload for all history. Projected steady state
-  **~70 MB** (hot 7 days ~52 MB + cold ~16–20 MB) growing ~117 MB/year, against ~7.5 MB/day today.
-- **The bucket key is `(user_id, epoch, tag, ring_timestamp_ds/864000)` — NOT a calendar day.** Wall
-  time is derived through anchors and that derivation changes (Q-71/I25), so a calendar-day partition
-  would need re-partitioning on every clock fix, reintroducing exactly the failure this removes.
-  `epoch` is load-bearing and the data proves it: the four epochs' ds ranges overlap heavily.
-- **Task 0 first** — check whether any rows share `(user_id, ring_timestamp_ds, tag, body_hex)` across
-  different epochs. The existing unique constraint omits `epoch`; given the overlap that is worth
-  ruling out before relying on the key. Cheap, and it could change the design.
-- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
-  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
-  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
-  difference is representation, not information.
-- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
-  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
-  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
-  50 MB.
-- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
-  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
-  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
-
-### [platform] Q-531 — one repeating fault cost 49 MB because the error dedupe is defeated by parameterised SQL
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §7
-- **Branch:** `fix/error-events-dedupe-key`
-- **Added:** 2026-08-17 · **Placement:** small and self-contained, but below the two above because the
-  49 MB **clears itself** by ~2026-09-12 and no space is at stake — only the next incident.
-- **The prune is fine and the bug is already fixed — this entry is about neither.** `error_events` is
-  49 MB / 13,196 rows. The 30-day prune (`adapter.ts:4416`) runs correctly (owner's oldest row is
-  exactly 31 days old). 5,771 of the owner's 6,222 rows are one fault — the `oura_heartrate`
-  `cardinality_violation` **fixed by Q-214 on 2026-08-13**, whose last occurrence was that same day.
-- **Defect 1 — the dedupe key varies when the information does not.** `shouldRecordRequestError`
-  suppresses same-route+same-message repeats inside 60 s, which should have capped this at ~1,440
-  rows/day; it recorded ~2,600. Drizzle's failure message embeds the whole generated `VALUES` list, so
-  a different batch size is a different message. **Measured: 5,771 rows, 18 distinct messages, 1
-  distinct 60-character prefix.** Dedupe bypassed 18-fold. Fix shape: key the dedupe on a normalised
-  message (strip the parameter list / collapse `($N, ...)` runs), not the raw string.
-- **Defect 2 — 2 kB of boilerplate stored per row.** Every one of the 5,771 messages is truncated to
-  exactly 2,000 chars (`avg = max = 2000`) and is almost entirely `(default, $N, $N, $N, $N),`
-  repeated. The caps at `request-error.ts:153` work as written; they are just far too generous for a
-  message whose information ends at character 60.
-- Either fix alone would have made this incident cost single-digit MB.
-
-### [devices][platform] Q-533 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
-- **Branch:** `perf/oura-raw-row-narrowing`
-- **Lane A.** Migration + `lib/data/**`.
-- **Added:** 2026-08-17
-- ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
-  lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
-  was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
-- **Take the `event_name` half regardless. Take the `bytea` half only if Q-534 is NOT imminent** — a
-  packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
-- **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
-  from `tag`** — the Kotlin/TS cross-language parity test already pins that mapping. `text` → `bytea`
-  is a lossless re-encoding that halves `body_hex` (26 MB → ~13 MB) and shrinks the 78 MB dedup index
-  with it. Together: ~45–50 MB, and ~328 B/row → ~270 B/row.
-- Needs `VACUUM FULL` to reclaim (ops-doc I17).
-
-### [devices][platform] Q-535 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6, §7b
-- **Added:** 2026-08-17 · **Answered the same day.** No longer blocking anything.
-- **The owner chose A + B + C — index audit, row narrowing, repack. Options D and E are declined.**
-  Nothing irreversible is being done: every chosen step preserves `body_hex` byte for byte, so the
-  `CLAUDE.md` archival rule stands unchanged and needs no rewrite.
-- **The reframing the decision rested on:** the archival rule protects `body_hex`, which is **26 MB of
-  the 360 MB table — 7.3%**. The rest is indexes and row overhead, all reversible. So the expensive
-  thing and the irreplaceable thing were never the same thing.
-- **The `disk_full` incident (Q-536) did not change this and must not be read as forcing it.** That
-  was a bloat event from a full `measured_at` re-stamp, not growth; **§6 A would have prevented it and
-  neither D nor E would have.** Against the stock 500 MB target the non-destructive path alone reaches
-  ~260 MB and, with C, holds it for years.
-- **Also settled:** D4 remains the destination with **no deadline**, which lapses decision O1 and
-  unblocks Q-533. The 2026-08-02 retention decision justified the 14-day device tier *because* the
-  server keeps `body_hex` forever — that premise now holds indefinitely, so the tier needs no revision.
-- **Remove this entry** once Q-532/Q-533/Q-534 are all closed; it carries no work of its own.
-
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
@@ -890,6 +1100,67 @@ session working from a temporarily restored copy.
 > The others may well contain load-bearing keys — `cache-groups.ts`'s own comments flag
 > `freshWithinTtl` entries inside them — and Q-263 files that.
 > Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/entries/2026-08-16-invalidation-audit.md).
+
+### [platform] Q-530 — an admin snapshot endpoint, so a migration's first real run is not production
+
+- **Branch:** `feat/admin-db-snapshot`
+- **Plan:** [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)
+- **Lane: A**, and not splittable — `app/api/**`, `lib/data/postgres/migrations/`, and a Postgres
+  migration number, which belongs to Lane A alone. No Lane B surface is touched at all.
+  ⚠️ **Two of the paths are unlisted in the lane contract and must be claimed in Lane A's baton
+  before starting**: `scripts/` (the generator and the restore command) and `lib/export/` — neither
+  appears in §3 of [`docs/agents/README.md`](agents/README.md), and `lib/export/` is shared with
+  Q-288 below, so the two items must not run concurrently in different sessions.
+- **Added:** 2026-08-17 · planning session against the rescoped Q-251
+- **Steps, in order — the plan carries the detail, this is the slot list:**
+  1. `scripts/generate-claude-ro-views.js` — emit `_meta_excluded_tables` and
+     `_meta_withheld_columns`; regenerate into **migration 189** (a new number, never overwriting an
+     applied file) and re-point the filename pin in `claude-ro-readonly-role.test.ts` *in the same
+     commit*.
+  2. `lib/export/db-snapshot.ts` — view enumeration, the drift gate, PK discovery from `pg_index`,
+     keyset chunking, the manifest. All the tests live here.
+  3. `app/api/admin/db-snapshot/route.ts` — copy `day-review`'s `authorize()` verbatim; `bulk` and
+     `tables` params; NDJSON via `ReadableStream`; audit row into `db_query_log`.
+  4. `scripts/local-db/snapshot.js` + `pnpm db:snapshot` — local-target guard **first**, then
+     restore per plan §5.
+  5. Docs — `CLAUDE.md` env-var row, `docs/module-map.md` row, and a
+     `docs/runbooks/db-backup-restore.md` section distinguishing this from `pg_dump`.
+- **⛔ Step 3 is blocked on the owner** until `ADMIN_SNAPSHOT_SECRET` is agreed and set in Railway —
+  secret handling is confirm-first. Steps 1, 2 and 4 do not depend on it and can land first.
+- **Placement:** below the four live user-facing bugs above it and below the two CI-integrity items,
+  above everything else — it is a capability every later item borrows (rehearse a migration against
+  prod-shaped rows, run `pnpm dev` against real data), and it is the first thing that touches
+  `CLAUDE.md`'s standing root cause *"a bug that reproduces in prod but not locally: suspect prod
+  data drift vs the fresh local seed"*.
+- **This is Q-251 shape (a), designed.** Q-251 stays open for shape (b), the second Railway service,
+  which remains deferred. Read Q-251 first for the decision history; read the plan for what to build.
+- **It is much smaller than Q-251 implies, and the reason is the finding to carry into the work:**
+  `claude_ro` already *is* the export — 80 views, one user, default-deny, 9 columns withheld, served
+  by a role with no write grants. The endpoint paginates `SELECT *` over that schema. **No new
+  scoping map is written**, so there is no second copy to drift, which is the property this could not
+  survive losing.
+- **What happens when a table is added and the views are not regenerated: the export fails, naming
+  it.** The gate is a runtime set difference — `public` base tables minus `claude_ro` views minus a
+  generator-emitted exclusion view — computed from `pg_catalog`, which the `claude_readonly` role can
+  read for `public` despite holding no `SELECT` there (verified against production: 83 tables, 944
+  columns). Column-level, not just table-level. The existing CI parity test stays but does not cover
+  this: it is a count rather than a set of names, it is column-blind, its migration pin **went stale
+  silently between 181 and 185**, and it checks the *local* schema.
+- **Volume, measured 2026-08-17.** The DB is 477 MB and `oura_raw_samples` is 360 MB of it —
+  **1,098,005 of its 1,098,183 rows are the owner's**, so scoping to one user removes 0.02% of the
+  volume. Scoping is a consent fix, never a size fix. The shaped data that rehearsal actually needs
+  is a few MB, so the default export omits the four bulk tables and `?bulk=<days>` opts a window
+  back in.
+- **Ships with a first-class round-trip** (`pnpm db:snapshot`), guarded to refuse any target that is
+  not the local DB. Two verified constraints: `push_subscriptions` **cannot** round-trip (all three
+  withheld columns are `NOT NULL`) and is skipped and declared in the manifest; `users.password_hash`
+  is withheld and nullable, so the restore stamps the seed's known bcrypt hash or nobody can log in.
+- **⚠️ New secret — `ADMIN_SNAPSHOT_SECRET`, not a reuse of `ADMIN_EXPORT_SECRET`.** Secret handling
+  is confirm-first per `CLAUDE.md`; the owner has approved the endpoint's existence, but confirm the
+  variable before it is added to Railway. Leak analysis is in the plan §6: total health-data
+  disclosure for one person, **no** account takeover, no write path, no third-party rows — and the
+  marginal risk over today is small, because `CLAUDE_DB_QUERY_SECRET` already reads exactly this data
+  through the same views and the same role.
 
 ### [platform] Q-263 — audit the remaining cache groups the way Q-262 audited one
 
@@ -1731,6 +2002,9 @@ session working from a temporarily restored copy.
 
 - **Branch:** `fix/export-completeness`
 - **Plan:** none needed
+- **Lane: A** — `lib/export/full-export.ts`, `app/api/export/`. ⚠️ `lib/export/` is unlisted in the
+  lane contract and is **shared with Q-530**; claim it in Lane A's baton, and do not run the two
+  items concurrently in different sessions.
 - **Added:** 2026-08-15 · from the uncovered-lenses review §4
 - **Measured:** `lib/export/full-export.ts` exports 17 `DIRECT_DOMAINS` + 9 `JOINED_DOMAINS` +
   `goals` = **27**. `schema.ts` declares **80** `pgTable`s.
@@ -1753,6 +2027,22 @@ session working from a temporarily restored copy.
 - **Decide explicitly on the big ones:** `oura_raw_samples` (1M rows, 341 MB) probably should *not*
   stream into a user download; that is a legitimate exclusion, but it should be **written down** as
   one rather than absent by accident.
+- **Re-measured 2026-08-17** (Q-530's planning session, checking whether the snapshot endpoint could
+  extend this route instead of adding one — it can't; the two have different auth models and opposite
+  needs on ops tables). Two corrections and one new defect:
+  - **The count is 26 of 82 tables**, not 27 of 80. The old 27 counted `goals`, which is a repository
+    call rather than a table. `oura_raw_samples` is now **1,098,183 rows / 360 MB** in production.
+  - Also missing beyond the list above: the user's own **`users` profile row**,
+    `saved_meal_items`, `meal_plan_variants`, `plan_meal_answers`, `user_dietary_restrictions`,
+    `scale_raw_samples`, `oura_workouts`, `user_stats`, `session_periodization`,
+    `exercise_estimates`.
+  - **⚠️ The route cannot stream a large table today, and its comment says it can.** `exportUserData`
+    calls `pool.query` per table, which buffers the entire result set; the route comment claims it
+    streams "rather than buffering the whole export in memory", and only the per-table `ReadableStream`
+    enqueue is true. Harmless across 26 small tables, an OOM the moment a bulk table is added — so
+    **fixing coverage without fixing this is strictly worse than the bug.** Use keyset pagination by
+    primary key (every prod table has one, verified) per
+    [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md) §3.3.
 
 ### [platform] Q-295 — Coach is 8% of AI calls, 52% of tokens, and the slowest surface in the app
 
@@ -2533,6 +2823,44 @@ session working from a temporarily restored copy.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+> **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
+> Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
+> in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
+> it could never have succeeded:
+>
+> > **`getLocalStore(userId)` requires a signed-in user** (`lib/local-store/index.ts`). The app
+> > launches to the sign-in screen, so the local SQLite database is never created, and
+> > `scripts/ci/emulator-local-db-smoke.sh` polls 90 seconds for a file that cannot appear.
+>
+> **What *is* proven, on a real runner, and should not be rebuilt:** the app builds; the server
+> starts (after fixing a readiness probe that hit `/api/version`, the one route that makes an
+> outbound GitHub call before responding); the APK assembles against `http://10.0.2.2:3000` with a
+> fail-closed guard so it can never be built pointed at production; KVM enables; the emulator boots.
+> Steps 1–14 of 15 pass. Only the assertion fails.
+>
+> **The job is now `workflow_dispatch`-only** (`.github/workflows/android-emulator.yml`), not
+> deleted. It failed every run while enabled, and a permanently-red check is worse than no check —
+> it trains everyone to ignore the signal, so the next red, which would be a genuine migration
+> failure, goes unread.
+>
+> **To finish it: add Maestro.** A declarative YAML flow that launches the app, signs in, and waits
+> for the app shell; the existing `PRAGMA user_version` assertion then runs unchanged. Two things
+> make this cheaper than it sounds: the job already runs a **seeded local Postgres containing
+> `test@local.dev` / `testpass123`**, so no credentials or secrets are needed — Maestro just types
+> into the form — and the job is non-required, so iteration costs nothing but time. Restore the
+> `pull_request` trigger in the same PR. Expect several CI rounds: **none of this is runnable in a
+> Claude session** (no `/dev/kvm`, Firecracker microVM), so a UI flow can only be iterated by
+> pushing.
+>
+> Once sign-in works, the rest of this entry's deferred scope becomes reachable for the first time:
+> offline cold start, the service-worker `/api/` passthrough, deep-link cold launch, the hardware
+> back-button guard, local notifications, and PiP.
+>
+> ---
+>
+> **The 2026-08-17 note below is superseded in its headline claim and accurate in its detail.** Kept
+> because its reasoning about the production-URL trap is what the next session most needs.
+>
 > **PARTIALLY SHIPPED 2026-08-17 — the local-SQLite half is in.**
 > `.github/workflows/android-emulator.yml` + `scripts/ci/emulator-local-db-smoke.sh`: boots an
 > emulator, installs the debug APK, and asserts `PRAGMA user_version` read **off the device**
@@ -2586,6 +2914,13 @@ session working from a temporarily restored copy.
 
 - **Branch:** `feat/staging-environment`
 - **Added:** 2026-08-14 · same owner ask
+- **✅ Shape (a) is now planned and split out as [Q-530](#platform-q-530--an-admin-snapshot-endpoint-so-a-migrations-first-real-run-is-not-production)**
+  (2026-08-17), which sits higher in the queue. It came out smaller than shape (a) describes below:
+  `pg_dump` is the wrong transport, because the consumer is the agent sandbox and Railway's Postgres
+  port is blocked there — only 80/443 are open. So it is an HTTPS endpoint reading the `claude_ro`
+  views, which already carry the one-user scoping, the default-deny and the column withholding.
+  Scrubbing turned out not to be needed at all: filtering to one consenting user replaces it.
+  **This entry stays open for shape (b) only** — the second Railway service, still deferred.
 - **The gap:** every Postgres migration, every destructive write path and every sync-engine change
   is exercised against a **freshly-seeded local DB** and then against **production**. `CLAUDE.md`
   names the consequence as a standing root cause: *"A bug that reproduces in prod but not locally:

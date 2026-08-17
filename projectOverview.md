@@ -63,6 +63,99 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][devices] 🔴 Production hit `disk_full` during a full re-sync — and the indexes, not the data, are the bulk (2026-08-17)
+
+**Live fault, mitigated by raising the volume; the underlying sizing is unresolved.** During the
+2026-08-17 ring re-sync, `/admin/oura-ble` returned a Server Components render error and two API
+routes failed with **`[pg 53100]`** — PostgreSQL's `disk_full`. Both failing queries read
+`oura_raw_samples`; one is a `SELECT DISTINCT ON (tag)` over 1.1M rows, which must sort, and with
+`work_mem` at 4 MB it spills to temp disk. There was no room. Confirmed in `error_events`
+(`GET /api/oura-ble/device-metrics`, `GET /api/oura-ble/samples/summary`).
+
+**Measured at the time of failure:**
+
+| | |
+|---|---|
+| Database total | **583 MB**, up ~110 MB in one hour |
+| `oura_raw_samples` heap | 175 MB |
+| `oura_raw_samples` **indexes** | **291 MB** — 1.66× the heap |
+| That one table | **80% of the database** |
+| `last_autovacuum` / `last_analyze` | **never** — `n_live_tup` reads 0 |
+
+**Three things stack, and only one of them is the archival data.**
+1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation; **the stated target
+   is to return to the stock 500 MB** once the bulk is dealt with.
+2. **Indexes exceed the table.** The dedup index covers
+   `(user_id, ring_timestamp_ds, tag, body_hex)` — it indexes the raw payload itself, so it grows
+   faster than the rows do. **291 MB of the 466 MB is index, not data.**
+3. **Autovacuum has never run on this table**, so there are no statistics either. The planner has
+   been working blind on the largest table in the database; that same `DISTINCT ON` takes 6.5 s
+   even with disk available.
+
+**Why (2) matters more than it looks.** Reclaiming index space is *non-destructive* — it does not
+touch `body_hex`, so it does not collide with the rule that the server archive is the source of
+truth and must never be pruned. Replacing the payload in that index with a hash would preserve
+dedup semantics on a fraction of the bytes. That may get under 500 MB without deleting anything,
+which is a very different proposition from the retention question.
+
+**⚠️ Correction to (3), measured after recovery — do not chase an autovacuum misconfiguration.** At
+08:04 and 08:45 UTC this table reads `last_autovacuum = 2026-08-17T07:57:35Z` and
+`n_live_tup = 1,097,626`. **Autovacuum has run, twice, today.** The never/0 reading was taken while
+the statistics were still empty: an unclean shutdown makes Postgres discard the stats file on
+recovery, and `stats_reset` stays `NULL` because only an explicit `pg_stat_reset()` sets it — so
+freshly-zeroed counters look exactly like "never". `error_events` showed the same artifact, reading
+`n_live_tup = 0` while holding 6,222 rows. **Every counter on this table is now "since ~07:42", not
+lifetime** — which also means index `idx_scan` counts are a short window, not evidence of disuse.
+
+**What actually consumed the space, proven.** `n_tup_ins = 0`, `n_tup_upd = 681,005`,
+**`n_tup_hot_upd = 0`**. The re-sync was the *trigger* (a catch-up drain, whose re-POSTed events all
+dedup to zero inserts); the *mechanism* is the full-table `measured_at` re-stamp that ops-doc I14/I25
+tells the owner to run after one. The table went 360 → 666 MB — and the DB 464 → 771 MB — while live
+rows went **down** by 557 and `body_hex`/`event_name` did not move at all. **Zero new data; ~306 MB
+of pure bloat.**
+
+**The fourth finding, and the one with leverage.** `measured_at` is indexed, so **no update that
+changes it can ever be HOT** — each rewrites a heap tuple plus an entry in all four indexes — and it
+is the *only* indexed column such a re-stamp changes. **Dropping `idx_oura_raw_samples_user_measured`
+makes the whole operation HOT-eligible**, so it is both a space win and the fix for the mechanism.
+Q-46's `IS DISTINCT FROM` guard is present and correct (`adapter.ts:4954`) and **is not the bug** —
+it can only skip a re-stamp writing back the same value, and the Q-71/I25 clock fix changed every
+row's derived value. The durable hazard: the operations manual prescribes Redecode as the remedy for
+**five** failure modes (I12, I14, I19, I20, I25), so the documented fix procedure is a disk-fill
+hazard until that index goes and the route gains a free-space pre-flight check.
+
+**Is 500 MB reachable without touching retention? Yes — measured, not estimated.** `VACUUM FULL`
+→ ~465 MB; + the index work → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB.
+**The owner chose A+B+C on 2026-08-17 and declined both irreversible options** (Q-542), so the
+archival rule stands unchanged. Caveat worth keeping separate: *reaching* 500 MB and *holding* it
+differ — vacuum alone re-crosses it in ~5 days, with the index+row work ~7 weeks, and **with Q-541
+(repack) ~3 years**. Sequencing, and the owner's own runbook, in
+[`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0/§0a.
+
+**Owed:** the sizing work (see the storage research item) must now be framed as *how to get back
+under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
+**do not run another Full re-sync until this is resolved**; that is what triggered it.
+
+### [devices][platform] 🔴 An app uninstall destroys the Oura ring key, and nothing warned about it (2026-08-17)
+
+The 32-hex ring key lives **only** in Android SharedPreferences. `OuraBlePlugin.kt` says so in its
+own comment — *"the key never leaves SharedPreferences; never logged"* — so it is not on the server,
+not in this repository, and not in any log. Correct for a credential, and it means **an uninstall
+makes the ring unreachable**: the BLE service logs `no key stored` and refuses to start, while the
+Devices screen still shows the ring as healthy because that card reads server data.
+
+Hit live on 2026-08-17. The uninstall was necessary (moving to a stably-signed APK, #19), and the
+"what you lose" list given beforehand covered only the JS local store — the native side was never
+checked. Recovered from the `key.hex` the original `open_oura` re-key produced; **there is no
+other copy**, and if it had been lost the only apparent fix — re-onboarding the official Oura app —
+is the one that can force a firmware update and break the reverse-engineered protocol outright.
+
+Documented in `CLAUDE.md`'s APK section and as §0 of
+[`docs/oura-ble-operations.md`](docs/oura-ble-operations.md). **Still open** because the mitigation
+is prose, not a mechanism: nothing in the app backs the key up, warns before an uninstall, or lets
+the owner export it. Worth a backlog entry for an explicit "export/ring key" affordance before
+the next device change.
+
 ### [workouts][readiness] ✅ An engine-chosen deload prescribed full weights — fixed, device check owed (Q-310, 2026-08-17)
 
 - **Fixed in v1.317.5.** `/api/workout-data`'s ai_dynamic catch-all — two verbatim copies —
@@ -284,36 +377,8 @@ order.
   confirm both that the card flips immediately and that the log reaches the server afterwards.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
 
-### [devices][platform] 🔴 INCIDENT — production `disk_full` at 583 MB; masked by a temporary 5 GB volume (Q-536, 2026-08-17)
 
-Production hit `[pg 53100] disk_full` at ~07:42 UTC. **The volume was 500 MB, not the 1 GB asserted in
-a `lib/observability/request-error.ts` code comment** — so at the 464 MB measured hours earlier the
-database was already at **93% of capacity**. The volume has been raised 500 MB → 5 GB as temporary
-mitigation; **the owner's target is a return to stock 500 MB**, so this stays open until that holds.
-
-**It was not growth.** Measured 22 minutes after recovery: `oura_raw_samples` went 360 MB → **666 MB**
-while live rows went **down** by 557 and `body_hex`/`event_name` did not move. All 306 MB is bloat.
-`n_tup_ins = 0`, `n_tup_upd = 681,005`, **`n_tup_hot_upd = 0`** — a full-table `measured_at` re-stamp,
-and because `measured_at` is indexed **no such update can ever be HOT**, so each writes a new heap
-tuple plus an entry in all four indexes.
-
-**This is not the Q-46 bug and must not be "re-fixed".** That `IS DISTINCT FROM` guard is present and
-working (`adapter.ts:4954`); it can only skip a re-stamp writing back the *same* value, and the
-Q-71/I25 clock correction changed every row's derived value. The operation was legitimate.
-
-- **The durable finding:** this table cannot be re-stamped without roughly doubling, and
-  [`docs/oura-ble-operations.md`](docs/oura-ble-operations.md) prescribes Redecode as the remedy for
-  **five** failure modes (I12, I14, I19, I20, I25). The documented fix procedure is a disk-fill hazard
-  for every future decoder or clock correction.
-- **No retention change is needed and none was chosen.** `VACUUM FULL` reclaims the 306 MB
-  non-destructively (~465 MB); the index audit and repack take it to ~260 MB and hold it. Owner chose
-  A+B+C on 2026-08-17 — every step preserves `body_hex`, so the archival rule stands unchanged.
-- **Still owed:** the `VACUUM FULL` after the re-stamp completes, then Q-532 (which also makes future
-  re-stamps HOT-eligible), a pre-flight free-space guard on the redecode route, and replacing that
-  1 GB comment with the real provisioned size.
-- Detail: [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
-
-### [devices][platform] 🟠 `oura_raw.db` is growing without bound on the phone, and nobody has ever seen how big it is (Q-530, 2026-08-17)
+### [devices][platform] 🟠 `oura_raw.db` is growing without bound on the phone, and nobody has ever seen how big it is (Q-538, 2026-08-17)
 
 The documented "14-day rolling buffer" for on-device raw frames (owner retention decision,
 2026-08-02) **has not shipped**. `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
@@ -631,9 +696,13 @@ a metric user. `CLAUDE.md` forbids an LLM number *gating an action*; it does not
 *displayed as fact*, and it should.
 
 **🟠 Two Play Store gates are unmet (Q-287/Q-288).** No self-service account deletion exists (admin
-route only) — required in-app and on web since 2024. And `/api/export` covers **27 domains against
-80 tables**, silently omitting the user's heart rate, derived scores, AI conversations and nutrition
-plans. Deletion is **⛔ owner-sign-off-first**; it is destructive and irreversible.
+route only) — required in-app and on web since 2024. And `/api/export` covers **26 of 82 tables**
+(re-measured 2026-08-17; the old "27 of 80" counted `goals`, a repository call rather than a table),
+silently omitting the user's own profile row, their heart rate, derived scores, AI conversations and
+nutrition plans. Deletion is **⛔ owner-sign-off-first**; it is destructive and irreversible.
+⚠️ **The route also cannot stream a large table while its comment claims it can** — `exportUserData`
+buffers each table via `pool.query`, so closing the coverage gap without fixing that first is an OOM
+the moment `oura_raw_samples` (1,098,183 rows / 360 MB) joins the list. Both halves ship together.
 
 **The rest:** `ai_health_insights.context_hash` is NULL on **109 of 117** rows, so the
 regeneration-avoidance key is written by one section of fourteen (Q-293). Coach is **8% of AI calls

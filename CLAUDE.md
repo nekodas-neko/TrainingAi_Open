@@ -592,6 +592,28 @@ Always the newest `main` build, non-expiring, and genuinely no login required �
 logged-out browser on 2026-08-17, which is the entire point of the public-repo migration (Q-49). For an unmerged PR the APK is a
 workflow artifact (`app-debug-apk`) on that PR's Android run, kept 14 days.
 
+> ### ⛔ Before telling anyone to uninstall the app, read this
+>
+> **An uninstall destroys the Oura ring key, and it is not recoverable from this repository, the
+> server, or any log.** `OuraBlePlugin.kt` keeps it in Android SharedPreferences and says so in its
+> own comment — *"the key never leaves SharedPreferences; never logged"*. That is deliberate and
+> correct, and it means an uninstall leaves the BLE service logging `no key stored` and the ring
+> unreachable. The only copy is the `key.hex` produced by the original `open_oura` re-key, on
+> whoever's machine ran it.
+>
+> **The obvious recovery is the one that must not be taken.** Re-onboarding the official Oura app
+> re-keys the ring — and can force a firmware update that changes the BLE event encoding, which is
+> what the frozen firmware exists to prevent. That converts a lost-credential problem into a full
+> protocol re-validation.
+>
+> So: **confirm the owner has `key.hex` in hand before any uninstall**, and say so explicitly rather
+> than assuming. This cost a live session on 2026-08-17. The uninstall was correct and necessary
+> (see the signing note below); the omission was enumerating only the JS local store as "what you
+> lose" and never checking the native side. An uninstall also wipes the 14-day local raw window
+> (harmless — the server holds the archive) and any unsynced outbox mutation (**not** harmless —
+> flush it first with pull-to-refresh on More, which pushes; the "Sync now" button in Data & Sync
+> only pulls and will not flush anything).
+
 **These APKs upgrade in place only while the `ANDROID_DEBUG_KEYSTORE_B64` repository secret is
 set.** Gradle's fallback debug keystore is generated per machine, and a GitHub runner is a fresh
 machine every run — so before that secret existed, every published APK carried a **different**

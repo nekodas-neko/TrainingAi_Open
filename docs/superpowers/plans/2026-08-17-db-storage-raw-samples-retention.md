@@ -48,7 +48,9 @@ oura_raw_samples   n_tup_ins = 0   n_tup_upd = 681,005   n_tup_hot_upd = 0   n_d
 ```
 
 **681,005 updates in ~22 minutes, zero of them HOT, and zero inserts.** A full-table `measured_at`
-re-stamp is running. `measured_at` is indexed (`idx_oura_raw_samples_user_measured`), so **no update
+re-stamp. (The *trigger* was a **Full re-sync**, per the concurrent session's Q-534 — a catch-up
+drain, whose re-POSTed events all dedup to zero inserts, and which ops-doc I14 tells the owner to
+follow with a Redecode. The re-sync is the trigger; the re-stamp is what consumed the space.) `measured_at` is indexed (`idx_oura_raw_samples_user_measured`), so **no update
 that changes it can ever be HOT** — each one writes a new heap tuple *and* a new entry in all four
 indexes. Index growth confirms it: the dedup key 78 → 155 MB, `user_measured` 46 → 117 MB,
 `user_tag_ts` 60 → 102 MB, `pkey` 24 → 47 MB — everything roughly doubled, in step.
@@ -137,21 +139,21 @@ at this size, so the app is briefly unavailable — pick a moment.
 - **Expected: table 666 → ~360 MB, DB 771 → ~465 MB.** Confirm before continuing.
 - **Do not stop here.** ~465 MB re-crosses 500 MB in ~5 days.
 
-**Step 3 — AGENT (Lane A). Q-532, the index audit.** Already queued at position 2. This is the
+**Step 3 — AGENT (Lane A). Q-534, the index audit.** Already queued at position 2. This is the
 mechanism fix as well as the space win — dropping `idx_oura_raw_samples_user_measured` makes every
 future re-stamp HOT-eligible. **Re-measure scan counts after step 2**, never mid-re-stamp.
 - Expected: table ~250 MB, DB ~355 MB.
 
-**Step 4 — AGENT (Lane A). Q-536 steps 3–4**, in the same PR as step 3 if convenient: a pre-flight
+**Step 4 — AGENT (Lane A). Q-534 steps 3–4**, in the same PR as step 3 if convenient: a pre-flight
 free-space guard on the redecode route, and replace the 1 GB comment with the real provisioned size.
 
 **Step 5 — OWNER. Revert the Railway volume 5 GB → 500 MB.** Only now. After steps 2–4 the DB is
 ~355 MB with a re-stamp that can no longer double the table.
 
-**Step 6 — AGENT (Lane A). Q-533 `event_name`, then Q-534 the repack.** Q-534 is what makes 500 MB
-hold (~3 years of headroom vs ~7 weeks). Skip Q-533's `bytea` half if Q-534 is imminent.
+**Step 6 — AGENT (Lane A). Q-540 `event_name`, then Q-541 the repack.** Q-541 is what makes 500 MB
+hold (~3 years of headroom vs ~7 weeks). Skip Q-540's `bytea` half if Q-541 is imminent.
 
-**Step 7 — AGENT (Lane B). Q-530**, the `rawStats()` admin panel — independent of all of the above and
+**Step 7 — AGENT (Lane B). Q-538**, the `rawStats()` admin panel — independent of all of the above and
 the only way to see the device store's real size.
 
 **Unrelated but noticed, check it:** no raw sample has been ingested since **07:38:52** (67 minutes at
@@ -168,12 +170,14 @@ immediately after the crash, so confirm the BLE pipeline actually recovered rath
    decision on §6 D or E. The incident is a bloat event; neither D nor E would have prevented it, and
    §6 A would have.
 
-> **Numbering note.** The instruction that prompted this section referred to "Q-534 … the
-> non-destructive half (indexes 291 MB against a 175 MB heap)". In this document the index audit is
-> **Q-532** and the repack is **Q-534**; both are non-destructive, as is Q-533. The 291/175 figures
-> match neither the pre-crash reading (208/152) nor the post-crash one (421/245) and sit between them,
-> consistent with a sample taken while the re-stamp was running. Flagged rather than silently
-> reconciled.
+> **Numbering note — resolved on merge.** The instruction that prompted this section referred to
+> "Q-534 … the non-destructive half (indexes 291 MB against a 175 MB heap)". That was **a real entry
+> filed by a concurrent planning session**, not a misremembering of this one — and its 291/175 sits
+> between this document's pre-crash (208/152) and post-crash (421/245) readings because it was
+> sampled while the re-stamp ran. On merge, this session's index-audit and incident entries were
+> **folded into that Q-534 rather than filed as duplicates of it**, and this session's remaining
+> entries were renumbered **Q-530…Q-536 → Q-538…Q-542**. Where this document says "§6 A", the queue
+> entry is **Q-534**.
 
 ---
 
@@ -541,7 +545,7 @@ than disturbing any of them.
 | Question | Decision |
 |---|---|
 | Retention policy | **A + B + C — repack, keep everything.** No option D, no option E. |
-| Is D4 (device-primary, server raw dropped) still the destination? | **Yes, but no deadline.** This lapses master-plan decision **O1**, which vetoed `bytea` on the grounds that the table was about to be dropped — a drop that is years out cannot veto a cheap reversible win today. **Q-533 is therefore unblocked in full**, not just its `event_name` half. |
+| Is D4 (device-primary, server raw dropped) still the destination? | **Yes, but no deadline.** This lapses master-plan decision **O1**, which vetoed `bytea` on the grounds that the table was about to be dropped — a drop that is years out cannot veto a cheap reversible win today. **Q-540 is therefore unblocked in full**, not just its `event_name` half. |
 | Volume ceiling | **Stock 500 MB is the target**, not the temporary 5 GB. |
 | Device raw store | **Visibility first** — build the `rawStats()` panel, measure, then set retention. |
 
@@ -552,7 +556,7 @@ is reachable and holdable entirely with non-destructive work.
 this decision C is **load-bearing, not optional polish**. A and B buy roughly seven weeks between
 them; C buys years and removes the re-stamp failure mode that caused the outage.
 
-**Note that C subsumes B's `bytea` half** — a packed blob *is* `bytea`. If C is taken promptly, Q-533
+**Note that C subsumes B's `bytea` half** — a packed blob *is* `bytea`. If C is taken promptly, Q-540
 reduces to dropping `event_name` alone, and the standalone `text` → `bytea` migration should be
 skipped rather than done twice.
 
@@ -575,18 +579,19 @@ skipped rather than done twice.
 
 ## 9. Backlog entries filed
 
-Q-530 – Q-535, from the unallocated pointer (this session is a one-off, not one of the five standing
-agents, so it took a block rather than a lane band; the pointer is bumped to 540 and the block is
-recorded in the band table).
+Q-538 – Q-542, **renumbered from Q-530 – Q-536 on merge**: this session took its block from a pointer
+reading 530 while a concurrent planning session held the same numbers unmerged — the exact failure the
+standing bands prevent and the pointer cannot, since it cannot see an unmerged PR. Pointer now 543,
+block recorded in the band table with that lesson attached.
 
 | Q | Item | Blocked on |
 |---|---|---|
-| **Q-530** | `oura_raw.db` grows unbounded on-device — no `pruneRaw` caller, and `rolled_up` is never set | — (D2 Task 5 for the full fix) |
-| **Q-531** | `error_events` dedupe defeated by parameterised SQL in the message; cap the message to its diagnostic prefix | — |
-| **Q-532** | Index audit on `oura_raw_samples` — 106 MB for 5,129 lifetime scans (§6 A) | — |
-| **Q-533** | Narrow the row: drop `event_name`, `body_hex` → `bytea` (§6 B) | Owner decision, only if E is not chosen |
-| **Q-534** | Repack raw frames — ~20× reduction, lossless (§6 C) | Owner decision |
-| **Q-535** | **Owner decision required:** raw-retention policy — §6 D and E are irreversible | **Owner** |
+| **Q-538** | `oura_raw.db` grows unbounded on-device — no `pruneRaw` caller, and `rolled_up` is never set | — (D2 Task 5 for the full fix) |
+| **Q-539** | `error_events` dedupe defeated by parameterised SQL in the message; cap the message to its diagnostic prefix | — |
+| **Q-534** | Index audit — **folded into the concurrent session's entry of the same number**, incl. the HOT-eligibility fix (§6 A) | — |
+| **Q-540** | Narrow the row: drop `event_name`, `body_hex` → `bytea` (§6 B) | ✅ unblocked — see §7b |
+| **Q-541** | Repack raw frames — ~20× reduction, lossless (§6 C). Own plan: [`…-oura-raw-frame-packing.md`](2026-08-17-oura-raw-frame-packing.md) | ✅ unblocked — see §7b |
+| **Q-542** | Raw-retention policy — **answered 2026-08-17: A+B+C, D and E declined** | ✅ answered |
 
 ---
 
@@ -609,4 +614,4 @@ curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \
 and nothing was run on the device. The device findings in §3 are **static analysis** (grep for callers,
 reading the prune predicate, reading the manifest); the actual size of `oura_raw.db` on the owner's S25
 was **not** observed, because the admin console has no `rawStats()` panel to display it. Confirming it
-is the first step of Q-530.
+is the first step of Q-538.

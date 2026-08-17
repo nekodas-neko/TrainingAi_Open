@@ -1,4 +1,4 @@
-# Q-534 — Pack raw BLE frames into per-bucket blobs (implementation plan)
+# Q-541 — Pack raw BLE frames into per-bucket blobs (implementation plan)
 
 _Planning session, 2026-08-17. Implements option **§6 C** of
 [`2026-08-17-db-storage-raw-samples-retention.md`](2026-08-17-db-storage-raw-samples-retention.md),
@@ -126,7 +126,7 @@ then per frame, ordered by ds ascending:
 ```
 
 - **Store bytes, not hex.** The blob is `bytea`, so `body_hex` is halved on the way in. This is where
-  Q-533's `bytea` half is absorbed — **do not also run the standalone `text` → `bytea` migration**, it
+  Q-540's `bytea` half is absorbed — **do not also run the standalone `text` → `bytea` migration**, it
   would be the same rewrite twice.
 - **`event_name` is not stored.** It is a pure function of `tag` (30 distinct values, already pinned by
   the Kotlin/TS cross-language parity test) and `tag` is a column on the blob row.
@@ -187,7 +187,7 @@ delete side is 1.1M rows, so batch it and **`VACUUM FULL` after**, not during.
 **Task 6 — hot-window prune.** Only after Task 5 has verified clean: a throttled prune matching the
 existing `shouldPrune` pattern in `adapter.ts`, deleting hot rows whose bucket is sealed and packed.
 
-**Task 7 — measured_at range queries.** `idx_oura_raw_samples_user_measured` is dropped by Q-532; any
+**Task 7 — measured_at range queries.** `idx_oura_raw_samples_user_measured` is dropped by the index work in Q-534; any
 surviving read that filters by wall-clock converts its range to a ds range through the anchors first.
 Confirm the set is empty or convert it.
 
@@ -220,7 +220,7 @@ Deletions of dead weight this enables: the redecode `event_name` refresh and `me
   no APK.
 - **It does not implement D4**, and it does not make D4 harder: a packed table pulls to the device as
   well as an unpacked one, arguably better.
-- **It does not replace Q-532.** The index audit is separate, lands first, and is what makes the
+- **It does not replace the index work in Q-534.** The index audit is separate, lands first, and is what makes the
   interim (pre-packing) table survivable.
 
 **Failure surfaces not exercised:** planning only, no code written. All sizing is projected from
