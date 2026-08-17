@@ -17,6 +17,23 @@ this harness wants the TCP one:
 export DATABASE_URL='postgresql://postgres:postgres@localhost:5433/trainingai_dev'
 ```
 
+## Two accounts
+
+`auth.setup.ts` signs in the **seeded** user (program, logs, metrics) — the default for every spec.
+`zero-data.setup.ts` creates and signs in a second account with **none** of those, for first-run and
+empty-state specs. Opt in per file:
+
+```ts
+import { ZERO_DATA_STORAGE_STATE } from './fixtures'
+test.use({ storageState: ZERO_DATA_STORAGE_STATE })
+```
+
+It exists because no empty state was reachable from this harness before it (Q-352), which is why
+Q-451 and Q-452 — both first-run bugs — shipped unguarded. The account is created by the setup rather
+than by `scripts/local-db/seed.sql` on purpose: `setup.sh` skips the seed when `users` is non-empty,
+so an existing local database would never gain it while CI always would, and a spec resting on that
+passes in CI and fails locally.
+
 ## What a green run does and does not prove
 
 Read this before trusting a pass. Every line here was measured, not assumed.

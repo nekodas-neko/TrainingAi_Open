@@ -47,7 +47,9 @@ export default defineConfig({
     video: 'off',
   },
   projects: [
-    { name: 'setup', testMatch: /auth\.setup\.ts/, use: { launchOptions: { executablePath } } },
+    // Both setups run before the specs: the seeded user every spec uses by default, and the
+    // zero-data account (Q-352) that specs opt into with `test.use({ storageState: … })`.
+    { name: 'setup', testMatch: /(auth|zero-data)\.setup\.ts/, use: { launchOptions: { executablePath } } },
     {
       name: 'mobile-chromium',
       dependencies: ['setup'],
