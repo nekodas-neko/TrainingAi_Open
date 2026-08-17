@@ -177,7 +177,15 @@ So numbers are **not** taken one at a time from the pointer. Each agent owns a b
 | BugFix | **387 – 449** |
 | Review | **450 – 499** |
 | Tuning | **500 – 529** |
-| *(one-off planning sessions)* | **530** taken 2026-08-17 for Q-530 — not a standing band |
+| *(one-off planning sessions)* | no standing band — take a block from the pointer |
+
+Blocks taken this way so far: **530–537** (2026-08-17) and **538–542** (2026-08-17, DB storage /
+raw-sample retention). The second of those was **renumbered from 530–536 on merge** — it had taken
+its block from a pointer reading 530 while a concurrent planning session held the same numbers
+unmerged, which is the exact failure the standing bands exist to prevent and which the pointer
+cannot prevent, because it cannot see an unmerged PR. **If you are a one-off session, take your
+block, and re-check it against `origin/main` immediately before you open the PR as well as when you
+claim it.**
 
 A session that is not one of the five standing agents — a one-off planning session started from its
 own prompt — has no band. It takes the next numbers from the pointer in the backlog and bumps that

@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **538** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -443,6 +443,183 @@ below threshold and left in place for next time.
   and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
   estimating, and say whether 500 MB is reachable without touching retention.
 - **Do not run a Full re-sync while this is open** — that is what triggered the incident.
+
+- **⚠️ Finding 2 above is a measurement artifact — do not chase it.** Re-measured at 08:04 and 08:45
+  UTC, `oura_raw_samples` reads `last_autovacuum = 2026-08-17T07:57:35Z` and
+  `n_live_tup = 1,097,626`. **Autovacuum has run, twice, today.** The null/zero reading was taken
+  while the statistics were still empty: an unclean shutdown makes Postgres discard the stats file
+  on recovery, and `stats_reset` stays `NULL` because only an explicit `pg_stat_reset()` sets it —
+  so freshly-zeroed counters are indistinguishable from "never" unless you know the crash happened.
+  The same artifact showed on `error_events`, which read `n_live_tup = 0` while really holding 6,222
+  rows. **Every counter on this table is "since ~07:42 recovery", not lifetime** — which matters for
+  finding 1, since index `idx_scan` counts are now a ~1-hour window, not evidence of disuse.
+- **What actually consumed the space, proven:** `n_tup_ins = 0`, `n_tup_upd = 681,005`,
+  **`n_tup_hot_upd = 0`**. A full-table `measured_at` re-stamp — the Full re-sync was the *trigger*,
+  a catch-up drain, and the re-stamp it prompts (ops-doc I14/I25) is the *mechanism*. The table went
+  360 → 666 MB while live rows went **down** by 557 and `body_hex`/`event_name` did not move at all.
+  Zero new data; ~306 MB of pure bloat.
+- **This makes a fourth finding, and it is the one with leverage.** `measured_at` is indexed, so **no
+  update that changes it can ever be HOT** — each rewrites a heap tuple plus an entry in all four
+  indexes. `measured_at` is also the *only* indexed column such a re-stamp changes. **Dropping
+  `idx_oura_raw_samples_user_measured` (117 MB, and it exists to serve range queries that can be
+  expressed as ds ranges instead) makes the whole operation HOT-eligible** — so it is both a space
+  win and the fix for the mechanism. Q-46's `IS DISTINCT FROM` guard is present and correct at
+  `adapter.ts:4954`; **it is not the bug and must not be "re-fixed"** — it can only skip a re-stamp
+  writing back the same value, and the Q-71/I25 clock correction changed every row's derived value.
+- **Two more, for sequencing:** (a) the owner must run `VACUUM FULL` (existing admin button) once the
+  re-stamp is confirmed finished — it reclaims the ~306 MB and gets the DB to ~465 MB, under stock;
+  (b) **do not revert the volume to 500 MB until the `measured_at` index is dropped**, or the next
+  prescribed re-stamp refills it. Add a pre-flight free-space guard to the redecode route: the
+  operations manual prescribes Redecode as the remedy for five failure modes (I12, I14, I19, I20,
+  I25), so the documented fix procedure is itself a disk-fill hazard.
+- **Answering this entry's own closing question — is 500 MB reachable without touching retention?
+  Yes, and it is now measured rather than estimated.** `VACUUM FULL` → ~465 MB; + the index work
+  → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB. **No retention change is
+  needed, and the owner has chosen none** (Q-542). The one caveat is that *reaching* 500 MB and
+  *holding* it differ: vacuum alone re-crosses it in ~5 days, this entry plus Q-540 in ~7 weeks, and
+  **Q-541 (repack) in ~3 years**. Full analysis:
+  [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
+
+
+### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
+- **Branch:** `fix/oura-raw-device-store-visibility`
+- **Lane B.** `app/admin/oura-ble/**` + `components/oura-ble/**` only — it calls plugin-bridge methods Lane A already shipped, so it needs nothing from Lane A and can run fully in parallel.
+- **Added:** 2026-08-17 · **Placement:** above the storage-policy items because it is true and getting
+  worse under every option in that plan, and it is the one that can wedge the drain (ops-doc I21,
+  `SQLITE_FULL` → cursor held).
+- **What's actually on `main`:** `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
+  `rawStats`, all four exposed as `@PluginMethod`s and declared in `lib/oura-ble/plugin.ts:90-99`.
+  **A repo-wide grep finds no caller for any of them** outside that interface declaration. The
+  documented "14-day rolling window" (owner retention decision, 2026-08-02) is a plan, not shipped
+  behaviour.
+- **Two independent causes, and fixing the first does not fix the second:** (1) nothing invokes
+  `pruneRaw`; (2) the predicate is `rolled_up = 1 AND synced = 1 AND measured_at < ?`, and `rolled_up`
+  is set only by `markRolledUp`, which is called only by the WebView rollup consumer — **D2 Task 5,
+  not built**. Wiring the prune tomorrow would delete zero rows.
+- **Consequence:** the store has accumulated everything drained since 2026-07-27 at ~2–3 MB/day, with
+  no bound and no visible failure state — exactly what the retention decision warned about (*"a rollup
+  that silently falls behind turns Tier 1 into unbounded growth"*).
+- **Do first, it is cheap and unblocks measurement:** build the missing `rawStats()` panel in
+  `app/admin/oura-ble/` (already a known gap — `rawStoreOpen`/`lowDisk`/`totalRows`/`unrolledRows` are
+  wired in the plugin and rendered nowhere). **Nobody has ever observed the real size of this file.**
+  Then the bound + failure state; the full prune needs D2 Task 5.
+- **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
+  Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
+  **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
+
+
+### [platform] Q-539 — one repeating fault cost 49 MB because the error dedupe is defeated by parameterised SQL
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §7
+- **Branch:** `fix/error-events-dedupe-key`
+- **Added:** 2026-08-17 · **Placement:** small and self-contained, but below the two above because the
+  49 MB **clears itself** by ~2026-09-12 and no space is at stake — only the next incident.
+- **The prune is fine and the bug is already fixed — this entry is about neither.** `error_events` is
+  49 MB / 13,196 rows. The 30-day prune (`adapter.ts:4416`) runs correctly (owner's oldest row is
+  exactly 31 days old). 5,771 of the owner's 6,222 rows are one fault — the `oura_heartrate`
+  `cardinality_violation` **fixed by Q-214 on 2026-08-13**, whose last occurrence was that same day.
+- **Defect 1 — the dedupe key varies when the information does not.** `shouldRecordRequestError`
+  suppresses same-route+same-message repeats inside 60 s, which should have capped this at ~1,440
+  rows/day; it recorded ~2,600. Drizzle's failure message embeds the whole generated `VALUES` list, so
+  a different batch size is a different message. **Measured: 5,771 rows, 18 distinct messages, 1
+  distinct 60-character prefix.** Dedupe bypassed 18-fold. Fix shape: key the dedupe on a normalised
+  message (strip the parameter list / collapse `($N, ...)` runs), not the raw string.
+- **Defect 2 — 2 kB of boilerplate stored per row.** Every one of the 5,771 messages is truncated to
+  exactly 2,000 chars (`avg = max = 2000`) and is almost entirely `(default, $N, $N, $N, $N),`
+  repeated. The caps at `request-error.ts:153` work as written; they are just far too generous for a
+  message whose information ends at character 60.
+- Either fix alone would have made this incident cost single-digit MB.
+
+
+### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
+- **Branch:** `perf/oura-raw-row-narrowing`
+- **Lane A.** Migration + `lib/data/**`.
+- **Added:** 2026-08-17
+- ✅ **UNBLOCKED 2026-08-17.** The owner kept D4 as the destination **but with no deadline**, which
+  lapses master-plan decision **O1** (*"do not do both"* — it vetoed `bytea` on the grounds the table
+  was about to be dropped; a drop that is years out cannot veto a cheap reversible win today).
+- **Take the `event_name` half regardless. Take the `bytea` half only if Q-541 is NOT imminent** — a
+  packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
+- **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
+  from `tag`** — the Kotlin/TS cross-language parity test already pins that mapping. `text` → `bytea`
+  is a lossless re-encoding that halves `body_hex` (26 MB → ~13 MB) and shrinks the 78 MB dedup index
+  with it. Together: ~45–50 MB, and ~328 B/row → ~270 B/row.
+- Needs `VACUUM FULL` to reclaim (ops-doc I17).
+
+
+### [devices][platform] Q-541 — repack raw frames: ~20× smaller, byte-for-byte lossless
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
+  — full implementation plan, written 2026-08-17. Decision context in
+  [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
+- **Branch:** `perf/oura-raw-frame-packing`
+- **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
+- **Added:** 2026-08-17
+- ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
+  archival rule does not consider, and the only one that makes the growth curve sustainable without
+  deleting anything or depending on the phone.
+- **It is load-bearing, not polish.** Against the stock 500 MB target: `VACUUM FULL` alone re-crosses
+  500 MB in ~5 days, A+B in ~7 weeks, **C in ~3 years** (~0.37 MB/day vs ~7.5 today). C is the only
+  step that makes 500 MB a home rather than somewhere the database passes through.
+- **It also deletes the failure mode behind the Q-534 outage.** A packed table holds ~30 rows/day
+  instead of 22,910, and `measured_at` stops being a stored per-frame column — it is derived at decode
+  time from the anchor — so a clock correction re-stamps nothing at all.
+- **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
+  the standalone `text` → `bytea` migration rather than doing the work twice.
+- ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
+  plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
+  and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
+  failure mode; **(b)** every reader becomes "cold blobs ∪ hot rows", which is one shared helper rather
+  than a per-call-site rewrite, because nearly every read is already the same
+  `user_id + tag IN (…) + ds BETWEEN` shape; **(c)** the migration adds a table and moves data with a
+  packer that only deletes a hot row after re-reading its blob and proving the frames equal.
+- **Measured shape (production 2026-08-17):** **968 blobs replace 1,098,956 rows — 1,135×.** 22.5
+  blobs/day, mean 1,135 frames each, 13 MB of raw payload for all history. Projected steady state
+  **~70 MB** (hot 7 days ~52 MB + cold ~16–20 MB) growing ~117 MB/year, against ~7.5 MB/day today.
+- **The bucket key is `(user_id, epoch, tag, ring_timestamp_ds/864000)` — NOT a calendar day.** Wall
+  time is derived through anchors and that derivation changes (Q-71/I25), so a calendar-day partition
+  would need re-partitioning on every clock fix, reintroducing exactly the failure this removes.
+  `epoch` is load-bearing and the data proves it: the four epochs' ds ranges overlap heavily.
+- **Task 0 first** — check whether any rows share `(user_id, ring_timestamp_ds, tag, body_hex)` across
+  different epochs. The existing unique constraint omits `epoch`; given the overlap that is worth
+  ruling out before relying on the key. Cheap, and it could change the design.
+- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
+  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
+  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
+  difference is representation, not information.
+- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
+  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
+  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
+  50 MB.
+- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
+  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
+  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
+
+
+### [devices][platform] Q-542 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
+
+- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6, §7b
+- **Added:** 2026-08-17 · **Answered the same day.** No longer blocking anything.
+- **The owner chose A + B + C — index audit, row narrowing, repack. Options D and E are declined.**
+  Nothing irreversible is being done: every chosen step preserves `body_hex` byte for byte, so the
+  `CLAUDE.md` archival rule stands unchanged and needs no rewrite.
+- **The reframing the decision rested on:** the archival rule protects `body_hex`, which is **26 MB of
+  the 360 MB table — 7.3%**. The rest is indexes and row overhead, all reversible. So the expensive
+  thing and the irreplaceable thing were never the same thing.
+- **The `disk_full` incident (Q-534) did not change this and must not be read as forcing it.** That
+  was a bloat event from a full `measured_at` re-stamp, not growth; **§6 A would have prevented it and
+  neither D nor E would have.** Against the stock 500 MB target the non-destructive path alone reaches
+  ~260 MB and, with C, holds it for years.
+- **Also settled:** D4 remains the destination with **no deadline**, which lapses decision O1 and
+  unblocks Q-540. The 2026-08-02 retention decision justified the 14-day device tier *because* the
+  server keeps `body_hex` forever — that premise now holds indefinitely, so the tier needs no revision.
+- **Remove this entry** once Q-534/Q-540/Q-541 are all closed; it carries no work of its own.
+
+
 
 ### [devices][app-shell] Q-533 — the drain runs unattended but only reports completion to a screen nobody should have to watch
 
