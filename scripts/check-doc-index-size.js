@@ -46,7 +46,7 @@ const root = path.join(__dirname, '..');
 // they are preserved in the entry rather than cited. The prose around them was cut from a first
 // draft 100 over. If a later sweep moves this entry out, the tables go with it.
 //
-// Raised 2026-08-17 (Q-530 planning): backlog 6057 -> 6119, projectOverview 6484 -> 6487.
+// Raised 2026-08-17 (Q-530 planning): backlog 6057 -> 6120, projectOverview 6484 -> 6488.
 // One queue entry for the planned snapshot endpoint, plus a re-measurement folded into the existing
 // Q-288 rather than filed as a second entry. The projectOverview half is three lines correcting a
 // wrong number already in the index (/api/export covers 26 of 82 tables, not 27 of 80) and naming a
@@ -55,8 +55,8 @@ const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6487,
-  'docs/implementation-backlog.md': 6119,
+  'projectOverview.md': 6488,
+  'docs/implementation-backlog.md': 6120,
   'CLAUDE.md': 988,
 };
 
