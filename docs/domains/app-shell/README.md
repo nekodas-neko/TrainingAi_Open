@@ -54,6 +54,8 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-451 dead first-run CTA, Q-452 AI insight generated over "no data"). Findings Q-450…Q-455; four areas recorded **clean**.
 
+- [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-457 — `lib/github-release.ts` defaults to the archived private repo, so the update card and More → Download APK break silently if the env var is ever unset). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
+
 ## Open issues
 
 ```bash
