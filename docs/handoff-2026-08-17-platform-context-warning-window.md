@@ -76,8 +76,9 @@ Nothing here touches app code, so no `pnpm dev` pass, no device check, and no ch
 
 - No change to the `90`/`95` thresholds themselves, or to the once-per-threshold `/tmp` marker logic.
 - No `1M` formatting fix in `k()`.
-- No CLAUDE.md edit. Nothing in CLAUDE.md was wrong; the confusion was about *where the rule lived*,
-  and this handoff plus the hook's own comment is the record of that.
+- No CLAUDE.md edit for the *hook* itself. Nothing in CLAUDE.md was wrong about it; the confusion was
+  about *where the rule lived*, and this handoff plus the hook's own comment is the record of that.
+  (CLAUDE.md was edited for an unrelated reason — the CI-lag gotcha above.)
 
 ## Files to look at
 
