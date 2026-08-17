@@ -70,6 +70,23 @@ with the real module (6 partial days of 14 → 514 kcal low, all gates passing, 
 Queued below the three live user-facing bugs (Q-450/451/452) and above the tooling items, since
 it is a prescription-correctness bug that is not firing *yet*. Known-Issues row added.
 
+**Filed: Q-388** — `[devices][heart-rate]` ring battery drains ~3.5× stock (owner: 20% overnight,
+charge every 2 days, vs 7 days stock). `enableMeasurementSequence()` (`OuraProtocol.kt:123-127`)
+sets DAYTIME_HR + SPO2 + REAL_STEPS → AUTOMATIC on every connect, unconditionally, no user toggle.
+Production confirms SpO₂ is the largest event source (53,412 rows/7d) and ~75% of it falls
+22:00–09:00, matching the reported overnight window. Filed above Q-387. Known-Issues row added.
+
+**Method note that paid off, and a correction I had to make mid-investigation.** The first
+hypothesis was a stuck live-HR mode — `reqBleFastHrMode(false)` and `EXERCISE_HR → AUTOMATIC` exist
+*only* in `liveHrStopSequence()`, so a session that never reaches `stopLiveHr()` leaves fast-HR
+sampling on forever. That is a real defect and it is in the entry. But it is **not** what is
+draining the battery: an hour-of-day query showed `ehr_trace_event` at exactly zero from 21:00 to
+08:00, which a stuck live mode could not be. **Query the distribution before believing a
+mechanism** — the tag totals alone would have supported the wrong answer, and the hourly breakdown
+both refuted it and pointed at SpO₂. Also: event counts from `oura_raw_samples` measure *ingestion*,
+which is sensing **and** drain success — an unexplained 2026-08-04 step change is in the entry as an
+open question for exactly that reason, not as a finding.
+
 **`check-doc-index-size.js` will fail every intake PR you write — plan for it.** New as of
 2026-08-17: a shrink-only ratchet on `projectOverview.md`, `docs/implementation-backlog.md` and
 `CLAUDE.md`. Intake adds an entry per report, so it trips every time. The precedent set by the

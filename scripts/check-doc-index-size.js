@@ -38,12 +38,19 @@ const root = path.join(__dirname, '..');
 // and roughly a third of the rest was showing the work. Intake adds an entry per report, so this
 // ceiling will be pushed regularly — the answer is a periodic sweep moving *cleared* entries out,
 // not a standing allowance for verbose ones.
+//
+// Raised 2026-08-17 (BugFix intake, Q-388): backlog 5972 -> 6057, projectOverview 6461 -> 6484.
+// One owner-reported queue entry, and a deliberately larger one: ~20 of its 85 lines are measured
+// production tables (7-day event counts by tag, and by hour of day) behind an owner-scoped
+// claude_ro view that **prunes at 30 days**. Re-deriving them after that window is impossible, so
+// they are preserved in the entry rather than cited. The prose around them was cut from a first
+// draft 100 over. If a later sweep moves this entry out, the tables go with it.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6461,
-  'docs/implementation-backlog.md': 5972,
+  'projectOverview.md': 6484,
+  'docs/implementation-backlog.md': 6057,
   'CLAUDE.md': 988,
 };
 
