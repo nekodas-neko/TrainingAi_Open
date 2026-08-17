@@ -5,7 +5,7 @@ _Domain: `workouts` · Branch: `claude/exercise-deload-scoping-1wy79m` (reset to
 > **Read first:** `projectOverview.md` (status + the three new `[workouts]` Known-Issues rows), then
 > [`docs/domains/workouts/README.md`](domains/workouts/README.md), then
 > [`docs/implementation-backlog.md`](implementation-backlog.md) (Q-52). The session journal entry
-> ([`docs/overview/entries/2026-08-03-exercise-deload-scoping.md`](overview/entries/2026-08-03-exercise-deload-scoping.md))
+> ([`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md))
 > has the full narrative; this file covers what to do next.
 >
 > Adjacent prior work on the same card:

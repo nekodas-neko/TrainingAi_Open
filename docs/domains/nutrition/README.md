@@ -29,14 +29,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 - [`docs/superpowers/plans/2026-08-11-meal-plan.md`](../../superpowers/plans/2026-08-11-meal-plan.md)
   — **Meal Plan** (Q-186). Carries six decisions with reasoning; D1 deliberately deviates from the
   owner's ask (chain picker, not geolocation). **Shipped** 2026-08-11 across three releases:
-  [`entries/2026-08-11-meal-plan-phase-1.md`](../../overview/entries/2026-08-11-meal-plan-phase-1.md)
+  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)
   (v1.282.0/v1.283.0 — schema, setup flow, restrictions picker, itemised meals, manage sheet) and
-  [`entries/2026-08-11-meal-plan-portions-and-controls.md`](../../overview/entries/2026-08-11-meal-plan-portions-and-controls.md)
+  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)
   (v1.287.0 — portion scaling, per-meal reroll, macro bars, structural edits). Phase 2 prefill is
   Q-187, now unblocked. **Editing a saved plan and building one around meals you already eat**
   (Q-192/Q-193, v1.288.0):
-  [`entries/2026-08-11-meal-plan-edit-and-your-own-meals.md`](../../overview/entries/2026-08-11-meal-plan-edit-and-your-own-meals.md).
-- [`entries/2026-08-12-saved-meals-search-and-sheet-header.md`](../../overview/entries/2026-08-12-saved-meals-search-and-sheet-header.md)
+  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md).
+- [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)
   — **ingredient search reaches Open Food Facts**, gram-level meal editing, and the app-wide
   `SheetHeader` close-button clearance (v1.290.0). Read it before touching `SheetHeader` or the
   external-food path; it carries the tailwind-merge override trap and the OFF serving-size bug.
@@ -44,7 +44,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   — **batch servings, plan top-up, reorder and instructed edits** (Q-207…Q-210), from owner testing
   on the S25. Carries the measurement behind Q-210: the plan **scales a saved meal and never adds to
   it**, so a 63P/15C meal in an 83C slot cannot get there at any allowed factor. Slice A shipped as
-  v1.292.0 ([`entries/2026-08-12-saved-meal-servings.md`](../../overview/entries/2026-08-12-saved-meal-servings.md)).
+  v1.292.0 ([`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)).
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

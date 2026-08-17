@@ -39,7 +39,7 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
    `scripts/private-paths.json`)
 6. [`docs/device-agnostic-source-architecture.md`](../../device-agnostic-source-architecture.md) —
    the raw-capable vs computed source tiers, and
-   [`docs/overview/entries/2026-08-02-health-connect-source-tier.md`](../../overview/entries/2026-08-02-health-connect-source-tier.md)
+   [`docs/../overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)
    for what tiers 1-2 actually landed as (Q-43): sleep has one write path with a required `source`,
    Health Connect stage intervals become a `sleep_phase_5_min` hypnogram, and the readiness
    composite runs without a ring. **Nothing in it has run against a real Health Connect provider.**
@@ -89,14 +89,14 @@ Live at the time of writing (2026-07-30):
   an unreachable strap by design and nothing re-armed them, so a strap put on after launch needed
   an app restart. Fixed via `retryAmbient()` + a foreground tick; the BLE half cannot be exercised
   in the sandbox. See
-  [`docs/overview/entries/2026-08-05-more-tab-refresh-and-strap-retry.md`](../../overview/entries/2026-08-05-more-tab-refresh-and-strap-retry.md).
+  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - 🟠 **Sleep/HRV/breathing metrics changed scale at the BLE re-key** with no conversion — open.
 - 🟢 **Clock anchors are stamped at server batch-receive time, not ring-capture time (Q-71,
   unblocked 2026-08-12)** — traced to `insertOuraRawSamples`'s `anchorUtc = new Date()`; the
   already-shipped `resolveDsToMs` robust-offset fix (Q-139) tests clean against real sleep history
   (uniform −3min) and just needs wiring to the sleep/HR/temperature converter. See
   [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) I25 and
-  [`docs/overview/entries/2026-08-12-oura-ble-anchor-drain-lag-investigation.md`](../../overview/entries/2026-08-12-oura-ble-anchor-drain-lag-investigation.md).
+  [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md).
 - 🟡 **Eight device-owned `oura_daily_derived` columns have no producer** (Q-7b) — open.
 - ⏳ **Ring clock anchors are append-only observations** — phase 1 of 2, currently inert.
 - The D1/D2 on-device restore and raw-store tracks are largely **shipped server-side but

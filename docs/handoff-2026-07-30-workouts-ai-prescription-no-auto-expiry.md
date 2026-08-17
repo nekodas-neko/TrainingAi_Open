@@ -5,7 +5,7 @@ _Domain: `workouts` · Branch: `claude/workout-dismissal-vfrq3b` · PR: [#955](h
 > **Read first:** `projectOverview.md` (Known Issues → `[workouts] AI prescription silent
 > auto-dismiss + generation moved to pre-workout`), then `docs/domains/workouts/README.md`, then
 > this file. The session journal entry
-> ([`docs/overview/entries/2026-07-30-workout-dismissal-vfrq3b.md`](overview/entries/2026-07-30-workout-dismissal-vfrq3b.md))
+> ([`docs/overview/overview/history-2026-07-30.md`](overview/history-2026-07-30.md))
 > has the full investigation narrative if you need it; this file covers only what to do next.
 
 ## Goal

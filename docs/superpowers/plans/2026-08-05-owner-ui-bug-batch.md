@@ -3156,7 +3156,7 @@ suppression window at `emergency-deload.ts:19` should change too, since it reads
 > rows render the fields the data model already had (distance, calories, HR, pace, elevation).
 > **⚠️ Not device-verified** — the striped-bar CSS mask in particular is an unobserved Samsung
 > WebView question. Full detail:
-> [`entries/2026-08-15-nutrition-day-guard-and-deload-bar.md`](../../overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md).
+> [`docs/overview/history-2026-08-15.md`](../../overview/history-2026-08-15.md).
 > The investigation below is kept as the historical record of what was found before implementation.
 
 - **Branch:** `fix/health-day-detail-energy-and-deload-bar`
@@ -3226,7 +3226,7 @@ screen. `ActivitySection` (`components/health/day-detail/day-sections.tsx:123-14
 > `drop`/`keep`/`replace`. **⚠️ Not device-verified** — the swipe gesture itself was never driven in
 > a browser (Playwright isn't a dependency here); the decision function is unit-tested, the gesture
 > wiring around it is not. Full detail:
-> [`entries/2026-08-15-nutrition-day-guard-and-deload-bar.md`](../../overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md).
+> [`docs/overview/history-2026-08-15.md`](../../overview/history-2026-08-15.md).
 
 - **Branch:** `fix/nutrition-stale-day-swipe-food-logs`
 - **Reported:** owner-reported, 2026-08-14 (screenshot: Nutrition page, fresh today, `Eaten 0`): "on
@@ -3290,7 +3290,7 @@ occurrences together — one bug, not three.
 > remains unconfirmed**, and a second possible cause stays open: if `onSaved` was never firing at all
 > (not just delayed), the card now flips regardless but the underlying write could still be failing
 > silently — watch for a readiness log that never reaches the server. Full detail:
-> [`entries/2026-08-15-readiness-card-optimistic-flip.md`](../../overview/entries/2026-08-15-readiness-card-optimistic-flip.md).
+> [`docs/overview/history-2026-08-15.md`](../../overview/history-2026-08-15.md).
 
 - **Branch:** `fix/readiness-card-stuck-after-save`
 - **Reported:** owner-reported, 2026-08-15 (screenshot: Home, readiness sheet just closed): "add
