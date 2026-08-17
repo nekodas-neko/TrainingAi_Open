@@ -157,12 +157,14 @@ export function RequiredInfoSection({
 
       {/* Biological Sex */}
       <div className="px-4 py-3 space-y-1.5">
-        <Label className="text-xs text-muted-foreground">Biological Sex</Label>
-        <div className="flex gap-2">
+        <p id="goals-sex-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Biological Sex</p>
+        <div className="flex gap-2" role="radiogroup" aria-labelledby="goals-sex-label">
           {(['male', 'female', 'other'] as const).map(opt => (
             <button
               key={opt}
               type="button"
+              role="radio"
+              aria-checked={sex === opt}
               disabled={saving}
               onClick={() => onSexChange(sex === opt ? '' : opt)}
               className={[
@@ -197,14 +199,16 @@ export function RequiredInfoSection({
 
       {/* Activity Level */}
       <div className="px-4 py-3 space-y-2">
-        <Label className="text-xs text-muted-foreground">Activity Level</Label>
-        <div className="space-y-1.5">
+        <p id="goals-activityLevel-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Activity Level</p>
+        <div className="space-y-1.5" role="radiogroup" aria-labelledby="goals-activityLevel-label">
           {ACTIVITY_LEVELS.map(level => {
             const active = activityLevel === level
             return (
               <button
                 key={level}
                 type="button"
+                role="radio"
+                aria-checked={active}
                 disabled={saving}
                 onClick={() => onActivityLevelChange(active ? null : level)}
                 className={[
