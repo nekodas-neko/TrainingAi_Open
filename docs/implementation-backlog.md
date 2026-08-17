@@ -470,6 +470,14 @@ below threshold and left in place for next time.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
+- ⛔ **blocked: needs an owner decision before any code moves.** Skipped by Implementation Lane B on
+  2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
+  to be re-litigated against a real user's task, and the owner's report is the only evidence of what
+  that task actually is. An agent choosing the new structure alone would be repeating exactly the
+  mistake the entry describes — Q-234 reasoned taxonomically, correctly on paper, and was wrong in
+  use. What unblocks it: the owner walking the drain/re-sync/verify flow start to finish and saying
+  where they expected each step to live. That is a planning session's output (a plan doc), not a
+  Lane B implementation item.
 - **Branch:** `fix/device-console-ia`
 - **Added:** 2026-08-17, from an owner report while running the Oura re-sync runbook.
 - **This is feedback on a shipped change, not a new idea.** Q-234 landed 2026-08-15 (v1.313.0):
@@ -491,24 +499,6 @@ below threshold and left in place for next time.
   screens. Q-537's placement half — the key field should be nested behind something deliberate so it
   cannot be edited by accident — is best solved as part of this, not separately.
 - **Verification:** device-only. None of it is checkable from the sandbox.
-
-### [app-shell][devices] Q-532 — the BLE screen re-centres itself while a scan runs, making buttons hard to hit
-
-- **Branch:** `fix/ble-scan-scroll-jump`
-- **Added:** 2026-08-17, owner report during the Oura re-sync runbook.
-- **What it is.** *"The screen constantly moves to the centre while a scan is running — making it
-  hard to click buttons."* While a BLE scan/drain is active on `/admin/oura-ble`, the view keeps
-  scrolling back, so a control the user is aiming at moves out from under the tap.
-- **Where to look first.** The screen re-renders on every status/log update during a scan, so the
-  likely causes are a `scrollIntoView` / auto-scroll on new log lines, or a keyed remount that
-  resets scroll position on each poll. `components/oura-ble/oura-ble-debug.tsx` holds the log and
-  frame panels that update most frequently.
-- **Why it matters more than it sounds.** This screen is only ever used during a live drain — the
-  one situation where a mistimed tap can hit **Clear key** or interrupt a sync. An unstable layout
-  on a destructive control set is a safety problem, not just an annoyance.
-- **Verification:** reproduce on-device with a scan actually running; a static screenshot will not
-  show it, and the sandbox cannot scan at all.
-
 
 ### [activity][cardio] Q-450 — `/activity` reached without a type: Start works, Finish works, Save silently discards the activity
 

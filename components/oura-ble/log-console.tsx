@@ -1,8 +1,9 @@
 'use client'
 
-import { memo, useEffect, useRef } from 'react'
+import { memo, useRef } from 'react'
 import { Check, Copy, Trash2 } from 'lucide-react'
 import { useCopy } from '@/lib/use-copy'
+import { useScrollToBottom } from '@/lib/hooks/use-scroll-to-bottom'
 
 export const LogConsole = memo(function LogConsole({
   lines,
@@ -11,10 +12,9 @@ export const LogConsole = memo(function LogConsole({
   lines: string[]
   onClear?: () => void
 }) {
-  const endRef = useRef<HTMLDivElement>(null)
   const copyRef = useRef<HTMLTextAreaElement>(null)
   const { copied, copy } = useCopy()
-  useEffect(() => { endRef.current?.scrollIntoView({ behavior: 'auto' }) }, [lines.length])
+  const logRef = useScrollToBottom<HTMLDivElement>(lines.length)
 
   const text = lines.join('\n')
 
@@ -45,9 +45,8 @@ export const LogConsole = memo(function LogConsole({
           )}
         </div>
       </div>
-      <div className="h-64 overflow-y-auto rounded-md border border-border bg-muted/30 p-2 font-mono text-[10px] leading-4 text-muted-foreground">
+      <div ref={logRef} className="h-64 overflow-y-auto rounded-md border border-border bg-muted/30 p-2 font-mono text-[10px] leading-4 text-muted-foreground">
         {lines.map((l, i) => <div key={i} className="whitespace-pre-wrap break-all">{l}</div>)}
-        <div ref={endRef} />
       </div>
       {/* Off-screen source for the WebView-compatible execCommand copy path. */}
       <textarea ref={copyRef} readOnly value={text} tabIndex={-1} aria-hidden className="pointer-events-none absolute -left-[9999px] h-px w-px opacity-0" />

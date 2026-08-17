@@ -63,6 +63,21 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][devices] ⚠️ Q-532 FIXED — a streaming panel no longer scrolls the page; NOT device-verified (v1.317.6, 2026-08-17)
+
+- **Cause:** `scrollIntoView` on a sentinel inside the log panel's `overflow-y-auto` box. It scrolls
+  **every** scrollable ancestor up to the document, so each log line during a drain moved the whole
+  `/admin/oura-ble` page — on the one screen where a mistimed tap can hit Clear key. Both call sites
+  now use `lib/hooks/use-scroll-to-bottom.ts` (`scrollTop` on the container, which cannot escape it).
+  The sibling sweep found a second, unreported instance: the workout-builder AI chat.
+- **NOT device-verified and not reproducible here** — the sandbox cannot run a BLE scan, so the
+  mechanism is identified but the symptom was never seen to disappear. **Owner check: run a drain,
+  confirm the page holds still.**
+- **No regression guard exists** — a capability gap: both vitest projects are `environment: 'node'`
+  with no `@testing-library/react`, and the route needs admin plus a live radio, so neither a
+  component test nor an E2E spec can reach it. Reintroducing the bug would fail nothing.
+- Detail: [`entries/2026-08-17-scroll-panel-page-jump.md`](docs/overview/entries/2026-08-17-scroll-panel-page-jump.md).
+
 ### [platform][devices] 🔴 Production hit `disk_full` during a full re-sync — and the indexes, not the data, are the bulk (2026-08-17)
 
 **Live fault, mitigated by raising the volume; the underlying sizing is unresolved.** During the
