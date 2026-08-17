@@ -32,6 +32,14 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   undetectable elsewhere (Q-273). Start here before touching any score — **but read its §1.3 against
   the calibration doc below, which found that finding (Q-271) was measured over eight days and does
   not hold over the series.**
+- [`docs/reviews/2026-08-17-score-presentation-audit.md`](../../reviews/2026-08-17-score-presentation-audit.md)
+  — **how the five pillars are actually presented (Q-281), 2026-08-17.** Read it before planning
+  **Q-278**: it contradicts two of that entry's premises with measurement. Absent scores are already
+  handled consistently everywhere (`—`, muted, band label suppressed — **never 0, never carried
+  forward**), so what is missing is only the *why*; and **daytime stress and resilience have no score
+  surface at all**, so "five pillars" may be three pillars and two derived values. Also:
+  `scoreAvailability` has exactly one consumer, and the `score-audit/` layer has **zero** user-facing
+  ones.
 - [`docs/reviews/2026-08-17-readiness-calibration.md`](../../reviews/2026-08-17-readiness-calibration.md)
   — **the Recovery Index contributor, calibrated against Oura's own contributor** on the 15 nights
   where both exist (2026-06-23 → 07-07, the only ground truth this metric has). Three things to carry
