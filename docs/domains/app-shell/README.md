@@ -104,6 +104,14 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-17-nutrition-tap-refuted.md`](../../overview/entries/2026-08-17-nutrition-tap-refuted.md)**
+  — 🆕 Q-309 **refuted**: a real touch tap on Nutrition's action row works. `.click()` in Playwright
+  dispatches a *mouse* sequence with no touch events, so the suspected `useDrag`/`filterTaps`
+  tap-swallowing cannot be the cause; `page.touchscreen.tap()` opens the sheet every time. The spec
+  now taps that way instead of `dispatchEvent`. Residue filed as **Q-354** (mouse click reaches the
+  element, handler does not run, this screen only) — low priority on a touch-only target, and its
+  entry says not to touch gesture code without a *touch* failure first.
+
 - **[`docs/overview/entries/2026-08-17-ai-insight-sufficiency-gate.md`](../../overview/entries/2026-08-17-ai-insight-sufficiency-gate.md)**
   — 🆕 Q-452: `AiInsightCard` fired on every mount and the route feeds the model the literal string
   `"no data"` for absent fields, which it reads as a measured zero. The card now takes a **required**

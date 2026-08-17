@@ -2829,37 +2829,27 @@ session working from a temporarily restored copy.
 > §7. **The per-row bucketing was done from headings, not by reading each row** — re-check a row
 > before claiming a capability closes it.
 
-### [nutrition][app-shell] Q-309 — a touch tap on Nutrition's action row does not activate the button; a synthesised click does
+### [app-shell] Q-354 — a mouse click on Nutrition's action row does nothing, and only on that screen
 
-- **Branch:** `fix/nutrition-tap-swallowed-by-date-swipe`
-- **Added:** 2026-08-16 · found by the Q-297 water write-path E2E spec, which could not open the
-  water sheet by tapping.
-- **Measured, and the two cases differ cleanly.** The E2E context runs
-  `devices['Galaxy S9+']` (`hasTouch`, `isMobile`), so Playwright's `.click()` dispatches a real
-  **touch** sequence. That sequence **never** opens the sheet — 20 s of waiting, and the failure
-  screenshot shows the plain Nutrition screen with the Water button visible and untouched. A
-  `dispatchEvent('click')`, which skips the pointer sequence entirely and invokes the React handler,
-  opens it **immediately**. Same element, same selector, same run.
-- **The obvious suspect is the date-swipe binding.** `app/nutrition/nutrition-content.tsx:513`
-  `useDrag(..., { axis: 'x', filterTaps: true, pointer: { touch: true } })`, spread onto the
-  scrolling container at line 575 that contains the whole action row. `filterTaps: true` is meant to
-  let a tap through; something about a zero-movement synthetic tap is not clearing it.
-- **This is a known class in this repo, which is why it is worth taking seriously.** CLAUDE.md
-  records pull-to-sync swallowing normal scrolling **twice** (sessions 150, 152) before a
-  movement-threshold lock was added, and the standing rule is that custom gesture handlers must
-  direction-lock before capturing. `components/pull-to-sync.tsx` is also mounted on this screen and
-  has not been ruled out.
-- **⚠️ What is NOT established: whether a human finger on the S25 reproduces this.** A synthetic
-  touch sequence has zero movement and near-zero duration, which is not identical to a real thumb.
-  It is entirely possible the harness is the anomaly. **Do not ship a gesture change off this
-  entry alone** — reproduce on the device first, or with a slower/jittered synthetic tap, and say
-  which. If it does reproduce on device it is a live bug on the owner's most-used write path.
-- **Whatever the verdict, the spec should stop needing `dispatchEvent`.** `e2e/water-log-write-path.spec.ts`
-  carries the workaround with this number in a comment; a spec that cannot tap the way a user taps is
-  testing something adjacent to the product.
-- **Check the sibling surfaces in the same pass** — Health and the day-detail screen carry the same
-  `useDrag` date-swipe pattern (`app/health/day/day-detail-content.tsx` copies it deliberately), so
-  if this is real it is not one screen.
+- **Branch:** `fix/nutrition-mouse-click-swallowed`
+- **Added:** 2026-08-17 · the residue of Q-309, which was **refuted** and removed (see below)
+- **Priority: low, and the reason is the canonical runtime.** The supported target is a touch-only
+  APK. A real touch tap works (measured). This only affects mouse input, which no supported user
+  produces — it is filed because it is unexplained and screen-specific, not because it hurts anyone.
+- **What is measured.** On `/nutrition`, Playwright's `.click()` on the Water action row dispatches
+  `pointerdown → mousedown → pointerup → mouseup`, a click event reaches the element, and the sheet
+  **never opens** (DOM polled 20× over 2 s — not an open-then-close). `page.touchscreen.tap()` on the
+  same element dispatches the full touch sequence and opens it every time. `.click()` on a button
+  outside this screen (`/more` → Edit Profile) works normally.
+- **The Q-309 hypothesis is refuted, so do not start from it.** Q-309 blamed the date-swipe
+  `useDrag` (`filterTaps: true`, `pointer: { touch: true }`) swallowing the tap. It cannot be that:
+  the failing sequence produces **no touch events at all** for `filterTaps` to act on. `pull-to-sync`
+  is also ruled out — it binds only touch listeners and is not mounted on this screen.
+- **What is still unknown:** why a click event that reaches the element does not run the handler on
+  this screen when it does elsewhere. Worth one careful look with React DevTools or by bisecting the
+  screen's wrappers; not worth a gesture rewrite.
+- **Do not "fix" this by changing gesture code** without reproducing a *touch* failure first. The
+  touch path is verified working, and a speculative change there would risk the path that matters.
 
 ### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
 

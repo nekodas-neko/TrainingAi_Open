@@ -3,10 +3,15 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **354**)
+**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **355**)
 
 ## Now
-Nothing in flight. Five items shipped today:
+Nothing in flight. Six items closed today:
+
+- **Q-309 REFUTED** — a real touch tap on Nutrition works; `.click()` sends a mouse sequence with no
+  touch events, so the suspected `filterTaps` tap-swallowing cannot be it. Spec now uses
+  `touchscreen.tap()`. Residue is **Q-354**.
+  [Journal](../../overview/entries/2026-08-17-nutrition-tap-refuted.md).
 
 - **Q-452** (v1.318.6) — the AI insight card commented on data that did not exist. `AiInsightCard`
   now takes a required `hasData`. **Client half only — the prompt half is Q-353, Lane A's.**
@@ -27,13 +32,12 @@ Work the queue top-down and take the highest Lane-B-owned item, re-verifying its
 
 Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B candidates in order:
 
-1. **Q-309** `[nutrition][app-shell]` — a touch tap on Nutrition's action row does not activate the
-   button; a synthesised click does. `e2e/water-log-write-path.spec.ts` documents this from the
-   harness side and works around it with `dispatchEvent('click')`.
-2. **Q-352** — the zero-data E2E fixture. Touches `scripts/local-db/`, which is neither lane's;
+1. **Q-352** — the zero-data E2E fixture. Touches `scripts/local-db/`, which is neither lane's;
    claim it in this baton first. Read the trap in its entry before starting. **Two dependants now**
    (Q-451 and Q-452 both shipped verified-but-unguarded for want of it).
-3. **Q-350** — the radiogroup keyboard sweep. Low priority.
+2. **Q-350** — the radiogroup keyboard sweep. Low priority.
+3. **Q-354** — the mouse-click residue of Q-309. Low priority, and its entry says do **not** change
+   gesture code without reproducing a *touch* failure first.
 4. **Q-531** — ⛔ blocked, see below.
 
 ## Blocked
@@ -54,6 +58,8 @@ Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B can
   `ActivityLogBody.durationMin` is `.positive()`, so the POST 400s and the activity is lost behind a
   generic toast. Measured (2 s → 400, 5 s → 201). The outbox parses the same schema.
 - **Q-352** — the E2E harness has no zero-data account, so no first-run bug can be guarded.
+- **Q-354** — a mouse click on Nutrition's action row reaches the element and the handler does not
+  run, this screen only. Touch works. Low priority on a touch-only target.
 - **Q-353** — **Lane A's to fix.** The health-insight prompt substitutes the literal `"no data"` for
   absent fields and the model reads it as a measured zero. Q-452 closed the fully-empty case from the
   client; a scored section missing one field still misreports.
@@ -75,6 +81,8 @@ None beyond the lane list in [`docs/agents/README.md`](../README.md) §3. **Q-35
 - **Q-450's guard belongs at the destination, not the call sites** — a cold open reaches `/activity`
   with no call site at all.
 - **`radiogroup` beat `group` + `aria-pressed`** for pick-one option sets (8 sites vs 1).
+- **Q-309's `filterTaps` hypothesis is refuted by measurement** — the failing input produces no
+  touch events at all. Do not re-derive it, and do not change gesture code off it.
 - **`coach-content.tsx`'s `scrollIntoView` is correct** — no inner scroll container, so the page is
   genuinely its scroller.
 - **Q-452 gates in the client, not the route** — a client gate costs no request at all, where a
