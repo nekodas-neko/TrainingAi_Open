@@ -17,15 +17,22 @@
  * *archived* repo, whose `apk-latest` release still exists and still returns 200. The update card
  * would go on reporting a version that never changes again, with nothing in the logs to say so.
  *
- * The default is the pre-cut repository, so behaviour is unchanged until the variable is set.
+ * The default is the pre-cut repository, which is now archived — so the variable is no longer
+ * optional in practice. Left as a fallback rather than made required because a throw here would
+ * take down the More screen over a stale env var, which is worse than a stale version number.
  */
 const APK_RELEASE_REPO = process.env.APK_RELEASE_REPO ?? 'nekodas-neko/TrainingAI'
 const RELEASE_URL = `https://api.github.com/repos/${APK_RELEASE_REPO}/releases/tags/apk-latest`
 
 /**
  * Why a lookup produced no version. A bare null was undiagnosable in production — it could mean
- * the token is missing, GitHub is down, or the release was mid-recreate — and the owner cannot act
- * on "null". `unconfigured` in particular is a Railway env var they can fix in a minute.
+ * GitHub is down or the release was mid-recreate — and the owner cannot act on "null".
+ *
+ * `unconfigured` is retained but is now unreachable from this module: it existed for a missing
+ * `GITHUB_RELEASES_TOKEN` back when the releases lived in a private repository, where an
+ * unauthenticated call could only 404. The repository is public, so no token is needed. The member
+ * stays in the union because `/api/version` publishes this value and a client pinned to the old
+ * shape should not meet an unknown string; drop it once nothing reads it.
  */
 export type ApkReleaseStatus = 'ok' | 'unconfigured' | 'unavailable'
 
@@ -85,21 +92,27 @@ export async function fetchLatestApkRelease(): Promise<ApkRelease | null> {
 
 /**
  * As `fetchLatestApkRelease`, but says *why* it failed. The release is deleted and recreated on
- * every publish, so a lookup landing in that window legitimately 404s — which is a different
- * problem from a missing token, and the two must not read the same.
+ * every publish, so a lookup landing in that window legitimately 404s — which is a transient
+ * condition the owner should not go looking for a cause behind.
  */
 export async function lookupLatestApkRelease(): Promise<{ release: ApkRelease | null; status: ApkReleaseStatus }> {
+  // No token needed since the repository went public (Q-49). It used to be required — an
+  // unauthenticated call to a private repo can only 404 — and its absence was reported as
+  // `unconfigured` rather than spending a request to rediscover that. The variable had in fact been
+  // unset in Railway since 2026-08-04, so this card had been dead the whole time; going public is
+  // what revives it, and dropping the requirement is what makes that true in code.
+  //
+  // Still sent when present, because an authenticated call gets 5,000 requests/hour against 60 for
+  // an anonymous one, per IP. Neither limit is close for this app, so treat the token as an
+  // optimisation and never as a dependency.
   const token = process.env.GITHUB_RELEASES_TOKEN
-  // The repo is private, so an unauthenticated call 404s. Fail with a distinct status rather than
-  // spending a request to discover the same thing.
-  if (!token) return { release: null, status: 'unconfigured' }
   // Bounded: this sits behind a user-facing card, and `fetch` has no default timeout, so a
   // stalled GitHub call would otherwise hang the More screen rather than fall back.
   const res = await fetch(RELEASE_URL, {
     headers: {
       Accept: 'application/vnd.github+json',
       'X-GitHub-Api-Version': '2022-11-28',
-      Authorization: `Bearer ${token}`,
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
     signal: AbortSignal.timeout(5_000),
     next: { revalidate: 300 },
