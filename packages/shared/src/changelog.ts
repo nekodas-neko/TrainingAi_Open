@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.318.3",
+    version: "1.318.4",
     date: "2026-08-17",
     changes: [
       "Admin: when a re-decode fails it now says why. It was reporting which database query failed and never the reason, so a timeout, a dropped connection and a permissions problem all looked identical \u2014 which is why the sleep-time re-decode failed three times without anyone being able to tell what was wrong.",
+    ],
+  },
+  {
+    version: "1.318.3",
+    date: "2026-08-17",
+    changes: [
+      "The Workout tab now tells a new account what to do instead of showing an empty card with a Start Workout button that did nothing. Before you have a program it says so and offers to create one; cardio and one-off activities were always available and still are.",
     ],
   },
   {

@@ -11,7 +11,7 @@
 10:33:52 / 10:34:11 and the clock is repaired — all 5,383 anchors are epoch 0, merged p10 lands 3 s
 from clean. But the **redecode that rewrites the 43 stored nights fails**, three attempts, always at
 `getOuraClockAnchor` (`adapter.ts:4530`), and the cause was unknowable because the rollup worker
-flattened errors with `err.message` alone. v1.318.3 fixes that reporting
+flattened errors with `err.message` alone. v1.318.4 fixes that reporting
 ([`entries/2026-08-17-rollup-worker-error-cause.md`](../../overview/entries/2026-08-17-rollup-worker-error-cause.md)).
 **Next Lane A session: ask the owner for the new error text, then diagnose.** Ruled out already —
 query speed (34 ms), connection exhaustion (11 of 500), the migration itself, and the worker as a

@@ -1,4 +1,4 @@
-## 2026-08-17 — the redecode reported which query failed and never why (v1.318.3)
+## 2026-08-17 — the redecode reported which query failed and never why (v1.318.4)
 
 Three redecode attempts, three identical reports:
 
