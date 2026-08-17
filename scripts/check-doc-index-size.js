@@ -123,6 +123,10 @@ const root = path.join(__dirname, '..');
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
 // an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
 // composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
+// Raised 2026-08-17 (Q-530 secret settled): backlog 6735 -> 6746. Q-530's step-3 gate flipped from
+// "blocked on the owner" to the settled decision, plus the two operational notes that stop the next
+// session misreading it — a stale container reading the variable as absent, and the fact that
+// nothing can verify either copy until the route exists.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -143,7 +147,7 @@ const BASELINE = {
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
   'projectOverview.md': 6679,
-  'docs/implementation-backlog.md': 6735,
+  'docs/implementation-backlog.md': 6746,
   'CLAUDE.md': 1010,
 
 };
