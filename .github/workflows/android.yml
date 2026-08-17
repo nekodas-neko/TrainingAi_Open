@@ -62,6 +62,38 @@ jobs:
         with:
           distribution: temurin
           java-version: '21'
+
+      # Without this, every APK this workflow published was signed with a different key.
+      # Gradle's fallback debug keystore is generated per machine and a runner is a fresh
+      # machine each run, so successive APKs refused to install over one another and the
+      # only way through was to uninstall first — which on an offline-first app drops any
+      # outbox mutation that has not yet reached the server.
+      #
+      # The key is a credential and is never committed. If the secret is absent the step
+      # skips and the build falls back to the old per-runner behaviour, so this cannot
+      # break a fork or a first run before the secret is set.
+      # The secret is read through `env` rather than interpolated into the script: a `${{ }}`
+      # inside `run:` is substituted as raw text, which both breaks on shell metacharacters
+      # and is a script-injection surface. `secrets` is also unavailable in a step-level `if`,
+      # so the absent case is handled in the script instead of as a condition.
+      - name: Restore the stable debug signing key
+        env:
+          KEY_B64: ${{ secrets.ANDROID_DEBUG_KEYSTORE_B64 }}
+        run: |
+          if [ -z "$KEY_B64" ]; then
+            echo "::warning::ANDROID_DEBUG_KEYSTORE_B64 is not set, so this APK is signed with a"
+            echo "::warning::throwaway per-runner key and will NOT install over an existing copy."
+            echo "::warning::The device has to uninstall first, which drops any unsynced outbox"
+            echo "::warning::mutations. See android/app/build.gradle for how to set it."
+            exit 0
+          fi
+          printf '%s' "$KEY_B64" | base64 -d > android/debug-signing.keystore
+          if [ ! -s android/debug-signing.keystore ]; then
+            echo "Decoded keystore is empty — the secret is set but malformed."
+            exit 1
+          fi
+          echo "Stable debug key restored; APKs will upgrade in place."
+
       - name: Kotlin unit tests
         working-directory: android
         run: ./gradlew :app:testDebugUnitTest --no-daemon
