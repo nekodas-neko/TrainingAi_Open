@@ -589,6 +589,13 @@ ehr     0     0     0     0   648   208   128   556     0
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-533** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
+- ⚠️ **This needs its own implementation plan before an implementer takes it.** §6 C of the retention
+  doc is a costed *option*, not a task breakdown — it settles that repacking is right and roughly what
+  it buys, and leaves open the three things an implementer would have to decide anyway: where the
+  dedup key goes (it currently includes `body_hex`, and it is what makes re-sends free — ops-doc I8),
+  how the rollup reader and redecode consume blobs instead of rows, and how one migration rewrites
+  1.1M rows without repeating Q-536. **Route this to a planning session first**; the implementer
+  session is the PR after that.
 - **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
   stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
   days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
