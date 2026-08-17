@@ -1495,31 +1495,23 @@ session working from a temporarily restored copy.
 - **The change:** one constant in `packages/shared/src/health/readiness-composite.ts` —
   `RECOVERY_INDEX_OPTIMAL_HOURS = 5` (was 6). **The estimator, smoothing window and 9% weight all
   stay as they are.**
-- **Why 5.** 15 nights (2026-06-23 → 2026-07-07) carry both Oura's own `recovery_index` contributor
-  and an overnight HR series — the only ground truth this contributor has, and it had not been used.
-  Fitted against it, the zero-bias anchor is **4.63 h** (leave-one-out 4.40–5.14, so no single night
-  drives it) and RMSE is flat from 4.5–5.25. **5** sits on that floor, is inside the LOO range, and
-  keeps a small negative bias (−2.7 vs −10.2 today) so it still errs toward under-scoring.
-- **Blast radius, measured over all 41 days with stored hours:** 40 of 41 days move (the one that
-  doesn't clamps at 100). Sub-score mean +7.4, max +16. **Readiness mean +0.67 pts, max +1.44 pts —
-  no day moves more than 1.5 points, and no day scores lower.** Mean sub-score 42.1 → 49.5; days
-  above 50 go 12 → 19; cost against a neutral 50 falls from 0.71 to 0.05 pts/day.
-- **What Q-271 got wrong**, all re-measured over 41 days instead of 8:
-  - *"Never above 50, on any day, ever"* — false. The contributor exceeds 50 on **12 of 41** days and
-    the persisted contributor records **exactly 100 on 2026-07-17**. Q-271's eight quoted values
-    (13, 18, 20, 21, 22, 28, 43, 48) are exactly 2026-08-08 → 2026-08-15, the worst stretch in the record.
-  - *"Costs roughly 2.2 readiness points every day"* — it costs **0.71**.
-  - *"The anchor may be mis-specified because we measure from the HR minimum"* — the direction is
-    right but the mechanism is not. The shipped argmin estimator correlates **r = +0.712** with
-    Oura's own contributor, **better than every stabilisation-style alternative tested** (best
-    alternative +0.636). Do not change the estimator; that hypothesis was tested and failed.
-- **Sequencing:** land **Q-273** (model versioning) first, or stamp a readiness model version in the
-  same PR — otherwise this makes 40 days of history incomparable with no marker saying why, which is
-  the exact problem Q-501 documents. Also fix the two stale `lib/health/recovery-index.ts` path
-  references (backlog + `adapter.ts:5518`); the file is at `packages/shared/src/health/`.
-- **Follow-up after shipping:** re-derive the zero-bias anchor on ~15 BLE-era nights. The fit is from
-  Cloud-era HR, and BLE overnight HR is measurably noisier (median sample-to-sample |Δbpm| 2.0 vs
-  1.0 at the same density). If the BLE-only anchor lands materially below 5, the input changed and
+- **Why 5.** Fitted against Oura's own `recovery_index` contributor over the 15 nights that carry both
+  it and an overnight HR series (2026-06-23 → 07-07), the zero-bias anchor is **4.63 h** (LOO
+  4.40–5.14) and RMSE is flat 4.5–5.25. **5** sits on that floor and keeps a small negative bias, so
+  it still errs toward under-scoring.
+- **Blast radius, all 41 days with stored hours:** 40 of 41 move (the other clamps at 100). Readiness
+  **mean +0.67 pts, max +1.44, none lower**. Days above 50 go 12 → 19; cost against neutral 50 falls
+  0.71 → 0.05 pts/day.
+- **What Q-271 got wrong** (it measured 8 days and generalised): "never above 50, ever" — the
+  contributor exceeds 50 on **12 of 41** days and hits **100 on 2026-07-17**; "~2.2 pts/day" — it is
+  **0.71**. Its eight quoted values are exactly 2026-08-08 → 08-15. **The estimator is sound** —
+  r = +0.712 vs Oura's, beating every stabilisation-style alternative tested (+0.636 best). That
+  hypothesis was tested and failed; do not change the estimator.
+- **Sequencing:** land **Q-273** (model versioning) first or stamp a readiness version in the same PR,
+  else 40 days of history become incomparable with no marker — the Q-501 problem. Also fix the stale
+  `lib/health/recovery-index.ts` paths (here + `adapter.ts:5518`); it lives in `packages/shared/src/health/`.
+- **Follow-up:** re-derive the anchor on ~15 BLE-era nights. The fit is Cloud-era, and BLE overnight HR
+  is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
 
 ### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
@@ -1528,25 +1520,20 @@ session working from a temporarily restored copy.
 - **Plan:** none yet
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
-- **Measured.** Comparing each persisted
-  `oura_daily_derived.readiness_contributors->'recoveryIndex'->>'score'` against the
-  `oura_daily_summary.recovery_index_hours` it derives from, **5 of 33 disagree** — 2026-07-16
-  (0.89 h → expected 15, persisted 4), 07-20 (2.32 → 39, persisted 4), 07-21 (1.94 → 32, persisted
-  23), 07-26 (0.97 → 16, persisted 13), 08-03 (3.21 → 54, persisted 29).
-- **Mechanism.** `oura_daily_summary` rows get recomputed (several were updated 2026-08-13); the
-  `oura_daily_derived` readiness rows computed from them are not recomputed in step. The two tables
-  drift apart silently.
-- **Why it matters beyond tidiness.** `oura_daily_derived.model_versions->>'readiness'` is **NULL on
-  all 33 rows**, so readiness carries no version stamp either. Between the two, there is no way to
-  tell whether a past readiness score changed because its inputs changed or because the model did —
-  which is precisely what any calibration or before/after comparison needs. The admin score-audit
-  panel presents a score alongside "the inputs that produced it" and on these five days that pairing
-  is false.
-- **Same class as Q-273** (only Body Battery stamps a model version). Consider one treatment for both.
-- **First action:** decide whether readiness rows should be recomputed when their summary is, or
-  whether the derived row should store the input values it actually used. The second is cheaper and
-  makes the row self-describing; the first keeps history correct but re-scores days silently, which
-  needs Q-273's version stamp first either way.
+- **Measured.** Each persisted `oura_daily_derived.readiness_contributors->'recoveryIndex'->>'score'`
+  against the `oura_daily_summary.recovery_index_hours` it derives from: **5 of 33 disagree** —
+  2026-07-16 (0.89 h → expected 15, persisted 4), 07-20 (2.32 → 39, persisted 4), 07-21 (1.94 → 32,
+  persisted 23), 07-26 (0.97 → 16, persisted 13), 08-03 (3.21 → 54, persisted 29).
+- **Mechanism.** `oura_daily_summary` rows get recomputed (several updated 2026-08-13); the derived
+  readiness rows built from them are not recomputed in step, so the two drift apart silently.
+- **Why it matters.** `model_versions->>'readiness'` is **NULL on all 33 rows** too, so there is no way
+  to tell whether a past readiness score moved because its inputs changed or because the model did —
+  exactly what any calibration needs. The admin score-audit panel pairs a score with "the inputs that
+  produced it", and on these five days that pairing is false. **Same class as Q-273** — consider one
+  treatment for both.
+- **First action:** decide whether derived rows get recomputed with their summary, or store the input
+  values they actually used. The second is cheaper and self-describing; the first re-scores days
+  silently and needs Q-273's version stamp first either way.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

@@ -522,22 +522,19 @@ one backlog entry per finding, **Q-271 … Q-284**.
   `previousNight` (16% of readiness) and `sleepBalance` (10%). **This is the sweep Q-225 asked for,
   and it found at least one more night sharing 08-13's signature.**
 - **🟠 The Recovery Index anchor is ~1 h too high — Q-271 SUPERSEDED by Q-500 (2026-08-17).** The
-  original finding ("never above 50, ever", "~2.2 points/day") was measured over **eight** days and
-  does not survive the full series: over 41 days the contributor exceeds 50 on **12** of them, hits
-  **100 on 2026-07-17**, and costs **0.71** points/day, not 2.2. What is real is a systematic
-  **−10.2-point** bias: fitted against Oura's own `recovery_index` contributor on the 15 nights where
-  both exist, the zero-bias anchor is **4.63 h** (LOO 4.40–5.14), not 6. The shipped estimator is
-  **sound** (r = +0.712 vs Oura's, better than every alternative tested) and must not be changed.
+  original finding ("never above 50, ever", "~2.2 points/day") was measured over **eight** days: over 41
+  the contributor exceeds 50 on **12**, hits **100 on 2026-07-17**, and costs **0.71** points/day. What
+  is real is a systematic **−10.2-point** bias — fitted against Oura's own `recovery_index` contributor
+  on the 15 nights where both exist, the zero-bias anchor is **4.63 h** (LOO 4.40–5.14), not 6. The
+  shipped estimator is **sound** (r = +0.712, beating every alternative tested) and must not change.
   Proposal: `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5, moving 40 of 41 days by at most **1.44** readiness
   points. **⛔ Blocked on owner sign-off.**
   [`docs/reviews/2026-08-17-readiness-calibration.md`](docs/reviews/2026-08-17-readiness-calibration.md)
 - **🟠 A stored readiness score cannot be re-derived from the inputs stored beside it (Q-501, 2026-08-17).**
-  `oura_daily_summary` rows get recomputed; the `oura_daily_derived` readiness rows built from them do
-  not follow. **5 of 33** persisted `recoveryIndex` sub-scores disagree with the hours they derive from
-  (worst: 2026-07-20, 2.32 h should give 39, persisted 4). `model_versions->>'readiness'` is **NULL on
-  all 33 rows**, so there is no way to tell whether a past readiness score moved because its inputs
-  changed or because the model did. Same class as Q-273; the admin score-audit panel pairs a score with
-  inputs that on those days did not produce it.
+  `oura_daily_summary` rows get recomputed; the derived readiness rows built from them do not follow, so
+  **5 of 33** persisted `recoveryIndex` sub-scores disagree with their stored hours (worst: 2026-07-20,
+  2.32 h should give 39, persisted 4). `model_versions->>'readiness'` is **NULL on all 33 rows**, so a
+  past readiness shift cannot be attributed to inputs or model. Same class as Q-273.
 - **🟠 Body Battery v5 drains 5× faster than it charges (Q-272).** v5 halved `CHARGE_RATE` to fix
   ceiling-pinning and overshot: charge 10.5/day vs drain 52.4/day, **ends at its daily minimum on 10
   of 12 days**, hits 0 on 3. Across all 40 days it never rises above its waking value on a third of
