@@ -40,6 +40,8 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-450 — the guided-walk summary's Done button lands on the untyped `/activity` screen). Findings Q-450…Q-455; four areas recorded **clean**.
+
 ## Open issues
 
 ```bash
