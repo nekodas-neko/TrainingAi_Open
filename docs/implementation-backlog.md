@@ -2471,6 +2471,22 @@ session working from a temporarily restored copy.
 - **Related:** the always-null columns (`training_load_ots`, `recovery_index_hours`,
   `active_calories_est`, …) are Q-7b / Q-270 / Q-184 and are **not** in scope here; this entry is
   about the middle band that has a producer and fires on half the days.
+- **⚠️ Two of this entry's premises are wrong, measured by Q-281's audit 2026-08-17
+  ([doc](reviews/2026-08-17-score-presentation-audit.md) §3–§4). Read them before planning:**
+  1. **"What a user sees today … typically a gap, a carried-forward value, or nothing, depending on
+     the surface" is not what the code does.** Every surface audited independently arrived at the
+     same behaviour: Home and day-detail render `—`; the detail hero renders `—` with a muted ring
+     **and suppresses the band label** so a null cannot borrow "Low"; the timeline, day-sections,
+     sleep card and stress tiles hide the element entirely. **No surface renders a null as 0, and
+     none carries yesterday's value forward.** What is missing is only the *why*. That makes this a
+     one-layer addition, not a defect sweep — a much smaller job than the entry implies.
+  2. **Two of the five "pillars" have no score surface to fix.** Daytime stress appears only as two
+     *minute* tiles inside `/health/activity`; resilience only as one conditional tile in
+     `/health/readiness`. Decide whether they are pillars before generalising a coverage
+     representation over five of them — the table above may be measuring three pillars and two
+     derived values.
+  - Scope item 1 ("generalise `ScoreAvailability`") has exactly **one** migration site,
+    `components/health/readiness-breakdown.tsx`, so it is cheaper than it reads.
 
 ### [workouts][readiness] Q-279 — ACWR drives two user-facing behaviours on evidence that has substantially collapsed
 
@@ -2521,6 +2537,25 @@ session working from a temporarily restored copy.
 - **Sequencing:** this is presentation over numbers that Q-500/Q-272/Q-275/Q-277 are all about to
   change. Do the **audit** now (it is cheap and its output is durable); hold the **UI work** until
   the model changes settle, or it gets done twice.
+- **✅ The audit is DONE (2026-08-17, Lane B) —
+  [`docs/reviews/2026-08-17-score-presentation-audit.md`](reviews/2026-08-17-score-presentation-audit.md).**
+  Fourteen surfaces, each scored for contributors / trend / action. **Nine of fourteen render a score
+  with no contributors and no trend**, and exactly one surface has all three. The
+  colour-only-state first pass shipped with it (v1.318.10): the Home "accentring" style's band dot
+  now carries its word, guarded by a mutation-checked `e2e/score-band-not-colour-only.spec.ts`.
+  **`FactorBar` is a literal match for the rule and was deliberately NOT changed** — the sub-score is
+  rendered as text beside the bar, so the state is already in a non-colour channel; the doc records
+  why, so it is not re-filed as a violation.
+- **Three corrections the audit made to this entry's own premises, worth reading before planning:**
+  (a) `packages/shared/src/health/score-audit/` has **zero user-facing consumers** (two admin routes,
+  one admin tab, one producer) — a plan that says "wire up the existing layer" is building the first
+  consumer, not the second; (b) `scoreAvailability` has exactly **one** consumer,
+  `readiness-breakdown.tsx`; (c) **daytime stress and resilience have no score surface at all** —
+  stress is two *minute* tiles nested in `/health/activity`, resilience is one conditional tile in
+  `/health/readiness`. The five pillars are not five peers.
+- **What is LEFT here is the UI work only, and it stays held** per the sequencing above. The audit's
+  own recommendation: **trend is the missing dimension, not contributors** (contributors are
+  genuinely inapplicable to a chip or a timeline row; a 7-day sparkline is not).
 
 ### [platform][app-shell] Q-282 — no automated accessibility check exists anywhere in CI
 
