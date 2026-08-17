@@ -762,63 +762,32 @@ below threshold and left in place for next time.
   cannot be edited by accident — is best solved as part of this, not separately.
 - **Verification:** device-only. None of it is checkable from the sandbox.
 
-### [activity][cardio] Q-450 — `/activity` reached without a type: Start works, Finish works, Save silently discards the activity
+### [activity][platform] Q-351 — an activity under 3 seconds is rejected by the API and lost, with a bare "Failed to save activity"
 
-- **Branch:** `fix/activity-untyped-entry-silent-save-loss`
-- **Added:** 2026-08-17 · review sweep (failure-cells lens, **reproduced in a browser**) ·
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
-- **Placement:** top of the queue. This one **loses a completed activity with no error
-  message**, and the recording flow up to that point works perfectly, so the user has no reason to
-  suspect anything until the data is gone.
-- **Observed, not inferred.** Signed in against the seeded local DB, navigated to `/activity`, and
-  drove it through Playwright at 412×915:
-
-  | Step | Observed |
-  |---|---|
-  | Load `/activity` | Renders. Full text of the screen is **`"Title\nStart"`** — 58 KB of HTML, 11 characters of text |
-  | Tap **Start** | Works. Active screen, timer running (`0:05 / Pause / Finish`) |
-  | Tap **Finish** | Works. Summary renders (`0.1 / min / Discard / Save`) |
-  | Tap **Save** | **Nothing.** No toast, no error, no navigation, no state change, **zero network requests**. `select count(*) from activity_logs` = 0 afterwards |
-
-- **Root cause — `components/activity/done-activity-screen.tsx:167`:**
-  ```ts
-  async function handleSave() {
-    if (!activityType || !startMs || !endMs || !draftSummary) return
-  ```
-  With `activityType === null` this returns before `setSaving(true)` — before the local
-  `store.upsertActivityLog`, before the outbox `queueMutation`, and before the `/api/activity-logs`
-  web fallback. **Discard is the only working control on that screen.** This is the `CLAUDE.md`
-  *"No silent fallbacks on failure paths"* rule and the *"UI feedback fires synchronously"* rule
-  failing in the same guard.
-- **Why the untyped state is normal, not exotic.** `components/activity/activity-screen.tsx` renders
-  `PreActivityScreen` whenever `mode === 'pre'` with **no guard on `activityType`**. The store's
-  initial state (`lib/stores/activity-store.ts:71-74`) is `activityType: null, activityLabel: '',
-  activityIcon: ''`, and `resetSession()` (`:180`) restores exactly that — and `resetSession()` runs
-  **after every successful save** and **on the back button inside `PreActivityScreen` itself**
-  (`pre-activity-screen.tsx:24`). So this is where the store sits *between* activities.
-- **Why the screen gives no warning.** The `<h1>` and the type caption both bind `activityLabel`,
-  which is `''`; `getActivityIcon('')` falls through to a placeholder ellipsis glyph. The user sees a
-  back chevron, a dotted circle, an unlabelled "Title" field and a working Start button.
-- **Two in-app paths reach it.** `startActivity()` has exactly two callers repo-wide —
-  `components/workout/log-activity-sheet.tsx:42` (the picker) and
-  `components/running/running-plan-content.tsx:204` — and **both set the type correctly before
-  pushing**. The two that do not:
-  - `components/coach/handoff-card.tsx:16` — `log_activity: { href: "/activity", … }`, a plain
-    `<Link>` in the AI Coach's fixed destination map. Nothing sets a type.
-  - `components/guided-walk/walk-summary.tsx:286` —
-    `onClick={() => { onDone(); router.push('/activity') }}`, the only exit from the guided-walk
-    summary. `onDone` is the *guided-walk* store's reset; **nothing in `components/guided-walk/`
-    imports `useActivityStore`** (verified), so this lands on whatever the activity store last held.
-
-  Plus a cold open on `/activity`, `lib/native/run-status-chip.ts:73`'s
-  `window.location.assign('/activity')`, and any refresh of the URL.
-- **Fix shape (implementer's call, not prescribed here).** Either guard the entry — render a type
-  picker or redirect when `activityType == null` instead of a blank Pre screen — or make the two
-  offending navigations set a type first, or both. Whatever else changes, `handleSave`'s bail-out
-  must stop being silent: it is the last line of defence and it currently fails without a word.
-- **NOT device-verified.** Reproduced in the web build, where `getLocalStore` returns null and the
-  run took the web fallback. The `:167` guard sits above the local-store branch too, so on device the
-  bail-out is if anything earlier — but that is reasoning, not an observation.
+- **Branch:** `fix/activity-zero-duration-reject`
+- **Lane:** **A** — the schema is `packages/shared/src/validation/activity-log.ts` and the route is
+  `app/api/activity-logs/route.ts`, both Lane A. Lane B found it and is not taking it.
+- **Added:** 2026-08-17 · found by the Q-450 E2E spec, **measured, not inferred**
+- **The mechanism, end to end.** `activity-store.ts:136` computes
+  `durationMin = Math.round((activeMs / 60000) * 10) / 10` — one decimal place. Anything under
+  **3 real seconds** therefore rounds to exactly `0`. `ActivityLogBody.durationMin` is
+  `z.number().positive()`, so `0` fails validation, the route returns a bare
+  `400 {"error":"Invalid body"}`, and `done-activity-screen.tsx`'s catch shows
+  `toast.error('Failed to save activity')`. The recording is discarded.
+- **Measured both sides.** The Q-450 spec recorded 2 s and got `POST /api/activity-logs 400`, with
+  `activity_logs` still empty; at 5 s the identical path returned `201` and the row landed with
+  `duration_min = 0.1`. The spec now waits 5 s and says why.
+- **Why it is worth fixing even though 3 seconds is a mis-tap.** The user is told the save
+  *failed*, not that the activity was too short, and there is no way back to the data — the same
+  "your activity is gone" outcome as Q-450, one layer down and behind a generic message. It is also
+  the shape that hides: any future rounding change to `durationMin` widens the dead zone silently.
+- **Fix shape (Lane A's call).** Either clamp/floor `durationMin` to the schema's minimum before it
+  is sent, or relax `.positive()` to `.nonnegative()` on a field that is already `.optional()`, or
+  refuse the save in the UI with a message that names the reason. Whichever is chosen, the generic
+  toast must stop standing in for "too short to record".
+- **Note the outbox path shares this schema** — `pushMutations` parses with the same
+  `ActivityLogBody`, so a sub-3-second activity queued offline is a poison-pill candidate, not just
+  a failed web POST. Check it against the "one bad mutation must never wedge the queue" rule.
 
 ### [workouts][app-shell] Q-451 — a brand-new account's Workout tab is a giant empty card with a dead "Start Workout" button
 

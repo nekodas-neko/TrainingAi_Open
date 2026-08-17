@@ -224,15 +224,15 @@ the next device change.
   seeded local Postgres, driven through the repo's Playwright harness at 412×915 and with `curl`
   against a live session cookie. Full write-up, with every query and the reproduction:
   [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](docs/reviews/2026-08-17-failure-cells-running-the-app.md).
-- **🔴 Q-450 — `/activity` reached without a type silently discards a completed activity.** The Pre
-  screen renders with no guard on `activityType`; its entire rendered text is `"Title\nStart"`.
-  **Start works. Finish works. Save does nothing** — no toast, no error, no navigation, zero network
-  requests — because `done-activity-screen.tsx:167` bails on `!activityType` before the local write,
-  the outbox queue and the web fallback. `activity_logs` stayed empty. Discard is the only working
-  control. Two in-app paths reach it: the AI Coach's `log_activity` handoff card
-  (`coach/handoff-card.tsx:16`, a bare `<Link href="/activity">`) and the guided-walk summary's Done
-  button (`walk-summary.tsx:286`) — and `resetSession()` leaves the store untyped after **every**
-  successful save, so it is the state the store normally sits in.
+- **✅ Q-450 FIXED (v1.318.1) — `/activity` without a type recorded an activity and discarded it on
+  Save**, with no toast, error or network request, because `done-activity-screen.tsx` bailed on
+  `!activityType` before the local write, the outbox and the web fallback alike. Reached from the
+  Coach handoff, the guided-walk Done button, a cold open or a refresh — and `resetSession()` leaves
+  the store untyped after **every** save. It now shows a type picker instead of a recordable blank
+  screen, and the bail-out toasts. Guarded by `e2e/activity-untyped-entry.spec.ts`, mutation-checked.
+  **Not device-verified** — the web fallback ran, not SQLite+outbox. The spec exposed a second defect
+  the bail-out was masking, filed as **Q-351** (Lane A): a sub-3-second activity rounds `durationMin`
+  to 0, which `.positive()` rejects as a bare 400. [Journal](docs/overview/entries/2026-08-17-activity-untyped-entry.md).
 - **🔴 Q-451 — a brand-new account's Workout tab is a ~1,400 px empty card with a dead button.**
   `/workout-select` with no program renders a lone 💪 and a **Start Workout** button that is not
   disabled and does nothing when tapped (`workout-select-content.tsx:412` short-circuits on a missing
@@ -258,8 +258,8 @@ the next device change.
   `getLocalStore()` returns null, so every offline-first domain took its web fallback and the device
   branch — the canonical runtime — was never exercised. No safe-area, Samsung-WebView, native-plugin
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
-- **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit at
-  the top of `docs/implementation-backlog.md` (Q-310 above them has since shipped and been removed).
+- **Q-450 has since shipped (Lane B, v1.318.1) and is struck above; the other five stay queued**, with
+  Q-451 now the top one in `docs/implementation-backlog.md`.
 ### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
 
 - Owner: stock ring lasts 7 days; on our build it loses ~20% overnight and needs charging every 2
