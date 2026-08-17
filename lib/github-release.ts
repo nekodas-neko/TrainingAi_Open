@@ -17,11 +17,17 @@
  * *archived* repo, whose `apk-latest` release still exists and still returns 200. The update card
  * would go on reporting a version that never changes again, with nothing in the logs to say so.
  *
- * The default is the pre-cut repository, which is now archived — so the variable is no longer
- * optional in practice. Left as a fallback rather than made required because a throw here would
- * take down the More screen over a stale env var, which is worse than a stale version number.
+ * The default is this repository, so an unset variable degrades to "correct" rather than to a
+ * silent dead end (Q-457). It used to default to the pre-cut `nekodas-neko/TrainingAI`, which is
+ * archived and private: with the variable unset or missed on a new environment, the app read
+ * releases from a repo whose APK never changes again, and the failure surfaced as
+ * "Could not fetch release info" rather than as a misconfiguration. A public clone got the same
+ * dead end out of the box, against a repo it cannot read at all.
+ *
+ * Still a fallback rather than a required variable: throwing here would take down the More screen
+ * over a stale env var, which is worse than a stale version number.
  */
-const APK_RELEASE_REPO = process.env.APK_RELEASE_REPO ?? 'nekodas-neko/TrainingAI'
+const APK_RELEASE_REPO = process.env.APK_RELEASE_REPO ?? 'nekodas-neko/TrainingAi_Open'
 const RELEASE_URL = `https://api.github.com/repos/${APK_RELEASE_REPO}/releases/tags/apk-latest`
 
 /**

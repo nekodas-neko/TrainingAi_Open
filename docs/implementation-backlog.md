@@ -910,33 +910,6 @@ too, so the Balance card's "burned" figure is dragged down in step.
   nothing plays that role for this project's own users' identifiers. Whether that wants a second list
   or a widening of the existing one is a design decision; see the review's closing section.
 
-### [platform][app-shell] Q-457 — `lib/github-release.ts` still defaults to the archived private repo
-
-- **Branch:** `fix/apk-release-repo-default`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** upper-mid. One line, and it removes a silent failure mode on a user-visible surface
-  that **has already been dead for two weeks once**.
-- **What.** `lib/github-release.ts:24`:
-  ```ts
-  const APK_RELEASE_REPO = process.env.APK_RELEASE_REPO ?? 'nekodas-neko/TrainingAI'
-  ```
-  The fallback is the **pre-cut, archived, private** repo. Correct before the migration, wrong after.
-- **Two ways it bites.**
-  - *Deployment:* if `APK_RELEASE_REPO` is ever unset, cleared, or missed on a new environment, the
-    app reads releases from an archived repo whose APK never changes again — and it fails
-    **silently-looking**, as a 404 surfacing as "Could not fetch release info" rather than as a
-    misconfiguration. `CLAUDE.md` records that this exact surface was dead for two weeks over the
-    related `GITHUB_RELEASES_TOKEN` question, which is why the *shape* matters more than the odds.
-  - *Public clone:* the default points at a repo the cloner cannot read at all, so the update card
-    and More → Download APK are broken out of the box with no indication why.
-- **NOT verified against the deployment.** This session cannot see Railway's environment;
-  `CLAUDE.md` asserts `APK_RELEASE_REPO` is set to the public repo. **This is about the default being
-  a trap, not a live outage** — do not write it up as one.
-- **Fix shape:** default to `nekodas-neko/TrainingAi_Open`, and update the two fixtures at
-  `lib/__tests__/github-release.test.ts:49,58`, which pin the old repo's URL and so would not catch
-  the flip.
-
 ### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
 
 - **Branch:** `fix/publish-dry-run-build-gate`

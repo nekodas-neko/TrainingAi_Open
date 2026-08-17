@@ -6,7 +6,11 @@
 **Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **355**)
 
 ## Now
-Nothing in flight. Seven items closed today:
+Nothing in flight. Eight items closed today:
+
+- **Q-457** — `lib/github-release.ts` defaulted `APK_RELEASE_REPO` to the archived private repo.
+  Now defaults to the public one, guarded by a test on the URL actually requested.
+  [Journal](../../overview/entries/2026-08-17-apk-release-repo-default.md).
 
 - **Q-352** — the E2E harness now has a zero-data account (`e2e/zero-data.setup.ts`), and Q-451 and
   Q-452 are guarded by `e2e/first-run-empty-states.spec.ts`. Carries a **correction** to yesterday's
@@ -66,8 +70,12 @@ Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B can
   client; a scored section missing one field still misreports.
 
 ## Claimed paths
-None beyond the lane list in [`docs/agents/README.md`](../README.md) §3. **Q-352 will need
-`scripts/local-db/`**, which is neither lane's — claim it here before touching it.
+- **`lib/github-release.ts`** + `lib/__tests__/github-release.test.ts` — neither lane lists them;
+  taken for Q-457 with Lane A's baton showing no claims. Release the claim when convenient.
+
+Otherwise the lane list in [`docs/agents/README.md`](../README.md) §3. Note **Q-352 did NOT need
+`scripts/local-db/`** in the end — the zero-data account is created by the Playwright setup instead,
+which is why the local/CI seeding asymmetry never arose.
 
 ## Do not re-litigate
 - The lane contract, authority limits and Q bands are settled in

@@ -46,7 +46,7 @@ describe('mapApkRelease', () => {
     body: BODY,
     published_at: '2026-08-04T09:20:07Z',
     assets: [
-      { name: 'app-debug.apk', browser_download_url: 'https://github.com/nekodas-neko/TrainingAI/releases/download/apk-latest/app-debug.apk' },
+      { name: 'app-debug.apk', browser_download_url: 'https://github.com/nekodas-neko/TrainingAi_Open/releases/download/apk-latest/app-debug.apk' },
     ],
   }
 
@@ -55,7 +55,7 @@ describe('mapApkRelease', () => {
       version: '1.255.1',
       sha: '8ff51fa',
       publishedAt: '2026-08-04T09:20:07Z',
-      apkUrl: 'https://github.com/nekodas-neko/TrainingAI/releases/download/apk-latest/app-debug.apk',
+      apkUrl: 'https://github.com/nekodas-neko/TrainingAi_Open/releases/download/apk-latest/app-debug.apk',
     })
   })
 
@@ -88,6 +88,29 @@ describe('lookupLatestApkRelease', () => {
     } finally {
       fetchSpy.mockRestore()
       if (prev !== undefined) process.env.GITHUB_RELEASES_TOKEN = prev
+    }
+  })
+
+  // Q-457. The two payload fixtures above carry a repo URL but prove nothing about which repo is
+  // *asked*, so the default could be flipped back to the archived private repo without a single test
+  // failing — which is exactly how it survived the migration. This asserts the URL instead.
+  it('defaults to the public repo when APK_RELEASE_REPO is unset', async () => {
+    const prev = process.env.APK_RELEASE_REPO
+    // The module reads the variable once, at import — so this asserts the default that was baked in
+    // when the suite loaded, which is the configuration a fresh environment gets.
+    expect(prev, 'APK_RELEASE_REPO must be unset for this test to say anything').toBeUndefined()
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ name: 'Latest debug APK (v9.9.9)', assets: [] }), { status: 200 }),
+    )
+    try {
+      await lookupLatestApkRelease()
+      const url = String(fetchSpy.mock.calls[0][0])
+      expect(url).toContain('/repos/nekodas-neko/TrainingAi_Open/')
+      // The archived, private, pre-cut repo. Reading it returns a release whose APK never changes
+      // again, and surfaces as "Could not fetch release info" rather than as a misconfiguration.
+      expect(url).not.toContain('/repos/nekodas-neko/TrainingAI/')
+    } finally {
+      fetchSpy.mockRestore()
     }
   })
 
