@@ -396,6 +396,91 @@ below threshold and left in place for next time.
   the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
   than feeding a bare `"no data"` string the model reads as a measurement.
 
+### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
+
+- **Branch:** `fix/ring-measurement-power-budget`
+- **Added:** 2026-08-17 · owner: *"the battery life drains too fast. Stock it lasts 7 days; but with
+  our build it loses about 20% over night I'm seeing. Well too much. It requires a long charge every
+  2 days. Needs to be reviewed to see whats chewing so much of its battery."*
+- **The arithmetic:** stock 7 days ≈ 14%/day. A charge every 2 days ≈ 50%/day, with 20% of that
+  overnight alone. Roughly **3.5× stock drain**.
+
+**What we turn on, and where.** `OuraRingService.onReady()` runs
+`OuraProtocol.enableMeasurementSequence()` on **every connect**
+(`android/app/src/main/java/com/trainingai/app/oura/OuraProtocol.kt:123-127`):
+
+```kotlin
+reqSetFeatureMode(FeatureId.DAYTIME_HR, FeatureMode.AUTOMATIC),
+reqSetFeatureMode(FeatureId.SPO2,       FeatureMode.AUTOMATIC),
+reqSetFeatureMode(FeatureId.REAL_STEPS, FeatureMode.AUTOMATIC),
+```
+
+Unconditional, idempotent, **no user toggle anywhere in the app**, and re-asserted on every
+reconnect so the ring can never drift back. On stock Oura, blood-oxygen sensing is an opt-in the
+vendor itself warns costs battery life. We enable it for everyone, permanently, and the only
+in-repo note on its cost is the REAL_STEPS comment observing that steps are *"passive (no sensor
+power cost, unlike the DHR burst)"* — so the DHR burst's cost was known and never budgeted.
+
+**Measured against production** (`claude_ro.oura_raw_samples`, 7 days, owner's rows only — this view
+is row-scoped to one user and prunes at 30 days, so these are the owner's counts, recently):
+
+```
+tag  event_name                rows(7d)
+139  spo2_r_pi_event             53,412   <- largest single source
+ 96  ibi_and_amplitude_event     40,898
+128  green_ibi_quality_event     14,098
+115  ehr_trace_event              3,859
+```
+
+**SpO₂ is both the biggest source and concentrated exactly where the owner sees the loss** — events
+by hour, Brisbane:
+
+```
+hour   00    03    05    08    11    14    16    20    23
+spo2 5942  4946  7319  1465     0    11  2149    54  5216
+green  45   125     0   587   706   750  1174  1126  1068
+ehr     0     0     0     0   648   208   128   556     0
+```
+
+~75% of SpO₂ events fall between 22:00 and 09:00 — the overnight window the owner reports losing
+20% in. Green-PPG (DAYTIME_HR) carries a steady daytime load on top.
+
+- **A step change on 2026-08-04 that nothing explains — resolve this first.** Daily totals go
+  5,378 → 23,874 and hold (SpO₂ 586 → ~8,000/day). **Open question, not a cause:** this counts
+  *ingested* events, so better draining looks identical to more sensing. SPO2 has been in
+  `enableMeasurementSequence` since 2026-07-07 (#320, v1.117.2), and
+  `docs/overview/history-2026-08-04.md` shows no ring-side change that would account for it. It
+  decides whether the fix is "sense less" or "we always sensed this much and only now noticed".
+- **A separate latent defect, found while tracing — NOT today's cause.** `reqBleFastHrMode(false)`
+  and `EXERCISE_HR → AUTOMATIC` appear **only** in `liveHrStopSequence()` (`OuraProtocol.kt:256-259`);
+  the connect-time sequence resets DAYTIME_HR, SPO2 and REAL_STEPS but **neither of these**. Any
+  live-HR session that never reaches `stopLiveHr()` — app killed mid-workout, Samsung battery
+  management killing the service (failure L9 in
+  [`docs/oura-ble-operations.md`](oura-ble-operations.md)), or the `/admin/oura-ble` tester's
+  **Live HR** button without **Stop HR** — leaves continuous fast-HR sampling on **permanently**,
+  healed by no reconnect, app restart or service restart. Production says it is not firing now
+  (`ehr_trace_event` is zero 21:00–08:00), so it is a trap waiting, not the current drain. Fix
+  regardless: add both resets to the connect-time sequence, the one path guaranteed to run.
+- **Evidence that would settle it** (device-only, none reachable from the sandbox): (a) persist the
+  ring's battery telemetry — the keepalive already polls it every 5 min and `parseBattery` decodes
+  it, but **it is never stored**, so drain cannot be measured at all today; (b) A/B two nights, SPO2
+  `OFF` vs unchanged, same wear pattern, compare overnight % — that prices the feature directly;
+  (c) confirm whether the owner had blood-oxygen sensing enabled in the stock Oura app before the
+  re-key. If it was off there and on here, that alone is most of the gap.
+- **Fix directions (undecided — measurement first):** (1) make SpO₂ a user setting defaulting off,
+  rather than an unconditional connect-time write; (2) reset EXERCISE_HR and fast-HR mode in
+  `enableMeasurementSequence()` — cheap, independent of the measurement, do it regardless;
+  (3) persist the battery poll so this is observable rather than argued; (4) *only then* the cadence
+  knobs ([`docs/oura-ble-operations.md`](oura-ble-operations.md) §2: raise `DRAIN_INTERVAL_MS`, drop
+  idle priority to `CONNECTION_PRIORITY_LOW_POWER`) — **these are radio-side, not sensor-side**, so
+  they cannot touch a PPG/SpO₂ duty cycle and are the wrong lever if sensing is the cause. That
+  doc's rule against touching the 5-min keepalive still stands: it is the drop detector.
+- **What would count as fixed:** overnight drop back near stock (~14%/day), proven by (a) rather
+  than a subjective "feels better", and nothing power-hungry enabled that the owner did not choose.
+- **Surface: device required.** Every claim here is code-traced or from ingested-event counts;
+  **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
+  and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
+
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
 - **Branch:** `fix/tdee-partial-day-completeness`
