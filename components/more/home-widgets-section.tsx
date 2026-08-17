@@ -8,6 +8,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
+import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { SCORE_RING_STYLE_KEY, SCORE_RING_STYLES, SCORE_RING_STYLE_CHANGE_EVENT, loadScoreRingStyle, type ScoreRingStyle } from '@/lib/home/home-prefs'
 
 type MetaKey = "weightKg" | "steps" | "calories" | "protein" | "carb" | "fat" | "distanceKm" | "waterIntake"
@@ -101,6 +102,8 @@ export function HomeWidgetsSection() {
   const [hiddenSections, setHiddenSections] = useState<Set<HomeSectionKey>>(() => new Set())
   const [weightLookback, setWeightLookback] = useState<7 | 30>(7)
   const [scoreRingStyle, setScoreRingStyle] = useState<ScoreRingStyle>('default')
+  // Always one of the styles, so `hasSelection` is unconditionally true.
+  const scoreStyleGroup = useRovingRadioGroup(true)
 
   useEffect(() => {
     try {
@@ -312,15 +315,14 @@ export function HomeWidgetsSection() {
           <div className="px-4 py-3">
             <p className="text-sm font-medium">Score Card Style</p>
             <p className="text-xs text-muted-foreground mb-2">Frame for the four home score circles</p>
-            <div role="radiogroup" aria-label="Score card style" className="flex flex-col gap-1.5">
-              {SCORE_RING_STYLES.map(opt => {
+            <div {...scoreStyleGroup.groupProps} aria-label="Score card style" className="flex flex-col gap-1.5">
+              {SCORE_RING_STYLES.map((opt, i) => {
                 const active = scoreRingStyle === opt.value
                 return (
                   <button
                     key={opt.value}
                     type="button"
-                    role="radio"
-                    aria-checked={active}
+                    {...scoreStyleGroup.getRadioProps(active, i)}
                     onClick={() => {
                       setScoreRingStyle(opt.value)
                       localStorage.setItem(SCORE_RING_STYLE_KEY, opt.value)

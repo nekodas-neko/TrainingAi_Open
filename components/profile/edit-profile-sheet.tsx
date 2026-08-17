@@ -6,6 +6,7 @@ import { ChevronDown, KeyRound, Loader2, Settings } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import {
   Sheet,
   SheetContent,
@@ -41,6 +42,9 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
   const [isPasswordExpanded, setIsPasswordExpanded] = useState(false)
 
   const [saving, setSaving] = useState(false)
+  // Both are always-selected groups, so `hasSelection` is unconditionally true.
+  const unitsGroup = useRovingRadioGroup(true)
+  const regionGroup = useRovingRadioGroup(true)
 
   function resetFromUser(u: User | null) {
     if (!u) return
@@ -203,18 +207,16 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
                 <p id="ep-units-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Weight Units</p>
                 <p className="text-sm font-medium mt-0.5">Kg / Lbs</p>
               </div>
-              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold" role="radiogroup" aria-labelledby="ep-units-label">
+              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold" {...unitsGroup.groupProps} aria-labelledby="ep-units-label">
                 <button
                   type="button"
-                  role="radio"
-                  aria-checked={units === 'kg'}
+                  {...unitsGroup.getRadioProps(units === 'kg', 0)}
                   onClick={() => setUnits('kg')}
                   className={`rounded-lg px-3 py-1.5 transition ${units === 'kg' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
                 >kg</button>
                 <button
                   type="button"
-                  role="radio"
-                  aria-checked={units === 'lbs'}
+                  {...unitsGroup.getRadioProps(units === 'lbs', 1)}
                   onClick={() => setUnits('lbs')}
                   className={`rounded-lg px-3 py-1.5 transition ${units === 'lbs' ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
                 >lbs</button>
@@ -227,13 +229,12 @@ export function EditProfileSheet({ user, onSaved }: EditProfileSheetProps) {
             <div className="px-4 py-3 space-y-2">
               <p id="ep-foodRegion-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Food Region</p>
               <p className="text-[10px] text-muted-foreground">Used to bias AI food analysis toward local brands.</p>
-              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border" role="radiogroup" aria-labelledby="ep-foodRegion-label">
-                {['AU', 'US', 'UK', 'NZ'].map(r => (
+              <div className="flex items-center gap-0.5 rounded-xl bg-muted p-0.5 text-xs font-semibold border border-border" {...regionGroup.groupProps} aria-labelledby="ep-foodRegion-label">
+                {['AU', 'US', 'UK', 'NZ'].map((r, i) => (
                   <button
                     key={r}
                     type="button"
-                    role="radio"
-                    aria-checked={foodRegion === r}
+                    {...regionGroup.getRadioProps(foodRegion === r, i)}
                     onClick={() => { setFoodRegion(r); localStorage.setItem('ta_food_region', r) }}
                     className={`rounded-lg px-4 py-1.5 transition ${foodRegion === r ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground'}`}
                   >{r}</button>

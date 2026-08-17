@@ -1,6 +1,7 @@
 'use client'
 
 import { Input } from '@/components/ui/input'
+import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { Label } from '@/components/ui/label'
 import { FITNESS_GOALS, type FitnessGoal } from '@trainingai/shared/types/user'
 import { GoalProgressBar } from '@/components/health/goal-progress-bar'
@@ -49,6 +50,7 @@ export function GoalTargetsSection({
   waterGoalStr, onWaterGoalChange, waterGoalType, onWaterGoalTypeChange,
   todayMeta, weekToDate, macroRefreshKey,
 }: GoalTargetsSectionProps) {
+  const fitnessGoalGroup = useRovingRadioGroup(fitnessGoal != null)
   return (
     <div className="rounded-2xl bg-muted/40 border border-border overflow-hidden divide-y divide-border">
       <div className="px-4 pt-3 pb-1.5">
@@ -58,15 +60,14 @@ export function GoalTargetsSection({
       {/* Fitness Goal */}
       <div className="px-4 py-3 space-y-2">
         <p id="goals-fitnessGoal-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Fitness Goal</p>
-        <div className="space-y-1.5" role="radiogroup" aria-labelledby="goals-fitnessGoal-label">
-          {FITNESS_GOALS.map(goal => {
+        <div className="space-y-1.5" {...fitnessGoalGroup.groupProps} aria-labelledby="goals-fitnessGoal-label">
+          {FITNESS_GOALS.map((goal, i) => {
             const active = fitnessGoal === goal
             return (
               <button
                 key={goal}
                 type="button"
-                role="radio"
-                aria-checked={active}
+                {...fitnessGoalGroup.getRadioProps(active, i)}
                 disabled={saving}
                 onClick={() => onFitnessGoalChange(active ? null : goal)}
                 className={[

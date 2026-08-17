@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import { ACTIVITY_LEVELS, type ActivityLevel } from '@trainingai/shared/types/user'
 
 const ACTIVITY_LABELS: Record<ActivityLevel, { label: string; description: string }> = {
@@ -53,6 +54,8 @@ export function RequiredInfoSection({
   onActivityLevelChange,
   saving,
 }: RequiredInfoSectionProps) {
+  const sexGroup = useRovingRadioGroup(!!sex)
+  const activityGroup = useRovingRadioGroup(activityLevel != null)
   const router = useRouter()
 
   return (
@@ -158,13 +161,12 @@ export function RequiredInfoSection({
       {/* Biological Sex */}
       <div className="px-4 py-3 space-y-1.5">
         <p id="goals-sex-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Biological Sex</p>
-        <div className="flex gap-2" role="radiogroup" aria-labelledby="goals-sex-label">
-          {(['male', 'female', 'other'] as const).map(opt => (
+        <div className="flex gap-2" {...sexGroup.groupProps} aria-labelledby="goals-sex-label">
+          {(['male', 'female', 'other'] as const).map((opt, i) => (
             <button
               key={opt}
               type="button"
-              role="radio"
-              aria-checked={sex === opt}
+              {...sexGroup.getRadioProps(sex === opt, i)}
               disabled={saving}
               onClick={() => onSexChange(sex === opt ? '' : opt)}
               className={[
@@ -200,15 +202,14 @@ export function RequiredInfoSection({
       {/* Activity Level */}
       <div className="px-4 py-3 space-y-2">
         <p id="goals-activityLevel-label" className="flex items-center gap-2 text-xs leading-none font-medium text-muted-foreground select-none">Activity Level</p>
-        <div className="space-y-1.5" role="radiogroup" aria-labelledby="goals-activityLevel-label">
-          {ACTIVITY_LEVELS.map(level => {
+        <div className="space-y-1.5" {...activityGroup.groupProps} aria-labelledby="goals-activityLevel-label">
+          {ACTIVITY_LEVELS.map((level, i) => {
             const active = activityLevel === level
             return (
               <button
                 key={level}
                 type="button"
-                role="radio"
-                aria-checked={active}
+                {...activityGroup.getRadioProps(active, i)}
                 disabled={saving}
                 onClick={() => onActivityLevelChange(active ? null : level)}
                 className={[

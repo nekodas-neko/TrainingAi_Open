@@ -104,6 +104,14 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-17-radiogroup-keyboard-nav.md`](../../overview/entries/2026-08-17-radiogroup-keyboard-nav.md)**
+  — 🆕 Q-350: all eight `role="radiogroup"`s now share
+  [`lib/hooks/use-roving-radio-group.ts`](../../../lib/hooks/use-roving-radio-group.ts) for arrow keys
+  and a roving tabindex. **A hook, not the `components/ui/` component the entry proposed** — the
+  eight sites render five different shapes, so behaviour is what they share. Writing the guard turned
+  up **Q-355**: the three goal groups pass `disabled={saving}` and PATCH on change, so the browser
+  drops focus mid-save and ejects the user from the group on every keypress.
+
 - **[`docs/overview/entries/2026-08-17-nutrition-tap-refuted.md`](../../overview/entries/2026-08-17-nutrition-tap-refuted.md)**
   — 🆕 Q-309 **refuted**: a real touch tap on Nutrition's action row works. `.click()` in Playwright
   dispatches a *mouse* sequence with no touch events, so the suspected `useDrag`/`filterTaps`
