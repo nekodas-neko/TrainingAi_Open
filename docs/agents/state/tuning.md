@@ -6,8 +6,8 @@
 **Updated:** 2026-08-17 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 502)
 
 ## Now
-Nothing in flight. First Tuning session complete and merged: the Recovery Index anchor, measured.
-Evidence in [`docs/reviews/2026-08-17-readiness-calibration.md`](../../reviews/2026-08-17-readiness-calibration.md),
+Nothing in flight. The Recovery Index anchor is measured and written up, and the owner has been asked
+to decide. Evidence in [`docs/reviews/2026-08-17-readiness-calibration.md`](../../reviews/2026-08-17-readiness-calibration.md),
 method and gotchas in [`docs/handoff-2026-08-17-readiness-recovery-index-calibration.md`](../../handoff-2026-08-17-readiness-recovery-index-calibration.md).
 
 ## Next
@@ -23,6 +23,11 @@ calibration work with the data already stored.
   lifts 40 of the last 41 days by at most 1.4 readiness points and lowers none.* If approved it is
   Lane A's, one constant, and **Q-273 (model versioning) lands first or a readiness version stamp
   rides along**.
+  **The owner's stated blocker was not the size of the change but its consequences, so §5.2 of the
+  review now answers exactly that** and is the section to point them at: 4 of 26 days cross a
+  threshold — three go 74 → 75 (rest-day guidance tips to "train hard") and one goes 69 → 70
+  (Moderate → High); **nothing crosses the early-deload gate, the Low/Moderate line, or the AI
+  low-readiness line**. Do not re-answer this in prose; it is measured.
 - **Q-501** (persisted readiness rows drift from the summaries they derive from) is queued and **not**
   blocked — it needs no sign-off, it is not a scoring change.
 
@@ -38,3 +43,8 @@ None. This session wrote only docs.
   been replaced by Q-500 in the backlog and its live cross-references re-pointed — do not resurrect it
   from a stale review copy.
 - Q numbers come from the band above, not the backlog's next-free pointer. No migration numbers.
+- **Production data moves under you mid-session.** The 2026-08-13 summary was re-rolled while the
+  review was being written — `recovery_index_hours` 1.20 → 5.78 as a Q-274 fragment night resolved
+  itself. Exactly one of 41 rows, but it changed a headline figure. **Re-pull before quoting, and
+  record the pull time.** It also means Q-274's fragment nights *can* self-heal on a re-rollup, which
+  nothing had established.
