@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **535** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **536** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -276,6 +276,33 @@ below threshold and left in place for next time.
 
 
 ### [devices][platform] Q-530 — the ring key has one copy and no way to back it up
+### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
+
+- **Branch:** `fix/redecode-async-job`
+- **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
+- **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
+  no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
+  moved that work off the event loop into the rollup worker, which is why the rest of the process
+  survives it, but the route's own comment is explicit that *"the caller still waits for the
+  result"*. On real data that exceeds the platform's request timeout, so Railway returns **502**
+  and the tester prints `redecode failed`.
+- **The work had completed.** Measured this session: `scanned=1098158`, `updated=0`, and every
+  `sleep_sessions` row carried `updated_at = 07:58:44` — after the request had already 502'd.
+  The aggregate that the UI reported as failed is the one that produced the night the owner was
+  trying to see.
+- **Why it matters beyond the cosmetics.** A false failure invites a retry, and a retry is another
+  full-history walk of the heaviest pair of calls in the app — the same operation whose own comment
+  names it as *"the event-loop starvation that took production down on 2026-08-13"*. The UI is
+  actively encouraging the thing most likely to hurt. It also cost real diagnostic time here: the
+  502 was investigated as a crash before the data showed the write had landed.
+- **What to do.** Return a job id immediately and let the client poll, rather than holding the
+  request open. The work is already off-loop, so this is a response-shape change rather than an
+  architectural one. While in there, consider whether a date-scoped redecode is worth having —
+  `fullHistory` is correct after a decoder change, and overkill for "re-aggregate last night",
+  which is what it is usually reached for.
+- **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
+  row. Do not run a full redecode while those are open.
+
 ### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
 
 - **Branch:** `fix/oura-raw-samples-index-and-vacuum`
