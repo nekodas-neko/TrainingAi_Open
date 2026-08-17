@@ -30,12 +30,20 @@ const root = path.join(__dirname, '..');
 // them. Same justification as above: entries, not narrative. The sweep's actual prose lives in
 // docs/reviews/2026-08-17-failure-cells-running-the-app.md, which this ratchet does not govern —
 // which is the split it is meant to enforce.
+//
+// Raised 2026-08-17 (BugFix intake, Q-387): backlog 5945 -> 5972, projectOverview 6443 -> 6461.
+// One owner-reported queue entry and its Known-Issues row — entries, per the same split as the two
+// raises above. Recorded because the first draft was 24/48 over and the ratchet was right to catch
+// it: the trace, the measured table and the three-option assessment are what an implementer needs,
+// and roughly a third of the rest was showing the work. Intake adds an entry per report, so this
+// ceiling will be pushed regularly — the answer is a periodic sweep moving *cleared* entries out,
+// not a standing allowance for verbose ones.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6443,
-  'docs/implementation-backlog.md': 5945,
+  'projectOverview.md': 6461,
+  'docs/implementation-backlog.md': 5972,
   'CLAUDE.md': 988,
 };
 
