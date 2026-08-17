@@ -111,6 +111,12 @@ const root = path.join(__dirname, '..');
 // (printable saved-meal labels). Only +18 because a sweep had left the file 47 under its ceiling —
 // which is the intended cycle working: entries land, cleared ones leave, the number does not ratchet
 // on every single filing.
+//
+// Raised 2026-08-17 (BugFix intake, Q-389 amendment): backlog 6700 -> 6721. The owner settled the
+// two questions the entry was waiting on (50x50mm label; name + calories + code, macros optional;
+// handwritten date line), so the "open questions" block became a spec. +16 net for replacing four
+// lines of questions with the answers plus the QR quiet-zone/payload constraint the mockups
+// surfaced. Amended in place rather than filed as a second entry, per this role's dedup rule.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -131,7 +137,7 @@ const BASELINE = {
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
   'projectOverview.md': 6679,
-  'docs/implementation-backlog.md': 6700,
+  'docs/implementation-backlog.md': 6721,
   'CLAUDE.md': 1010,
 
 };
