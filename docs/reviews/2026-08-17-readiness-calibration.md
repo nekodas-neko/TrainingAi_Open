@@ -69,12 +69,19 @@ The window is bounded by data availability, not by a prune: `oura_daily_summary`
 | | value |
 |---|---|
 | min / max | 0.35 h / 8.28 h |
-| mean / median | 2.58 h / 2.37 h |
-| sd | 1.54 h |
+| mean / median | **2.69 h** / 2.38 h |
 | days reaching the 6 h optimum | **1 of 41** |
 
 Under the shipped curve `clamp(round(hours / 6 × 100))` those hours give a mean sub-score of
-**42.1**, exceeding 50 on **12 of 41** days.
+**43.9**, exceeding 50 on **13 of 41** days.
+
+> **These figures were re-pulled at the end of the session and one row had moved under me.**
+> 2026-08-13 — one of Q-274's fragment nights — was **re-rolled during this session** (row
+> `created_at` 2026-08-17T07:50:31Z): `sleep_duration_hours` 6.08 → **8.17**, `recovery_index_hours`
+> 1.20 → **5.78**. Exactly one of 41 rows changed. Every figure in this document is the post-re-roll
+> value. Two things follow: **Q-274's fragment nights can resolve themselves on a re-rollup**, which
+> nothing had established; and **a calibration number has a shelf life** — re-pull before quoting
+> these rather than trusting the table.
 
 The persisted contributor (`claude_ro.oura_daily_derived.readiness_contributors->'recoveryIndex'`)
 covers a shorter window, 2026-07-16 → 2026-08-17, n = 33. Within it the sub-score exceeds 50 on 5
@@ -82,7 +89,7 @@ days and **records exactly 100 on 2026-07-17**. That single row is sufficient to
 50, on any day, ever" without any recomputation at all.
 
 **Cost against a neutral 50**, which is what a missing contributor supplies:
-`0.09 × (50 − 42.1) = ` **0.71 readiness points per day**. The review's 2.2 is what its own 8-day
+`0.09 × (50 − 43.9) = ` **0.55 readiness points per day**. The review's 2.2 is what its own 8-day
 window gives (mean sub-score there is ~26), and it does not hold over the series.
 
 **Model-version check.** `oura_daily_derived.model_versions->>'readiness'` is **NULL on all 33 rows**,
@@ -224,9 +231,9 @@ Applied to **all 41 days** with a stored `recovery_index_hours`, not just the da
 
 | | 6 h (shipped) | 5 h (proposed) |
 |---|---|---|
-| mean sub-score | 42.1 | **49.5** |
-| days scoring > 50 | 12 / 41 | **19 / 41** |
-| cost vs neutral 50 | 0.71 pts/day | **0.05 pts/day** |
+| mean sub-score | 43.9 | **51.3** |
+| days scoring > 50 | 13 / 41 | **20 / 41** |
+| cost vs neutral 50 | 0.55 pts/day | **−0.12 pts/day** |
 
 Per-day movement:
 
@@ -255,6 +262,43 @@ sub 75 → 90, readiness 80 → ~81.3).
 **This is a small change and should be presented as one.** It re-centres a 9%-weighted contributor
 and moves no displayed readiness score by more than about one point. It is worth doing because the
 bias is systematic and one-directional, not because any day is badly wrong.
+
+### 5.2 What actually changes — the decision thresholds
+
+Points are not the unit that matters; **thresholds** are. The readiness score feeds six numeric
+decision points in the app, and the question worth answering is whether any day crosses one.
+
+| threshold | where |
+|---|---|
+| `< 45` (with ACWR > 1.2) → early deload | `lib/health/readiness-payload.ts:47,505` |
+| `50` → band Low / Moderate | `scoreBand()` |
+| `< 60` → AI `lowReadiness` branch | `packages/shared/src/ai-periodization/ai-dynamic.ts:231` |
+| `< 60` → rest-day guidance | `packages/shared/src/health/rest-day-guidance.ts:46` |
+| `70` → band Moderate / High | `scoreBand()` |
+| `>= 75` → rest-day guidance "train hard" | `packages/shared/src/health/rest-day-guidance.ts:36` |
+
+Method: reconstruct the exact unrounded composite from the persisted contributors (it reproduces the
+stored rounded score on **26 of 33** days — the other seven predate the `checkin` contributor or hit
+the §6 drift), then swap **only** the Recovery Index term between the 6 h and 5 h curves on the same
+stored hours. That isolates the anchor from the §6 drift, which is a separate effect and would
+otherwise be double-counted.
+
+**Result: 4 of 26 days cross a threshold.**
+
+| day | 6 h | 5 h | crossing |
+|---|---|---|---|
+| 2026-07-28 | 74 | 75 | rest-day guidance → "train hard" |
+| 2026-07-29 | 74 | 75 | rest-day guidance → "train hard" |
+| 2026-07-31 | 74 | 75 | rest-day guidance → "train hard" |
+| 2026-08-16 | 69 | 70 | band Moderate → **High** |
+
+**No day crosses the early-deload line (45), the Low/Moderate line (50), or the `lowReadiness` line
+(60).** The displayed score moves on 18 of 26 days, always by exactly **+1**.
+
+In plain terms, this is what approving Q-500 buys and costs: *the readiness number reads one point
+higher on about two-thirds of days; one day in 26 shows "High" where it showed "Moderate"; three days
+in 26 tip rest-day guidance toward the harder session; and nothing at all changes about deload
+triggering or the low-readiness AI branch.* That is the whole behavioural surface of the change.
 
 ### 5.1 Two caveats that bound the whole proposal
 
@@ -304,7 +348,15 @@ is currently **no way to tell whether a past readiness score changed because its
 because the model did**. That is the same class as Q-273, and it is the reason §2's version check
 could only be run on the summary table.
 
-This does not affect the anchor proposal, which is computed from the hours directly.
+**It was then demonstrated live, mid-session.** The 2026-08-13 summary was re-rolled while this
+document was being written (§2), moving its Recovery Index hours 1.20 → 5.78. The `oura_daily_derived`
+readiness row did not follow: it still carries the sub-score computed from the old hours. Measured
+against a fresh recompute at the *unchanged* 6 h anchor, **3 of 26 reconstructable days now disagree
+with their persisted score — 2026-08-13 by 7 points** (62 persisted vs 69 recomputed), 08-03 by 2,
+07-26 by 1. Nothing about the model changed; only the inputs did, and the stored score did not notice.
+
+This does not affect the anchor proposal, which is computed from the hours directly — and §5.2's
+threshold analysis deliberately holds this drift out so the two effects are not conflated.
 
 ---
 

@@ -2201,8 +2201,14 @@ session working from a temporarily restored copy.
   4.40–5.14) and RMSE is flat 4.5–5.25. **5** sits on that floor and keeps a small negative bias, so
   it still errs toward under-scoring.
 - **Blast radius, all 41 days with stored hours:** 40 of 41 move (the other clamps at 100). Readiness
-  **mean +0.67 pts, max +1.44, none lower**. Days above 50 go 12 → 19; cost against neutral 50 falls
-  0.71 → 0.05 pts/day.
+  **mean +0.67 pts, max +1.44, none lower**. Days above 50 go 13 → 20; cost against neutral 50 falls
+  0.55 → −0.12 pts/day.
+- **What actually changes (§5.2 — this is the part to decide on).** Isolating the anchor from the
+  Q-501 drift and testing all six numeric decision points readiness feeds: **4 of 26 reconstructable
+  days cross a threshold** — 2026-07-28/29/31 go 74 → 75, tipping rest-day guidance to "train hard",
+  and 2026-08-16 goes 69 → 70, Moderate → **High**. **No day crosses the early-deload line (45), the
+  Low/Moderate line (50), or the AI `lowReadiness` line (60).** The displayed score moves on 18 of 26
+  days, always by exactly +1. That is the entire behavioural surface of the change.
 - **What Q-271 got wrong** (it measured 8 days and generalised): "never above 50, ever" — the
   contributor exceeds 50 on **12 of 41** days and hits **100 on 2026-07-17**; "~2.2 pts/day" — it is
   **0.71**. Its eight quoted values are exactly 2026-08-08 → 08-15. **The estimator is sound** —
@@ -2221,6 +2227,9 @@ session working from a temporarily restored copy.
 - **Plan:** none yet
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
+- **Demonstrated live 2026-08-17:** the 08-13 summary was re-rolled mid-session (hours 1.20 → 5.78,
+  a Q-274 fragment night resolving itself) and the derived readiness row did not follow — that day's
+  persisted score is now **7 points** off a fresh recompute at the unchanged anchor.
 - **Measured.** Each persisted `oura_daily_derived.readiness_contributors->'recoveryIndex'->>'score'`
   against the `oura_daily_summary.recovery_index_hours` it derives from: **5 of 33 disagree** —
   2026-07-16 (0.89 h → expected 15, persisted 4), 07-20 (2.32 → 39, persisted 4), 07-21 (1.94 → 32,
