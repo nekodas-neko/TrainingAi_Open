@@ -7,41 +7,18 @@
 **Migrations:** 189 and 190 taken (Q-536); next free is **191**. Local SQLite unchanged at v22.
 
 ## Now
-**Q-536 is NOT finished and the owner is blocked.** Migrations 189 + 190 applied cleanly at
-10:33:52 / 10:34:11 and the clock is repaired — all 5,383 anchors are epoch 0, merged p10 lands 3 s
-from clean. But the **redecode that rewrites the 43 stored nights fails**, three attempts, always at
-`getOuraClockAnchor` (`adapter.ts:4530`), and the cause was unknowable because the rollup worker
-flattened errors with `err.message` alone. v1.318.4 fixes that reporting
-([`entries/2026-08-17-rollup-worker-error-cause.md`](../../overview/entries/2026-08-17-rollup-worker-error-cause.md)).
-**Next Lane A session: ask the owner for the new error text, then diagnose.** Ruled out already —
-query speed (34 ms), connection exhaustion (11 of 500), the migration itself, and the worker as a
-whole (the ingest rollup succeeded through it at 10:21:58).
+Nothing in flight. **Q-536 is CLOSED and confirmed on the owner's device** — the midday cluster went
+**43 nights → 4** after migrations 189 + 190 (v1.318.2) and the 10:47 redecode, and the four
+survivors are short daytime fragments belonging to Q-274. Entry removed from the queue, Known-Issues
+row moved to the resolved archive.
 
-Nothing in flight. **Q-536 diagnosed and half-repaired** (v1.318.0, migration 189). The 43 midday bedtimes are a
-spurious clock epoch, not a timezone bug: a 2026-08-17 re-pair made the ring re-drain buffered
-history, `isClockEpochReset` read that as a reset, and the new epoch's offset — estimated at the p10
-of anchor lag, which a re-drain contaminates — landed **+14.16 h** wrong. `aggregateOuraRawSamples`
-resolves every ds against `currentEpoch`, so the full redecode re-timed all history.
-[`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](../../overview/entries/2026-08-17-q536-clock-epoch-diagnosis.md).
+It cost three deploys, two of them my own errors, both recorded so they are not repeated:
+a migration verified on an 8-row fixture that rolled back against a 15 s `statement_timeout` on
+434,707 rows, and a rollup worker that discarded Drizzle's `cause` so the next two failures were
+unreadable.
 
-The owner approved the repair. **Migration 189 shipped** — it merges same-clock epochs, deciding
-what to merge from measured evidence (two epochs are one clock when their *minimum* anchor lag
-agrees within 10 min) rather than from a user id or an epoch number, so a genuine re-key is left
-alone. Mutation-checked both ways.
-
-⚠️ **STILL OWED: a full-history Redecode after deploy — and it is not free.** The route re-stamps
-`measured_at` over all 1.1 M rows, which is the same non-HOT full-table rewrite that produced the
-disk_full incident's ~306 MB of bloat (Q-534). Measured 2026-08-17: DB **786 MB**, the volume
-temporarily at **5 GB**, so there is ample headroom *today*. **Do not let the volume go back to
-500 MB before Q-534's index work lands.**
-
- The migration relabels; it does not rewrite
-the 43 stored nights, and the rollup's 35-day window does not reach the oldest of them (the damage
-spans 44 days). **Health shows the wrong bedtimes until that is run** — it is the step that fixes
-what the owner actually sees, and it has not been done. Q-535 notes Redecode reports a spurious
-"failed: 502" for work that succeeded, so do not take that as failure.
-
-Before that: **Q-310 shipped and merged** — #17, v1.317.5.
+**Q-314 is now the live one** — the re-drain-as-reset misdetection that caused all of it. Until it
+lands, every ring re-pair reopens Q-536.
 
 ## Next
 Work the queue top-down, taking the highest item in Lane A's ownership. As of this writing:

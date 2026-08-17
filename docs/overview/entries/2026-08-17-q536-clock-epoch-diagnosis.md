@@ -104,6 +104,25 @@ spurious "failed: 502" for work that succeeded.)
   Both epoch openings were re-drains. Getting it wrong in the other direction — missing a real
   re-key — is worse and quieter than the current failure, which is not a call to make silently.
 
+### ✅ Confirmed on the owner's device, 2026-08-17
+
+The redecode ran at 10:47 against v1.318.2 and the fix is real, measured rather than reported:
+
+| | before | after |
+|---|---|---|
+| nights starting 10:00–14:00 Brisbane | **43** | **4** |
+| nights starting 21:00–22:00 | 25 | **62** |
+| total nights | 82 | 82 — nothing lost |
+
+The owner's screen now reads 10:01 pm, 9:10 pm, 10:23 pm, 11:03 pm — against 10:45 am, 9:54 am,
+12:30 pm before. The four survivors are **short daytime fragments** (0.0–1.4 h: 14:39–14:59,
+11:03–11:33, 09:33–11:11, 16:47–18:32), not bedtimes; they are Q-274, and they are now the only
+deviation left in the table.
+
+**The +14.16 h reconciliation was arithmetic on stored values when this entry was written. It is now
+an observed result** — which is the claim the "Not exercised" section below correctly refused to make
+at the time, and it took three deploys to earn.
+
 ### Not exercised
 
 - **The migration has not run against production.** It is verified against a local reproduction of
