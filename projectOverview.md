@@ -3483,17 +3483,33 @@ journal.
 - Detail: [`docs/overview/entries/2026-08-16-health-stale-goal.md`](docs/overview/entries/2026-08-16-health-stale-goal.md) ·
   [`docs/overview/entries/2026-08-16-goal-label-association.md`](docs/overview/entries/2026-08-16-goal-label-association.md).
 
-### [app-shell][platform] Q-261 — six `<Label>`s front button groups, and `<Label>` may be the wrong element (2026-08-16)
+### [app-shell][platform] ⚠️ Q-261 FIXED — six button groups on More now have accessible names; TalkBack check still owed (v1.317.4, 2026-08-17)
 
-- Found finishing Q-258, which fixed every `<Label>`/`<Input>` pair in `components/profile/`. These
-  six are a different shape: Fitness Goal, Biological Sex, Activity Level, Timezone, Weight Units,
-  Food Region all front **button groups or static text**, so there is no `id` to point `htmlFor` at.
-- **Needs an owner decision, which is why it was not bundled.** `<Label>` renders
-  `@radix-ui/react-label`, whose job is associating text with a control; pointed at a `<div>` of
-  buttons it is the wrong element rather than an unfinished one. Either wrap each group in
-  `role="group"` + `aria-labelledby`, or drop `<Label>` where nothing is being labelled at all
-  (Timezone and Weight Units front a value and a button, not a set of options).
-- Not a regression — it has been this way since the components were written.
+- **Shipped in v1.317.4.** The six bare `<Label>`s in `components/profile/` are gone. Five front
+  mutually-exclusive option sets — Fitness Goal, Biological Sex, Activity Level, Weight Units, Food
+  Region — and now carry `role="radiogroup"` + `aria-labelledby` pointing at their visible text,
+  with `role="radio"` + `aria-checked` on each option. That is the pattern already used at three
+  sites in the app (`deload-toggle`, `session-duration-picker`, `home-widgets-section`), so this
+  follows house precedent rather than inventing a sixth shape.
+- **`aria-labelledby`, not `aria-label`** — the name is taken from the on-screen text, so the
+  visible label and the accessible name cannot drift apart.
+- **Timezone was the one case that is not a group**: its label fronted a static value plus an
+  unrelated action, so `<Label>` was dropped for a plain styled `<p>`. The button left behind was
+  named only "Auto-detect", which says nothing once the surrounding text is not visible — it is now
+  "Auto-detect timezone".
+- **Guarded, and the guard was mutation-checked.** `e2e/profile-group-labelling.spec.ts` asserts
+  every group through `getByRole('radiogroup', { name })`, which is the accessibility tree rather
+  than the DOM. Reverting `goal-targets-section.tsx` fails only the Fitness Goal case; reverting
+  `edit-profile-sheet.tsx`'s units row fails only the Weight Units case — so each assertion dies
+  with the fix it covers, which is the property Q-259 established a guard must have.
+- **NOT device-verified, and the gap is precise.** Playwright reads Chromium's accessibility tree.
+  That proves the name and checked state are exposed, which is the mechanism that was broken; it is
+  **not** the same as hearing TalkBack announce these groups on the S25. Nothing about the layout
+  changed — the replacement elements carry the same computed classes `<Label>` resolved to — so
+  there is no safe-area or reflow risk to check, only the announcement.
+- **Arrow-key navigation is deliberately not implemented**, matching the three pre-existing
+  radiogroups. Filed as **Q-350**, which covers all eight sites rather than these five.
+- Detail: [`docs/overview/entries/2026-08-17-profile-group-labelling.md`](docs/overview/entries/2026-08-17-profile-group-labelling.md).
 
 ### [readiness][app-shell] ⚠️ The readiness card now flips on the tap — cause is code-evidenced, NOT device-reproduced (Q-248, 2026-08-15)
 
