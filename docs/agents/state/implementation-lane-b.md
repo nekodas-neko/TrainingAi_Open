@@ -8,8 +8,9 @@
 ## Now
 Nothing in flight. Nine items closed today:
 
-- **Q-350** (v1.318.7) — all eight radiogroups now share `lib/hooks/use-roving-radio-group.ts` for
-  arrow keys and a roving tabindex. A **hook**, not the component the entry proposed.
+- **Q-350 + Q-355** (v1.318.7) — all eight radiogroups now share `lib/hooks/use-roving-radio-group.ts`
+  for arrow keys and a roving tabindex (a **hook**, not the component the entry proposed), and the
+  three goal groups no longer eject keyboard focus mid-save.
   [Journal](../../overview/entries/2026-08-17-radiogroup-keyboard-nav.md).
 
 - **Q-457** — `lib/github-release.ts` defaulted `APK_RELEASE_REPO` to the archived private repo.
@@ -43,15 +44,13 @@ Nothing in flight. Nine items closed today:
 Work the queue top-down and take the highest Lane-B-owned item, re-verifying its premise against
 `main` first. **The queue re-prioritises daily** — re-read it rather than trusting this list.
 
-**Lane B's queue is essentially drained.** What is left is two low-priority items this lane filed
-itself, and one blocked on the owner:
+**Lane B's queue is drained.** What is left is one low-priority item this lane filed itself, and one
+blocked on the owner:
 
 1. **Q-354** — the mouse-click residue of Q-309. Low priority (no supported user produces mouse
    input), and its entry says do **not** change gesture code without reproducing a *touch* failure
    first — the touch path is verified working.
-2. **Q-355** — `disabled={saving}` ejects keyboard focus from the three goal radiogroups. Low
-   priority for the same reason Q-350 was.
-3. **Q-531** — ⛔ blocked on an owner decision, see below.
+2. **Q-531** — ⛔ blocked on an owner decision, see below.
 
 Everything else in the queue is Lane A's (Kotlin/BLE, sleep-window data, DB sizing, migrations,
 scoring) or was routed there by this lane: **Q-351** (activity `durationMin` 0 → 400) and **Q-353**
@@ -71,8 +70,7 @@ is to pick up Q-354 or Q-355 rather than to reach into Lane A's band.
 
 ## Q numbers used from the band
 - **Q-350** — DONE (v1.318.7).
-- **Q-355** — selecting a goal disables the group mid-save, which ejects keyboard focus. Affects 3 of
-  the 8 radiogroups. Low priority; found writing Q-350's guard.
+- **Q-355** — DONE (v1.318.7), fixed alongside Q-350 rather than left half-shipped.
 - **Q-351** — **Lane A's to fix.** A sub-3-second activity rounds `durationMin` to 0 and
   `ActivityLogBody.durationMin` is `.positive()`, so the POST 400s and the activity is lost behind a
   generic toast. Measured (2 s → 400, 5 s → 201). The outbox parses the same schema.
@@ -140,6 +138,12 @@ which is why the local/CI seeding asymmetry never arose.
   Q-452's first guard **passed** under mutation and had to be rewritten to assert on the *request*
   rather than on what rendered. Asserting "the card is absent" is not a guard when the card is absent
   either way.
+- **A long-lived local DB ages out of its seeded window.** `seed.sql` fills 14 days ending at the
+  *user's* Brisbane today, and `setup.sh` will not re-seed a non-empty `users` table — so once the
+  session crosses Brisbane midnight (14:00 UTC), "today" has no metrics and
+  `e2e/goal-invalidation.spec.ts` fails locally while CI (fresh seed every run) stays green. It is
+  not a regression. Top up today's `body_metrics` row rather than debugging the app. Verified by
+  stashing all changes and watching it fail on clean `main` too.
 - **A fixed short wait is not a measurement on a cold dev server.** A 6 s probe read a not-yet-loaded
   `/api/readiness-score` as "no data" and produced a wrong, confidently-stated finding. Use `toPass`
   with a real budget; `SKELETON_TIMEOUT_MS` is 20 s and `goal-round-trip` records 39.7 s cold.

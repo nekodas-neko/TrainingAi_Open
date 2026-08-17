@@ -9,7 +9,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "1.318.7",
     date: "2026-08-17",
     changes: [
-      "Accessibility: the option groups across the app \u2014 intensity and session length on Workout, the goal and profile pickers, the home score-card style \u2014 now respond to the arrow keys and act as a single stop when tabbing, instead of making you tab through every option one at a time. Nothing changes for touch.",
+      "Accessibility: the option groups across the app \u2014 intensity and session length on Workout, the goal and profile pickers, the home score-card style \u2014 now respond to the arrow keys and act as a single stop when tabbing, instead of making you tab through every option one at a time. The goal pickers also stop greying themselves out for the moment it takes to save, which was interrupting keyboard use. Nothing changes for touch.",
     ],
   },
   {

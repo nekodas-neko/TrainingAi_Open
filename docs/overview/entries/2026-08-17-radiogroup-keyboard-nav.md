@@ -1,6 +1,6 @@
 # 2026-08-17 — Q-350: arrow keys for the eight radiogroups
 
-**Branch:** `claude/implementation-lane-b-0o7kb9` · **Version:** v1.318.7 · **Lane:** Implementation B
+**Branch:** `claude/implementation-lane-b-0o7kb9` · **Version:** v1.318.7 (Q-350 + Q-355) · **Lane:** Implementation B
 
 ## What was missing
 
@@ -55,13 +55,18 @@ focus was gone. That is not the hook. `handleFitnessGoalChange` calls `patchProf
 becomes disabled**. So on the three goal groups, an arrow keypress moves the selection and then
 ejects the user from the group.
 
-Filed as **Q-355**. It affects 3 of the 8 (the workout pickers, the two Edit Profile strips and the
-home-widgets list do not disable on change), and the spec now reflects the split honestly: Food
-Region asserts the full contract, Fitness Goal asserts only that selection moves.
+Filed as **Q-355 — and then fixed in the same PR**, because a keyboard feature that ejects you on
+every press is not worth shipping half-done. The three goal groups now use `aria-disabled={saving}`
+with the in-flight guard moved into the handler (`if (saving) return`). That keeps exactly the
+double-submit protection `disabled` gave — CLAUDE.md is explicit that submit paths need an in-flight
+guard — while leaving the button focusable. `useRovingRadioGroup` skips `aria-disabled` options, so
+the group is inert but not lost while a save is running.
 
-I could have made the spec pass by dropping the focus assertions everywhere. Keeping them on a group
-that can hold them is what makes the file say something true about the app rather than something
-true about the test.
+The spec's second case now asserts focus on Fitness Goal, twice in a row so that one keypress
+surviving cannot pass by luck. Mutation-checked: putting `disabled={saving}` back fails it.
+
+I could have made the original failure go away by dropping the focus assertions everywhere. Keeping
+them where they can hold is what turned a red test into a real second fix.
 
 ## What was NOT exercised
 

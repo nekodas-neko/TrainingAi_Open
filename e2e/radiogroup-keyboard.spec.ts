@@ -11,13 +11,12 @@ import { settleRouteBoundary } from './fixtures'
  * Asserts `aria-checked` and `tabIndex` rather than visual state — those are the properties the
  * keyboard contract is about, and what a screen reader reads.
  *
- * **Driven against Food Region, not Fitness Goal, and the reason is a finding rather than a
- * preference.** The three goal groups pass `disabled={saving}` and their handlers PATCH on every
- * change, so selecting an option disables the focused button for the duration of the request — and
- * a browser drops focus from a disabled element. Arrow keys still *move the selection* there, but
- * focus is ejected from the group on each press. That is pre-existing save behaviour rather than
- * anything this hook does, it affects three of the eight groups, and it is filed as Q-355. Food
- * Region writes `localStorage` and never disables, so it can assert the full contract.
+ * Two groups are driven, and the second one is the interesting case. The three goal groups PATCH on
+ * every change; they used to carry `disabled={saving}`, and a browser drops focus from an element
+ * that becomes disabled — so an arrow keypress moved the selection and then ejected the user from
+ * the group. That was Q-355, found by this spec failing, and fixed by moving the in-flight guard
+ * into the handler behind `aria-disabled`. Fitness Goal therefore now asserts focus too: it is the
+ * group where losing it was the actual bug.
  */
 test.setTimeout(180_000)
 
@@ -59,9 +58,10 @@ test('arrow keys move and select within a radiogroup, and it is one tab stop', a
   await expect(options.nth(count - 1)).toHaveAttribute('aria-checked', 'true')
 })
 
-test('a radiogroup that disables itself while saving still moves selection on arrow', async ({ page }) => {
-  // The Fitness Goal case (Q-355): focus is ejected by `disabled={saving}` mid-PATCH, but the
-  // selection itself must still move — that is the half of the contract this group can keep.
+test('a radiogroup that saves on change keeps focus while the PATCH is in flight', async ({ page }) => {
+  // Q-355. This asserted only selection movement until the in-flight guard moved out of `disabled`;
+  // the focus assertion below is the regression guard for that fix, and it fails if `disabled` comes
+  // back — which is the whole reason the group is driven separately from Food Region.
   await page.goto('/more')
   await settleRouteBoundary(page)
   await page.getByText('Activity level, targets & AI recommendations').click()
@@ -73,4 +73,11 @@ test('a radiogroup that disables itself while saving still moves selection on ar
   await options.first().focus()
   await options.first().press('ArrowDown')
   await expect(options.nth(1)).toHaveAttribute('aria-checked', 'true')
+  await expect(options.nth(1), 'the in-flight save must not eject keyboard focus').toBeFocused()
+
+  // And again immediately, while the first PATCH is plausibly still in flight — one keypress
+  // surviving could be luck, two in a row is the guard actually holding.
+  await options.nth(1).press('ArrowDown')
+  await expect(options.nth(2)).toHaveAttribute('aria-checked', 'true')
+  await expect(options.nth(2)).toBeFocused()
 })
