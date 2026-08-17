@@ -39,6 +39,37 @@ cannot be opened at all (I22).
 
 ---
 
+## 0. The ring key — the single-copy credential
+
+**The 32-hex ring key exists in exactly one place: Android SharedPreferences on the phone.**
+`OuraBlePlugin.kt` stores it under `key_hex` and its own comment states the intent — *"the key never
+leaves SharedPreferences; never logged"*. It is not on the server, not in this repository, and not
+in any log or crash report. That is the right design for a credential and it has one consequence
+worth stating loudly:
+
+> **Uninstalling the app destroys it.** The BLE service then logs `no key stored`, refuses to start,
+> and the ring is unreachable — while the Devices screen still shows the ring as fine, because that
+> card reads server data.
+
+**Recovery is the `key.hex` file from the original `open_oura` re-key** (§ the Phase-0 runbook), on
+whichever machine ran it. There is no other copy. Paste the 32 hex characters into
+`/admin/oura-ble` → **Ring key** → Save → Start.
+
+**Do not re-onboard the official Oura app to "fix" a lost key.** It re-keys the ring and can force a
+firmware update that changes the BLE event encoding — the exact thing the frozen firmware protects
+against. A lost credential becomes a full protocol re-validation, and the reverse-engineered
+decoders may not survive it.
+
+**Before any uninstall or device change:** confirm `key.hex` is in hand *first*. Observed
+2026-08-17 — an uninstall was required to move to a stably-signed APK, the "what you lose" list
+covered only the JS local store, and the ring went dark until the key file was found. Two other
+things the same uninstall clears: the 14-day local raw window (harmless, the server holds the
+archive and a Full re-sync re-drains) and any unsynced outbox mutation (**flush first** — pull-to-
+refresh on More pushes the outbox; the Data & Sync "Sync now" button pulls only and flushes
+nothing).
+
+---
+
 ## 1. Failure-point matrix (ring → radio → link → drain → ingest → DB)
 
 Each row: what breaks → how the system handles it automatically → the manual contingency

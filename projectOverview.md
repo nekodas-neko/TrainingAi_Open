@@ -63,6 +63,26 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [devices][platform] 🔴 An app uninstall destroys the Oura ring key, and nothing warned about it (2026-08-17)
+
+The 32-hex ring key lives **only** in Android SharedPreferences. `OuraBlePlugin.kt` says so in its
+own comment — *"the key never leaves SharedPreferences; never logged"* — so it is not on the server,
+not in this repository, and not in any log. Correct for a credential, and it means **an uninstall
+makes the ring unreachable**: the BLE service logs `no key stored` and refuses to start, while the
+Devices screen still shows the ring as healthy because that card reads server data.
+
+Hit live on 2026-08-17. The uninstall was necessary (moving to a stably-signed APK, #19), and the
+"what you lose" list given beforehand covered only the JS local store — the native side was never
+checked. Recovered from the `key.hex` the original `open_oura` re-key produced; **there is no
+other copy**, and if it had been lost the only apparent fix — re-onboarding the official Oura app —
+is the one that can force a firmware update and break the reverse-engineered protocol outright.
+
+Documented in `CLAUDE.md`'s APK section and as §0 of
+[`docs/oura-ble-operations.md`](docs/oura-ble-operations.md). **Still open** because the mitigation
+is prose, not a mechanism: nothing in the app backs the key up, warns before an uninstall, or lets
+the owner export it. Worth a backlog entry for an explicit "export/ring key" affordance before
+the next device change.
+
 ### [workouts][readiness] ✅ An engine-chosen deload prescribed full weights — fixed, device check owed (Q-310, 2026-08-17)
 
 - **Fixed in v1.317.5.** `/api/workout-data`'s ai_dynamic catch-all — two verbatim copies —

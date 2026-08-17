@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **530** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **533** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -274,6 +274,77 @@ below threshold and left in place for next time.
 > whole fix/revert/restore cycle was re-run against the final code.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
 
+
+### [devices][platform] Q-530 — the ring key has one copy and no way to back it up
+### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
+
+- **Branch:** `fix/device-console-ia`
+- **Added:** 2026-08-17, from an owner report while running the Oura re-sync runbook.
+- **This is feedback on a shipped change, not a new idea.** Q-234 landed 2026-08-15 (v1.313.0):
+  `/admin` kept user administration, diagnostics moved to **Settings → Developer**, and the three
+  device consoles became rows there. Its journal records that as done and correct. The owner, using
+  it under real conditions for the first time, reports the opposite: *"it was moved away from the
+  admin section to the diagnostic section = bad"*, and *"everything is spread out sporadically,
+  needs organisation"*.
+- **Why the disagreement is the useful part.** Q-234's reasoning was taxonomic — device diagnostics
+  are not user administration, so they belong apart. That is sound on paper and appears to be wrong
+  in use, because the operations these screens support (drain, re-sync, verify) are a **single task**
+  that now spans two locations. Re-litigate the premise before re-arranging anything; a second
+  reorganisation chosen the same way will land in the same place.
+- **What to do.** Read the Q-234 entry and its journal first, then treat this as an IA question with
+  a real user's task in hand: what does someone actually *do* on these screens, start to finish, and
+  where should that live. The answer may be that diagnostics belong back under `/admin`, or that
+  the split is right but the destination is wrong. Decide it deliberately and write down why.
+- **Related:** Q-530 (ring key has one copy) and Q-532 (the scan auto-recentre) both live on these
+  screens. Q-530's placement half — the key field should be nested behind something deliberate so it
+  cannot be edited by accident — is best solved as part of this, not separately.
+- **Verification:** device-only. None of it is checkable from the sandbox.
+
+### [app-shell][devices] Q-532 — the BLE screen re-centres itself while a scan runs, making buttons hard to hit
+
+- **Branch:** `fix/ble-scan-scroll-jump`
+- **Added:** 2026-08-17, owner report during the Oura re-sync runbook.
+- **What it is.** *"The screen constantly moves to the centre while a scan is running — making it
+  hard to click buttons."* While a BLE scan/drain is active on `/admin/oura-ble`, the view keeps
+  scrolling back, so a control the user is aiming at moves out from under the tap.
+- **Where to look first.** The screen re-renders on every status/log update during a scan, so the
+  likely causes are a `scrollIntoView` / auto-scroll on new log lines, or a keyed remount that
+  resets scroll position on each poll. `components/oura-ble/oura-ble-debug.tsx` holds the log and
+  frame panels that update most frequently.
+- **Why it matters more than it sounds.** This screen is only ever used during a live drain — the
+  one situation where a mistimed tap can hit **Clear key** or interrupt a sync. An unstable layout
+  on a destructive control set is a safety problem, not just an annoyance.
+- **Verification:** reproduce on-device with a scan actually running; a static screenshot will not
+  show it, and the sandbox cannot scan at all.
+
+
+- **Branch:** `feat/ring-key-export`
+- **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
+- **What it is.** The 32-hex ring key exists only in Android SharedPreferences
+  (`OuraBlePlugin.kt`, `key_hex`). Deliberately — its own comment reads *"the key never leaves
+  SharedPreferences; never logged"* — and that is the right call for a credential. But it means the
+  key has **exactly one copy**, on one device, with no export, no backup, and no warning before the
+  operations that destroy it.
+- **Why it matters.** An uninstall or a device change silently makes the ring unreachable: the BLE
+  service logs `no key stored`, refuses to start, and the Devices screen keeps showing the ring as
+  healthy because that card reads server data. Worse, the intuitive recovery — re-onboarding the
+  official Oura app — re-keys the ring and can force a firmware update that changes the BLE event
+  encoding, which is precisely what the frozen firmware exists to prevent. **A recoverable
+  credential problem turns into a protocol re-validation.** This happened on 2026-08-17 and was only
+  recovered because the original `open_oura` `key.hex` still existed on the owner's machine.
+- **What to do.** The minimum is an *export* affordance in `/admin/oura-ble` — reveal the stored key
+  so it can be copied somewhere durable — plus a confirm-with-warning before `clearKey`. Consider a
+  "key present" indicator on the Devices card, so a keyless state is visible where the ring is
+  managed rather than only in the admin console.
+- **Placement, reported separately.** The owner also asks that the key field be nested behind
+  something deliberate rather than sitting in the open — *"so it cant accidently be used"*. That is
+  the same subject and is best solved with Q-531, which is re-deciding where these screens live;
+  the export/backup half below stands on its own.
+- **What NOT to do.** Do not sync the key to the server to "solve" this. It is device-only on
+  purpose, and moving it server-side widens the blast radius of every other credential path in the
+  app. This is a *backup and visibility* problem, not a storage-location problem.
+- **Verification:** the affordance must be shown to work while the key is present, and the warning
+  shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
 
 ### [activity][cardio] Q-450 — `/activity` reached without a type: Start works, Finish works, Save silently discards the activity
 

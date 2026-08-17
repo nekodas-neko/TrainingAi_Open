@@ -34,9 +34,9 @@ const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6443,
+  'projectOverview.md': 6463,
   'docs/implementation-backlog.md': 5945,
-  'CLAUDE.md': 988,
+  'CLAUDE.md': 1010,
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;
