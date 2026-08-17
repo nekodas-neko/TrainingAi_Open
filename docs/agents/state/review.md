@@ -3,11 +3,49 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** the first sweep to run under this role · **Q band:** 450–499 (next free: **456**)
+**Updated:** 2026-08-17 · **By:** two sweeps, both 2026-08-17 · **Q band:** 450–499 (next free: **460**)
 
 ## Now
 
-**PR #16 carries this sweep.** If it is still open, merge it once green — docs-only, no ceremony.
+Two sweeps have run under this role, both on 2026-08-17. PR #16 (failure cells) is **merged**; the
+repo-migration sweep below is the second.
+
+### Sweep 2 — the public/private boundary as an architectural property
+
+Owner-requested: review the architecture specifically with respect to the repo migration. Write-up:
+[`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md).
+
+**Filed — Q-456 … Q-459.** Q-456/457 upper-mid (above Q-313), Q-458/459 low.
+
+| Q | | What |
+|---|---|---|
+| Q-456 | 🟠 | The owner's production user ID is baked into **18 committed migrations**, and `CLAUDE.md`'s "re-run the generator into a new migration" rule re-publishes it on every schema change. Not a credential; fix the generator, not the files. **Lane A.** |
+| Q-457 | 🟠 | `lib/github-release.ts:24` still defaults `APK_RELEASE_REPO` to the **archived private repo**. |
+| Q-458 | 🟡 | `.env.example` wrong both ways — 8 dead keys incl. `TOKEN_ENC_KEY` (names a security property the app lacks) and 5 Oura **Cloud** keys; 4 real vars undeclared. |
+| Q-459 | 🟡 | The rolling `apk-latest` release is delete-then-recreate → the public download URL 404s on every native merge. |
+
+**CLEAN — six areas, including the two that mattered most:**
+
+1. **No credentials published.** No GitHub/Google/OpenAI-shaped keys, no PEM private keys, no `.env`
+   (only `.env.example`, values all empty), no keystores, no tracked build output.
+2. **No third-party personal data.** The only real emails belong to bundled library authors.
+3. **The public-repo CI posture is correct.** All three workflows use `pull_request`, **not
+   `pull_request_target`**; `ci.yml` uses no secrets; the APK publish is gated on `push` so forks
+   cannot reach it.
+4. **A fresh clone's tests genuinely work** — synthetic constants are committed and `vitest.config.ts`
+   falls back to them when the real `MANIFEST.json` is absent. That is the path CI takes every run.
+5. **`AWS_*`/`STORAGE_*` is a deliberate alias chain, not two schemes.** Checked and cleared — a
+   near-miss recorded so it is not re-raised.
+6. **`private-paths.json` is well built,** down to deliberately non-specific descriptions so the
+   inventory is not a map to what it protects.
+
+**Noted, not filed:** `private-paths.json` protects a third party's IP; nothing plays that role for
+this project's own users' identifiers. Q-456 reached a public repo because no gate was looking.
+Second list, or widen the first? A design decision, not a review finding.
+
+### Sweep 1 — the failure cells, exercised live (PR #16, merged)
+
+**PR #16 carried this sweep and is merged.**
 
 > **A method warning worth more than the finding it came from.** This session spent a long stretch
 > convinced CI had stalled: Lint/Custom Rules/Migration Check went green in under a minute while
@@ -67,6 +105,17 @@ much it is worth:
   `POST /api/admin/db-query` over the `claude_ro` views was **not** used at all.
 - **Q-452's siblings.** Only the four `AiInsightCard` sections were checked; `weekly-digest` and the
   coach were not checked for the same absent-vs-zero confusion. *Sibling-surface sweep* applies.
+
+From sweep 2 (the repo migration):
+
+- **A clean clone, actually built.** Sweep 2 read the tree and argued the fresh-clone claims from the
+  committed fixtures and CI's behaviour. Nobody has done `git clone` into an empty container and run
+  `pnpm install && pnpm build && pnpm test`. That is the one check that would settle `NOTICE`'s claim
+  outright, and Q-313 (no `next build` gate in the publish dry-run) is the reason it is worth doing.
+- **The archived private repo was not examined.** The public repo's single-snapshot history is what
+  bounds the exposure question here; that reasoning does not transfer to the archive.
+- **Secret detection was pattern-based.** Strong evidence of absence for conventional formats, not
+  proof for a bespoke or high-entropy-but-unpatterned credential.
 
 ## Blocked
 

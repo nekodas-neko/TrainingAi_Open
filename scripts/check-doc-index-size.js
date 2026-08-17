@@ -101,6 +101,11 @@ const root = path.join(__dirname, '..');
 // sequential scans of the largest table), and the redecode's own re-stamp cost, which that entry
 // gates but did not quantify. Both are corrections to an existing entry, which is cheaper to carry
 // here than to have an implementer discover by dropping the index in production.
+//
+// Raised 2026-08-17 (Review, Q-456…Q-459): projectOverview 6655 -> 6679. One Known-Issues row
+// indexing the repo-migration architecture sweep. Entries and open-issue content, not narrative —
+// the sweep's prose is in docs/reviews/2026-08-17-repo-migration-architecture.md, which this
+// ratchet does not govern.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -120,7 +125,7 @@ const BASELINE = {
   // cut from 12 lines to 7). The two it is over are the two the original entry had no reason to
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
-  'projectOverview.md': 6655,
+  'projectOverview.md': 6679,
   'docs/implementation-backlog.md': 6682,
   'CLAUDE.md': 1010,
 
