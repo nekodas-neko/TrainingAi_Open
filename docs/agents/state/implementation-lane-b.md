@@ -3,11 +3,14 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** the fourth Lane B run · **Q band:** 350–386 (next free: **353**)
+**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **354**)
 
 ## Now
-Nothing in flight. Four items shipped today:
+Nothing in flight. Five items shipped today:
 
+- **Q-452** (v1.318.6) — the AI insight card commented on data that did not exist. `AiInsightCard`
+  now takes a required `hasData`. **Client half only — the prompt half is Q-353, Lane A's.**
+  [Journal](../../overview/entries/2026-08-17-ai-insight-sufficiency-gate.md).
 - **Q-451** (v1.318.3) — a new account's Workout tab was an empty card with a dead Start button.
   Now an empty state with a Create-a-program CTA.
   [Journal](../../overview/entries/2026-08-17-workout-select-empty-state.md).
@@ -24,19 +27,14 @@ Work the queue top-down and take the highest Lane-B-owned item, re-verifying its
 
 Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B candidates in order:
 
-1. **Q-452** `[app-shell][platform]` — the AI insight card fires `POST /api/ai/health-insight` on
-   every mount with no sufficiency gate, and the route substitutes the literal string `"no data"` for
-   absent fields. A day-one user is told their "inactivity creates a significant gap". **Check the
-   lane split before starting**: the card is `components/health/ai-insight-card.tsx` (Lane B), the
-   prompt is `app/api/ai/health-insight/route.ts` (Lane A). A client-side sufficiency gate is
-   entirely Lane B and is probably the right first cut; changing the prompt is not yours.
-2. **Q-309** `[nutrition][app-shell]` — a touch tap on Nutrition's action row does not activate the
+1. **Q-309** `[nutrition][app-shell]` — a touch tap on Nutrition's action row does not activate the
    button; a synthesised click does. `e2e/water-log-write-path.spec.ts` documents this from the
    harness side and works around it with `dispatchEvent('click')`.
-3. **Q-352** — the zero-data E2E fixture this session filed. Touches `scripts/local-db/`, which is
-   neither lane's; claim it in this baton first. Read the trap in its entry before starting.
-4. **Q-350** — the radiogroup keyboard sweep. Low priority.
-5. **Q-531** — ⛔ blocked, see below.
+2. **Q-352** — the zero-data E2E fixture. Touches `scripts/local-db/`, which is neither lane's;
+   claim it in this baton first. Read the trap in its entry before starting. **Two dependants now**
+   (Q-451 and Q-452 both shipped verified-but-unguarded for want of it).
+3. **Q-350** — the radiogroup keyboard sweep. Low priority.
+4. **Q-531** — ⛔ blocked, see below.
 
 ## Blocked
 - **Q-531** `[app-shell][devices]` — needs an owner decision, annotated in the backlog. It asks for
@@ -47,8 +45,8 @@ Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B can
 - **A TalkBack pass on the S25** (Q-261) over More → Goals and More → Edit Profile.
 - **A drain run on the S25** (Q-532) confirming `/admin/oura-ble` holds still while the log streams.
 - **Q-450's device path** — the E2E run took the web fallback, not SQLite+outbox.
-- **Q-451 has no committed guard** — observed working against a temporary account, then removed.
-  Q-352 is what fixes that.
+- **Q-451 and Q-452 have no committed guard** — both observed working against a temporary zero-data
+  account, then removed. Q-352 is what fixes that.
 
 ## Q numbers used from the band
 - **Q-350** — eight `role="radiogroup"`s, none with arrow-key navigation. Wants one shared primitive.
@@ -56,6 +54,9 @@ Most of the current top is Lane A (Kotlin, sleep windows, DB sizing). Lane B can
   `ActivityLogBody.durationMin` is `.positive()`, so the POST 400s and the activity is lost behind a
   generic toast. Measured (2 s → 400, 5 s → 201). The outbox parses the same schema.
 - **Q-352** — the E2E harness has no zero-data account, so no first-run bug can be guarded.
+- **Q-353** — **Lane A's to fix.** The health-insight prompt substitutes the literal `"no data"` for
+  absent fields and the model reads it as a measured zero. Q-452 closed the fully-empty case from the
+  client; a scored section missing one field still misreports.
 
 ## Claimed paths
 None beyond the lane list in [`docs/agents/README.md`](../README.md) §3. **Q-352 will need
@@ -76,6 +77,11 @@ None beyond the lane list in [`docs/agents/README.md`](../README.md) §3. **Q-35
 - **`radiogroup` beat `group` + `aria-pressed`** for pick-one option sets (8 sites vs 1).
 - **`coach-content.tsx`'s `scrollIntoView` is correct** — no inner scroll container, so the page is
   genuinely its scroller.
+- **Q-452 gates in the client, not the route** — a client gate costs no request at all, where a
+  server-side `{ insight: null }` still pays one.
+- **The heart-rate `hasData` gate uses the trend series, NOT `data.hrMin`/`data.recentHrv`.** Those
+  look right and are live-ring-only, so they are null for an account with months of recorded RHR;
+  using them hid the card from the seeded user. Measured. Don't "simplify" it back.
 
 ## Gotchas worth carrying
 - **`scripts/check-doc-index-size.js` is a shrink-only baseline** on `projectOverview.md`,

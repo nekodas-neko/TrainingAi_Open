@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.6",
+    date: "2026-08-17",
+    changes: [
+      "The AI Insight card no longer appears on a health screen that has nothing recorded yet. It was being asked to comment on empty data and would state your steps were zero rather than unrecorded \u2014 a brand-new account was told its inactivity created a significant gap on its first ever visit. Screens that do have data are unchanged.",
+    ],
+  },
+  {
     version: "1.318.5",
     date: "2026-08-17",
     changes: [

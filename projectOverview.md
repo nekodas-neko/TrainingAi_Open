@@ -270,11 +270,11 @@ the next device change.
   ad-hoc zero-data account, but **not guarded** — the harness's one seeded account has a program, so
   no committed spec reaches a first-run state (filed as **Q-352**). Home's syntactic sibling is
   guarded upstream and is not a bug. [Journal](docs/overview/entries/2026-08-17-workout-select-empty-state.md).
-- **🟠 Q-452 — the AI insight card runs an LLM over a prompt of literal `"no data"` strings.** No
-  sufficiency gate between mount and model. Rendered for a day-one account, `/health/activity` said:
-  *"Your activity tracker currently shows zero movement and no strength sessions toward your goal of
-  five per week. This inactivity creates a significant gap…"* — the model reads `Steps: no data` as a
-  measured zero and editorialises, because the prompt does not distinguish absent from zero.
+- **✅ Q-452 HALF-FIXED (v1.318.6)** — the AI insight card ran an LLM over literal `"no data"` strings,
+  telling a day-one account *"…shows zero movement… this inactivity creates a significant gap"*.
+  `AiInsightCard` now takes a required `hasData` and neither fetches nor renders without it; measured
+  both ways (all four sections show for the seeded user, none for a zero-data one). **The prompt half
+  is Lane A's — Q-353**: a scored section missing one field still feeds the model a `"no data"` line.
 - **🟡 Q-453/454/455 — three low-severity ones,** filed mid-low: `/api/training-stress` silently
   answers for *today* on a malformed `date` where its ten siblings all 400; `/api/day-log` and
   `/api/exercise-history` validate params before checking auth (**no data leaks** — verified 401 once
@@ -291,7 +291,7 @@ the next device change.
   branch — the canonical runtime — was never exercised. No safe-area, Samsung-WebView, native-plugin
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
 - **Q-450 and Q-451 have since shipped (Lane B, v1.318.1/v1.318.3) and are struck above; the other
-  four stay queued**, with Q-452 now the top one in `docs/implementation-backlog.md`.
+  four stay queued** (Q-452's client half shipped too; its prompt half is Q-353, Lane A).
 ### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
 
 - Owner: stock ring lasts 7 days; on our build it loses ~20% overnight and needs charging every 2

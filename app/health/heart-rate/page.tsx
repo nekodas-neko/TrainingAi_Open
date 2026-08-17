@@ -167,7 +167,17 @@ export default function HeartRateDetailPage() {
           </div>
         )}
 
-        <AiInsightCard section="heart-rate" date={today} />
+        {/* The route's heart-rate prompt reads `body_metrics.restingHeartRate` and `hrvMs`; with
+            neither, every line it builds is the literal string "no data" (Q-452). The trend series
+            is the client-side view of exactly those two columns (`rhrBpm` ← `restingHeartRate`).
+            Deliberately NOT `data.hrMin`/`data.recentHrv`, which look like the right fields and are
+            not: those come from live ring readings, so they are null for an account with months of
+            recorded RHR and no ring — measured, and it hid the card from the seeded user. */}
+        <AiInsightCard
+          section="heart-rate"
+          date={today}
+          hasData={trends?.trends?.some(t => t.rhrBpm != null || t.hrvMs != null) ?? false}
+        />
 
         {!data && (
           <div className="space-y-3">

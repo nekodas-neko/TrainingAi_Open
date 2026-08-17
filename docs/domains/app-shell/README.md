@@ -104,6 +104,14 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-17-ai-insight-sufficiency-gate.md`](../../overview/entries/2026-08-17-ai-insight-sufficiency-gate.md)**
+  — 🆕 Q-452: `AiInsightCard` fired on every mount and the route feeds the model the literal string
+  `"no data"` for absent fields, which it reads as a measured zero. The card now takes a **required**
+  `hasData`. **Carry the gotcha**: the heart-rate page's `data.hrMin`/`recentHrv` look like the right
+  signal and are live-ring-only, so they are null for an account with months of recorded RHR — the
+  gate has to mirror what the *prompt* reads (`body_metrics`, via the trend series). Only running it
+  caught that. The prompt half is **Q-353** (Lane A).
+
 - **[`docs/overview/entries/2026-08-17-scroll-panel-page-jump.md`](../../overview/entries/2026-08-17-scroll-panel-page-jump.md)**
   — 🆕 Q-532: `scrollIntoView` on a sentinel scrolls **every** scrollable ancestor including the
   document, so a panel appending content drags the whole page. Use

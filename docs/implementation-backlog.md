@@ -691,33 +691,26 @@ below threshold and left in place for next time.
   (the `claude-ro-readonly-role.test.ts` precedent), or add an idempotent top-up step to `db:local`.
 - **`scripts/local-db/` belongs to neither lane** — claim it in the implementing lane's baton first.
 
-### [app-shell][platform] Q-452 — the AI insight card runs an LLM over a prompt of literal "no data" strings, and tells a day-one user their inactivity is a "significant gap"
+### [platform] Q-353 — the health-insight prompt says "no data" where it means "absent", and the model reads it as zero
 
-- **Branch:** `fix/ai-insight-sufficiency-gate`
-- **Added:** 2026-08-17 · review sweep (failure-cells lens, **rendered output quoted**) ·
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
-- **Placement:** mid-queue. Not data loss, but it is **wrong user-facing copy shown to exactly the
-  users least able to discount it**, and it costs LLM calls that cannot carry signal.
-- **No sufficiency gate anywhere between the mount and the model.**
-  `components/health/ai-insight-card.tsx:44-48` fires `POST /api/ai/health-insight` on every mount,
-  unconditionally. `app/api/ai/health-insight/route.ts` builds its prompt by substituting the literal
-  string `"no data"` for every absent field (`:102, :105, :116-119, :125-126, :157-158`) and calls
-  `generateText` regardless.
-- **Rendered, as a zero-data account, on its first ever visit:**
-  - `/health/sleep` — *"Your current sleep dashboard is empty, which prevents us from identifying any patterns in your recovery or rest quality…"*
-  - `/health/readiness` — *"Your readiness data is currently unavailable, which prevents me from providing a specific assessment…"*
-  - `/health/activity` — *"Your activity tracker currently shows **zero movement and no strength sessions** toward your goal of five per week. **This inactivity creates a significant gap** in your ph…"*
-- **The third one is the actual bug.** Handed `Steps: no data`, the model does not report absence — it
-  asserts **zero**, then editorialises about it. A user on day one is told they have a significant
-  fitness gap. The model cannot distinguish "no data" from "measured zero" because **the prompt does
-  not distinguish them either**.
-- **Bounded but not free:** `rateLimit('ai-insight:${userId}', 10, 60*60*1000)` (`:64`) plus a 6 h
-  client cache caps it at four calls per new user per day. Cost is the aggravation, not the finding —
-  the six-round review already measured AI spend and recorded a decision not to optimise it. **This
-  entry is about correctness of what is said.**
-- **Fix shape:** gate the card on the section actually having data (return `{ insight: null }` and let
-  the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
-  than feeding a bare `"no data"` string the model reads as a measurement.
+- **Branch:** `fix/ai-insight-prompt-absent-vs-zero`
+- **Lane:** **A** — `app/api/ai/health-insight/route.ts` only.
+- **Added:** 2026-08-17 · the half of Q-452 Lane B could not take
+- **What Q-452 fixed and what it did not.** Q-452 gated `AiInsightCard` on the section having data,
+  so a zero-data account no longer gets an insight at all (verified: all four sections render the
+  card for the seeded user and none for a zero-data one). **That closes the fully-empty case only.**
+- **The underlying defect is in the prompt.** Ten lines across the four sections substitute the
+  literal string `"no data"` for an absent field (`:102, :105, :116-119, :125-126, :157-158`).
+  Handed `Steps: no data` the model does not report absence — it asserts **zero** and editorialises,
+  which is how a day-one account was told *"your activity tracker currently shows zero movement…
+  this inactivity creates a significant gap"*.
+- **So a partially-empty section still misreports.** A user with a readiness score but no body-temp
+  reading passes Q-452's gate and still hands the model `Body temp deviation: no data`. That is the
+  common case for anyone without a ring, not an edge case.
+- **Fix shape:** say *absent* rather than `"no data"` — omit the line entirely, or word it so the
+  model cannot read it as a measurement (`Body temp deviation: not recorded`), and state in the
+  system prompt that absent fields are unmeasured and must not be described as zero or as a
+  behaviour. Worth checking the other AI prompt builders for the same substitution.
 
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
