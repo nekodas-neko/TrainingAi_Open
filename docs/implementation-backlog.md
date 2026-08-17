@@ -937,8 +937,11 @@ which also makes it testable and works offline.
    is the one genuinely hard question in the feature.
 
 - **✅ SETTLED by the owner, 2026-08-17 — the two open questions are answered, build to this:**
-  - **Label size is 50 × 50 mm**, square. At 96 dpi that is **189 × 189 px** — the whole design
-    budget. Every earlier rectangular sketch is superseded.
+  - **Label is 50 × 50 mm, and rotates between SQUARE and CIRCULAR dies.** One artwork must serve
+    both, so the binding constraint is the **inscribed circle**, not the square: the corners are
+    unusable. Usable area is a centred **130 × 137 px** box (189 × 189 px is the sheet). Compose
+    everything centred and radially symmetric. Every earlier rectangular sketch is superseded, and
+    so is every corner-anchored one.
   - **Payload is name + calories + P/C/F macros + scanning code.** The owner first asked for
     name + calories + code with macros optional, then chose the with-macros layout once shown what
     macros cost (~3 mm off the code, a point size off the name). **Macros are IN** — build to that,
@@ -949,12 +952,23 @@ which also makes it testable and works offline.
     metrics and the layout is tight enough that it will reflow.
   - **The made-on date is a blank ruled line the owner writes on**, not a rendered date. This
     removes a whole question: the label no longer has to know when it was printed.
-  - Calories are stated **per serving with the serving count beside them** ("312 kcal · 1 of 2").
-    The per-serving-vs-batch ambiguity above is real and this is the resolution of it.
-- **Mockups exist** — four 50 × 50 mm layouts at true scale (stacked · split · with-macros ·
-  code-first), each annotated with its tradeoff and its code's physical size. They live in a design
-  canvas, **not in this repo**; ask the owner for the link, or redraw from this spec, which carries
-  everything the mockups encode.
+  - **No per-serving line** — the owner removed it (2026-08-17). The label shows calories and macros
+    as bare figures.
+    **⚠ This un-resolves the per-serving-vs-batch ambiguity flagged above, by choice.** On a recipe
+    that makes two, a person reading the label cannot tell whether 312 kcal is one serving or the
+    tub. That is acceptable *only* if the app settles it instead: **scanning the code must log a
+    defined amount (one serving), never infer one.** Settle this when the scan-back is built — the
+    label can no longer carry the answer.
+- **Mockups exist** — four centred, circle-safe 50 × 50 mm treatments at true scale (editorial ·
+  black band · deli ticket · plaque), each annotated with its tradeoff and its code's physical size.
+  They live in a design canvas, **not in this repo**; ask the owner for the link, or redraw from this
+  spec, which carries everything they encode. No aesthetic has been picked yet.
+- **⚠ Going circular shrank the code, and this is the live risk.** Square-with-macros allowed
+  ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**, i.e. 0.58–0.76 mm per module on a
+  21-module code. A modern phone reads that at close range, but the margin is thin and **ink spread
+  on a home printer merges small modules** — that is the failure mode to expect, and it will look
+  like "the scanner doesn't work" rather than like a print problem. Levers, cheapest first: drop the
+  MADE line (worth ~3.7 mm), then drop macros. **Test-print and scan before the layout is frozen.**
 - **One constraint the mockups surface that the spec must not lose:** a QR needs a **quiet zone** —
   clear white margin on all four sides — and the code's physical size sets how much data it can
   carry legibly. At 50 mm the four layouts give codes of ~16–28 mm, all fine for a 21×21-module

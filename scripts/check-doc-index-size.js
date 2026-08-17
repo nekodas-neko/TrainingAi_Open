@@ -117,6 +117,12 @@ const root = path.join(__dirname, '..');
 // handwritten date line), so the "open questions" block became a spec. +16 net for replacing four
 // lines of questions with the answers plus the QR quiet-zone/payload constraint the mockups
 // surfaced. Amended in place rather than filed as a second entry, per this role's dedup rule.
+//
+// Raised 2026-08-17 (BugFix intake, Q-389 round-label revision): backlog 6721 -> 6735. The owner
+// added that labels rotate between square and CIRCULAR dies, which changes the binding constraint
+// from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
+// an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
+// composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -137,7 +143,7 @@ const BASELINE = {
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
   'projectOverview.md': 6679,
-  'docs/implementation-backlog.md': 6721,
+  'docs/implementation-backlog.md': 6735,
   'CLAUDE.md': 1010,
 
 };
