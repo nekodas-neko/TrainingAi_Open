@@ -7,18 +7,13 @@
 **Migrations:** 189 and 190 taken (Q-536); next free is **191**. Local SQLite unchanged at v22.
 
 ## Now
-Nothing in flight. **Q-536 is CLOSED and confirmed on the owner's device** — the midday cluster went
-**43 nights → 4** after migrations 189 + 190 (v1.318.2) and the 10:47 redecode, and the four
-survivors are short daytime fragments belonging to Q-274. Entry removed from the queue, Known-Issues
-row moved to the resolved archive.
+Nothing in flight. **Q-536 CLOSED and confirmed on device** (midday cluster 43 → 4; survivors are
+short daytime fragments, now Q-274's). **Q-539 shipped** (v1.318.5) — the `error_events` dedupe key
+was defeated by Drizzle embedding the generated `VALUES` list in its message, so one fault wrote
+5,771 rows and 49 MB; the key is normalised now and the stored message cap halved.
 
-It cost three deploys, two of them my own errors, both recorded so they are not repeated:
-a migration verified on an 8-row fixture that rolled back against a 15 s `statement_timeout` on
-434,707 rows, and a rollup worker that discarded Drizzle's `cause` so the next two failures were
-unreadable.
-
-**Q-314 is now the live one** — the re-drain-as-reset misdetection that caused all of it. Until it
-lands, every ring re-pair reopens Q-536.
+**Q-314 is the live one** — the re-drain-as-reset misdetection behind Q-536. Every ring re-pair
+reopens it. It needs an owner design call and I have asked for one (see Blocked).
 
 ## Next
 Work the queue top-down, taking the highest item in Lane A's ownership. As of this writing:

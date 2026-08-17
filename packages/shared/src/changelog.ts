@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.5",
+    date: "2026-08-17",
+    changes: [
+      "Internal: a repeating server fault no longer fills the error log with thousands of near-identical copies of itself. One fault in August wrote 5,771 entries and 49 MB \u2014 the de-duplication was there, but each copy looked different to it because the database driver includes the whole query text, which changes with the size of the batch that failed.",
+    ],
+  },
+  {
     version: "1.318.4",
     date: "2026-08-17",
     changes: [

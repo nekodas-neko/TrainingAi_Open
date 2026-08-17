@@ -498,29 +498,6 @@ below threshold and left in place for next time.
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
 
 
-### [platform] Q-539 — one repeating fault cost 49 MB because the error dedupe is defeated by parameterised SQL
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §7
-- **Branch:** `fix/error-events-dedupe-key`
-- **Added:** 2026-08-17 · **Placement:** small and self-contained, but below the two above because the
-  49 MB **clears itself** by ~2026-09-12 and no space is at stake — only the next incident.
-- **The prune is fine and the bug is already fixed — this entry is about neither.** `error_events` is
-  49 MB / 13,196 rows. The 30-day prune (`adapter.ts:4416`) runs correctly (owner's oldest row is
-  exactly 31 days old). 5,771 of the owner's 6,222 rows are one fault — the `oura_heartrate`
-  `cardinality_violation` **fixed by Q-214 on 2026-08-13**, whose last occurrence was that same day.
-- **Defect 1 — the dedupe key varies when the information does not.** `shouldRecordRequestError`
-  suppresses same-route+same-message repeats inside 60 s, which should have capped this at ~1,440
-  rows/day; it recorded ~2,600. Drizzle's failure message embeds the whole generated `VALUES` list, so
-  a different batch size is a different message. **Measured: 5,771 rows, 18 distinct messages, 1
-  distinct 60-character prefix.** Dedupe bypassed 18-fold. Fix shape: key the dedupe on a normalised
-  message (strip the parameter list / collapse `($N, ...)` runs), not the raw string.
-- **Defect 2 — 2 kB of boilerplate stored per row.** Every one of the 5,771 messages is truncated to
-  exactly 2,000 chars (`avg = max = 2000`) and is almost entirely `(default, $N, $N, $N, $N),`
-  repeated. The caps at `request-error.ts:153` work as written; they are just far too generous for a
-  message whose information ends at character 60.
-- Either fix alone would have made this incident cost single-digit MB.
-
-
 ### [devices][platform] Q-540 — narrow the `oura_raw_samples` row: drop `event_name`, `body_hex` → `bytea`
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 B
