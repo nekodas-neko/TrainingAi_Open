@@ -100,6 +100,16 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md`](../../handoff-2026-08-16-app-shell-goal-cache-and-e2e-findings.md)**
+  — 🆕 what came after the IA cluster: 6 PRs closing Q-255, Q-232-followup, Q-258, Q-259, Q-260 and
+  Q-262. **Q-260 is the substantive fix** — `user-goals` was fetched by the Progress tab's group
+  while the water goal renders on a `BODY_GROUPS` card, and because every tab stays mounted for the
+  app's life nothing ever re-read it. Also two corrections to standing beliefs: Q-240's "renders the
+  old one for 30 minutes" was never right for that path (`cachedFetchCore` always revalidates), and
+  `invalidateGoalRecommendations()` is inert for all six keys. Records a **withdrawn** finding
+  (Playwright's `:visible` is not "on screen"), three attempts at one guard of which none is one, and
+  the parallel-lane trap that cost two complete pieces of work.
+
 - **[`docs/handoff-2026-08-15-app-shell-ia-cluster-complete.md`](../../handoff-2026-08-15-app-shell-ia-cluster-complete.md)**
   — 🆕 the 2026-08-14 UI/flow/IA cluster worked to completion: 11 PRs, v1.307.2→v1.314.0, closing
   Q-232/233/234/235/236/237/238/239/242/244 and Q-256. `profile-tab.tsx` 845 → 465 lines and off the

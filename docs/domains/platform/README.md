@@ -26,6 +26,13 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](../../reviews/2026-08-16-goal-invalidation-audit.md)
+  — Q-262: does `invalidateGoalRecommendations()` do anything? **No, for all six keys.** Establishes
+  the method for auditing any cache group: an invalidation can only change a *settled* value where a
+  call site passes `freshWithinTtl` or a read path is seed-only, because `cachedFetchCore` always
+  revalidates otherwise. Q-263 applies it to the remaining groups, which are **not** expected to come
+  out the same way.
+
 - [`docs/reviews/2026-08-16-multi-user-load-test.md`](../../reviews/2026-08-16-multi-user-load-test.md)
   — **the multi-user load test, with a committed harness** (`scripts/load-test/`). Nothing breaks at
   10 users or at 100; first failures extrapolate to ~300 concurrent syncs. **A bigger pool does not
