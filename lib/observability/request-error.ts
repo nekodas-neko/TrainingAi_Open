@@ -22,6 +22,49 @@ const DEDUPE_MAX_KEYS = 200
 
 const recentlySeen = new Map<string, number>()
 
+/**
+ * The dedupe key must not vary when the *fault* does not.
+ *
+ * Q-539: one fault — the `oura_heartrate` `cardinality_violation` fixed by Q-214 — wrote **5,771
+ * rows**, when a 60 s window over ~200 routes should have capped it near 1,440/day. The window was
+ * not broken; the key was. Drizzle embeds the whole generated `VALUES` list in its failure message,
+ * so a batch of 40 rows and a batch of 41 are different strings describing the same broken query.
+ * **Measured on those rows: 18 distinct messages, all sharing 1 distinct 60-character prefix** — so
+ * the window was bypassed 18-fold, and the incident cost 49 MB instead of single digits.
+ *
+ * Normalising collapses the parts that carry no information: runs of `($1, $2, …)` tuples, bare
+ * `$N` placeholders, and long digit runs. Two genuinely different faults still differ in the text
+ * around those, which is where a query's identity actually lives.
+ */
+export function normaliseErrorKey(message: string): string {
+  return message
+    // A generated VALUES list: `(default, $1, $2), (default, $3, $4), …` → one marker, however long.
+    .replace(/\((?:\s*(?:default|\$\d+)\s*,?)+\)(?:\s*,\s*\((?:\s*(?:default|\$\d+)\s*,?)+\))*/gi, '(…)')
+    // Any surviving placeholder run, e.g. an IN list rendered as `$1, $2, $3`.
+    .replace(/\$\d+(?:\s*,\s*\$\d+)*/g, '$N')
+    // Row counts, ids and byte offsets that ride along in driver messages.
+    .replace(/\d{3,}/g, 'N')
+    .slice(0, KEY_MAX_CHARS)
+}
+
+/**
+ * The key needs only enough of the message to tell two faults apart. Q-539's 5,771 rows shared a
+ * 60-character prefix; past that the message was pure boilerplate. 500 leaves generous headroom
+ * over that observation while keeping the key map small.
+ */
+const KEY_MAX_CHARS = 500
+
+/**
+ * Q-539 defect 2: every one of those 5,771 stored messages was truncated to exactly 2,000 chars
+ * (`avg = max = 2000`) and was almost entirely `(default, $N, $N, $N),` repeated — 2 kB of
+ * boilerplate per row for a message whose information ended at character 60. The cap worked as
+ * written; it was simply far too generous for what these messages contain.
+ *
+ * 1,000 still holds a long stack-free driver message whole. What it stops is a generated VALUES
+ * list being archived at full width, 5,771 times.
+ */
+const MESSAGE_MAX_CHARS = 1_000
+
 /** Exported for tests; also lets a long-lived process drop keys it will never see again. */
 export function shouldRecordRequestError(key: string, nowMs: number, windowMs = DEDUPE_WINDOW_MS): boolean {
   const last = recentlySeen.get(key)
@@ -144,13 +187,15 @@ export async function recordRequestError(err: unknown, ctx: RequestErrorContext)
     // The user id IS in the key, though: without it the 60 s window silently collapses two users
     // hitting the same fault into one row, so even the count understates it. Anonymous requests
     // share the empty slot, which is the same behaviour as before for them.
-    if (!shouldRecordRequestError(`${userId ?? ''}|${url ?? ''}|${baseMessage}`, Date.now())) return
+    // Normalised, not raw: a generated VALUES list makes every batch size a different string for
+    // the same broken query, which is what let Q-539's single fault through 18 times per window.
+    if (!shouldRecordRequestError(`${userId ?? ''}|${url ?? ''}|${normaliseErrorKey(baseMessage)}`, Date.now())) return
 
     // The pool, not the repository: see the file header. Raw SQL rather than the Drizzle schema
     // keeps this import graph to `pg` alone.
     const { getPool } = await import('@/lib/data/postgres/client')
     const insert = `INSERT INTO error_events (user_id, source, message, stack, url) VALUES ($4, 'server', $1, $2, $3)`
-    const params = [message.slice(0, 2000), fullStack?.slice(0, 8000) ?? null, url]
+    const params = [message.slice(0, MESSAGE_MAX_CHARS), fullStack?.slice(0, 8000) ?? null, url]
     try {
       await getPool().query(insert, [...params, userId])
     } catch (insertErr) {
