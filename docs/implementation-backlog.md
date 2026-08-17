@@ -1690,19 +1690,15 @@ session working from a temporarily restored copy.
     `components/workout/session-duration-picker.tsx`, `components/more/home-widgets-section.tsx`.
   - Added by Q-261: `components/profile/goal-targets-section.tsx`,
     `components/profile/required-info-section.tsx` (×2), `components/profile/edit-profile-sheet.tsx` (×2).
-- **Q-261 matched the existing three deliberately rather than fixing them.** Building a roving
-  tabindex for five sites inside a labelling fix would have been an unrequested refactor, and
-  shipping five sites with keyboard nav next to three without it is worse than eight consistent
-  ones. So this is filed as the sweep it actually is.
-- **Genuinely low priority, and the reason is specific to this app.** The canonical runtime is a
-  touch-only APK with no attached keyboard, and TalkBack navigates by swipe rather than by arrow
-  key, so the affected population on the supported target is close to zero today. It matters if the
-  app ever gets real desktop/keyboard use, and it is the kind of thing an automated accessibility
-  scanner (Q-282) will flag, which is why it sits next to that entry.
-- **Do it as one sweep with a shared helper**, not eight hand-rolled copies — that is the "any
-  pattern at ≥2 sites gets extracted" rule, and eight is well past it. A `components/ui/`
-  radio-group primitive taking `{ options, value, onChange, label }` would replace all eight and is
-  the shape to aim at.
+- **Q-261 matched the existing three deliberately rather than fixing them** — a roving tabindex for
+  five sites inside a labelling fix would have been an unrequested refactor, and five sites with
+  keyboard nav beside three without is worse than eight consistent ones.
+- **Genuinely low priority**: the canonical runtime is a touch-only APK with no keyboard, and
+  TalkBack navigates by swipe, so the affected population on the supported target is near zero
+  today. It sits next to Q-282 because an accessibility scanner is what will force it.
+- **Do it as one sweep with a shared `components/ui/` primitive** taking
+  `{ options, value, onChange, label }`, not eight hand-rolled copies — eight is well past the
+  "any pattern at ≥2 sites gets extracted" rule.
 
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
