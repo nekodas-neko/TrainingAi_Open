@@ -168,7 +168,7 @@ const BASELINE = {
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
   'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6785,
+  'docs/implementation-backlog.md': 6789,
   'CLAUDE.md': 1010,
 
 };

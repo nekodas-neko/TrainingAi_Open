@@ -950,8 +950,11 @@ which also makes it testable and works offline.
     it uses — the candidates are Google Fonts (Geist, Archivo, Instrument Serif) and none can be
     assumed present wherever the PNG/PDF is generated. A silently-substituted fallback changes the
     metrics and the layout is tight enough that it will reflow.
-  - **The made-on date is a blank ruled line the owner writes on**, not a rendered date. This
-    removes a whole question: the label no longer has to know when it was printed.
+  - **The made-on date is a bare ruled line the owner writes on** — a rule and nothing else, with
+    **no "MADE" label beside it** (owner, 2026-08-17; deli ticket already did it this way and the
+    other styles now match). Not a rendered date, which removes a whole question: the label never
+    has to know when it was printed. Plaque carries no line at all, which is what buys it the
+    largest code.
   - **No per-serving line** — the owner removed it (2026-08-17). The label shows calories and macros
     as bare figures.
     **⚠ This un-resolves the per-serving-vs-batch ambiguity flagged above, by choice.** On a recipe
@@ -962,9 +965,9 @@ which also makes it testable and works offline.
 - **✅ ALL FOUR STYLES SHIP, and the user cycles between them** (owner, 2026-08-17). This is a
   different build from "pick one aesthetic", and it is cheap designed-in / expensive retrofitted:
   **the renderer takes a style name and looks up a template**, rather than one layout with the style
-  baked in. Build it that way from the first commit. The four are *editorial* (Geist, quietest —
-  the sensible default), *black band* (Archivo, reversed header), *deli ticket* (mono, dashed rules)
-  and *plaque* (Instrument Serif, double ring).
+  baked in. Build it that way from the first commit. The four are *black band* (Archivo, reversed
+  header — **the owner's chosen DEFAULT**, 2026-08-17), *editorial* (Geist, quietest), *deli ticket*
+  (mono, dashed rules) and *plaque* (Instrument Serif, double ring).
   - **Where the style choice lives is undecided, and one option costs a migration.** Per saved meal
     is the nicest and needs a new `saved_meals` column — **that is Lane A's to claim, not intake's**.
     A global user setting avoids the schema change. Picked-at-print-time and not stored is cheapest
@@ -978,7 +981,7 @@ which also makes it testable and works offline.
 - **Mockups exist** — the four treatments at true scale, plus a working style-cycler that mounts the
   same four files, so the demo cannot drift from the designs. They live in a design canvas, **not in
   this repo**; ask the owner for the link, or redraw from this spec, which carries everything they
-  encode. **No default has been chosen** — editorial is the recommendation.
+  encode. **Default is black band** (owner, 2026-08-17).
 - **⚠ Going circular shrank the code, and this is the live risk.** Square-with-macros allowed
   ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**, i.e. 0.58–0.76 mm per module on a
   21-module code. A modern phone reads that at close range, but the margin is thin and **ink spread
