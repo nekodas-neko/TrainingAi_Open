@@ -51,7 +51,7 @@ Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
   rendered** for any activity (found + fixed 2026-08-09, v1.276.1) — a validation-gate mismatch on
   `/api/oura/hr-window`, not missing data. Both that sheet and the exercise review sheet now
   cache-seed the HR window. See
-  [`the journal entry`](../../overview/entries/2026-08-09-q165-cache-seeded-reads.md).
+  [`the journal entry`](../../overview/history-2026-08-08.md).
 
 - ✅ **A lifting day's zero zone-minutes was scored as a missed cardio target** (Q-183, fixed
   2026-08-11, v1.279.2). The Activity Score already excluded *absent* zone-minutes and renormalised,
@@ -60,7 +60,7 @@ Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
   excludes the lane on an exact zero, leaving rest-day zeros scored. Worth knowing for any future
   work on this score: **40 of the owner's last 45 days had exactly zero zone minutes**, so the lane
   carries very little information either way. See
-  [`the journal entry`](../../overview/entries/2026-08-11-zone-minutes-structural-zero.md).
+  [`the journal entry`](../../overview/history-2026-08-08.md).
 
 - 🔴 **Q-139 — `resolveDsToMs` compresses ring time by up to 18× during a backlog drain**
   (found 2026-08-07, queued, needs one owner decision). Anchor lag spans 56.2 min over one day, and
@@ -98,7 +98,7 @@ cause of one class was a posted step window coming from a *different stream* tha
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-36 — the guided walk that could never sync, and the calendar blind spot behind it), filed under `cross` because it spans five pillars and so is not matched by the glob above.
 - Journal: `grep -rl 'step\|activity.score' docs/overview/entries/` — plus
-  [`entries/2026-08-07-log-activity-interval-walk-removal.md`](../../overview/entries/2026-08-07-log-activity-interval-walk-removal.md)
+  [`entries/2026-08-07-log-activity-interval-walk-removal.md`](../../overview/history-2026-08-07.md)
   (Q-140 — removed the Log Activity sheet's redundant "Interval walk" shortcut; Guided Walk keeps
   its own separate entry point on the Cardio Hub screen).
 
@@ -124,5 +124,5 @@ cause of one class was a posted step window coming from a *different stream* tha
   training calendar and Home's week strip/streak both use it. Do **not** make the server-payload
   writers additive to achieve the same thing: last-server-payload-wins is what makes a workout
   deleted on another device disappear here.
-  ([`2026-08-02-calendar-local-overlay.md`](../../overview/entries/2026-08-02-calendar-local-overlay.md),
-  [`2026-08-03-streak-local-overlay.md`](../../overview/entries/2026-08-03-streak-local-overlay.md))
+  ([`2026-08-02-calendar-local-overlay.md`](../../overview/history-2026-07-30.md),
+  [`2026-08-03-streak-local-overlay.md`](../../overview/history-2026-07-30.md))

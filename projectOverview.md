@@ -86,7 +86,7 @@ order.
   has the gap.**
 - **The `E2E` job is not a required status check** and should stay that way until it has a track
   record. Remaining write-path specs and the promotion are **Q-297**.
-- Detail: [`docs/overview/entries/2026-08-15-e2e-harness.md`](docs/overview/entries/2026-08-15-e2e-harness.md).
+- Detail: [`docs/overview/entries/2026-08-15-e2e-harness.md`](docs/overview/history-2026-08-15.md).
 
 ### [app-shell][health] ⚠️ Two user-visible goal fixes shipped — NOT device-verified (Q-260, Q-258, 2026-08-16)
 
@@ -137,7 +137,7 @@ order.
   out to be missing from the server, that is the other cause and this reopens.**
 - **The device check that would close this:** trigger a sync pull, log readiness mid-pull, and
   confirm both that the card flips immediately and that the log reaches the server afterwards.
-- Detail: [`docs/overview/entries/2026-08-15-readiness-card-optimistic-flip.md`](docs/overview/entries/2026-08-15-readiness-card-optimistic-flip.md).
+- Detail: [`docs/overview/entries/2026-08-15-readiness-card-optimistic-flip.md`](docs/overview/history-2026-08-15.md).
 
 ### [platform][devices] 🟢 Q-308 RESOLVED — serialise the sync fan-out; owner-measured RTT settled it (2026-08-16)
 
@@ -544,7 +544,7 @@ The review's own architecture lens (Lens F) is shallower than the rest, and **"w
 - **Deliberately not done:** a per-workout kcal estimate in the day screen's Training section. It
   needs `estWorkoutKcal` per session, which is the Q-230 bundle hazard from a client component —
   doing it properly means computing it server-side in `/api/day-log`.
-- Detail: [`docs/overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md`](docs/overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md).
+- Detail: [`docs/overview/entries/2026-08-15-nutrition-day-guard-and-deload-bar.md`](docs/overview/history-2026-08-15.md).
 
 ### [platform][app-shell] 🟠 Editing a goal never busts the goal cache — Health shows the old goal for 30 minutes (Q-240, 2026-08-14)
 
@@ -582,7 +582,7 @@ The review's own architecture lens (Lens F) is shallower than the rest, and **"w
 ### [platform] 🟠 83 device-verification rows, now tagged by which capability each actually waits on (re-measured 2026-08-15, Q-249…Q-254)
 
 - **Every row now carries a `· needs:` tag** (Q-254's re-tagging half, 2026-08-15 — see
-  [`docs/overview/entries/2026-08-15-device-verification-retag.md`](docs/overview/entries/2026-08-15-device-verification-retag.md)). Re-measured on
+  [`docs/overview/entries/2026-08-15-device-verification-retag.md`](docs/overview/history-2026-08-15.md)). Re-measured on
   the day Q-249 landed, the 83 rows split **browser 32 · android 26 · data 11 · hardware 13** —
   `grep -cE '^### .*needs: browser' projectOverview.md` and friends are the live count (anchor it to
   the heading, or this paragraph counts itself). The 2026-08-14
@@ -809,14 +809,14 @@ would delete up to 13 days of HR series it could no longer rebuild — and is mu
   during a rollup: **185 ms of a 262 ms in-process run → 4 ms of a 439 ms worker run**. A missing or
   unstartable worker bundle **falls back to in-process**, i.e. to the prior behaviour — proven by
   deleting the bundle and watching the correctness test still pass. Journal:
-  [`entries/2026-08-13-rollup-off-the-request-loop.md`](docs/overview/entries/2026-08-13-rollup-off-the-request-loop.md).
+  [`entries/2026-08-13-rollup-off-the-request-loop.md`](docs/overview/history-2026-08-12.md).
 - ~~**Stage 3 — the coalescing predicate**~~ — **shipped 2026-08-13.** `frames.length < 255` meant
   "any batch", not "the drain's last batch", so it bypassed its own 8 s window nearly every time. Now
   a trailing-edge debounce with a max-wait (`lib/oura-ble/rollup-debounce.ts`, 3 s / 20 s). Dev:
   three batches in quick succession → three 200s and **one** rollup.
 - ~~**The admin redecode route**~~ — **shipped 2026-08-13.** Both phases go through the worker,
   keeping the route's per-phase errors. Journal:
-  [`entries/2026-08-13-rollup-debounce-and-redecode-off-loop.md`](docs/overview/entries/2026-08-13-rollup-debounce-and-redecode-off-loop.md).
+  [`entries/2026-08-13-rollup-debounce-and-redecode-off-loop.md`](docs/overview/history-2026-08-12.md).
 - **Why this stays ⚠️ with everything shipped:** none of it is confirmed by production yet. The one
   number so far is `POST /api/oura-ble/samples` at **76–458 ms** on the live deployment, against 500s
   after 27.6 s during the outage — pointing the right way, over one quiet hour. Both of the outage
@@ -929,7 +929,7 @@ latency is the cheapest ongoing probe — it should stay in milliseconds.
 
 ### [nutrition] Saved-meal batch servings + local SQLite v25 (v1.292.0, 2026-08-12) — NOT verified on device · needs: android
 
-Journal: [`entries/2026-08-12-saved-meal-servings.md`](docs/overview/entries/2026-08-12-saved-meal-servings.md) ·
+Journal: [`entries/2026-08-12-saved-meal-servings.md`](docs/overview/history-2026-08-12.md) ·
 plan: [`plans/2026-08-12-meal-plan-portions-and-editing.md`](docs/superpowers/plans/2026-08-12-meal-plan-portions-and-editing.md)
 
 **The local migration is the risk, not the feature.** Local SQLite v25 adds
@@ -948,7 +948,7 @@ count is set.
 
 ### [nutrition][app-shell] Ingredient search, gram-level meal editing, sheet close-button clearance (v1.290.0, 2026-08-12) — NOT verified on device · needs: browser
 
-Journal: [`entries/2026-08-12-saved-meals-search-and-sheet-header.md`](docs/overview/entries/2026-08-12-saved-meals-search-and-sheet-header.md)
+Journal: [`entries/2026-08-12-saved-meals-search-and-sheet-header.md`](docs/overview/history-2026-08-12.md)
 
 Verified only in headless Chromium at 412×915. Safe-area insets read 0 in the sandbox and Samsung's
 WebView renderer is absent, so three things need `docs/device-smoke-checklist.md` on the S25:
@@ -967,7 +967,7 @@ No migration, no schema change and no sync-path change in this release.
 
 ### [nutrition] Meal Plan Phase 1 (v1.282.0, 2026-08-11) — NOT verified on device · needs: browser
 
-Journal: [`entries/2026-08-11-meal-plan-phase-1.md`](docs/overview/entries/2026-08-11-meal-plan-phase-1.md) ·
+Journal: [`entries/2026-08-11-meal-plan-phase-1.md`](docs/overview/history-2026-08-08.md) ·
 plan: [`superpowers/plans/2026-08-11-meal-plan.md`](docs/superpowers/plans/2026-08-11-meal-plan.md)
 
 Shipped: build/edit/activate a plan with optional training-rest variants, a six-step setup sheet, a
@@ -996,7 +996,7 @@ nine hand-rolled chevron toggles missing `aria-expanded`. It has no chevron togg
 one entry was checked, so the count in CLAUDE.md is left alone rather than decremented on a guess.
 
 **Portions, per-meal reroll, macro bars and a real manage sheet followed in v1.287.0** —
-journal: [`entries/2026-08-11-meal-plan-portions-and-controls.md`](docs/overview/entries/2026-08-11-meal-plan-portions-and-controls.md).
+journal: [`entries/2026-08-11-meal-plan-portions-and-controls.md`](docs/overview/history-2026-08-08.md).
 Ingredient weights are now sized in code per variant (`scaleIngredientsToTargets`), so a split plan
 no longer shows a permanent shortfall on whichever variant it was not sized for; a single meal can
 be rerolled without touching the others; each meal shows a bar per macro against its target; and
@@ -1009,7 +1009,7 @@ fix is in, but it can only be exercised on a device that already holds a plan an
 re-split. Add that case to the smoke run.
 
 **A saved plan is now editable meal-by-meal (Q-192/Q-193, v1.288.0)** —
-journal: [`entries/2026-08-11-meal-plan-edit-and-your-own-meals.md`](docs/overview/entries/2026-08-11-meal-plan-edit-and-your-own-meals.md).
+journal: [`entries/2026-08-11-meal-plan-edit-and-your-own-meals.md`](docs/overview/history-2026-08-08.md).
 Per-meal reroll previously worked only during review, and that was not a UI gap: `meal_plan_meals`
 stored a name and four targets and **discarded the ingredients on save**, so there was nothing to
 re-scale or replace. Migration 180 persists an ingredient snapshot; Manage plan → **Edit meals**
@@ -1027,7 +1027,7 @@ there. Diff a regenerated views migration against its predecessor — the only d
 the new columns.
 
 **Typed meals now get looked-up macros, and Saved Meals has a real UI (Q-194/Q-195, v1.289.0)** —
-journal: [`entries/2026-08-11-typed-meal-macros-and-saved-meals-uplift.md`](docs/overview/entries/2026-08-11-typed-meal-macros-and-saved-meals-uplift.md).
+journal: [`entries/2026-08-11-typed-meal-macros-and-saved-meals-uplift.md`](docs/overview/history-2026-08-08.md).
 Typing a meal into a plan calls the existing `/api/nutrition/scan` text mode (no new AI route), so it
 becomes a keepable meal rather than only a steer. Saved Meals gained a per-ingredient breakdown, a
 macro split bar, a delete confirmation, and multi-select delete.
@@ -1045,7 +1045,7 @@ backlog item on the targets editor.
 
 ### [nutrition] Energy Balance + calibrated maintenance (v1.280.0, 2026-08-11) — NOT verified on device · needs: browser
 
-Journal: [`entries/2026-08-11-nutrition-tracking-review.md`](docs/overview/entries/2026-08-11-nutrition-tracking-review.md)
+Journal: [`entries/2026-08-11-nutrition-tracking-review.md`](docs/overview/history-2026-08-08.md)
 
 Shipped: the five-band Energy Balance card on Nutrition, Health and (optional) Home; calibrated
 maintenance from logged intake vs weight trend; one calorie target across the app; the
@@ -1090,7 +1090,7 @@ straight across wrote 13,650 into the daily macro target. Both directions now co
 Review:
 [`docs/reviews/2026-08-09-soft-delete-mutation-coverage.md`](docs/reviews/2026-08-09-soft-delete-mutation-coverage.md)
 · journal:
-[`entries/2026-08-09-soft-delete-mutation-coverage.md`](docs/overview/entries/2026-08-09-soft-delete-mutation-coverage.md)
+[`entries/2026-08-09-soft-delete-mutation-coverage.md`](docs/overview/history-2026-08-08.md)
 
 The ownership mutation harness, pointed at soft-delete filtering. **113 filters neutralised, 371 of
 372 tests still passed** — one test notices, as a side clause. Every slice was at zero except
@@ -1167,7 +1167,7 @@ the native SQLite half was inferred from the absent call, not observed.
 **Fixed 2026-08-10 (#1235, v1.277.3)** — and the fix was larger than the finding: reading the
 sign-out that *did* work found `clearLocalStoreData()` was a hand-written list drifted to 27 of the
 schema's 37 tables. See the Current Status entry above and
-[`docs/overview/entries/2026-08-10-sign-out-clears-device.md`](docs/overview/entries/2026-08-10-sign-out-clears-device.md).
+[`docs/overview/entries/2026-08-10-sign-out-clears-device.md`](docs/overview/history-2026-08-08.md).
 ⚠️ **Still not device-verified:** `clearLocalStoreData()` is a no-op on web, so the local-store half
 has never actually run.
 
@@ -1176,7 +1176,7 @@ has never actually run.
 Full method:
 [`docs/reviews/2026-08-09-ownership-mutation-coverage.md`](docs/reviews/2026-08-09-ownership-mutation-coverage.md)
 · journal:
-[`entries/2026-08-09-ownership-mutation-coverage.md`](docs/overview/entries/2026-08-09-ownership-mutation-coverage.md)
+[`entries/2026-08-09-ownership-mutation-coverage.md`](docs/overview/history-2026-08-08.md)
 
 **The scoping is correct today — this is not a live leak.** Q-155 said one cross-user leak passes all
 tests; mutation testing turns that into a number. All **246** `user_id` predicates in
@@ -1265,7 +1265,7 @@ primitive, so the **goal-recommendation sheet** in Profile is the other surface 
 ### [platform][app-shell] Three rules mechanised, one CI blind spot closed, two cache findings queued (2026-08-09)
 
 Journal:
-[`docs/overview/entries/2026-08-09-ci-enforcement-and-cache-findings.md`](docs/overview/entries/2026-08-09-ci-enforcement-and-cache-findings.md).
+[`docs/overview/entries/2026-08-09-ci-enforcement-and-cache-findings.md`](docs/overview/history-2026-08-08.md).
 **No app behaviour changed** — CI scripts, workflow config and docs only.
 
 **The pattern behind all of it:** every rule checked this session was either *in CI and holding* or
@@ -1564,7 +1564,7 @@ repo has no jsdom environment — verified to fail on a planted regression.
 
 **⏳ Q-151 — REFUTED 2026-08-08, and it looks like Q-73 did close the class.** Filed as "React #418
 is NOT closed — `/sign-in` has a second, independent instance". Three measurements say otherwise
-([journal](docs/overview/entries/2026-08-08-signin-hydration-refuted.md)). **(1)** Production has
+([journal](docs/overview/history-2026-08-07.md)). **(1)** Production has
 **never** recorded a #418 on the sign-in page — `0` of `272` rows; all of them are on `/` (234),
 `/more` (15), `/health` (13) and four `/workout` URLs. **(2)** The whole series **stopped at Q-73's
 deploy**: last occurrence anywhere 2026-08-07 20:53 UTC, #1130 merged 21:12 UTC, nothing since,
@@ -1592,7 +1592,7 @@ permanent, so failing closed would crash-loop every boot rather than surface any
 The `check-timezone-rendering` CI rule shipped earlier the same day with twelve undifferentiated
 files. That was honest but not useful — **"calls `toLocale*` without a `timeZone`" is not by itself a
 bug** — so every file was read and classified
-([journal](docs/overview/entries/2026-08-08-timezone-rendering-triage.md)).
+([journal](docs/overview/history-2026-08-08.md)).
 
 **7 benign, no work needed:** each builds its Date from calendar components or a **local**-anchored
 string, so device-local rendering returns the same calendar date in any zone.
@@ -1624,7 +1624,7 @@ that added the review and which was missed there.
 ### [app-shell][platform] Bundle sizes measured for the first time — and they are NOT the navigation lever (2026-08-08)
 
 Never measured in 25 review documents. Numbers now exist
-([journal](docs/overview/entries/2026-08-08-bundle-baseline-measured.md)): **105 kB First Load JS
+([journal](docs/overview/history-2026-08-07.md)): **105 kB First Load JS
 shared by every route**; `/workout` heaviest at **361 kB**; `/` · `/health` · `/nutrition` · `/more`
 all at **316 kB while carrying 235 B of their own code** — so the weight is shared-layer, and
 screen-level splitting would move almost none of it.
@@ -1795,7 +1795,7 @@ exercised here at all. Needs the on-device smoke run
 (`docs/device-smoke-checklist.md`) — specifically: Pause/Finish during a tracked activity, "End
 test early" during a fitness test, and "End walk" during a guided walk, checked against the
 gesture bar on the S25. Full detail:
-[`entries/2026-08-07-navless-safe-area-sweep.md`](docs/overview/entries/2026-08-07-navless-safe-area-sweep.md).
+[`entries/2026-08-07-navless-safe-area-sweep.md`](docs/overview/history-2026-08-07.md).
 
 ### [app-shell] Cardio Hub entry card on the workout screen (2026-08-07, v1.269.0) — NOT verified on device · needs: browser
 
@@ -2011,7 +2011,7 @@ Fixed by writing the override's server response through `store.upsertPrescribedR
 — only the unaffected web path was verified (regression-free, since this change's new code never
 runs on web). Needs a real on-device swipe-to-pick-a-different-run-type check, after a skip, before
 this can be marked confirmed. Full detail:
-[`entries/2026-08-06-running-plan-override-local-write.md`](docs/overview/entries/2026-08-06-running-plan-override-local-write.md).
+[`entries/2026-08-06-running-plan-override-local-write.md`](docs/overview/history-2026-08-04.md).
 
 ### [sleep] ✅ Sleep analysis counts nights, not rows (Q-76, 2026-08-05, v1.261.0) — two nights still unrecoverable
 
@@ -2552,7 +2552,7 @@ same token.**
 > file, gated behind a currently-null `displayName` so not yet a live mismatch, but the same class),
 > plus the identical bare `toLocaleDateString` on `overview-screen.tsx` and
 > `pre-workout-screen.tsx`. Detail:
-> [`docs/overview/entries/2026-08-07-home-hydration-mismatch.md`](docs/overview/entries/2026-08-07-home-hydration-mismatch.md),
+> [`docs/overview/entries/2026-08-07-home-hydration-mismatch.md`](docs/overview/history-2026-08-04.md),
 > [`docs/reviews/2026-08-07-full-app-review.md`](docs/reviews/2026-08-07-full-app-review.md) §2.1.
 
 **Minified React error #418** (`args[]=text` — *"Text content does not match server-rendered HTML"*),
@@ -2613,7 +2613,7 @@ every morning, and "what should a bad night score" is a product judgement. Track
 owner explicitly declined both of this entry's original options (rescale the whole model, or make
 `sleep_quality_feel` a live input) and asked for an objective awake-time/fragmentation criterion
 instead. An awake-time fragmentation cap now ships in `sleep-score.ts` — see the Current Status
-entry above and [`entries/2026-08-06-sleep-fragmentation-cap.md`](docs/overview/entries/2026-08-06-sleep-fragmentation-cap.md).
+entry above and [`entries/2026-08-06-sleep-fragmentation-cap.md`](docs/overview/history-2026-08-04.md).
 This measured 32-night finding (the score's compressed dynamic range) is **still true and still
 open** — the cap only fires on awake-time outliers specifically, it does not widen the range for
 nights that are bad on other axes (autonomic, short duration). Q-72 itself is not closed.
@@ -3014,7 +3014,7 @@ per-item as the fix PRs land.
   `invalidatePrescriptionChanged` to the `aiPrescriptionPending` trigger. Finding (c) was
   investigated and is **unreachable** — after (a), every remaining reader of that endpoint either
   passes `no-store` or goes through the invalidated cache key — so no code was written for it. See
-  [`docs/overview/entries/2026-08-03-prescription-cache-staleness.md`](docs/overview/entries/2026-08-03-prescription-cache-staleness.md).
+  [`docs/overview/entries/2026-08-03-prescription-cache-staleness.md`](docs/overview/history-2026-07-30.md).
   **Not reproduced end to end:** the staleness needs a real transition plus a second read inside a
   60-second window, which is not drivable from the sandbox.
 - **[workouts] Q-54 — prescription-generation write race under concurrent triggers.** Two
@@ -3028,7 +3028,7 @@ per-item as the fix PRs land.
   `exerciseType` guard as the block 70 lines above it. The sibling sweep was re-run and found
   nothing else: every other `target80` render is already guarded, two of them by an earlier
   short-circuit in the same ternary chain rather than an explicit check. See
-  [`docs/overview/entries/2026-08-03-bodyweight-target-preview-sheet.md`](docs/overview/entries/2026-08-03-bodyweight-target-preview-sheet.md)
+  [`docs/overview/entries/2026-08-03-bodyweight-target-preview-sheet.md`](docs/overview/history-2026-07-30.md)
   — which also records a **new, smaller finding** the fix surfaced: `target80` for a bodyweight
   exercise is 0.8 × a BW_REF(100)-relative index, so it falls *below* BW_REF and inverts to
   "1 reps". Both blocks now agree and neither fabricates a weight, but "1 reps" is a weak reading
@@ -3060,7 +3060,7 @@ Home's week strip and streak now merge outbox-pending workouts on top of the ser
 time (`mergeCalendarOverlay` + a separate `pendingDays` state), so a **second** workout on a day that
 already holds a synced one is no longer masked. A workout on a fresh day already showed — the
 backlog entry's stated cause was wrong and is corrected in
-[`docs/overview/entries/2026-08-03-streak-local-overlay.md`](docs/overview/entries/2026-08-03-streak-local-overlay.md).
+[`docs/overview/entries/2026-08-03-streak-local-overlay.md`](docs/overview/history-2026-07-30.md).
 
 **Which surface was NOT exercised:** the overlay itself, on any path. `getLocalStore` returns null in
 the web sandbox, so `pendingDays` is provably always `{}` there and the merge is a no-op — the dev
@@ -3136,7 +3136,7 @@ a surface prints "kg" after it. A sweep of every 1RM render found two that did: 
 (which also *selected* the wrong PR — a plain `max` over two incomparable units ranked a pull-up
 above a 96 kg bench press) and the deload sheet's kg target. Both fixed; `live-1rm-readout.tsx` looks
 like the same bug but is unreachable for bodyweight, and the digests were already correct. See
-[`docs/overview/entries/2026-08-03-year-review-bodyweight-1rm.md`](docs/overview/entries/2026-08-03-year-review-bodyweight-1rm.md).
+[`docs/overview/entries/2026-08-03-year-review-bodyweight-1rm.md`](docs/overview/history-2026-07-30.md).
 **The weighted-lift half above is untouched and still open.**
 
 ### [activity] ⚠️ Activity HR for GPS runs/walks (Q-41 finding 2, v1.250.4, 2026-08-02) — not run against a real GPS activity
@@ -3193,7 +3193,7 @@ checklist. Doing the REINDEX without this guard would simply have refilled it.
 740,966 rows carry `decoded`) and its Finding 4 — a sha256 generated column for the dedup index —
 would have made the table *bigger* (sha256 is 32 bytes; `body_hex` averages 24 characters). Full
 numbers in
-[`docs/overview/entries/2026-08-02-oura-raw-samples-footprint-remeasured.md`](docs/overview/entries/2026-08-02-oura-raw-samples-footprint-remeasured.md).
+[`docs/overview/entries/2026-08-02-oura-raw-samples-footprint-remeasured.md`](docs/overview/history-2026-07-30.md).
 
 ### [platform][devices][readiness] ⚠️ Health Connect tier (Q-43, v1.250.0, 2026-08-02) — never run against a real provider
 
@@ -3225,7 +3225,7 @@ Do not strike this row on intent — the device check is on the owner checklist 
 "Resting heart rate 88" when there was no resting-HR data at all. Provisional factors now show their
 weight as `15%` in muted text, fill the bar to that same weight, and sort last instead of
 interleaving at their neutral `50` placeholder. See
-[`docs/overview/entries/2026-08-02-provisional-contributor-bar.md`](docs/overview/entries/2026-08-02-provisional-contributor-bar.md).
+[`docs/overview/entries/2026-08-02-provisional-contributor-bar.md`](docs/overview/history-2026-07-30.md).
 
 ### [activity][platform][workouts][readiness][devices] Owner bug batch reported 2026-08-02 — all 5 shipped, device checks outstanding
 
@@ -4175,7 +4175,7 @@ chart.js config, not visually with >1 week of non-zero data; on-device Samsung W
 caveat as every prior cardio-hub surface. **By design, not a gap:** "distance/pace vs anchor" and
 "PR history" trend views are deferred until the baseline-anchor system (backlog item "Density-
 progression engine") exists. Entry:
-[`docs/overview/entries/2026-07-27-cardio-trends.md`](docs/overview/entries/2026-07-27-cardio-trends.md).
+[`docs/overview/entries/2026-07-27-cardio-trends.md`](docs/overview/history-2026-07-23.md).
 
 ### [cardio][devices] 🟡 Ring cadence is octave-ambiguous, not flat — still gated off (2026-07-27)
 **Supersedes an earlier, wrong entry** that read "the ring DOES NOT track cadence". A
@@ -4218,7 +4218,7 @@ not a real multi-week GPS history. **By design, not a gap:** a full elevation-vs
 chart is not included — `encodeRoute` drops the per-point `ele` field, so only the aggregate
 gain/loss numbers persist; a real profile needs a new stored series + migration + sync-mirroring,
 tracked separately as `feat/cardio-elevation-profile`. Entry:
-[`docs/overview/entries/2026-07-27-cardio-session-visuals.md`](docs/overview/entries/2026-07-27-cardio-session-visuals.md).
+[`docs/overview/entries/2026-07-27-cardio-session-visuals.md`](docs/overview/history-2026-07-23.md).
 
 ### [cardio][devices] Cadence: slow-walk capture found 3 bugs; D-2 now supported at TWO cadences (v1.213.2, 2026-07-27)
 Owner capture at 1.5 km/h, counted **64 spm** — the first below the old band floor. Three distinct
@@ -4352,7 +4352,7 @@ few times; (3) on-device paint/safe-area of the new sheet, same caveat as Phase 
 Chromium, not the canonical S25 WebView). **By design, not a gap:** walk and Other activity never
 carry a recovery-gate note — `recovery-gate.ts` has no modality-agnostic equivalent, and building
 one was explicitly scoped out of this item (see the plan). Entry:
-[`docs/overview/entries/2026-07-27-cardio-session-picker.md`](docs/overview/entries/2026-07-27-cardio-session-picker.md).
+[`docs/overview/entries/2026-07-27-cardio-session-picker.md`](docs/overview/history-2026-07-23.md).
 
 ### [cardio] Cardiovascular hub Phase 1 (v1.212.0, 2026-07-27) — NOT verified on device / on real zone data · needs: data
 New `/cardio` screen + `GET /api/cardio-week` + the workout-select IA split. The quota logic
@@ -4368,7 +4368,7 @@ the framework default rather than a plan's personalised `weeklyBaseMinutes`. Dev
 `/cardio` on the S25 after a day of ring/strap wear and with a real running plan set up; confirm
 non-zero zone minutes, the bars render and clear the status/gesture bars, and the quota total
 reflects the plan's actual volume rather than the 150-min floor. Entry:
-[`docs/overview/entries/2026-07-26-cardio-hub-phase-1.md`](docs/overview/entries/2026-07-26-cardio-hub-phase-1.md).
+[`docs/overview/entries/2026-07-26-cardio-hub-phase-1.md`](docs/overview/history-2026-07-23.md).
 ### [readiness] 🔴 Nightly temperature treats one frame's simultaneous probes as consecutive samples (found 2026-07-27, OPEN)
 Same audit; **description rewritten twice** — first after re-verifying against full production
 history, then again after the `open_oura` source answered the protocol questions. `open_oura` decodes
@@ -4406,7 +4406,7 @@ invented. `efficiency` and the awake fraction are unit-stable and carry the sign
 the era is already recorded per-field in `sleep_sessions.source_map`, so no new column was needed.
 Remainders (a calibrated awakenings penalty; the chronic-stress consumer, whose score is populated on
 **0 of 70 rows**) queued as **Q-3b**. Journal:
-[`entries/2026-07-27-restless-periods-unit-mismatch.md`](docs/overview/entries/2026-07-27-restless-periods-unit-mismatch.md).
+[`entries/2026-07-27-restless-periods-unit-mismatch.md`](docs/overview/history-2026-07-23.md).
 
 ### [sleep] ✅ Sleep Score gained an autonomic axis (v1.215.0, 2026-07-27) — NOT verified on device · needs: browser
 Owner-directed, from the case study of the night of 2026-07-25
@@ -4435,7 +4435,7 @@ held exactly the **0** that was stored. Ring-only days merely showed it, because
 workout samples happened to land after the nap. Fixed by using the shared night selection scoped to
 today, plus a fallback when the recorded wake is in the future, and the response now reports the
 anchor the curve actually used rather than re-deriving it. Journal:
-[`entries/2026-07-27-body-battery-nap-wake-anchor.md`](docs/overview/entries/2026-07-27-body-battery-nap-wake-anchor.md).
+[`entries/2026-07-27-body-battery-nap-wake-anchor.md`](docs/overview/history-2026-07-23.md).
 ⚠️ Server-side only, but the card has not been re-checked on the S25.
 
 ### [sleep] ✅ Sleep Score vs how it actually felt — a calibration view (v1.220.0, 2026-07-27) — NOT verified on device · needs: browser
@@ -4449,7 +4449,7 @@ difference would be meaningless. Against production (24 rated mornings) it says 
 and surfaces three concrete targets: the model uses 15 points where the owner uses the whole scale,
 "Good" nights average *higher* (92.5) than "Great" ones (91.0), and 2026-07-21 was rated **Poor**
 while scoring **92**. Nothing here changes a score. Journal:
-[`entries/2026-07-27-sleep-feel-calibration.md`](docs/overview/entries/2026-07-27-sleep-feel-calibration.md).
+[`entries/2026-07-27-sleep-feel-calibration.md`](docs/overview/history-2026-07-23.md).
 ⚠️ Admin-only surface, not seen on the S25.
 
 ### [workouts] ✅ AI no longer quotes bodyweight 1RMs in kilograms (v1.224.0, 2026-07-27) — NOT verified on device · needs: browser
@@ -4462,7 +4462,7 @@ guard on the kg achievement milestones — `prFor` matches by **substring**, so 
 Squat" would have unlocked Century Squat at its `BW_REF` value. Proven end-to-end on `pnpm dev`:
 *"what is my pull-up PR?"* → **"6 reps (bodyweight)"**, while bench still answers "98kg". Three
 model-input-only builders remain (never quoted at the user) — queued as **Q-19b**. Journal:
-[`entries/2026-07-27-ai-bodyweight-units.md`](docs/overview/entries/2026-07-27-ai-bodyweight-units.md).
+[`entries/2026-07-27-ai-bodyweight-units.md`](docs/overview/history-2026-07-23.md).
 
 ### [workouts] ✅ Bodyweight sets no longer count as zero volume (v1.227.0, 2026-07-27) — NOT verified on device · needs: browser
 Q-13. The same sets were priced at `BW_REF + added` for the 1RM and intensity but at the **raw**
@@ -4477,7 +4477,7 @@ this adds. Isometrics stay unpriced on purpose — their "reps" are seconds. Mig
 `exercise_logs.volume` no longer equals Σ(`set_logs.weight_kg` × reps) on bodyweight rows, because the
 set records the *bar* and volume records work *done* — any future check must exempt bodyweight rather
 than "correct" it back. Journal:
-[`entries/2026-07-27-bodyweight-volume.md`](docs/overview/entries/2026-07-27-bodyweight-volume.md).
+[`entries/2026-07-27-bodyweight-volume.md`](docs/overview/history-2026-07-23.md).
 
 ### [workouts] ✅ Bodyweight sets no longer record a prescription they were never given (v1.227.3, 2026-07-27) — NOT verified on device · needs: browser
 Q-14. `planned_pct` stored the progression style's nominal percentage while `intensity_pct` is
@@ -4490,7 +4490,7 @@ prescribed rep target instead — `planned_reps` is written for **every** exerci
 bodyweight. Migration 153 adds the column to `set_logs`/`set_hr_stats` and clears the 6 historical
 rows; `planned_reps` is left NULL on them rather than reconstructed from a 1RM that has since moved.
 `sync-helpers` now replays the *prescribed* reps, not the performed ones. Journal:
-[`entries/2026-07-27-planned-pct-bodyweight.md`](docs/overview/entries/2026-07-27-planned-pct-bodyweight.md).
+[`entries/2026-07-27-planned-pct-bodyweight.md`](docs/overview/history-2026-07-23.md).
 
 ### [workouts] 🔴 `personal_records` is not the all-time best, and "starting weights" never reach the bar (found 2026-07-27, **enlarged 2026-07-28**, OPEN)
 Same audit. `POST /api/personal-records/seed` uses the unconditional upsert (no `IfBetter` gate, no
@@ -4531,7 +4531,7 @@ starts *recording* the observations phase 2 needs. **Phase 2 (queued, Q-23)** sw
 sites to `resolveDsToMs`; it wants a few days of accumulated observations first so the improvement is
 measurable rather than assumed, and is deliberately kept apart from the step backfill. Plan:
 [`plans/2026-07-29-ring-clock-anchor-epochs.md`](docs/superpowers/plans/2026-07-29-ring-clock-anchor-epochs.md).
-Journal: [`entries/2026-07-29-ring-clock-anchor-epochs.md`](docs/overview/entries/2026-07-29-ring-clock-anchor-epochs.md).
+Journal: [`entries/2026-07-29-ring-clock-anchor-epochs.md`](docs/overview/history-2026-07-28.md).
 
 ### [activity] 🟠 Step backfill preview computed; three days materially inflated (2026-07-28, OPEN)
 Recomputed all 20 ring-era days: stored **106,902** → recomputed **104,458** (net **−2,444**). Most
@@ -4594,7 +4594,7 @@ shared `PillarAudit.persist` field, so the two can't drift — including the sub
 readiness is the composite *before* illness suppression, not the displayed score). Dry-run by default,
 31 days/call, sequential, idempotent. **The remaining work is operational:** nobody has paged through
 production with `dryRun=false` yet, so coverage is still 21%. Journal:
-[`entries/2026-07-27-backfill-derived-scores.md`](docs/overview/entries/2026-07-27-backfill-derived-scores.md).
+[`entries/2026-07-27-backfill-derived-scores.md`](docs/overview/history-2026-07-23.md).
 
 ### [platform] ⏰ Claude read-only prod-DB access is approved FOR BETA ONLY — revisit on beta exit (2026-07-26)
 Owner approved standing read-only production-DB access for Claude sessions for the duration of beta

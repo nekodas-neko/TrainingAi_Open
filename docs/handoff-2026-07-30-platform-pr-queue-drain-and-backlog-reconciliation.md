@@ -6,7 +6,7 @@ _Domain: `platform` (also touches `workouts`, `devices`, `sleep`, `app-shell`) Â
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > `docs/implementation-backlog.md` (the queue, just reconciled â€” read the top-of-file notice), then
 > this file. The per-PR detail lives in
-> [`docs/overview/entries/2026-07-30-pr-queue-drain-and-backlog-reconciliation.md`](overview/entries/2026-07-30-pr-queue-drain-and-backlog-reconciliation.md).
+> [`docs/overview/entries/2026-07-30-pr-queue-drain-and-backlog-reconciliation.md`](overview/history-2026-07-28.md).
 
 ## Goal
 

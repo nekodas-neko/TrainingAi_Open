@@ -67,11 +67,11 @@ layer**) through §16. Read it before building any shared helper.
     (widget vocabulary, interaction rules) · [`-round3-widgets.html`](../../design/2026-08-08-ai-coach-round3-widgets.html)
     (paired widgets, the added domains; §4 records every settled decision).
   - **Shipped** across #1191, #1195, #1197, #1199 and the `early_deload` follow-up. Journals:
-    [`…-widget-protocol`](../../overview/entries/2026-08-08-ai-coach-widget-protocol.md) ·
-    [`…-route-and-thread`](../../overview/entries/2026-08-09-ai-coach-route-and-thread.md) ·
-    [`…-write-domains`](../../overview/entries/2026-08-09-ai-coach-write-domains.md) ·
-    [`…-tier3-and-widgets`](../../overview/entries/2026-08-09-ai-coach-tier3-and-widgets.md) ·
-    [`…-early-deload`](../../overview/entries/2026-08-09-coach-early-deload.md). Six write domains;
+    [`…-widget-protocol`](../../overview/history-2026-08-07.md) ·
+    [`…-route-and-thread`](../../overview/history-2026-08-08.md) ·
+    [`…-write-domains`](../../overview/history-2026-08-08.md) ·
+    [`…-tier3-and-widgets`](../../overview/history-2026-08-08.md) ·
+    [`…-early-deload`](../../overview/history-2026-08-08.md). Six write domains;
     remaining follow-ups (device verification, cardio goals) are **Q-168**.
 - **[`docs/superpowers/plans/2026-08-02-public-repo-migration-roadmap.md`](../../superpowers/plans/2026-08-02-public-repo-migration-roadmap.md)**
   — 🆕 backlog **Q-49**, the top platform item. How the gitignored models still reach Railway (they
@@ -134,7 +134,7 @@ Live at the time of writing (2026-07-30):
   2026-08-09: `scripts/check-repository-user-scoping.js` fails any adapter/slice method that takes
   `userId` and never uses it (368 take it, all use it today). That catches an *omitted* scope, not
   a wrong one, not a join that mentions `userId` without constraining, and not a broken pre-check.
-  See [`the journal entry`](../../overview/entries/2026-08-09-repository-user-scoping-check.md).
+  See [`the journal entry`](../../overview/history-2026-08-08.md).
 
 - 🔴 **Postgres volume approaching 1 GB for one user** — handed over, structural fix pending.
 - **`/mobile-signin` sits behind the auth gate**, which likely breaks first-run APK sign-in.
@@ -186,7 +186,7 @@ Live at the time of writing (2026-07-30):
   than reading code — see the journal entry for why that distinction matters. Plan:
   [`plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md`](../../superpowers/plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md).
   **Stage 2 shipped 2026-08-13** — the rollup now runs in a `worker_threads` realm; see
-  [`entries/2026-08-13-rollup-off-the-request-loop.md`](../../overview/entries/2026-08-13-rollup-off-the-request-loop.md)
+  [`entries/2026-08-13-rollup-off-the-request-loop.md`](../../overview/history-2026-08-12.md)
   for the worker-bundle constraint (`onnxruntime-node` cannot be webpack-bundled, so it needs its own
   esbuild output) and the in-process fallback that keeps a broken bundle harmless.
 
@@ -231,7 +231,7 @@ Live at the time of writing (2026-07-30):
   shape decision before anyone starts it, and that Q-7b/Q-104/Q-114 are device-gated despite an
   earlier handoff listing them as ready.
 
-- **[`docs/overview/entries/2026-08-14-sleep-stale-window-and-pool-contention.md`](../../overview/entries/2026-08-14-sleep-stale-window-and-pool-contention.md)**
+- **[`docs/overview/entries/2026-08-14-sleep-stale-window-and-pool-contention.md`](../../overview/history-2026-08-12.md)**
   — 🆕 much sharper burst evidence for the standing Q-107 DB-pool-contention fault (two ~20-minute
   bursts hitting 15-20+ unrelated routes at once, a cleaner signature than the 2026-08-08
   measurement), found while diagnosing an unrelated `[sleep]` bug (Q-225) via a full local
@@ -272,7 +272,7 @@ Live at the time of writing (2026-07-30):
   the first deploy's `[oura-models]` logs" step is superseded** — the loaders are lazy, so those
   lines prove nothing by their absence. The gate is now Admin → Tools → Additional tools → **Model
   asset delivery** (`GET /api/admin/model-assets`, v1.252.3), which asks the bucket directly;
-  see [`2026-08-03-model-asset-bucket-report.md`](../../overview/entries/2026-08-03-model-asset-bucket-report.md).
+  see [`2026-08-03-model-asset-bucket-report.md`](../../overview/history-2026-07-30.md).
   Also records that `constants/` (12 MB) *cannot* move
   because it is statically imported — so the repo cannot go fully public on the `.onnx` move
   alone — and that ~14 kB is close to the home screen's bundle ceiling.
