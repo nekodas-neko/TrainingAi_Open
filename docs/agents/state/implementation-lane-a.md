@@ -3,35 +3,51 @@
 > **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** the first session to run as Lane A · **Q band:** 314–349 (next free: 314 — none taken)
+**Updated:** 2026-08-17 · **By:** the first session to run as Lane A · **Q band:** 314–349 (next free: **315** — Q-314 taken for the ring-clock reset-detection defect)
 
 ## Now
-Nothing in flight. **Q-310 shipped and merged** — #17, v1.317.5. An engine-chosen ai_dynamic deload
-was prescribing full weights: `/api/workout-data`'s catch-all phase branch existed as two verbatim
-copies that both hardcoded `isDeloadActive: false` while title-casing the *same*
-`aiPeriodizationState.phase` field into the header label "Deload". Both now call
-`aiDynamicFallbackPhaseStatus()` in `packages/shared/src/workout/session-data.ts`. Detail, evidence
-and what was refuted:
-[`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](../../overview/entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md).
+Nothing in flight. **Q-536 diagnosed, not fixed** — docs-only PR. The 43 midday bedtimes are a
+spurious clock epoch, not a timezone bug: a 2026-08-17 re-pair made the ring re-drain buffered
+history, `isClockEpochReset` read that as a reset, and the new epoch's offset — estimated at the p10
+of anchor lag, which a re-drain contaminates — landed **+14.16 h** wrong. `aggregateOuraRawSamples`
+resolves every ds against `currentEpoch`, so the full redecode re-timed all history.
+[`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](../../overview/entries/2026-08-17-q536-clock-epoch-diagnosis.md).
+
+**Waiting on the owner:** the repair is a migration merging epoch 3 → 2 and epoch 1 → 0, then a full
+redecode. Both mutate health history. Nothing else in Q-536 can proceed until that is answered.
+
+Before that: **Q-310 shipped and merged** — #17, v1.317.5.
 
 ## Next
 Work the queue top-down, taking the highest item in Lane A's ownership. As of this writing:
 
-1. **Q-450** `[activity][cardio]` and **Q-451** `[workouts][app-shell]` sit at the top. Both
-   root-cause into `components/` (`done-activity-screen.tsx`, the Workout empty state) — **Lane B's**,
-   skip them.
-2. **Q-452** `[app-shell][platform]` — the AI insight card runs an LLM over literal "no data" strings.
+0. **Q-537** `[devices][platform]` is above Q-536 and is **not** takeable as-is: it is credential
+   handling (reveal/export the ring key) and its own verification line says nothing is checkable
+   from the sandbox. Needs owner sign-off before anyone builds it.
+1. **Q-314** `[devices][platform]` — filed this session, the root cause behind Q-536. Reset
+   detection treats a re-drain as a re-key. **Read its open-design-question block first**: there is
+   no observed true reset in the data, so any threshold is unvalidated against the case it exists
+   for, and missing a real re-key is worse and quieter than the current failure.
+2. **Q-450** `[activity][cardio]` and **Q-451** `[workouts][app-shell]`: both root-cause into
+   `components/` (`done-activity-screen.tsx`, the Workout empty state) — **Lane B's**, skip them.
+3. **Q-452** `[app-shell][platform]` — the AI insight card runs an LLM over literal "no data" strings.
    Read it before claiming: the fix may sit in the route (Lane A) or the card (Lane B), and the
    entry does not settle which.
-3. **Q-313** `[platform]` — a `next build` gate for `scripts/publish-dry-run.js`. `scripts/` is in
+4. **Q-313** `[platform]` — a `next build` gate for `scripts/publish-dry-run.js`. `scripts/` is in
    neither lane's list, so **claim it in this file before touching it** and check Lane B's baton.
    Heed the entry's own note: a build is minutes, so gate it behind `--all`.
-4. **Q-312** `[platform]` — the synthetic MET table is physiologically impossible, ~9 tests in CI.
-5. **Q-263** `[platform]` — audit the remaining cache groups the way Q-262 audited one
+5. **Q-312** `[platform]` — the synthetic MET table is physiologically impossible, ~9 tests in CI.
+6. **Q-263** `[platform]` — audit the remaining cache groups the way Q-262 audited one
    (`lib/cache-groups.ts`). Lane A.
 
 ## Blocked
-Nothing on the owner. One thing **owed**: the device check on Q-310, filed as a Known-Issues row in
+- **Q-536's repair needs owner sign-off** — a migration merging the spurious clock epochs, then a
+  full redecode. Both mutate the owner's health history, which is why they are not shipped. The
+  diagnosis is complete and the entry carries it; only the decision is outstanding.
+- **Q-537 needs owner sign-off** before anyone builds it: it is credential handling, and its own
+  verification line says nothing about it is checkable from the sandbox.
+
+One thing **owed** rather than blocked: the device check on Q-310, filed as a Known-Issues row in
 `projectOverview.md` rather than left implicit. Server/JS only, so it reached the APK via the
 Railway deploy with no rebuild — but the client half was verified from the route's response, not on
 hardware. Confirm at the next engine-chosen deload: header "Deload", reduced weights, no PR badge.

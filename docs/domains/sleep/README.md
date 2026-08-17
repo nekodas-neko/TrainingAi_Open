@@ -127,6 +127,17 @@ curve). **Before writing anything that treats one row as one night, call the hel
 
 ## Gotchas specific to this domain
 
+- **A ring re-pair can silently re-time every night in history.** `aggregateOuraRawSamples`'s
+  `toDate` resolves each `ds` against `currentEpoch(anchors)`, so whichever clock epoch is newest
+  governs *all* history — and a history re-drain after a re-pair opens a spurious epoch whose offset
+  is estimated from backlog-laden anchors. On 2026-08-17 that shifted 43 nights by **+14.16 h** into
+  midday bedtimes, and the full redecode is what applied it. Diagnosis, with the measurements:
+  [`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](../../overview/entries/2026-08-17-q536-clock-epoch-diagnosis.md)
+  (Q-536 to repair, Q-314 for the detection defect). Two things to carry: a bimodal bedtime
+  histogram means **one constant offset**, so measure the shift before theorising about timezones;
+  and `oura_raw_samples.epoch` existing does **not** mean resolving per-row is safe, because the
+  labels themselves can be wrong.
+
 
 - **`sleep_sessions.oura_id` is unique PER USER, not globally** (migration 166). The BLE rollup
   derives it as `ble:<startDs>` from the ring counter with no user component, so a global unique
