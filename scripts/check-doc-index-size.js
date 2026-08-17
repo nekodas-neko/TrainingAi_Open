@@ -123,6 +123,14 @@ const root = path.join(__dirname, '..');
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
 // an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
 // composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
+//
+// Raised 2026-08-17 (BugFix intake, Q-389 multi-style): backlog 6735 -> 6751. The owner wants all
+// four label styles to ship with the user cycling between them, which is a different build from
+// "pick one" — the renderer becomes template-lookup rather than one baked-in layout, and it is the
+// kind of thing that is cheap designed-in and expensive retrofitted. Records that, plus the three
+// consequences an implementer would otherwise hit late: where the style choice is stored (one
+// option needs a Lane A migration), the four-font embedding cost, and that the smallest style's
+// code now sets the scannability floor for the whole set.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -143,7 +151,7 @@ const BASELINE = {
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
   'projectOverview.md': 6679,
-  'docs/implementation-backlog.md': 6735,
+  'docs/implementation-backlog.md': 6751,
   'CLAUDE.md': 1010,
 
 };
