@@ -249,8 +249,9 @@ only one is recorded.
 
 **Q-292 sized: all 117 insights audited.** **7 imperial-unit errors** (all Fahrenheit, all in
 `sleep`) and **12 absolute superlatives** — roughly **16% carry at least one**. A second fabricated
-superlative is double-confirmed: *"a perfect recovery index"*, for a contributor **Q-271 measured has
-never exceeded 50 on any of 31 scored days**. One quasi-medical inference (hedged, benign advice, but
+superlative is double-confirmed: *"a perfect recovery index"*, for a contributor that scored **21 of
+100** that day. (This cited Q-271's "never exceeded 50 on any of 31 scored days"; **Q-500 re-measured
+it over 41 days and it is false** — see below. The superlative finding stands on that day's value.) One quasi-medical inference (hedged, benign advice, but
 it infers infection from a temperature reading **and states it is advising without a readiness
 score**). One regex hit was read and is a **false positive** — recorded so it is not re-raised.
 
@@ -520,11 +521,23 @@ one backlog entry per finding, **Q-271 … Q-284**.
   0.00 h**. On 2026-08-11 and 2026-08-13 the fragment is the *entire* record for the date. These feed
   `previousNight` (16% of readiness) and `sleepBalance` (10%). **This is the sweep Q-225 asked for,
   and it found at least one more night sharing 08-13's signature.**
-- **🟠 The Recovery Index contributor can never score above ~50 (Q-271).** `RECOVERY_INDEX_OPTIMAL_HOURS = 6`
-  against a production mean of **2.58 h**, with 1 of 39 days reaching the optimum. Realised
-  sub-scores across all 31 scored days: 13, 18, 20, 21, 22, 28, 43, 48 — **never above 50, ever.**
-  Nine percent of readiness weight that can only subtract (~2.2 points/day), flagged `provisional`
-  on 31 of 31 days.
+- **🟠 The Recovery Index anchor is ~1 h too high — Q-271 SUPERSEDED by Q-500 (2026-08-17).** The
+  original finding ("never above 50, ever", "~2.2 points/day") was measured over **eight** days and
+  does not survive the full series: over 41 days the contributor exceeds 50 on **12** of them, hits
+  **100 on 2026-07-17**, and costs **0.71** points/day, not 2.2. What is real is a systematic
+  **−10.2-point** bias: fitted against Oura's own `recovery_index` contributor on the 15 nights where
+  both exist, the zero-bias anchor is **4.63 h** (LOO 4.40–5.14), not 6. The shipped estimator is
+  **sound** (r = +0.712 vs Oura's, better than every alternative tested) and must not be changed.
+  Proposal: `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5, moving 40 of 41 days by at most **1.44** readiness
+  points. **⛔ Blocked on owner sign-off.**
+  [`docs/reviews/2026-08-17-readiness-calibration.md`](docs/reviews/2026-08-17-readiness-calibration.md)
+- **🟠 A stored readiness score cannot be re-derived from the inputs stored beside it (Q-501, 2026-08-17).**
+  `oura_daily_summary` rows get recomputed; the `oura_daily_derived` readiness rows built from them do
+  not follow. **5 of 33** persisted `recoveryIndex` sub-scores disagree with the hours they derive from
+  (worst: 2026-07-20, 2.32 h should give 39, persisted 4). `model_versions->>'readiness'` is **NULL on
+  all 33 rows**, so there is no way to tell whether a past readiness score moved because its inputs
+  changed or because the model did. Same class as Q-273; the admin score-audit panel pairs a score with
+  inputs that on those days did not produce it.
 - **🟠 Body Battery v5 drains 5× faster than it charges (Q-272).** v5 halved `CHARGE_RATE` to fix
   ceiling-pinning and overshot: charge 10.5/day vs drain 52.4/day, **ends at its daily minimum on 10
   of 12 days**, hits 0 on 3. Across all 40 days it never rises above its waking value on a third of
