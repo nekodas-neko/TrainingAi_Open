@@ -550,6 +550,26 @@ below threshold and left in place for next time.
   prescribed re-stamp refills it. Add a pre-flight free-space guard to the redecode route: the
   operations manual prescribes Redecode as the remedy for five failure modes (I12, I14, I19, I20,
   I25), so the documented fix procedure is itself a disk-fill hazard.
+- **⚠️ Finding 4 is NOT a drop-in index drop — measured 2026-08-17 (Lane A).**
+  `idx_oura_raw_samples_user_measured` (118 MB, `idx_scan` 14 in the ~1 h since crash recovery) has
+  **two live consumers**, and both break into a sequential scan of the largest table in the DB if it
+  goes:
+  1. `getLatestOuraBleMeasuredAt` (`slices/oura.ts:173`) — `WHERE user_id AND measured_at IS NOT
+     NULL ORDER BY measured_at DESC LIMIT 1`. Without the index this is a full scan per call.
+  2. `getOuraRawSamplesForTags` (`adapter.ts:6446`) — `WHERE user_id AND tag IN (…) AND measured_at
+     >= now() - N days ORDER BY measured_at`.
+  This entry's *"it exists to serve range queries that can be expressed as ds ranges instead"* is a
+  **plan, not a fact**: expressing them as ds ranges means converting the window bound through the
+  clock anchors at both call sites, and `getOuraRawSamplesForTags` is on a read path. So the order is
+  **rewrite both call sites to be ds-keyed, prove equivalence, then drop the index** — three steps,
+  not one. Do not drop it first and measure afterwards.
+- **The redecode's own cost, since this entry gates it.** `POST /api/oura-ble/samples/redecode`
+  re-stamps `measured_at` over every row (its own opening comment says so), which is exactly the
+  non-HOT full-table rewrite that produced the ~306 MB of bloat. Measured 2026-08-17 **after** the
+  incident: DB **786 MB**, `oura_raw_samples` **667 MB** (245 MB heap / 422 MB indexes). On the
+  temporarily-raised **5 GB** volume a redecode has ample headroom; on the stock 500 MB it does not.
+  **So the sequencing is: redecode now while the volume is large, and do not revert to 500 MB until
+  the index work above has landed** — otherwise the next prescribed redecode refills it.
 - **Answering this entry's own closing question — is 500 MB reachable without touching retention?
   Yes, and it is now measured rather than estimated.** `VACUUM FULL` → ~465 MB; + the index work
   → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB. **No retention change is
