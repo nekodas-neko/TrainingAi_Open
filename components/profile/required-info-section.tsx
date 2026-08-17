@@ -167,8 +167,10 @@ export function RequiredInfoSection({
               key={opt}
               type="button"
               {...sexGroup.getRadioProps(sex === opt, i)}
-              disabled={saving}
-              onClick={() => onSexChange(sex === opt ? '' : opt)}
+              // See the note in goal-targets-section.tsx — `disabled` drops keyboard focus mid-save
+              // (Q-355), so the in-flight guard moves into the handler.
+              aria-disabled={saving}
+              onClick={() => { if (saving) return; onSexChange(sex === opt ? '' : opt) }}
               className={[
                 'flex-1 rounded-xl border px-3 py-2 text-xs font-semibold capitalize transition',
                 sex === opt
@@ -210,8 +212,8 @@ export function RequiredInfoSection({
                 key={level}
                 type="button"
                 {...activityGroup.getRadioProps(active, i)}
-                disabled={saving}
-                onClick={() => onActivityLevelChange(active ? null : level)}
+                aria-disabled={saving}
+                onClick={() => { if (saving) return; onActivityLevelChange(active ? null : level) }}
                 className={[
                   'w-full text-left rounded-xl border px-3 py-2 transition',
                   active ? 'bg-foreground text-background border-foreground' : 'bg-muted border-transparent text-foreground',

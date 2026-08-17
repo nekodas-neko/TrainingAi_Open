@@ -79,3 +79,35 @@ ever picked up and turns out to be something structural, the sweep belongs with 
   the entry's concern: the harness was the pessimistic case.
 - **Why the mouse path fails.** Narrowed to "screen-specific, click arrives, handler does not run",
   not pinned. That is Q-354.
+
+## Addendum, 2026-08-17 — the cause found, and a correction to this entry
+
+The section above concluded that the `useDrag` binding "cannot be the cause", reasoning that the
+failing input produces no touch events for `filterTaps` to filter. **That reasoning was too narrow
+and the conclusion was wrong.** It is about the *touch* path; `useDrag` also binds mouse/pointer, and
+the mouse path is exactly what it breaks.
+
+Proven by removing `{...bindDateSwipe()}` from the container and re-running the probe:
+
+| Input | with binding | binding removed |
+|---|---|---|
+| `locator.click()` | ✗ | ✓ |
+| raw `page.mouse.click()` | ✗ | ✓ |
+| mouse down+up, 0 ms gap | ✗ | ✓ |
+| `touchscreen.tap()` | ✓ | ✓ |
+| `element.click()` in page context | ✓ | ✓ |
+
+So the original Q-309 report named the right component for the wrong reason, and this entry then
+cleared it for a reason that did not cover the mouse path. **What does not change** is the part that
+decides whether anyone is affected: touch taps work, on every probe, and touch is the only input the
+supported runtime produces. Q-309 stays refuted as a user-facing bug.
+
+`pointer: { touch: true, mouse: false }` was tried as a targeted fix and **does not work** — all
+three mouse paths still fail with it set — so it was reverted rather than left in as a
+plausible-looking no-op. A real fix means going into use-gesture's click-suppression behaviour, which
+is the rewrite the entry warned against, for a path no supported user takes. Recorded in Q-354 with
+that recommendation.
+
+**The method lesson:** "X cannot be the cause because mechanism M does not apply" is only as good as
+the enumeration of mechanisms. The binding had two (touch and mouse); I checked one and generalised.
+Removing the suspect and re-measuring is what settled it, and it is cheaper than the argument was.

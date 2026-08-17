@@ -285,6 +285,41 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
 
 
+### [platform] Q-356 — `periodization-soft-delete.test.ts` fails every day between 14:00 and 16:00 UTC, for every branch
+
+- **Branch:** `fix/periodization-soft-delete-local-midnight`
+- **Lane:** **A** — `lib/data/postgres/__tests__/`. Lane B diagnosed and reproduced it but does not
+  own the path.
+- **Added:** 2026-08-17 · found when it turned a Lane B PR's Tests job red
+- **⚠️ This blocks merges repo-wide for two hours a day, on any branch.** It is not specific to
+  whatever PR happens to be open when it fires.
+- **The mechanism, reproduced.** `beforeEach` inserts a session at `now() - interval '1 hour'`
+  (a UTC instant) and then derives the query window from the **user's** timezone:
+  ```sql
+  SELECT to_char((now() AT TIME ZONE 'Australia/Brisbane')::date, 'YYYY-MM-DD') AS today
+  ```
+  `weekStart = weekEnd = today`. Between 00:00 and 02:00 Brisbane — 14:00–16:00 UTC — "an hour ago"
+  is **the previous Brisbane day**, so the session falls outside `[today, today]`,
+  `getWeeklySetsByMuscleGroup` counts zero, and all five assertions fail. Measured at 14:35 UTC:
+  ```
+  Brisbane today:    2026-08-18
+  session completed: 2026-08-17 23:35 Brisbane  → date 2026-08-17
+  ```
+- **The comment above the insert asserts the opposite** — *"Started an hour ago so the session sits
+  inside today's user-local week regardless of the hour the suite runs at"* — which is true for 22
+  hours a day and false for two. Fix the comment with the code.
+- **Reproduce without waiting for the window:** seed a fresh database (`current_date` is irrelevant;
+  the seed anchors on Brisbane today) and run
+  `DATABASE_URL=… npx vitest run lib/data/postgres/__tests__/periodization-soft-delete.test.ts`
+  between 14:00 and 16:00 UTC. Outside that window it passes, which is why it has survived.
+- **Fix shape:** anchor the inserted session to the *user-local* day rather than to a UTC offset —
+  e.g. insert `completed_at` at local midday for the Brisbane date the window is computed from, so
+  both sides come from the same day by construction. This is the same rule CLAUDE.md already states
+  for tests (*"derive the fixture from the clock or inject the clock — never hardcode one side of a
+  rolling window"*), in the shape where both sides are derived but from **different timezones**.
+- **Worth a sweep:** any other test inserting `now() - interval '…'` and querying a user-local day
+  window has this exact hole. `grep -rn "now() - interval" lib/data/postgres/__tests__/`.
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
@@ -2485,28 +2520,6 @@ session working from a temporarily restored copy.
   `check-hex-literals.js`, so the existing violations are recorded rather than blocking, and the
   count can only go down.
 
-### [app-shell] Q-355 — selecting a goal disables the group mid-save, which ejects keyboard focus
-
-- **Branch:** `fix/goal-group-focus-on-save`
-- **Added:** 2026-08-17 · found implementing Q-350's arrow-key navigation, which exposed it
-- **Priority: low** — same reasoning as Q-350. The canonical runtime is a touch-only APK, so the
-  affected population today is close to zero. Filed because it half-defeats a feature that just
-  shipped, not because anyone is hitting it.
-- **The mechanism.** The three goal groups (Fitness Goal, Biological Sex, Activity Level) pass
-  `disabled={saving}`, and their handlers call `patchProfile`, which sets `saving` for the duration
-  of the PATCH. A browser **drops focus from an element that becomes disabled** — so an arrow keypress
-  moves the selection correctly and then ejects the user from the group, every press.
-- **Measured**, not inferred: an E2E spec asserting focus follows the arrow passes on Food Region
-  (which writes `localStorage` and never disables) and fails on Fitness Goal. That asymmetry is why
-  `e2e/radiogroup-keyboard.spec.ts` drives Food Region for the full contract and asserts only
-  selection movement on Fitness Goal.
-- **Affects 3 of the 8 radiogroups.** The workout pickers, the two Edit Profile strips and the
-  home-widgets style list do not disable on change.
-- **Fix shape:** either stop disabling the group for a debounced background PATCH (the save is
-  already optimistic — the UI does not wait for it), or restore focus after the disable clears. The
-  first is likely correct and is also the better UX: disabling a control for a save the user was not
-  told about is what makes the group feel unresponsive on touch too.
-
 ### [platform] Q-283 — ~11 MB of indexes have never served a scan, on a DB where index bloat already caused an incident
 
 - **Branch:** `chore/drop-unused-indexes`
@@ -2753,27 +2766,38 @@ session working from a temporarily restored copy.
 > §7. **The per-row bucketing was done from headings, not by reading each row** — re-check a row
 > before claiming a capability closes it.
 
-### [app-shell] Q-354 — a mouse click on Nutrition's action row does nothing, and only on that screen
+### [app-shell] Q-354 — the date-swipe `useDrag` swallows MOUSE clicks on Nutrition (touch is fine)
 
 - **Branch:** `fix/nutrition-mouse-click-swallowed`
-- **Added:** 2026-08-17 · the residue of Q-309, which was **refuted** and removed (see below)
-- **Priority: low, and the reason is the canonical runtime.** The supported target is a touch-only
-  APK. A real touch tap works (measured). This only affects mouse input, which no supported user
-  produces — it is filed because it is unexplained and screen-specific, not because it hurts anyone.
-- **What is measured.** On `/nutrition`, Playwright's `.click()` on the Water action row dispatches
-  `pointerdown → mousedown → pointerup → mouseup`, a click event reaches the element, and the sheet
-  **never opens** (DOM polled 20× over 2 s — not an open-then-close). `page.touchscreen.tap()` on the
-  same element dispatches the full touch sequence and opens it every time. `.click()` on a button
-  outside this screen (`/more` → Edit Profile) works normally.
-- **The Q-309 hypothesis is refuted, so do not start from it.** Q-309 blamed the date-swipe
-  `useDrag` (`filterTaps: true`, `pointer: { touch: true }`) swallowing the tap. It cannot be that:
-  the failing sequence produces **no touch events at all** for `filterTaps` to act on. `pull-to-sync`
-  is also ruled out — it binds only touch listeners and is not mounted on this screen.
-- **What is still unknown:** why a click event that reaches the element does not run the handler on
-  this screen when it does elsewhere. Worth one careful look with React DevTools or by bisecting the
-  screen's wrappers; not worth a gesture rewrite.
-- **Do not "fix" this by changing gesture code** without reproducing a *touch* failure first. The
-  touch path is verified working, and a speculative change there would risk the path that matters.
+- **Added:** 2026-08-17 as the residue of Q-309 · **cause located and proven 2026-08-17**
+- **Priority: low, and that is a considered position rather than a shrug.** The supported target is
+  a touch-only APK and **touch works** — verified repeatedly. No supported user produces mouse input.
+  This is filed because it is now *understood*, not because it needs doing.
+- **Proven cause: the date-swipe `useDrag` binding** on the scrolling container
+  (`nutrition-content.tsx:513`, spread at `:575`). Removing `{...bindDateSwipe()}` and re-running the
+  probe makes **every** input method work:
+
+  | Input | with binding | binding removed |
+  |---|---|---|
+  | `locator.click()` | ✗ | ✓ |
+  | raw `page.mouse.click()` | ✗ | ✓ |
+  | mouse down+up, 0 ms gap | ✗ | ✓ |
+  | `touchscreen.tap()` | ✓ | ✓ |
+  | `element.click()` in page context | ✓ | ✓ |
+
+- **This corrects Q-309's write-up, and the correction matters.** Q-309 blamed this binding;
+  the Q-309 closing note then said it could not be the cause, reasoning that the failing input
+  produces no touch events for `filterTaps` to filter. That reasoning was about the *touch* path.
+  `useDrag` also binds mouse/pointer, and the mouse path is what it breaks — so the original
+  suspect was the right component and the wrong mechanism. **Both halves are now measured**: touch
+  taps genuinely work, and the binding genuinely swallows mouse clicks.
+- **`pointer: { touch: true, mouse: false }` does NOT fix it** — tried, measured, reverted. All three
+  mouse paths still fail with it set. Whatever suppresses the click is not that switch, so a real fix
+  means going into use-gesture's tap/click-suppression behaviour or restructuring the binding.
+- **Recommendation: do not pursue without a reason.** The only working path is the one that matters,
+  a rewrite risks it, and there is no user on the supported runtime who benefits. Revisit if the app
+  ever gets genuine desktop use, or if an automated accessibility/interaction scanner (Q-282) starts
+  driving mouse input.
 
 ### [platform] Q-297 — finish the E2E specs Q-249's first PR deliberately left, and cover more than one tab per screen
 

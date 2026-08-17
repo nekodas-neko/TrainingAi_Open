@@ -68,8 +68,13 @@ export function GoalTargetsSection({
                 key={goal}
                 type="button"
                 {...fitnessGoalGroup.getRadioProps(active, i)}
-                disabled={saving}
-                onClick={() => onFitnessGoalChange(active ? null : goal)}
+                // `aria-disabled`, not `disabled`, with the guard moved into the handler (Q-355).
+                // A native `disabled` still blocks the double-submit this is for, but the browser
+                // also drops focus from an element that becomes disabled — so every arrow keypress
+                // ejected the user from the group while the PATCH was in flight. This keeps the
+                // protection and the focus. `useRovingRadioGroup` skips `aria-disabled` options.
+                aria-disabled={saving}
+                onClick={() => { if (saving) return; onFitnessGoalChange(active ? null : goal) }}
                 className={[
                   'w-full text-left rounded-xl border px-3 py-2 transition',
                   active ? 'bg-foreground text-background border-foreground' : 'bg-muted border-transparent text-foreground',
