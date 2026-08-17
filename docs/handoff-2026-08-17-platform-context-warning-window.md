@@ -66,6 +66,11 @@ Nothing here touches app code, so no `pnpm dev` pass, no device check, and no ch
   silently, in whichever direction is wrong.
 - The rendered message says `1000k` rather than `1M` — the `k()` helper only knows thousands.
   Cosmetic, left alone deliberately.
+- **The CI checks endpoint lagged 30+ minutes and cost this session two hours.** `Lint`, a
+  43-second job, read `in_progress` for ~35 min, and log fetches 404'd the whole time — which reads
+  as proof a job is still running and is not. The merge attempt is the reliable green check; it
+  validates against real branch-protection state. Written up as gotcha (3) in CLAUDE.md's
+  CI-monitoring list.
 
 ## Deliberately NOT done
 
