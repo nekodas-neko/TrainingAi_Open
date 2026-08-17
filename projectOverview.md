@@ -3471,6 +3471,37 @@ journal.
   confirm both that the card flips immediately and that the log reaches the server afterwards.
 - Detail: [`docs/overview/entries/2026-08-15-readiness-card-optimistic-flip.md`](docs/overview/entries/2026-08-15-readiness-card-optimistic-flip.md).
 
+### [platform][devices] 🟢 Q-308 RESOLVED — serialise the sync fan-out; owner-measured RTT settled it (2026-08-16)
+
+The owner measured Railway per-query RTT from the app service — **p50 0.86 ms · p95 1.22 ms · min
+0.62 ms** — which was the one thing Q-308 said had to be known before touching anything. Evidence in
+[`docs/reviews/2026-08-16-sync-fanout-rtt-verdict.md`](docs/reviews/2026-08-16-sync-fanout-rtt-verdict.md).
+
+With a 1 ms per-query hop simulated against the production pool of 10:
+
+| concurrent syncs | PARALLEL (today) | **SERIAL** | CHUNKED ×4 |
+|---|---|---|---|
+| 10 | 155 / 161 ms · 210 conn | **95 / 137 ms · 10 conn** | 138 / 145 ms · 40 conn |
+| 50 | 588 / 625 ms · 1,050 conn | **356 / 607 ms · 50 conn** | 700 / 744 ms · 200 conn |
+| 100 | 1,153 / 1,218 ms · 2,100 conn | **588 / 1,026 ms · 100 conn** | 1,010 / 1,083 ms · 400 conn |
+
+**Serial is faster at p50 AND p95 at every concurrency, with 21× fewer connections** — roughly half
+the p50 at 100 concurrent. There is no trade-off to weigh, and chunking beats neither.
+
+**The previous round's "serial and parallel are identical at p95" reading was measured at 0 ms RTT**,
+where the two shapes converge because pool queueing dominates. A realistic hop separates them **in
+serial's favour** — the opposite of the risk the entry was written to guard against. A parallel
+fan-out demands 21 connections from a pool of 10, so each sync's own queries queue against each other
+and pay RTT again on every acquisition.
+
+**This re-frames Q-107 and Q-213 without striking them.** Both blame "DB-pool contention"; the pool is
+not the constraint, **the fan-out shape is what creates the contention they observed**. A bigger pool
+treats the symptom.
+
+**Not exercised:** still local Postgres with a *simulated* hop (`setTimeout`, not a real network),
+sync-vs-sync only — production sync also competes with every other route, which makes the
+connection-demand argument stronger rather than weaker.
+
 ### [workouts][platform] 🟠 The deferred measurements, taken — one escape hatch tested and closed off, one confound ruled out (2026-08-16)
 
 No new Q numbers. This round **answered questions four existing entries told an implementer to answer
@@ -6007,9 +6038,18 @@ and throw in production; `NOTICE` states that no third-party model weights are i
 17 test files, not the 16 the handoff measured — see the two rows below for what that count missed
 and for what has still never executed.
 
-**What remains is Phase B**, the cut itself: [`docs/public-repo-cut-runbook.md`](docs/public-repo-cut-runbook.md)
-steps 8–14. Rollback stays available throughout — the old repo remains a working Railway target
-until the final step, and that step archives rather than deletes it.
+**Update 2026-08-16 — the snapshot is PUSHED (step 8).** `nekodas-neko/TrainingAi_Open` holds one
+commit, `6c072f9`, verified by cloning it fresh and running `check-private-paths.js` there:
+`total tracked: 0.0 MB`. The pre-push audit found three real things, all fixed first — the owner's
+email in two docs (#1393), a private-path manifest that catalogued what it was protecting (#1396),
+and `main` red on E2E for ten hours of every day from a UTC-vs-Brisbane seed bug (#1397). Journal:
+[`entries/2026-08-16-public-repo-snapshot-pushed.md`](docs/overview/entries/2026-08-16-public-repo-snapshot-pushed.md).
+
+**What remains is Phase B steps 9–14**, and all but one are the owner's:
+[`docs/public-repo-cut-runbook.md`](docs/public-repo-cut-runbook.md). Branch protection on the new
+repo cannot be set from a session (no MCP tool for it). Rollback stays available throughout — the old
+repo remains a working Railway target until the final step, and that step archives rather than
+deletes it.
 
 **Update 2026-08-15 (#1353):** the CI story is solved — the model tests replay from recorded
 fixtures, so the suite passes with all ten `.onnx` files absent, and the constants resolve from the
