@@ -50,7 +50,16 @@ git history and the session journal (`docs/overview/entries/`).
 > was waiting for and traced the exact ungated code path (`onUnstableReading`,
 > `ScaleBleService.kt:314-329`); see its entry.
 >
-> **Next free Q number: 309** (updated 2026-08-16 — **Q-263** claimed from the app-shell lane's
+> **Next free Q number: 311** (updated 2026-08-17 — **Q-310** claimed by an owner report of a
+> `deload` phase that visibly changed nothing: header still read "Deload", but weights climbed
+> set-to-set and a new PR fired. Traced to `app/api/workout-data/route.ts`'s ai_dynamic fallback
+> branch (two identical copies) hardcoding `isDeloadActive: false` / `phaseType: 'normal'` even
+> when `aiPeriodizationState.phase === 'deload'` — the phase NAME still renders "Deload" from that
+> same field, but the flag every actual deload behaviour reads (weight reduction, the PR gate) is
+> wrong. Filed near the top given it's a live prescription/data-correctness bug, not cosmetic.
+> Checked `list_pull_requests`: the file's own pointer said 309 was free, but open PR #1390 already
+> holds it ("Add the first write-path E2E spec... Q-297, Q-309") — the provisional-number trap
+> again. #1396/#1315/#1281 claim nothing in range. 310 is clear. Previously 309 (updated 2026-08-16 — **Q-263** claimed from the app-shell lane's
 > reserved 255–269 block: the scope Q-262 deliberately did not take, auditing the remaining cache
 > groups for load-bearing keys the same way. 309 unaffected — the block was already held.
 > Previously 309 (updated 2026-08-16 — **Q-262** claimed from the app-shell lane's
@@ -588,6 +597,77 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
 
 
+### [workouts][readiness] Q-310 — an ai_dynamic deload phase that fell into the generic fallback branch is a deload in name only
+
+- **Branch:** `fix/ai-dynamic-deload-fallback-not-flagged`
+- **Added:** 2026-08-17 · owner (two screenshots: an active Sumo Deadlift set showing "Pull ·
+  Deload · S2 · Ex 1/5", and the exercise summary right after, showing a "New Personal Record!"
+  badge and the estimated 1RM up +15.5 kg): "it still reccomended deload again - and the weights
+  are increasing the PR."
+- **Confirmed root cause, present in two identical copies.** `app/api/workout-data/route.ts` has a
+  generic ai_dynamic fallback (lines ~255-272 in the per-session-summary loop, duplicated verbatim
+  at lines ~450-467 in the single-session-detail path) that runs whenever `isAiDynamic` is true,
+  `sessionPhaseStatus` wasn't already set by the earlier baseline/early-deload-week branches, and
+  `aiPeriodizationState` exists:
+  ```ts
+  const phaseName = aiPeriodizationState.phase.charAt(0).toUpperCase() + aiPeriodizationState.phase.slice(1)
+  sessionPhaseStatus = {
+    phase: { ..., name: phaseName, phaseType: 'normal' } as ProgramPhase,
+    ...
+    isDeloadActive: false,
+    ...
+  }
+  ```
+  When `aiPeriodizationState.phase === 'deload'` — the AI periodization engine's own,
+  accumulated-fatigue-triggered deload decision, tracked in `session_periodization` and distinct
+  from the separate owner-confirmed `earlyDeloadWeek` mechanism the two branches above this one
+  already handle correctly — `phaseName` correctly becomes `"Deload"` (title-cased from the same
+  field), but `isDeloadActive` and `phaseType` are **hardcoded** to `false`/`'normal'` regardless.
+  The comment directly above this branch even says "not baseline, not deload" — the author believed
+  this generic branch could not see a deload phase, but `aiPeriodizationState.phase === 'deload'` is
+  exactly the case this branch exists to catch when it isn't caught by the two branches above it,
+  and it silently mishandles that one case.
+- **This is one bug with three visible symptoms, all from the same wrong flag:**
+  1. **Weights don't drop.** `buildWorkoutExercises` is called with
+     `isDeloadActive: sessionPhaseStatus?.isDeloadActive ?? false` (route.ts ~line 298) — `false`
+     here means full-intensity weights are prescribed exactly as if this weren't a deload at all,
+     matching the screenshot's set-to-set weight increase.
+  2. **The PR gate never engages.** `components/workout-screen.tsx` derives
+     `isAnyDeload = deload || (phaseStatus?.isDeloadActive ?? false)` from this same flag, which
+     flows into `shouldCountTowardPr` (`packages/shared/src/workout/log-exercise.ts`) — the gate
+     that exists specifically so "deload work is deliberately submaximal, so its 1RM estimate must
+     never enter personal_records" (its own comment). With `isDeloadActive` wrongly `false`, this
+     isn't just a misleading UI badge — `upsertPersonalRecordIfBetter` is called and a genuine
+     `personal_records` row is written from submaximal-labeled work.
+  3. **The deload never resolves, so the AI keeps recommending another one.** Whatever
+     fatigue/monotony signal made the AI choose `phase: 'deload'` in the first place never actually
+     gets addressed, since no real intensity reduction happened this "deload" — consistent with the
+     report of a deload being recommended again right after this one.
+- **Separately, `components/workout/exercise-summary-screen.tsx`'s "New Personal Record!" badge
+  (`isNewPR`, line 86) is a naive client-side comparison** (`newEst1rm > (allTimePr1rm ??
+  prevEst1rm)`) **with no deload awareness of its own** — even once the flag above is fixed, this
+  badge would still need to check `isAnyDeload`/`exerciseDeloaded` itself, or it can independently
+  misfire on any *correctly-flagged* deload set whose submaximal-adjusted `estimated1rm` still
+  happens to exceed the stored bar. Worth fixing in the same PR since it's the other half of what
+  the screenshots show.
+- **Possible data cleanup needed**: if this fallback branch has been live and reachable in
+  production, some `personal_records` rows may already be wrong the same way the historical
+  `168_q115_whole_session_deload_pr_correction.sql` migration corrected — this needs a query against
+  production `exercise_logs`/`personal_records` joined on `session_periodization` to check for rows
+  logged while `phase = 'deload'` that both counted toward a PR and don't have `exercise_deloaded`
+  set, before deciding whether a corrective migration is needed.
+- **Fix direction (not yet built or reviewed):**
+  1. In both copies of the fallback branch, derive `isDeloadActive` and `phaseType` from
+     `aiPeriodizationState.phase === 'deload'` instead of hardcoding `false`/`'normal'` — matching
+     how the branches above it already set these fields correctly.
+  2. Give `exercise-summary-screen.tsx`'s `isNewPR` the same deload gate `shouldCountTowardPr` uses,
+     so the badge and the actual PR write agree.
+  3. Query production for already-corrupted `personal_records` rows from this path before deciding
+     whether a corrective migration is needed.
+  4. Verify locally: force `aiPeriodizationState.phase = 'deload'` via the generic-fallback path
+     (not the early-deload-week path) and confirm the header still reads "Deload", weights are now
+     reduced, and no PR badge/write fires for a submaximal set.
+
 ### [platform] Q-306 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
 
 - **Branch:** `fix/publish-dry-run-build-gate`
@@ -845,7 +925,7 @@ session working from a temporarily restored copy.
 - **Add the sibling check:** `volume = 0` is currently 0 of 355, but the same "computed and stored as
   zero" hazard applies to it and to `avg_reps`.
 
-### [platform][devices] Q-308 — the sync fan-out demands 21 connections to save 8 ms, and the pool is not the bottleneck
+### [platform][devices] Q-308 — SERIALISE the sync fan-out (RTT measured, recommendation settled)
 
 - **Branch:** `perf/sync-fanout-connection-demand`
 - **Plan:** none yet — **the first task is a measurement that may change the answer**
@@ -878,6 +958,33 @@ session working from a temporarily restored copy.
   | 100 | 1,450 ms | 1,519 ms | 2,100 | **100** |
 
   Serial is also far more predictable (min 152 ms vs 26 ms).
+- **✅ RTT MEASURED 2026-08-16 BY THE OWNER — p50 0.86 ms · p95 1.22 ms · min 0.62 ms** (from the
+  Railway app service). **The blocker below is cleared and the answer is: serialise.** With a 1 ms
+  per-query hop simulated against the production pool of 10:
+
+  | concurrent | PARALLEL (today) | **SERIAL** | CHUNKED ×4 |
+  |---|---|---|---|
+  | 10 | 155 / 161 ms · 210 conn | **95 / 137 ms · 10 conn** | 138 / 145 ms · 40 conn |
+  | 50 | 588 / 625 ms · 1,050 conn | **356 / 607 ms · 50 conn** | 700 / 744 ms · 200 conn |
+  | 100 | 1,153 / 1,218 ms · 2,100 conn | **588 / 1,026 ms · 100 conn** | 1,010 / 1,083 ms · 400 conn |
+
+  **Serial is faster at p50 AND p95 at every concurrency, with 21× fewer connections.** No trade-off
+  to weigh. Chunking beats neither and is not worth the complexity. Full working in [`docs/reviews/2026-08-16-sync-fanout-rtt-verdict.md`](reviews/2026-08-16-sync-fanout-rtt-verdict.md).
+- **Why the earlier "identical p95" reading was wrong:** it was measured at **0 ms RTT**, where the
+  two shapes converge because pool queueing dominates. A realistic hop separates them **in serial's
+  favour** — the opposite of the risk this entry was written to guard against. Mechanism: a parallel
+  fan-out demands 21 connections from a pool of 10, so each sync's own queries queue against each
+  other and pay RTT again on every acquisition; serial takes one connection and runs to completion.
+- **The work:** replace the single `Promise.all` in `lib/data/postgres/adapter.ts:3362` with a
+  sequential loop on one checked-out client. **Keep the pagination contract**
+  (`packages/shared/src/sync/cursor.ts`, PR #97) untouched — this changes how reads are issued, not
+  what they return. Expect **no user-visible change at current scale** (real concurrency ≈ 0–1,
+  about +18 ms on a single sync) and strictly better behaviour under any concurrency.
+- **Verify after:** `RTT_MS=1 CHUNKS=1 node scripts/load-test/sync-fanout.js 50 10` — connection
+  demand should drop to 1× concurrency with p95 no worse than the table above.
+- **Re-frames Q-107/Q-213 without striking them.** Both blame "DB-pool contention". The pool is not
+  the constraint — **the fan-out shape is what creates the contention they observed.** A bigger pool
+  treats the symptom. Read this before assuming pool size is the lever.
 - **⚠️ DO NOT SERIALISE ON THIS EVIDENCE. Measure Railway RTT first.** The harness runs against a
   local Postgres over a Unix socket where per-query round-trip is ~0. On Railway the app and DB are
   separated by a real network, so serial adds **21 × RTT** per sync: +42 ms at 2 ms RTT, +210 ms at

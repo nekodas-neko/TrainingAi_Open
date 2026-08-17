@@ -141,13 +141,36 @@ build gate to the dry-run) and **Q-307** (the synthetic MET table).
 **`nekodas-neko/TrainingAi_Open`** — public, empty, default branch `main`. This is the name to use for
 `APK_RELEASE_REPO` at step 11.
 
-### ☐ 8. Push the snapshot · **agent**
+### ☑ 8. Push the snapshot · **agent** — DONE 2026-08-16
 
-Fresh `git init` over the working tree, one commit, push. **Not** a history rewrite: 81 MB of
-material sits across the old history and missing one trace is the failure mode.
+`nekodas-neko/TrainingAi_Open` now holds one commit, `6c072f9`, 3,253 files / 45 MB, taken from
+`main` at `c9df8db` via `git archive` (tracked files only). Not a history rewrite.
 
-**Check:** clone it fresh into a scratch directory and run `node scripts/check-private-paths.js` —
-every row must read "already removed".
+**Checked, the way this step specifies:** cloned fresh into a scratch directory, and
+`check-private-paths.js` there reports every row "already removed" or 0 files, `total tracked:
+0.0 MB`. Also audited before the push: no `.env`/`.pem`/`.key`/`.keystore`, no credential-shaped
+literals, and zero occurrences of either the owner's email or the provenance detail — both of which
+were live findings, not hypotheticals, and are recorded below.
+
+**Three things this step turned up.** None were in the plan, and all three had to be fixed *before*
+the push, because after it they are public:
+
+1. **The owner's email was in two historical docs** (#1393). Migration 006's hardcoded admin address
+   had been removed during this migration for exactly that reason; the sweep missed the two doc
+   mentions.
+2. **`scripts/private-paths.json` catalogued what it was protecting** (#1396) — including, for the
+   most sensitive entry, a restatement of the substance of the file. The *same description* had been
+   copied into a journal entry, so trimming only the manifest would have achieved nothing. Owner
+   instruction: vague to an outsider, still usable by an agent.
+3. **`main` was red on E2E, and had been since 14:00 UTC** (#1397). `seed.sql` built every date from
+   `current_date` — the server's UTC date — while the app reads today in the user's timezone
+   (Brisbane, UTC+10). After 14:00 UTC the newest seeded row is yesterday as far as the app is
+   concerned, so `goal-invalidation.spec.ts` could not pass for ten hours of every day. It had landed
+   in the morning, which is why it went green then. Unrelated to the migration, and it would have
+   blocked step 9's throwaway PR too.
+
+**The commit is authored `nekodas-neko <nekodas-neko@users.noreply.github.com>`** — GitHub's noreply
+form, deliberately, so the one permanent commit does not republish the address that #1393 redacted.
 
 ### ☐ 9. CI and branch protection in the new repo · **owner + agent**
 
