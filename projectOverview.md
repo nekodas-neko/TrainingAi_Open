@@ -36,6 +36,11 @@ ownership, plus a BugFix, a Tuning and a Review agent. Their roles, authority li
 and cold-start prompts are in [`docs/agents/README.md`](docs/agents/README.md). Start there rather
 than picking an item straight off the queue.
 
+**Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
+— the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is open and
+live**: 43 nights show wrong sleep windows from a ring clock-epoch collision the reinstall caused.
+**Do not run another full redecode** until it lands.
+
 **Open at the time of writing:** PR #4 (APK release read without a token), PR #6 (session notes the
 public cut did not carry), PR #9 (the first write-path E2E spec). Check
 `list_pull_requests` rather than trusting this line — it is a snapshot, not a live view.

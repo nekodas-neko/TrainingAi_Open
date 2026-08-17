@@ -103,11 +103,10 @@ const BASELINE = {
   // neither vitest (node-only, no @testing-library/react) nor the E2E harness (needs admin + a live
   // radio) can reach the code. The mechanism, the five-site sibling sweep and the CI-rule option
   // that was considered and declined all stayed in the journal entry.
-  'projectOverview.md': 6642,
+  'projectOverview.md': 6647,
   'docs/implementation-backlog.md': 6649,
   'CLAUDE.md': 1010,
-  'projectOverview.md': 6642,
-  'docs/implementation-backlog.md': 6649,
+
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;

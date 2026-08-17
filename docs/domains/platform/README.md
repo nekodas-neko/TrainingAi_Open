@@ -330,6 +330,7 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](../../handoff-2026-08-17-platform-agent-model-and-device-session-findings.md) — the standing-agent model (roles, lane contract, Q bands, batons, prompts), the documentation reorganisation and its two CI guards, and six findings from a live APK reinstall + Oura re-sync: the ring key an uninstall destroys, the emulator job that could not pass, `disk_full` in production, and the clock-epoch collision behind 43 wrong sleep windows (Q-536).
 - [`handoff-2026-08-17-platform-context-warning-window.md`](../../handoff-2026-08-17-platform-context-warning-window.md)
   — the wrap-up warning fired at ~111% while the window was 22% full. It is a `Stop` hook
   (`.claude/hooks/context-usage-warn.mjs`), **not** a CLAUDE.md rule — worth knowing before hunting
