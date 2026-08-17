@@ -106,6 +106,23 @@ const root = path.join(__dirname, '..');
 // indexing the repo-migration architecture sweep. Entries and open-issue content, not narrative —
 // the sweep's prose is in docs/reviews/2026-08-17-repo-migration-architecture.md, which this
 // ratchet does not govern.
+//
+// Raised 2026-08-17 (BugFix intake, Q-389): backlog 6682 -> 6700. One owner-requested feature entry
+// (printable saved-meal labels). Only +18 because a sweep had left the file 47 under its ceiling —
+// which is the intended cycle working: entries land, cleared ones leave, the number does not ratchet
+// on every single filing.
+//
+// Raised 2026-08-17 (BugFix intake, Q-389 amendment): backlog 6700 -> 6721. The owner settled the
+// two questions the entry was waiting on (50x50mm label; name + calories + code, macros optional;
+// handwritten date line), so the "open questions" block became a spec. +16 net for replacing four
+// lines of questions with the answers plus the QR quiet-zone/payload constraint the mockups
+// surfaced. Amended in place rather than filed as a second entry, per this role's dedup rule.
+//
+// Raised 2026-08-17 (BugFix intake, Q-389 round-label revision): backlog 6721 -> 6735. The owner
+// added that labels rotate between square and CIRCULAR dies, which changes the binding constraint
+// from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
+// an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
+// composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -126,17 +143,23 @@ const BASELINE = {
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
   //
-  // Raised 2026-08-17 (Q-281, Lane B): 6679 -> 6689. Same shape as the two raises above and the same
-  // reason: a shipped fix owing a device check cannot go to the resolved archive. The ratchet was
-  // right to catch the first draft at 20 over — the audit's findings, the FactorBar judgement call
-  // and the Q-278 corrections all moved to docs/reviews/2026-08-17-score-presentation-audit.md,
-  // which this file does not govern. What is left is the owed check (a 7.5px band word, verified
-  // only in a browser harness, on a style the owner selects) and the one pointer that stops Q-278
-  // being planned on premises this audit refuted. Two stale lines were corrected in the same pass:
-  // the version, four minors out of date, and an open-PR snapshot naming three PRs of which two had
-  // long since closed.
+  // Raised 2026-08-17 (Q-281, Lane B): projectOverview 6679 -> 6689, backlog 6735 -> 6770. Same
+  // shape as the two raises above and the same reason: a shipped fix owing a device check cannot go
+  // to the resolved archive. The ratchet was right to catch the first draft at 20 over — the audit's
+  // findings, the FactorBar judgement call and the Q-278 corrections all moved to
+  // docs/reviews/2026-08-17-score-presentation-audit.md, which this file does not govern. What is
+  // left is the owed check (a 7.5px band word, verified only in a browser harness, on a style the
+  // owner selects) and the one pointer that stops Q-278 being planned on premises this audit
+  // refuted. Two stale lines were corrected in the same pass: the version, four minors out of date,
+  // and an open-PR snapshot naming three PRs of which two had long since closed. The backlog half is
+  // Q-281's audit result folded into its entry plus the two refuted premises annotated onto Q-278 —
+  // a correction to an existing entry, which is cheaper here than an implementer discovering it.
+  //
+  // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
+  // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
+  // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
   'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6682,
+  'docs/implementation-backlog.md': 6770,
   'CLAUDE.md': 1010,
 
 };
