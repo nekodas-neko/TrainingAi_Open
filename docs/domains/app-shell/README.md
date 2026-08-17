@@ -102,6 +102,13 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-17-scroll-panel-page-jump.md`](../../overview/entries/2026-08-17-scroll-panel-page-jump.md)**
+  — 🆕 Q-532: `scrollIntoView` on a sentinel scrolls **every** scrollable ancestor including the
+  document, so a panel appending content drags the whole page. Use
+  [`lib/hooks/use-scroll-to-bottom.ts`](../../../lib/hooks/use-scroll-to-bottom.ts) instead — the ref
+  goes on the `overflow-y-auto` element. The sibling sweep found a second, unreported instance in
+  the workout-builder chat, and confirmed `coach-content.tsx` is correct as written. Not
+  device-verified, and no automated guard is possible today — the entry records why.
 - **[`docs/overview/entries/2026-08-17-profile-group-labelling.md`](../../overview/entries/2026-08-17-profile-group-labelling.md)**
   — 🆕 Q-261, the tail of the Q-258 sweep: the six `<Label>`s in `components/profile/` that front
   button groups rather than controls. Five became `role="radiogroup"` + `aria-labelledby` following

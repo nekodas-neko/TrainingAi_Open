@@ -58,7 +58,15 @@ const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6547,
+  //
+  // Raised 2026-08-17 (Q-532, Lane B): 6547 -> 6562. Same shape as the line above and the same
+  // justification — a shipped fix owing a device check cannot go to the resolved archive. Fifteen
+  // lines for three facts a session must not have to dig for: the sandbox cannot reproduce this at
+  // all, so the owner's drain run is the only verification; and no regression guard exists, because
+  // neither vitest (node-only, no @testing-library/react) nor the E2E harness (needs admin + a live
+  // radio) can reach the code. The mechanism, the five-site sibling sweep and the CI-rule option
+  // that was considered and declined all stayed in the journal entry.
+  'projectOverview.md': 6562,
   'docs/implementation-backlog.md': 6417,
   'CLAUDE.md': 1010,
 };
