@@ -902,6 +902,70 @@ too, so the Balance card's "burned" figure is dragged down in step.
   reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
   control, if option 1 is chosen, would need a device check.
 
+### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
+
+- **Branch:** `fix/claude-ro-owner-id-out-of-committed-migrations`
+- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
+  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
+- **Placement:** upper-mid. Not urgent — nothing is exploitable today — but it **compounds**: the
+  documented process adds another public copy on every schema change, so the cost of fixing it only
+  goes up.
+- **What.** `fe481797-4114-4f59-824d-223e0281823e` is the owner's production `users.id`. It is in
+  **18 tracked files**: every `NNN_claude_ro_views*.sql` migration,
+  `lib/data/postgres/__tests__/claude-ro-readonly-role.test.ts:41` (`OWNER_ID`), and
+  `docs/superpowers/plans/2026-08-12-meal-plan-portions-and-editing.md` (which spells out
+  `CLAUDE_RO_OWNER_USER_ID=fe481797-…`). `scripts/generate-claude-ro-views.js` bakes it in as the
+  row-scoping predicate and the generated SQL is committed. Invisible while the repo was private.
+- **What it is NOT.** Not a credential. It grants nothing alone — `/api/admin/db-query` needs
+  `CLAUDE_DB_QUERY_SECRET` **and** `requireAdmin`, and every other route is `auth()`-scoped. No
+  health data, email or name is exposed with it. **Do not treat this as an incident.**
+- **Why it is still worth fixing, in order:**
+  1. **It is one half of a credential pair.** `WEBHOOK_USER_ID` (+ `HEALTH_CONNECT_INGEST_SECRET`)
+     and `ADMIN_EXPORT_USER_ID` (+ `ADMIN_EXPORT_SECRET`) resolve to a user id that is almost
+     certainly this one. If either secret leaks, the other half is no longer a guess.
+  2. **It cannot be rotated cheaply** — 18 files plus the production row it identifies.
+  3. **The process re-publishes it.** `CLAUDE.md` requires re-running the generator into a **new**
+     migration number whenever a table is added, so every future schema change adds another public
+     file containing it, indefinitely.
+- **Fix shape (implementer's call).** Prefer killing the class over scrubbing 18 files: have the
+  generator resolve the owner at **apply** time rather than **generate** time — views scoped on
+  `current_setting('app.claude_ro_owner')`, or a single-row private lookup seeded out-of-band, the
+  same way the `claude_readonly` role's password is already kept out of committed migrations. Then
+  the 18 existing files can be superseded by one rebuild migration rather than edited. Note
+  `CLAUDE.md`'s warning: `ensureSchema` tracks by filename, so **never edit an already-applied
+  migration** — this has to land as a new number that DROPs and rebuilds the schema.
+- **Lane A owns this** — it is migrations, and no other agent takes a migration number.
+- **Related, not filed separately:** `private-paths.json` protects a third party's IP well, and
+  nothing plays that role for this project's own users' identifiers. Whether that wants a second list
+  or a widening of the existing one is a design decision; see the review's closing section.
+
+### [platform][app-shell] Q-457 — `lib/github-release.ts` still defaults to the archived private repo
+
+- **Branch:** `fix/apk-release-repo-default`
+- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
+  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
+- **Placement:** upper-mid. One line, and it removes a silent failure mode on a user-visible surface
+  that **has already been dead for two weeks once**.
+- **What.** `lib/github-release.ts:24`:
+  ```ts
+  const APK_RELEASE_REPO = process.env.APK_RELEASE_REPO ?? 'nekodas-neko/TrainingAI'
+  ```
+  The fallback is the **pre-cut, archived, private** repo. Correct before the migration, wrong after.
+- **Two ways it bites.**
+  - *Deployment:* if `APK_RELEASE_REPO` is ever unset, cleared, or missed on a new environment, the
+    app reads releases from an archived repo whose APK never changes again — and it fails
+    **silently-looking**, as a 404 surfacing as "Could not fetch release info" rather than as a
+    misconfiguration. `CLAUDE.md` records that this exact surface was dead for two weeks over the
+    related `GITHUB_RELEASES_TOKEN` question, which is why the *shape* matters more than the odds.
+  - *Public clone:* the default points at a repo the cloner cannot read at all, so the update card
+    and More → Download APK are broken out of the box with no indication why.
+- **NOT verified against the deployment.** This session cannot see Railway's environment;
+  `CLAUDE.md` asserts `APK_RELEASE_REPO` is set to the public repo. **This is about the default being
+  a trap, not a live outage** — do not write it up as one.
+- **Fix shape:** default to `nekodas-neko/TrainingAi_Open`, and update the two fixtures at
+  `lib/__tests__/github-release.test.ts:49,58`, which pin the old repo's URL and so would not catch
+  the flip.
+
 ### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
 
 - **Branch:** `fix/publish-dry-run-build-gate`
@@ -1420,6 +1484,66 @@ session working from a temporarily restored copy.
   exercises and absent from `MUSCLE_LANDMARKS`, which looks like a silent fall-through to
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly.
+
+### [platform] Q-458 — `.env.example` is the public configuration contract and it is wrong in both directions
+
+- **Branch:** `fix/env-example-reconcile`
+- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
+  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
+- **Placement:** mid. Mostly tidy-up, with one edge that names a security property the app does not
+  have.
+- **Method.** Differenced every `process.env.X` read under `lib app packages scripts
+  instrumentation*` against the keys declared in `.env.example`.
+- **Declared, read by no code — 8 keys:**
+
+  | Key | Why dead |
+  |---|---|
+  | `OURA_CLIENT_ID`, `OURA_CLIENT_SECRET`, `OURA_REDIRECT_URI`, `OURA_WEBHOOK_CALLBACK_URL`, `OURA_WEBHOOK_VERIFICATION_TOKEN` | Oura **Cloud** integration deleted 2026-08-13 |
+  | `GEMINI_API_KEY` | Retired at Q-189; `CLAUDE.md` already says nothing reads it |
+  | `TOKEN_ENC_KEY` | Nothing reads it |
+  | `AUTH_URL` | Nothing reads it |
+
+- **The sharp edge is `TOKEN_ENC_KEY`.** It reads as the key that encrypts stored tokens. An operator
+  will generate one, set it, and reasonably conclude tokens are encrypted at rest. Nothing reads it,
+  so nothing is. **A dead variable that names a security property is worse than a dead variable** —
+  fix this one even if the rest is deferred.
+- **The second edge is the five Oura Cloud keys.** `CLAUDE.md` is emphatic that the Cloud integration
+  must never be re-added (re-onboarding the official app risks a firmware update that breaks the
+  reverse-engineered BLE protocol). The public onboarding file currently invites a contributor to go
+  get credentials for exactly that. Two project files contradict each other, and the newcomer reads
+  the wrong one first.
+- **Read by code, undeclared — the real configuration** (excluding test/script knobs
+  `OURA_CONSTANTS_DIR`, `RECORD_MODEL_FIXTURES`, `CHUNKS`, `RTT_MS`, `SERIAL`):
+  `CLAUDE_RO_OWNER_USER_ID`, `LOCAL_DATABASE_URL`, `PG_POOL_MAX`, `RAILWAY_GIT_COMMIT_SHA`.
+- **Do NOT "fix" the `AWS_*` keys.** They are absent from `.env.example` deliberately —
+  `lib/exercise-storage.ts:4-24` reads `AWS_* ?? STORAGE_*` as an alias chain and
+  `constants-delivery.ts:74` reuses that module, so documenting `STORAGE_*` alone is correct. This
+  was checked and cleared; see the review.
+- **Fix shape:** delete the eight, add the four. Consider a Custom Rules step that differences the
+  two automatically — this drifted silently because nothing measured it, the same argument that
+  produced the hex-literal and TTL-divergence ratchets.
+
+### [platform][devices] Q-459 — the rolling APK release is delete-then-recreate, so the advertised public download URL 404s during every native merge
+
+- **Branch:** `fix/apk-rolling-release-no-404-window`
+- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
+  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
+- **Placement:** low. Short window, infrequent trigger.
+- **What.** `.github/workflows/android.yml:122-127`:
+  ```bash
+  gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
+  gh release create apk-latest android/app/build/outputs/apk/debug/app-debug.apk …
+  ```
+  Between the two commands the release **and its tag** do not exist. `CLAUDE.md` advertises
+  `…/releases/download/apk-latest/app-debug.apk` as *"always the newest `main` build, non-expiring,
+  and genuinely no login required"*, and `/api/download-apk` resolves it via
+  `/releases/tags/apk-latest` — a 404 in that window, surfacing as "Could not fetch release info".
+- **The workflow comment explains the choice honestly** (`gh` cannot overwrite an existing asset of
+  the same name in place), so this is a known trade-off, not an oversight. **The migration is what
+  made it matter:** while the repo was private nobody could use that URL; it is now the documented
+  distribution path.
+- **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
+  than the release and tag, so the release id and tag survive the swap.
 
 ### [platform][readiness] Q-453 — `/api/training-stress` silently answers for *today* when handed a malformed date; its ten siblings all reject it
 
