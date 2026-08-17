@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.0",
+    date: "2026-08-17",
+    changes: [
+      "Groundwork for fixing the sleep times on Health, which have been showing midday bedtimes since the app was reinstalled. Re-pairing the ring made it replay several days of stored history, and the app mistook that replay for the ring\u2019s clock having been reset \u2014 which shifted every night in your history by about 14 hours. Nothing was lost: the readings are all still there and the durations, heart rate and HRV were never affected. This release corrects the clock records themselves; the stored nights are rewritten by a follow-up re-decode.",
+    ],
+  },
+  {
     version: "1.317.5",
     date: "2026-08-17",
     changes: [

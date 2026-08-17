@@ -1,10 +1,11 @@
-## 2026-08-17 — the 43 midday bedtimes are a spurious clock epoch, not a timezone bug (Q-536 diagnosis, docs-only)
+## 2026-08-17 — the 43 midday bedtimes are a spurious clock epoch, not a timezone bug (Q-536, v1.318.0)
 
 Q-536 was handed to Lane A as top of queue with an explicit gate: *"Do not run a corrective pass
 until the open question is settled"* — whether the 2026-07-04 → 08-16 rows were already wrong or
 were rewritten wrong by the 2026-08-17 redecode. **Both of its questions are now answered from
-production, and two hypotheses are refuted.** No code shipped: the fix the entry proposed would have
-made things worse, and the fix that is right mutates the owner's health history.
+production, and two hypotheses are refuted** — including the one the entry called "the fix". The
+repair the evidence *does* support was approved by the owner and shipped as migration 189; the
+redecode that rewrites the stored nights is still owed.
 
 ### What is actually wrong
 
@@ -53,11 +54,47 @@ across two offsets 14 hours apart, which is worse than the uniform shift it repl
 *"That is the fix"* does not survive contact with the data: **the epoch labels themselves are
 wrong**, so scoping to them repairs nothing.
 
-### What was deliberately not done
+### What shipped
 
-- **No code.** The right repair is a migration merging epoch 3 → 2 and epoch 1 → 0 across
-  `oura_ble_clock_anchors` and `oura_raw_samples`, then a full redecode. Both mutate the owner's
-  health history, so both are waiting on sign-off rather than shipped.
+**Migration `189_q536_merge_redrain_clock_epochs.sql`** merges same-clock epochs across
+`oura_ble_clock_anchors` and `oura_raw_samples`, and drops the affected `oura_rollup_state`
+watermark so the next rollup re-derives rather than trusting a watermark whose epoch moved
+underneath it.
+
+It decides what to merge from **measured evidence, not a user id or an epoch number**. Scoping to
+one user would need that id hardcoded in a public repo, and `pg_stat_user_tables` is far too stale
+to prove the owner is the only ring user (it estimated 6 anchor rows against 5,374 actual). Scoping
+to "epochs 1 and 3" would encode the incident rather than the rule. So the criterion is the
+evidence: two epochs are the same ring clock when their **minimum** anchor lag agrees, within 10
+minutes — 12× the observed 50 s spread and orders of magnitude below any real re-key gap. A re-drain
+leaves that minimum untouched, because the drain's newest anchor is delivered as promptly as any
+steady-state one; a re-key restarts the counter and moves the origin by weeks.
+
+Validated on the merged production values before writing it: p10 across all 5,374 anchors lands
+**3 seconds** from the clean epoch-2 offset.
+
+`lib/data/postgres/__tests__/q536-merge-redrain-clock-epochs.test.ts` — 5 tests, run through
+`pool.query()` with the whole file, the same way `ensureSchema` runs it, so the `ON COMMIT DROP`
+temp table is exercised under the production execution path. **Mutation-checked both ways:**
+removing the lag-agreement guard fails the "genuine re-key is left alone" test, and removing the
+sample relabel fails another.
+
+**The fixture taught something worth keeping.** Its first draft gave each drained epoch two anchors,
+and the test failed — with n=2, `robustOffsetMs`'s p10 index is 0, so it returns the clean minimum
+and the contamination vanishes. The second draft left the drain's newest anchor 40 minutes late,
+which broke the merge criterion instead of testing it. What actually reproduces the bug is the
+*shape*: a drain replays days of ds inside a short window that ends as the newest event lands, so
+lag falls monotonically to ~0 and p10 sits a tenth of the way up that ramp.
+
+### Still owed
+
+⚠️ **A full-history Redecode after deploy.** The migration relabels; it does **not** rewrite the 43
+stored nights. The rollup's incremental window is 35 days and the damage spans 44 (2026-07-04 →
+2026-08-17), so clearing the watermark does not reach the oldest of them. **Health stays wrong until
+that is run** — this is the step that actually fixes what the owner sees. (Q-535: Redecode reports a
+spurious "failed: 502" for work that succeeded.)
+
+### What was deliberately not done
 - **`robustOffsetMs` was left alone, on evidence.** Lowering the percentile is the obvious fix and
   it is wrong: on a drained epoch even **p1 is already +1.28 h contaminated**, and only the *two*
   smallest anchors are clean — too thin to estimate from. On a healthy epoch p0→p10 spans 7 s and
@@ -69,8 +106,11 @@ wrong**, so scoping to them repairs nothing.
 
 ### Not exercised
 
-- **Nothing was run.** This is a measurement and reconciliation pass over production via the
-  read-only `claude_ro` views; no code path was executed, no dev server, no device.
-- **Owner-scoped.** Every count is the owner's rows only, and `claude_ro` prunes at 30 days.
-- **The repair is unverified** because it has not been run. The +14.16 h reconciliation is
-  arithmetic on stored values, not an observed corrected window.
+- **The migration has not run against production.** It is verified against a local reproduction of
+  the production epoch shape, and against a synthetic genuine re-key. Nobody has yet seen a real
+  corrected sleep window — the +14.16 h reconciliation is arithmetic on stored values.
+- **The redecode has not been run**, so Health still shows the wrong times as of this writing.
+- **No device, no dev server.** Server/DB only; nothing here reaches the APK except through data.
+- **Owner-scoped.** Every production count is the owner's rows only, and `claude_ro` prunes at 30
+  days — the migration's merge criterion is deliberately per-user so that limitation cannot leak
+  into other people's data.

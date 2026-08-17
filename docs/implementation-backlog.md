@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **189** | `lib/data/postgres/migrations/` (head: `188_claude_ro_views_plan_meal_answers.sql`) |
+| Next free Postgres migration | **190** | `lib/data/postgres/migrations/` (head: `189_q536_merge_redrain_clock_epochs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **538** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -367,16 +367,24 @@ below threshold and left in place for next time.
 
 - **Branch:** `fix/ble-sleep-window-timezone`
 - **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts`, and a Postgres migration.
-- **Recommended fix, in order.**
-  1. **Relabel the spurious epochs** — a migration merging epoch 3 → 2 and epoch 1 → 0 on both
-     `oura_ble_clock_anchors` and `oura_raw_samples`, restoring one continuous clock. This alone
-     makes `robustOffsetMs` compute the correct offset again, because the merged epoch's p10 is
-     dominated by epoch 2's 3,666 clean anchors.
-  2. **Re-run the full-history redecode**, which recomputes all 44 nights from stored `body_hex`.
-     ⚠️ **Both steps mutate the owner's health history and need sign-off before running.**
-  3. **Stop the misdetection** — filed separately as **Q-314**, because it needs a design decision
-     (how to tell a re-drain from a genuine re-key) and cannot repair rows that already carry the
-     bad labels. Until it lands, every re-pair reopens this.
+- **Step 1 SHIPPED (owner-approved 2026-08-17): migration `189_q536_merge_redrain_clock_epochs.sql`.**
+  It merges same-clock epochs on `oura_ble_clock_anchors` and `oura_raw_samples`, and drops the
+  affected `oura_rollup_state` watermark so the next rollup re-derives. It decides what to merge
+  from **measured evidence, not a user id or an epoch number**: two epochs are the same ring clock
+  when their *minimum* anchor lag agrees (within 10 min). A re-drain leaves that minimum untouched —
+  the drain's newest anchor is as prompt as any — while a re-key moves the ring's origin by weeks.
+  Verified on merged production values: p10 across all 5,374 anchors lands **3 s** from the clean
+  epoch-2 offset. A genuine re-key is left alone, and that half is mutation-checked.
+- ⚠️ **STILL OWED after deploy: a full-history Redecode.** The migration relabels; it does not
+  rewrite the 43 stored nights. The rollup's incremental window is 35 days and the damage spans 44
+  (2026-07-04 → 2026-08-17), so clearing the watermark does not reach the oldest nights. **This is
+  the step that actually makes Health right, and it has not been run.** (Note Q-535: Redecode
+  reports a spurious "failed: 502" for work that succeeded.)
+- **Then verify** a known night's window against the owner's account of it, and re-run the start-hour
+  histogram: the 43 rows at 10:00–14:00 Brisbane should land in the 20:00–00:00 band.
+- **The misdetection is still live** — **Q-314**. It needs a design decision (how to tell a re-drain
+  from a genuine re-key) and cannot repair rows that already carry the bad labels. Until it lands,
+  **every re-pair reopens this**, and the migration would have to be re-run.
 - **Do NOT "fix" `robustOffsetMs` by lowering the percentile.** Measured: on a drained epoch even
   **p1 is already contaminated** (+1.28 h), and only the *two* smallest anchors are clean — too thin
   to estimate from. On a healthy epoch p0→p10 spans 7 s and 50 s, so the estimator is fine. The
@@ -994,7 +1002,7 @@ session working from a temporarily restored copy.
 - **Added:** 2026-08-17 · planning session against the rescoped Q-251
 - **Steps, in order — the plan carries the detail, this is the slot list:**
   1. `scripts/generate-claude-ro-views.js` — emit `_meta_excluded_tables` and
-     `_meta_withheld_columns`; regenerate into **migration 189** (a new number, never overwriting an
+     `_meta_withheld_columns`; regenerate into **migration 190** (a new number, never overwriting an
      applied file) and re-point the filename pin in `claude-ro-readonly-role.test.ts` *in the same
      commit*.
   2. `lib/export/db-snapshot.ts` — view enumeration, the drift gate, PK discovery from `pg_index`,

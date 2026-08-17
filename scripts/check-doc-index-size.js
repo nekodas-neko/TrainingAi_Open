@@ -58,15 +58,17 @@ const root = path.join(__dirname, '..');
 // Raised 2026-08-17 (Lane A, Q-536 diagnosis): backlog 6417 -> 6474. The Q-536 rewrite (+19) replaces
 // a refuted diagnosis with the measured one and keeps the refuted text folded in a <details>, which
 // is the cheapest way to stop it being re-derived; Q-314 (+38) is the new queue entry for the root
-// cause. Entries and a corrected entry, per the same split as the raises above. projectOverview
+// cause, +8 more when Q-536's repair shipped and its entry had to say which half is done. Entries
+// and a corrected entry, per the same split as the raises above. projectOverview
 // 6547 -> 6568 for Q-536's Known-Issues row: a live, unrepaired data-correctness fault on displayed
-// health values, which is exactly what that section indexes.
+// health values, which is exactly what that section indexes. +3 more when the repair shipped, to
+// say which half is done and which is still owed — the distinction the row exists to carry.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
-  'projectOverview.md': 6568,
-  'docs/implementation-backlog.md': 6474,
+  'projectOverview.md': 6571,
+  'docs/implementation-backlog.md': 6482,
   'CLAUDE.md': 1010,
 };
 

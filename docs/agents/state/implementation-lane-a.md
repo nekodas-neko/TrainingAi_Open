@@ -4,17 +4,26 @@
 > successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-17 · **By:** the first session to run as Lane A · **Q band:** 314–349 (next free: **315** — Q-314 taken for the ring-clock reset-detection defect)
+**Migrations:** 189 taken (`189_q536_merge_redrain_clock_epochs.sql`); next free is **190**. Local SQLite unchanged at v22.
 
 ## Now
-Nothing in flight. **Q-536 diagnosed, not fixed** — docs-only PR. The 43 midday bedtimes are a
+Nothing in flight. **Q-536 diagnosed and half-repaired** (v1.318.0, migration 189). The 43 midday bedtimes are a
 spurious clock epoch, not a timezone bug: a 2026-08-17 re-pair made the ring re-drain buffered
 history, `isClockEpochReset` read that as a reset, and the new epoch's offset — estimated at the p10
 of anchor lag, which a re-drain contaminates — landed **+14.16 h** wrong. `aggregateOuraRawSamples`
 resolves every ds against `currentEpoch`, so the full redecode re-timed all history.
 [`entries/2026-08-17-q536-clock-epoch-diagnosis.md`](../../overview/entries/2026-08-17-q536-clock-epoch-diagnosis.md).
 
-**Waiting on the owner:** the repair is a migration merging epoch 3 → 2 and epoch 1 → 0, then a full
-redecode. Both mutate health history. Nothing else in Q-536 can proceed until that is answered.
+The owner approved the repair. **Migration 189 shipped** — it merges same-clock epochs, deciding
+what to merge from measured evidence (two epochs are one clock when their *minimum* anchor lag
+agrees within 10 min) rather than from a user id or an epoch number, so a genuine re-key is left
+alone. Mutation-checked both ways.
+
+⚠️ **STILL OWED: a full-history Redecode after deploy.** The migration relabels; it does not rewrite
+the 43 stored nights, and the rollup's 35-day window does not reach the oldest of them (the damage
+spans 44 days). **Health shows the wrong bedtimes until that is run** — it is the step that fixes
+what the owner actually sees, and it has not been done. Q-535 notes Redecode reports a spurious
+"failed: 502" for work that succeeded, so do not take that as failure.
 
 Before that: **Q-310 shipped and merged** — #17, v1.317.5.
 
@@ -41,9 +50,9 @@ Work the queue top-down, taking the highest item in Lane A's ownership. As of th
    (`lib/cache-groups.ts`). Lane A.
 
 ## Blocked
-- **Q-536's repair needs owner sign-off** — a migration merging the spurious clock epochs, then a
-  full redecode. Both mutate the owner's health history, which is why they are not shipped. The
-  diagnosis is complete and the entry carries it; only the decision is outstanding.
+- **Q-536 owes a full-history Redecode after v1.318.0 deploys.** Nothing in the queue depends on
+  it, but Health is wrong until it runs. Then re-check the start-hour histogram: the 43 rows at
+  10:00–14:00 Brisbane should move into the 20:00–00:00 band.
 - **Q-537 needs owner sign-off** before anyone builds it: it is credential handling, and its own
   verification line says nothing about it is checkable from the sandbox.
 
