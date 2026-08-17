@@ -143,6 +143,24 @@ the next device change.
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
 - **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit at
   the top of `docs/implementation-backlog.md` (Q-310 above them has since shipped and been removed).
+### [nutrition] 🟠 A half-logged day feeds the calibrated maintenance as if it were complete (Q-387, 2026-08-17)
+
+- Owner asked what stops the tuner treating "breakfast + lunch, skipped dinner" as a whole day.
+  Nothing does. `adaptive-tdee.ts:96` counts any day with `intakeKcal > 0` as logged, so one apple
+  qualifies — it clears the coverage gate *and* enters the mean intake the estimate is built on.
+- Measured with the module: 14-day window, weight-stable user whose true maintenance is 2600, six
+  partial days → **2086 kcal**, with `daysLogged: 14`, `excludedReason: null`, `confidence:
+  'medium'`. 86 kcal of error per partial day, every gate passing, and the 1000 kcal plausibility
+  floor never fires. It reaches the **prescription**: `energy-balance-service.ts:180` feeds it to
+  `targetFromMaintenance`, so the recommended target carries the error and a cut's delta stacks on it.
+- **Two partial-day guards exist and neither covers this** — an unlogged day is a gap, and *today*
+  is excluded. The comment at `energy-balance-service.ts:146-150` names this exact trap and solves
+  only the in-progress case; an abandoned **past** day never self-corrects. The 2026-08-11 entry
+  below presents those two as the whole story, which this corrects.
+- **Latent and armed.** Per Q-302 no recent window clears the gate, so nothing wrong shows today; it
+  fires when logging gets consistent enough to switch tuning on — on success, not failure.
+- **Q-387** holds the trace and an assessment of the owner's two proposed controls (the "% below
+  expected" one is circular — do not ship as specified). No device or prod data needed. **Not started.**
 
 ### [platform] ✅ PR #1390's red E2E job — cause found, fixed (Q-297/Q-309, closed 2026-08-17)
 

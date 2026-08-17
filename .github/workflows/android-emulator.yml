@@ -25,19 +25,39 @@ name: Android Emulator
 # emulator produces a paired Ring 5, Polar H10 or Renpho scale), and Samsung's WebView — this is
 # stock Chromium, so the compositor bugs stay invisible to it.
 
+# ⛔ DISABLED 2026-08-17 — manual trigger only, pending Q-250's sign-in driving.
+#
+# Everything up to the assertion works and was proven on a real runner: the app builds, the server
+# starts, the APK assembles against the host loopback, KVM comes up and the emulator boots. The
+# assertion itself cannot pass, and could never have passed:
+#
+#   getLocalStore(userId) requires a signed-in user (lib/local-store/index.ts). The app launches to
+#   the sign-in screen, so no local SQLite database is ever created, and the smoke script polls 90
+#   seconds for a file that cannot appear.
+#
+# Driving sign-in needs a UI automation tool (Maestro is the intended one — see Q-250), not a shell
+# script. Until that lands this job fails every run, and a permanently-red check is worse than no
+# check: it trains everyone to ignore the signal, so the next red — a genuine migration failure,
+# which is the entire point of this job — goes unread.
+#
+# Left as workflow_dispatch rather than deleted: the hard parts are done and working, and the next
+# session needs them rather than a blank file. Restore the `pull_request` block below when the
+# Maestro flow lands.
 on:
-  pull_request:
-    branches: [main]
-    paths:
-      # Native paths, as android.yml.
-      - 'android/**'
-      - 'capacitor.config.ts'
-      - 'pnpm-lock.yaml'
-      - '.github/workflows/android-emulator.yml'
-      # The reason this job is not simply folded into android.yml: the migrations it exists to
-      # exercise are TypeScript, and changing them touches none of the native paths above.
-      - 'lib/sqlite/**'
-      - 'lib/local-store/**'
+  workflow_dispatch:
+  # Restore on Q-250 completion:
+  # pull_request:
+  #   branches: [main]
+  #   paths:
+  #     # Native paths, as android.yml.
+  #     - 'android/**'
+  #     - 'capacitor.config.ts'
+  #     - 'pnpm-lock.yaml'
+  #     - '.github/workflows/android-emulator.yml'
+  #     # The reason this job is not simply folded into android.yml: the migrations it exists to
+  #     # exercise are TypeScript, and changing them touches none of the native paths above.
+  #     - 'lib/sqlite/**'
+  #     - 'lib/local-store/**'
 
 concurrency:
   group: android-emulator-${{ github.ref }}

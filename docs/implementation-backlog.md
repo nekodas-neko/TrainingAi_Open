@@ -491,6 +491,104 @@ below threshold and left in place for next time.
   the card's existing `if (!insight) return null` hide it), and/or make the prompt say *absent* rather
   than feeding a bare `"no data"` string the model reads as a measurement.
 
+### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
+
+- **Branch:** `fix/tdee-partial-day-completeness`
+- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
+  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
+  the rest? does it assume thats all I had for the day and tune around that? Need some control
+  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
+  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
+  that the owner's suspicion is correct.
+- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
+  There is no completeness concept anywhere in the path.
+
+**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
+"logged day" is with a bare non-zero test:
+
+```ts
+const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
+```
+
+A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
+*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
+(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
+`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
+
+**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
+miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
+in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
+comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
+in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
+the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
+abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
+fixed the version that self-corrects by evening, and left the version that never does.
+
+**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
+eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
+1400, dinner never logged):
+
+```
+partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
+0            14          2600        2600         medium      null
+6            14          2086        2086         medium      null
+14           14          1400        1400         medium      null
+```
+
+Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
+`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
+as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
+"plausible" 1400.
+
+**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
+`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
+inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
+under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
+module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
+too, so the Balance card's "burned" figure is dragged down in step.
+
+- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
+  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
+  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
+  presents protections (1) and (2) as the complete story — the claim this corrects.
+- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
+  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
+  this question is about: logs consistently enough to switch tuning on.
+- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
+  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
+  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
+  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
+
+**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
+
+1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
+   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
+   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
+   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
+   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
+   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
+2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
+   "expected" is the calorie target, derived *from* maintenance, which is the number being
+   estimated, so a low estimate lowers the threshold and admits more partial days next window.
+   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
+   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
+   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
+3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
+   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
+   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
+   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
+   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
+
+- **What would count as fixed:** a day the user did not finish logging can no longer enter
+  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
+  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
+  rather than toward a confident wrong number. Whichever mechanism is chosen,
+  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
+  module is well-tested for empty days and has never been tested for half-full ones.
+- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
+  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
+  control, if option 1 is chosen, would need a device check.
+
 ### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
 
 - **Branch:** `fix/publish-dry-run-build-gate`
@@ -2243,6 +2341,44 @@ session working from a temporarily restored copy.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+> **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
+> Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
+> in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
+> it could never have succeeded:
+>
+> > **`getLocalStore(userId)` requires a signed-in user** (`lib/local-store/index.ts`). The app
+> > launches to the sign-in screen, so the local SQLite database is never created, and
+> > `scripts/ci/emulator-local-db-smoke.sh` polls 90 seconds for a file that cannot appear.
+>
+> **What *is* proven, on a real runner, and should not be rebuilt:** the app builds; the server
+> starts (after fixing a readiness probe that hit `/api/version`, the one route that makes an
+> outbound GitHub call before responding); the APK assembles against `http://10.0.2.2:3000` with a
+> fail-closed guard so it can never be built pointed at production; KVM enables; the emulator boots.
+> Steps 1–14 of 15 pass. Only the assertion fails.
+>
+> **The job is now `workflow_dispatch`-only** (`.github/workflows/android-emulator.yml`), not
+> deleted. It failed every run while enabled, and a permanently-red check is worse than no check —
+> it trains everyone to ignore the signal, so the next red, which would be a genuine migration
+> failure, goes unread.
+>
+> **To finish it: add Maestro.** A declarative YAML flow that launches the app, signs in, and waits
+> for the app shell; the existing `PRAGMA user_version` assertion then runs unchanged. Two things
+> make this cheaper than it sounds: the job already runs a **seeded local Postgres containing
+> `test@local.dev` / `testpass123`**, so no credentials or secrets are needed — Maestro just types
+> into the form — and the job is non-required, so iteration costs nothing but time. Restore the
+> `pull_request` trigger in the same PR. Expect several CI rounds: **none of this is runnable in a
+> Claude session** (no `/dev/kvm`, Firecracker microVM), so a UI flow can only be iterated by
+> pushing.
+>
+> Once sign-in works, the rest of this entry's deferred scope becomes reachable for the first time:
+> offline cold start, the service-worker `/api/` passthrough, deep-link cold launch, the hardware
+> back-button guard, local notifications, and PiP.
+>
+> ---
+>
+> **The 2026-08-17 note below is superseded in its headline claim and accurate in its detail.** Kept
+> because its reasoning about the production-URL trap is what the next session most needs.
+>
 > **PARTIALLY SHIPPED 2026-08-17 — the local-SQLite half is in.**
 > `.github/workflows/android-emulator.yml` + `scripts/ci/emulator-local-db-smoke.sh`: boots an
 > emulator, installs the debug APK, and asserts `PRAGMA user_version` read **off the device**
