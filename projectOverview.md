@@ -5975,9 +5975,18 @@ and throw in production; `NOTICE` states that no third-party model weights are i
 17 test files, not the 16 the handoff measured — see the two rows below for what that count missed
 and for what has still never executed.
 
-**What remains is Phase B**, the cut itself: [`docs/public-repo-cut-runbook.md`](docs/public-repo-cut-runbook.md)
-steps 8–14. Rollback stays available throughout — the old repo remains a working Railway target
-until the final step, and that step archives rather than deletes it.
+**Update 2026-08-16 — the snapshot is PUSHED (step 8).** `nekodas-neko/TrainingAi_Open` holds one
+commit, `6c072f9`, verified by cloning it fresh and running `check-private-paths.js` there:
+`total tracked: 0.0 MB`. The pre-push audit found three real things, all fixed first — the owner's
+email in two docs (#1393), a private-path manifest that catalogued what it was protecting (#1396),
+and `main` red on E2E for ten hours of every day from a UTC-vs-Brisbane seed bug (#1397). Journal:
+[`entries/2026-08-16-public-repo-snapshot-pushed.md`](docs/overview/entries/2026-08-16-public-repo-snapshot-pushed.md).
+
+**What remains is Phase B steps 9–14**, and all but one are the owner's:
+[`docs/public-repo-cut-runbook.md`](docs/public-repo-cut-runbook.md). Branch protection on the new
+repo cannot be set from a session (no MCP tool for it). Rollback stays available throughout — the old
+repo remains a working Railway target until the final step, and that step archives rather than
+deletes it.
 
 **Update 2026-08-15 (#1353):** the CI story is solved — the model tests replay from recorded
 fixtures, so the suite passes with all ten `.onnx` files absent, and the constants resolve from the
