@@ -592,6 +592,27 @@ Always the newest `main` build, non-expiring, and genuinely no login required �
 logged-out browser on 2026-08-17, which is the entire point of the public-repo migration (Q-49). For an unmerged PR the APK is a
 workflow artifact (`app-debug-apk`) on that PR's Android run, kept 14 days.
 
+**These APKs upgrade in place only while the `ANDROID_DEBUG_KEYSTORE_B64` repository secret is
+set.** Gradle's fallback debug keystore is generated per machine, and a GitHub runner is a fresh
+machine every run — so before that secret existed, every published APK carried a **different**
+signing key, Android refused to install each one over the last (`App not installed`), and the only
+way through was to uninstall. On an offline-first app **an uninstall drops every outbox mutation
+that has not yet reached the server**, which made routine APK delivery a data-loss hazard rather
+than an inconvenience. The Android job warns loudly when the secret is missing. To (re)create it:
+
+```bash
+keytool -genkeypair -v -keystore debug-signing.keystore \
+  -storepass android -keypass android -alias androiddebugkey \
+  -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=TrainingAI Debug, OU=Dev, O=TrainingAI, C=AU"
+base64 -w0 debug-signing.keystore    # macOS: base64 -i debug-signing.keystore
+```
+
+Paste the output into **Settings → Secrets and variables → Actions → New repository secret**, named
+`ANDROID_DEBUG_KEYSTORE_B64`. It is a credential: never commit it (`android/.gitignore` excludes
+it), and never reuse it as a release/Play Store key. **Changing it invalidates in-place upgrades
+once more**, so a device carrying an APK signed by the old key has to uninstall one final time.
+
 Note the workflow is **path-gated** on `android/**`, `capacitor.config.ts`, `package.json`,
 `pnpm-lock.yaml` — a JS-only PR produces no Android run at all, which is correct and not a
 failure. It is deliberately **not** a required status check, so a filtered-out run leaves no
