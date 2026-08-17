@@ -13,6 +13,13 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.317.6",
+    date: "2026-08-17",
+    changes: [
+      "Fixed: a panel that streams new content no longer drags the whole page down with it. The ring's debug log did this on every line during a scan — the screen kept sliding away while you were aiming at a button, on the one screen where a mistimed tap can clear the ring key. The AI chat in the program builder had the same fault and is fixed with it.",
+    ],
+  },
+  {
     version: "1.317.5",
     date: "2026-08-17",
     changes: [
