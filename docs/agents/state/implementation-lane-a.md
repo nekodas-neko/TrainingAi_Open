@@ -1,74 +1,69 @@
 # Implementation Lane A — baton
 
-**Last written:** 2026-08-17 · **Branch:** `claude/implementation-lane-a-ctx048`
-**Working branch this run:** `fix/ai-dynamic-deload-fallback-not-flagged`
+**Updated:** 2026-08-17 · **By:** the first session to run as Lane A · **Q band:** 314–349 (next free: 314 — none taken)
 
-> This file is rewritten in full each session, never appended. It is the state the previous Lane A
-> left; if it says a PR is open, that PR is yours.
+## Now
+**Q-310 is built and its PR is open** on `fix/ai-dynamic-deload-fallback-not-flagged` (v1.317.4).
+An engine-chosen ai_dynamic deload was prescribing full weights: `/api/workout-data`'s catch-all
+phase branch existed as two verbatim copies that both hardcoded `isDeloadActive: false` while
+title-casing the *same* `aiPeriodizationState.phase` field into the header label "Deload". Both now
+call `aiDynamicFallbackPhaseStatus()` in `packages/shared/src/workout/session-data.ts`.
 
-## Lane contract (as given, since `docs/agents/README.md` does not exist yet)
-
-**Owned paths:** `lib/data/**` (every Postgres migration), `lib/local-store/**`, `lib/sqlite/**`,
-`lib/cache-groups.ts`, `app/api/**`, `packages/shared/**` except `changelog.ts`, the domain-math
-directories under `lib/`, the BLE and device pipelines, auth/security, `android/**`.
-Lane B owns screens and components (`app/**/*-content.tsx`, `components/**`).
-
-**Q band:** 313–349, taken directly. **None taken yet** — this run worked an existing entry.
-Postgres migration numbers and local SQLite versions are Lane A's alone. **None taken this run.**
-Next free Postgres migration per the backlog header is **177**; local SQLite is at **v22**.
-
-## In flight
-
-**PR: Q-310 — an engine-chosen ai_dynamic deload prescribed full weights.**
-Branch `fix/ai-dynamic-deload-fallback-not-flagged`, v1.317.4. Full local gate green (see the
-journal entry for the numbers). If the PR is still open when you read this, drive it to green and
-merge it — it is a standard bug fix, not destructive, so no confirmation is needed.
-
-Files: `packages/shared/src/workout/session-data.ts` (new `aiDynamicFallbackPhaseStatus`),
-`app/api/workout-data/route.ts` (both catch-all copies), a new test, plus bookkeeping
-(journal entry, `projectOverview.md`, backlog removal, `docs/domains/workouts/README.md`,
-`package.json` + `changelog.ts`).
+Full local gate green — `tsc` clean, lint 0 errors, `pnpm build` green, `pnpm check:rules` **Ran 36
+of 36**, suite 477 files / 3,893 tests, and both fixed copies exercised on a running `pnpm dev`
+against a seeded deload phase. Numbers and method are in
+[`entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md`](../../overview/entries/2026-08-17-ai-dynamic-deload-fallback-not-flagged.md).
+Standard bug fix, not destructive — drive it to green and merge without asking.
 
 ## Next
+Work the queue top-down, taking the highest item in Lane A's ownership. At the time of writing (numbers as renumbered by the 2026-08-17 duplicate-Q sweep):
 
-Work the backlog queue top-down, taking the highest item inside Lane A. As of this writing the
-queue head is:
-
-1. **Q-306** `[platform]` — add a `next build` gate to `scripts/publish-dry-run.js`. Lane A
-   (tooling/platform, no component surface). Small. Note the entry's own caution: a build is
-   minutes, so consider gating it behind the `--all` flag rather than the default path.
-2. **Q-307** `[platform]` — the synthetic MET table is physiologically impossible and costs ~9
+1. **Q-313** `[platform]` — a `next build` gate for `scripts/publish-dry-run.js`. Lane A. Small;
+   heed the entry's own note that a build is minutes, so gate it behind `--all` rather than the
+   default path.
+2. **Q-312** `[platform]` — the synthetic MET table is physiologically impossible and costs ~9
    tests in CI. Lane A.
-3. **Q-261** `[app-shell][platform]` — six `<Label>`s in `components/profile/`. **Lane B**, skip.
+3. **Q-261** `[app-shell][platform]` — `<Label>`s in `components/profile/`. **Lane B's**, skip it.
 4. **Q-263** `[platform]` — audit the remaining cache groups the way Q-262 audited one
    (`lib/cache-groups.ts`). Lane A.
 
-**Re-verify each premise against `main` before building.** Q-310's entry was right about the root
-cause and wrong about two of its three consequences — see below.
+## Blocked
+Nothing on the owner. One thing still **owed**: the device check on Q-310, filed as a Known-Issues
+row in `projectOverview.md` rather than left implicit. Server/JS only, so it reaches the APK via the
+Railway deploy with no rebuild — but the client half was verified from the route's response, not on
+hardware.
 
-## Things learned this run, worth not re-learning
+## Claimed paths
+None held. Q-310 touched only Lane A paths plus its own bookkeeping. It deliberately did **not**
+touch `components/workout/exercise-summary-screen.tsx` (Lane B) — see below.
 
-- **The backlog's leads are half-right in a specific way.** Q-310 nailed the root cause and the
-  first symptom, and was wrong about the other two: `personal_records` was never corrupted (the
-  server has its own independent gate), and the summary badge needs no deload check of its own
-  (`estimateOneRm` returns exactly `0` when `deloaded`, and the badge already gates on `> 0`). Both
-  were settled by reading the code and querying production, in under an hour. Do that before
-  writing any corrective migration an entry asks for.
-- **`CLAUDE_DB_QUERY_SECRET` is set in this environment** and the admin `db-query` endpoint works
-  from the sandbox. It is the fastest way to answer "did this actually corrupt anything". Remember
-  it is row-scoped to the owner — write findings as "nothing of the owner's".
-- **Exercising an ai_dynamic route locally** means mutating the local seed: the seeded program is
-  `phase_mode = 'manual'` with no `session_periodization` row. Set `phase_mode='ai_dynamic'` and
-  insert a periodization row at the phase you want, hit the route, then **revert both** — the DB
-  is shared with the test suite.
-- **`npx playwright test --project=setup` gives you a real session cookie** at
-  `e2e/.auth/seed-user.json`; extract it and `curl` the API routes directly. Much faster than
-  driving the UI for a route-level check.
-- The local dev DB reports 3 pre-existing `ensureSchema` failures (`038`, `040`, `041` —
+## Do not re-litigate
+- The lane contract, authority limits and Q bands are settled in
+  [`docs/agents/README.md`](../README.md). Read it rather than re-deciding it. Take Q numbers from
+  the band above, never from the backlog's next-free pointer.
+- **Q-310's fix direction items 2 and 3 are refuted, and were deliberately not built.**
+  (2) `exercise-summary-screen.tsx`'s `isNewPR` needs no deload gate: `estimateOneRm` returns
+  exactly `0` when `deloaded`, and the badge already gates on `newEst1rm > 0`. There is no
+  "submaximal-adjusted estimate that still exceeds the bar". (3) No corrective migration is needed:
+  `logExerciseFromPayload` reads `session_periodization` independently of the route, so the server
+  zeroed the estimate and refused the PR throughout. Both production deload sessions (2026-08-09,
+  2026-08-16) carry `max(estimated_1rm) = 0` and no `personal_records` row on either date. The badge
+  the owner photographed was the *client's* optimistic display.
+- **Q-185 is closed**, despite `docs/domains/workouts/README.md` having said "still open" until this
+  session. The un-prescribed deload branch exists below the `if (aiDrivesLoad)` block; verified in
+  source and on the dev server.
+
+## Method notes worth keeping
+- **`CLAUDE_DB_QUERY_SECRET` is set in this environment** and `POST /api/admin/db-query` works from
+  the sandbox. It is the fastest way to answer "did this actually corrupt anything" before writing
+  a migration an entry asks for. Row-scoped to the owner — phrase findings as "nothing of the
+  owner's".
+- **Exercising an ai_dynamic route locally** means mutating the seed: the seeded program is
+  `phase_mode = 'manual'` with no `session_periodization` row. Set `phase_mode='ai_dynamic'`, insert
+  a periodization row at the phase you want, hit the route, then **revert both** — the local DB is
+  shared with the test suite.
+- **`npx playwright test --project=setup` mints a real session cookie** into
+  `e2e/.auth/seed-user.json`; extract it and `curl` the API directly. Far faster than driving the UI
+  for a route-level check.
+- The local dev DB reports three pre-existing `ensureSchema` failures (`038`, `040`, `041` —
   `progression_styles.created_at` missing). Unrelated to any change; ignore them.
-
-## Blocked / owner
-
-Nothing blocked on the owner from this run. The one outstanding item is the **device check** on
-Q-310, recorded as a Known-Issues row in `projectOverview.md` rather than left implicit: confirm on
-the S25 that an engine-chosen deload shows reduced weights and no PR badge.

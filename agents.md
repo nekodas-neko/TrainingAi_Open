@@ -1,63 +1,23 @@
 # Agent Rules — TrainingAI
 
-## Code Quality & Scope
+**This file is a pointer, not a rule set.** It exists because several tools look for an
+`AGENTS.md`/`agents.md` at the repo root. The rules live in two places, and both override anything
+a tool infers from this file:
 
-- Do not add features, refactor, or introduce abstractions beyond what the task explicitly requires.
-- Do not add error handling for scenarios that cannot happen — trust internal code and framework guarantees.
-- Default to writing no comments. Only add one when the **why** is non-obvious (a hidden constraint, subtle invariant, or surprising behaviour). If removing it wouldn't confuse a future reader, skip it.
-- Prefer editing existing files over creating new ones.
+| What you need | Where it lives |
+|---|---|
+| **The engineering rules** — timezone, cache invalidation, offline sync, safe-area, migrations, git workflow, merge authority, communication | [`CLAUDE.md`](CLAUDE.md) |
+| **Who does what** — the four standing agents, their authority limits, the two-lane file-ownership contract, the cold-start prompts and the handoff protocol | [`docs/agents/README.md`](docs/agents/README.md) |
+| **Orientation** — current status, live Known Issues, what's left | [`projectOverview.md`](projectOverview.md) |
+| **The queue** — priority-ordered work | [`docs/implementation-backlog.md`](docs/implementation-backlog.md) |
 
----
+## Why this file no longer carries its own copy of the rules
 
-## Safety & Reversibility
+It used to restate a subset of `CLAUDE.md`, and the copy drifted until it actively contradicted the
+original in three places — it required confirmation before pushing or opening a PR (`CLAUDE.md`
+exempts both), it described merging to `main` directly (branch protection has blocked that for
+months), and it put the `projectOverview.md` update *after* the merge (`CLAUDE.md` requires it in
+the same PR, so an abandoned PR cannot leave a stale "done" claim behind).
 
-- Never force-push, `reset --hard`, or run any destructive git operation without explicit user confirmation.
-- Never skip hooks (`--no-verify`) — investigate the failure and fix the root cause instead.
-- Never commit secrets, `.env` files, or credential files under any circumstances.
-- Confirm with the user before any action that affects shared systems: pushing code, creating/closing PRs, posting comments, or sending messages.
-
----
-
-## Git Workflow
-
-- Never commit directly to `main`. Always develop on a feature branch and merge when complete.
-- Write commit messages focused on **why** the change was made, not what changed (the diff already shows that).
-- Run tests and lint before committing. If they fail, fix them — don't bypass.
-
----
-
-## Communication
-
-- State in one sentence what you are about to do before doing it.
-- Report blockers clearly rather than silently working around them.
-- Ask before taking any irreversible or wide-blast-radius action — the cost of pausing is always lower than the cost of an unwanted action.
-
----
-
-## After Every Change — Local Testing Instructions
-
-After making any change, provide the following:
-
-**1. Pull command** — give the exact command to fetch the latest changes locally:
-```bash
-git pull origin <branch-name>
-```
-
-**2. What to look for** — specify exactly:
-- Which page, component, or API route is affected
-- What the expected visible or behavioural change is
-- Any edge cases or regressions to check (e.g. adjacent features that touch the same state or UI)
-
-**3. How to test it** — give step-by-step instructions appropriate to the change, for example:
-- Which URL to open and what action to take
-- What the correct outcome looks like vs. a broken outcome
-- Any specific device/viewport to test on (this app targets Samsung Galaxy S25 Ultra)
-
----
-
-## Project-Specific Rules
-
-- **Session start**: Read `projectOverview.md` before doing anything. Use it to orient — it tracks past changes, known issues, and planned work.
-- **Session end**: After committing and merging to `main`, update `projectOverview.md` with a summary of what was done, any new known issues, and what is planned next.
-- Keep components small. Split code into focused files and avoid long single files.
-- Never push to a branch other than the designated session branch without explicit user permission.
+A second copy of a rule set is a second thing to keep current, and this one was not kept current.
+One source of truth, pointed at from here.

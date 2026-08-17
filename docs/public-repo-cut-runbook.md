@@ -126,8 +126,8 @@ wrong, and the dry-run could not have seen it: it runs no `next build`, and `nex
 every route to collect page data — so six modules reading a constant at *module scope* were still
 opening the files at build time. Deleting them gave `ENOENT` at `Failed to collect page data for
 /api/achievements`, which would have been a failed Railway deploy. Those six now read on first use;
-parity against the real vendor values was re-proven before and after. Queued as **Q-306** (add a
-build gate to the dry-run) and **Q-307** (the synthetic MET table).
+parity against the real vendor values was re-proven before and after. Queued as **Q-313** (add a
+build gate to the dry-run) and **Q-312** (the synthetic MET table).
 
 **Still unexecuted:** the bucket *download*. Merging is not running it — see step 11's check and the
 `projectOverview.md` row.
