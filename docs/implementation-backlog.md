@@ -2219,6 +2219,30 @@ session working from a temporarily restored copy.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+> **PARTIALLY SHIPPED 2026-08-17 — the local-SQLite half is in.**
+> `.github/workflows/android-emulator.yml` + `scripts/ci/emulator-local-db-smoke.sh`: boots an
+> emulator, installs the debug APK, and asserts `PRAGMA user_version` read **off the device**
+> against the max `toVersion` in `lib/sqlite/migrations.ts` — plus that `reconcileSchema()` did not
+> have to repair anything, since a repaired schema reaches the right version while the migration
+> that should have produced it is quietly broken. That is the #27/#85 shape, and it is the line
+> this entry called the most valuable.
+>
+> **The entry's suggested shape was wrong in one load-bearing way, found while building it.** It
+> said "install the debug APK the existing job already builds" — but the APK is a WebView loading
+> `capacitor.config.ts`'s `server.url`, which is hardcoded to **production**. Installing the
+> existing APK would have pointed CI write traffic at the real database, and connection-pool
+> exhaustion there has taken the app down twice (Q-107, Q-308). The job therefore builds its own
+> APK against `http://10.0.2.2:3000` (the emulator's host-loopback alias) with a seeded Postgres
+> and a local Next server, and **fails closed** if that URL rewrite stops matching. That also means
+> it needs **neither production nor a staging environment**, which decouples it from Q-251.
+>
+> **Still open, and why it is not done here:** sign-in, offline cold start, the service-worker
+> `/api/` passthrough, deep-link cold launch, the hardware back-button guard, local
+> notifications/reminders, and PiP. Each needs the app driven through real flows rather than merely
+> launched, which is a Maestro/Espresso-shaped job rather than a shell script. Do that as a second
+> PR once this one has proven stable across a few runs — it is non-required precisely so its early
+> flakiness costs nothing.
+
 - **Branch:** `feat/ci-android-emulator`
 - **Added:** 2026-08-14 · same owner ask
 - **This cannot run in a session, and that is settled — do not retry it here.** Verified 2026-08-14:
@@ -2257,13 +2281,33 @@ session working from a temporarily restored copy.
 - **What it closes:** the ~10 data-gated rows (a real night's sleep data, real HR, the owner's live
   program, real zone data), plus it converts the "confirm before merging a destructive change" gate
   from a judgement call into something rehearsable.
-- **Shape:** a second Railway service on a branch deploy, with a **scrubbed** prod-shaped snapshot
-  restored into its DB. Scrubbed matters and is the whole reason this is preferable to widening
-  `claude_ro`: production holds several real accounts with months of health data, and they cannot
-  consent on the owner's behalf — the same reasoning that row-scoped `claude_ro` to one user in the
-  first place. Snapshot shape and volume, not other people's rows.
-- **Sequencing note:** this is the one item in the cluster with a recurring cost (a second Railway
-  service and its DB). Worth costing before building.
+- **⚠️ RESCOPED 2026-08-17 after the owner pushed back, and the pushback was right.** The entry was
+  written around a second Railway service. It should have been written around the **data**. The
+  environment was only ever the vehicle: what closes the ~10 data-gated rows and makes a migration
+  rehearsable is *a prod-shaped database to run against*, and that does not require a second
+  deployed service. Two shapes, cheapest first:
+  - **(a) Scrubbed snapshot restored into the local DB — recommended, no recurring cost.**
+    `pg_dump` from Railway → scrub → restore into the local Postgres the session-start hook already
+    provisions. `docs/runbooks/db-backup-restore.md` already covers the dump/restore halves. This
+    plugs straight into `pnpm dev` and the existing Playwright harness, needs no credentials
+    migrated, and carries **no production risk at all**. The scrubbing is the real work and must be
+    got right — see the consent point below — but it is one-off work, not a monthly bill.
+  - **(b) A second Railway service**, as originally written. Buys the things (a) cannot: real
+    HTTPS, the service worker under a real origin, and an APK that can point somewhere that is not
+    production. A minority of the value, all of the recurring cost. Defer until something concretely
+    needs a deployed non-prod origin.
+- **Scrubbing is the load-bearing part of either shape**, and is the whole reason this is preferable
+  to widening `claude_ro`: production holds several real accounts with months of health data, and
+  they cannot consent on the owner's behalf — the same reasoning that row-scoped `claude_ro` to one
+  user in the first place. Snapshot shape and volume, not other people's rows.
+- **A test account on production is NOT a substitute**, though it was raised and is worth having
+  separately for deployed-app smoke checks. It does not help here: migrations still run against
+  production first (the risk this entry exists to remove), a fresh account has none of the real
+  sleep/HR/program data the ~10 rows need, and its writes land in the production database — adding
+  CI load to a system that has fallen over from connection exhaustion twice (Q-107, Q-308).
+- **Q-250 no longer depends on this.** The emulator job builds its own APK against a host-loopback
+  server, so it needs neither production nor staging. That coupling was real when both entries were
+  written and is now removed.
 
 ### [platform] Q-252 — error tracking with session replay, for the bug class that cannot be reproduced from source
 

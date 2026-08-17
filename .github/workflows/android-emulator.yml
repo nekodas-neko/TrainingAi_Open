@@ -1,0 +1,190 @@
+name: Android Emulator
+
+# Q-250. Runs the local SQLite migrations against a real Android SQLite, in an emulator.
+#
+# Why this job exists: the local store has been silently killed twice by migration bugs (a WAL
+# pragma inside the upgrade transaction, #27; a non-idempotent ADD COLUMN rolling back the whole
+# version, #85), and each time every local read returned empty — the root of the recurring "my data
+# disappeared" reports. Until now a migration's first real execution was on the owner's phone.
+# The 466 test files never open the app, and the E2E harness drives the *web* build, where
+# getLocalStore returns null and the device branch never runs at all.
+#
+# This cannot run in a Claude session and that is settled — /dev/kvm does not exist there and
+# /proc/cpuinfo reports neither vmx nor svm (Firecracker microVM). GitHub's ubuntu-latest runners
+# do expose KVM, which is why it has to live here.
+#
+# It is deliberately SELF-CONTAINED: a seeded Postgres and a local Next server, with the APK built
+# against the emulator's host loopback instead of capacitor.config.ts's Railway URL. That means it
+# needs neither production nor a staging environment — an emulator pointed at production would put
+# CI write traffic on the real database, and connection-pool exhaustion there has taken the app
+# down twice (Q-107, Q-308).
+#
+# NOT a required status check, matching android.yml. A flaky emulator must never block a merge.
+#
+# What it does NOT cover, and must not be described as covering: anything involving a radio (no
+# emulator produces a paired Ring 5, Polar H10 or Renpho scale), and Samsung's WebView — this is
+# stock Chromium, so the compositor bugs stay invisible to it.
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      # Native paths, as android.yml.
+      - 'android/**'
+      - 'capacitor.config.ts'
+      - 'pnpm-lock.yaml'
+      - '.github/workflows/android-emulator.yml'
+      # The reason this job is not simply folded into android.yml: the migrations it exists to
+      # exercise are TypeScript, and changing them touches none of the native paths above.
+      - 'lib/sqlite/**'
+      - 'lib/local-store/**'
+
+concurrency:
+  group: android-emulator-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  emulator:
+    name: Local SQLite on a real Android runtime
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: trainingai_ci
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    env:
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+      AUTH_SECRET: emulator-ci-secret-not-used-outside-this-job
+      SESSION_SECRET: emulator-ci-placeholder-secret-32-chars
+      GOOGLE_CLIENT_ID: placeholder
+      GOOGLE_CLIENT_SECRET: placeholder
+      GOOGLE_REDIRECT_URI: http://localhost:3000/api/auth/callback/google
+      GOOGLE_GENERATIVE_AI_API_KEY: placeholder
+      HEALTH_CONNECT_INGEST_SECRET: placeholder
+      WEBHOOK_USER_ID: placeholder
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.0
+
+      # Node 22, not 20: the Capacitor CLI 8.x (`npx cap sync`) requires >=22.
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Apply all migrations
+        run: node scripts/local-db/migrate.js
+
+      - name: Seed the test user and program
+        run: psql "$DATABASE_URL" -f scripts/local-db/seed.sql
+
+      # 10.0.2.2 is the emulator's alias for the host loopback. cleartext is required because this
+      # is plain http; it is set only on this throwaway build and never on the shipped config.
+      - name: Point the build at the host loopback instead of Railway
+        run: |
+          node - <<'EOF'
+          const fs = require('fs');
+          const p = 'capacitor.config.ts';
+          let s = fs.readFileSync(p, 'utf8');
+          s = s.replace(
+            /url: 'https:\/\/trainingai-production\.up\.railway\.app'/,
+            "url: 'http://10.0.2.2:3000'",
+          );
+          s = s.replace(/cleartext: false/, 'cleartext: true');
+          if (!s.includes('10.0.2.2')) {
+            console.error('capacitor.config.ts server.url did not match — refusing to build an APK still pointed at production.');
+            process.exit(1);
+          }
+          fs.writeFileSync(p, s);
+          EOF
+          grep -n "url:\|cleartext:" capacitor.config.ts
+
+      - name: Build the app
+        run: pnpm build
+
+      # Readiness means "accepting connections", not "this endpoint returns 200". The probe asks for
+      # `/` and treats ANY HTTP status as up — middleware redirects it to /sign-in (307), which is a
+      # perfectly good proof that the server is listening.
+      #
+      # Do not probe /api/version. It looks like the obvious health endpoint and is the one thing
+      # here that must not be used: it awaits lookupLatestApkRelease(), an outbound call to the
+      # GitHub Releases API, before it responds. With no GITHUB_RELEASES_TOKEN in CI that call is
+      # slow or hangs, so the probe timed out against a server that had been up for a minute.
+      - name: Start the server
+        run: |
+          pnpm start > /tmp/next-server.log 2>&1 &
+          SERVER_PID=$!
+          for i in $(seq 1 120); do
+            if ! kill -0 "$SERVER_PID" 2>/dev/null; then
+              echo "server process exited during startup:"; cat /tmp/next-server.log; exit 1
+            fi
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 http://localhost:3000/ || true)
+            if [ -n "$CODE" ] && [ "$CODE" != "000" ]; then
+              echo "server up after ${i}s (HTTP $CODE)"; exit 0
+            fi
+            sleep 1
+          done
+          echo "server never accepted a connection in 120s:"; cat /tmp/next-server.log; exit 1
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+
+      - name: Sync and assemble the debug APK
+        run: |
+          mkdir -p www
+          npx cap sync android
+          cd android && ./gradlew :app:assembleDebug --no-daemon
+
+      # KVM has to be made available to the runner user before the emulator action runs.
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' \
+            | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Boot the emulator and assert the local schema version
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          profile: pixel_6
+          ram-size: 4096M
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          script: bash scripts/ci/emulator-local-db-smoke.sh
+
+      - name: Server log
+        if: always()
+        run: tail -100 /tmp/next-server.log || true
+
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: emulator-diagnostics
+          path: |
+            /tmp/next-server.log
+            /tmp/logcat.txt
+            /tmp/pulled-local.db
+          retention-days: 7
+          if-no-files-found: ignore

@@ -1,4 +1,7 @@
-# Implementation Lane B — baton
+# Implementation Agent (B) 🚧 — baton
+
+> **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
+> successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-17 · **By:** the first session to run as Lane B · **Q band:** 350–386 (next free: **351**)
 

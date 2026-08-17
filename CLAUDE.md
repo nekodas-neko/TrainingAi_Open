@@ -62,6 +62,11 @@ code — which is what keeps the collision surface to Lane A against Lane B.
   changes is that a green check goes stale while you work. Never merge a stale green.
 - **`get_check_runs` returning `total_count: 0` several minutes after opening a PR means a stale
   base, not slow CI.** Real CI reports queued checks within about a minute. Fetch, merge, push.
+- **The session titles are fixed, and a successor reuses its predecessor's exactly** — `Implementation
+  Agent (A) 🚧` · `Implementation Agent (B) 🚧` · `BugFix Intake Agent 🪲` · `Tuning Agent 🎶` ·
+  `Review Agent 📖`. The title is how the owner tells five concurrent sessions apart, so a renamed
+  successor is a lost thread even when its baton is perfect. Every handoff states its successor's
+  title outright rather than leaving it to be inferred.
 - **Handing over:** land everything first — the container is ephemeral, so an uncommitted baton is a
   lost baton — then **rewrite** `docs/agents/state/<agent>.md` in full. Never append; a baton that is
   half last week's is worse than none, because it gets trusted. The dated

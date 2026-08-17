@@ -32,8 +32,8 @@ const root = path.join(__dirname, '..');
 // which is the split it is meant to enforce.
 const BASELINE = {
   'projectOverview.md': 6428,
-  'docs/implementation-backlog.md': 5903,
-  'CLAUDE.md': 962,
+  'docs/implementation-backlog.md': 5945,
+  'CLAUDE.md': 967,
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;
