@@ -789,40 +789,27 @@ below threshold and left in place for next time.
   `ActivityLogBody`, so a sub-3-second activity queued offline is a poison-pill candidate, not just
   a failed web POST. Check it against the "one bad mutation must never wedge the queue" rule.
 
-### [workouts][app-shell] Q-451 — a brand-new account's Workout tab is a giant empty card with a dead "Start Workout" button
+### [platform][app-shell] Q-352 — the E2E harness has no zero-data account, so no first-run bug can be guarded
 
-- **Branch:** `fix/workout-select-no-program-empty-state`
-- **Added:** 2026-08-17 · review sweep (failure-cells lens, **reproduced in a browser**) ·
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
-- **Placement:** high. This is the app's **primary tab and primary action**, on the **first-run
-  path**, and both the screen and the button are inert. Every other first-run screen tested was fine
-  — this is the one that fails, and the worst one to fail.
-- **Observed.** A second account with no program, no logs and no metrics, signed in and sent to
-  `/workout-select` (the `Workout` bottom-nav destination; `/workout` and `/session-select` both
-  resolve here). At 412×915 it renders a **~1,400 px tall empty peach card** with a lone 💪 in the
-  top-left corner and a full-width green **Start Workout** button at the bottom. Full rendered text
-  of the screen: `"Workout / Choose a session to start / 💪 / Start Workout / Cardio Hub / Run · Walk
-  · Log anything"`.
-- **The button is dead.** Tapped it: same URL, same DOM, no navigation, no toast, **no console error,
-  no `/api/` request**. `app/workout-select/workout-select-content.tsx:412`:
-  ```tsx
-  onClick={() => currentSession && handleStart(currentSession)}
-  ```
-  With no program there is no `currentSession`, so the expression short-circuits to `undefined`. The
-  button is **not `disabled`**, carries no empty state, and gives no hint that creating a program is
-  the missing prerequisite.
-- **The empty card is the session carousel painting a session that isn't there.** `:337` is
-  `{currentSession?.icon ?? p.emoji}` where `p = getPaletteEntry(currentSession?.position ?? 0)` — so
-  the 💪 is position-0's palette decoration standing in for absent content, and the card keeps its
-  full height. That is position-indexed, so the *No Hardcoded Session Names* rule is **not** violated
-  — but it is why the empty state reads as a rendering fault.
-- **The comparison that makes it a bug rather than a gap:** `/program` handles the same account
-  correctly — *"No programs yet. Create one to get started."* The screen a new user is actually
-  dropped on has no such affordance.
-- **Fix shape:** give the no-program case a real empty state that routes to `/program`, and disable
-  (or repurpose) the button rather than leaving an inert primary CTA. Worth checking the same
-  short-circuit pattern on sibling surfaces per the *Sibling-surface sweep* rule.
-- **NOT device-verified** (web build, browser only).
+- **Branch:** `feat/e2e-zero-data-fixture`
+- **Added:** 2026-08-17 · found shipping Q-451, which could not be guarded without it
+- **The gap.** `e2e/auth.setup.ts` signs in one seeded user who has a program, logs and metrics.
+  Every spec runs as that user, so **no first-run or empty state is reachable from the harness** —
+  and first-run is exactly where the 2026-08-17 failure-cells sweep found the app broken (Q-451's
+  dead primary action on the primary tab, and Q-452's AI copy).
+- **Q-451 shipped observed-but-unguarded because of this.** It was verified by inserting an ad-hoc
+  `fresh@local.dev` row into the local DB and driving a throwaway spec — which worked, and proves the
+  fixture is straightforward — but nothing committed can re-run it, so the empty state can regress
+  silently.
+- **What to build.** A second seeded account with no program/logs/metrics in
+  `scripts/local-db/seed.sql`, plus a second Playwright project (or a `storageState` fixture) signed
+  in as it, so a spec can opt into the zero-data user per test.
+- **The one real trap:** `scripts/local-db/setup.sh` will not re-seed a database whose `users` table
+  is non-empty, so an existing local DB never gains the account while CI (fresh each run) always has
+  it — a spec that assumes it will pass in CI and fail locally, which is the wrong way round for
+  something meant to catch regressions. Either make the spec skip loudly when the account is absent
+  (the `claude-ro-readonly-role.test.ts` precedent), or add an idempotent top-up step to `db:local`.
+- **`scripts/local-db/` belongs to neither lane** — claim it in the implementing lane's baton first.
 
 ### [app-shell][platform] Q-452 — the AI insight card runs an LLM over a prompt of literal "no data" strings, and tells a day-one user their inactivity is a "significant gap"
 

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.2",
+    date: "2026-08-17",
+    changes: [
+      "The Workout tab now tells a new account what to do instead of showing an empty card with a Start Workout button that did nothing. Before you have a program it says so and offers to create one; cardio and one-off activities were always available and still are.",
+    ],
+  },
+  {
     version: "1.318.1",
     date: "2026-08-17",
     changes: [

@@ -109,7 +109,12 @@ const BASELINE = {
   // neither vitest (node-only, no @testing-library/react) nor the E2E harness (needs admin + a live
   // radio) can reach the code. The mechanism, the five-site sibling sweep and the CI-rule option
   // that was considered and declined all stayed in the journal entry.
-  'projectOverview.md': 6647,
+  // Raised 2026-08-17 (Q-451, Lane B): 6647 -> 6649. Striking a fixed item usually shrinks this,
+  // and this one nearly did — the replacement bullet was cut from 12 lines to 7. The two it is over
+  // are the two the original entry had no reason to carry: that the fix is **observed but not
+  // guarded**, and the Q-352 pointer to why. A struck item that can silently regress is exactly what
+  // a session must not have to discover for itself.
+  'projectOverview.md': 6649,
   'docs/implementation-backlog.md': 6671,
   'CLAUDE.md': 1010,
 

@@ -150,6 +150,16 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/overview/entries/2026-08-17-workout-select-empty-state.md`](../../overview/entries/2026-08-17-workout-select-empty-state.md)**
+  — 🆕 Q-451: `/workout-select` with no program rendered the carousel anyway (position-0's palette
+  emoji standing in for absent content) under a **Start Workout** button that short-circuited on the
+  missing `currentSession` and did nothing. Now three states, not one — the new `programLoaded` flag
+  is what separates "no program" from "still loading", and it is deliberately never set in a
+  `finally`, so a failed load holds the skeleton rather than claiming the account has no program.
+  **Observed working but not guarded**: the E2E harness has one seeded account and it has a program.
+  That gap is **Q-352**. The sweep also cleared Home's `recommendation-card.tsx:281`, which has the
+  same `x && f(x)` shape but is inside a `displaySession ?` branch — redundant, not a bug.
+
 - Cross-domain, but the deload work lives here:
   [`docs/handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md`](../../handoff-2026-08-11-platform-queue-drain-deload-coverage-coach-charts.md)
   (Q-175 — a confirmed deload **week** never reached the AI-dynamic prescription, the second of the

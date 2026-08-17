@@ -3,7 +3,8 @@
 import { useEffect, useLayoutEffect, useState, useCallback, useRef, useMemo } from "react";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { useTabVisibility } from "@/components/shell/tab-visibility";
-import { RefreshCwIcon, CalendarIcon, HeartPulse, ChevronRight, SlidersHorizontal } from "lucide-react";
+import { RefreshCwIcon, CalendarIcon, HeartPulse, ChevronRight, SlidersHorizontal, Dumbbell } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { motion, AnimatePresence } from "motion/react";
 import type { ProgramSession, ExerciseLibraryEntry } from "@trainingai/shared/types/program";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
@@ -64,6 +65,12 @@ export default function WorkoutSelectContent() {
   const router = useTransitionRouter();
   const { epoch: tabEpoch } = useTabVisibility();
   const [sessions, setSessions] = useState<ProgramSession[]>([]);
+  // `sessions: []` means two different things — "still loading" and "this account has no program" —
+  // and rendering the second as the first is what left a new user staring at an empty card with a
+  // dead Start button (Q-451). Set only from a cache seed or a settled fetch, never in a `finally`:
+  // telling someone with a program "No program yet" because their network dropped is a worse
+  // failure than holding the skeleton.
+  const [programLoaded, setProgramLoaded] = useState(false);
   const [library, setLibrary] = useState<ExerciseLibraryEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [dataEpoch, forceUpdate] = useState(0);
@@ -117,6 +124,7 @@ export default function WorkoutSelectContent() {
 
   useLayoutEffect(() => {
     const meta = readCacheSync<{ program?: { sessions?: ProgramSession[] }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>("workout-data:meta");
+    if (meta) setProgramLoaded(true);
     if (meta?.program?.sessions?.length) {
       const loaded = meta.program.sessions;
       setSessions(loaded);
@@ -143,7 +151,7 @@ export default function WorkoutSelectContent() {
       await Promise.all([
         cachedFetch<{ program?: { sessions?: ProgramSession[] }; phaseStatus?: import('@/app/api/workout-data/route').PhaseStatus | null; perSessionPhaseStatus?: import('@/app/api/workout-data/route').PerSessionPhaseStatus[] }>(
           "workout-data:meta", "/api/workout-data?tab=meta", TTL_LONG,
-          (meta) => { loaded = meta?.program?.sessions ?? []; setSessions(loaded); setPhaseStatus(meta?.phaseStatus ?? null); setPerSessionPhaseStatus(meta?.perSessionPhaseStatus ?? []); },
+          (meta) => { loaded = meta?.program?.sessions ?? []; setSessions(loaded); setProgramLoaded(true); setPhaseStatus(meta?.phaseStatus ?? null); setPerSessionPhaseStatus(meta?.perSessionPhaseStatus ?? []); },
         ),
         cachedFetchToday<NextSessionRecommendation>(
           'next-session', '/api/next-session', NEXT_SESSION_TTL,
@@ -306,7 +314,38 @@ export default function WorkoutSelectContent() {
       </header>
 
       <div className="flex-1 flex flex-col min-h-0 py-4 gap-3">
-        {/* Single card — body diagram stays, only text/button animates */}
+        {N === 0 && !programLoaded ? (
+          /* Nothing is known yet — no cache seed and no settled fetch. A repeat visit never lands
+             here: the layout effect seeds `sessions` synchronously before paint, so the card is
+             already on screen. This is the genuine cold first load. */
+          <Skeleton className="flex-1 min-h-0 mx-4 rounded-2xl" />
+        ) : N === 0 ? (
+          /* No program on the account. This used to render the carousel anyway — a ~1,400 px card
+             showing position-0's palette emoji as a stand-in for absent content, under a full-width
+             "Start Workout" button whose onClick short-circuited on the missing session and did
+             nothing at all (Q-451). `/program` already handled the same account properly, so the
+             fix is to say the same thing on the screen the user is actually dropped on. */
+          <div className="flex-1 min-h-0 mx-4">
+            <div className="h-full rounded-2xl border border-border bg-muted/40 p-6 flex flex-col items-center justify-center gap-4 text-center">
+              <Dumbbell className="h-10 w-10 text-muted-foreground" aria-hidden />
+              <div>
+                <p className="text-base font-semibold">No program yet</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Create one to get a session to start. Cardio and one-off activities work without a program.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => router.push("/program")}
+                className="rounded-xl px-5 py-3 text-sm font-bold text-brand-foreground active:scale-95 transition-transform"
+                style={{ background: "var(--color-brand)" }}
+              >
+                Create a program
+              </button>
+            </div>
+          </div>
+        ) : (
+        /* Single card — body diagram stays, only text/button animates */
         <div
           ref={containerRef}
           className="flex-1 min-h-0 mx-4"
@@ -422,6 +461,7 @@ export default function WorkoutSelectContent() {
 
           </div>
         </div>
+        )}
 
         {/* Dot indicators */}
         {N > 0 && (
