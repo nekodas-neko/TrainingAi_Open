@@ -63,6 +63,45 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][devices] 🔴 Production hit `disk_full` during a full re-sync — and the indexes, not the data, are the bulk (2026-08-17)
+
+**Live fault, mitigated by raising the volume; the underlying sizing is unresolved.** During the
+2026-08-17 ring re-sync, `/admin/oura-ble` returned a Server Components render error and two API
+routes failed with **`[pg 53100]`** — PostgreSQL's `disk_full`. Both failing queries read
+`oura_raw_samples`; one is a `SELECT DISTINCT ON (tag)` over 1.1M rows, which must sort, and with
+`work_mem` at 4 MB it spills to temp disk. There was no room. Confirmed in `error_events`
+(`GET /api/oura-ble/device-metrics`, `GET /api/oura-ble/samples/summary`).
+
+**Measured at the time of failure:**
+
+| | |
+|---|---|
+| Database total | **583 MB**, up ~110 MB in one hour |
+| `oura_raw_samples` heap | 175 MB |
+| `oura_raw_samples` **indexes** | **291 MB** — 1.66× the heap |
+| That one table | **80% of the database** |
+| `last_autovacuum` / `last_analyze` | **never** — `n_live_tup` reads 0 |
+
+**Three things stack, and only one of them is the archival data.**
+1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation; **the stated target
+   is to return to the stock 500 MB** once the bulk is dealt with.
+2. **Indexes exceed the table.** The dedup index covers
+   `(user_id, ring_timestamp_ds, tag, body_hex)` — it indexes the raw payload itself, so it grows
+   faster than the rows do. **291 MB of the 466 MB is index, not data.**
+3. **Autovacuum has never run on this table**, so there are no statistics either. The planner has
+   been working blind on the largest table in the database; that same `DISTINCT ON` takes 6.5 s
+   even with disk available.
+
+**Why (2) matters more than it looks.** Reclaiming index space is *non-destructive* — it does not
+touch `body_hex`, so it does not collide with the rule that the server archive is the source of
+truth and must never be pruned. Replacing the payload in that index with a hash would preserve
+dedup semantics on a fraction of the bytes. That may get under 500 MB without deleting anything,
+which is a very different proposition from the retention question.
+
+**Owed:** the sizing work (see the storage research item) must now be framed as *how to get back
+under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
+**do not run another Full re-sync until this is resolved**; that is what triggered it.
+
 ### [devices][platform] 🔴 An app uninstall destroys the Oura ring key, and nothing warned about it (2026-08-17)
 
 The 32-hex ring key lives **only** in Android SharedPreferences. `OuraBlePlugin.kt` says so in its
@@ -143,6 +182,29 @@ the next device change.
   or native-SQLite claim is made, and a fresh correct local seed cannot speak to prod data drift.
 - **Nothing was fixed.** All six are queued per *Backlog-driven implementation*; Q-450 and Q-451 sit at
   the top of `docs/implementation-backlog.md` (Q-310 above them has since shipped and been removed).
+### [devices][heart-rate] 🔴 The ring records SpO₂ and daytime HR permanently — ~3.5× stock battery drain (Q-388, 2026-08-17)
+
+- Owner: stock ring lasts 7 days; on our build it loses ~20% overnight and needs charging every 2
+  days. That is ~50%/day against a ~14%/day stock baseline.
+- `OuraProtocol.kt:123-127` — `enableMeasurementSequence()` sets **DAYTIME_HR + SPO2 + REAL_STEPS →
+  AUTOMATIC** on *every* connect, unconditionally, with **no user toggle**, re-asserted on each
+  reconnect. On stock, blood-oxygen sensing is opt-in and the vendor warns it costs battery.
+- **Production (owner's rows, 7 days):** `spo2_r_pi_event` is the largest source at **53,412** rows,
+  and **~75% of it lands between 22:00 and 09:00** — precisely the window the owner is losing 20% in.
+  Green-PPG adds a steady daytime load. Daily totals stepped 5,378 → ~24,000 on **2026-08-04** and
+  held; **unexplained, and confounded** — this counts *ingested* events, so better draining looks
+  identical to more sensing. Resolving that comes first.
+- **Separate latent trap (not today's cause):** `reqBleFastHrMode(false)` and `EXERCISE_HR →
+  AUTOMATIC` exist only in `liveHrStopSequence()`; the connect-time sequence resets neither. A
+  live-HR session that never reaches `stopLiveHr()` — app killed mid-workout, or the tester's
+  **Live HR** button without **Stop HR** — leaves continuous fast-HR sampling on permanently, healed
+  by no reconnect or restart. Production shows it is *not* firing now (`ehr_trace` is zero 21:00–08:00).
+- **Nothing has measured ring power draw, because nothing records it** — the keepalive polls battery
+  every 5 min and `parseBattery` decodes it, but it is never persisted. Everything above is
+  code-traced or inferred from event counts. Persisting that poll is the prerequisite for a real fix.
+- **Q-388** holds the trace, the hourly table and the fix directions. **Device-gated** — needs an APK
+  and a wear cycle. **Not fixed; not started.**
+
 ### [nutrition] 🟠 A half-logged day feeds the calibrated maintenance as if it were complete (Q-387, 2026-08-17)
 
 - Owner asked what stops the tuner treating "breakfast + lunch, skipped dinner" as a whole day.
