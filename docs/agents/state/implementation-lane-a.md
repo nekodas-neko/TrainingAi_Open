@@ -19,7 +19,13 @@ what to merge from measured evidence (two epochs are one clock when their *minim
 agrees within 10 min) rather than from a user id or an epoch number, so a genuine re-key is left
 alone. Mutation-checked both ways.
 
-⚠️ **STILL OWED: a full-history Redecode after deploy.** The migration relabels; it does not rewrite
+⚠️ **STILL OWED: a full-history Redecode after deploy — and it is not free.** The route re-stamps
+`measured_at` over all 1.1 M rows, which is the same non-HOT full-table rewrite that produced the
+disk_full incident's ~306 MB of bloat (Q-534). Measured 2026-08-17: DB **786 MB**, the volume
+temporarily at **5 GB**, so there is ample headroom *today*. **Do not let the volume go back to
+500 MB before Q-534's index work lands.**
+
+ The migration relabels; it does not rewrite
 the 43 stored nights, and the rollup's 35-day window does not reach the oldest of them (the damage
 spans 44 days). **Health shows the wrong bedtimes until that is run** — it is the step that fixes
 what the owner actually sees, and it has not been done. Q-535 notes Redecode reports a spurious
@@ -63,6 +69,18 @@ hardware. Confirm at the next engine-chosen deload: header "Deload", reduced wei
 
 ## Claimed paths
 None held.
+
+## Findings recorded this session, so they are not re-derived
+- **Q-534's finding 4 is not a drop-in index drop.** `idx_oura_raw_samples_user_measured` (118 MB)
+  has two live consumers — `getLatestOuraBleMeasuredAt` (`slices/oura.ts:173`) and
+  `getOuraRawSamplesForTags` (`adapter.ts:6446`) — and both become sequential scans of the largest
+  table in the DB without it. The entry's "can be expressed as ds ranges instead" is a plan, not a
+  fact: it means converting the window bound through the clock anchors at both sites, one of which
+  is a read path. Order is rewrite → prove equivalence → drop, and the entry now says so.
+- **Q-535 is the next Lane A item and it is genuinely worth doing**, partly because it is what makes
+  the redecode safe to re-run: the route holds the request open through the heaviest pair of calls
+  in the app, 502s at the gateway, and the false failure invites a retry of a full-table rewrite.
+  Note the split — returning a job id is Lane A, the client poller is Lane B.
 
 ## Do not re-litigate
 - The lane contract, authority limits and Q bands are settled in
