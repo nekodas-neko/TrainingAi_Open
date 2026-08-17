@@ -27,10 +27,19 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 
 - [`docs/reviews/2026-08-15-comprehensive-app-review.md`](../../reviews/2026-08-15-comprehensive-app-review.md)
   — **the first review to measure all five scoring pillars together, on the same production days.**
-  Readiness is structurally blind to training load (Q-275); the Recovery Index contributor can never
-  score above ~50 (Q-271); readiness and Body Battery share no variance (Q-276); and only Body
-  Battery stamps a `model_version`, so mixed-model correlations are undetectable elsewhere (Q-273).
-  Start here before touching any score.
+  Readiness is structurally blind to training load (Q-275); readiness and Body Battery share no
+  variance (Q-276); and only Body Battery stamps a `model_version`, so mixed-model correlations are
+  undetectable elsewhere (Q-273). Start here before touching any score — **but read its §1.3 against
+  the calibration doc below, which found that finding (Q-271) was measured over eight days and does
+  not hold over the series.**
+- [`docs/reviews/2026-08-17-readiness-calibration.md`](../../reviews/2026-08-17-readiness-calibration.md)
+  — **the Recovery Index contributor, calibrated against Oura's own contributor** on the 15 nights
+  where both exist (2026-06-23 → 07-07, the only ground truth this metric has). Three things to carry
+  out of it: the shipped argmin estimator is **sound** (r = +0.712, better than every alternative
+  tested — do not change it); the **6 h anchor is ~1 h too high** and the zero-bias fit is 4.63 h,
+  proposed as 5 (**Q-500, ⛔ owner sign-off**); and Q-271's headline numbers ("never above 50, ever",
+  "2.2 pts/day") are an 8-day artefact — over 41 days it is 12 days above 50 and 0.71 pts/day. Also
+  files **Q-501**: persisted readiness rows drift from the summaries they derive from.
 - [`docs/body-battery-tuning.md`](../../body-battery-tuning.md) — how the Body Battery model is
   tuned against physiology; the reasoning behind its constants. **Read the v5 section before
   touching any constant**: the v5 values were set by backtesting for distributional plausibility,

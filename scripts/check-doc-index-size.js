@@ -19,12 +19,17 @@ const path = require('path');
 const root = path.join(__dirname, '..');
 
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
+//
+// Raised 2026-08-17 (Tuning, Q-500/Q-501): backlog 5698 -> 5722, projectOverview 6372 -> 6382.
+// Two new queue entries replacing one (Q-271 superseded by Q-500, plus Q-501) and one rewritten +
+// one new Known-Issues row. This is queue and open-issue content, which is what these two files are
+// for — the growth the ratchet exists to catch is narrative and dated notes, not entries.
 const BASELINE = {
-  // +15 on 2026-08-17 for Q-310's Known-Issues row: a shipped fix that still owes a device check,
-  // which is exactly what this section is for — the archive only takes an entry when nothing is
-  // still owed. The evidence lives in the journal entry; only the outstanding part is here.
-  'projectOverview.md': 6387,
-  'docs/implementation-backlog.md': 5698,
+  // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
+  // check, so it belongs here rather than in the resolved archive, which only takes an entry when
+  // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
+  'projectOverview.md': 6397,
+  'docs/implementation-backlog.md': 5722,
   'CLAUDE.md': 962,
 };
 
