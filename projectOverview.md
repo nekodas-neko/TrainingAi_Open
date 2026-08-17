@@ -171,10 +171,16 @@ under 500 MB safely*, not *whether growth will eventually matter* — it already
   on 2026-08-17 by the redecode; every other night still carries its own write date), and all 44
   nights recompute from stored `body_hex`. Subtracting 14 h 10 min puts every one of the 43 back
   into a 20:00–00:00 bedtime distribution.
-- **Half repaired.** Migration **189** (owner-approved) merges same-clock epochs, deciding what to
+- ⚠️ **v1.318.0 did not land the repair.** Migration 189 relabelled 434,707 sample rows in the same
+  transaction, hit the pool's 15 s `statement_timeout`, and rolled back on every boot — so the
+  owner's redecode faithfully reproduced the wrong times. **Fixed in v1.318.1**: 189 raises the
+  timeout and does the anchors only; the sample relabel is now 190, isolated because
+  `oura_raw_samples.epoch` is read by nothing and must not be able to roll back the half that works.
+- **Repaired by** migration **189** (owner-approved), which merges same-clock epochs, deciding what to
   merge from measured evidence — two epochs are one clock when their *minimum* anchor lag agrees, a
   criterion a genuine re-key fails by weeks. Merged production p10 lands 3 s from the clean offset.
-- ⚠️ **Still owed: a full-history Redecode after deploy.** The migration relabels; it does not
+- ⚠️ **Still owed: a full-history Redecode after v1.318.1 deploys.** The one run against v1.318.0
+  did nothing, because the migration under it had rolled back — it has to be run again. The migration relabels; it does not
   rewrite the 43 stored nights, and the rollup's 35-day window does not reach the oldest of them.
   **Health stays wrong until that is run.** **Q-314** covers the detection defect that caused it;
   until that lands, every re-pair reopens this.

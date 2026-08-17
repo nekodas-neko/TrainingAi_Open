@@ -4,7 +4,7 @@
 > successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-17 · **By:** the first session to run as Lane A · **Q band:** 314–349 (next free: **315** — Q-314 taken for the ring-clock reset-detection defect)
-**Migrations:** 189 taken (`189_q536_merge_redrain_clock_epochs.sql`); next free is **190**. Local SQLite unchanged at v22.
+**Migrations:** 189 and 190 taken (Q-536); next free is **191**. Local SQLite unchanged at v22.
 
 ## Now
 Nothing in flight. **Q-536 diagnosed and half-repaired** (v1.318.0, migration 189). The 43 midday bedtimes are a
@@ -80,6 +80,16 @@ None held.
   the dev server.
 
 ## Method notes worth keeping
+- **A migration verified on a fixture is not verified.** Q-536's first migration passed a 5-test
+  local suite and CI, and still rolled back on every production boot: the fixture was 8 rows, the
+  real table 434,707 on 667 MB, and the pool's `statement_timeout` is **15 s**. For any data
+  migration, ask what the production row count is *before* writing it, and put `SET LOCAL
+  statement_timeout` on anything that is not obviously small. `SET LOCAL` is confirmed to work
+  inside `pool.query()`'s implicit multi-statement transaction, in both directions.
+- **The tell that a migration silently failed:** it is absent from `schema_migrations` while
+  `/api/version` reports the release that carries it. `ensureSchema` catches, logs to console only,
+  records nothing, and retries every boot — so there is no `error_events` row to find. Check the
+  table, not the logs.
 - **`CLAUDE_DB_QUERY_SECRET` is set in this environment** and `POST /api/admin/db-query` works from
   the sandbox. It is the fastest way to answer "did this actually corrupt anything" before writing a
   migration an entry asks for. Row-scoped to the owner — phrase findings as "nothing of the owner's".

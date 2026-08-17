@@ -34,6 +34,7 @@
 -- is left alone. Merging is downward only, into the lowest epoch of the matching group.
 --
 -- Idempotent: re-running finds every epoch already equal to its group's minimum and updates nothing.
+-- Cheap: the anchors table is ~5,400 rows, so this finishes in well under a second.
 -- Non-destructive: no row is deleted and no `body_hex` is touched, so a corrected decoder can always
 -- re-derive. `oura_raw_samples.epoch` is a label, and this migration only relabels.
 --
@@ -42,6 +43,25 @@
 -- clearing the watermark below is not by itself enough to reach the oldest nights.
 --
 -- The misdetection that caused this is Q-314 — until that lands, every re-pair reopens it.
+
+-- ⚠️ REWRITTEN 2026-08-17, SAME DAY, BEFORE THIS EVER APPLIED ANYWHERE THAT MATTERS.
+-- The first version also relabelled `oura_raw_samples` in this transaction — 434,707 rows on the
+-- 667 MB table — and the pool sets `statement_timeout = 15s` (`lib/data/postgres/client.ts`). It
+-- timed out on every boot, the whole implicit transaction rolled back, and `ensureSchema` logged
+-- the failure and carried on, so production sat on four epochs and the owner's redecode changed
+-- nothing. It was verified locally against an 8-row fixture, which proved correctness and said
+-- nothing at all about scale.
+--
+-- Editing this file rather than superseding it is deliberate and safe **only because it never
+-- reached `schema_migrations` in production**. Do not take it as licence to edit an applied
+-- migration; `ensureSchema` tracks by filename, so an edit to an applied file never runs.
+--
+-- The sample relabel moved to migration 190. It is NOT load-bearing for the repair:
+-- `oura_raw_samples.epoch` is written at ingest (`adapter.ts:4888`) and read by **nothing** — the
+-- offset every timestamp depends on comes from `oura_ble_clock_anchors` alone, via
+-- `currentEpoch(anchors)` and `robustOffsetMs(anchors)`. Splitting it out means the expensive,
+-- inert half can no longer roll back the cheap, load-bearing one.
+SET LOCAL statement_timeout = '5min';
 
 -- One canonical epoch per group of same-clock epochs, per user.
 CREATE TEMP TABLE q536_epoch_merge ON COMMIT DROP AS
@@ -67,13 +87,6 @@ UPDATE oura_ble_clock_anchors a
  WHERE a.user_id = m.user_id
    AND a.epoch = m.from_epoch
    AND a.epoch <> m.to_epoch;
-
-UPDATE oura_raw_samples r
-   SET epoch = m.to_epoch
-  FROM q536_epoch_merge m
- WHERE r.user_id = m.user_id
-   AND r.epoch = m.from_epoch
-   AND r.epoch <> m.to_epoch;
 
 -- The watermark stores the epoch its `last_rolled_ds` was measured in, and a watermark from a
 -- different epoch is ignored rather than trusted (migration 184). Relabelling the epochs underneath

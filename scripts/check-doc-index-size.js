@@ -91,6 +91,11 @@ const root = path.join(__dirname, '..');
 // shipped and which is still owed; Q-314 is the new queue entry for the root cause; the
 // projectOverview row is a live, unrepaired fault on displayed health values. Entries and a
 // corrected entry, per the same split as the raises above.
+//
+// Raised 2026-08-17 (Lane A, Q-536 follow-up): projectOverview 6647 -> 6653, backlog 6649 -> 6665.
+// v1.318.0's migration rolled back in production on every boot and the repair never landed; both
+// entries now say so, because "shipped" was recorded here and was false. A correction to an existing
+// row and an existing entry, which is the cheapest possible place to carry it.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -103,8 +108,8 @@ const BASELINE = {
   // neither vitest (node-only, no @testing-library/react) nor the E2E harness (needs admin + a live
   // radio) can reach the code. The mechanism, the five-site sibling sweep and the CI-rule option
   // that was considered and declined all stayed in the journal entry.
-  'projectOverview.md': 6647,
-  'docs/implementation-backlog.md': 6649,
+  'projectOverview.md': 6653,
+  'docs/implementation-backlog.md': 6665,
   'CLAUDE.md': 1010,
 
 };
