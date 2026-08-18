@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/acwr-calibration` · **Q band:** 500–529 (next free: 514)
+**Updated:** 2026-08-18 · **By:** `tuning/acwr-calibration` · **Q band:** 500–529 (next free: 515)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -92,7 +92,7 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | activity | ✅ specified (Q-505) — build is Lane A's |
 | body | ✅ battery range clean; anchor measured (Q-511) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
-| **workouts** | 🟡 **STARTED 2026-08-18** — ACWR done (Q-512/513). **1RM, expected RPE, progression, monotony/strain still untouched** |
+| **workouts** | 🟡 ACWR (Q-512/513) + RPE autoregulation (Q-514) done 2026-08-18. **Still untouched: progression rules, monotony/strain, goal-range bands.** 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
 | **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05` (documented rationale, never validated against the owner's HR), `PEAK_BANDS` (their "stable per-bucket sample sizes" justification is an empirical claim nobody measured), zone boundaries |
 | **nutrition** | 🟡 **movement goals ARE calibrated** — `STRENGTH_FREQ_GOAL 5` (Q-137, 91 days) and `SESSION_VOLUME_GOAL_KG 5200` (Q-190, 40 sessions), see [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md). `STEP_GOAL 8000` / `ZONE_MINUTES 22` / `BMR_FRACTION 0.24` are **deliberate population anchors** (Paluch 2022, WHO 150 min/wk), not unchecked round numbers. **Genuinely uncalibrated: the calorie/macro targets vs the owner's observed weight change** — a TDEE outcome check nobody has run |
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
@@ -155,6 +155,13 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **`RPE_DEAD_BAND = 1.5` is RIGHT — do not tune it** (Q-514). It sits on a flat part of the
+  sensitivity curve (1.25→20.7%, 1.5→17.5%, 2.0→14.9%) and the delta distribution is centred. The bias
+  is in the input: `expectedRpe`'s **floor** clamp binds on 6.5% of sets (the ceiling never binds),
+  giving them a **+1.89** mean delta against **−0.34** for everything else, which fires the back-off
+  arm. Excluding them removes **64% of back-off triggers and zero push triggers** — the asymmetry is
+  the proof it is bias, not sensitivity. **Third instance today of "the threshold is right, the input
+  is wrong"** (Q-506, Q-512, Q-514). Check the input's distribution before touching any constant.
 - **ACWR's thresholds are RIGHT — do not tune them** (Q-512/513). Over 77 sessions the
   decision-driving variant reads mean 0.99, median 1.05, sd 0.32, bands 18/69/13/0%. The `> 1.5`
   emergency deload has **never fired** (max 1.48) and that is **correct** — an emergency deload that

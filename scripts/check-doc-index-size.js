@@ -467,7 +467,10 @@ const BASELINE = {
   // conclusion is counterintuitive: the ACWR thresholds are RIGHT and must not be touched (the >1.5
   // emergency deload has never fired, and that is correct), while two of the three call sites
   // computing ACWR are wrong. Strip the tables and the next reader tunes the thresholds instead.
-  'docs/implementation-backlog.md': 8308,
+  // +50 for Q-514 (expected-RPE clamp): its two tables ARE the argument — the +1.89/-0.34 split shows
+  // the bias is one-directional, and the 39->14 / 27->27 pair is what distinguishes a bias fix from a
+  // de-sensitisation. Without both, the obvious response is to raise RPE_DEAD_BAND, which is wrong.
+  'docs/implementation-backlog.md': 8358,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

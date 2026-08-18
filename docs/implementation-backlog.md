@@ -3938,6 +3938,56 @@ session working from a temporarily restored copy.
 - **Upper bound caveat:** `build-day-audit`'s `programTooNew` gate can null its ACWR independently, so
   38% bounds the days the panel actually renders a band.
 
+### [workouts] Q-514 — 64% of the engine's back-off load cuts are an expected-RPE clamp artefact
+
+- **Branch:** `fix/expected-rpe-clamp-exclusion`
+- **Plan:** none — a predicate plus a filter. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](reviews/2026-08-18-rpe-autoregulation-calibration.md)
+- **`RPE_DEAD_BAND = 1.5` is correctly placed — do NOT move it.** Sensitivity over 377 per-exercise
+  windows: 0.5 → 48.3%, 1.0 → 29.4%, 1.25 → 20.7%, **1.5 → 17.5%**, 2.0 → 14.9%. It sits on a flat part
+  of the curve and the delta distribution is centred (mean −0.05). **The input is what is biased.**
+- **The floor clamp splits the data in two.** `expectedRpe` clamps to the 5–10 slider range. The
+  **ceiling never binds** (raw expected tops out at exactly 10.0, 0 sets clamped); the **floor binds on
+  37 of 570 sets (6.5%)**, hiding raw values as low as **−10.4**. Those are not warm-ups —
+  `intensity_pct` **49.6–66.7** (median 54.3) at **7–13 reps** (median 10), ordinary accessory work. At
+  54.3% reps-to-failure is ~19, so a 10-rep set has ~9 RIR and a "true" expected RPE near 0.6; the model
+  can only say **5**, and the owner reports **6.9**.
+
+  | population | n | mean delta |
+  |---|---|---|
+  | floor-clamped | 37 | **+1.89** |
+  | everything else | 533 | **−0.34** |
+
+  A **2.2-point systematic offset**, in the direction the back-off arm reads as "RPE ran high".
+- **Cost, replaying the shipped grouping** (per exercise, trailing 3 sessions, ≥3 sets, threshold 1.5):
+
+  | | shipped | excluding floor-clamped |
+  |---|---|---|
+  | back-off (≥ +1.5) | **39 (10.3%)** | **14 (4.1%)** |
+  | push (≤ −1.5) | 27 (7.2%) | **27 (7.9%)** |
+  | sd of delta | 1.16 | 0.96 |
+
+  **25 of 39 back-off triggers vanish — 64%** — while the push arm is *untouched*. That asymmetry is
+  what makes it a bias fix rather than a de-sensitisation. 64% of back-off windows contain ≥1
+  floor-clamped set. Each trigger is a **5–10% load cut**.
+- **First action:** exclude sets whose **raw (pre-clamp)** expected RPE falls outside the slider range
+  from the autoregulation delta. They carry no information — the model cannot state its expectation, so
+  the gap to the reported value measures nothing. Matches the codebase's existing principle of passing
+  `null` rather than fabricating a neutral (`computeResilienceForDay`). Contained: one predicate beside
+  `expectedRpe`, plus a filter in `signals.ts`'s `perExRpeDelta` loop (~line 293). **No curve change.**
+- **Do NOT widen the clamp** to allow expected RPE below 5 — an expectation of 0.6 against an owner who
+  never reports below 6 gives a delta of **+6.3**, worse. The set is unrepresentable either way.
+- **Re-measure after.** Back-off 4.1% vs push 7.9% is asymmetric the other way; whether that is right is
+  the next question, and it must be asked against unbiased input.
+- **Caveat that bounds the counts:** the back-off arm needs a second signal (`rm1Trend === 'down'` OR
+  missed reps) which this replay does **not** model, so 39/14 count windows clearing the *RPE* gate, not
+  cuts actually issued. **The 64% ratio is the finding, not the absolute counts.** Only sets carrying
+  both `rpe` and `intensity_pct` are visible (570 of 1,029 set logs).
+- **Related, recorded not filed:** `calcAmrap1RM` / `amrapScaleFactor` (the 1.0/0.97/0.93/0.88/0.82
+  rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls
+  would be wasted; removing it is a Review-lane call.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)
