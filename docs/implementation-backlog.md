@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **194** | `lib/data/postgres/migrations/` (head: `193_drop_oura_raw_samples_measured_index.sql`) |
+| Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **545** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -282,98 +282,240 @@ below threshold and left in place for next time.
 > entry required, and now passes with the fix, **fails with `health-content.tsx` reverted to
 > `main`**, and passes again restored. The extraction was made *after* that first proof, so the
 > whole fix/revert/restore cycle was re-run against the final code.
-> Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
+> Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
-### [platform] Q-356 — `periodization-soft-delete.test.ts` fails every day between 14:00 and 16:00 UTC, for every branch
+### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
-- **Branch:** `fix/periodization-soft-delete-local-midnight`
-- **Lane:** **A** — `lib/data/postgres/__tests__/`. Lane B diagnosed and reproduced it but does not
-  own the path.
-- **Added:** 2026-08-17 · found when it turned a Lane B PR's Tests job red
-- **⚠️ This blocks merges repo-wide for two hours a day, on any branch.** It is not specific to
-  whatever PR happens to be open when it fires.
-- **The mechanism, reproduced.** `beforeEach` inserts a session at `now() - interval '1 hour'`
-  (a UTC instant) and then derives the query window from the **user's** timezone:
-  ```sql
-  SELECT to_char((now() AT TIME ZONE 'Australia/Brisbane')::date, 'YYYY-MM-DD') AS today
+- **Branch:** `feat/meal-label-ingredient-breakdown`
+- **⬆ MOVED TO THE TOP OF THE QUEUE by the owner, 2026-08-18** — *"can this be added to the top
+  of the lanes queue - I will test and get back"*. Take this before the numbered items below it.
+- **✅ The owner has approved ALL the drawn variants as shippable styles** (*"I like all of these
+  ones… lets keep them all as options to cycle through and choose a default"*), so this is no
+  longer a pick-one decision — every layout below becomes an entry in the style registry the
+  renderer already reads. **The default is the open question, and it is a stored preference:**
+  see the Q-392 note further down before choosing where to keep it.
+- **Added:** 2026-08-18 · owner: *"could we have a small font showing the break down of the meal i.e
+  Pasta / [macros] / (100g pasta, 200g mince, etc etc) so its the full summary of the meal."*
+- **Follow-up to Q-389, which shipped 2026-08-18 (v1.320.0)** — the label renderer exists
+  (`components/nutrition/meal-label-render.ts`, canvas, four styles, style passed as a parameter),
+  so this is a new layout variant inside a working system, not new machinery.
+
+**The measurement first, because it decides the shape.** On a **round** 50 × 50 mm label the usable
+area is a centred **130 × 137 px** box, and the shipped default already spends all of it:
+
+```
+band header 34 + calories 22 + macros 12 + code 46 + gaps 16  =  130 px
+                                                     leaving  =    7 px
+```
+
+**That is zero ingredient lines.** A list cannot be added to the round label without removing
+something already on it. A **square** label gets the corners back — 171 × 171 usable, **1.64× the
+area and 34 px more height** — and a full five-ingredient list fits there comfortably, with the code
+moving *beside* the calories rather than under them.
+
+- **⚠ It cannot go in the QR instead.** `packages/shared/src/nutrition/label-payload.ts:22-23` sets
+  `QR_V2_M_BYTE_CAPACITY = 26`; the shipped payload is the bare 22-char id, leaving four bytes.
+  Q-389's journal records that **a unit test asserts the length against that budget precisely so a
+  later "let's also put the name in" fails in CI rather than on paper.** An ingredient list is
+  hundreds of bytes. It goes on the paper or it does not go.
+- **Data is available and needs no new shape.** `NutritionIngredient`
+  (`packages/shared/src/types/nutrition.ts:91-97`) already carries `name` and `weightG`, which is
+  exactly "200g Beef mince". For a saved meal it comes from `saved_meal_items` →
+  `food_items`; the plumbing to get it as far as the label sheet is the only new work on the data
+  side.
+- **Three options drawn at true size in the design canvas** (ask the owner for the link):
+  1. **Square, full list** — all five ingredients, code beside the calories at 62 px / **0.656 mm per
+     module**, the roomiest code of anything drawn for this feature, because the corners paid for it.
+     Cost: the artwork does **not** survive a round die, which reverses Q-389's settled
+     "one artwork serves both".
+  2. **Round, trimmed** — three ingredients then "+2 more — scan", calories and macros merged onto
+     one line. **⚠ Forces the code down to 44 px = 0.465 mm per module, below the 0.487 that was
+     already the tightest in the set** — so it trades scan reliability for a partial list, and a
+     partial list is what the request was trying to avoid.
+  3. **Round, scan only** — no list; the code already resolves to the full breakdown in the app.
+     Keeps the code and the name at full size.
+- **The honest framing for the decision:** the printed list is only worth its cost when reading a
+  tub **without** a phone. With a phone in hand, option 3 gives the *whole* breakdown where option 2
+  gives three of five lines at 6.5 px. So the real question is not "can we fit it" but "is this label
+  read away from a phone" — and if the answer is yes, the round die is what has to give, not the code.
+- **✅ Answered 2026-08-18 — two of the owner's follow-up questions, checked against shipped code:**
+  1. **"Will the QR work?"** The shipped renderer uses a **real encoder** — `qrcode@1.5.4`,
+     `QRCode.create(encodeMealLabelToken(mealId), { errorCorrectionLevel: 'M' })`
+     (`components/nutrition/meal-label-render.ts:125`), and its own comment already reasons about
+     exactly this: *"the code is 12.2–16.4 mm on these layouts, so ink spread on a home printer is
+     the expected failure and M is the level that survives it."* EC level M tolerates ~15% damage,
+     which is the margin that absorbs spread. **What is still unproven is the print**, and nobody has
+     run one — it is one of the two physical checks Q-389 already owes. **The mockup codes are
+     placeholder patterns and will not scan; do not test with those.**
+  2. **"Can the image be saved for a label-printer app?"** **Already shipped.**
+     `meal-label-sheet.tsx` does `canvas.toBlob(…, 'image/png')` → `navigator.share({ files })`
+     behind a "Share or save" button, with `<a download>` as the browser fallback. On Android the
+     share sheet is where a label-printer app appears, which is why it was built that way rather than
+     as a Capacitor plugin. **No work needed here.**
+- **⚠ "Cycle through them and choose a default" is two requests, and the second one is new.**
+  Cycling is nearly free — the renderer already takes the style as a parameter and four styles ship,
+  so the breakdown variants are more entries in the same registry. But **Q-389 deliberately ships the
+  style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
+  straight on **Q-392** (preferences live only on the device). If a label default is written to
+  `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
+  **Build the default on whatever Q-392 settles**, not beside it.
+- **✅ SHIPPED 2026-08-18 (v1.323.0, Lane B) — option 1, and NOT option 2.** `square` is now a style
+  in the registry: full per-serving ingredient list, code at 70 units, marked **SQUARE** in the
+  picker with a standing warning under the preview that a round die crops the list. The preview also
+  reports how many ingredients actually printed and how many were summarised, so a truncated list
+  cannot ship silently. Guarded by `e2e/meal-label.spec.ts`, mutation-checked — an earlier version of
+  that guard **passed** with the ingredient path switched off (the style fell through to the round
+  painter and still painted ink), which is why the spec now asserts the reported count.
+- **⚠️ CORRECTION, measured — every module-pitch figure in this entry and in Q-389 is ~24% too
+  optimistic.** The renderer draws the 4-module quiet zone **inside** the code box
+  (`cell = codeW / (moduleCount + 8)`), so the pitch actually printed divides by **33**, not 25:
+
+  | style | code | pitch as documented (÷25) | **pitch as drawn (÷33)** |
+  |---|---|---|---|
+  | band (default) | 12.17 mm | 0.487 mm | **0.369 mm** |
+  | editorial | 13.23 mm | 0.529 mm | **0.401 mm** |
+  | ticket | 13.76 mm | 0.550 mm | **0.417 mm** |
+  | plaque | 15.87 mm | 0.635 mm | **0.481 mm** |
+  | **square (new)** | 18.52 mm | 0.741 mm | **0.561 mm** |
+
+  The app was already showing the honest number; only the docs were wrong. This makes the print test
+  **more** important, not less, and it is why `square` was sized at 70 units — its 0.561 mm is the
+  only style above the 0.487 that everything here was assumed to have.
+- **⛔ Option 2 (round, trimmed) is NOT shipped, and needs an owner decision.** At 44 units its true
+  pitch is **0.353 mm** — below every shipped style, not merely below the "0.487 floor" this entry
+  names. It buys three of five ingredient lines at 6.5 px in exchange for the least reliable code in
+  the set. Recommendation: do not build it; the square die is the answer to wanting the list on paper.
+- **Still open:** option 2 above, and **the stored default**, which stays blocked on **Q-392** exactly
+  as this entry says — the style remains picked-at-print-time and nothing was persisted.
+- **What would count as done:** a saved meal's label can render its ingredient list with weights;
+  whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
+  without an explicit owner decision recorded here; and if a square-only variant ships, the app makes
+  clear which labels are square-only rather than letting a round die silently crop the list.
+- **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
+  layout and overflow need no device. **The two checks that matter are still physical** — print it and
+  scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
+
+### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
+
+- **Branch:** `feat/coach-undo-control`
+- **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
+  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
+- **Placement:** upper-mid. An AI-initiated write to the data that decides what the user is told to
+  lift, with no in-app way back.
+- **A complete undo subsystem exists and has no caller.** All of this is built:
+  `POST /api/coach/apply/[id]/undo` (auth-gated, rate-limited, ownership-scoped, with a well-reasoned
+  "until the next workout started after the change" window); `undoCoachChange()` with a double-undo
+  guard; an `undo()` handler in **all five** domains; `captureBefore()` in each, existing solely for
+  it; the `coach_changes.undone_at` column; and `components/coach/coach-history.tsx` already styling
+  undone changes with strikethrough, muted colour and a "· undone" suffix.
+- **Nothing calls it.** Every client fetch to a Coach endpoint, enumerated across `app/`,
+  `components/` and `lib/`:
   ```
-  `weekStart = weekEnd = today`. Between 00:00 and 02:00 Brisbane — 14:00–16:00 UTC — "an hour ago"
-  is **the previous Brisbane day**, so the session falls outside `[today, today]`,
-  `getWeeklySetsByMuscleGroup` counts zero, and all five assertions fail. Measured at 14:35 UTC:
+  /api/coach   /api/coach/threads   /api/coach/preview   /api/coach/apply   /api/coach/options
   ```
-  Brisbane today:    2026-08-18
-  session completed: 2026-08-17 23:35 Brisbane  → date 2026-08-17
-  ```
-- **The comment above the insert asserts the opposite** — *"Started an hour ago so the session sits
-  inside today's user-local week regardless of the hour the suite runs at"* — which is true for 22
-  hours a day and false for two. Fix the comment with the code.
-- **Reproduce without waiting for the window:** seed a fresh database (`current_date` is irrelevant;
-  the seed anchors on Brisbane today) and run
-  `DATABASE_URL=… npx vitest run lib/data/postgres/__tests__/periodization-soft-delete.test.ts`
-  between 14:00 and 16:00 UTC. Outside that window it passes, which is why it has survived.
-- **Fix shape:** anchor the inserted session to the *user-local* day rather than to a UTC offset —
-  e.g. insert `completed_at` at local midday for the Brisbane date the window is computed from, so
-  both sides come from the same day by construction. This is the same rule CLAUDE.md already states
-  for tests (*"derive the fixture from the clock or inject the clock — never hardcode one side of a
-  rolling window"*), in the shape where both sides are derived but from **different timezones**.
-- **Worth a sweep:** any other test inserting `now() - interval '…'` and querying a user-local day
-  window has this exact hole. `grep -rn "now() - interval" lib/data/postgres/__tests__/`.
+  `/api/coach/apply/[id]/undo` appears in **no** client file, and `coach-history.tsx` renders the
+  list read-only — no Undo button anywhere.
+- **⚠️ This is NOT the known "no user-facing entry point" note** (this file, in the Coach phase-1
+  entry). That note is about phase 1 shipping the **apply** path without an entry point; phases 2–3
+  then wired apply — `change-preview.tsx`, `number-dial.tsx`, `confirm-content.tsx` and
+  `lib/coach/pending-change.ts` all POST to it and it works. **Undo was never wired with it.** The
+  asymmetry is the finding; do not close this as already-known.
+- **Why this severity:** the user approves changes per row, which implies reversibility, and the
+  history screen then styles for an undo that cannot be reached. The only way back is to ask the Coach
+  to change it again — a *new* change against current state, not a restore, and for `early_deload` or
+  `program_phase` possibly not expressible at all.
+- **Fix shape:** an Undo control in `coach-history.tsx` for changes that are not `undoneAt` and still
+  inside the window, treating the route's 409 ("you've trained since") as a first-class state rather
+  than an error. **Lane B** — the route already exists.
+- **⛔ Do Q-468 first, or in the same change.** Wiring the button onto today's undo would ship the
+  defect below.
 
-### [workouts][app-shell] Q-390 — the deload "D" is its own flex row, so it lifts that day's bar out of line with the rest
+### [workouts][platform] Q-468 — `undo` restores its captured state without checking the target still holds what the change set
 
-- **Branch:** `fix/training-load-day-flag-inline`
-- **Added:** 2026-08-18 · owner, with a screenshot of Health → Training: *"look at the format;
-  reccomend doing Mon (D) instead so it fits better."*
-- **What the screenshot shows** (it will not survive into an implementer's session): the TRAINING
-  LOAD card, week Mon–Sun. Mon carries a green striped bar with a small amber **D** on its own line
-  *below* the "Mon" label; Tue carries a solid orange bar with no flag; Wed–Sun are empty grey
-  slivers. **Mon's bar visibly sits higher than Tue's and collides with the "TRAINING LOAD"
-  heading above it**, which is the part the owner did not ask about and is the actual defect.
-- **Confirmed root cause, one line of markup.** `components/stats/weekly-stats-hub.tsx:98-107`
-  renders the flag as a *sibling* of the day label inside a column flex:
-  ```tsx
-  <div className="flex flex-1 flex-col items-center gap-1">   // :77 — the day column
-    <div style={{ height: totalHeight }}>…bars…</div>
-    <span className="text-[9px] …">{day.label}</span>
-    {day.isDeload  && <span className="text-[8px] … text-amber-500">D</span>}
-    {day.isTesting && <span className="text-[8px] … text-purple-500">T</span>}
-  ```
-  so each flag becomes an extra **row**, which is the "D on its own line" the owner sees.
-- **Why that is more than cosmetic.** The row of columns is
-  `<div className="flex items-end gap-1 h-14">` (`:62`) — **`items-end`, fixed 56 px**. The columns
-  are already taller than their container and overflow *upward*; adding a flag row makes that
-  column taller still, so its bar is pushed further up than its neighbours:
+- **Branch:** `fix/coach-undo-drift-check`
+- **Added:** 2026-08-18 · review sweep (the Coach write path) ·
+  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
+- **Placement:** directly with Q-467. **Latent today** (nothing can call undo) and **exactly what
+  Q-467 would expose** the moment a button is wired.
+- **The asymmetry.** `applyCoachPatch` refuses to write over a moved target — every domain runs
+  `driftAgainst(...)` and returns `stale` → 409 with a per-field drift report. `undoCoachChange` has
+  no equivalent: it reads `beforeState` and writes it back. The route's guard asks *"have you trained
+  since?"*, not *"has this row changed since?"*.
+- **Measured live, entirely within the Coach's own flow — no external edit needed:**
 
-  ```
-  column with a flag:  52 bar + 4 + 13.5 label + 4 + 8 flag = 81.5 px   (25.5 px above the container)
-  column with none:    52 bar + 4 + 13.5 label              = 69.5 px   (13.5 px above)
-  difference:                                                  12 px
-  ```
+  | Step | Action | `session_exercises.exercise_name` |
+  |---|---|---|
+  | 0 | initial | `Barbell Bench Press` |
+  | 1 | Coach change **A**: Barbell → Dumbbell | `Dumbbell Bench Press` |
+  | 2 | Coach change **B**: Dumbbell → Incline | `Incline Bench Press` |
+  | 3 | **Undo A** → `200` | **`Barbell Bench Press`** |
+  | 4 | **Undo B** → `200` | **`Dumbbell Bench Press`** |
 
-  **The bars are therefore not on a common baseline whenever any day is flagged** — a deload or
-  testing day reads ~12 px taller than an identical unflagged day, on a chart whose whole purpose is
-  comparing days against each other. That is the misreading, and the collision with the heading is
-  the same 25.5 px overflow reaching the `mb-3` gap above.
-- **The owner's fix resolves both**, which is why it is the right one: inline the flag into the
-  label span (`Mon (D)`) and the extra row disappears, every column becomes the same height, and the
-  bars land on one baseline again.
-- **Three things to get right while doing it:**
-  1. **Keep the letter, not just the colour.** `CLAUDE.md`'s colour-only-state rule is currently
-     satisfied because the glyph *is* the non-colour channel. `(D)` keeps that; a coloured dot would
-     not.
-  2. **Both flags can be true at once** — the two `&&` blocks are independent, so a day can render
-     `D` and `T` together. `Mon (D)(T)` is ~10 characters in a column roughly 50 dp wide at the S25
-     viewport, which is where it will wrap or clip. Decide the combined form (`Mon (D·T)`?) rather
-     than discovering it on a testing-week screenshot.
-  3. **Check the container height after the change.** Columns overflow `h-14` by 13.5 px even with
-     no flag, so `h-14` is already too small for its contents; inlining removes the *difference* but
-     not the overflow. Either raise the container or move the labels out of the fixed-height row.
-- **Evidence that would confirm it end-to-end:** seed a week where one day is a deload and another
-  has identical volume without the flag, and check the two bars' top edges land at the same y. Today
-  they will differ by ~12 px.
-- **Surface:** browser-reproducible at the S25 viewport (≤640 px) — no device, no native path, no
-  production data needed. `weekly-stats-hub.tsx` is Lane B's (`components/**`).
+- **Two things are wrong.** After step 3 `coach_changes` shows A struck through and B as `NOT UNDONE`
+  — the history claims "Swapped Dumbbell → Incline" is in effect while the row says `Barbell Bench
+  Press`, so the screen that exists to report what the Coach did is wrong. And after step 4 — undoing
+  **everything** — the exercise is `Dumbbell Bench Press` when it started as `Barbell Bench Press`:
+  undoing every Coach change does not return the programme to where it began, and leaves it holding a
+  value the user never chose.
+- **All five domains share the gap.** No `undo()` in any handler checks current state; only
+  `session-exercise` re-verifies ownership on the way back. (The lone `drift` string in `goals.ts` is
+  a comment about a drifting local-storage copy, not a check.)
+- **Fix shape:** run `driftAgainst` on the way back too — compare the target's current values against
+  what the change **set** (`to`) and refuse with 409 + drift when they disagree, exactly as apply
+  does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
+  alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
+
+### [readiness][platform] ✅ Q-394 — RESOLVED: `anchor-source.test.ts` was red on `main`, fixed by Q-356's fixture change
+
+- **✅ Resolved 2026-08-18, and NOT by this entry.** Verified after merging `main` at `74efac6`:
+  the test passes 3/3 locally where it failed 3/3 an hour earlier on the same tree plus docs.
+  **The likely fix is #90 (Q-356)** — *"Anchor the periodization fixture to the user-local day,
+  not a UTC offset"*. That is the same root shape: a fixture anchored to a UTC offset while the
+  query computes a user-local day window. **I did not bisect**, so treat the attribution as
+  strongly-indicated rather than proven; what is proven is that it fails before `74efac6` and
+  passes after.
+- **Kept rather than deleted for the one part that is still open:** Q-356's own entry flagged a
+  sweep — *any other test inserting `now() - interval '…'` and querying a user-local day window
+  has this hole*. This was the second test to hit it and it was found by accident, taking out two
+  unrelated PRs first. That sweep is worth doing, and the structural point below stands.
+- **Branch:** `fix/body-battery-anchor-source-test`
+- **Added:** 2026-08-18 · found while shepherding a docs-only PR (#89) whose `Tests` job went red.
+- **⚠ This blocks every lane, not one PR.** `main` is the broken base: two unrelated PRs failed the
+  same job within fifteen minutes (`claude/trainingai-bugfix-intake-sozcr7` at 05:30,
+  `claude/implementation-lane-b-0o7kb9` at 05:15), and CI runs only on `pull_request` here, so a
+  broken `main` is invisible until it takes out the next PR — which is what happened.
+- **Reproduced locally on a tree differing from `main` by two documentation files**, so the diff is
+  provably not the cause:
+  ```
+  FAIL  app/api/body-battery/__tests__/anchor-source.test.ts
+    > body-battery — anchor precedence (S2) > anchors on our own computed sleep score…
+      AssertionError: expected 'readiness' to be 'sleep'
+    > body-battery — anchor precedence (S2) > prefers today's persisted derived readiness…
+      AssertionError: expected 55 to be 77
+    anchor-source.test.ts:65   expect(body.anchor).toBe(77)   // received 55
+  ```
+  **3 failed locally, 2 in CI** — the count differs between environments, which is itself worth a
+  look: it suggests at least one assertion is sensitive to seeded data or ordering rather than purely
+  to the code change.
+- **Likely cause — not confirmed, and deliberately not guessed at further.** `main` has taken several
+  Tuning-lane recalibrations in the last few hours that touch this pillar: **#84** ("a threshold
+  pointing backwards, and a score with one value"), **#85**, **#87** ("protect a side effect worth
+  17.7 points") and **#88** (Body Battery range). The failures are about *anchor precedence* —
+  whether Body Battery anchors on persisted derived readiness or falls back to the computed sleep
+  score — so a recalibration that changed which source wins, without updating this test, fits the
+  evidence. **Whoever takes this must decide which side is wrong**: if the new precedence is correct
+  the test needs updating, and if the test still encodes the intended contract the recalibration
+  regressed it. Do not simply re-baseline the expected numbers to make it green.
+- **What would count as fixed:** `anchor-source.test.ts` passes on a clean checkout of `main`, and
+  the entry records which of the two readings was right — the test or the behaviour — so the next
+  recalibration does not silently repeat it.
+- **Worth considering separately:** CI runs on `pull_request` only, so nothing tests `main` after a
+  merge. Every squash-merge lands unverified against whatever else landed beside it, and the cost
+  shows up as an unrelated lane's red PR. A push-triggered run on `main` would have caught this at
+  the merge that caused it rather than two PRs later. Not this entry's work.
+- **Surface:** reproducible in the sandbox against the seeded local DB — no device, no production
+  data. `app/api/body-battery/**` is Lane A's.
 
 ### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
 
@@ -496,6 +638,118 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
+### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
+
+- **Branch:** `feat/nutrition-visual-uplift`
+- **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
+  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
+- **What this entry is for.** A taste request cannot be implemented from as written, so this
+  separates the part that is objectively wrong (findings 1–3, each with a CI check that already
+  measures it) from the part that is genuinely a design decision (findings 4–5, which need
+  mockups before code). Do the first half regardless of what is decided about the second.
+- **Scope.** `app/nutrition/nutrition-content.tsx` and `components/nutrition/**` — the Nutrition
+  tab, the Saved Meals sheet, the Edit Meal builder, and the meal-plan sheets that share their
+  visual language. Nothing server-side: no route, no schema, no migration.
+
+**1 — 48 hardcoded hex literals, and `#22c55e` is the one that actually breaks.**
+`--brand` is **user-selectable at runtime**: `components/theme-color-picker.tsx:38` writes
+`--brand`/`--color-brand` from a hue the user picks, and `app/globals.css:59-65` *darkens* the
+light-mode value on purpose (the comment there says why — the vivid dark-mode green is unreadable
+as light-mode text). Every `#22c55e` in nutrition opts out of both. Change the accent to blue and
+nutrition's selected chips and checkboxes stay green; switch to light mode and they stay at the
+value the CSS deliberately avoids. Sites: `saved-meal-card.tsx:75,97` · `my-meals-picker.tsx:226,270,276` ·
+`restrictions-picker.tsx:183` · `meal-plan-edit-sheet.tsx:220` · `meal-plan-manage-sheet.tsx:173` ·
+`meal-plan-setup-sheet.tsx:206,433` · `meal-plan-review-step.tsx:114,158` · `meal-plan-section.tsx:30`.
+Same story for `#ef4444` where `text-destructive` already exists — `ingredient-row.tsx:52` uses the
+token correctly, `saved-meal-card.tsx` and `meal-plan-manage-sheet.tsx:248,263` use the literal.
+
+**2 — CI is already pointed at this, which is what makes it cheap.**
+`scripts/check-hex-literals.js:91-103` carries **14 nutrition files** as shrink-only baselines
+totalling 48 literals. Lowering those numbers *is* the deliverable for finding 1, the check proves
+it, and the ratchet means a redesign structurally cannot make it worse. Do not sweep the whole repo
+(471 literals) — that is a separate, much larger job.
+
+**3 — ⚠ Both landing files are at the 800-line ceiling, and this bites on line one.**
+`app/nutrition/nutrition-content.tsx` is **exactly 800** and `components/nutrition/saved-meals-sheet.tsx`
+is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both are held to
+`LIMIT = 800` hard — verified by the script's own counting, not `wc`. **Adding a single line to
+`nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
+the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
+files to it to buy room.
+
+**4 — Edit Meal is three times taller than it needs to be (the design half).**
+Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro
+line, a 44 px delete button, a 44 px −/qty/+ stepper row, and a serving-conversion hint. Two
+ingredients fill the S25 screen — which is exactly what the owner's screenshot shows, with the
+whole-batch total already off-screen. A five-ingredient recipe is a blind scroll. **This needs a
+decision, not a fix.** Two shapes worth drawing: a compact row that reveals its stepper on tap, or
+the stepper inline with the name. Do not pick one in code first.
+
+**5 — Card metadata has an uneven rhythm.** `saved-meal-card.tsx:102,118` gate "Makes N portions"
+and "· per portion" on `servings !== 1`, so the first card in the owner's screenshot carries two
+lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
+redesign should either reserve the slot or move it into the expanded view.
+
+
+**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
+before code, so both screens were recreated at true S25 size from the real tokens and reviewed
+against the `ui-ux-pro-max` rule set. **Canvas:**
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
+today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
+theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
+
+**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
+44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
+the smallest targets on either screen); quantity steppers, row delete and all four card actions
+**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
+`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
+(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
+(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
+
+**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
+exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
+pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
+Whichever option below wins, the control that survives comes from the primitive.
+
+**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
+the row already prints both ways: `ingredient-row.tsx:100-107` always renders
+`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
+so two rows can sit in different modes at once and `1.2` beside `60` means different things.
+- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
+  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
+  the freed width is what pays for 48 px steppers.
+- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
+  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
+- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
+  tallest of the three, which works against the density complaint that started this.
+
+**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
+string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
+The selection-state literals and the macro palette are the same eight characters and must not share
+a fate — finding 1 is the former only.
+
+**What NOT to change — all three exist because a CLAUDE.md rule required them:**
+- `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
+  correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
+- `saved-meal-card.tsx` is well built: `role="button"` + `aria-expanded` (`:80-82`) for the
+  nested-control WebView rule, macro colour always paired with its P/C/F label (`:130-142`) for the
+  colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
+- No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
+
+- **First step is done — the drawings exist** (finding 6). What is still open is the owner's pick
+  between srv/g options A, B and C, and whether the collapse-when-not-editing row in the proposed
+  Edit Meal artboard is wanted. Do not start coding the ingredient row before that answer; findings
+  1, 2, 3, 7 and 8 do not depend on it and can go first.
+- **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
+  nothing here touches an engine path.
+- **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
+  `ui-ux-pro-max` skill — it is this repo's own design system and the authority for this item.
+- **Verification.** `node scripts/check-hex-literals.js` must report a **lower** number for every
+  file touched; `node scripts/check-component-size.js` clean without new BASELINE rows;
+  `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
+  in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
+  fallback if no device is available.
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
@@ -526,45 +780,27 @@ blocker and the intended shape were both already named, so **do not re-derive th
 - **Verification:** the affordance must be shown to work while the key is present, and the warning
   shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
 
-### [devices][platform] Q-314 — a history re-drain is detected as a ring-clock reset, and every re-pair reopens Q-536
+### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
-- **Branch:** `fix/ble-clock-reset-vs-redrain`
-- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts` (the ingest anchor path
-  around `isClockEpochReset`).
-- **Added:** 2026-08-17, from the Q-536 diagnosis. **Q-536 is now shipped and confirmed on the
-  owner's device** (v1.318.2 + the 10:47 redecode: the midday cluster went 43 nights → 4, and the
-  survivors are short daytime fragments, not bedtimes). This entry is the mechanism that caused it,
-  it is **still live**, and it will do the same thing again on the next re-pair.
-- **What happens.** `isClockEpochReset(batchMaxDs, epochMaxDs)` (`clock.ts`) opens a new clock epoch
-  whenever a batch's max `ds` regresses more than `EPOCH_REGRESSION_TOLERANCE_DS` (36,000 ds = 1 h)
-  below the epoch's high-water mark. After a re-pair the app holds no sync cursor, so the ring
-  replays days of buffered history — a regression of **4.75 days** on 2026-08-17 — and that reads as
-  a reset. It is not: the counter is continuous across the boundary (epoch 3's first sample above
-  epoch 2's ceiling is ds 37,112,507 against 37,112,321, a gap of **18.6 s**), and the minimum
-  anchor lag agrees across all four epochs to within **50 s**.
-- **Why it is expensive.** A spurious epoch becomes `currentEpoch(anchors)`, and its offset is
-  estimated from a burst in which >90% of anchors carry re-drain backlog — so it lands ~14 h wrong.
-  `aggregateOuraRawSamples` resolves every ds against `currentEpoch`, so **one re-pair re-times the
-  entire sleep history**. It has now happened twice (2026-07-30 → epoch 1, +12.17 h; 2026-08-17 →
-  epoch 3, +14.16 h); the first self-healed within 7 minutes when epoch 2 opened, the second did not.
-- **The open design question — this is why it is filed rather than fixed.** How do you tell a
-  re-drain from a genuine re-key? Candidates, none yet chosen:
-  - **Absolute floor.** `clock.ts`'s own comment says a real reset "drops the counter to near zero",
-    so require `batchMaxDs` below some absolute threshold rather than merely below the high-water
-    mark. Clean against both observed events (17.4 M and 33.0 M ds, neither near zero) — but the
-    threshold is a guess, and a re-key not synced for longer than it would be missed.
-  - **Overlap test.** A re-drain replays ds values already stored; a reset produces genuinely new
-    low ones. Checkable against `oura_raw_samples`, at the cost of a query on the biggest table in
-    the DB in the ingest path.
-  - **Make it explicit.** A re-key is a deliberate act (`clearKey` / re-pair). Have that path
-    declare the new epoch instead of inferring it from counter shape.
-  - ⚠️ **There is no observed true reset in the data** — both epoch openings were re-drains — so any
-    threshold chosen here is unvalidated against the case it exists for. Getting this wrong in the
-    other direction (missing a real re-key) is worse and quieter than the current failure.
-- **Do not fix by lowering `robustOffsetMs`'s percentile.** Measured on the drained epochs: p1 is
-  already +1.28 h contaminated and only the two smallest anchors are clean. See Q-536.
-- **Verification:** unit tests over both measured re-drain events and a synthetic true reset; the
-  re-pair path can only really be exercised on device.
+- **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
+  Lane A's and already shipped (Q-314).
+- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Why it matters more than a convenience.** The whole point of Q-314 is that a re-key is
+  **declared** rather than inferred, because inferring it from counter shape re-timed the owner's
+  entire sleep history twice. A declaration nobody can make in the app is a declaration that will be
+  forgotten at exactly the moment it is needed — right after a re-key, on a laptop, mid-`open_oura`.
+- **What exists:** `GET /api/oura-ble/rekey` → `{ pending: { id, declaredAt } | null }`;
+  `POST` (optional `{note}`, idempotent — declaring twice returns the pending one and says so);
+  `DELETE` cancels an un-consumed one. Admin-gated, POST rate-limited 5/min.
+- **Shape:** a control in the BLE admin console. It must say plainly that **nothing happens until the
+  ring next reports** — the effect is deferred because the new ds is not knowable at declaration
+  time, and a button that looks like it acted immediately would invite a second press or a "did it
+  work?" Show `pending` from the `GET` so the waiting state is visible, and offer cancel while it is
+  pending.
+- ⚠️ **Do not offer cancel once it is consumed.** The API refuses, correctly: the epoch it opened
+  already exists and every timestamp derived from it depends on that row as the audit trail.
+- **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
+  idempotency and the 401). This item is the affordance only.
 
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 
@@ -590,8 +826,55 @@ blocker and the intended shape were both already named, so **do not re-derive th
   architectural one. While in there, consider whether a date-scoped redecode is worth having —
   `fullHistory` is correct after a decoder change, and overkill for "re-aggregate last night",
   which is what it is usually reached for.
+- 🚧 **The Lane A half SHIPPED 2026-08-18; the 502 is NOT gone yet.** `POST …?async=1` returns
+  `{ jobId, status, startedAt, alreadyRunning }` immediately and `GET …?jobId=…` polls it (status is
+  *derived* from the timestamps, never stored, so nothing can disagree). Migration **196** adds
+  `oura_redecode_jobs` (**197** regenerates the `claude_ro` views), with one in-flight job per user
+  on a partial unique index — the 4/min rate limit does not stop two overlapping runs, and two
+  concurrent full-history re-aggregates are the load this exists to prevent — plus a staleness reaper,
+  because a process that died mid-run would otherwise hold that slot forever and refuse every future
+  redecode. That would be a worse and quieter failure than the 502.
+  ⚠️ **`?async=1` is opt-in and the default is unchanged, deliberately.** Both current callers read
+  the synchronous shape and report completion from it: `oura-ble-debug.tsx` falls back to *"redecode
+  ran … data refreshed"* and `step-backfill-console.tsx` says *"Done. Backfill applied"*. Flipping the
+  default without a poller would make both state that work had finished when it had only started.
+  **Q-318 is the other half** — the poller and the default flip, Lane B.
+- ⚠️ **Half this entry's premise expired on 2026-08-18.** The redecode's row-walking phase is now a
+  no-op (Q-541 Task 7 made `measured_at`/`event_name` derived, so it had nothing to correct), which
+  removes the `scanned=1098158` full-table walk. **The remaining weight is the full-history
+  re-aggregate**, which still rebuilds every daily summary and still exceeds the gateway timeout. The
+  `scanned` counts quoted above are historical.
 - **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
   row. Do not run a full redecode while those are open.
+
+### [app-shell][devices] Q-318 — poll the redecode job, and stop the two consoles reporting "done" for work that has started
+
+- **Lane B.** `components/oura-ble/oura-ble-debug.tsx` and `components/oura-ble/step-backfill-console.tsx`
+  only — the job store, the route and the reaper are Lane A's and already shipped (Q-535).
+- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Why the default was not flipped for you.** `?async=1` exists and works, but both consoles read
+  the synchronous response shape and report completion from it. Switched blind, `oura-ble-debug.tsx`
+  falls back to *"redecode ran (response was slow to return) — data refreshed"* and
+  `step-backfill-console.tsx` says *"Done. Backfill applied — re-run preview to confirm 0 days
+  remain."* — for a backfill that has only begun. That is a quieter and more misleading failure than
+  the 502 it replaces, which is why Lane A left the default alone rather than crossing the boundary.
+- **The contract:** `POST …?async=1` → `{ jobId, status: 'running', startedAt, alreadyRunning, note }`.
+  `GET …?jobId=<id>` (or no id for the most recent) → `{ job: { jobId, status, startedAt, finishedAt,
+  opts, error, ...phases } }` where `status` is `running` | `done` | `failed`, and the phases payload
+  is exactly what the synchronous route used to return (`redecoded`, `redecodeError`, `aggregated`,
+  `aggregateError`). `GET` with no jobs yet → `{ job: null }`; a non-numeric `jobId` → 400.
+- **Shape:** POST with `async=1`, then poll the `GET` on a timer until `status !== 'running'`, then
+  render exactly what the synchronous path rendered. `alreadyRunning: true` means someone else's run
+  is in flight and this press started nothing — say so rather than showing a spinner that implies it
+  did. A run can take **minutes**; the point is that the response arriving first is normal.
+- ⚠️ **Do not treat a `failed` status as a reason to retry automatically.** A retry is another
+  full-history re-aggregate, which is the whole hazard Q-535 is about.
+- **Once both consoles poll, drop `?async=1` and make it the default** — the synchronous branch in
+  the route exists only to keep these two working in the meantime, and should go with it.
+- **Verification:** the route is already proven end to end on `pnpm dev` — start, poll to `done` with
+  the full phases payload, `alreadyRunning` on a second press with one genuinely in flight, a 400 on a
+  bad id, and the reaper turning an abandoned job into `failed` with a reason. This item is the
+  client only.
 
 ### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
 
@@ -1556,7 +1839,7 @@ session working from a temporarily restored copy.
 > `xpath=following::input[1]` selector for `page.getByLabel('Daily Water Goal')`, which passes with
 > the association, **fails with `goal-targets-section.tsx` reverted to `main`**, and passes restored.
 > The brittle selector was the symptom, so deleting it is the proof.
-> Journal: [`entries/2026-08-16-goal-label-association.md`](overview/entries/2026-08-16-goal-label-association.md).
+> Journal: [`entries/2026-08-16-goal-label-association.md`](overview/history-2026-08-15.md).
 
 > **Q-259 CLOSED as not achievable, 2026-08-16 — and the measurement is the point.** The entry asked
 > for a guard that fails when Q-240's `invalidateGoalRecommendations()` is deleted. **No such guard
@@ -1581,7 +1864,7 @@ session working from a temporarily restored copy.
 > The spec built for this survives as `e2e/goal-invalidation.spec.ts`, relabelled: it covers the
 > Q-260 shape on the Progress panel (a goal with no device copy, reached client-side), proven by two
 > mutations, and its header records why it is not a Q-240 guard.
-> Journal: [`entries/2026-08-16-goal-invalidation-not-guardable.md`](overview/entries/2026-08-16-goal-invalidation-not-guardable.md).
+> Journal: [`entries/2026-08-16-goal-invalidation-not-guardable.md`](overview/history-2026-08-15.md).
 
 > **Q-262 ANSWERED and removed, 2026-08-16 — the answer is "no", for all six keys.**
 > [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](reviews/2026-08-16-goal-invalidation-audit.md)
@@ -1601,7 +1884,7 @@ session working from a temporarily restored copy.
 > **Scope limit, stated because it would be easy to over-read:** only this one group was audited.
 > The others may well contain load-bearing keys — `cache-groups.ts`'s own comments flag
 > `freshWithinTtl` entries inside them — and Q-263 files that.
-> Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/entries/2026-08-16-invalidation-audit.md).
+> Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/history-2026-08-15.md).
 
 ### [platform] Q-530 — an admin snapshot endpoint, so a migration's first real run is not production
 
@@ -2972,6 +3255,30 @@ session working from a temporarily restored copy.
 - **Plan:** none yet
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
+- **⚠️ SECOND live demonstration, 2026-08-18, and it is the more damaging one.** After the Sleep
+  (v1.319.0) and Readiness (v1.321.0) recalibrations deployed (production reports **1.321.1**), a
+  bulk job at **03:55:01** bumped `updated_at` on essentially every `oura_daily_derived` row **without
+  rewriting any score**. Result, measured: **0 of 96 rows carry a `readiness` model version**, and
+  every stored sleep/readiness score is still pre-recalibration (2026-08-17 stores **78** for a
+  7.58 h / 90% / 0.75 h-deep night — an old-model value). Every one of those rows was *created*
+  before the deploy.
+  **So `updated_at` is not evidence of which model wrote a row** — it moves for reasons unrelated to
+  the score. Anyone auditing "did the recalibration land?" by timestamp gets the wrong answer, and
+  this is exactly why the `model_version` stamp matters more than it looks.
+- **✅ RESOLVED for the "did it land" question, 2026-08-18 ~05:00 UTC** — the prediction below came
+  true within the hour. **1 of 96** rows now carries `{"bodyComp": "atlas_2_1_0", "readiness":
+  "v3:ri5:2026-08-18"}` (so the JSONB **merge** held in production, not just in review), and sleep —
+  which has no stamp — was verified by recomputation instead: 2026-08-17 stores **78** against a raw
+  blend of **77.91** (old model), 2026-08-18 stores **92** against a calibrated **92** (new model,
+  raw blend 86.07). The trend step falls between those two days.
+  [`docs/reviews/2026-08-18-recalibrations-live-verified.md`](reviews/2026-08-18-recalibrations-live-verified.md).
+  **This entry's own substance is unaffected** — a stored derived row still cannot be re-derived from
+  the inputs beside it, and `updated_at` still does not identify the writing model; the sleep check
+  worked only because that pillar's *contributors* happen to be persisted.
+- **Consequence worth knowing:** stored scores are only rewritten when the readiness route recomputes,
+  which happens on app open. Placeholder rows already exist through **2026-08-22** with null scores,
+  so the first row to carry new-model values *and* the `v3:ri5:2026-08-18` stamp will be the next day
+  actually scored — that is where the trend step falls, and the stamp is what will mark it.
 - **Demonstrated live 2026-08-17:** the 08-13 summary was re-rolled mid-session (hours 1.20 → 5.78,
   a Q-274 fragment night resolving itself) and the derived readiness row did not follow — that day's
   persisted score is now **7 points** off a fresh recompute at the unchanged anchor.
@@ -2989,6 +3296,266 @@ session working from a temporarily restored copy.
 - **First action:** decide whether derived rows get recomputed with their summary, or store the input
   values they actually used. The second is cheaper and self-describing; the first re-scores days
   silently and needs Q-273's version stamp first either way.
+
+### [devices][readiness] Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
+
+- **Branch:** `fix/temperature-baseline-cold-start`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a baseline/data fix, not
+  a scoring-constant change.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-illness-radar-calibration.md`](reviews/2026-08-18-illness-radar-calibration.md)
+- **Measured** over `claude_ro.oura_daily_derived`, n = 46 days with an illness score: range **0–38**,
+  median 7.5, sd 7.17. Flags: `normal` 33, `learning` 13, and **zero** `watch` / `elevated` / `fever`.
+  `ILLNESS_WATCH_SCORE = 40`, so the score has peaked **two points short** of the lowest threshold and
+  never crossed it.
+- **Cause — one biomarker of four is dead, and it carries 40% of the weight.** Observed z ranges:
+
+  | biomarker | weight | z range (n = 31–33) | days z ≥ 1.2 |
+  |---|---|---|---|
+  | **temperature** | **0.40** | **0.07 – 0.47** | **0** |
+  | breathing | 0.25 | −1.37 – 1.88 | 6 |
+  | restingHeartRate | 0.20 | −1.22 – 1.18 | 0 |
+  | hrvBalance | 0.15 | −2.51 – 3.77 | 17 |
+
+  Three look like z-scores. Temperature is one-sided, always positive, and spans 0.4 in total — at its
+  observed maximum it contributes **6** of the 40 points its weight allows. The best day on record
+  (2026-07-26, score 38) had a −2.5σ HRV drop *with* elevated breathing *and* elevated resting HR and
+  still fell short, because the heaviest term was asleep.
+- **The defect is the baseline, not the thresholds.** Stored baseline deviation against the true
+  night-to-night sd of the same rows: temperature **253.7 vs 13.5 = 18.7×**; hrv 0.6×, rhr 1.4×,
+  breath 1.4×. Since `tempZ = (value − mean) / dev`, every temperature z is divided by ~19× too much.
+  It is a **cold start**: the EMA mean began at **1791** centi-°C (17.9 °C) on 2026-07-08 against true
+  values of ~3584, so the first nights produced residuals ~130× the true sd, and the dev term is still
+  carrying them 40 nights later (332 → 196, with an order of magnitude to go). It hit temperature and
+  not the others purely because of scale — centi-°C is ~3,500 where HRV is ~50 ms.
+- **`FEVER_TEMP_Z = 2.5` is unreachable, not merely unused** — against an observed max of 0.47 a fever
+  would need a nightly skin temperature roughly **5 °C** above baseline.
+- **Second consumer.** The same `tempZ` feeds readiness's `temperature` contributor at 10% weight
+  (`closer-better`, `100 − |z| × 66.7`). With |z| pinned near 0.3 it returns ~80 essentially every day
+  — measured mean 70.5, sd 17.3, **0 of 33 days with |z| ≥ 1.2**. A contributor meant to catch fever is
+  close to a constant.
+- **Do NOT lower the thresholds.** `watch = 40`, `elevated = 65` and `FEVER_TEMP_Z = 2.5` are all
+  defensible *given a correct z*; moving them fits the threshold to a broken input — the mistake this
+  session made once on readiness and reverted (Q-504).
+- **First action**, in preference order: (1) re-seed the temperature baseline from the observed
+  distribution (mean 3584, sd 13.5 over 40 nights) rather than waiting out the EMA — cheapest, fixes
+  both consumers; (2) the durable fix — seed a first observation and a sane prior dev instead of zero,
+  or hold the dev term through a warm-up, **because every new user repeats this and the app has other
+  users**; (3) failing both, gate the radar on temperature baseline maturity so it reports `learning`
+  rather than a confident `normal` built on a dead biomarker.
+- **Re-measure the whole biomarker table afterwards** — every z in it moves by ~19×, and it is entirely
+  possible the radar then fires *too* often. That is the next calibration question, not this one.
+- **Worth checking in the same pass:** whether the other baselines cold-start the same way and simply
+  recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
+  they say nothing about night 5.
+
+### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
+
+- **Branch:** `fix/stress-override-input`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-stress-resilience-calibration.md`](reviews/2026-08-18-stress-resilience-calibration.md) §1
+- **What it drives.** `STRESS_HIGH_DAY_THRESHOLD_MIN = 120` raises a stress override in
+  `computeAiDynamicNextSession`, easing the day's prescribed session. The constant is flagged in
+  source as a judgement call (*"tune here, nowhere else"*) and has never been calibrated.
+- **The firing rate is fine.** Over n = 25 days carrying `stress_high_minutes`: mean 58.8, median 60,
+  sd 47.0, and the override fires on **4 of 25 days (16%)**.
+- **The signal points the wrong way.** `corr(stress_high_minutes, readiness_score)` = **+0.400**:
+
+  | group | days | mean readiness | mean sleep | worst readiness |
+  |---|---|---|---|---|
+  | **fires (≥ 120)** | 4 | **79.0** | 92.8 | 69 |
+  | quiet (< 120) | 21 | **65.0** | 84.9 | **29** |
+
+  The four days that would ease training are 2026-07-17 (readiness 69), 07-23 (80), 07-24 (84) and
+  07-27 (83). The two genuinely bad days — 07-21 (readiness 37, sleep score 31) and 07-26
+  (readiness 29) — carry 0 and 30 minutes and never fire.
+- **Two explanations tested and rejected.** *Not exercise*: 19 of 25 are completed-workout days,
+  spread evenly (4 of 4 at 0 minutes, 3 of 4 at ≥ 120). *Not purely wear coverage*: it is a partial
+  confound (`corr(stress_high, recovery_high)` = +0.304, and both zero-days are zero on **both**
+  counts) but net stress still correlates **+0.379** with readiness. For contrast
+  `daytime_stress_scaled` — the day's mean level rather than a bucket count — correlates **−0.111**,
+  the right sign and no magnitude.
+- **Do NOT tune the threshold.** Moving a constant that sits on a signal pointing backwards changes
+  *which* good days get eased, not whether the right ones do. Same shape as Q-506, failure inverted:
+  there the input was dead, here it is alive and anti-correlated.
+- **A precision illusion to know about.** `STRESS_BUCKET_MS` is 30 min, so the value is always a
+  multiple of 30 — observed set is exactly `{0,30,60,90,120,150,180}`. The threshold has **seven**
+  meaningful positions and 120 sits on an atom: `>= 121` halves the firing rate (4 days → 2). Express
+  and justify any future change in **buckets**, not minutes.
+- **First action**, in preference order: (1) explain the sign before touching the constant; (2)
+  consider `daytime_stress_scaled` as the override input instead — right sign, a mean so coverage
+  cancels, already persisted, and it needs its own threshold from scratch (its range is −0.14 to
+  +0.23, nothing like 120); (3) failing both, gate the override on daytime coverage, which removes the
+  measurable confound without removing the feature.
+- **n = 25 is small** — at that size r = +0.40 sits near the conventional significance boundary, so the
+  strength is provisional. The group means are the durable part. Re-measure at n ≈ 60.
+
+### [readiness] Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)
+
+- **Branch:** `fix/resilience-longterm-sleep-recovery`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** Blocked on a question this repo
+  cannot answer (see first action).
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-stress-resilience-calibration.md`](reviews/2026-08-18-stress-resilience-calibration.md) §2
+- **Measured.** `resilience_level` is present on **13 of 96 rows**, and on every one of them
+  `resilience_level` = **5** (min = max) and `resilience_granular` = **5.99** (min = max), with
+  confidence ≤ 0.57. **5.99 is the clamp bound** — `findGranularResilienceLevel` ends in
+  `Math.max(1.01, Math.min(5.99, …))`, so that exact value is what it returns when the computation
+  runs off the top of the scale. The score has never produced an informative reading and is surfaced
+  as a band label.
+- **The port is not hard-wired.** The pinned golden (`stress_resilience_2_2_1.golden.json`) produces
+  level **1.0** / granular **1.01** — the *bottom* clamp. The pinning is input-driven.
+- **Mechanism.** `longTermStress` and `longTermRestorativeTime` are weighted means;
+  `longTermSleepRecovery` is not — it replicates a `[N,1] × [N]` broadcast from the `.pt` and reduces
+  to `(Σ all weights × Σ list) / Σ used weights`, i.e. **the plain sum of the window** when every day
+  is valid. Verified exactly against the golden: its list is 13 × 0.6 and today's index is 29.99013,
+  and `13 × 0.6 + 29.99013 = 37.79013` = `out_7` to every stored digit. Solving the golden's own
+  outputs for the recovery weights (`out_8 = w_d·out_6 + w_s·out_7`, summing to 1) gives
+  **w_d = 0.30, w_s = 0.70** — so 70% of `longTermRecovery` is a quantity that grows with the number
+  of valid days. Production per-day indices run **0.0 – 55.6**, so a 5–7 day window sum lands around
+  **130–240** against the golden's 37.79 — above every band boundary, every day.
+- **The golden cannot catch this**, and that is the transferable lesson: its list is 13 *identical*
+  values of 0.6, two orders of magnitude below production, so the fixture pins the arithmetic without
+  ever exercising the sum's scale. A golden proves a port computes the same function; it says nothing
+  about whether the inputs are on the scale it was captured at.
+- **Second oddity, observed not diagnosed.** `resilience_daily_sleep_recovery` barely tracks sleep:
+  sleep score 93 → **0.0**, 87 → 12.8, 83 → 10.2, 80 → 9.9, 78 → 13.5, while sleep score **31 → 17.3**.
+  `dailySleepRecovery = clamp(polyval(sleepRecoveryScalerCoef, sr))` where `sr` blends our sleep score,
+  hrvBalance, recoveryIndex and RHR contributors — a vendor polynomial fitted against *Oura's*
+  distribution fed *our* contributors is the obvious suspect, but this was not chased down.
+- **It is also dormant.** The 2026-08-05 review recorded `resilience_level` on **13 of 79** rows;
+  today it is **13 of 96** — the same 13, with the newest dated **2026-08-05**, while
+  `daytime_stress_scaled` grew 11 → 25 over the same period. Likely the daily-index gate: only **12 of
+  96** rows carry a `resilience_daily_stress` and they cluster (07-20 → 07-27, then 08-09, 08-10,
+  08-16, 08-21), and a level needs `validCount >= windowMinLength` inside the 14-day window.
+  **Unconfirmed** — `/api/admin/db-query` began returning `Forbidden` to every query before the
+  per-gate coverage could be pulled. Check which of `contributorsOk`'s four inputs is missing on
+  recent days first.
+- **Do NOT touch the algorithm or the constants** — the file says so and the golden is the contract.
+- **First action:** establish whether the sum is **faithful to the vendor**. If it is, Oura feeds a
+  per-day index on a far smaller scale than ours and the defect is in what we supply; if not, it is a
+  port bug. **This repo cannot settle it** — the vendor source is in the private archive — and that
+  decision gates everything else. Then: add a golden case with realistic list magnitudes (the current
+  fixture passes under either reading); and **until the level varies, stop surfacing it as a band** — a
+  score that has returned "strong" on 100% of days is worse than absent, because it reads as a
+  measurement.
+- **Re-measure after both recalibrations reach stored rows.** The call site passes our `sleepScore`
+  *and* `comp.contributors.recoveryIndex.score`, so v1.319.0 (sleep mean 84.1 → 69.5) and v1.321.0
+  (Recovery Index anchor) both feed `sr`. All 13 rows predate both, and the direction is *downward* on
+  the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
+
+### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
+
+- **Branch:** `fix/ble-recovery-index-hours-bias`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a `devices` finding by the
+  readiness code's own pre-registered rule, **not** a scoring change.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-ble-era-input-drift.md`](reviews/2026-08-18-ble-era-input-drift.md) §1
+- **The rule this fires.** `readiness-composite.ts` says above the constant: *"If a BLE-only refit
+  lands well below 5, the input changed and that is a `devices` finding, not a scoring one."* Written
+  when only 15 Cloud-era nights existed; there are now **42 BLE-era nights**, so the refit is runnable.
+- **The refit.** BLE-era `recovery_index_hours`, n = 42 (07-07 → 08-18): mean **2.657 h**, median
+  **2.377**, sd 1.591, range 0.35–8.28. Same zero-bias procedure as Q-500 (solve for the anchor at
+  which our mean sub-score equals Oura's 15-night mean of 69.0, same clamping):
+
+  | fit | window | n | anchor |
+  |---|---|---|---|
+  | Q-500 (shipped basis) | Cloud-era 06-23 → 07-07 | 15 | **4.63 h** |
+  | this refit | BLE-era 07-07 → 08-18 | **42** | **3.31 h** |
+
+- **The check that makes it convincing — anchor and input moved by the SAME factor:** mean hours
+  3.59 → 2.657 (**0.74×**), median 3.28 → 2.377 (**0.72×**), zero-bias anchor 4.63 → 3.31 (**0.715×**).
+  A genuine physiological shift moves the hours while leaving the correct anchor where it is. An anchor
+  that must shrink by exactly the factor its input shrank by is absorbing a **multiplicative bias in
+  the estimator**. Mechanism already measured in Q-500's review: at matched sampling density (107 vs
+  108 samples/night) the BLE series is ~**2× noisier** (median sample-to-sample |Δbpm| 1.0 → 2.0).
+- **A level shift, not a drift.** 2026-07: n 24, mean 2.73, median 2.35, 2 nights ≥ 5 h. 2026-08: n 18,
+  mean 2.56, median 2.48, 1 night ≥ 5 h. Flat across both BLE months — the step is at the re-key.
+- **Cost today.** At the shipped anchor of 5 the contributor is mean **50.8**, median 47.5, reaching
+  100 on **3 of 42** nights. At the old anchor of 6 it was mean 43.4 and 1 of 42 — so **Q-500 worked**
+  (+7.4 points) and nothing here argues against it.
+- **Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`.** A second anchor change inside two days, same
+  direction, fitted to an input that moved for measurement reasons, is how a scoring constant gets
+  quietly re-purposed into a bias correction.
+- **First action:** treat the hours estimator's BLE behaviour as the work item. It is a global argmin
+  over an overnight HR series; at 2× the sample-to-sample noise it settles at a systematically
+  different point. **Concrete experiment:** smooth the BLE series to Cloud-like noise *before* the
+  argmin and re-measure the ratio — if it goes to ~1.0 the estimator is fine and the input needed
+  conditioning. Re-run the refit after any HR-smoothing change; the ratio above is the pass test.
+- **Caveat.** The two fits are different windows and sizes (15 Cloud vs 42 BLE, six weeks apart), so a
+  real seasonal/behavioural change is not excluded by this data alone — the flat BLE-era level and the
+  anchor-tracks-input result argue against it without proving it. The smoothing experiment does not
+  depend on the comparison at all, which is why it is the first action.
+
+### [devices][readiness] Q-510 — resilience's missing days are the daytime-stress coverage gate, and that coverage is not persisted anywhere
+
+- **Branch:** `feat/persist-daytime-stress-coverage`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** Closes the lead Q-508 left open.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-ble-era-input-drift.md`](reviews/2026-08-18-ble-era-input-drift.md) §2
+- **It is NOT the contributor gate.** Over 2026-08-01 → 08-18, from `oura_daily_summary`:
+  `recovery_index_hours` **18/18**, `hrv_avg_ms` **18/18**, `rhr_avg_bpm` **18/18**,
+  `hrv_baseline_mean_x8` **18/18**. A daytime stress series exists on 14/18 (from 08-05). A resilience
+  daily index is produced on **3/18** (08-09, 08-10, 08-16). All four `contributorsOk` inputs pass
+  every single day, so the blocker is inside `preprocessStress` — and since `daytime_stress_scaled` is
+  non-null on those days, `final_check_stress_coverage`
+  (`resolutionMinutes × nonNaN >= minDaytimeStressHours × 60`) is the live candidate.
+- **It cannot be confirmed from the database.** Neither side of that inequality is persisted:
+  `minDaytimeStressHours` is a vendored constant and the per-day non-NaN bucket count is never stored.
+  The stored extreme-bucket counts do not separate the cases — 08-07, 08-13 and 08-17 all carry 90
+  minutes of extremes and produce no index, while 08-16 carries the same 90 and does.
+- **`worn_hours_ble` is NULL on all 96 rows** — recorded as 0 of 79 in the 2026-08-05 review, and 13
+  days later still empty. It is the field an auditor would look in first for this answer.
+- **First action:** persist the daytime-stress coverage on the derived row (non-NaN bucket count, or
+  the hours it implies). One number, already computed inside `preprocessStress`, and without it "why
+  did resilience produce nothing today" is unanswerable from data. Then: **populate `worn_hours_ble`
+  or drop the column** — a field that has never held a value on any row reads as an available signal
+  in every column-listing audit.
+- **Only after that**, decide whether `minDaytimeStressHours` is too strict for this wear pattern.
+  That *is* a calibration question and it is Tuning's — but it cannot be asked until the coverage is
+  visible, and it must not be answered by lowering the constant until the score fires, which is the
+  Q-506 mistake.
+
+### [body][sleep] Q-511 — the Body Battery anchor flip is worth 17.7 points, and the sleep recalibration removed 82% of it
+
+- **Branch:** `feat/instrument-provisional-anchor` (low priority; **nothing to change in scoring**)
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-battery-anchor-discontinuity.md`](reviews/2026-08-18-battery-anchor-discontinuity.md)
+- **Why it exists:** the audit of "did the sleep recalibration miss any consumer of the sleep scale?"
+  **Answer: no.** There is exactly **one** comparison threshold on the sleep scale in the whole
+  codebase (`rest-day-guidance.ts`'s `LOW_SLEEP_SCORE`) and it was re-anchored in the same PR. The
+  other consumers take the score as a *value* and inherit the shift directly.
+- **What the audit turned up instead.** `body-battery/anchor.ts` uses `ownSleepScore` as the day's
+  anchor **raw** (clamped 0–100), and a provisional sleep anchor can upgrade to readiness mid-morning.
+  Its own docstring records the consequence — *"shifted the ENTIRE day's curve … the number visibly
+  jumped"*, an **owner report from 2026-08-02**. The jump is `readiness − sleepScore`, and it had
+  never been measured. Over the 33 days carrying both: mean sleep 87.2, mean readiness 69.5,
+  **mean jump −17.7**, sd 10.2, range **−51 … +6**, mean |jump| 18.1.
+- **The recalibration mostly fixed it, as a side effect.** The review's 65-night replay moved sleep
+  84.1 → 69.5 (**−14.6**), so the gap goes −17.7 → **≈ −3.1**: the two anchor sources were ~18 points
+  apart and are now ~3. Nothing targeted Body Battery; it fell out of putting sleep on a realistic
+  range, because readiness already was.
+- **⚠️ PROTECT THIS.** If a later session reads the new sleep distribution as "too harsh" and lifts it
+  back toward the old mean, **it re-opens an owner-reported bug in a different pillar.** The sleep and
+  readiness scales being comparable is now load-bearing for Body Battery.
+- **What did NOT go away:** the per-day disagreement (sd 10.2). The scores agree *on average*, which
+  is not the same as agreeing. ±10-point flips remain routine, so **the freeze-once rule stays
+  load-bearing and must not be relaxed** on the grounds that the scores now agree.
+- **The flip RATE is not observable.** `body_battery_daily` has **never** persisted
+  `anchor_source = 'sleep'` (41 days `readiness`, 9 `default`, 0 `sleep`) because a sleep anchor is
+  provisional and gets overwritten. So the end-state table cannot separate "the flip happens daily"
+  from "readiness is always there first". Magnitude is solid; frequency is unknown. The owner's report
+  proves it fires at least sometimes.
+- **First action:** none in scoring. If the flip is reported again, **instrument the provisional
+  anchor** — record it and its source when first written, not only the final one; that turns an
+  unmeasurable rate into a measurable one. Otherwise low priority.
+- **Recorded, not filed:** nine days (2026-07-08 → 07-16, right after the re-key) anchored at a flat
+  **50** (`anchor_source = 'default'`) — no readiness and no sleep score existed, so Body Battery
+  started each of those days at a fixed midpoint regardless of recovery. Last occurrence was over a
+  month ago, so it reads as a post-re-key coverage gap that closed on its own. *Something that stopped
+  is not something that was fixed* — noted as unexplained rather than closed.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

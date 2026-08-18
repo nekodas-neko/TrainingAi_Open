@@ -69,12 +69,51 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][workouts][platform] 🟠 The AI Coach's write path reviewed for the first time — apply is exemplary, undo is unreachable and wrong (Q-467, Q-468, 2026-08-18)
+
+- **Never reviewed before.** The Coach appears in eight prior review docs and five backlog entries —
+  all about cost, latency, model ID and navigation. **No review document mentions `coach_changes`,
+  `applyCoachChange` or the undo mechanism**, verified by grep across `docs/reviews/`. It is also the
+  only place an LLM-initiated flow writes to the data deciding what the user is told to lift: five
+  domains — `session-exercise`, `goals`, `injury`, `program-phase`, `early-deload`. Full write-up:
+  [`docs/reviews/2026-08-18-coach-apply-path.md`](docs/reviews/2026-08-18-coach-apply-path.md).
+- **✅ The apply path is a model of how to do this, and is recorded at length so it stays that way.**
+  The model is never in the write path (documented, with the reason the SDK's binary tool-approval was
+  rejected); `fieldsMatchDomain` stops a model aiming a calorie field at an exercise row; ownership is
+  by join where the table has no `user_id`; the boundary is Zod-whitelisted with `CLAUDE.md` rule (b)
+  quoted back at itself; creating a shared-catalogue exercise is admin-gated with the policy reason
+  written down; a merged-away catalogue row cannot be resurrected; a bad swap fails the whole apply
+  rather than half-applying. **Double-apply is refused** — a repeated patch returned `409` with a
+  per-field drift report — and **cross-user undo returned 404**.
+- **🟠 Q-467 — the Coach can change your programme and nothing in the app can undo it.** The entire
+  undo subsystem is built: the route with a well-reasoned "until the next workout started after the
+  change" window, `undoCoachChange()`, an `undo()` handler in all five domains, `captureBefore()`
+  existing solely for it, the `undone_at` column, and `coach-history.tsx` **already styling undone
+  changes** with strikethrough and a "· undone" suffix. **Nothing calls it** — every client fetch to a
+  Coach endpoint was enumerated and the undo path appears in none. ⚠️ **Not** the known "no
+  user-facing entry point" note: that is about phase 1's *apply* path, which phases 2–3 wired and
+  which works. Undo was never wired with it.
+- **🟠 Q-468 — and when it is wired, it will restore stale state.** `apply` refuses to write over a
+  moved target (`driftAgainst` → 409); `undo` has no equivalent and writes `beforeState` back blindly.
+  Measured entirely within the Coach's own flow: apply A (Barbell→Dumbbell), apply B
+  (Dumbbell→Incline), **undo A** → the row becomes **Barbell** while `coach_changes` still shows B as
+  `NOT UNDONE`, so the history contradicts the data. Then **undo B** → the row becomes **Dumbbell**.
+  Undoing *every* Coach change leaves the programme holding a value the user never chose, not the
+  original. All five domains share the gap. **Do Q-468 with or before Q-467** — wiring the button onto
+  today's undo would ship the defect.
+- **NOT device-verified**, web build only. **The model was never in the loop** — every patch was
+  hand-written, which is the right way to test a path designed to keep the model out of it, but means
+  nothing here says whether the model *proposes* good patches. Only `session_exercise` was driven end
+  to end; the other four handlers were read. `/api/coach/preview` was not probed. The local DB was
+  restored afterwards.
+- **Nothing was fixed.** Both are queued at the top.
+
 ### [nutrition][app-shell] 🟢 Printable saved-meal labels shipped (Q-389) — TWO owed checks, both physical (2026-08-18, v1.320.0)
 
 - **⚠️ Owed 1 — the print test, and it is a real gate not a formality.** The code is **25×25
-  modules** (a UUID cannot fit 21×21), so on the circle-safe layouts the pitch is **0.49–0.66 mm per
-  module** — band, the default, is the tightest. **Print black band and scan it before relying on
-  this**: if the default scans, the other three do. Ink spread on a home printer merging fine modules
+  modules**. **Re-measured 2026-08-18 and finer than first recorded**: the quiet zone is drawn
+  *inside* the code box, so the printed pitch divides by 33, not 25 — band, the default, is
+  **0.369 mm**, not 0.487. **Print black band and scan it**: if the default scans, every style does. Ink spread on a home printer merging fine modules
   is the expected failure, and it will present as "the scanner doesn't work" rather than as a print
   problem. The preview sheet prints the measured mm-per-module under the label so the number is
   visible rather than assumed.
@@ -602,8 +641,8 @@ the next device change.
   seed/`userGoals` pair and are fixed by the same change, but **any other screen that reads a value
   it does not re-subscribe to has this exact shape** — mount-scoped state on a screen that never
   unmounts. No sweep was done.
-- Detail: [`docs/overview/entries/2026-08-16-health-stale-goal.md`](docs/overview/entries/2026-08-16-health-stale-goal.md) ·
-  [`docs/overview/entries/2026-08-16-goal-label-association.md`](docs/overview/entries/2026-08-16-goal-label-association.md).
+- Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md) ·
+  [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
 
 ### [app-shell][platform] ⚠️ Q-261 FIXED — six button groups on More now have accessible names; TalkBack check still owed (v1.317.4, 2026-08-17)
 
@@ -3264,7 +3303,7 @@ commit, `6c072f9`, verified by cloning it fresh and running `check-private-paths
 `total tracked: 0.0 MB`. The pre-push audit found three real things, all fixed first — the owner's
 email in two docs (#1393), a private-path manifest that catalogued what it was protecting (#1396),
 and `main` red on E2E for ten hours of every day from a UTC-vs-Brisbane seed bug (#1397). Journal:
-[`entries/2026-08-16-public-repo-snapshot-pushed.md`](docs/overview/entries/2026-08-16-public-repo-snapshot-pushed.md).
+[`entries/2026-08-16-public-repo-snapshot-pushed.md`](docs/overview/history-2026-08-15.md).
 
 **What remains is Phase B steps 9–14**, and all but one are the owner's:
 [`docs/public-repo-cut-runbook.md`](docs/public-repo-cut-runbook.md). Branch protection on the new

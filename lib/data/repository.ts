@@ -914,6 +914,22 @@ export interface WorkoutRepository {
   /** Has the ring ever reported? Answers "is it connected" without needing a resolvable clock
    *  anchor — see the note on the implementation for why those are different questions. */
   hasOuraBleSamples(userId: string): Promise<boolean>
+  /** Q-314 — the owner declares a deliberate ring re-key; the next ingest batch opens the epoch.
+   *  Idempotent: declaring twice returns the pending one rather than queueing a second. */
+  declareOuraRekey(userId: string, note: string | null): Promise<{ id: number; declaredAt: Date; alreadyPending: boolean }>
+  getPendingRekeyDeclaration(userId: string): Promise<{ id: number; declaredAt: Date } | null>
+  consumeRekeyDeclaration(id: number, epoch: number): Promise<void>
+  cancelPendingRekeyDeclaration(userId: string): Promise<boolean>
+
+  /** Q-535 — a redecode runs off the request. One in-flight job per user; `startRedecodeJob`
+   *  returns the running one rather than starting a second. */
+  startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean }>
+  getRedecodeJob(userId: string, id: number): Promise<import('./postgres/slices/oura').RedecodeJob | null>
+  getLatestRedecodeJob(userId: string): Promise<import('./postgres/slices/oura').RedecodeJob | null>
+  finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null): Promise<void>
+  /** Closes a job whose process died mid-run — otherwise the one-at-a-time index blocks every
+   *  future redecode forever. */
+  reapStaleRedecodeJobs(userId: string): Promise<number>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────

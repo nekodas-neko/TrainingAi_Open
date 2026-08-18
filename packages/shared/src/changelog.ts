@@ -6,6 +6,37 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.323.0",
+    date: "2026-08-18",
+    changes: [
+      "Meal labels can now print the ingredient breakdown \u2014 \u201c200g Beef mince\u201d, one line each, for a single serving. It is a new \u201cSquare \u00b7 ingredients\u201d style, and it is marked SQUARE because it uses the corners a round die cuts off: there is no room for a list on a round label without shrinking the code, and the code is the part that has to keep working. It also has the largest, most scannable code of any style.",
+      "The label preview now says how many ingredients will actually print, and tells you when some were summarised as \u201cscan for the full list\u201d rather than quietly dropping them.",
+      "Corrected the code size the preview reports. It was dividing by the wrong number and reading about a quarter larger than what is really printed \u2014 worth knowing before a test print, since fine modules are what ink spread destroys.",
+    ],
+  },
+  {
+    version: "1.322.2",
+    date: "2026-08-18",
+    changes: [
+      "On Health \u2192 Training Load, a deload or testing day is now marked inline next to the day name \u2014 \u201cMon (D)\u201d \u2014 instead of on a line of its own. The flag used to add a whole extra row to that day, which pushed its bar about 12 pixels higher than the others and made it collide with the heading above: two days with the same volume drew at visibly different heights on a chart whose whole job is comparing them.",
+    ],
+  },
+  {
+    version: "1.322.1",
+    date: "2026-08-18",
+    changes: [
+      "Groundwork for the Redecode button reporting honestly. Redecode takes longer than the server is allowed to hold a request open, so it came back as \"failed\" for work that had actually finished \u2014 and a failure that isn't real invites pressing it again, which is the single heaviest thing the app can be asked to do. It can now be started and then checked on separately. The button itself still uses the old path until its side of the change lands, so what you see is unchanged for now.",
+    ],
+  },
+  {
+    version: "1.322.0",
+    date: "2026-08-18",
+    changes: [
+      "Re-pairing the ring no longer shifts the timestamps on your whole sleep history. When the ring re-sends buffered history after a re-pair, the app used to read that as the ring's clock having been reset and re-dated everything against it \u2014 which is what moved months of nights by twelve to fourteen hours, twice. A replay of history the ring already sent is now recognised as exactly that.",
+      "A genuine ring re-key is something you now tell the app about, rather than something it tries to work out from the data. It still notices one you forgot to mention, if the ring's counter really did restart.",
+    ],
+  },
+  {
     version: "1.321.2",
     date: "2026-08-18",
     changes: [

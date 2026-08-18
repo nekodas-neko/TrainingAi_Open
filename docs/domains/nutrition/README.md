@@ -53,6 +53,12 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   module pitch is 0.49–0.64 mm, ~16% finer than recorded); the "log one serving" requirement is
   already met by `oneServingItems`/`logMealItems`; and consequently **`SavedMeal.totals` is the whole
   recipe**, so a label must render `totals / servings` or it prints double what scanning it logs.
+- [`docs/overview/entries/2026-08-18-meal-label-ingredient-breakdown.md`](../../overview/entries/2026-08-18-meal-label-ingredient-breakdown.md)
+  — **Q-393, the ingredient breakdown on the label (v1.323.0).** A square-only style, because a round
+  50 mm label has **7 units of slack — zero lines** — once the default's content is on it. **Carries a
+  correction worth reading before any print test: every module-pitch figure in Q-389/Q-393 is ~24%
+  optimistic**, since the quiet zone is drawn *inside* the code box (band is 0.369 mm, not 0.487).
+  The round trimmed variant was measured at 0.353 mm and deliberately **not** built.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

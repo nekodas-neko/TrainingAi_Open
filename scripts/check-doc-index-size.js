@@ -168,10 +168,23 @@ const root = path.join(__dirname, '..');
 // implementer would otherwise repeat. Also records that the pattern already exists (Q-241 made goals
 // server-authoritative and left hydrateGoalSeeds behind), and that users.food_region is a dead
 // column whose setting is device-only — the cheapest possible proof of the approach.
-// Raised 2026-08-18 (disk_full recovery): the first on-device rawStats reading (209,326 rows, 0
-// rolled up, 31.2 MB) replaces "never measured" on Q-538 and its Known-Issues row, and Q-544 files
-// the console gate that made a desktop VACUUM impossible. A measurement replacing a projection, and
-// one new entry — entries, per the same split as the raises above.
+//
+// Raised 2026-08-18 (BugFix intake, Q-393 + Q-394): the label ingredient-breakdown entry, plus the
+// broken-main entry marked resolved rather than deleted — Q-356's fixture fix cleared it, and the
+// sweep that entry called for is still open, which is the part worth keeping. Q-393 gained the two
+// answers checked against shipped code: the QR encoder is real (qrcode@1.5.4 at EC M) and save/share
+// already exists, so the only open question there is the physical print.
+//
+// Raised 2026-08-18 (BugFix intake, Q-393 prioritised): +7. The owner moved the label-breakdown entry
+// to the top of the queue and approved every drawn variant as a shippable style, so the entry gains
+// the priority marker and the note that this is no longer a pick-one decision — only the default is
+// still open, and that is a stored preference belonging to Q-392.
+//
+// Raised 2026-08-18 (disk_full aftermath): the first on-device rawStats reading (209,326 rows, 0
+// rolled up, 31.2 MB) replaces "never measured" on Q-538 and its Known-Issues row; Q-544 files the
+// console gate that made a desktop VACUUM impossible; and CLAUDE.md gains a session-start DB-size
+// read, because the 500 MB volume that used to fail loudly is now 5 GB and cannot be shrunk back.
+// A measurement replacing a projection, one new entry, and one standing rule.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -353,7 +366,6 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6882,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -363,9 +375,91 @@ const BASELINE = {
   // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
   // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
   // fourth time. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7360,
-  'docs/implementation-backlog.md': 7360,
-  'CLAUDE.md': 1063,
+  // Raised 2026-08-18 (Tuning): -> 7366, recomputed from the MERGED file. Q-506 — the illness radar
+  // has never produced an action-bearing flag in 46 days because one of its four biomarkers is scored
+  // against a baseline whose deviation is 18.7x too large. The measured biomarker table and the
+  // cold-start numbers are the entry: without them the next reader lowers the threshold instead of
+  // fixing the baseline, which is the mistake Q-504 already made and reverted.
+  // Raised 2026-08-18 (Tuning): 7366 -> 7454. Q-507/Q-508, the last two un-calibrated scores. Both
+  // entries carry measured tables rather than conclusions on purpose: Q-507's whole point is that a
+  // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
+  // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
+  // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
+  //
+  // Raised 2026-08-18 (Q-535 Lane A half, Lane A): 7462 -> 7491. Two things the queue cannot afford
+  // to lose: Q-535 now says the 502 is NOT gone yet and why the default was left alone (both
+  // consoles report completion from the synchronous shape, so flipping it blind would have them
+  // state that started work had finished), and half its own premise expired the same day — the
+  // row-walking phase became a no-op, so the `scanned=1098158` figures it quotes are historical.
+  // Plus the new Q-318 entry carrying the exact response contract, so the other lane does not have
+  // to read the route to build against it.
+  // Raised 2026-08-18 (Tuning): 7514 -> 7596, recomputed from the MERGED file. Q-509/Q-510 (BLE-era
+  // input drift) plus Q-501's "did it land" half marked resolved. Q-509's entry carries the
+  // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
+  // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
+  // against.
+  //
+  // Raised 2026-08-18 (Q-356, Lane A): 1044 -> 1056. The date-arithmetic section already said "never
+  // hardcode one side of a rolling window"; it did not cover the shape that broke every branch for
+  // two hours a day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines
+  // for the mechanism, the two correct fixture shapes, and the one thing a regression test for this
+  // class must do (construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock). This is the file every session reads before it can start, and the rule it
+  // sits beside is the reason this bug was filed rather than repeated.
+
+  //
+  // Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file. Lane A's delta was +29:
+  // Q-535 now states the 502 is NOT gone yet and why the default was left alone, that half its own
+  // premise expired the same day (the row-walking phase became a no-op, so its scanned figures are
+  // historical), and a new Q-318 carrying the exact response contract so the other lane need not
+  // read the route to build against it.
+  // Raised 2026-08-18 (Tuning): 7596 -> 7636. Q-511 — the audit of "did the sleep recalibration miss
+  // a consumer of the sleep scale?" (it did not) turned up that the Body Battery anchor flip was worth
+  // 17.7 points and the recalibration removed 82% of it. The entry is long because most of it is a
+  // PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
+  // owner-reported bug in another pillar, and that only lands with the numbers attached.
+
+  //
+  // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
+  // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
+  // day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
+  // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
+  // must do: construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock. Recomputed from the merged file.
+  //
+  // Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
+  // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
+  // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
+
+  'projectOverview.md': 6921,
+  // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
+  // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
+  // bare "make it nicer" is not implementable — the length is the three findings that carry a
+  // CI check (hex literals vs the runtime-themeable --brand, the shrink-only ratchet already
+  // aimed at them, and both landing files sitting ON the 800-line limit so line one fails),
+  // kept separate from the two that need mockups first.
+  // Raised 2026-08-18 (Q-393, Lane B): backlog 7800 -> 7828. Note `main` was ALREADY over this
+  // baseline by 28 when measured here, so this raise unblocks every branch, not just this one — a
+  // baseline that main itself exceeds fails the Custom Rules job on unrelated PRs. The lines are
+  // Q-393's shipped/not-shipped annotation, which carries the measured module-pitch table: every
+  // earlier figure in Q-389/Q-393 divided by the module count and not by the module count plus the
+  // quiet zone the renderer draws inside the code box, so all of them read ~24% large. That table is
+  // what stops the next session sizing a label against a number the printer will not honour.
+  // Raised 2026-08-18 (Q-395 round 2, BugFix intake). The owner asked for mockups and a UI
+  // review of the nutrition screens before any code. Four findings came back that the entry
+  // did not have: every control is 44 px against this repo's own 48 dp rule, the srv/g toggle
+  // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
+  // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
+  // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
+  'docs/implementation-backlog.md': 7927,
+  //
+  // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
+  // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
+  // day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
+  // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
+  // must do: construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock. Recomputed from the merged file on each merge this branch took.
+  'CLAUDE.md': 1075,
 
 };
 

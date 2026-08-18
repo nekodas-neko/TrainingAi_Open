@@ -48,6 +48,23 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   proposed as 5 (**Q-500, ⛔ owner sign-off**); and Q-271's headline numbers ("never above 50, ever",
   "2.2 pts/day") are an 8-day artefact — over 41 days it is 12 days above 50 and 0.71 pts/day. Also
   files **Q-501**: persisted readiness rows drift from the summaries they derive from.
+- [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
+  — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
+  at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's
+  stored deviation is **253.7 against a true nightly sd of 13.5 (18.7×)**, a cold start the EMA is
+  still digesting 40 nights on, and temperature carries **40%** of the weight. `FEVER_TEMP_Z = 2.5` is
+  unreachable (it would need ~5 °C above baseline). The same `tempZ` makes **readiness's temperature
+  contributor near-constant** (0 of 33 days with |z| ≥ 1.2). Filed **Q-506**: fix the baseline, do not
+  touch the thresholds.
+- [`docs/reviews/2026-08-18-stress-resilience-calibration.md`](../../reviews/2026-08-18-stress-resilience-calibration.md)
+  — **the last two un-calibrated scores, measured 2026-08-18.** `STRESS_HIGH_DAY_THRESHOLD_MIN = 120`
+  fires at a healthy-looking 16% but on the **wrong days**: high-stress minutes correlate **+0.40**
+  with readiness, the four firing days average readiness 79 against 65 for the rest, and the two worst
+  days never fire (**Q-507** — do not tune the constant). **Resilience has emitted exactly one value
+  ever** — level 5, granular pinned at the 5.99 clamp, on all 13 rows — because `longTermSleepRecovery`
+  is a window *sum* where its siblings are means, and it carries 70% of the recovery weight
+  (**Q-508**). The pinned golden cannot catch it: its list is 13 identical values two orders of
+  magnitude below production.
 - [`docs/body-battery-tuning.md`](../../body-battery-tuning.md) — how the Body Battery model is
   tuned against physiology; the reasoning behind its constants. **Read the v5 section before
   touching any constant**: the v5 values were set by backtesting for distributional plausibility,
@@ -89,8 +106,22 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   anchor is provisional and upgrades exactly once. The shared-composite refactor that would remove
   the fallback entirely is still open as Q-42.
 
+- [`docs/reviews/2026-08-18-ble-era-input-drift.md`](../../reviews/2026-08-18-ble-era-input-drift.md)
+  — **the BLE-only Recovery Index refit `readiness-composite.ts` pre-registered, run on 42 nights,
+  2026-08-18.** It lands at **3.31 h** against the shipped anchor of 5 — and the anchor must **not**
+  move: the refit anchor and the input distribution shrank by the *same* factor (0.715× vs 0.72–0.74×),
+  which is a multiplicative bias in the hours estimator rather than a change in the owner (**Q-509**,
+  a `devices` finding). Also closes Q-508's open lead: all four `contributorsOk` gates pass **18/18**
+  August days, so resilience is starved by the daytime-stress **coverage** check — which is persisted
+  nowhere, and `worn_hours_ble` is NULL on all 96 rows (**Q-510**).
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/reviews/2026-08-18-recalibrations-live-verified.md`](../../reviews/2026-08-18-recalibrations-live-verified.md)
+  — **both shipped recalibrations verified live in production, 2026-08-18**, hours after PR #77 found
+  neither had reached a stored row. Readiness is stamped `v3:ri5:2026-08-18` and the shared JSONB
+  **merge held** (`bodyComp` survived). Sleep has no stamp and was verified by **recomputation**:
+  08-17 stores 78 against a raw blend of 77.91 (old model), 08-18 stores 92 against a calibrated 92
+  (new). **The trend step falls between those two days**, and history is not back-filled.
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-452 insight-over-no-data, Q-453 `/api/training-stress` accepts a malformed date). Findings Q-450…Q-455; four areas recorded **clean**.
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (Q-465 — `POST /api/day-checkin` creates a check-in row from an empty body, indistinguishable from a check-in where the user answered nothing). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**

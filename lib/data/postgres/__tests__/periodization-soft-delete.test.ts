@@ -62,12 +62,27 @@ describe.skipIf(!canRun)('periodization slice — soft-delete filters', () => {
     await pool.query(`DELETE FROM workout_sessions WHERE user_id = $1`, [USER])
     await pool.query(`DELETE FROM session_periodization WHERE user_id = $1`, [USER])
 
-    // Started an hour ago so the session sits inside today's user-local week regardless of the
-    // hour the suite runs at — the weekly window below is derived from the same clock.
+    // Q-356. The user-local day is computed FIRST and the session is anchored to midday ON THAT DAY,
+    // so both sides of the comparison come from the same date by construction.
+    //
+    // This used to insert at `now() - interval '2 hours'` — a UTC offset — while deriving the query
+    // window from the user's timezone, and `getWeeklySetsByMuscleGroup` filters on `started_at`.
+    // Between 00:00 and 02:00 Brisbane (14:00–16:00 UTC) "two hours ago" is the PREVIOUS Brisbane
+    // day, so the session fell outside `[today, today]`, the count came back zero, and all five
+    // assertions failed — on every branch, for two hours a day. The comment above it asserted the
+    // opposite and was true for the other twenty-two.
+    //
+    // Midday, not midnight: midnight is a boundary, and a boundary is where an off-by-one in either
+    // direction stops being visible.
+    const { rows: [d] } = await pool.query(
+      `SELECT to_char((now() AT TIME ZONE $1)::date, 'YYYY-MM-DD') AS today`, [TZ])
+    weekStart = d.today; weekEnd = d.today
+    const localMidday = `(($1 || ' 12:00')::timestamp AT TIME ZONE '${TZ}')`
+
     const { rows: [ws] } = await pool.query(
       `INSERT INTO workout_sessions (user_id, session_id, session_name, started_at, completed_at)
-       VALUES ($1, $2, 'SD Session', now() - interval '2 hours', now() - interval '1 hour') RETURNING id`,
-      [USER, programSessionId])
+       VALUES ($2, $3, 'SD Session', ${localMidday}, ${localMidday} + interval '1 hour') RETURNING id`,
+      [d.today, USER, programSessionId])
     sessionId = ws.id
 
     const { rows: [lib] } = await pool.query(
@@ -83,10 +98,6 @@ describe.skipIf(!canRun)('periodization slice — soft-delete filters', () => {
       `INSERT INTO set_logs (exercise_log_id, set_number, weight_kg, reps, set_time_sec) VALUES
          ($1, 1, 50, 5, 30), ($2, 1, 50, 5, 30) RETURNING id`, [libLogId, freeLogId])
     setIds = rows.map(r => r.id)
-
-    const { rows: [d] } = await pool.query(
-      `SELECT to_char((now() AT TIME ZONE $1)::date, 'YYYY-MM-DD') AS today`, [TZ])
-    weekStart = d.today; weekEnd = d.today
 
     await pool.query(
       `INSERT INTO session_periodization (user_id, program_session_id, phase, phase_started_at, sessions_in_phase)

@@ -28,16 +28,85 @@ export interface ClockAnchor {
 const MS_PER_DS = 100
 
 /**
- * A ring counter that goes *backwards* is the only unambiguous evidence of a reset (re-key
- * or dead battery). Batches do arrive slightly out of order, though, so a small regression
- * is noise rather than a new epoch. One hour of deciseconds is far beyond any observed
- * reordering and far below any real reset, which drops the counter to near zero.
+ * A ring counter that goes *backwards* is evidence that *something* happened. Batches do arrive
+ * slightly out of order, so a small regression is noise. One hour of deciseconds is far beyond any
+ * observed reordering.
+ *
+ * ⚠️ **A regression is NOT sufficient evidence of a reset, and treating it as such caused Q-536.**
+ * See `isCounterRestart` below for what actually distinguishes the two, and
+ * `classifyClockRegression` for the decision.
  */
 export const EPOCH_REGRESSION_TOLERANCE_DS = 36_000
 
-/** True when `batchMaxDs` is low enough against the epoch's high-water mark to mean a reset. */
+/** True when `batchMaxDs` regressed far enough below the epoch's high-water mark to be real rather
+ *  than batch reordering. Says nothing about *why*. */
 export function isClockEpochReset(batchMaxDs: number, epochMaxDs: number): boolean {
   return batchMaxDs < epochMaxDs - EPOCH_REGRESSION_TOLERANCE_DS
+}
+
+/**
+ * How far below the epoch's high-water mark a batch must fall before the counter can be said to have
+ * *restarted* rather than merely replayed.
+ *
+ * **This is the discriminator a bare regression lacks.** A re-drain replays history the ring already
+ * sent, so its max ds is a large fraction of the epoch's ceiling — measured on both real events,
+ * **53%** (17.4 M against 33.0 M) and **89%** (33.0 M against 37.1 M). A genuine re-key restarts the
+ * ring's own clock at zero, so the first batch after one is a *small* fraction of a ceiling built
+ * over months.
+ *
+ * A ratio rather than an absolute floor because it self-scales: on a ring re-keyed after two years
+ * the ceiling is ~630 M ds, and 5% of that is still 36 days of fresh history before this stops
+ * firing — where a fixed threshold would either be too small then or too large now.
+ *
+ * ⚠️ **There is no observed true reset in the data**, so this bound is validated only against the
+ * two re-drains it must NOT fire on, where it has a 10× margin. It is a safety net for an
+ * *undeclared* re-key; the declared path is the one that is supposed to carry the load.
+ */
+export const EPOCH_RESTART_RATIO = 0.05
+
+/** True when the counter looks restarted-from-zero rather than replayed. */
+export function isCounterRestart(batchMaxDs: number, epochMaxDs: number): boolean {
+  if (!Number.isFinite(epochMaxDs) || epochMaxDs <= 0) return false
+  return batchMaxDs < epochMaxDs * EPOCH_RESTART_RATIO
+}
+
+/**
+ * What to do about a batch, given the epoch's high-water mark and whether a re-key was declared.
+ *
+ * **Q-314 — why this exists.** `isClockEpochReset` alone opened a new epoch on any regression over
+ * an hour. After a re-pair the app holds no sync cursor, so the ring replays days of buffered
+ * history — a 4.75-day regression on 2026-08-17 — and that read as a reset. It is not: the counter
+ * is continuous across the boundary (18.6 s gap) and the minimum anchor lag agrees across all four
+ * epochs to within 50 s.
+ *
+ * The cost of getting it wrong that way is not small. A spurious epoch becomes `currentEpoch`, and
+ * its offset is estimated from a burst in which >90% of anchors carry re-drain backlog, so it lands
+ * ~14 h out — and `aggregateOuraRawSamples` resolves every ds against `currentEpoch`, so **one
+ * re-pair re-times the entire sleep history**. That happened twice (+12.17 h, then +14.16 h).
+ *
+ * The owner's decision (2026-08-17) is that a re-key is **declared**, not inferred: it is a
+ * deliberate act performed with `open_oura` on a laptop, so the app can be told rather than left to
+ * guess from counter shape. `isCounterRestart` remains as a net for an undeclared one, because
+ * missing a real re-key is worse and quieter than the failure this replaces.
+ */
+export type ClockRegressionVerdict =
+  /** Extend the current epoch. Either no regression, or one explained by a re-drain. */
+  | { action: 'extend'; reason: 'in-sequence' | 'redrain' }
+  /** Open the next epoch. */
+  | { action: 'open-epoch'; reason: 'declared' | 'undeclared-restart' }
+
+export function classifyClockRegression(
+  batchMaxDs: number,
+  epochMaxDs: number,
+  rekeyDeclared: boolean,
+): ClockRegressionVerdict {
+  // A declaration wins outright, and deliberately does not require a regression at all: a ring
+  // re-keyed mid-buffer can legitimately come back with a HIGHER ds than the old epoch's ceiling,
+  // and requiring the counter to look restarted would silently ignore the owner saying it was.
+  if (rekeyDeclared) return { action: 'open-epoch', reason: 'declared' }
+  if (!isClockEpochReset(batchMaxDs, epochMaxDs)) return { action: 'extend', reason: 'in-sequence' }
+  if (isCounterRestart(batchMaxDs, epochMaxDs)) return { action: 'open-epoch', reason: 'undeclared-restart' }
+  return { action: 'extend', reason: 'redrain' }
 }
 
 /**

@@ -76,6 +76,13 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md`](../../overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md)
+  — **Q-314, shipped 2026-08-18.** A ring re-key is now **declared** (`POST /api/oura-ble/rekey`),
+  not inferred from a ds regression — a history re-drain produces the same shape, and reading it as a
+  reset re-timed the whole sleep history twice (+12.17 h, +14.16 h). `EPOCH_RESTART_RATIO = 0.05`
+  remains as a net for an undeclared re-key, validated only against the two re-drains it must not
+  fire on, because there is no observed true reset in the data. No button yet — Q-317, Lane B.
+
 - [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](../../superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
   — **Q-541 implementation plan (2026-08-17).** Two tiers: `oura_raw_samples` stays exactly as it is
   for a 7-day hot window, a new `oura_raw_packed` holds everything older as sealed `bytea` blobs keyed
@@ -108,6 +115,17 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 - [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — `DELETE /api/phase-sets/[id]` answers a missing row with a 500 while `PUT` on the same resource answers 400). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (the scale/ring ingest routes reject malformed frames and take no `userId` from the body; two sit behind `requireAdmin`). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
+
+- [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
+  — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
+  at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's
+  stored deviation is **253.7 against a true nightly sd of 13.5 (18.7×)**, a cold start the EMA is
+  still digesting 40 nights on, and temperature carries **40%** of the weight. `FEVER_TEMP_Z = 2.5` is
+  unreachable (it would need ~5 °C above baseline). The same `tempZ` makes **readiness's temperature
+  contributor near-constant** (0 of 33 days with |z| ≥ 1.2). Filed **Q-506**: fix the baseline, do not
+  touch the thresholds.
+
+- [`docs/reviews/2026-08-18-ble-era-input-drift.md`](../../reviews/2026-08-18-ble-era-input-drift.md) — **the BLE-only Recovery Index refit, run on 42 nights, 2026-08-18** (Q-509 — the refit lands at 3.31 h against a shipped anchor of 5, and the anchor must **not** move: it and the input shrank by the same factor, so the hours estimator carries a multiplicative bias from the ~2× noisier BLE series. Q-510 — resilience is starved by the daytime-stress coverage check, which is persisted nowhere, and `worn_hours_ble` is NULL on all 96 rows).
 
 ## Open issues
 
