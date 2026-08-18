@@ -982,6 +982,11 @@ export interface WorkoutRepository {
   getOuraStorageStats(): Promise<OuraStorageStats>
   nullHistoricalDecoded(userId: string, maxRows?: number): Promise<{ nulled: number; remaining: number }>
   vacuumOuraRawSamples(): Promise<{ beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number }>
+  /** Q-315 — `VACUUM FULL` on an allowlisted table. The name is interpolated into the statement
+   *  (VACUUM takes no bind parameter), so the allowlist is the safety boundary, not validation. */
+  vacuumTableFull(table: import('./postgres/slices/oura').VacuumFullTable): Promise<{
+    table: string; liveRows: number; beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number
+  }>
   /** Q-541 Task 4 — move sealed buckets of raw frames into `oura_raw_packed`. Bounded per call,
    *  idempotent, resumable; deletes a hot row only after re-reading its blob and proving the frames
    *  equal. Admin-triggered only — never runs on deploy. */
