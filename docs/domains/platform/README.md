@@ -136,6 +136,8 @@ layer**) through §16. Read it before building any shared helper.
 
 - [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-456 the owner user ID in 18 committed migrations, Q-457 the archived-repo release default, Q-458 `.env.example` drift both ways, Q-459 the APK 404 window). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
 
+- [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-460 missing affected-row check on a client-id-driven scoped UPDATE, Q-462 a permanent ownership refusal reported as a transient 500). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
+
 ## Open issues
 
 ```bash
