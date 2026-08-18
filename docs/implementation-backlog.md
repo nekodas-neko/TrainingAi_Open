@@ -4170,6 +4170,58 @@ session working from a temporarily restored copy.
   rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls
   would be wasted; removing it is a Review-lane call.
 
+### [heart-rate][body] Q-515 — the rest/active boundary shrank 3× because the owner got fitter
+
+- **Branch:** `fix/hr-rest-threshold-anchor`
+- **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
+- **Blast radius.** `HR_REST_THRESHOLD = 0.05` is the single rest/active boundary shared by **Body
+  Battery's charge/drain** and the **Activity Score's "moved this hour"** signal — it propagates into
+  two pillars.
+- **Measured** over 12,471 BLE ring samples, waking hours (07:00–21:59), joined per day to that day's
+  own stored profile:
+
+  | month | resting HR | hr_max | boundary | median % of waking samples below it |
+  |---|---|---|---|---|
+  | 2026-07 | 62.9 | 187.0 | **69.1 bpm** | **26.5%** |
+  | 2026-08 | 54.4 | 171.2 | **60.2 bpm** | **8.2%** |
+
+  **A 3.2× collapse in one month at identical sample density (184/day).**
+- **Every input behaved correctly.** Resting HR 62.9 → 54.4 is a genuine fitness gain; `hr_max`
+  187 → 168 is the profile maturing from the age formula to a corroborated observed ceiling (the chest
+  strap's max is 166 over 40,230 samples) — `resolveHrProfile` working as designed. Waking HR also fell,
+  77.5 → 73.3.
+- **The trap is a RATE difference.** Resting HR fell **8.5 bpm**; waking HR fell only **4.2**. Resting
+  HR is the more responsive fitness marker, so a boundary pinned to it moves ~2× as fast as the
+  distribution it classifies. Decomposed: resting HR explains ~8.1 of the 8.9 bpm boundary drop, the
+  `hr_max` maturation ~0.9. **The owner got fitter and was rewarded with less recovery credit.**
+- **No fraction fixes it** — sweeping the constant, July vs August medians: 0.05 → 26.5/8.2 (3.2×),
+  0.08 → 38.5/22.7, 0.10 → 47.8/29.8, 0.12 → 59.6/35.2, 0.15 → 72.8/50.6 (1.4×). The gap narrows but
+  never closes. **Tuning this constant is not the fix** — fourth instance of that pattern today
+  (Q-506, Q-512, Q-514, Q-515).
+- **Two separable questions; only one is answered here.** *(a) Is it stable?* No — a defect regardless
+  of taste. *(b) Is 8.2% the right level?* **Unknown** — ~1.2 h of a 15 h day is not obviously wrong,
+  and whether Body Battery should charge more in daylight is an owner question. **Fix (a) alone**; if
+  the fraction is raised at the same time the two effects become inseparable and neither is verifiable.
+- **First action — recommendation:** anchor the boundary to a **slow-moving** resting baseline (90-day
+  trailing, or a fixed offset re-derived quarterly) so a month of fitness improvement cannot move the
+  classifier under its own data. Keeps personalisation, removes the month-scale feedback. Reversal cost
+  is low and the effect is observable within a week of BLE data.
+- **Rejected alternative:** a percentile of the owner's own recent *waking* HR (trailing-28-day p25).
+  Stable by construction — which is the objection: Body Battery charge would go near-constant and a
+  genuinely restful day could not read as one. The codebase already names this "the treadmill" and
+  removed it from the activity-goal volume lane (Q-190). **Self-referential boundaries are fine for a
+  pure classifier and wrong for anything feeding a score — this one feeds two.**
+- **Re-measure both consumers afterwards**: Body Battery's charge/drain balance (currently mean charged
+  23.1 vs drained 36.0) and the Activity Score's movement signal.
+- **On Q-272:** its "median 6.7% of waking samples" could not be reproduced — the same statistic on
+  current data gives **15.0%** pooled over 42 days. **Not filed as an error there**; the month split
+  (26.5% / 8.2%) suggests it was measured on recent data alone, and the drift documented here explains
+  the difference.
+- **Still unreviewed in this pillar:** `PEAK_BANDS` (its "stable per-bucket sample sizes" justification
+  is an empirical claim nobody has measured) and the Karvonen zone boundaries (0.6/0.7/0.8/0.9).
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

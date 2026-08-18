@@ -37,6 +37,8 @@ second copy. Same for zone thresholds.
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (heart-rate ingest rejects `-50` and `99999` bpm; no findings specific to this pillar). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
+- [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](../../reviews/2026-08-18-hr-rest-threshold-calibration.md) — **first calibration review of this pillar, 2026-08-18** (Q-515 — `HR_REST_THRESHOLD` is the rest/active boundary shared by Body Battery and the Activity Score, and its charge window collapsed **26.5% → 8.2%** of waking samples in one month. **Every input was correct**: a genuine fitness gain plus `resolveHrProfile` maturing `hr_max` from the age formula to an observed ceiling. The trap is a rate difference — resting HR fell 8.5 bpm while waking HR fell 4.2 — so a boundary pinned to resting moves twice as fast as the distribution it classifies. Sweeping the constant narrows the gap 3.2× → 1.4× but never closes it: **the anchoring is the defect, not the number**).
+
 ## Open issues
 
 ```bash
