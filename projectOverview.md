@@ -635,8 +635,8 @@ the next device change.
   seed/`userGoals` pair and are fixed by the same change, but **any other screen that reads a value
   it does not re-subscribe to has this exact shape** — mount-scoped state on a screen that never
   unmounts. No sweep was done.
-- Detail: [`docs/overview/entries/2026-08-16-health-stale-goal.md`](docs/overview/entries/2026-08-16-health-stale-goal.md) ·
-  [`docs/overview/entries/2026-08-16-goal-label-association.md`](docs/overview/entries/2026-08-16-goal-label-association.md).
+- Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md) ·
+  [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
 
 ### [app-shell][platform] ⚠️ Q-261 FIXED — six button groups on More now have accessible names; TalkBack check still owed (v1.317.4, 2026-08-17)
 
@@ -3292,7 +3292,7 @@ commit, `6c072f9`, verified by cloning it fresh and running `check-private-paths
 `total tracked: 0.0 MB`. The pre-push audit found three real things, all fixed first — the owner's
 email in two docs (#1393), a private-path manifest that catalogued what it was protecting (#1396),
 and `main` red on E2E for ten hours of every day from a UTC-vs-Brisbane seed bug (#1397). Journal:
-[`entries/2026-08-16-public-repo-snapshot-pushed.md`](docs/overview/entries/2026-08-16-public-repo-snapshot-pushed.md).
+[`entries/2026-08-16-public-repo-snapshot-pushed.md`](docs/overview/history-2026-08-15.md).
 
 **What remains is Phase B steps 9–14**, and all but one are the owner's:
 [`docs/public-repo-cut-runbook.md`](docs/public-repo-cut-runbook.md). Branch protection on the new

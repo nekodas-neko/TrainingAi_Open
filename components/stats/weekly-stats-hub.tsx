@@ -59,7 +59,12 @@ export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubP
       {/* Training Load Bars */}
       <div>
         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-3">Training Load</p>
-        <div className="flex items-end gap-1 h-14">
+        {/* min-h, not a fixed h-14: the columns were ALREADY taller than 56 px with no flag at
+              all (52 bar + 4 gap + ~13.5 label = 69.5), so they overflowed upward and the tallest
+              bar collided with the heading above. Inlining the flags removed the difference between
+              columns; this removes the overflow itself. min-h keeps the row a stable height across
+              weeks so the card does not resize as data changes. */}
+          <div className="flex items-end gap-1 min-h-[72px]">
           {data.days.map((day) => {
             // A deload/testing day's volume is held out of `volume` so it can't inflate the weekly
             // total — but the day was still trained, so the bar draws from that held-out figure
@@ -96,15 +101,30 @@ export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubP
                     })
                   )}
                 </div>
+                {/* The flags are INLINE in the label, not siblings of it (Q-390). As separate
+                    children of this column flex each one became an extra ROW, so a flagged day's
+                    column grew ~12 px taller than an unflagged one — and since the row is
+                    `items-end`, that pushed its bar up off the shared baseline. On a chart whose
+                    only job is comparing days against each other, two identical volumes rendered at
+                    visibly different heights. They stay coloured *and* lettered: the glyph is the
+                    non-colour channel the colour-only-state rule needs, so a coloured dot would not
+                    do. */}
                 <span className={`text-[9px] font-medium ${isToday ? "text-brand font-bold" : "text-muted-foreground"}`}>
                   {day.label}
+                  {(day.isDeload || day.isTesting) && (
+                    <>
+                      {" ("}
+                      {day.isDeload && <span className="font-bold text-amber-500">D</span>}
+                      {/* Both flags can be true at once — they are independent fields, so this had
+                          to have a defined combined form rather than being met for the first time on
+                          a testing week. "Mon (D·T)" is 9 characters in a ~51 dp column at the S25
+                          viewport, which fits; a separator wider than the interpunct would not. */}
+                      {day.isDeload && day.isTesting && "·"}
+                      {day.isTesting && <span className="font-bold text-purple-500">T</span>}
+                      {")"}
+                    </>
+                  )}
                 </span>
-                {day.isDeload && (
-                  <span className="text-[8px] font-bold text-amber-500 leading-none">D</span>
-                )}
-                {day.isTesting && (
-                  <span className="text-[8px] font-bold text-purple-500 leading-none">T</span>
-                )}
               </div>
             );
           })}

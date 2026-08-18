@@ -373,5 +373,5 @@ Live at the time of writing (2026-07-30):
   still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-313), the
   measured blast radius was 17 files not 16, and the guards had to go finer than per-`describe`.
   Runbook: [`public-repo-cut-runbook.md`](../../public-repo-cut-runbook.md), steps 8–14 remain.
-- [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](../../overview/entries/2026-08-16-public-repo-cut-a4b.md)
+- [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](../../overview/history-2026-08-15.md)
   — the A4b journal entry.

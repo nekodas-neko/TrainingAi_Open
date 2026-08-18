@@ -58,6 +58,11 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-461 — the infinite `animate-bounce` on Start Set blocks Playwright's stability check, so no E2E spec can drive a workout past set 1). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
 
+- [`docs/overview/entries/2026-08-18-training-load-day-flag-inline.md`](../../overview/entries/2026-08-18-training-load-day-flag-inline.md)
+  — **Q-390, the Training Load bars were not on a common baseline (v1.321.2).** A deload/testing flag
+  rendered as a *sibling* of the day label became an extra row, and in an `items-end` row that pushes
+  the bar up: two days of identical volume drew **12 px** apart, measured. Carries the correction that
+  `D` and `T` are mutually exclusive at the data level, and a geometry-asserting E2E guard.
 - [`docs/reviews/2026-08-17-score-presentation-audit.md`](../../reviews/2026-08-17-score-presentation-audit.md) — **every surface rendering a pillar score, audited (Q-281), 2026-08-17.** Fourteen surfaces scored for contributors / trend / action: **nine render a score with no contributors and no trend**, and exactly one has all three. One real colour-only-state violation found and fixed (Home "accentring" band dot); `FactorBar` inspected and deliberately left alone. Also carries three corrections to **Q-278**'s premises — `score-audit/` has zero user-facing consumers, `scoreAvailability` has one, and daytime stress + resilience have no score surface at all.
 
 - [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-467 — the Coach's undo subsystem is fully built, `coach-history.tsx` already styles undone changes, and **nothing calls the undo route**). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
