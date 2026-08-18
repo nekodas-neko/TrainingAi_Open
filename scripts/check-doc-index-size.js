@@ -349,7 +349,6 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6910,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -369,17 +368,38 @@ const BASELINE = {
   // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
   // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
   // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
+  //
+  // Raised 2026-08-18 (Q-535 Lane A half, Lane A): 7462 -> 7491. Two things the queue cannot afford
+  // to lose: Q-535 now says the 502 is NOT gone yet and why the default was left alone (both
+  // consoles report completion from the synchronous shape, so flipping it blind would have them
+  // state that started work had finished), and half its own premise expired the same day — the
+  // row-walking phase became a no-op, so the `scanned=1098158` figures it quotes are historical.
+  // Plus the new Q-318 entry carrying the exact response contract, so the other lane does not have
+  // to read the route to build against it.
   // Raised 2026-08-18 (Tuning): 7514 -> 7596, recomputed from the MERGED file. Q-509/Q-510 (BLE-era
   // input drift) plus Q-501's "did it land" half marked resolved. Q-509's entry carries the
   // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
   // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
   // against.
+
+  //
+  // Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file. Lane A's delta was +29:
+  // Q-535 now states the 502 is NOT gone yet and why the default was left alone, that half its own
+  // premise expired the same day (the row-walking phase became a no-op, so its scanned figures are
+  // historical), and a new Q-318 carrying the exact response contract so the other lane need not
+  // read the route to build against it.
   // Raised 2026-08-18 (Tuning): 7596 -> 7636. Q-511 — the audit of "did the sleep recalibration miss
   // a consumer of the sleep scale?" (it did not) turned up that the Body Battery anchor flip was worth
   // 17.7 points and the recalibration removed 82% of it. The entry is long because most of it is a
   // PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
   // owner-reported bug in another pillar, and that only lands with the numbers attached.
-  'docs/implementation-backlog.md': 7636,
+
+  'projectOverview.md': 6910,
+  //
+  // Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
+  // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
+  // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
+  'docs/implementation-backlog.md': 7683,
   'CLAUDE.md': 1044,
 
 };

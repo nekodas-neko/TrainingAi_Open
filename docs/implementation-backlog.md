@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **196** | `lib/data/postgres/migrations/` (head: `195_claude_ro_views_rekey_declarations.sql`) |
+| Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -642,8 +642,55 @@ blocker and the intended shape were both already named, so **do not re-derive th
   architectural one. While in there, consider whether a date-scoped redecode is worth having —
   `fullHistory` is correct after a decoder change, and overkill for "re-aggregate last night",
   which is what it is usually reached for.
+- 🚧 **The Lane A half SHIPPED 2026-08-18; the 502 is NOT gone yet.** `POST …?async=1` returns
+  `{ jobId, status, startedAt, alreadyRunning }` immediately and `GET …?jobId=…` polls it (status is
+  *derived* from the timestamps, never stored, so nothing can disagree). Migration **196** adds
+  `oura_redecode_jobs` (**197** regenerates the `claude_ro` views), with one in-flight job per user
+  on a partial unique index — the 4/min rate limit does not stop two overlapping runs, and two
+  concurrent full-history re-aggregates are the load this exists to prevent — plus a staleness reaper,
+  because a process that died mid-run would otherwise hold that slot forever and refuse every future
+  redecode. That would be a worse and quieter failure than the 502.
+  ⚠️ **`?async=1` is opt-in and the default is unchanged, deliberately.** Both current callers read
+  the synchronous shape and report completion from it: `oura-ble-debug.tsx` falls back to *"redecode
+  ran … data refreshed"* and `step-backfill-console.tsx` says *"Done. Backfill applied"*. Flipping the
+  default without a poller would make both state that work had finished when it had only started.
+  **Q-318 is the other half** — the poller and the default flip, Lane B.
+- ⚠️ **Half this entry's premise expired on 2026-08-18.** The redecode's row-walking phase is now a
+  no-op (Q-541 Task 7 made `measured_at`/`event_name` derived, so it had nothing to correct), which
+  removes the `scanned=1098158` full-table walk. **The remaining weight is the full-history
+  re-aggregate**, which still rebuilds every daily summary and still exceeds the gateway timeout. The
+  `scanned` counts quoted above are historical.
 - **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
   row. Do not run a full redecode while those are open.
+
+### [app-shell][devices] Q-318 — poll the redecode job, and stop the two consoles reporting "done" for work that has started
+
+- **Lane B.** `components/oura-ble/oura-ble-debug.tsx` and `components/oura-ble/step-backfill-console.tsx`
+  only — the job store, the route and the reaper are Lane A's and already shipped (Q-535).
+- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Why the default was not flipped for you.** `?async=1` exists and works, but both consoles read
+  the synchronous response shape and report completion from it. Switched blind, `oura-ble-debug.tsx`
+  falls back to *"redecode ran (response was slow to return) — data refreshed"* and
+  `step-backfill-console.tsx` says *"Done. Backfill applied — re-run preview to confirm 0 days
+  remain."* — for a backfill that has only begun. That is a quieter and more misleading failure than
+  the 502 it replaces, which is why Lane A left the default alone rather than crossing the boundary.
+- **The contract:** `POST …?async=1` → `{ jobId, status: 'running', startedAt, alreadyRunning, note }`.
+  `GET …?jobId=<id>` (or no id for the most recent) → `{ job: { jobId, status, startedAt, finishedAt,
+  opts, error, ...phases } }` where `status` is `running` | `done` | `failed`, and the phases payload
+  is exactly what the synchronous route used to return (`redecoded`, `redecodeError`, `aggregated`,
+  `aggregateError`). `GET` with no jobs yet → `{ job: null }`; a non-numeric `jobId` → 400.
+- **Shape:** POST with `async=1`, then poll the `GET` on a timer until `status !== 'running'`, then
+  render exactly what the synchronous path rendered. `alreadyRunning: true` means someone else's run
+  is in flight and this press started nothing — say so rather than showing a spinner that implies it
+  did. A run can take **minutes**; the point is that the response arriving first is normal.
+- ⚠️ **Do not treat a `failed` status as a reason to retry automatically.** A retry is another
+  full-history re-aggregate, which is the whole hazard Q-535 is about.
+- **Once both consoles poll, drop `?async=1` and make it the default** — the synchronous branch in
+  the route exists only to keep these two working in the meantime, and should go with it.
+- **Verification:** the route is already proven end to end on `pnpm dev` — start, poll to `done` with
+  the full phases payload, `alreadyRunning` on a second press with one genuinely in flight, a 400 on a
+  bad id, and the reaper turning an abandoned job into `failed` with a reason. This item is the
+  client only.
 
 ### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
 
