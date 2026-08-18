@@ -69,6 +69,38 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [devices][platform][body] 🔴 The Health Connect ingest route, driven for real — the brute-force gate is bypassable and a far-future date poisons "latest" permanently (Q-493…Q-496, 2026-08-18)
+
+- **The only unauthenticated write into `body_metrics`, exercised for the first time.** It has sat on
+  the Review baton as untested since sweep 1 because it needs `HEALTH_CONNECT_INGEST_SECRET` set. All
+  four findings are **reproduced against a running server**:
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](docs/reviews/2026-08-18-health-connect-ingest.md).
+- **🔴 Q-493 — the SEC-I3 brute-force gate is bypassed by rotating one request header.** The limiter
+  keys on `x-forwarded-for`'s **leftmost** hop, which is the value the *client* supplies. Measured, 30
+  wrong-secret attempts each way: **fixed** header → 1 key at count 20, gate engaged; **rotating** →
+  **30 keys at count 1, all 30 reached the secret compare.** **Seven sites** share the pattern,
+  including `admin/day-review` (bearer path to the owner's full health history). Nothing in the docs
+  records it, and the R1 security-hardening plan *propagated* it as "the existing pattern".
+  **⚠️ Unverified: whether Railway's proxy sanitises the header** — not determinable from the sandbox,
+  and production's limiter was not probed. The fix does not depend on the answer.
+- **🔴 Q-494 — one far-future date permanently captures every `ORDER BY date DESC LIMIT 1` read.**
+  `POST {"date":"9999/12/30","weightKg":499}` took `getMostRecentConfirmedWeightKg` from **81 kg to
+  499 kg**, and no later write can outrank it. Feeds the BLE-scale confirmation path and
+  `deriveActivityKcal`. **The ranked source merge is orthogonal to this, not weak against it** —
+  ranking is per column *per date*, and a row on a date nothing else writes has no competitor.
+- **🟡 Q-496** — `2026-13-45` / `2026-02-31` / `0000-00-00` pass the shape regex and return **HTTP 500**
+  plus an `error_events` row each. The class `normalizeDateParam` exists to prevent; this route never
+  got the guard. **🟢 Q-495** — `z.coerce.number()` turns `[]`→0, `true`→1, `""`→0 kg; the route's own
+  comment names two garbage inputs and both are correctly rejected, these three are not named.
+- **What the route gets right, stated because three findings are refinements of it:** the gate runs
+  *before* the compare and returns an identical 401 on trip; `safeCompare` is constant-time and
+  length-safe; the date regex accepts both separators (the Q-130 lesson); both garbage examples its
+  comment names are rejected.
+- **Not exercised:** local dev server, seeded DB. Not on device, not against production, not against
+  Railway's real proxy — the one unknown Q-493 turns on. All test rows, `error_events` and
+  `rate_limits` rows were deleted and the 81 kg reading verified restored.
+
+
 ### [platform] 🟡 Seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current (Q-492, 2026-08-18)
 
 - **The lens was the file every session must read first.** Three sweeps this week each found a stale

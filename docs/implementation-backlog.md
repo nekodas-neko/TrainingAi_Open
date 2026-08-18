@@ -848,6 +848,86 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [devices][platform] Q-493 — the ingest brute-force gate is bypassed by rotating one request header (7 sites)
+
+- **Branch:** `security/client-ip-from-trusted-hop`
+- **Added:** 2026-08-18 · review sweep (secret-gated ingest, driven for real) ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement: high.** It defeats a mitigation (SEC-I3) written specifically to stop this, on the
+  **only unauthenticated write into `body_metrics`**, and the same pattern guards the bearer path to
+  the owner's full health history.
+- **The defect.** Every limiter keys on `x-forwarded-for`'s **leftmost** hop — the value the *client*
+  supplied (a proxy appends its peer to the right). The caller therefore chooses the rate-limit key.
+- **Measured**, 30 wrong-secret attempts each way, limit 20/60 s. Both return 401 throughout (by
+  design), so the observable is `rate_limits`:
+  - **fixed** `X-Forwarded-For` → **1 key, count 20** — gate engaged, 10 attempts blocked.
+  - **rotating** → **30 keys, count 1 each** — **all 30 reached the secret compare.**
+- **Seven sites:** `health-connect/ingest`, `admin/day-review` (bearer → full health history),
+  `admin/db-query` ×2, `auth/register`, `auth/exchange-mobile-token`, `status`.
+- **Nothing in the docs records this, and the R1 security-hardening plan *propagated* it** — the
+  `status` route was added keyed by `x-forwarded-for` *"matching the existing pattern in
+  `auth/register` and `auth/exchange-mobile-token`"*.
+- **⚠️ Not verified:** whether Railway's edge proxy sanitises the header before the app sees it. Not
+  determinable from the sandbox, and probing production's limiter was not done unasked. The
+  code-level bypass is proven; production exploitability turns on that one unknown. **The fix does
+  not depend on it** — the leftmost hop is untrustworthy under the header's own semantics regardless.
+- **Fix:** one shared helper deriving the client IP from the **rightmost** hop or a configured
+  trusted-proxy count — the treatment `safeCompare` already has. Seven call sites should not each
+  re-decide this.
+
+### [devices][body] Q-494 — a far-future ingest date permanently captures every "most recent" read
+
+- **Branch:** `fix/ingest-date-range-bounds`
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement: high.** Single request, permanent, silent, and it corrupts a value feeding the scale
+  pipeline and every activity-calorie estimate.
+- **Measured.** The regex bounds the date's shape, nothing bounds its range:
+  ```
+  before: getMostRecentConfirmedWeightKg -> 2026-08-18, 81 kg
+  POST {"date":"9999/12/30","weightKg":499} -> {"success":true}
+  after:  getMostRecentConfirmedWeightKg -> 9999-12-30, 499 kg
+  ```
+  `ORDER BY date DESC LIMIT 1` answers **499 kg until the year 9999**; no later write can outrank it.
+  Two readers use that shape: `getMostRecentConfirmedWeightKg` (BLE-scale confirmation) and
+  `deriveActivityKcal` (multiplies body weight into activity calories).
+- **The ranked source merge cannot help, and the reason is worth keeping.** `health-source.ts` ranks
+  per **column, per date** — it stops a worse source overwriting a better one *on the same day*. A row
+  on a date nothing else ever writes has no competitor, so rank 1 (`health_connect`, the lowest) wins
+  outright. The documented protection is orthogonal to this, not weak against it.
+- **Fix:** bound the accepted date to a sane window (e.g. not more than a day ahead of the user's
+  today, not before the account). Consider whether other `desc(date).limit(1)` readers want the same.
+
+### [devices] Q-496 — a regex-passing but invalid ingest date returns 500 and writes an `error_events` row
+
+- **Branch:** `fix/ingest-date-semantic-validation`
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement:** medium. Needs the secret, so not an open spam vector — but it makes the fault table
+  every session is required to read less trustworthy.
+- **Measured:** `2026-13-45`, `2026-02-31`, `0000-00-00` each → **HTTP 500** plus an `error_events`
+  row (`[pg 22008]`). The regex accepts any `\d{4}[-/]\d{2}[-/]\d{2}`, so month 13 and day 45 pass
+  validation and fail at the driver.
+- **This is the class `normalizeDateParam` exists to prevent.** `CLAUDE.md` lists the routes
+  retrofitted with that guard; this one is not among them. A client input error is being recorded as a
+  server fault.
+- **Fix:** route the param through `normalizeDateParam` and return 400. Shares a location with Q-494.
+
+### [devices] Q-495 — `z.coerce.number()` launders `[]`, `true` and `""` into stored readings
+
+- **Branch:** `fix/ingest-no-coercion`
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement:** low. Needs the secret, writes at the lowest rank, and produces implausible rather
+  than dangerous values.
+- **The route's own comment is accurate about what it tested and silent about coercion.** It says the
+  bounds *"reject clearly-garbage values (a stringified `75kg`, a 1e308 double)"* — **both named
+  examples are indeed rejected.** Three unnamed ones are not: `"steps":[]` → **0**, `"steps":true` →
+  **1**, `"weightKg":""` → **0 kg**. Each landed in `body_metrics` stamped `health_connect`; a 0 kg
+  body weight is in range for `.min(0)`.
+- **Fix:** `z.number()` rather than `z.coerce.number()` (Tasker sends real JSON numbers), or reject
+  non-primitive input before the bounds. Give body weight a plausible floor, not zero.
+
 ### [platform] Q-492 — seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current
 
 - **Branch:** `docs/claude-md-counts-cite-the-command`
