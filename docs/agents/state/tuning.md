@@ -3,19 +3,24 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 505)
+**Updated:** 2026-08-18 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 506)
 
 ## Now
-Sleep Score recalibrated and shipped (**v1.319.0**, Q-503) — mean 84.1 → 69.5, sd 15.9 → 16.6, range
-32–99, every band populated. Evidence:
-[`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](../../reviews/2026-08-18-sleep-score-range-recalibration.md).
+The owner's three-pillar range pass is complete as far as it can go without them.
+- **Sleep — SHIPPED** (v1.319.0, Q-503): mean 84.1 → 69.5, sd 15.9 → 16.6, range 32–99, every band
+  populated. [`review`](../../reviews/2026-08-18-sleep-score-range-recalibration.md).
+- **Readiness — HELD** (Q-504): fix measured and ready (mean 66.8, sd 19.3, range 15–99); blocked on
+  blast radius, not the owner. Five action thresholds need re-anchoring first.
+- **Activity — BLOCKED ON THE OWNER** (Q-505): needs a decision about what the score means, not a
+  number. [`review`](../../reviews/2026-08-18-activity-score-calibration.md).
 
 ## Next
 1. **Q-504 — Readiness range calibration.** Analysis is done and in the review's §6; it is held only
    on blast radius, not on the owner. Re-anchor the five action thresholds to preserve firing rates
    before shipping the calibration, and land **Q-273 (model versioning) first**.
-2. **Q-277 — Activity Score** (n=22, sd 7.3, range 56–91) is the most compressed pillar and has not
-   been analysed at all.
+2. **Q-505 — Activity Score.** Analysed; waiting on the owner to choose between "score today"
+   (re-weight toward the same-day lane) and "score recent training" (keep weights, fix the daily
+   framing). Q-277 is the older discrimination finding this supersedes.
 3. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
@@ -24,6 +29,8 @@ Sleep Score recalibrated and shipped (**v1.319.0**, Q-503) — mean 84.1 → 69.
 - **Q-500** (`RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5) — still awaiting the owner, and now **lower
   priority**: it was a ~1-point correction aimed at the same range problem Q-504 fixes wholesale.
   Re-measure it *after* Q-504 rather than stacking them.
+- **Q-505** (Activity Score) — needs an owner *decision*, not sign-off. Tuning recommends "score
+  today" and the entry says why.
 - **Q-501, Q-502** queued, not blocked — neither is a scoring change.
 
 ## Claimed paths
@@ -51,6 +58,10 @@ for this work:
 - **Q-272's direction #1 is refuted** — the Body Battery charge window is reachable on a median 6.7%
   of waking samples, so `CHARGE_RATE` scales a term that is barely active. `REST_THRESHOLD`/the
   reserve is the lever (Q-502 doc §2).
+- **A range calibration does NOT transfer to Activity.** Stretching preserves ranking, and Activity's
+  ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
+  A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
+  Fix the weights first, measure, and only then consider a calibration.
 - Q numbers come from the band above, not the backlog's next-free pointer. No migration numbers.
 
 ## Gotchas that cost time

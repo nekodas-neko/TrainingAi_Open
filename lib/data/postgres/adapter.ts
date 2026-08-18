@@ -91,6 +91,7 @@ import * as prog from './slices/programs'
 import * as period from './slices/periodization'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
+import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
 import * as bodyBattery from './slices/body-battery'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
@@ -4639,10 +4640,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (anchor) {
       const startDs = Math.floor(dsFromMeasuredAtMs(start.getTime(), anchor.anchorDs, anchor.anchorUtc.getTime()))
       const endDs = Math.ceil(dsFromMeasuredAtMs(end.getTime(), anchor.anchorDs, anchor.anchorUtc.getTime()))
-      const rows = await this.db
-        .select({ tag: s.ouraRawSamples.tag })
-        .from(s.ouraRawSamples)
-        .where(and(eq(s.ouraRawSamples.userId, userId), gte(s.ouraRawSamples.ringTimestampDs, startDs), lte(s.ouraRawSamples.ringTimestampDs, endDs)))
+      const rows = await readRawFrames(this.db, userId, { startDs, endDs })
       const counts = new Map<number, number>()
       for (const r of rows) counts.set(r.tag, (counts.get(r.tag) ?? 0) + 1)
       rawByTag = [...counts.entries()]
@@ -4686,15 +4684,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const endDs = Math.ceil(dsFromMeasuredAtMs(nowMs, anchor.anchorDs, anchorUtcMs))
     const tagsOfInterest = Object.keys(TAG_LABELS).map(Number)
 
-    const rows = await this.db
-      .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag })
-      .from(s.ouraRawSamples)
-      .where(and(
-        eq(s.ouraRawSamples.userId, userId),
-        inArray(s.ouraRawSamples.tag, tagsOfInterest),
-        gte(s.ouraRawSamples.ringTimestampDs, startDs),
-        lte(s.ouraRawSamples.ringTimestampDs, endDs),
-      ))
+    const rows = await readRawFrames(this.db, userId, { tags: tagsOfInterest, startDs, endDs })
 
     const perTag = new Map<number, number[]>() // tag → 24-bucket hour histogram
     for (const r of rows) {
@@ -4738,16 +4728,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const anchorUtcMs = anchor.anchorUtc.getTime()
     const startDs = Math.floor(dsFromMeasuredAtMs(from.getTime(), anchor.anchorDs, anchorUtcMs))
     const endDs = Math.ceil(dsFromMeasuredAtMs(to.getTime(), anchor.anchorDs, anchorUtcMs))
-    const rows = await this.db
-      .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, decoded: s.ouraRawSamples.decoded, bodyHex: s.ouraRawSamples.bodyHex })
-      .from(s.ouraRawSamples)
-      .where(and(
-        eq(s.ouraRawSamples.userId, userId),
-        inArray(s.ouraRawSamples.tag, [0x46, 0x69, 0x50]),
-        gte(s.ouraRawSamples.ringTimestampDs, startDs),
-        lte(s.ouraRawSamples.ringTimestampDs, endDs),
-      ))
-      .orderBy(asc(s.ouraRawSamples.ringTimestampDs))
+    const rows = await readRawFrames(this.db, userId, { tags: [0x46, 0x69, 0x50], startDs, endDs })
     const temp: { tsMs: number; valueC: number }[] = []
     const met: { tsMs: number; value: number }[] = []
     for (const r of rows) {
@@ -4775,16 +4756,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const anchorUtcMs = anchor.anchorUtc.getTime()
     const startDs = Math.floor(dsFromMeasuredAtMs(from.getTime(), anchor.anchorDs, anchorUtcMs))
     const endDs = Math.ceil(dsFromMeasuredAtMs(to.getTime(), anchor.anchorDs, anchorUtcMs))
-    const rows = await this.db
-      .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, decoded: s.ouraRawSamples.decoded, bodyHex: s.ouraRawSamples.bodyHex })
-      .from(s.ouraRawSamples)
-      .where(and(
-        eq(s.ouraRawSamples.userId, userId),
-        eq(s.ouraRawSamples.tag, 0x61),
-        gte(s.ouraRawSamples.ringTimestampDs, startDs),
-        lte(s.ouraRawSamples.ringTimestampDs, endDs),
-      ))
-      .orderBy(asc(s.ouraRawSamples.ringTimestampDs))
+    const rows = await readRawFrames(this.db, userId, { tags: [0x61], startDs, endDs })
     const out: Array<{ tsMs: number; kind: 'battery_level_changed' | 'charging_time'; batteryPct: number | null; voltageMv: number | null; chargingTimeSec: number | null }> = []
     for (const r of rows) {
       const decoded = (r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null)) as Record<string, unknown> | null
@@ -5102,13 +5074,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // so the partition is exact and each result array stays ds-ordered (the base query is).
     const ROLLUP_TAGS = [0x76, 0x4b, 0x4e, 0x5a, 0x80, 0x60, 0x5d, 0x6f, 0x8b, 0x86, 0x46, 0x69, 0x72, 0x75, 0x50]
     const rollupRows = await (async () => {
-      const conds = [eq(s.ouraRawSamples.userId, userId), inArray(s.ouraRawSamples.tag, ROLLUP_TAGS)]
-      if (rollupCutoffDs != null) conds.push(gte(s.ouraRawSamples.ringTimestampDs, rollupCutoffDs))
-      const raw = await this.db
-        .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, decoded: s.ouraRawSamples.decoded, bodyHex: s.ouraRawSamples.bodyHex })
-        .from(s.ouraRawSamples)
-        .where(and(...conds))
-        .orderBy(asc(s.ouraRawSamples.ringTimestampDs))
+      const raw = await readRawFrames(this.db, userId, { tags: ROLLUP_TAGS, startDs: rollupCutoffDs })
       return raw
         .map(r => ({ ds: r.ds, tag: r.tag, decoded: r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null) }))
         .filter((r): r is { ds: number; tag: number; decoded: Record<string, unknown> } => r.decoded != null)
@@ -5696,24 +5662,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // (lower) step_counter number immediately, safely.
     await step('steps', async () => {
       const [stepFrameRows, motionFrameRows, liveWindowRows] = await Promise.all([
-        this.db
-          .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, bodyHex: s.ouraRawSamples.bodyHex })
-          .from(s.ouraRawSamples)
-          .where(and(
-            eq(s.ouraRawSamples.userId, userId),
-            inArray(s.ouraRawSamples.tag, [...STEP_FEATURE_TAGS]),
-            ...(rollupCutoffDs != null ? [gte(s.ouraRawSamples.ringTimestampDs, rollupCutoffDs)] : []),
-          ))
-          .orderBy(asc(s.ouraRawSamples.ringTimestampDs)),
-        this.db
-          .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, bodyHex: s.ouraRawSamples.bodyHex })
-          .from(s.ouraRawSamples)
-          .where(and(
-            eq(s.ouraRawSamples.userId, userId),
-            eq(s.ouraRawSamples.tag, STEP_MOTION_TAG),
-            ...(rollupCutoffDs != null ? [gte(s.ouraRawSamples.ringTimestampDs, rollupCutoffDs)] : []),
-          ))
-          .orderBy(asc(s.ouraRawSamples.ringTimestampDs)),
+        readRawFrames(this.db, userId, { tags: [...STEP_FEATURE_TAGS], startDs: rollupCutoffDs }),
+        readRawFrames(this.db, userId, { tags: [STEP_MOTION_TAG], startDs: rollupCutoffDs }),
         this.db
           .select({ startDs: s.stepLiveWindows.startDs, endDs: s.stepLiveWindows.endDs, steps: s.stepLiveWindows.steps })
           .from(s.stepLiveWindows)
@@ -6156,16 +6106,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const anchors = await this.getOuraClockAnchors(userId)
     if (anchors.length === 0) return []
     const [stepFrameRows, motionFrameRows, liveWindowRows] = await Promise.all([
-      this.db
-        .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, bodyHex: s.ouraRawSamples.bodyHex })
-        .from(s.ouraRawSamples)
-        .where(and(eq(s.ouraRawSamples.userId, userId), inArray(s.ouraRawSamples.tag, [...STEP_FEATURE_TAGS])))
-        .orderBy(asc(s.ouraRawSamples.ringTimestampDs)),
-      this.db
-        .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, bodyHex: s.ouraRawSamples.bodyHex })
-        .from(s.ouraRawSamples)
-        .where(and(eq(s.ouraRawSamples.userId, userId), eq(s.ouraRawSamples.tag, STEP_MOTION_TAG)))
-        .orderBy(asc(s.ouraRawSamples.ringTimestampDs)),
+      readRawFrames(this.db, userId, { tags: [...STEP_FEATURE_TAGS] }),
+      readRawFrames(this.db, userId, { tags: [STEP_MOTION_TAG] }),
       this.db
         .select({ startDs: s.stepLiveWindows.startDs, endDs: s.stepLiveWindows.endDs, steps: s.stepLiveWindows.steps })
         .from(s.stepLiveWindows)
@@ -6263,24 +6205,65 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraRawSampleSummary(userId: string): Promise<OuraRawSampleSummary> {
     const where = eq(s.ouraRawSamples.userId, userId)
 
-    const [totals] = await this.db
-      .select({
-        total: sql<number>`count(*)::int`,
-        newest: sql<Date | null>`max(${s.ouraRawSamples.recordedAt})`,
-      })
-      .from(s.ouraRawSamples)
-      .where(where)
+    // The aggregates below count BOTH tiers. A packed bucket is still the owner's history, so a
+    // total that silently reported "the last 7 days" would read as data loss on the one screen that
+    // exists to answer whether the ring is delivering.
+    //
+    // The hot side is anti-joined against the packed side on `(epoch, tag, ds_bucket)`, because the
+    // packer writes a blob, verifies it, and only THEN deletes the hot rows — so a bucket is
+    // legitimately in both tiers for the width of that window, and permanently if the packer is
+    // interrupted between the two. Measured on the dev server before this anti-join existed: 80
+    // frames read as 120. A packed bucket is therefore counted from its blob and never from the hot
+    // rows it duplicates, which is exact because the packer's unit is a whole bucket.
+    const notAlreadyPacked = sql`NOT EXISTS (
+      SELECT 1 FROM ${s.ouraRawPacked} p
+       WHERE p.user_id = ${s.ouraRawSamples.userId}
+         AND p.epoch = ${s.ouraRawSamples.epoch}
+         AND p.tag = ${s.ouraRawSamples.tag}
+         AND p.ds_bucket = ${s.ouraRawSamples.ringTimestampDs} / ${DS_BUCKET_SPAN}
+    )`
 
-    const byName = await this.db
-      .select({ tag: s.ouraRawSamples.tag, eventName: s.ouraRawSamples.eventName, count: sql<number>`count(*)::int` })
-      .from(s.ouraRawSamples)
-      .where(where)
-      .groupBy(s.ouraRawSamples.tag, s.ouraRawSamples.eventName)
-      .orderBy(desc(sql`count(*)`))
+    const [[hotTotals], [packedTotals]] = await Promise.all([
+      this.db
+        .select({
+          total: sql<number>`count(*) FILTER (WHERE ${notAlreadyPacked})::int`,
+          newest: sql<Date | null>`max(${s.ouraRawSamples.recordedAt})`,
+        })
+        .from(s.ouraRawSamples)
+        .where(where),
+      this.db
+        .select({ frames: sql<number>`coalesce(sum(${s.ouraRawPacked.frameCount}), 0)::int` })
+        .from(s.ouraRawPacked)
+        .where(eq(s.ouraRawPacked.userId, userId)),
+    ])
+    const totals = { total: (hotTotals?.total ?? 0) + (packedTotals?.frames ?? 0), newest: hotTotals?.newest ?? null }
+
+    const [hotByTag, packedByTag] = await Promise.all([
+      this.db
+        .select({ tag: s.ouraRawSamples.tag, count: sql<number>`count(*)::int` })
+        .from(s.ouraRawSamples)
+        .where(and(where, notAlreadyPacked))
+        .groupBy(s.ouraRawSamples.tag),
+      this.db
+        .select({ tag: s.ouraRawPacked.tag, count: sql<number>`coalesce(sum(${s.ouraRawPacked.frameCount}), 0)::int` })
+        .from(s.ouraRawPacked)
+        .where(eq(s.ouraRawPacked.userId, userId))
+        .groupBy(s.ouraRawPacked.tag),
+    ])
+    // Grouped by tag alone and named from `eventName(tag)` rather than the stored column: a packed
+    // frame has no stored name, and grouping on a column one tier lacks would split one tag into
+    // two rows.
+    const countsByTag = new Map<number, number>()
+    for (const r of [...hotByTag, ...packedByTag]) countsByTag.set(r.tag, (countsByTag.get(r.tag) ?? 0) + r.count)
+    const byName = [...countsByTag.entries()]
+      .map(([tag, count]) => ({ tag, eventName: eventName(tag), count }))
+      .sort((a, b) => b.count - a.count)
 
     // One newest decoded row per event type for the tester's field inspector.
-    // DISTINCT ON (tag) keeps the highest ring clock per tag — cheap (~1 row/tag).
-    const latestRows = await this.db
+    // DISTINCT ON (tag) keeps the highest ring clock per tag — cheap (~1 row/tag). Hot-tier only,
+    // then a per-tag cold lookup for any tag that has gone quiet for longer than the hot window —
+    // without which a dormant tag reads as having no data rather than as stale.
+    const hotLatest = await this.db
       .selectDistinctOn([s.ouraRawSamples.tag], {
         tag: s.ouraRawSamples.tag,
         eventName: s.ouraRawSamples.eventName,
@@ -6291,6 +6274,17 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .from(s.ouraRawSamples)
       .where(where)
       .orderBy(s.ouraRawSamples.tag, desc(s.ouraRawSamples.ringTimestampDs))
+    const hotLatestTags = new Set(hotLatest.map(r => r.tag))
+    const dormantTags = [...countsByTag.keys()].filter(t => !hotLatestTags.has(t))
+    const coldLatest = dormantTags.length === 0 ? [] : (await Promise.all(
+      dormantTags.map(async tag => {
+        const [newest] = await readRecentRawFrames(this.db, userId, [tag], 1)
+        return newest
+          ? { tag, eventName: eventName(tag), measuredAt: null, decoded: newest.decoded, bodyHex: newest.bodyHex }
+          : null
+      }),
+    )).filter((r): r is NonNullable<typeof r> => r != null)
+    const latestRows = [...hotLatest, ...coldLatest]
 
     // Latest decoded values are pulled from the most recent candidate rows and
     // extracted in JS (the decoded arrays live in JSONB; a summary is low-volume).
@@ -6308,12 +6302,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // estimate cadence. Includes ring_timestamp_ds so we can anchor to wall-clock.
     // Coalesce decoded ?? decode-from-hex (Lever 1: decoded no longer persisted).
     const recent = async (tags: number[]) => {
-      const rows = await this.db
-        .select({ ds: s.ouraRawSamples.ringTimestampDs, tag: s.ouraRawSamples.tag, decoded: s.ouraRawSamples.decoded, bodyHex: s.ouraRawSamples.bodyHex })
-        .from(s.ouraRawSamples)
-        .where(and(where, inArray(s.ouraRawSamples.tag, tags)))
-        .orderBy(desc(s.ouraRawSamples.ringTimestampDs))
-        .limit(200)
+      const rows = await readRecentRawFrames(this.db, userId, tags, 200)
       return rows.map(r => ({ ds: r.ds, decoded: r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null) }))
     }
 
@@ -6327,12 +6316,26 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .orderBy(desc(s.ouraRawSamples.ringTimestampDs))
       .limit(1)
 
-    const spanQuery = this.db
-      .select({ minDs: sql<number | null>`min(${s.ouraRawSamples.ringTimestampDs})::bigint` })
-      .from(s.ouraRawSamples)
-      .where(where)
+    // Both tiers, min-of-mins in JS rather than one query: the oldest frame is by definition the one
+    // most likely to have been packed, so a hot-only MIN would report the history as starting 7 days
+    // ago — and a join-shaped version returns no row at all once the hot tier is empty.
+    const spanQuery = Promise.all([
+      this.db
+        .select({ minDs: sql<number | null>`min(${s.ouraRawSamples.ringTimestampDs})::bigint` })
+        .from(s.ouraRawSamples)
+        .where(where),
+      this.db
+        .select({ minDs: sql<number | null>`min(${s.ouraRawPacked.minDs})::bigint` })
+        .from(s.ouraRawPacked)
+        .where(eq(s.ouraRawPacked.userId, userId)),
+    ]).then(([[hot], [packed]]) => {
+      const candidates = [hot?.minDs, packed?.minDs]
+        .map(v => (v == null ? null : Number(v)))
+        .filter((v): v is number => v != null)
+      return { minDs: candidates.length > 0 ? Math.min(...candidates) : null }
+    })
 
-    const [hrRows, tempRows, hrvRows, spo2Rows, spo2RPiRows, [anchor], [span]] = await Promise.all([
+    const [hrRows, tempRows, hrvRows, spo2Rows, spo2RPiRows, [anchor], span] = await Promise.all([
       recent([0x80, 0x60, 0x5d]),
       recent([0x46, 0x69, 0x75]),
       recent([0x5d]),
@@ -6390,27 +6393,25 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async getOuraRawSamplesByTags(userId: string, tags: number[], limit: number): Promise<OuraRawSampleRow[]> {
     if (tags.length === 0) return []
-    const rows = await this.db
-      .select({
-        ds: s.ouraRawSamples.ringTimestampDs,
-        tag: s.ouraRawSamples.tag,
-        eventName: s.ouraRawSamples.eventName,
-        measuredAt: s.ouraRawSamples.measuredAt,
-        decoded: s.ouraRawSamples.decoded,
-        bodyHex: s.ouraRawSamples.bodyHex,
-      })
-      .from(s.ouraRawSamples)
-      .where(and(eq(s.ouraRawSamples.userId, userId), inArray(s.ouraRawSamples.tag, tags)))
-      .orderBy(desc(s.ouraRawSamples.ringTimestampDs))
-      .limit(Math.min(Math.max(limit, 1), 1000))
-    return rows.map((r): OuraRawSampleRow => ({
-      ringTimestampDs: Number(r.ds),
-      tag: r.tag,
-      eventName: r.eventName,
-      measuredAt: r.measuredAt ? new Date(r.measuredAt).toISOString() : null,
-      decoded: (r.decoded as Record<string, unknown> | null) ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null),
-      bodyHex: r.bodyHex,
-    }))
+    const [rows, anchors] = await Promise.all([
+      readRecentRawFrames(this.db, userId, tags, Math.min(Math.max(limit, 1), 1000)),
+      this.getOuraClockAnchors(userId),
+    ])
+    // `event_name` and `measured_at` are columns on a hot row and derivations for a packed one, so
+    // both are derived here for every row rather than read where available — a field that comes
+    // from two places drifts, and `event_name` already had to be repaired once by a full-table
+    // refresh for exactly that reason.
+    return rows.map((r): OuraRawSampleRow => {
+      const ms = resolveDsToMs(r.ds, anchors)
+      return {
+        ringTimestampDs: Number(r.ds),
+        tag: r.tag,
+        eventName: eventName(r.tag),
+        measuredAt: ms != null ? new Date(ms).toISOString() : null,
+        decoded: r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null),
+        bodyHex: r.bodyHex,
+      }
+    })
   }
 
   /**

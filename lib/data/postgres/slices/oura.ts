@@ -1274,7 +1274,10 @@ const BODY_COMP_MODEL_VERSION = 'atlas_2_1_0'
 // Read-only, admin-gated. Sizes come from the planner's stats (cheap, approximate); the raw-sample
 // column split is an exact scan of the (single-user) table.
 const OURA_FOOTPRINT_TABLES = [
-  'oura_raw_samples', 'oura_accel_chunks', 'oura_heartrate', 'step_live_windows',
+  // `oura_raw_packed` (Q-541) is listed beside `oura_raw_samples` deliberately: packing is only
+  // observable as the two moving in opposite directions, and this readout is where the owner watches
+  // that happen.
+  'oura_raw_samples', 'oura_raw_packed', 'oura_accel_chunks', 'oura_heartrate', 'step_live_windows',
   'oura_daily', 'oura_daily_summary', 'oura_daily_derived', 'sleep_sessions', 'body_metrics',
   'oura_tags', 'oura_workouts', 'oura_ble_clock_anchors', 'oura_tokens',
 ]

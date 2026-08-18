@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.319.1",
+    date: "2026-08-18",
+    changes: [
+      "Everything that reads your ring's raw history now looks in both places it can live \u2014 the new compact store as well as the original one. Nothing has moved yet, so you will not see a difference; this is what makes the move safe when it happens. The BLE admin screen also counts the compact store and names each event type from its tag, so an event whose stored label had gone stale now reads correctly.",
+    ],
+  },
+  {
     version: "1.319.0",
     date: "2026-08-18",
     changes: [

@@ -417,6 +417,33 @@ below threshold and left in place for next time.
 - **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
   row. Do not run a full redecode while those are open.
 
+### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
+
+- **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
+- **Added:** 2026-08-18 (found while measuring production for Q-541)
+- **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
+  12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
+  database** held by four rows.
+- **This is dead weight, not data.** Q-539 diagnosed the cause: one fault wrote **5,771 rows** because
+  the dedupe key varied with a generated `VALUES` list, each stored message truncated to exactly
+  2,000 chars of `(default, $N, $N),` boilerplate. Q-539 fixed the key and cut the cap to 1,000, and
+  the rows themselves have since been pruned — but Postgres MVCC leaves the dead tuples in place, so
+  the file never shrank. **Nothing here re-grows**: the write path is already fixed, so this is a
+  one-off reclaim, not a recurring chore.
+- **Why it is worth a queue entry rather than a footnote:** it is the cheapest MB in the database
+  against the owner's end-of-week 500 MB deadline (Q-534). Q-541's packing is worth ~680 MB and is
+  several sessions of careful work; this is ~49 MB for a single statement over a four-row table, with
+  no data at risk and no read path to reason about.
+- **Shape:** the existing `app/api/oura-ble/samples/vacuum/route.ts` already runs
+  `VACUUM (FULL) oura_raw_samples` behind an admin gate — generalise it to take a table name from a
+  small allowlist, or add a sibling. `VACUUM FULL` takes an ACCESS EXCLUSIVE lock and rewrites the
+  table; on four live rows that is milliseconds, but it still needs free disk equal to the current
+  file (49 MB against a 5 GB volume — not a constraint today, and worth re-checking if the volume is
+  cut back to 500 MB before this runs).
+- **Verification:** `pg_total_relation_size` before and after via `/api/admin/db-query`, and
+  `SELECT count(*) FROM error_events` unchanged either side. Do not assume the count is 4 by the time
+  it runs — read it first.
+
 ### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
 
 - **Branch:** `fix/oura-raw-samples-index-and-vacuum`
@@ -556,7 +583,7 @@ below threshold and left in place for next time.
 - **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
   — full implementation plan, written 2026-08-17. Decision context in
   [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
-- **Branch:** `perf/oura-raw-frame-packing`
+- **Branch:** `perf/oura-two-tier-frame-reader` (Tasks 0–2 landed on `perf/oura-raw-frame-packing`)
 - **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
 - **Added:** 2026-08-17
 - ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
@@ -570,6 +597,20 @@ below threshold and left in place for next time.
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
+- 🚧 **Task 3 SHIPPED 2026-08-18 (v1.318.12) — the two-tier reader.**
+  `lib/data/postgres/slices/oura-raw-frames.ts`: `readRawFrames` (ds range + tags, ascending) and
+  `readRecentRawFrames` (newest-first, limited), returning **exactly the shape of the `select` they
+  replace**. Eleven read sites converted — the rollup, both step-feature reads, the temp/MET and
+  battery range reads, the two tag censuses, the admin raw dump and the summary. Still inert in
+  production: nothing writes a blob yet.
+  Three findings worth not re-deriving: **(a)** an aggregate cannot use the reader's identity dedupe,
+  and the summary's per-tag counts double-counted a bucket sitting in both tiers — 80 frames read as
+  120 on the dev server — so they now anti-join on `(epoch, tag, ds_bucket)`; **(b)** `event_name` had
+  to become derived from `tag`, because a packed frame carries none and grouping on a column one tier
+  lacks splits a tag into two rows; **(c)** a tag dormant longer than the hot window needs a cold
+  fallback in three places or it reads as never having produced data.
+  Verified on `pnpm dev` by rehearsing the packer by hand over four seeded ring-days: every read is
+  byte-identical across all-hot, both-tiers and hot-rows-deleted.
 - 🚧 **Tasks 0–2 SHIPPED 2026-08-17 (v1.318.11), additively.** Task 0 answered structurally rather
   than by counting — `epoch` is **not** in the dedup unique constraint, so a cross-epoch duplicate
   was never insertable, and the count the plan proposed now returns "none" for the wrong reason
@@ -577,9 +618,9 @@ below threshold and left in place for next time.
   regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
   with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
   row has moved** — `oura_raw_samples` and the ingest path are untouched.
-  **Remaining: Tasks 3–7** — the two-tier reader, the packer, the backfill, the hot-window prune, and
-  the `measured_at` range-query sweep. The packer's delete is the only destructive step in the plan
-  and is gated on a proven-equal re-read (§6); it has not been written.
+  **Remaining: Tasks 4–7** — the packer, the backfill, the hot-window prune, and the `measured_at`
+  range-query sweep. The packer's delete is the only destructive step in the plan and is gated on a
+  proven-equal re-read (§6); it has not been written.
 - ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
   plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
   and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
@@ -2685,6 +2726,53 @@ session working from a temporarily restored copy.
 - **Follow-up:** re-derive the anchor on ~15 BLE-era nights. The fit is Cloud-era, and BLE overnight HR
   is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
+
+### [activity] ⛔ Q-505 — Activity Score: redesign as a daily effort meter with a target (2 owner decisions open)
+
+- **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
+- **⛔ blocked: owner decision.** Not sign-off on a number — a decision about what the score means.
+  Both answers below are coherent and they are different products.
+- **Added:** 2026-08-18 · Tuning ·
+  [`docs/reviews/2026-08-18-activity-score-calibration.md`](reviews/2026-08-18-activity-score-calibration.md)
+- **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
+  same-day steps **r = +0.417** — and **2026-08-12 scored 76 on 828 steps while 2026-08-16 scored 64
+  on 8,935**. Steps span 29x across the window; the score moves 25 points.
+- **Why (three measured causes):**
+  1. `strengthFreq` (25) + `strengthVolume` (20) are **45 of 100** and both roll over 7 days. The
+     owner has logged **exactly one session/day for 27 consecutive days**, so `strengthFreq` is
+     near-constant by construction.
+  2. `activeCalories` is non-null on **1 of 47 days** and zone-2+ minutes are **0 on 22 of 27**. Both
+     get excluded and the weights renormalise, leaving roughly **steps 24% · moveHours 16% ·
+     strengthFreq 33% · strengthVolume 27%** — 60% on the near-constant terms.
+  3. `adjustment` is **0 on all 22 days**: `ACWR_TAPER_START = 1.5` has never been reached, so the
+     only place ACWR enters this score is inert.
+- **A range calibration is NOT the fix here, unlike Sleep (Q-503).** Stretching preserves ranking, so
+  it would make the "828 steps beat 8,935 steps" ordering *more* emphatic. Do not copy the Sleep
+  technique onto this pillar.
+- **DECIDED 2026-08-18 — the owner chose (a): it scores TODAY.** Design proposal with the measured
+  input audit:
+  [`docs/superpowers/plans/2026-08-18-activity-score-redesign.md`](superpowers/plans/2026-08-18-activity-score-redesign.md).
+  Brief: steps/day, movement distribution, zone minutes (daily + against a weekly target), exercise
+  minutes, a weekly-to-daily target split; hitting everything = 100; doubles as guidance
+  ("keep it under X today on a deload").
+- **Two owner decisions remain open in that plan** — how hard over-exertion should hit readiness, and
+  what the colour bands mean once a *low* score can be correct on a rest day.
+- **⚠️ A prerequisite bug found while auditing the inputs: `daily_zone_minutes` computes zones against
+  `max_hr = 187` (220 − age) on all 27 days, while Body Battery resolves this owner's MEASURED max at
+  168** (`resolveBatteryHrMax`, Q-57). Every zone boundary sits ~19 bpm too high, which is why zone 2
+  averages **1 min/day** and zone 1 absorbs **554**. Two parts of the app disagree about the same
+  user's max HR — a One-Formula-One-Place violation independent of this work. **Fix it before
+  weighting any zone lane**, or the lane ships dead like `activeCalories` (non-null 1 of 47 days).
+- **"Steps per hour" has no source** — `step_live_windows` holds **11 rows total**. Use the existing
+  HR-derived `moveHours` proxy (`packages/shared/src/health/hourly-movement.ts`), which exists for
+  exactly this reason; do not build hourly step ingest for it.
+- **If (a):** re-weight first, then measure the new distribution, then apply a range calibration only
+  if still compressed — and re-anchor any threshold on the activity scale in the same PR (Q-503's §5
+  is the worked example).
+- **Related, not fixed by this:** Q-278 (the score is absent on more than half of days and the UI does
+  not distinguish that from a real score) and Q-277 (the original discrimination finding). Also worth
+  doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
+  `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
 
 ### [readiness][workouts] Q-504 — recalibrate the Readiness range, and re-anchor the five thresholds that ride on it
 
