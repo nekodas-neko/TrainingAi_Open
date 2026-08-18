@@ -116,6 +116,15 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (the scale/ring ingest routes reject malformed frames and take no `userId` from the body; two sit behind `requireAdmin`). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
+- [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
+  — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
+  at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's
+  stored deviation is **253.7 against a true nightly sd of 13.5 (18.7×)**, a cold start the EMA is
+  still digesting 40 nights on, and temperature carries **40%** of the weight. `FEVER_TEMP_Z = 2.5` is
+  unreachable (it would need ~5 °C above baseline). The same `tempZ` makes **readiness's temperature
+  contributor near-constant** (0 of 33 days with |z| ≥ 1.2). Filed **Q-506**: fix the baseline, do not
+  touch the thresholds.
+
 ## Open issues
 
 ```bash

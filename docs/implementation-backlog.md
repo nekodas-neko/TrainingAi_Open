@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **196** | `lib/data/postgres/migrations/` (head: `195_claude_ro_views_rekey_declarations.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -431,6 +431,70 @@ blocker and the intended shape were both already named, so **do not re-derive th
   production data needed. Spans `app/api/day-log` (Lane A) and `components/**` (Lane B); the deferral
   note says the server half is the correct home, so **route it to Lane A** with the display change
   riding along.
+
+### [platform][app-shell] Q-392 — preferences live only on the device, so a reinstall or a second browser starts from defaults
+
+- **Branch:** `feat/server-backed-user-preferences`
+- **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
+  - when i do a new install or open on computer - it loses all the saved preferences. We need to
+  make it persist across installs/etc."*
+- **Screenshot context** (Home, so it does not need to survive): the customised surface is exactly
+  what resets — the score-ring style behind Readiness / Heart Rate / Sleep / Activity, the three
+  chosen quick-log tiles (kg · Steps · Calories), card colours, and which widgets appear at all.
+
+**Confirmed: these are `localStorage` only, with no server copy.** Inventory as of this trace —
+
+| what | key | lives in |
+|---|---|---|
+| Home widgets / cards | `ta_ss_widgets`, `ta_ss_cards` | `lib/home/home-prefs.ts:29-30` |
+| Pill & card colours | `ta_pill_colors`, `ta_card_colors` | `home-prefs.ts:31,40` |
+| Score-ring style (20 options) | `ta_score_ring_style` | `home-prefs.ts:159` |
+| Weight lookback | `ta_weight_lookback` | `home-prefs.ts:57` |
+| Push / meal / health / day-review / calendar toggles | `ta_pref_*` | five call sites |
+| Rest & run status chips | `ta_pref_rest_chip`, `ta_pref_run_chip` | `lib/native/*-chip.ts` |
+| Background / wallpaper | `ta_background_settings` | `lib/stores/background-settings-store.ts:36` |
+| Food region | `ta_food_region` | four component sites |
+
+- **✅ The pattern to copy already exists and is proven — do not invent one.** **Q-241 (done
+  2026-08-14, v1.307.1)** made goals server-authoritative for exactly this reason, and left the
+  shape behind: the server owns the value, `PATCH /api/user/goals` writes it, and
+  `hydrateGoalSeeds()` (`home-prefs.ts:85`) pushes it into the same `localStorage` keys so first
+  paint stays instant. `app/api/user/` already holds `goals`, `profile`, `avatar`,
+  `equipped-title`, `bedtime-estimate`. **This item is extending that to the rest of the table
+  above**, not designing persistence from scratch.
+- **⚠ One row is already half-built, and is the cheapest possible proof.** `users.food_region`
+  **exists as a column** (`lib/data/postgres/schema.ts:31`, `NOT NULL DEFAULT 'AU'`) and **nothing
+  reads or writes it** — a grep of `app/api/**` and `lib/data/**` finds only the definition. The
+  region the app actually uses comes from `localStorage.getItem('ta_food_region') ?? 'AU'` at
+  `components/nutrition/capture-step.tsx:130,138`, `review-step.tsx:124`, and is set at
+  `components/profile/edit-profile-sheet.tsx:238`. So the column is dead, the setting is
+  device-only, and the landing spot is already in the schema. Wire this one first — it validates
+  the whole approach against a real preference for almost no work.
+- **Decisions the spec has to make:**
+  1. **A column per preference, or one JSONB blob?** Columns match `users.*` as it stands and keep
+     things queryable; a blob avoids a migration per new preference, which matters given how many
+     are listed above. **Either way the migration is Lane A's to claim, not intake's.**
+  2. **Conflict rule when two devices disagree.** Q-241 settled it for goals — server wins, local is
+     a seed — and the same rule should hold here rather than a second, different one.
+  3. **What deliberately stays device-local.** Not everything above should sync: `ta_pref_rest_chip`
+     and `ta_pref_run_chip` drive Android status-bar chips that mean nothing in a desktop browser,
+     and push-notification enablement is per-install by nature. Decide the list rather than syncing
+     the lot; a desktop browser inheriting a phone's notification state is its own bug.
+- **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
+  — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
+  destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
+  re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
+  This report establishes that reinstalls are part of the owner's normal routine, which changes
+  Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
+- **What would count as done:** sign in on a fresh install or a different browser and the chosen
+  ring style, widgets, colours, weight lookback and food region are already applied — no
+  re-configuration; changing one on either device and reopening the other shows the new value; and
+  the preferences that are deliberately per-install are documented as such rather than silently
+  not syncing.
+- **Surface:** browser-reproducible end to end (two profiles, or one profile and a private window)
+  against the seeded DB — no device needed to prove the sync. Only the native chip toggles need the
+  APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
+  the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
@@ -952,27 +1016,6 @@ blocker and the intended shape were both already named, so **do not re-derive th
   `prefers-reduced-motion` (Playwright sets it via `contextOptions`), or suppress the bounce when a
   test hook is present. Keep the affordance on device; make the control automatable. A spec covering
   log-set → complete-workout is the follow-on this unblocks.
-
-### [platform] Q-353 — the health-insight prompt says "no data" where it means "absent", and the model reads it as zero
-
-- **Branch:** `fix/ai-insight-prompt-absent-vs-zero`
-- **Lane:** **A** — `app/api/ai/health-insight/route.ts` only.
-- **Added:** 2026-08-17 · the half of Q-452 Lane B could not take
-- **What Q-452 fixed and what it did not.** Q-452 gated `AiInsightCard` on the section having data,
-  so a zero-data account no longer gets an insight at all (verified: all four sections render the
-  card for the seeded user and none for a zero-data one). **That closes the fully-empty case only.**
-- **The underlying defect is in the prompt.** Ten lines across the four sections substitute the
-  literal string `"no data"` for an absent field (`:102, :105, :116-119, :125-126, :157-158`).
-  Handed `Steps: no data` the model does not report absence — it asserts **zero** and editorialises,
-  which is how a day-one account was told *"your activity tracker currently shows zero movement…
-  this inactivity creates a significant gap"*.
-- **So a partially-empty section still misreports.** A user with a readiness score but no body-temp
-  reading passes Q-452's gate and still hands the model `Body temp deviation: no data`. That is the
-  common case for anyone without a ring, not an edge case.
-- **Fix shape:** say *absent* rather than `"no data"` — omit the line entirely, or word it so the
-  model cannot read it as a measurement (`Body temp deviation: not recorded`), and state in the
-  system prompt that absent fields are unmeasured and must not be described as zero or as a
-  behaviour. Worth checking the other AI prompt builders for the same substitution.
 
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
@@ -2851,6 +2894,20 @@ session working from a temporarily restored copy.
 - **Plan:** none yet
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
+- **⚠️ SECOND live demonstration, 2026-08-18, and it is the more damaging one.** After the Sleep
+  (v1.319.0) and Readiness (v1.321.0) recalibrations deployed (production reports **1.321.1**), a
+  bulk job at **03:55:01** bumped `updated_at` on essentially every `oura_daily_derived` row **without
+  rewriting any score**. Result, measured: **0 of 96 rows carry a `readiness` model version**, and
+  every stored sleep/readiness score is still pre-recalibration (2026-08-17 stores **78** for a
+  7.58 h / 90% / 0.75 h-deep night — an old-model value). Every one of those rows was *created*
+  before the deploy.
+  **So `updated_at` is not evidence of which model wrote a row** — it moves for reasons unrelated to
+  the score. Anyone auditing "did the recalibration land?" by timestamp gets the wrong answer, and
+  this is exactly why the `model_version` stamp matters more than it looks.
+- **Consequence worth knowing:** stored scores are only rewritten when the readiness route recomputes,
+  which happens on app open. Placeholder rows already exist through **2026-08-22** with null scores,
+  so the first row to carry new-model values *and* the `v3:ri5:2026-08-18` stamp will be the next day
+  actually scored — that is where the trend step falls, and the stamp is what will mark it.
 - **Demonstrated live 2026-08-17:** the 08-13 summary was re-rolled mid-session (hours 1.20 → 5.78,
   a Q-274 fragment night resolving itself) and the derived readiness row did not follow — that day's
   persisted score is now **7 points** off a fresh recompute at the unchanged anchor.
@@ -2868,6 +2925,58 @@ session working from a temporarily restored copy.
 - **First action:** decide whether derived rows get recomputed with their summary, or store the input
   values they actually used. The second is cheaper and self-describing; the first re-scores days
   silently and needs Q-273's version stamp first either way.
+
+### [devices][readiness] Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
+
+- **Branch:** `fix/temperature-baseline-cold-start`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a baseline/data fix, not
+  a scoring-constant change.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-illness-radar-calibration.md`](reviews/2026-08-18-illness-radar-calibration.md)
+- **Measured** over `claude_ro.oura_daily_derived`, n = 46 days with an illness score: range **0–38**,
+  median 7.5, sd 7.17. Flags: `normal` 33, `learning` 13, and **zero** `watch` / `elevated` / `fever`.
+  `ILLNESS_WATCH_SCORE = 40`, so the score has peaked **two points short** of the lowest threshold and
+  never crossed it.
+- **Cause — one biomarker of four is dead, and it carries 40% of the weight.** Observed z ranges:
+
+  | biomarker | weight | z range (n = 31–33) | days z ≥ 1.2 |
+  |---|---|---|---|
+  | **temperature** | **0.40** | **0.07 – 0.47** | **0** |
+  | breathing | 0.25 | −1.37 – 1.88 | 6 |
+  | restingHeartRate | 0.20 | −1.22 – 1.18 | 0 |
+  | hrvBalance | 0.15 | −2.51 – 3.77 | 17 |
+
+  Three look like z-scores. Temperature is one-sided, always positive, and spans 0.4 in total — at its
+  observed maximum it contributes **6** of the 40 points its weight allows. The best day on record
+  (2026-07-26, score 38) had a −2.5σ HRV drop *with* elevated breathing *and* elevated resting HR and
+  still fell short, because the heaviest term was asleep.
+- **The defect is the baseline, not the thresholds.** Stored baseline deviation against the true
+  night-to-night sd of the same rows: temperature **253.7 vs 13.5 = 18.7×**; hrv 0.6×, rhr 1.4×,
+  breath 1.4×. Since `tempZ = (value − mean) / dev`, every temperature z is divided by ~19× too much.
+  It is a **cold start**: the EMA mean began at **1791** centi-°C (17.9 °C) on 2026-07-08 against true
+  values of ~3584, so the first nights produced residuals ~130× the true sd, and the dev term is still
+  carrying them 40 nights later (332 → 196, with an order of magnitude to go). It hit temperature and
+  not the others purely because of scale — centi-°C is ~3,500 where HRV is ~50 ms.
+- **`FEVER_TEMP_Z = 2.5` is unreachable, not merely unused** — against an observed max of 0.47 a fever
+  would need a nightly skin temperature roughly **5 °C** above baseline.
+- **Second consumer.** The same `tempZ` feeds readiness's `temperature` contributor at 10% weight
+  (`closer-better`, `100 − |z| × 66.7`). With |z| pinned near 0.3 it returns ~80 essentially every day
+  — measured mean 70.5, sd 17.3, **0 of 33 days with |z| ≥ 1.2**. A contributor meant to catch fever is
+  close to a constant.
+- **Do NOT lower the thresholds.** `watch = 40`, `elevated = 65` and `FEVER_TEMP_Z = 2.5` are all
+  defensible *given a correct z*; moving them fits the threshold to a broken input — the mistake this
+  session made once on readiness and reverted (Q-504).
+- **First action**, in preference order: (1) re-seed the temperature baseline from the observed
+  distribution (mean 3584, sd 13.5 over 40 nights) rather than waiting out the EMA — cheapest, fixes
+  both consumers; (2) the durable fix — seed a first observation and a sane prior dev instead of zero,
+  or hold the dev term through a warm-up, **because every new user repeats this and the app has other
+  users**; (3) failing both, gate the radar on temperature baseline maturity so it reports `learning`
+  rather than a confident `normal` built on a dead biomarker.
+- **Re-measure the whole biomarker table afterwards** — every z in it moves by ~19×, and it is entirely
+  possible the radar then fires *too* often. That is the next calibration question, not this one.
+- **Worth checking in the same pass:** whether the other baselines cold-start the same way and simply
+  recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
+  they say nothing about night 5.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
@@ -7016,6 +7125,44 @@ since the CI link check (item 1) catches a botched rewrite immediately.
   specifically" caveat is now answered — it is fine, as are the other three. **The rule at the top
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
+
+---
+
+### [platform] 🟢 Q-543 — every concurrent PR conflicts on the doc-index BASELINE object
+
+`scripts/check-doc-index-size.js` holds three numbers — `projectOverview.md`,
+`docs/implementation-backlog.md`, `CLAUDE.md` — in one object literal, under ~170 lines of
+accumulated raise-history commentary. Every lane that raises a baseline edits the same few lines of
+the same file on the same day, so the ratchet has become the repo's most reliable merge conflict.
+
+**Measured on this branch, 2026-08-18:** one docs-only PR (#69, a single `CLAUDE.md` row) took four
+CI rounds. One was a genuine ratchet failure and correct. The other three were base collisions with
+#68, then #65/#71, then #75 — **all three on this file, none on the content being changed.** The
+file's own comments record the same thing happening to other lanes repeatedly, describing "the
+fourth same-day ratchet collision on this branch" and warning in five separate places that splicing
+a conflict hunk silently un-does the other lane's raise. That warning exists because it has been got
+wrong before.
+
+**This is the same problem `docs/overview/entries/` already solved.** Per-entry journal files took
+the journal-prepend conflict class to zero on the reasoning that two PRs writing *different files*
+cannot conflict. The baselines are the remaining shared-line edit that every PR touches.
+
+**Shape worth considering** (not a spec — the decision is which, and it is cheap to reverse):
+
+- **Per-file baseline fragments** — `scripts/doc-baselines/<slug>.json` or similar, one file per
+  ratcheted doc, read and merged by the check. Directly mirrors the entries-directory fix. Costs a
+  small loader; removes the conflict class outright.
+- **Move the raise-history prose out of the source file** into a log the check does not parse. Much
+  smaller change, and it shrinks the conflict window without closing it — two lanes raising the same
+  file the same day still collide, they just collide on one line instead of thirty.
+
+**Do not** solve it by dropping the history commentary wholesale. Several of those notes are the
+only record of *why* a number moved, and at least one documents a real near-miss where a splice
+would have reverted another lane's raise.
+
+**Not urgent.** It costs minutes per PR, never correctness — the check itself works exactly as
+intended, and caught a real overrun on #69. Filed per "no orphaned findings" rather than taken,
+because restructuring a CI gate mid-merge is not a docs change.
 
 ---
 
