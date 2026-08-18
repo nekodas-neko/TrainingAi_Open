@@ -6655,6 +6655,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraStorageStats() { return oura.getOuraStorageStats(this.db) }
   async nullHistoricalDecoded(userId: string, maxRows?: number) { return oura.nullHistoricalDecoded(this.db, userId, maxRows) }
   async vacuumOuraRawSamples() { return oura.vacuumOuraRawSamples() }
+  async vacuumTableFull(table: import('./slices/oura').VacuumFullTable) { return oura.vacuumTableFull(table) }
   async packOuraRawBuckets(userId: string, maxBuckets?: number) { return packOuraRawBuckets(this.db, userId, maxBuckets) }
   async countPackableBuckets(userId: string) { return countPackableBuckets(this.db, userId) }
   async getOuraTimeseriesDelta(userId: string, opts: { heartrate?: oura.TimeseriesCursor | null; bucket?: oura.TimeseriesCursor | null; budget?: number }) { return oura.getOuraTimeseriesDelta(userId, opts) }
