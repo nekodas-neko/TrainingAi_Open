@@ -355,8 +355,19 @@ below threshold and left in place for next time.
   does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
   alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
 
-### [readiness][platform] Q-394 — `anchor-source.test.ts` fails on `main`, so every open PR is red
+### [readiness][platform] ✅ Q-394 — RESOLVED: `anchor-source.test.ts` was red on `main`, fixed by Q-356's fixture change
 
+- **✅ Resolved 2026-08-18, and NOT by this entry.** Verified after merging `main` at `74efac6`:
+  the test passes 3/3 locally where it failed 3/3 an hour earlier on the same tree plus docs.
+  **The likely fix is #90 (Q-356)** — *"Anchor the periodization fixture to the user-local day,
+  not a UTC offset"*. That is the same root shape: a fixture anchored to a UTC offset while the
+  query computes a user-local day window. **I did not bisect**, so treat the attribution as
+  strongly-indicated rather than proven; what is proven is that it fails before `74efac6` and
+  passes after.
+- **Kept rather than deleted for the one part that is still open:** Q-356's own entry flagged a
+  sweep — *any other test inserting `now() - interval '…'` and querying a user-local day window
+  has this hole*. This was the second test to hit it and it was found by accident, taking out two
+  unrelated PRs first. That sweep is worth doing, and the structural point below stands.
 - **Branch:** `fix/body-battery-anchor-source-test`
 - **Added:** 2026-08-18 · found while shepherding a docs-only PR (#89) whose `Tests` job went red.
 - **⚠ This blocks every lane, not one PR.** `main` is the broken base: two unrelated PRs failed the
@@ -442,6 +453,27 @@ moving *beside* the calories rather than under them.
   tub **without** a phone. With a phone in hand, option 3 gives the *whole* breakdown where option 2
   gives three of five lines at 6.5 px. So the real question is not "can we fit it" but "is this label
   read away from a phone" — and if the answer is yes, the round die is what has to give, not the code.
+- **✅ Answered 2026-08-18 — two of the owner's follow-up questions, checked against shipped code:**
+  1. **"Will the QR work?"** The shipped renderer uses a **real encoder** — `qrcode@1.5.4`,
+     `QRCode.create(encodeMealLabelToken(mealId), { errorCorrectionLevel: 'M' })`
+     (`components/nutrition/meal-label-render.ts:125`), and its own comment already reasons about
+     exactly this: *"the code is 12.2–16.4 mm on these layouts, so ink spread on a home printer is
+     the expected failure and M is the level that survives it."* EC level M tolerates ~15% damage,
+     which is the margin that absorbs spread. **What is still unproven is the print**, and nobody has
+     run one — it is one of the two physical checks Q-389 already owes. **The mockup codes are
+     placeholder patterns and will not scan; do not test with those.**
+  2. **"Can the image be saved for a label-printer app?"** **Already shipped.**
+     `meal-label-sheet.tsx` does `canvas.toBlob(…, 'image/png')` → `navigator.share({ files })`
+     behind a "Share or save" button, with `<a download>` as the browser fallback. On Android the
+     share sheet is where a label-printer app appears, which is why it was built that way rather than
+     as a Capacitor plugin. **No work needed here.**
+- **⚠ "Cycle through them and choose a default" is two requests, and the second one is new.**
+  Cycling is nearly free — the renderer already takes the style as a parameter and four styles ship,
+  so the breakdown variants are more entries in the same registry. But **Q-389 deliberately ships the
+  style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
+  straight on **Q-392** (preferences live only on the device). If a label default is written to
+  `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
+  **Build the default on whatever Q-392 settles**, not beside it.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
   whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
   without an explicit owner decision recorded here; and if a square-only variant ships, the app makes
@@ -449,41 +481,6 @@ moving *beside* the calories rather than under them.
 - **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
-
-### [platform] Q-356 — `periodization-soft-delete.test.ts` fails every day between 14:00 and 16:00 UTC, for every branch
-
-- **Branch:** `fix/periodization-soft-delete-local-midnight`
-- **Lane:** **A** — `lib/data/postgres/__tests__/`. Lane B diagnosed and reproduced it but does not
-  own the path.
-- **Added:** 2026-08-17 · found when it turned a Lane B PR's Tests job red
-- **⚠️ This blocks merges repo-wide for two hours a day, on any branch.** It is not specific to
-  whatever PR happens to be open when it fires.
-- **The mechanism, reproduced.** `beforeEach` inserts a session at `now() - interval '1 hour'`
-  (a UTC instant) and then derives the query window from the **user's** timezone:
-  ```sql
-  SELECT to_char((now() AT TIME ZONE 'Australia/Brisbane')::date, 'YYYY-MM-DD') AS today
-  ```
-  `weekStart = weekEnd = today`. Between 00:00 and 02:00 Brisbane — 14:00–16:00 UTC — "an hour ago"
-  is **the previous Brisbane day**, so the session falls outside `[today, today]`,
-  `getWeeklySetsByMuscleGroup` counts zero, and all five assertions fail. Measured at 14:35 UTC:
-  ```
-  Brisbane today:    2026-08-18
-  session completed: 2026-08-17 23:35 Brisbane  → date 2026-08-17
-  ```
-- **The comment above the insert asserts the opposite** — *"Started an hour ago so the session sits
-  inside today's user-local week regardless of the hour the suite runs at"* — which is true for 22
-  hours a day and false for two. Fix the comment with the code.
-- **Reproduce without waiting for the window:** seed a fresh database (`current_date` is irrelevant;
-  the seed anchors on Brisbane today) and run
-  `DATABASE_URL=… npx vitest run lib/data/postgres/__tests__/periodization-soft-delete.test.ts`
-  between 14:00 and 16:00 UTC. Outside that window it passes, which is why it has survived.
-- **Fix shape:** anchor the inserted session to the *user-local* day rather than to a UTC offset —
-  e.g. insert `completed_at` at local midday for the Brisbane date the window is computed from, so
-  both sides come from the same day by construction. This is the same rule CLAUDE.md already states
-  for tests (*"derive the fixture from the clock or inject the clock — never hardcode one side of a
-  rolling window"*), in the shape where both sides are derived but from **different timezones**.
-- **Worth a sweep:** any other test inserting `now() - interval '…'` and querying a user-local day
-  window has this exact hole. `grep -rn "now() - interval" lib/data/postgres/__tests__/`.
 
 ### [workouts][app-shell] Q-390 — the deload "D" is its own flex row, so it lifts that day's bar out of line with the rest
 

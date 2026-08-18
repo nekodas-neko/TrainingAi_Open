@@ -62,6 +62,28 @@ Loose entries are a **holding area, not permanent storage.** Fold them in on thi
 > existing history-file rule — then `git rm` the folded entry files. One docs-only PR; because only
 > one session runs it, it never conflicts.
 
+### Two things the sweep must do that this file did not say (measured 2026-08-18)
+
+The first attempt at a sweep failed the `No broken relative links in docs` rule twice, in two
+different ways. Both are mechanical; neither is obvious until it happens.
+
+1. **Do not fold an entry that another doc links to.** Durable docs cite entries by path —
+   `projectOverview.md` Known-Issues rows, `docs/domains/*/README.md`, and the agent batons.
+   Folding all 61 loose entries broke **48 links**, several of them inside another lane's baton,
+   which is not a file a sweep should be rewriting. Fold the **unlinked** ones and leave the rest;
+   `grep -rl <entry-filename> --include='*.md' .` tells you which is which. (61 → 32 that way, which
+   is under the 60-file runaway limit and enough to unblock CI.)
+2. **Rewrite `](../../` → `](../` in every folded body.** An entry lives in
+   `docs/overview/entries/`; the history file is one level up in `docs/overview/`. Every relative
+   link inside the entry loses a level when it moves. Missing this left 6 broken links pointing one
+   directory too high.
+
+**The standing tension worth naming:** a fold-everything sweep and durable docs linking entries are
+incompatible, and today the docs win — which means the loose directory has a floor that grows.
+Resolving it properly means either the sweep rewriting citations to the history file it folded into
+(with an anchor), or durable docs citing the batched history rather than a loose entry. Not decided;
+recorded so the next sweep does not rediscover it from a red CI run.
+
 This is a standing chore in the same spirit as Dependabot remediation: it lives here permanently and
 is worked on a threshold, not every session. Below threshold, leave the entries; above it, compact.
 
