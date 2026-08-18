@@ -343,54 +343,6 @@ below threshold and left in place for next time.
   is plain TypeScript in `sync-engine.ts` with no native dependency and the arithmetic above is read
   straight from it.
 
-### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
-
-- **Branch:** `fix/exercises-route-admin-db-check`
-- **Added:** 2026-08-18 · review sweep (auth/session boundaries) ·
-  [`docs/reviews/2026-08-18-auth-session-boundaries.md`](reviews/2026-08-18-auth-session-boundaries.md)
-- **Placement:** mid. **Moderate-low impact** — the gain is rows in a catalogue, not user data — but
-  it is privilege persistence with a working proof of concept and the fix is deleting one argument.
-- **Two admin checks in one file disagree.** `lib/admin.ts`: `requireAdmin(userId, _isAdmin?)` accepts
-  the flag for signature compatibility and **refuses to trust it**, reading the row every call (**61
-  API routes**). `isAdminUser(userId, isAdmin?)` **returns the passed flag** when given one.
-- **Ten sites call `isAdminUser`; seven pass `session.user.isAdmin` (the JWT claim).** Six are page
-  guards, which is UI and fine. **The seventh is an API write route** —
-  `app/api/exercises/route.ts:38`, gating `createExercise`, a write into `exercise_library`, the
-  catalogue every user reads.
-- **The claim is refreshed only once a day.** `lib/auth/is-active-refresh.ts` re-reads `isActive`/
-  `isAdmin` inside the jwt callback, throttled by `ISACTIVE_RECHECK_MS = 24h` — a sound decision
-  (unthrottled would be a DB query per request). The problem is what it then claims:
-  > *"This governs the **UI** only: `requireAdmin` reads the row from the database on every call and
-  > never trusts this claim."*
-
-  **That is false**, and it is why this is easy to miss — a reviewer who reads it stops looking.
-- **Measured**, admin granted → fresh login → token warmed → admin revoked in the DB, **no re-login**,
-  cookie rotation persisted as a browser does:
-  ```
-  POST /api/exercises    = 201   ← isAdminUser, JWT claim
-  GET  /api/admin/errors = 403   ← requireAdmin, DB read  (the control)
-  session claim still says: isAdmin = True
-  → row "ZZ Probe Revoked" created in exercise_library
-  ```
-  Same cookie, same instant, one route refusing and the other admitting. **Window: up to 24 h.**
-- **Fix shape:**
-  1. `app/api/exercises/route.ts:38` — drop the second argument, or better, use `requireAdmin` like
-     its 61 siblings so the file stops being the odd one out.
-  2. **Correct the docstring** in `lib/auth/is-active-refresh.ts`; step 1 is what makes "UI only"
-     true. Say outright that an API route must never pass the claim — **the wrong comment is more
-     dangerous than the wrong call, because it scales to the next route someone adds.**
-  3. *Optional ratchet:* fail Custom Rules on `isAdminUser(` with a second argument under
-     `app/api/**`. Cheap, and the shape this repo already uses where prose did not hold.
-- **Lane A owns this** (`app/api/**`, `lib/admin.ts`, `lib/auth/**`).
-- **Do NOT "fix" the six page guards** — they are UI, they match the docstring, and a revoked admin
-  seeing an empty admin shell for ≤24 h while every API behind it 403s is the intended trade.
-- **Not verified on:** the APK (its WebView keeps cookies, so it behaves like the corrected harness)
-  or production. `ISACTIVE_RECHECK_MS` is read from source, not observed over a real 24-hour window.
-- **⚠️ If you re-run this, persist cookie rotation.** My first run reported revocation working and was
-  **wrong**: `curl -b` without `-c` discards the rotated cookie, so every request re-sent a token with
-  no `isActiveCheckedAt`, the throttle never engaged, and the DB was re-read every time. Use `-b` and
-  `-c` on the same file.
-
 ### [nutrition][platform] Q-481 — a water quick-add replayed by the outbox triple-counts; it is the one non-idempotent mutation of the nineteen
 
 - **Branch:** `fix/outbox-water-delta-dedupe`
