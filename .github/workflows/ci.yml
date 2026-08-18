@@ -291,6 +291,9 @@ jobs:
       - name: An admin check that cannot run is not a refusal
         run: node scripts/check-admin-guard-catch.js
 
+      - name: API routes do not authorise from the stale isAdmin claim
+        run: node scripts/check-admin-claim-in-api.js
+
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 
