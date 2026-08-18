@@ -107,7 +107,7 @@ describe.skipIf(!canRun)('claude_readonly role — the read-only guarantee', () 
     // than a column. Re-point it in the same commit as any new views migration — and note that a
     // green suite does not prove the pin is current, only that no table was added since.
     const migration = readFileSync(
-      join(process.cwd(), 'lib/data/postgres/migrations/197_claude_ro_views_redecode_jobs.sql'), 'utf8',
+      join(process.cwd(), 'lib/data/postgres/migrations/200_claude_ro_views_applied_mutations.sql'), 'utf8',
     )
     await exec(ADMIN_URL!, migration)
   }, 60_000)

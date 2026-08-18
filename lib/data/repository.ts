@@ -565,6 +565,10 @@ export interface WorkoutRepository {
   listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]>
   listMoodLogs(userId: string, from: string, to: string): Promise<MoodLog[]>
   incrementWaterLog(userId: string, date: string, ml: number): Promise<void>
+  /** Q-481 — the same increment, applied at most once per outbox mutation id. Returns false when
+   *  this id was already applied (an at-least-once replay), which the caller counts as processed:
+   *  it WAS processed, on an earlier delivery. */
+  incrementWaterLogOnce(userId: string, date: string, ml: number, mutationId: string): Promise<boolean>
   getUserGoals(userId: string): Promise<UserGoals>
   updateUserGoals(userId: string, goals: Partial<UserGoals>): Promise<void>
 

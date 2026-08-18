@@ -11,6 +11,9 @@ import { invitedEmails } from './schema'
 import { resolveSyncCursor } from '@trainingai/shared/sync/cursor'
 import { isRetryableWriteError } from '@trainingai/shared/sync/retryable-error'
 import { shouldPrune } from './retention-throttle'
+
+/** Q-481 — at most one `applied_mutations` prune per day per process. */
+const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
 import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
 
 /** Hard cap on `getOuraRawSamplesForTags`' lookback — the scan is over the biggest table in the DB
@@ -325,6 +328,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   /** Last daytime-HRV refit ATTEMPT per user (see maybeRefitDaytimeHrvModel). Static because the
    *  throttle must outlive any single repository instance within the process. */
   private static readonly lastHrvRefitAttemptMs = new Map<string, number>()
+
+  /** Q-481 — last opportunistic `applied_mutations` prune. Static for the same reason. */
+  private static lastAppliedMutationsPrune = 0
 
   private get db() { return getDb() }
 
@@ -2768,6 +2774,57 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       })
   }
 
+  /**
+   * Q-481 — the same increment, but at most once per outbox mutation id.
+   *
+   * The outbox delivers at-least-once: a push that reaches the server and commits but whose response
+   * is lost stays `pending` on the device and is re-pushed. Every other push branch upserts on
+   * `(user_id, date)` or a client-supplied row id and survives that; this one adds, so three
+   * deliveries of one 250 ml quick-add measured 750 ml.
+   *
+   * Claim-then-apply rather than check-then-apply. `ON CONFLICT DO NOTHING … RETURNING` makes the
+   * claim itself the exclusion, so two concurrent replays of one id cannot both read "not applied"
+   * and both add — the same reason `completeWorkoutSession` reads its own affected-row count
+   * (Q-473) instead of a prior SELECT. Both statements share a transaction, so a failed increment
+   * releases the claim and the mutation is retried rather than silently swallowed.
+   *
+   * Note this does NOT make the *write* idempotent, and must not be changed to: an absolute set
+   * would reintroduce SYNC-P7, where two genuinely distinct concurrent adds clobber instead of
+   * summing. Distinct adds still sum; only a repeat of the same id is refused.
+   */
+  async incrementWaterLogOnce(userId: string, date: string, ml: number, mutationId: string): Promise<boolean> {
+    // Opportunistic prune off the write path — this app has no cron layer, so that is the
+    // established shape (`retention-throttle.ts`, and the two oura_heartrate/rr_intervals sites).
+    // A ledger with no caller for its prune is the Q-538 mistake, and this table would grow one row
+    // per quick-add forever.
+    //
+    // 90 days is far past anything that can still be replayed: a replay only happens because the
+    // device lost the *response* to a push the server already committed, and it re-pushes on the
+    // next sync after reconnect. The row is only load-bearing between those two moments.
+    const now = Date.now()
+    if (shouldPrune(PostgresWorkoutRepository.lastAppliedMutationsPrune, now, APPLIED_MUTATIONS_PRUNE_THROTTLE_MS)) {
+      PostgresWorkoutRepository.lastAppliedMutationsPrune = now
+      this.db.execute(sql`DELETE FROM applied_mutations WHERE applied_at < now() - interval '90 days'`)
+        .catch(err => console.error('[prune] applied_mutations failed:', err))
+    }
+
+    return this.db.transaction(async tx => {
+      const claimed = await tx.insert(s.appliedMutations)
+        .values({ userId, mutationId })
+        .onConflictDoNothing()
+        .returning({ mutationId: s.appliedMutations.mutationId })
+      if (claimed.length === 0) return false
+
+      await tx.insert(s.bodyMetrics)
+        .values({ userId, date, waterMl: ml })
+        .onConflictDoUpdate({
+          target: [s.bodyMetrics.userId, s.bodyMetrics.date],
+          set: { waterMl: sql`COALESCE(${s.bodyMetrics.waterMl}, 0) + ${ml}` },
+        })
+      return true
+    })
+  }
+
   async getUserGoals(userId: string): Promise<UserGoals> {
     const [row] = await this.db
       .select({
@@ -3815,7 +3872,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // -1e9 delta drove the day's hydration to minus a billion via the raw SQL add.
             const delta = validWaterMlDeltaOrNull(p.waterMlDelta)
             if (delta == null) throw new Error(`body_metrics: implausible waterMlDelta ${p.waterMlDelta}`)
-            await this.incrementWaterLog(userId, mut.date, delta)
+            // Q-481: the one non-idempotent branch of the nineteen, so it is the one that dedupes on
+            // the mutation id. A replay is counted as processed — it WAS processed, on an earlier
+            // delivery — so the client confirms and drops it rather than retrying forever. An
+            // id-less mutation (a pre-id client) cannot be deduped and keeps the old behaviour.
+            if (mut.id) {
+              await this.incrementWaterLogOnce(userId, mut.date, delta, mut.id)
+            } else {
+              await this.incrementWaterLog(userId, mut.date, delta)
+            }
             processed++
             continue
           }

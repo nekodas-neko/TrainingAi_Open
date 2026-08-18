@@ -215,6 +215,15 @@ export const setLogs = pgTable('set_logs', {
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.exerciseLogId, t.setNumber)])
 
+// Q-481: the mutation ids the outbox has already applied, for the push branches that are not
+// idempotent under replay. Only `body_metrics`' waterMlDelta writes here — see migration 199 for
+// why the other eighteen branches do not need it.
+export const appliedMutations = pgTable('applied_mutations', {
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mutationId: text('mutation_id').notNull(),
+  appliedAt:  timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.mutationId] })])
+
 export const bodyMetrics = pgTable('body_metrics', {
   id:          uuid('id').primaryKey().defaultRandom(),
   userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
