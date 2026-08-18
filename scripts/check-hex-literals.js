@@ -99,7 +99,6 @@ const BASELINE = {
   'components/nutrition/my-meals-picker.tsx': 7,
   'components/nutrition/restrictions-picker.tsx': 6,
   'components/nutrition/saved-meal-card.tsx': 7,
-  'components/nutrition/saved-meals-sheet.tsx': 2,
   'components/nutrition/supplements-section.tsx': 1,
   'components/nutrition/weekly-nutrition-chart.tsx': 1,
   'components/oura-score-chip-row.tsx': 4,

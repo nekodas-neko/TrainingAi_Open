@@ -252,7 +252,15 @@ const BASELINE = {
   // without which the section reads as progress against the 500 MB deadline where there is none)
   // and +41 on the backlog (the Q-541 status block, and the new Q-315 entry for error_events
   // holding 4 live rows in 49 MB).
-  'projectOverview.md': 6760,
+  //
+  // Raised 2026-08-18 (Q-389 shipped, Lane B): projectOverview 6760 -> 6779. A shipped feature whose
+  // two remaining checks are both PHYSICAL and cannot be automated at all: a test print (the QR is
+  // 0.49-0.66mm per module, so ink spread is the expected failure and it presents as "the scanner is
+  // broken"), and the camera scan path, which the Capacitor plugin makes unreachable from the
+  // sandbox. Neither can go to the resolved archive while it is still owed, and neither is
+  // discoverable from the diff. The backlog SHRANK by 145 lines in the same PR - Q-389's entry was
+  // removed on completion - so the net across both index files is well down.
+  'projectOverview.md': 6779,
   // Raised 2026-08-18 (Tuning, Q-505): 7020 -> 7056. One queue entry for the Activity Score decision,
   // carrying the measured cause and the two coherent answers inline — the item is blocked on the
   // owner choosing between them, and an implementer must not have to open the review to learn that.

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.320.0",
+    date: "2026-08-18",
+    changes: [
+      "Saved meals can now print a food label. Open a saved meal and tap the code icon to get a 50 \u00d7 50 mm label with the meal name, its calories and macros, a blank line to write the date on, and a scannable code \u2014 in four styles you can switch between. Scanning that code with the food scanner logs the meal straight away.",
+      "The figures on the label are for one serving, and so is what scanning it logs. On a batch recipe that makes two, the label shows what one portion is rather than the whole tub.",
+    ],
+  },
+  {
     version: "1.319.1",
     date: "2026-08-18",
     changes: [

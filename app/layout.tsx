@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist, Geist_Mono, Archivo, Instrument_Serif } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
 import { ThemeProvider } from "next-themes";
 import { MotionConfig } from "motion/react";
@@ -71,6 +71,27 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// Q-389's printable meal label ships four styles and each IS its typeface — black band is Archivo,
+// plaque is Instrument Serif. They are loaded here rather than by the label component because
+// `next/font/google` self-hosts at build time, which is what satisfies the spec's "the renderer must
+// embed whatever face it uses": the label draws to a canvas in the WebView, so the face has to be a
+// real document font, and a silently-substituted fallback reflows a layout with no slack.
+// `display: "swap"` is deliberate — the renderer awaits `document.fonts.ready` before drawing, so
+// the label never paints in a fallback, and swap keeps these off the critical path for every screen
+// that is not the label.
+const archivo = Archivo({
+  variable: "--font-archivo",
+  subsets: ["latin"],
+  display: "swap",
+});
+
+const instrumentSerif = Instrument_Serif({
+  variable: "--font-instrument-serif",
+  weight: "400",
+  subsets: ["latin"],
+  display: "swap",
+});
+
 export const metadata: Metadata = {
   title: "TrainingAi",
   description: "AI-powered gym session tracker connected to Google Sheets",
@@ -112,7 +133,7 @@ export default async function RootLayout({
         <link rel="apple-touch-icon" href="/apple-icon?v=2" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} ${archivo.variable} ${instrumentSerif.variable} h-full antialiased`}
       >
         <script dangerouslySetInnerHTML={{ __html: brandThemeScript }} />
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>

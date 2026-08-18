@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useState } from 'react'
-import { ChevronDown, Check, Loader2, Pencil, Trash2 } from 'lucide-react'
+import { ChevronDown, Check, Loader2, Pencil, QrCode, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
@@ -17,6 +17,7 @@ interface Props {
   onLog: () => void
   onEdit: () => void
   onDelete: () => void
+  onLabel: () => void
 }
 
 /**
@@ -32,7 +33,7 @@ interface Props {
  * other small icons, and the only feedback was a toast after the fact.
  */
 export const SavedMealCard = memo(function SavedMealCard({
-  meal, logging, selected, onToggleSelected, onLog, onEdit, onDelete,
+  meal, logging, selected, onToggleSelected, onLog, onEdit, onDelete, onLabel,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -196,6 +197,12 @@ export const SavedMealCard = memo(function SavedMealCard({
             >
               {logging && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
               Log this meal
+            </Button>
+            <Button
+              variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
+              onClick={onLabel} aria-label={`Print a label for ${meal.name}`}
+            >
+              <QrCode className="w-3.5 h-3.5" />
             </Button>
             <Button
               variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
