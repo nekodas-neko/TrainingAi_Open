@@ -250,7 +250,7 @@ const BASELINE = {
   // carrying the measured cause and the two coherent answers inline — the item is blocked on the
   // owner choosing between them, and an implementer must not have to open the review to learn that.
   // Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
-  'docs/implementation-backlog.md': 7056,
+  'docs/implementation-backlog.md': 7067,
   'CLAUDE.md': 1010,
 };
 
