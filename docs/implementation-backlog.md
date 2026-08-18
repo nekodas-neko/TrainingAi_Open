@@ -1010,6 +1010,47 @@ and this is the sixth.
 - **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
   sync-payload change (Lane A) while everything above is Lane B.
 
+
+**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
+- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
+  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
+  second ring component.
+- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
+  search across everything · tabs **Recent · Frequent · Saved meals** · a bottom row of
+  **Barcode · Photo · Describe**. Photo is kept because it exists today and the owner did not ask
+  to remove it.
+- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
+  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
+- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
+  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
+- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
+  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
+- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
+  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
+  unrelated screen.
+
+**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
+page/section to what's in prod right now — we don't want to silently lose any sections."* The first
+draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
+(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
+MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
+**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
+**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
+and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
+quietly loses a section is the failure mode this entry exists to prevent.
+
+**17 — A section that has nowhere to go under the new tabs: `My Foods`.** The shipped capture step
+offers it (`onMyFoods` → `FoodLibrarySheet`) and the three agreed tabs are Recent, Frequent and
+Saved meals. Recommendation: make it a **fourth tab**, not a button — it is a list of foods like the
+other three, and a tab is where someone will look for it. Flagged rather than decided.
+
+**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
+assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
+`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
+`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
+delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
+whether or not anyone draws them first.
+
 **What NOT to change — all three exist because a CLAUDE.md rule required them:**
 - `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
   correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
