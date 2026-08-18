@@ -297,6 +297,9 @@ jobs:
       - name: Cache today-guards take the user's timezone
         run: node scripts/check-tz-aware-cache-guards.js
 
+      - name: memo() call sites pass stable props
+        run: node scripts/check-memo-prop-stability.js
+
       - name: Non-strict request schemas do not increase
         run: node scripts/check-strict-request-schemas.js
 

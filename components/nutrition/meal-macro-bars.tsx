@@ -5,7 +5,7 @@ import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import {
   mealFit,
-  type MacroFit, type MacroTotals,
+  type MacroFit,
 } from '@trainingai/shared/nutrition/meal-macro-fit'
 
 /**
@@ -55,14 +55,35 @@ function Bar({ fit, label, color }: {
   )
 }
 
+/**
+ * Both memos in this file take the eight macro numbers as SCALARS rather than two `MacroTotals`
+ * objects, and that is load-bearing rather than stylistic. Every call site builds both objects
+ * fresh on each render — `target` as an inline literal, `actual` from `sumMacroTotals`/
+ * `sumIngredients` — so `memo`'s shallow compare could never hold and both components re-rendered
+ * unconditionally (Q-490). A `useMemo` at the call site cannot fix the per-meal one, because that
+ * one renders inside `variant.meals.map(...)` where a hook is not allowed. Scalars remove the
+ * class instead of working around it: a future call site cannot reintroduce it by accident.
+ * Keep them scalar.
+ */
 export const MealMacroBars = memo(function MealMacroBars({
-  actual, target, className,
+  actualCalories, actualProteinG, actualCarbsG, actualFatG,
+  targetCalories, targetProteinG, targetCarbsG, targetFatG,
+  className,
 }: {
-  actual: MacroTotals
-  target: MacroTotals
+  actualCalories: number
+  actualProteinG: number
+  actualCarbsG: number
+  actualFatG: number
+  targetCalories: number
+  targetProteinG: number
+  targetCarbsG: number
+  targetFatG: number
   className?: string
 }) {
-  const fit = mealFit(actual, target)
+  const fit = mealFit(
+    { calories: actualCalories, proteinG: actualProteinG, carbsG: actualCarbsG, fatG: actualFatG },
+    { calories: targetCalories, proteinG: targetProteinG, carbsG: targetCarbsG, fatG: targetFatG },
+  )
   return (
     <div className={cn('space-y-1', className)}>
       <Bar fit={fit.calories} label="kcal" color="#a3a3a3" />
@@ -81,15 +102,26 @@ export const MealMacroBars = memo(function MealMacroBars({
  * without scrolling back up.
  */
 export const DayMacroTotals = memo(function DayMacroTotals({
-  actual, target, plannedCount, totalCount,
+  actualCalories, actualProteinG, actualCarbsG, actualFatG,
+  targetCalories, targetProteinG, targetCarbsG, targetFatG,
+  plannedCount, totalCount,
 }: {
-  actual: MacroTotals
-  target: MacroTotals
+  actualCalories: number
+  actualProteinG: number
+  actualCarbsG: number
+  actualFatG: number
+  targetCalories: number
+  targetProteinG: number
+  targetCarbsG: number
+  targetFatG: number
   /** Meals that have ingredients to sum. Fewer than `totalCount` means the total is incomplete. */
   plannedCount: number
   totalCount: number
 }) {
-  const fit = mealFit(actual, target)
+  const fit = mealFit(
+    { calories: actualCalories, proteinG: actualProteinG, carbsG: actualCarbsG, fatG: actualFatG },
+    { calories: targetCalories, proteinG: targetProteinG, carbsG: targetCarbsG, fatG: targetFatG },
+  )
   const cal = fit.calories
   const partial = plannedCount < totalCount
   // Calories alone would call a day "on target" while it was 105 g short on carbs and 38 g over on
@@ -115,7 +147,12 @@ export const DayMacroTotals = memo(function DayMacroTotals({
         )}
       </div>
       <div className="mt-2">
-        <MealMacroBars actual={actual} target={target} />
+        <MealMacroBars
+          actualCalories={actualCalories} actualProteinG={actualProteinG}
+          actualCarbsG={actualCarbsG} actualFatG={actualFatG}
+          targetCalories={targetCalories} targetProteinG={targetProteinG}
+          targetCarbsG={targetCarbsG} targetFatG={targetFatG}
+        />
       </div>
       {partial && (
         <p className="mt-2 text-[10px] leading-snug text-muted-foreground">

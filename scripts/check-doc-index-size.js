@@ -778,7 +778,12 @@ const BASELINE = {
   // budgets 274 apart, and the entry proves they are two TDEE models rather than staleness:
   // BMR x (1.375 - 1.2) = 266 kcal. It also records the owner's decision to adopt one number
   // that rises with measured activity, and why the wizard's multiplier is the real change.
-  'docs/implementation-backlog.md': 10008,
+  //
+  // Then ratchets DOWN 2026-08-18 (Lane B, Q-490 shipped): Q-490's entry out, Q-357's in, net
+  // seven fewer, recomputed from the merged file on top of the raise above. Q-357 is the four
+  // defeated memo call sites Q-490's review said did not exist ("no inline arrows exist
+  // anywhere"); the new check freezes them rather than leaving them to be rediscovered.
+  'docs/implementation-backlog.md': 10001,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

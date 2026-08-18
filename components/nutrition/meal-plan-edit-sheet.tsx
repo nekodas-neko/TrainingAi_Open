@@ -234,13 +234,10 @@ export function MealPlanEditSheet({ plan, onOpenChange, onChanged }: Props) {
             </p>
           ) : (
             <DayMacroTotals
-              actual={dayActual}
-              target={{
-                calories: variant.targetCalories,
-                proteinG: variant.targetProteinG,
-                carbsG: variant.targetCarbsG,
-                fatG: variant.targetFatG,
-              }}
+              actualCalories={dayActual.calories} actualProteinG={dayActual.proteinG}
+              actualCarbsG={dayActual.carbsG} actualFatG={dayActual.fatG}
+              targetCalories={variant.targetCalories} targetProteinG={variant.targetProteinG}
+              targetCarbsG={variant.targetCarbsG} targetFatG={variant.targetFatG}
               plannedCount={plannedCount}
               totalCount={variant.meals.length}
             />
@@ -300,13 +297,10 @@ export function MealPlanEditSheet({ plan, onOpenChange, onChanged }: Props) {
                   {actual ? (
                     <MealMacroBars
                       className="mt-2"
-                      actual={actual}
-                      target={{
-                        calories: m.targetCalories,
-                        proteinG: m.targetProteinG,
-                        carbsG: m.targetCarbsG,
-                        fatG: m.targetFatG,
-                      }}
+                      actualCalories={actual.calories} actualProteinG={actual.proteinG}
+                      actualCarbsG={actual.carbsG} actualFatG={actual.fatG}
+                      targetCalories={m.targetCalories} targetProteinG={m.targetProteinG}
+                      targetCarbsG={m.targetCarbsG} targetFatG={m.targetFatG}
                     />
                   ) : (
                     <p className="mt-2 text-[11px] tabular-nums text-muted-foreground">

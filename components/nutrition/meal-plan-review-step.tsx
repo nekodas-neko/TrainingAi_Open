@@ -130,13 +130,10 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
       )}
 
       <DayMacroTotals
-        actual={dayActual}
-        target={{
-          calories: variant.targetCalories,
-          proteinG: variant.targetProteinG,
-          carbsG: variant.targetCarbsG,
-          fatG: variant.targetFatG,
-        }}
+        actualCalories={dayActual.calories} actualProteinG={dayActual.proteinG}
+        actualCarbsG={dayActual.carbsG} actualFatG={dayActual.fatG}
+        targetCalories={variant.targetCalories} targetProteinG={variant.targetProteinG}
+        targetCarbsG={variant.targetCarbsG} targetFatG={variant.targetFatG}
         plannedCount={plannedCount}
         totalCount={variant.meals.length}
       />
@@ -211,13 +208,10 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
             {m.actual ? (
               <MealMacroBars
                 className="mt-2"
-                actual={m.actual}
-                target={{
-                  calories: m.targetCalories,
-                  proteinG: m.targetProteinG,
-                  carbsG: m.targetCarbsG,
-                  fatG: m.targetFatG,
-                }}
+                actualCalories={m.actual.calories} actualProteinG={m.actual.proteinG}
+                actualCarbsG={m.actual.carbsG} actualFatG={m.actual.fatG}
+                targetCalories={m.targetCalories} targetProteinG={m.targetProteinG}
+                targetCarbsG={m.targetCarbsG} targetFatG={m.targetFatG}
               />
             ) : (
               <p className="mt-2 text-[11px] tabular-nums text-muted-foreground">
