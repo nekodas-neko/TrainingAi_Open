@@ -69,6 +69,8 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 - [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-471 — the meal-plan reroll path is correctly guarded; its double-trip count is a fingerprint artefact, not tap-spam). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
 
+- [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](../../reviews/2026-08-18-nutrition-tdee-calibration.md) — **the TDEE outcome check, 2026-08-18** (Q-517 — the food log captures **~45%** of actual intake, so taking it at face value implies a maintenance *below the owner's own BMR*. `adaptive-tdee.ts` already anticipated this and its gates refuse **75%** of windows — but `MIN_PLAUSIBLE_MAINTENANCE = 1000` sits **52 kcal below** where the artefact lands (1,052), and `MIN_LOGGED_FRACTION` counts logged *days* rather than log *completeness*, so a 45%-complete record passes a 70% gate. Proposed: floor at the user's own BMR — blocks every harmful value, tightening the range to 1,902–2,219).
+
 ## Open issues
 
 ```bash
