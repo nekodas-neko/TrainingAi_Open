@@ -69,6 +69,26 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟢 A Known Issue was in both the live list and the resolved archive; nothing checked (Q-553, 2026-08-18)
+
+- **Filed and fixed in the same PR**, kept as the record of the class.
+  [`docs/reviews/2026-08-18-known-issue-duplication.md`](docs/reviews/2026-08-18-known-issue-duplication.md).
+- **Q-139 read `🔴 OPEN` here and `✅ fixed` in the archive, for ten days** — 69 lines describing a bug
+  fixed 2026-08-08 in v1.270.25. **Every session's mandated orientation read showed a red,
+  highest-severity open issue for a ten-day-old fix.** Both halves verified fixed **in source**
+  (`packages/shared/src/health/step-estimate.ts:176`), not taken on the archive's word. **Q-81** was a
+  byte-identical 31-line entry in both files.
+- **⚠️ Both were also archived early.** The rule allows a move only when nothing is owed, *including a
+  pending device check* — and both entries name one. So: **copied rather than moved, and moved before
+  it was allowed.** Resolution: cut the premature archive copies, keep the live entries (where an owed
+  check belongs), fold in anything unique first.
+- **Now enforced:** `scripts/check-known-issue-duplication.js`, step **41 of 41** in Custom Rules. Its
+  first version reported 4 of which 2 were real, so it skips **range** headings and identifies an entry
+  by its **first** Q number — both narrowings documented in the script itself.
+- **Not exercised:** static reconciliation. Q-139 still owes an on-device check after the next history
+  drain; Q-81 owes a production check. Neither is possible in this harness.
+
+
 ### [platform] 🟢 Two sources of truth for the next Q band; the prose one was wrong (Q-552, 2026-08-18)
 
 - **Review's band 450–499 was exhausted by Q-499.** `docs/agents/README.md` says *"claim the next block
@@ -3306,75 +3326,35 @@ Design galleries: `docs/design/2026-08-07-score-row-mockups*.html`.
 Secondary, non-blocking: the picker is now a flat list of nineteen radio options, which wants
 grouping or thumbnails rather than a longer list. Not scoped.
 
-### [activity][devices][platform] 🔴 Q-139 — `resolveDsToMs` compresses ring time by up to 18× during a backlog drain (found 2026-08-07, OPEN)
+### [activity][devices][platform] ⚠️ Q-139 — ring-clock compression FIXED (v1.270.25), **not verified on device**
 
-Found investigating an owner report that app steps read higher than the Samsung Health phone count
-(app 4,176 vs phone 3,376 at 21:49 on 2026-08-07). The step gap turned out **not** to be the bug —
-see the closing note below — but the investigation surfaced a real one on the shared ring clock.
+**Fixed 2026-08-08 in v1.270.25.** Owner decision: **fix forward, no backfill.** Kept here rather
+than archived because the device check is still owed, which is what this section is for. Full
+investigation, including the measurement traps that make it expensive to re-derive:
+[`docs/handoff-2026-08-07-activity-ring-clock-compression.md`](docs/handoff-2026-08-07-activity-ring-clock-compression.md);
+session journal `docs/overview/entries/2026-08-08-ring-clock-compression.md`.
 
-**What is wrong.** A clock anchor is `(batch max ds, server receive time)`, so its *lag*
-(`anchorUtcMs − anchorDs × 100`) is however long that batch took to reach the server. That lag is
-not constant: over 2026-08-07's ds range (n=99 anchors) it spans **56.2 minutes**, with a sharp
-lower edge (p0→p10 is 1.4 min) and a long upper tail — the signature of true time plus a variable
-receive latency. `resolveDsToMs` interpolates linearly between the two anchors bracketing a ds, so
-the local time-scale it applies is `Δutc / Δds`. When the ring drains buffered history, ds advances
-far faster than the wall clock and that ratio collapses.
+**The slope was never the unknown** — the ring's counter ticks at exactly 100 ms/ds by construction,
+only the offset is unobserved. `resolveDsToMs` now applies that fixed slope with one offset per
+epoch, estimated as the **p10 of anchor lag**: an event cannot be received before it happened, so the
+floor of the lag distribution is the honest offset and the tail is receive latency (p0→p10 spans
+1.4 min against a 56.2 min full spread). That also makes the mapping monotonic in `ds`, which
+interpolation could not promise.
 
-Measured on real production frames: ds `28297856`→`28314950` is Δds 17,094 = **28.5 minutes of ring
-time**, and it resolves into `12:47:19`→`12:48:54` — **95 seconds**, an ~18× compression. This is not
-one bad moment; at the 30 s frame cadence a 60 s block should hold 2 paired windows, and
-2026-08-07's blocks hold 79 (11:42), 70 (10:41), 66 (14:01) and 60 (17:11).
+- **Both halves shipped.** `resolveDsToMs` now applies the fixed 100 ms/ds slope with one offset per
+  epoch (p10 of anchor lag), which is also monotonic in `ds`. And the sibling gap is closed —
+  `mergeStepCounterWithLive` gates **model** windows through `isPlausibleStepWindow`, not just live
+  ones (verified in `packages/shared/src/health/step-estimate.ts:176`, whose comment names Q-139).
+- **⚠️ What is still owed: the on-device check only.** The consequence shows after the next real
+  history drain. Nothing else is outstanding — no code work, no owner decision.
+- **Stored history was deliberately not rewritten**, so ~35 days before the deploy read
+  inconsistently with everything after. Blast radius is steps + the admin console; sleep and HR use a
+  different converter (`measuredAtMs`) and are untouched.
 
-**Why it shows up in steps.** `resampleSteps` folds per-sample steps into fixed 60 s wall-clock
-blocks, so every window squeezed into one block sums there. 2026-08-07 produced 60 s windows of
-**1,555**, 664 and 268 steps — the top one is 26 steps *per second*.
-
-**It distorts placement far more than totals.** Re-running the real rollup over the same frames with
-a physically-correct clock (ds ticks at exactly 100 ms; offset = the minimum observed lag) gives
-**zero** implausible windows, and moves the day total from 4,178 to 4,652 — and 2026-08-06 from 1,232
-to 1,245. So the totals were roughly right and the *timeline* was wrong.
-
-**Blast radius is steps only.** `resolveDsToMs` is used by `step-day-buckets.ts` (the steps rollup
-write and `previewStepsBackfill`) and the admin step-counter console — nothing else. Sleep
-boundaries, HR bins and temperature go through `measuredAtMs`, a **fixed** 100 ms/ds slope from one
-anchor, which carries Q-71's offset error but structurally cannot compress. An earlier draft of this
-row said a fix would move sleep boundaries; it will not.
-
-**This is an input to [Q-71](docs/implementation-backlog.md), and partly contradicts it.** Q-71
-proposes moving the sleep/HR/temperature paths onto `resolveDsToMs` on the grounds that
-interpolation is "the more accurate one". It is more accurate than unbounded newest-anchor
-extrapolation, and it still carries this defect — so implementing Q-71 as written would trade an
-offset error for a compression error on sleep and HR. Fix Q-139 first; its fix (a robust
-non-interpolating offset) is also the right fix for Q-71's paths, letting one converter serve both.
-
-**Watch the monotonic guard.** The rollup recomputes a 35-day window but can only ever *raise* a
-stored total (`mergedSteps > existingSteps`), so a clock fix is not "future days only" — recent days
-would drift upward wherever the corrected number is higher, while days that should come *down* stay
-inflated without an owner-gated `allowStepsDecrease` backfill. Both measured days moved up.
-
-**Second, smaller gap on the same path:** `mergeStepCounterWithLive`
-(`packages/shared/src/health/step-estimate.ts`) applies `isPlausibleStepWindow` to **live** windows
-only — model windows go through unfiltered. That asymmetry is what let the three impossible windows
-above reach the daily total. Worth closing as a backstop, though under a correct clock it would not
-have fired on 2026-08-07.
-
-**Reproduction is exact**, so nothing here is inferred: replaying production's own
-`computeStepsByDay` over the same anchors and frames returns 4,178 against the stored 4,176.
-Full investigation, including the measurement traps that make this expensive to re-derive:
-[`docs/handoff-2026-08-07-activity-ring-clock-compression.md`](docs/handoff-2026-08-07-activity-ring-clock-compression.md).
-
-**On the original step question — no tuning is warranted.** 2026-08-07's steps are 100 %
-`step_counter` over ring frames: `body_metrics.source_map->>'steps'` is `oura_ble`, and
-`step_live_windows` has held no row since 2026-07-28, so no phone or Health Connect value is in the
-mix. Correcting the clock moves the ring *further* from the phone (4,652 vs 3,376), which is the
-expected direction — a finger-worn sensor counts movement a pocketed phone misses. Applying a scale
-factor to close that gap would be fitting a fudge to one day of paired data. Note also that the
-rollup's same-day guard is monotonic (`mergedSteps > existingSteps` in `adapter.ts`), so an
-over-count from a distorted clock can never self-correct downward.
-
-**Not found by the same-day full-app deep review** (below) — that sweep covered routes and pages;
-this sits under the ring rollup's clock conversion.
-
+*Rewritten 2026-08-18 (Q-553): this row previously read `🔴 … (found 2026-08-07, OPEN)` and carried
+69 lines describing the bug as unfixed, while an `✅ fixed` entry for the same issue already sat in
+the resolved archive. Every session's orientation read had shown a red open issue for a bug fixed ten
+days earlier.*
 ### [platform][app-shell] Full-app deep review, 2026-08-07 — 53 findings, ALL QUEUED (nothing fixed)
 
 A whole-app review of saving, caching, performance and domain logic across all **201 API routes** and

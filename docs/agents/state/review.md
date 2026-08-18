@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-four sweeps (2026-08-17 ×2, 2026-08-18 ×32) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **553**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
+**Updated:** 2026-08-18 · **By:** thirty-five sweeps (2026-08-17 ×2, 2026-08-18 ×33) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **554**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
 
 ## Now
 
-Thirty-four sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-five sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,38 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 35 — a Known Issue in two lists at once (2026-08-18)
+
+**Filed AND fixed Q-553**, plus a new CI check (Custom Rules is now **41 of 41**). Write-up:
+[`docs/reviews/2026-08-18-known-issue-duplication.md`](../../reviews/2026-08-18-known-issue-duplication.md).
+
+**Took this baton's own directive** — *audit prose that duplicates a machine-checked fact* — and
+applied it where there was **no check at all**: the live Known-Issues list vs the resolved archive.
+
+**Q-139 read `🔴 OPEN` live and `✅ fixed` archived, for ten days.** 69 lines describing a bug fixed
+2026-08-08 in v1.270.25, sitting in the one artefact every session must read before starting. **Q-81**
+was a byte-identical 31-line entry in both files.
+
+**⚠️ Both were also archived *early*** — the half that is easy to miss. The rule allows a move only
+when nothing is owed, **including a pending device check**, and both entries name one. So the mistake
+was two-part: **copied rather than moved, and moved before it was allowed.** Kept the live entries and
+cut the premature archive copies — the conservative direction, since an owed check belongs in the list
+everyone reads.
+
+**Verified the fix claims in source rather than trusting the archive.** The live row said a backstop
+was still open; `step-estimate.ts:176` shows it closed, with a comment naming Q-139. **Do not resolve a
+duplicate by believing whichever copy is more convenient.**
+
+**⚠️ My own new check reported 4 and only 2 were real** — written specifically to catch this class, and
+it over-reported anyway (an archive heading naming a second issue in passing; a `Q-63…Q-69` batch
+range). Narrowings are in the script's header, not just the diff. **That is now ~8 instances this run.
+Treat "the first version of any check over-reports" as certain, and budget the triage pass into the
+sweep rather than after it.**
+
+**A durable one for successors:** when two records disagree, **the artefact everyone is required to
+read is the one to fix first**, whichever is "more correct". A false `🔴 OPEN` there instructs five
+concurrent agents to treat a working subsystem as broken.
 
 ### Sweep 34 — Q-499 reproduced; and a Q-number ledger near-miss (2026-08-18)
 

@@ -19,6 +19,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-18-known-issue-duplication.md`](../../reviews/2026-08-18-known-issue-duplication.md) — **a Known Issue in two lists at once, 2026-08-18** (Q-553 — **Q-139 read `🔴 OPEN` in `projectOverview.md` and `✅ fixed` in the resolved archive for ten days**, 69 lines describing a bug fixed 2026-08-08; **Q-81** was a byte-identical 31-line entry in both. Both were also **archived early** — the rule forbids moving while a device check is owed, and both name one. Fixed here, and now enforced by `scripts/check-known-issue-duplication.js`, step 41 of 41.)
 - [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](../../reviews/2026-08-18-server-only-writes-to-local-first-domains.md) — **the activity delete audited end to end, 2026-08-18** (Q-488 — it updates the server and the caches but never the local store, so session-select, nutrition and the activity-history card keep showing the deleted activity until the next pull; self-heals via the tombstone). The Health Connect metrics PATCH is also server-only but its full pull chain checks out.
 - [`docs/reviews/2026-08-15-comprehensive-app-review.md`](../../reviews/2026-08-15-comprehensive-app-review.md)
   — §1.2 measured the Activity Score in production after v2: sd 5.9 over 19 days, range 66–91, 10
@@ -67,13 +68,14 @@ Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
   carries very little information either way. See
   [`the journal entry`](../../overview/history-2026-08-08.md).
 
-- 🔴 **Q-139 — `resolveDsToMs` compresses ring time by up to 18× during a backlog drain**
-  (found 2026-08-07, queued, needs one owner decision). Anchor lag spans 56.2 min over one day, and
-  interpolating between two anchors that disagree squeezes 28.5 min of ring time into 95 s —
-  producing 60 s step windows of 1,555 steps. Totals are roughly preserved (+474 on the worst
-  measured day); *placement* is not. **Blast radius is steps only** — sleep/HR/temperature use
-  `measuredAtMs`, a fixed slope that cannot compress. **Blocks Q-71**, whose plan is to roll this
-  same converter out to those paths and would therefore spread the defect.
+- ⚠️ **Q-139 — ring-clock compression FIXED (v1.270.25, 2026-08-08), not verified on device.**
+  `resolveDsToMs` now applies the fixed 100 ms/ds slope with one offset per epoch (p10 of anchor lag),
+  monotonic in `ds`; the sibling gap is closed too — `mergeStepCounterWithLive` gates **model** windows
+  through `isPlausibleStepWindow`, not just live ones. **The owner decision was made** — *fix forward,
+  no backfill* — so the previous "needs one owner decision" here was stale. **Only the on-device check
+  remains**, which shows after the next real history drain. Record:
+  [`docs/overview/known-issues-resolved.md`](../../overview/known-issues-resolved.md); this no longer
+  blocks Q-71, which now uses Q-139's robust per-epoch offset.
 
 - 🟠 **Three days hold inflated step totals that cannot self-correct** — open; a backfill preview
   was computed and confirms three days are materially inflated.

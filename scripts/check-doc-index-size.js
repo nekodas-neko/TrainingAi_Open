@@ -18,6 +18,17 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
+// projectOverview SHRANK by ~70 lines here even after adding an entry: Q-139's stale 69-line
+// "OPEN" body was replaced with a compact device-check row, and Q-81's duplicate archive copy was
+// cut. Baselines are shrink-only, so this ratchets down and the space cannot be reclaimed silently.
+//
+// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
+// projectOverview RATCHETS DOWN here (7805 -> 7785) even though an entry was added: Q-139's stale
+// 69-line "OPEN" body became a compact device-check row and Q-81's duplicate archive copy was cut.
+// The baseline is shrink-only, so locking the lower number in is the point -- reclaimed space
+// cannot quietly refill.
+//
 // Raised 2026-08-18 (Review, Q-499 reproduced + Q-552 ledger): backlog -> 9809, projectOverview -> 7805.
 // Q-499's entry grew rather than a new one being added: it was filed on static reading and is now
 // reproduced, and the before/after (1 node -> 0, control at 1) is what makes it actionable. Plus one
@@ -725,7 +736,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7805,
+  'projectOverview.md': 7785,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -736,7 +747,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9809,
+  'docs/implementation-backlog.md': 9841,
   'CLAUDE.md': 1075,
 
 };
