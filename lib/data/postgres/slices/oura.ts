@@ -1354,28 +1354,73 @@ export async function nullHistoricalDecoded(
 // smaller file, returning the space to the OS. It cannot run inside a transaction and takes a brief
 // ACCESS EXCLUSIVE lock on the table, so it is admin-triggered only, never automatic. body_hex is
 // untouched — no data is dropped, this only compacts. Not scoped to a user: VACUUM is whole-table.
-export async function vacuumOuraRawSamples(): Promise<{
-  beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number
+/**
+ * Tables this may rewrite, and why each is here.
+ *
+ * An allowlist rather than a validated identifier, because `VACUUM FULL` cannot take a bind
+ * parameter — the table name is interpolated into the statement, so the only safe input is one that
+ * never came from a request. A caller naming anything else is rejected.
+ *
+ * It is also a judgement list, not just a safety one: `VACUUM FULL` takes an ACCESS EXCLUSIVE lock
+ * and needs free disk equal to the table's current size, so it belongs on tables where a deliberate,
+ * owner-pressed rewrite is the right tool.
+ */
+export const VACUUM_FULL_TABLES = {
+  // The original Lever 1c target. Nulling `decoded` frees space only logically — MVCC leaves dead
+  // tuples that autovacuum reuses internally but never returns to the OS. Also what reclaims the
+  // space after Q-541's packing backfill deletes the hot rows.
+  oura_raw_samples: 'raw BLE frames',
+  // Q-315. 4 live rows in 49 MB (measured 2026-08-18) — 6% of the whole database, held by dead
+  // tuples and TOAST left behind after Q-539 fixed the write path and the rows were pruned. One
+  // fault had written 5,771 rows because the dedupe key varied with a generated VALUES list, each
+  // message truncated to exactly 2,000 chars of boilerplate. Nothing re-grows: this is a one-off
+  // reclaim, not a recurring chore.
+  error_events: 'server error log',
+} as const
+
+export type VacuumFullTable = keyof typeof VACUUM_FULL_TABLES
+
+export async function vacuumTableFull(table: VacuumFullTable): Promise<{
+  table: string; liveRows: number; beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number
 }> {
+  // Belt and braces over the type: this value is interpolated into SQL, so it is checked against the
+  // allowlist at runtime too rather than trusting a compile-time union a caller can cast past.
+  if (!Object.prototype.hasOwnProperty.call(VACUUM_FULL_TABLES, table)) {
+    throw new Error(`vacuumTableFull: ${table} is not in the allowlist`)
+  }
   const pool = getPool()
   const client = await pool.connect()
   const sizeOf = async () =>
-    Number((await client.query(`SELECT pg_total_relation_size('oura_raw_samples')::bigint AS bytes`)).rows[0]?.bytes ?? 0)
+    Number((await client.query(`SELECT pg_total_relation_size($1)::bigint AS bytes`, [table])).rows[0]?.bytes ?? 0)
   try {
     const beforeBytes = await sizeOf()
+    // Reported so the reclaim can be read honestly. A huge `before` against a handful of live rows
+    // is the signature of pure bloat — which is exactly Q-315's case, and is a different situation
+    // from a large table that is genuinely large.
+    const liveRows = Number((await client.query(
+      `SELECT n_live_tup FROM pg_stat_user_tables WHERE relname = $1`, [table])).rows[0]?.n_live_tup ?? 0)
     // VACUUM FULL can outlast the pool's 15s statement_timeout on a large table; lift both timeouts
     // for this session only, then destroy the connection (release(true)) so the pool never hands a
     // timeout-disabled client to normal query traffic.
     await client.query('SET statement_timeout = 0')
     await client.query('SET idle_in_transaction_session_timeout = 0')
     const started = Date.now()
-    await client.query('VACUUM (FULL) oura_raw_samples')
+    await client.query(`VACUUM (FULL) ${table}`)
     const ms = Date.now() - started
     const afterBytes = await sizeOf()
-    return { beforeBytes, afterBytes, reclaimedBytes: Math.max(0, beforeBytes - afterBytes), ms }
+    return { table, liveRows, beforeBytes, afterBytes, reclaimedBytes: Math.max(0, beforeBytes - afterBytes), ms }
   } finally {
     client.release(true)
   }
+}
+
+/** The original single-table entry point, kept so the existing admin button and its route are
+ *  untouched by the generalisation. */
+export async function vacuumOuraRawSamples(): Promise<{
+  beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number
+}> {
+  const { beforeBytes, afterBytes, reclaimedBytes, ms } = await vacuumTableFull('oura_raw_samples')
+  return { beforeBytes, afterBytes, reclaimedBytes, ms }
 }
 
 export async function persistBodyCompFromMetrics(db: Db, userId: string): Promise<number> {

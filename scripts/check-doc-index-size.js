@@ -287,7 +287,14 @@ const BASELINE = {
   // (the packer has no button, because components/** belongs to the other lane, and the entry
   // carries the warning that its confirm copy must not read like the lossless VACUUM beside it).
   'projectOverview.md': 6862,
-  'docs/implementation-backlog.md': 7144,
+  //
+  // Raised 2026-08-18 (Q-315 route, Lane A): 7144 -> 7156. Twelve lines splitting Q-315 into the half
+  // that shipped and the half that has not: the route exists and is verified, and nobody has pressed
+  // it against production. Without that split the entry reads as done and the 49 MB never gets
+  // reclaimed. Carries the one thing an implementer must not get wrong — the allowlist is the safety
+  // boundary because the table name is interpolated, and `in` accepts `toString` where
+  // `hasOwnProperty` does not.
+  'docs/implementation-backlog.md': 7156,
   'CLAUDE.md': 1010,
 
 };
