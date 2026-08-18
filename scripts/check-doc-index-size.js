@@ -501,7 +501,7 @@ const BASELINE = {
   // design questions were answered: the completeness control is an explicit button at the foot of
   // the log (Q-387 options 2 and 3 closed with reasons), the meal plan becomes a generator of
   // saved meals (Q-398), targets stay in Profile with a shortcut, and the pass covers the full journey.
-  'docs/implementation-backlog.md': 8867,
+  'docs/implementation-backlog.md': 8793,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
