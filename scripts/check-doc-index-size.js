@@ -201,7 +201,20 @@ const BASELINE = {
   // since the entry was written, and the entry states one of them three different ways. Left in the
   // entry rather than a review doc because the next session to take this item reads the entry, sees
   // a green Task 3, and would close it. Recomputed from the merged file, same as the raise above.
-  'docs/implementation-backlog.md': 6853,
+  //
+  // Raised 2026-08-18 (Q-541 task 3, Lane A): 6853 -> 6867. The Q-541 entry's status block gains
+  // fourteen lines and none of them are narrative: which read sites moved, and the three findings an
+  // implementer of tasks 4-7 would otherwise re-derive — that an aggregate cannot use the reader's
+  // identity dedupe (it double-counted 80 frames as 120), that event_name had to become derived, and
+  // that a dormant tag needs a cold fallback in three places. The rest of the story is in the plan
+  // and the journal entry, neither of which this ratchet governs. Recomputed from the merged file.
+  //
+  // Raised again the same day for the new Q-315 entry: 6867 -> 6894. `error_events` holds 4 live rows
+  // in 49 MB, found while measuring production for Q-541 — 6% of the database, reclaimable by one
+  // statement. Filed rather than taken, per "no orphaned findings", and it earns its 27 lines by
+  // carrying the measurement, the reason nothing re-grows (Q-539 already fixed the write path), and
+  // the free-disk caveat that decides whether it can run after the volume is cut back.
+  'docs/implementation-backlog.md': 6894,
   'CLAUDE.md': 1010,
 
 };
