@@ -1,0 +1,22 @@
+-- Q-534 finding 4 / Q-541 Task 7 — drop `idx_oura_raw_samples_user_measured`.
+--
+-- 136 MB in production (measured 2026-08-18), on a 699 MB table whose indexes were 443 MB — 63% of
+-- the largest table in the database. It had 165 scans against the primary key's 43,195.
+--
+-- This is safe ONLY because the same PR removed both of its readers. `getOuraRawSamplesForTags`
+-- and `getLatestOuraBleMeasuredAt` now convert their wall-clock window to a ring `ds` range through
+-- the clock anchors and read ds-keyed, which the existing `(user_id, tag, ring_timestamp_ds)` and
+-- primary-key indexes already serve. Dropping it before that rewrite would have turned both into
+-- sequential scans of the biggest table we have — which is why the backlog entry's "can be
+-- expressed as ds ranges instead" was a plan and not a fact.
+--
+-- It is also the index behind the 2026-08-17 `disk_full` outage. `measured_at` being indexed is
+-- what made a re-stamp UPDATE ineligible for a HOT update: production recorded 1,324,792 updates
+-- against 740,966 rows with 19 HOT, and one full re-stamp rewrote 681,005 rows without adding a
+-- single frame. With the index gone AND the re-stamp itself now a no-op (nothing reads the column),
+-- that operation cannot recur.
+--
+-- Reversible: the column stays, and `CREATE INDEX` rebuilds this in one statement if a future read
+-- genuinely needs a wall-clock filter. No data is dropped. Dropping the now-dead `measured_at` and
+-- `event_name` COLUMNS is a separate, owner-gated migration and is deliberately not done here.
+DROP INDEX IF EXISTS idx_oura_raw_samples_user_measured;

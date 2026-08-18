@@ -142,17 +142,24 @@ describe.skipIf(!canRun)('aggregateOuraRawSamples — sleep window without bedti
     expect(Number(wear[0].non_wear_time_sec)).toBeLessThanOrEqual(86400 - 8 * 3600)
   })
 
-  // Runs LAST: under Lever 1 the redecode pass no longer touches the (unpersisted)
-  // `decoded` column — it only refreshes event_name and re-stamps measured_at from
-  // the current anchor, which is what this asserts.
-  it('redecode re-stamps measured_at from the current anchor', async () => {
-    await repo.redecodeOuraRawSamples(TEST_USER_ID)
-    // The anchor pairs ANCHOR_DS <-> ANCHOR_UTC, so a row at ANCHOR_DS - 36000
-    // (1h earlier on the ring clock) must stamp exactly 1h before ANCHOR_UTC.
-    const { rows } = await pool.query(
+  // Runs LAST. This used to assert the redecode re-STAMPED `measured_at` onto the row. It no longer
+  // writes anything (Q-541 Task 7 — every reader derives the time from the anchors, so the column is
+  // dead, and the re-stamp is what filled the disk on 2026-08-17). What is asserted now is the same
+  // arithmetic on the reading side: the anchor pairs ANCHOR_DS ↔ ANCHOR_UTC, so a frame one ring-hour
+  // earlier must READ as exactly one hour before ANCHOR_UTC, whatever the stored column says.
+  it('derives measured_at from the current anchor, without writing it', async () => {
+    const before = (await pool.query(
       `SELECT measured_at FROM oura_raw_samples WHERE user_id = $1 AND ring_timestamp_ds = $2 AND tag = 114`,
-      [TEST_USER_ID, ANCHOR_DS - 36000])
-    expect(rows.length).toBe(1)
-    expect(new Date(rows[0].measured_at).getTime()).toBe(new Date(ANCHOR_UTC).getTime() - 3600_000)
+      [TEST_USER_ID, ANCHOR_DS - 36000])).rows
+    await repo.redecodeOuraRawSamples(TEST_USER_ID)
+    const after = (await pool.query(
+      `SELECT measured_at FROM oura_raw_samples WHERE user_id = $1 AND ring_timestamp_ds = $2 AND tag = 114`,
+      [TEST_USER_ID, ANCHOR_DS - 36000])).rows
+    expect(after).toEqual(before)   // the pass wrote nothing
+
+    const read = await repo.getOuraRawSamplesByTags(TEST_USER_ID, [114], 500)
+    const row = read.find(r => r.ringTimestampDs === ANCHOR_DS - 36000)
+    expect(row).toBeDefined()
+    expect(new Date(row!.measuredAt!).getTime()).toBe(new Date(ANCHOR_UTC).getTime() - 3600_000)
   })
 })

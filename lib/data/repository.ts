@@ -911,6 +911,9 @@ export interface WorkoutRepository {
   getLatestOuraCloudVitals(userId: string): Promise<{ date: string; vo2Max: number | null; vascularAge: number | null } | null>
   /** Newest `measured_at` across the user's BLE raw samples — the ring's freshness truth. */
   getLatestOuraBleMeasuredAt(userId: string): Promise<Date | null>
+  /** Has the ring ever reported? Answers "is it connected" without needing a resolvable clock
+   *  anchor — see the note on the implementation for why those are different questions. */
+  hasOuraBleSamples(userId: string): Promise<boolean>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────

@@ -257,9 +257,31 @@ delete side is 1.1M rows, so batch it and **`VACUUM FULL` after**, not during.
 **Task 6 — hot-window prune.** Only after Task 5 has verified clean: a throttled prune matching the
 existing `shouldPrune` pattern in `adapter.ts`, deleting hot rows whose bucket is sealed and packed.
 
-**Task 7 — measured_at range queries.** `idx_oura_raw_samples_user_measured` is dropped by the index work in Q-534; any
-surviving read that filters by wall-clock converts its range to a ds range through the anchors first.
-Confirm the set is empty or convert it.
+**Task 7 — ✅ SHIPPED, and it turned out to include the Q-534 index drop itself.** The set was not
+empty: two readers filtered on the stored `measured_at`. Both now convert their wall-clock window to
+a ring ds range through the anchors and read ds-keyed (two-tier, for free) —
+`getOuraRawSamplesForTags` via `resolveMsToDs`, `getLatestOuraBleMeasuredAt` via
+`max(ring_timestamp_ds)` across both tiers. **Migration 193 drops the index: 136 MB.**
+
+Three things this forced that the plan had not anticipated:
+
+- **The stored `measured_at` and `event_name` columns became dead**, so the redecode's re-stamp/
+  refresh loop was writing values nothing reads. It is now a documented no-op. **That loop is what
+  filled the disk on 2026-08-17** — `measured_at` being indexed made a changed-value UPDATE
+  ineligible for HOT, so production recorded 1,324,792 updates against 740,966 rows with **19** HOT.
+  Q-46's `IS DISTINCT FROM` guard bounded it but could not remove it, because the Q-71/Q-536 clock
+  fixes made every row genuinely distinct. Deriving at read time removes the operation, and with it
+  the reason the documented remedy for five ops-doc failure modes was a disk-fill hazard.
+- **`/api/oura/stats` was reading `connected` off "we can name a last-measured time"**, and those
+  stopped being the same question once the time became derived — a ring with frames but no resolvable
+  anchor would have read as disconnected and silently taken the Health tab's whole Ring section with
+  it. Split into `hasOuraBleSamples`, which is also the cheaper query.
+- **A test fixture stamped `measured_at` by hand with no clock anchor** — a state production cannot
+  be in, since anchors are append-only and every stamp came from one. Its ds and wall-clock columns
+  described different histories, which was invisible while nothing derived one from the other.
+
+Deliberately NOT done: dropping the now-dead `measured_at` and `event_name` **columns**. That is a
+data-dropping migration and owner-gated; the index drop is reversible with one `CREATE INDEX`.
 
 ## 8. Call sites this touches
 
