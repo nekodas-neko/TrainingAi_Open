@@ -16,10 +16,17 @@ import { todayInTz } from '@trainingai/shared/date-utils'
  * volume, one flagged, must have their bar top edges at the same y. Asserting "the label contains
  * (D)" would pass with the bug reintroduced in any other shape.
  *
- * **CI-vs-local hazard this spec already hit once:** it originally seeded fixed weekdays (Mon/Tue).
- * `seed.sql` fills relative to when it runs, so on CI's fresh database an ordinary seeded session
- * can share the probe's day — and `isDeload` is `every(isDeloadSession)`, so one such session
- * silently removes the "(D)" the assertions hang off. It now picks days the seed has not filled.
+ * **Two CI-vs-local hazards this spec hit, both worth knowing.** (1) The route renders
+ * `isFuture ? [] : …`, so a session dated after today is **discarded** — seeding "tomorrow" gives an
+ * empty 6 px sliver, not a bar. (2) `seed.sql` fills days relative to when it runs, and on a fresh
+ * CI database that always includes the current week's Monday; `isDeload` is `every(isDeloadSession)`,
+ * so one ordinary session there removes the "(D)" everything hangs off. Together they leave very
+ * little room on, say, a Tuesday: exactly two elapsed days, one of them already seeded.
+ *
+ * So the flagged day is a day the seed has **not** touched, and the control is simply the other
+ * elapsed day — free or not. If the seed already put volume there, that volume becomes the height to
+ * match rather than an obstacle, which is what makes this work on CI and on a months-old local
+ * database without mutating a single seeded row.
  *
  * **Mutation-checked, twice.** Restoring the flags as sibling `<span>`s fails it — but only on the
  * label assertion, which is the weaker half. So it was re-checked with a *geometry-only* mutation:
@@ -60,6 +67,24 @@ function weekDateStrings(): string[] {
 /** Midday Brisbane on a given Brisbane date, as the UTC instant to store. */
 const noonBrisbane = (dateStr: string) => `${dateStr}T02:00:00Z`
 
+
+/** One session with a single exercise of the given volume, on a Brisbane date. */
+async function insertSession(
+  c: Client, userId: string, day: string, phase: string | null, volume: number,
+): Promise<void> {
+  const at = noonBrisbane(day)
+  const ws = await c.query(
+    `INSERT INTO workout_sessions (user_id, session_name, started_at, completed_at, phase_type)
+     VALUES ($1, $2, $3, $3, $4) RETURNING id`,
+    [userId, MARKER, at, phase],
+  )
+  await c.query(
+    `INSERT INTO exercise_logs (workout_session_id, exercise_name, volume, logged_at)
+     VALUES ($1, $2, $3, $4)`,
+    [ws.rows[0].id, MARKER, volume, at],
+  )
+}
+
 test.beforeAll(async () => {
   await withDb(async c => {
     const { rows } = await c.query('SELECT id FROM users WHERE email = $1', [SEED_EMAIL])
@@ -71,40 +96,49 @@ test.beforeAll(async () => {
          SELECT workout_session_id FROM exercise_logs WHERE exercise_name = $1)`, [MARKER])
 
     const week = weekDateStrings()
+    const today = todayInTz()
+    // The route renders `isFuture ? [] : …`, so a session dated after today is DISCARDED — the first
+    // version of this spec seeded tomorrow and got an empty 6 px sliver. Only past days count.
+    const past = week.filter(d => d <= today)
+    if (past.length < 2) {
+      test.skip(true, `needs two elapsed days in the current week; today is ${today} (${past.length})`)
+      return
+    }
 
-    // Use days the seed has NOT already filled. `isDeload` is `every(isDeloadSession)`, so one
-    // ordinary seeded session sharing the probe's day silently removes the "(D)" this asserts on —
-    // and `seed.sql` fills relative to when it runs, so which weekdays are occupied differs between
-    // a long-lived local database and CI's fresh one. Choosing free days makes the spec independent
-    // of that instead of destroying seeded rows to make room.
-    const busy = await c.query(
-      `SELECT DISTINCT to_char(completed_at AT TIME ZONE 'Australia/Brisbane', 'YYYY-MM-DD') AS d
-         FROM workout_sessions
-        WHERE user_id = $1
-          AND (completed_at AT TIME ZONE 'Australia/Brisbane')::date BETWEEN $2::date AND $3::date`,
-      [userId, week[0], week[6]],
+    const existing = await c.query(
+      `SELECT to_char(s.completed_at AT TIME ZONE 'Australia/Brisbane', 'YYYY-MM-DD') AS d,
+              COALESCE(SUM(e.volume), 0) AS vol
+         FROM workout_sessions s
+         JOIN exercise_logs e ON e.workout_session_id = s.id
+        WHERE s.user_id = $1
+          AND (s.completed_at AT TIME ZONE 'Australia/Brisbane')::date BETWEEN $2::date AND $3::date
+        GROUP BY 1`,
+      [userId, past[0], past[past.length - 1]],
     )
-    const taken = new Set<string>(busy.rows.map((r: { d: string }) => r.d))
-    const free = week.filter(d => !taken.has(d))
-    if (free.length < 2) {
-      throw new Error(`need two session-free days this week, found ${free.length} (taken: ${[...taken].join(', ')})`)
+    const volumeByDay = new Map<string, number>(
+      existing.rows.map((r: { d: string; vol: string }) => [r.d, Number(r.vol)]),
+    )
+
+    // The flagged day must be one the seed has NOT touched: `isDeload` is `every(isDeloadSession)`,
+    // so a single ordinary session sharing it removes the "(D)" everything here hangs off.
+    const flaggedDay = [...past].reverse().find(d => !volumeByDay.has(d))
+    if (!flaggedDay) {
+      test.skip(true, `every elapsed day this week already has a session (${past.join(', ')})`)
+      return
     }
 
-    // Two days of the SAME volume: one a deload (flagged "D"), one an ordinary session (no flag).
-    // That pairing is the whole experiment — same height in, so any difference out is the layout bug.
-    for (const [day, phase] of [[free[0], 'deload'], [free[1], null]] as const) {
-      const at = noonBrisbane(day)
-      const ws = await c.query(
-        `INSERT INTO workout_sessions (user_id, session_name, started_at, completed_at, phase_type)
-         VALUES ($1, $2, $3, $3, $4) RETURNING id`,
-        [userId, MARKER, at, phase],
-      )
-      await c.query(
-        `INSERT INTO exercise_logs (workout_session_id, exercise_name, volume, logged_at)
-         VALUES ($1, $2, 5000, $3)`,
-        [ws.rows[0].id, MARKER, at],
-      )
+    // The control is any other elapsed day. It does NOT have to be free — if the seed already put a
+    // session there, that volume simply becomes the height to match, which is why this works on a
+    // fresh CI database where Monday is always taken.
+    const controlDay = past.find(d => d !== flaggedDay)!
+    let controlVolume = volumeByDay.get(controlDay) ?? 0
+    if (controlVolume === 0) {
+      await insertSession(c, userId, controlDay, null, 5000)
+      controlVolume = 5000
     }
+
+    // Same volume in, so the same bar height — the whole experiment is that one of them is flagged.
+    await insertSession(c, userId, flaggedDay, 'deload', controlVolume)
   })
 })
 

@@ -62,6 +62,27 @@ it failed on the baseline assertion. Writing the first mutation also exposed a r
 probe — it read the label from `lastElementChild`, which is only the label while the layout is
 correct, so it was blind to the very regression it existed to catch. It now reads the column's text.
 
+## The spec took three CI rounds, and the reason is worth carrying
+
+It passed locally and failed in CI twice. Both causes were in the *seeding*, not the fix:
+
+1. **Future days are discarded.** `app/api/weekly-stats/route.ts` renders `isFuture ? [] : …`, so a
+   session dated after today draws an empty 6 px sliver. The spec had seeded "tomorrow".
+2. **`seed.sql` fills days relative to when it runs**, so a fresh CI database always has a session on
+   the current week's Monday — and `isDeload` is `every(isDeloadSession)`, so that one ordinary
+   session removes the "(D)" the assertions hang off. A months-old local database has a completely
+   different set of days occupied, which is why local never showed it.
+
+Together those leave very little room: on a Tuesday there are exactly two elapsed days and one is
+already seeded. The spec now takes the *unseeded* elapsed day as the flagged one and uses the other
+elapsed day as the control **whatever is already on it** — reading that day's existing volume and
+matching it, rather than needing a free day or deleting a seeded row.
+
+**What actually settled it was reproducing CI's database locally** (`createdb`, `migrate.js`,
+`seed.sql`) rather than reading the job log — the log tail is filled by the Postgres container dump
+and never showed the Playwright output. That reproduction is three commands and is worth reaching for
+first next time.
+
 ## What was NOT exercised
 
 - **The device.** Chromium at 412×915. The entry says browser-reproducible at the S25 viewport with
