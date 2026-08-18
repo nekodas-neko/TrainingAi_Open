@@ -123,6 +123,11 @@ const root = path.join(__dirname, '..');
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
 // an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
 // composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
+//
+// Raised 2026-08-18 (Review, Q-460…Q-462): projectOverview 6679 -> 6725, backlog 6735 -> 6829.
+// Three queue entries from the workout write-path sweep plus the Known-Issues row indexing them.
+// Entries and open-issue content, which is what these files are for; the sweep's prose lives in
+// docs/reviews/2026-08-18-workout-write-path.md, outside this ratchet.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -142,8 +147,8 @@ const BASELINE = {
   // cut from 12 lines to 7). The two it is over are the two the original entry had no reason to
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
-  'projectOverview.md': 6679,
-  'docs/implementation-backlog.md': 6735,
+  'projectOverview.md': 6725,
+  'docs/implementation-backlog.md': 6829,
   'CLAUDE.md': 1010,
 
 };

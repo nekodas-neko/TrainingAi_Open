@@ -69,6 +69,52 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] 🟠 The workout write path probed cross-user for the first time — protection holds; a silent dropped write and an un-automatable core flow (Q-460…Q-462, 2026-08-18)
+
+- **The lens.** Every prior sweep of this pillar read the model (1RM, RPE, autoregulation, deload) or
+  swept `GET`. Nothing had probed the **mutations** — and `exercise_logs` and `set_logs` have **no
+  `user_id` column**, so every write that touches them depends on someone remembering to join up to
+  `workout_sessions`. Method, limits and the full tables:
+  [`docs/reviews/2026-08-18-workout-write-path.md`](docs/reviews/2026-08-18-workout-write-path.md).
+- **✅ The headline is the clean one: cross-user write protection holds.** A second live account
+  called every workout mutation against the owner's real row ids, and the owner's rows were re-read
+  from Postgres afterwards: `PATCH`/`DELETE /api/workout-entry` → **404**, `DELETE
+  /api/workout-sessions` → **404**, `/api/log-exercise` → **refused**, `ai-periodization/prescribe` →
+  **404**. Nothing crossed accounts. `workout-entry`'s `assertOwnership` is the documented
+  join-to-`workout_sessions` pattern done right. **A control was run for every probe** — the same call
+  by the owner on their own row returned 200 and actually changed the weights — because a 4xx proves
+  nothing if the body was malformed. That control caught one of my own probes being wrong mid-sweep.
+- **🟠 Q-460 — the session-RPE route reports success for a write that matched nothing.** A fabricated
+  session UUID returns `{"success":true}`. The security half is correct (the UPDATE is user-scoped and
+  matched zero rows); the missing piece is the affected-row check. **On device this is worse than a
+  wrong status code:** `pushMutations` does `setSessionRpe(...)` then `processed++` unconditionally, so
+  an RPE whose session row is absent server-side is **counted as processed and removed from the
+  outbox** — local keeps it, the server never gets it, nothing retries.
+- **🟠 Q-461 — the workout flow cannot be automated past set 1.** `Start Set 2` carries an infinite
+  `animate-bounce`, so Playwright's stability check never passes and the click hangs to the test
+  timeout (`animationIterationCount: infinite`; normal click blocked at 8 s; `force: true` clicks and
+  advances). **Not a user-facing defect** — a human taps a bouncing button fine. It matters because the
+  harness built to catch regressions (Q-249/Q-352) therefore cannot cover the app's core write path,
+  and the week's two worst findings (Q-450, Q-451) were exactly the shape an E2E spec catches.
+- **🟡 Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500.** `ensureWorkoutSession`
+  correctly refuses the write; the defect is reporting a permanent refusal as a transient fault, with a
+  stack trace. Kept low because it is unreachable through the UI **and** the outbox catches per
+  mutation rather than retrying forever — both checked, not assumed.
+- **Also clean:** the outbox cannot be wedged by one bad workout mutation (per-mutation `try/catch`,
+  the `CLAUDE.md` poison-pill rule implemented); and the flow itself runs end to end on the web build —
+  select → pre-workout → warm-up → active → set logging, correct rest countdown, RPE capture, live 1RM
+  and plate maths, with **zero uncaught page errors and zero failing `/api/` responses**.
+- **Two near-misses checked and cleared,** recorded so a later sweep does not re-raise them: the live
+  1RM's "▲ +2.00 kg" against a header reading 97.5 is **exact** (the stored PR is 98; the 97.5 is the
+  previous session's estimate), and the warm-up ramp labelling 70 kg as "92%" is a fixed target
+  percentage with the weight rounded to the loadable plate step, by design.
+- **NOT device-verified.** Web build only — `getLocalStore()` returns null, so the device's
+  local-write-plus-outbox path was never exercised and the Q-460 outbox half is read from source, not
+  run. Fresh local seed, so nothing here speaks to prod drift. Workout mutations only; the
+  program/phase-set/template routes were listed and **not** called, and rule (b) (raw bodies into
+  `.set()`) was **not** systematically audited.
+- **Nothing was fixed.** All three are queued.
+
 ### [platform] 🟠 The repo migration reviewed as an architecture change — no credentials leaked, CI posture correct, four leftovers filed (Q-456…Q-459, 2026-08-17)
 
 - **The lens.** Going public was not a hosting change. It altered three architectural properties at
