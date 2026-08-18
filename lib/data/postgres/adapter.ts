@@ -8,6 +8,7 @@ import { ageFromDob } from '@trainingai/shared/date-utils'
 import * as s from './schema'
 import { invitedEmails } from './schema'
 import { resolveSyncCursor } from '@trainingai/shared/sync/cursor'
+import { isRetryableWriteError } from '@trainingai/shared/sync/retryable-error'
 import { shouldPrune } from './retention-throttle'
 import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, hexToBytes, eventName } from '@/lib/oura-ble/decode'
 
@@ -4365,7 +4366,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         // Surface the real cause — per-mutation failures are otherwise only
         // returned in the 200 response body and never hit the server logs.
         console.error('[pushMutations] error', mut.domain, mut.date, err)
-        errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: String(err) })
+        // Q-475: this catch is the only place that still holds the driver error. `String(err)`
+        // flattens a dead database and a rejected payload into the same sentence, and the client
+        // was then dead-lettering the first as if it were the second. Classify here, while the
+        // cause chain is intact.
+        errors.push({
+          id: mut.id, domain: mut.domain, date: mut.date, error: String(err),
+          ...(isRetryableWriteError(err) ? { retryable: true } : {}),
+        })
       }
     }
 
