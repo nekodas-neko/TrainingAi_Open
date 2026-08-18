@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.1",
+    date: "2026-08-18",
+    changes: [
+      "Fixed the session-RPE rating silently not saving in one case. Rating a workout that the server did not have a record of reported success and saved nothing \u2014 and on the phone the pending change was then thrown away, so the rating stayed on the device and never reached the server, with nothing left to retry. It is now reported as a failure and retried, so it either lands or shows up as failed instead of quietly disappearing.",
+    ],
+  },
+  {
     version: "1.324.0",
     date: "2026-08-18",
     changes: [
