@@ -259,7 +259,13 @@ const BASELINE = {
   // owner choosing between them, and an implementer must not have to open the review to learn that.
   // Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
   'docs/implementation-backlog.md': 7276,
-  'CLAUDE.md': 1010,
+  // Raised 2026-08-18: 1010 -> 1044. The "Decisions That Come Back To Me" section, which sets the
+  // default shape for anything gated on an owner decision — recommendation first, alternatives with
+  // what each is better at, reversal cost, plain English — and pushes cheap reversible choices back
+  // down to the session rather than surfacing them. It belongs in the index: it governs every
+  // session's behaviour rather than recording one session's work. Drafted at 49 lines and cut to 34
+  // before raising, since a rule about brevity that arrives verbose argues against itself.
+  'CLAUDE.md': 1044,
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;
