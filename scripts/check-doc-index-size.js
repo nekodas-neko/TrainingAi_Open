@@ -161,6 +161,13 @@ const root = path.join(__dirname, '..');
 // wrong: the existing workoutKcal is a DAY total already rendering in the same screen's Energy
 // section, and the estimate is duration-only, so sitting it beside measured volume implies a
 // derivation that does not exist.
+//
+// Raised 2026-08-18 (BugFix intake, Q-392): +64 for one owner-reported queue entry — preferences are
+// localStorage-only, so a reinstall or a second browser starts from defaults. Most of the length is
+// the inventory table of which preference lives in which key and file, which is the work an
+// implementer would otherwise repeat. Also records that the pattern already exists (Q-241 made goals
+// server-authoritative and left hydrateGoalSeeds behind), and that users.food_region is a dead
+// column whose setting is device-only — the cheapest possible proof of the approach.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -352,17 +359,12 @@ const BASELINE = {
   // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
   // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
   // fourth time. Recomputed from the MERGED file.
-  // Raised 2026-08-18 (Tuning): 7257 -> 7271. Live evidence on Q-501 — after both recalibrations
-  // deployed, 0 of 96 derived rows carried a readiness model version and a bulk job had bumped
-  // updated_at on all of them without rewriting a score. It belongs in the entry because it is what
-  // stops the next person auditing the ship by timestamp. Recomputed from the MERGED file.
-  // Raised 2026-08-18 (Tuning): 7271 -> 7302, recomputed after merging main (which struck 21 lines,
-  // so the entry's own +52 lands at a lower number than it was first measured at). Q-506 — the illness radar has never produced an
-  // action-bearing flag in 46 days because one of its four biomarkers is scored against a baseline
-  // whose deviation is 18.7x too large. The measured biomarker table and the cold-start numbers are
-  // the entry: without them the next reader lowers the threshold instead of fixing the baseline,
-  // which is the mistake Q-504 already made and reverted. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7302,
+  // Raised 2026-08-18 (Tuning): -> 7366, recomputed from the MERGED file. Q-506 — the illness radar
+  // has never produced an action-bearing flag in 46 days because one of its four biomarkers is scored
+  // against a baseline whose deviation is 18.7x too large. The measured biomarker table and the
+  // cold-start numbers are the entry: without them the next reader lowers the threshold instead of
+  // fixing the baseline, which is the mistake Q-504 already made and reverted.
+  'docs/implementation-backlog.md': 7366,
   'CLAUDE.md': 1044,
 
 };
