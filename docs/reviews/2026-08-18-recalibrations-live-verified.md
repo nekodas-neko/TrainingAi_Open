@@ -26,10 +26,17 @@ readiness_source ble-derived
 Two things confirmed at once:
 
 1. **The stamp is exactly the shipped constant** — `v3:ri5:2026-08-18`.
-2. **`bodyComp` survived.** The readiness stamp is written into a JSONB column shared across pillars,
-   and that write was deliberately built as a merge rather than a replace. The concern was real
-   (PR #77 found the 70 rows carrying any versions carried *only* `bodyComp`), and the merge is now
-   observed working against production data rather than argued for.
+2. **`bodyComp` survived** — the readiness write's own merge is correct.
+
+> **⚠️ CORRECTED 2026-08-18, same day.** This section originally concluded that the shared-JSONB merge
+> *"is now observed working against production data rather than argued for"*. **That was true at
+> 04:38:27 and false by 10:18:40**, when a sibling writer rewrote the row as
+> `{"bodyComp": "atlas_2_1_0"}` — the `readiness` key gone, stamped rows across the table back to
+> **0**. `upsertOuraDailyDerived` sets every column with `COALESCE(excluded, existing)`, which for a
+> `jsonb` column replaces the document whole, so the merge is left to each caller and only the
+> readiness one does it. **The readiness write merges correctly; the result does not survive the next
+> body-composition backfill.** Filed as **Q-518**,
+> [`docs/reviews/2026-08-18-model-version-clobber.md`](2026-08-18-model-version-clobber.md).
 
 ---
 
