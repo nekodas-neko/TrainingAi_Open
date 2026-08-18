@@ -69,6 +69,31 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟡 Three unauthenticated routes buffer an unbounded request body; one parses it before any check (Q-498, 2026-08-18)
+
+- **Lens taken from sweep 31's method note** — *find bounds declared one way and enforced another*.
+  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](docs/reviews/2026-08-18-unbounded-request-bodies.md).
+- **The shared guard is correct and is not the defect.** `readJsonLimited` uses `Content-Length` only
+  as a fast path and streams with a real byte counter. Measured: 20 MB to `/api/client-error` (16 KB
+  cap) was **cut off at 2,949,120 bytes**.
+- **Coverage:** 113 routes take a body, **7** are guarded, **93** are not — and of those 93 exactly
+  **3** are reachable without a session: `auth/register`, `auth/exchange-mobile-token`,
+  `health-connect/ingest`. **The seven guarded routes are all *less* exposed than these three.**
+  Measured: the two tested each accepted the **full 20,000,048 bytes**, then returned 400.
+- **⚠️ Ordering separates them.** `auth/register` and `exchange-mobile-token` rate-limit **before**
+  parsing, so the rate is bounded. **`health-connect/ingest` reads at line 35 and Zod-parses at 40 but
+  rate-limits at 53 and checks the secret at 58** — a caller **holding no secret** makes the server
+  buffer and fully parse an arbitrary body, unthrottleable because the limiter runs after.
+- **Compounds with Q-493:** all three limiters key on the spoofable `x-forwarded-for` leftmost hop, so
+  the ordering that protects the two auth routes is itself bypassable. Two independent defects that
+  remove each other's mitigation.
+- **Fix:** route the three through `readJsonLimited`, **and** move the limiter + secret check above the
+  body read on the ingest route — the second is the larger win and is independent of the first.
+- **Not exercised:** the actual ceiling was **not** probed (20 MB proved there is no cap; going further
+  risked destabilising the server for no extra information). Railway's edge may impose its own limit —
+  not checked. No device, no production.
+
+
 ### [platform] 🟡 A 31-day range that passes every guard makes two admin routes loop forever (Q-497, 2026-08-18)
 
 - **Applied sweep 30's lesson to the *other* secret-gated route.** `admin/day-review` is gated by
