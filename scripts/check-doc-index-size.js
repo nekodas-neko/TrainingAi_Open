@@ -196,7 +196,7 @@ const BASELINE = {
   // step in the trend chart where the old and new model scores meet, and no device verification.
   // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
   // other lanes twice, which is the case the note below warns silently drops one side.
-  'projectOverview.md': 6751,
+  'projectOverview.md': 6791,
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
@@ -213,7 +213,7 @@ const BASELINE = {
   // Raised 2026-08-18 (Tuning, Q-504): 6947 -> 6979. One queue entry for the Readiness range
   // recalibration, carrying the measured before/after table for the five action thresholds that ride
   // on the readiness scale — the reason the item is held rather than shipped.
-  'docs/implementation-backlog.md': 6979,
+  'docs/implementation-backlog.md': 7037,
   'CLAUDE.md': 1010,
 };
 

@@ -99,6 +99,8 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-459 — the rolling `apk-latest` release is delete-then-recreate, so the advertised APK download URL 404s during every native merge). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
 
+- [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — `DELETE /api/phase-sets/[id]` answers a missing row with a 500 while `PUT` on the same resource answers 400). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
+
 ## Open issues
 
 ```bash

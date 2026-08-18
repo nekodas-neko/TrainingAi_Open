@@ -69,6 +69,46 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][nutrition][cardio][activity] 🟠 Nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for one question (Q-463, 2026-08-18)
+
+- **Two halves.** The nutrition/cardio/activity mutations probed cross-user exactly as workouts were;
+  then — because the workout sweep's Q-462 looked like it might not be a one-off — **every dynamic
+  write route in the app** called with a fabricated UUID to ask one question uniformly: what happens
+  when the row you named does not exist? 33 endpoints answered. Full tables and limits:
+  [`docs/reviews/2026-08-18-write-surface-not-found.md`](docs/reviews/2026-08-18-write-surface-not-found.md).
+- **✅ Cross-user protection holds here too.** Nine mutations by a second live account against the
+  owner's real rows, with the owner's rows re-read from Postgres afterwards: the supplement is still
+  `Creatine`, the food log still `1.5`, the meal type still `Breakfast`, the activity log still alive.
+  **Combined with the workout sweep, every workout, nutrition, cardio and activity mutation reachable
+  in this harness has now been probed cross-user, and none leaked or destroyed another user's row.**
+  A control ran for every probe — four of them returned bodiless 500s that looked like faults, and the
+  controls returning 200 are what established those were genuine rejections rather than my bad payloads.
+- **🟠 Q-463 — the not-found answer is inconsistent, and five routes give it as a 500.** `PATCH
+  /api/injuries/[id]`, `PUT /api/nutrition/meal-types/[id]`, `PATCH /api/supplements/[id]`, `POST
+  /api/supplements/[id]/log` (all four with an **empty body**) and `DELETE /api/phase-sets/[id]` —
+  plus `/api/log-exercise`, already filed as Q-462, which this generalises. One cause: **16 bare
+  `throw new Error('… not found')`** in the repository layer with nothing mapping them at the route.
+  `PUT`/`DELETE` on `phase-sets/[id]` return **400 and 500** for the same condition with the same
+  message; neither is 404.
+- **Why it is not cosmetic.** A 5xx tells the sync client to **back off and retry** a mutation that can
+  never succeed (`CLAUDE.md`'s poison-pill rule classifies by status); an empty-body 500 makes the
+  client's `res.json()` throw on top of the original failure; and every correctly-refused request
+  writes a stack trace into **`error_events`**, the one fault view nobody watches, which prunes at 30
+  days and is read at every session start. `/api/nutrition/meal-plans/*` is the in-repo reference —
+  all five of its write endpoints already return a clean 404.
+- **✅ Recorded as clean rather than filed:** the seven `DELETE`s returning 200/204 for an absent row
+  are **defensible** — `DELETE` is idempotent by convention, the desired end state holds, and the
+  outbox is right to treat it as done. That is what distinguishes them from Q-460, where the desired
+  end state was a stored RPE and it did **not** hold. Written down so the benign half of the pattern
+  is not filed later.
+- **✅ The nutrition screen renders and reads correctly** — day totals, the water figure reflecting a
+  write made through the API minutes earlier, meal sections and per-meal macros, with zero page
+  errors, zero console errors and zero failing `/api/` responses.
+- **NOT device-verified.** Web build only. The 12 endpoints that returned 400 did so from body
+  validation *before* the id lookup and are **excluded as evidence** rather than counted as correct.
+  The meal-plan generation, running-plan write and barcode/scan paths were not exercised.
+- **Nothing was fixed.** Q-463 is queued directly above Q-462, the instance it generalises.
+
 ### [workouts][platform] 🟠 The workout write path probed cross-user for the first time — protection holds; a silent dropped write and an un-automatable core flow (Q-460…Q-462, 2026-08-18)
 
 - **The lens.** Every prior sweep of this pillar read the model (1RM, RPE, autoregulation, deload) or

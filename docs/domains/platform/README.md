@@ -138,6 +138,8 @@ layer**) through §16. Read it before building any shared helper.
 
 - [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-460 missing affected-row check on a client-id-driven scoped UPDATE, Q-462 a permanent ownership refusal reported as a transient 500). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
 
+- [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — 16 bare `throw new Error('… not found')` in the repository layer reach five routes as 500s; the sync client classifies 5xx as retryable). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
+
 ## Open issues
 
 ```bash

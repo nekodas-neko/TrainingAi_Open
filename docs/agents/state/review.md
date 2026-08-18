@@ -3,11 +3,32 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** three sweeps (2026-08-17 ×2, 2026-08-18) · **Q band:** 450–499 (next free: **463**)
+**Updated:** 2026-08-18 · **By:** four sweeps (2026-08-17 ×2, 2026-08-18 ×2) · **Q band:** 450–499 (next free: **464**)
 
 ## Now
 
-Three sweeps have run under this role. All are **merged** (#16, #38, and the workout write-path PR below).
+Four sweeps have run under this role — #16 and #38 are merged, and the two 2026-08-18 sweeps below.
+
+### Sweep 4 — nutrition/cardio/activity writes, and the not-found answer app-wide (2026-08-18)
+
+Owner asked for section-by-section coverage. Write-up:
+[`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md).
+
+**Filed — Q-463** (sits directly above Q-462, the instance it generalises): the "row does not exist"
+answer is inconsistent across 33 dynamic write endpoints, and **five return a 500** (four with an
+empty body). One cause — 16 bare `throw new Error('… not found')` in the repository layer with no
+route mapping. Matters because a 5xx makes the sync client retry what can never succeed, and every
+refused request writes a stack trace into `error_events`.
+
+**CLEAN:** cross-user protection holds across nutrition/cardio/activity too (nine probes, owner's rows
+re-read, control for each) — so **all four write pillars are now probed and none leaked**. And the
+seven idempotent `DELETE`s returning 200/204 for an absent row are **defensible, deliberately not
+filed** — the reasoning is in the review so it is not re-litigated.
+
+**Section coverage so far.** The write surface is swept for workouts, nutrition, cardio, activity,
+and (via the app-wide probe) body/devices/platform/app-shell. **`sleep`, `readiness` and `heart-rate`
+barely expose dynamic write routes at all** — they are read-and-derive pillars whose writes arrive
+through ingest and sync, so they need a different lens, not this one. That is the next sweep.
 
 ### Sweep 3 — the workout write path, driven live and probed cross-user (2026-08-18)
 
