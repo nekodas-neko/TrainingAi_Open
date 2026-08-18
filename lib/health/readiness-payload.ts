@@ -27,7 +27,7 @@ import { accumulateZoneSeconds, activeMinutesFromZoneSeconds } from '@trainingai
 import { computeMovedHours, moveHoursGoal } from '@trainingai/shared/health/hourly-movement'
 import { excludeLowWearDays, toOuraByDate, isLowWearDay } from '@trainingai/shared/health/wear-confidence'
 import { baselineZ } from '@trainingai/shared/health/personal-baseline'
-import { computeReadinessComposite, checkinScoreFromEnergy, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
+import { computeReadinessComposite, checkinScoreFromEnergy, READINESS_MODEL_VERSION, type ReadinessCompositeResult } from '@trainingai/shared/health/readiness-composite'
 import { resilienceLevelToBand } from '@/lib/health/stress-resilience'
 import { computeIllnessRadar, illnessAdvisory, illnessZScores, type IllnessFlag, type IllnessBiomarker, type IllnessBiomarkerKey } from '@trainingai/shared/health/illness-radar'
 import { isPreRekey } from '@/lib/oura/cloud-freshness'
@@ -528,10 +528,20 @@ export async function buildReadinessPayload(userId: string, tz: string): Promise
   // stay null, since nothing recorded them at the time.
   if (ownComposite && (latestSummary || genericComposite)) {
     try {
+      // `model_versions` is one shared JSONB across every pillar on this row, and the upsert writes a
+      // provided column wholesale — so it is MERGED with what is already stored rather than replaced.
+      // Writing `{ readiness: ... }` alone would drop bodyBattery's stamp and any other pillar's.
+      //
+      // Stamped from 2026-08-18 (Q-273): without it, the range calibration that shipped the same day
+      // leaves an unmarked step in the readiness trend where old and new model scores meet, and no
+      // later correlation can tell an input change from a model change. Sleep shipped without one and
+      // has exactly that problem.
+      const existingVersions = (derivedToday?.modelVersions ?? {}) as Record<string, unknown>
       await repo.upsertOuraDailyDerived(userId, latestSummary?.date ?? todayIso, {
         readinessScore: ownComposite.score,
         readinessContributors: ownComposite.contributors,
         readinessSource: latestSummary ? 'ble-derived' : 'generic-derived',
+        modelVersions: { ...existingVersions, readiness: READINESS_MODEL_VERSION },
       })
     } catch (err) {
       console.error('[readiness-score] readiness persist failed (read still served):', err)

@@ -150,10 +150,16 @@ describe.skipIf(!canRun)('aggregateOuraRawSamples — overnight IBI volume', () 
     expect(summary.latestHrvRmssd).toBe(42)
     expect(summary.latestSpo2).toEqual({ pct: 97, calibrated: true })
 
-    // byEventName carries the tag so undecoded tags stay distinct (all share the
-    // event_name 'unknown').
-    const unknown = summary.byEventName.find((b) => b.eventName === 'unknown')
-    expect(unknown?.tag).toBe(0x77)
+    // byEventName carries the tag so undecoded tags stay distinct.
+    //
+    // Q-541 Task 3: the name is now derived from `eventName(tag)` rather than read from the stored
+    // `event_name` column, because a packed frame does not carry one — and grouping on a column one
+    // tier lacks would split a single tag into two rows. The fixture deliberately stores the STALE
+    // 'unknown' for 0x77, so this also pins the consequence: a stored name that has drifted from
+    // the decoder no longer reaches the summary. That drift is real — `refreshRawSampleEventNames`
+    // exists to repair it — and deriving is what makes the repair unnecessary.
+    const undecoded = summary.byEventName.find((b) => b.tag === 0x77)
+    expect(undecoded?.eventName).toBe('spo2_dc_event')
 
     // Inspector: one newest row per event type, including the undecoded one (decoded null).
     const tags = new Set(summary.latestByTag.map((r) => r.tag))

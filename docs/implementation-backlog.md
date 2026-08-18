@@ -320,6 +320,61 @@ below threshold and left in place for next time.
 - **Worth a sweep:** any other test inserting `now() - interval '…'` and querying a user-local day
   window has this exact hole. `grep -rn "now() - interval" lib/data/postgres/__tests__/`.
 
+### [workouts][app-shell] Q-390 — the deload "D" is its own flex row, so it lifts that day's bar out of line with the rest
+
+- **Branch:** `fix/training-load-day-flag-inline`
+- **Added:** 2026-08-18 · owner, with a screenshot of Health → Training: *"look at the format;
+  reccomend doing Mon (D) instead so it fits better."*
+- **What the screenshot shows** (it will not survive into an implementer's session): the TRAINING
+  LOAD card, week Mon–Sun. Mon carries a green striped bar with a small amber **D** on its own line
+  *below* the "Mon" label; Tue carries a solid orange bar with no flag; Wed–Sun are empty grey
+  slivers. **Mon's bar visibly sits higher than Tue's and collides with the "TRAINING LOAD"
+  heading above it**, which is the part the owner did not ask about and is the actual defect.
+- **Confirmed root cause, one line of markup.** `components/stats/weekly-stats-hub.tsx:98-107`
+  renders the flag as a *sibling* of the day label inside a column flex:
+  ```tsx
+  <div className="flex flex-1 flex-col items-center gap-1">   // :77 — the day column
+    <div style={{ height: totalHeight }}>…bars…</div>
+    <span className="text-[9px] …">{day.label}</span>
+    {day.isDeload  && <span className="text-[8px] … text-amber-500">D</span>}
+    {day.isTesting && <span className="text-[8px] … text-purple-500">T</span>}
+  ```
+  so each flag becomes an extra **row**, which is the "D on its own line" the owner sees.
+- **Why that is more than cosmetic.** The row of columns is
+  `<div className="flex items-end gap-1 h-14">` (`:62`) — **`items-end`, fixed 56 px**. The columns
+  are already taller than their container and overflow *upward*; adding a flag row makes that
+  column taller still, so its bar is pushed further up than its neighbours:
+
+  ```
+  column with a flag:  52 bar + 4 + 13.5 label + 4 + 8 flag = 81.5 px   (25.5 px above the container)
+  column with none:    52 bar + 4 + 13.5 label              = 69.5 px   (13.5 px above)
+  difference:                                                  12 px
+  ```
+
+  **The bars are therefore not on a common baseline whenever any day is flagged** — a deload or
+  testing day reads ~12 px taller than an identical unflagged day, on a chart whose whole purpose is
+  comparing days against each other. That is the misreading, and the collision with the heading is
+  the same 25.5 px overflow reaching the `mb-3` gap above.
+- **The owner's fix resolves both**, which is why it is the right one: inline the flag into the
+  label span (`Mon (D)`) and the extra row disappears, every column becomes the same height, and the
+  bars land on one baseline again.
+- **Three things to get right while doing it:**
+  1. **Keep the letter, not just the colour.** `CLAUDE.md`'s colour-only-state rule is currently
+     satisfied because the glyph *is* the non-colour channel. `(D)` keeps that; a coloured dot would
+     not.
+  2. **Both flags can be true at once** — the two `&&` blocks are independent, so a day can render
+     `D` and `T` together. `Mon (D)(T)` is ~10 characters in a column roughly 50 dp wide at the S25
+     viewport, which is where it will wrap or clip. Decide the combined form (`Mon (D·T)`?) rather
+     than discovering it on a testing-week screenshot.
+  3. **Check the container height after the change.** Columns overflow `h-14` by 13.5 px even with
+     no flag, so `h-14` is already too small for its contents; inlining removes the *difference* but
+     not the overflow. Either raise the container or move the labels out of the fixed-height row.
+- **Evidence that would confirm it end-to-end:** seed a week where one day is a deload and another
+  has identical volume without the flag, and check the two bars' top edges land at the same y. Today
+  they will differ by ~12 px.
+- **Surface:** browser-reproducible at the S25 viewport (≤640 px) — no device, no native path, no
+  production data needed. `weekly-stats-hub.tsx` is Lane B's (`components/**`).
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
@@ -416,6 +471,33 @@ below threshold and left in place for next time.
   which is what it is usually reached for.
 - **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
   row. Do not run a full redecode while those are open.
+
+### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
+
+- **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
+- **Added:** 2026-08-18 (found while measuring production for Q-541)
+- **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
+  12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
+  database** held by four rows.
+- **This is dead weight, not data.** Q-539 diagnosed the cause: one fault wrote **5,771 rows** because
+  the dedupe key varied with a generated `VALUES` list, each stored message truncated to exactly
+  2,000 chars of `(default, $N, $N),` boilerplate. Q-539 fixed the key and cut the cap to 1,000, and
+  the rows themselves have since been pruned — but Postgres MVCC leaves the dead tuples in place, so
+  the file never shrank. **Nothing here re-grows**: the write path is already fixed, so this is a
+  one-off reclaim, not a recurring chore.
+- **Why it is worth a queue entry rather than a footnote:** it is the cheapest MB in the database
+  against the owner's end-of-week 500 MB deadline (Q-534). Q-541's packing is worth ~680 MB and is
+  several sessions of careful work; this is ~49 MB for a single statement over a four-row table, with
+  no data at risk and no read path to reason about.
+- **Shape:** the existing `app/api/oura-ble/samples/vacuum/route.ts` already runs
+  `VACUUM (FULL) oura_raw_samples` behind an admin gate — generalise it to take a table name from a
+  small allowlist, or add a sibling. `VACUUM FULL` takes an ACCESS EXCLUSIVE lock and rewrites the
+  table; on four live rows that is milliseconds, but it still needs free disk equal to the current
+  file (49 MB against a 5 GB volume — not a constraint today, and worth re-checking if the volume is
+  cut back to 500 MB before this runs).
+- **Verification:** `pg_total_relation_size` before and after via `/api/admin/db-query`, and
+  `SELECT count(*) FROM error_events` unchanged either side. Do not assume the count is 4 by the time
+  it runs — read it first.
 
 ### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
 
@@ -556,7 +638,7 @@ below threshold and left in place for next time.
 - **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
   — full implementation plan, written 2026-08-17. Decision context in
   [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
-- **Branch:** `perf/oura-raw-frame-packing`
+- **Branch:** `perf/oura-two-tier-frame-reader` (Tasks 0–2 landed on `perf/oura-raw-frame-packing`)
 - **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
 - **Added:** 2026-08-17
 - ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
@@ -570,6 +652,20 @@ below threshold and left in place for next time.
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
+- 🚧 **Task 3 SHIPPED 2026-08-18 (v1.318.12) — the two-tier reader.**
+  `lib/data/postgres/slices/oura-raw-frames.ts`: `readRawFrames` (ds range + tags, ascending) and
+  `readRecentRawFrames` (newest-first, limited), returning **exactly the shape of the `select` they
+  replace**. Eleven read sites converted — the rollup, both step-feature reads, the temp/MET and
+  battery range reads, the two tag censuses, the admin raw dump and the summary. Still inert in
+  production: nothing writes a blob yet.
+  Three findings worth not re-deriving: **(a)** an aggregate cannot use the reader's identity dedupe,
+  and the summary's per-tag counts double-counted a bucket sitting in both tiers — 80 frames read as
+  120 on the dev server — so they now anti-join on `(epoch, tag, ds_bucket)`; **(b)** `event_name` had
+  to become derived from `tag`, because a packed frame carries none and grouping on a column one tier
+  lacks splits a tag into two rows; **(c)** a tag dormant longer than the hot window needs a cold
+  fallback in three places or it reads as never having produced data.
+  Verified on `pnpm dev` by rehearsing the packer by hand over four seeded ring-days: every read is
+  byte-identical across all-hot, both-tiers and hot-rows-deleted.
 - 🚧 **Tasks 0–2 SHIPPED 2026-08-17 (v1.318.11), additively.** Task 0 answered structurally rather
   than by counting — `epoch` is **not** in the dedup unique constraint, so a cross-epoch duplicate
   was never insertable, and the count the plan proposed now returns "none" for the wrong reason
@@ -577,9 +673,9 @@ below threshold and left in place for next time.
   regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
   with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
   row has moved** — `oura_raw_samples` and the ingest path are untouched.
-  **Remaining: Tasks 3–7** — the two-tier reader, the packer, the backfill, the hot-window prune, and
-  the `measured_at` range-query sweep. The packer's delete is the only destructive step in the plan
-  and is gated on a proven-equal re-read (§6); it has not been written.
+  **Remaining: Tasks 4–7** — the packer, the backfill, the hot-window prune, and the `measured_at`
+  range-query sweep. The packer's delete is the only destructive step in the plan and is gated on a
+  proven-equal re-read (§6); it has not been written.
 - ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
   plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
   and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
@@ -2567,61 +2663,86 @@ session working from a temporarily restored copy.
   is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
 
-### [readiness][workouts] Q-504 — recalibrate the Readiness range, and re-anchor the five thresholds that ride on it
+### [activity] ⛔ Q-505 — Activity Score: redesign as a daily effort meter with a target (2 owner decisions open)
 
-- **Branch:** `fix/readiness-range-calibration` · **Lane:** A
-- **Added:** 2026-08-18 · Tuning · owner-directed range work ·
-  [`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](reviews/2026-08-18-sleep-score-range-recalibration.md) §6
-- **Not blocked on the owner** — they directed the range work explicitly. It is held only because of
-  blast radius, and the analysis is already done.
-- **Measured.** Even with v1.319.0's new Sleep Score feeding its `previousNight` term, readiness is
-  mean 68.9, sd 11.6, **IQR 64.4–75.7 (11 points)**, nothing above 87, nothing in the 30s or 40s.
-  Same structural cause as Sleep: a blend of nine contributors shrinks spread by ~1/sqrt(9).
-- **The fix is known and measured.** A `SCORE_CALIBRATION`-style transform on the composite, anchored
-  on its own percentiles (p2/p10/p25/p50/p75/p90/p98 -> 25/42/55/68/81/91/97), gives **mean 66.8,
-  sd 19.3, range 15–99, 4 days >= 90 and 6 below 50** — the owner's stated acceptance test.
-- **Why it is not shipped: five action thresholds ride on the readiness scale**, and the change moves
-  **12 of 26 days across at least one.** Days below each, now -> after: early-deload `<45` **1 -> 4**;
-  band `50` 1 -> 6; AI low-readiness `<60` 4 -> 8; band `70` 12 -> 15; rest-day "train hard" `>=75`
-  19 -> 17.
-  - The **band** moves (50, 70) are the intended outcome — more days reading "Low" is what a working
-    range looks like. Leave them.
-  - The **action** thresholds are not. Shipping as-is quadruples early-deload firing, which the owner
-    did not ask for. Re-anchor each to preserve its firing RATE, exactly as `LOW_SLEEP_SCORE`
-    60 -> 42 was handled in v1.319.0 (that PR's §5 is the worked example).
-- **Files:** `packages/shared/src/health/readiness-composite.ts` (the calibration),
-  `lib/health/readiness-payload.ts:47` (`EARLY_DELOAD_SCORE_MAX`),
-  `packages/shared/src/ai-periodization/ai-dynamic.ts:231`,
-  `packages/shared/src/health/rest-day-guidance.ts:36,46`, `lib/oura-models/inference/ots.ts:151`.
-- **Sequencing:** **Q-273 (model versioning) first, or stamp a readiness version in the same PR.**
-  Sleep shipped without one and its trend chart now has an unmarked step at the changeover — do not
-  repeat that on readiness. **Q-500 (Recovery Index anchor 6 -> 5) becomes lower priority** once this
-  lands: it was a 1-point correction aimed at the same range problem this fixes wholesale, and it
-  should be re-measured *after* this rather than stacked with it.
+- **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
+- **⛔ blocked: owner decision.** Not sign-off on a number — a decision about what the score means.
+  Both answers below are coherent and they are different products.
+- **Added:** 2026-08-18 · Tuning ·
+  [`docs/reviews/2026-08-18-activity-score-calibration.md`](reviews/2026-08-18-activity-score-calibration.md)
+- **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
+  same-day steps **r = +0.417** — and **2026-08-12 scored 76 on 828 steps while 2026-08-16 scored 64
+  on 8,935**. Steps span 29x across the window; the score moves 25 points.
+- **Why (three measured causes):**
+  1. `strengthFreq` (25) + `strengthVolume` (20) are **45 of 100** and both roll over 7 days. The
+     owner has logged **exactly one session/day for 27 consecutive days**, so `strengthFreq` is
+     near-constant by construction.
+  2. `activeCalories` is non-null on **1 of 47 days** and zone-2+ minutes are **0 on 22 of 27**. Both
+     get excluded and the weights renormalise, leaving roughly **steps 24% · moveHours 16% ·
+     strengthFreq 33% · strengthVolume 27%** — 60% on the near-constant terms.
+  3. `adjustment` is **0 on all 22 days**: `ACWR_TAPER_START = 1.5` has never been reached, so the
+     only place ACWR enters this score is inert.
+- **A range calibration is NOT the fix here, unlike Sleep (Q-503).** Stretching preserves ranking, so
+  it would make the "828 steps beat 8,935 steps" ordering *more* emphatic. Do not copy the Sleep
+  technique onto this pillar.
+- **DECIDED 2026-08-18 — the owner chose (a): it scores TODAY.** Design proposal with the measured
+  input audit:
+  [`docs/superpowers/plans/2026-08-18-activity-score-redesign.md`](superpowers/plans/2026-08-18-activity-score-redesign.md).
+  Brief: steps/day, movement distribution, zone minutes (daily + against a weekly target), exercise
+  minutes, a weekly-to-daily target split; hitting everything = 100; doubles as guidance
+  ("keep it under X today on a deload").
+- **Two owner decisions remain open in that plan** — how hard over-exertion should hit readiness, and
+  what the colour bands mean once a *low* score can be correct on a rest day.
+- **⚠️ A prerequisite bug found while auditing the inputs: `daily_zone_minutes` computes zones against
+  `max_hr = 187` (220 − age) on all 27 days, while Body Battery resolves this owner's MEASURED max at
+  168** (`resolveBatteryHrMax`, Q-57). Every zone boundary sits ~19 bpm too high, which is why zone 2
+  averages **1 min/day** and zone 1 absorbs **554**. Two parts of the app disagree about the same
+  user's max HR — a One-Formula-One-Place violation independent of this work. **Fix it before
+  weighting any zone lane**, or the lane ships dead like `activeCalories` (non-null 1 of 47 days).
+- **"Steps per hour" has no source** — `step_live_windows` holds **11 rows total**. Use the existing
+  HR-derived `moveHours` proxy (`packages/shared/src/health/hourly-movement.ts`), which exists for
+  exactly this reason; do not build hourly step ingest for it.
+- **If (a):** re-weight first, then measure the new distribution, then apply a range calibration only
+  if still compressed — and re-anchor any threshold on the activity scale in the same PR (Q-503's §5
+  is the worked example).
+- **Related, not fixed by this:** Q-278 (the score is absent on more than half of days and the UI does
+  not distinguish that from a real score) and Q-277 (the original discrimination finding). Also worth
+  doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
+  `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
 
-### [readiness][body] Q-502 — Body Battery's tuning substrate is a biased sample of each day
+### [readiness] Q-504 — REFUTED: readiness should NOT get a range calibration; fix Q-500 instead
 
-- **Branch:** `fix/body-battery-end-of-day-snapshot`
-- **Added:** 2026-08-17 · Tuning agent ·
-  [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md) §3
-- **Not blocked on the owner** — this is a data-capture fix, not a scoring change.
-- **Measured.** `GET /api/body-battery` computes on read and writes through, so each
-  `body_battery_daily` row is as of the last time the app was opened that day. Comparing
-  `hr_sample_count` against the samples actually in `oura_heartrate` for the same waking window:
-  2026-08-04 **74 of 3,991 (1.9%)**, 08-16 **64 of 2,656 (2.4%)**, 08-11 125 of 1,451 (8.6%), against
-  08-05 at 88% and 08-14 at 62%. Not `preferStrapBuckets` thinning — that cannot turn 3,991 into 74.
-- **Why it matters.** Draining spreads across the waking day; the charge window is concentrated in
-  genuine rest, which is back-loaded into the evening. A midday snapshot therefore captures more of
-  the day's drain than its charge, so **every charge/drain ratio computed from this table is biased
-  upward by an unknown amount** — including Q-272's headline 5.6×, and including the v1/v4 rows it is
-  compared against. No constant can be fitted against a target that moves with when the app was opened.
-- **The fix is already named** in [`docs/body-battery-tuning.md`](body-battery-tuning.md)'s caveats —
-  a scheduled end-of-day recompute — but recorded there as optional ("if rigour demands it") and
-  scoped only to `end_value`. It applies to `total_charged`/`total_drained` too, and it is a
-  prerequisite for Q-272 rather than a nicety. **Note there is no cron layer** (see
-  [`docs/module-map.md`](module-map.md) §0), so this needs a mechanism decision, not just a job.
-- **Sequencing:** do this **before** Q-272. Tuning constants against a biased substrate produces a
-  constant fitted to the owner's app-opening habits.
+- **Added:** 2026-08-18 · **Resolved the same day, by implementing it and finding it wrong.**
+  [`docs/reviews/2026-08-18-readiness-range-refuted.md`](reviews/2026-08-18-readiness-range-refuted.md)
+- **What this entry used to say:** readiness has Sleep's compression problem and the same
+  `SCORE_CALIBRATION` fix is measured and ready (mean 66.8, sd 19.1, range 15–99), held only on the
+  blast radius of five action thresholds. **Both halves of that are wrong.**
+- **Why the calibration is wrong here, not just risky.** It was implemented and the suite failed on
+  7 tests across 4 files. Three encode invariants the composite genuinely holds, and a post-hoc
+  transform on the blend breaks all three: **contributions no longer sum to the displayed score**
+  (the score-audit panel's whole job), **all-neutral input stops mapping to 50** (it gave 35), and
+  **skipping the check-in can reach 100** (a deliberate cap defeated). The first is disqualifying on
+  its own — readiness drives every training recommendation, and making its explanation panel stop
+  adding up is a worse outcome than a narrow range.
+- **Why the in-model lever fails too.** `Z_POINTS_PER_UNIT` would widen spread while preserving all
+  three invariants (z=0 → 50 at any slope). But the z-based contributors are **already wide and
+  already saturating**: `hrvBalance` sd **27.1** with a median implied |z| of **1.26** against a
+  ceiling at 1.5; `sleepBalance` sd **32.3**, both reaching the 0 and 100 rails. Raising the slope
+  pushes more days onto the rails and compresses the ends.
+- **There is no compression bug.** Contributors carry sd 17–32; the composite carries sd ~11–13.
+  Treating the weighted sds as independent predicts **7.7** — so readiness is already extracting
+  *more* spread than independence would give. Against the owner's test it is the healthiest pillar
+  (range 29–87, sd 13.0, with genuinely low days), unlike Sleep's 27-of-35 above 85.
+- **Its real weakness is the CEILING** — 1 of 34 days reaches 85 — and the term dragging it down is
+  `recoveryIndex`, **mean 35.3**, the lowest of the nine by 20 points. **That is Q-500.** This session
+  had demoted Q-500 to "lower priority since Q-504 fixes the range wholesale"; that is corrected —
+  **Q-500 is the readiness fix.**
+- **Also note:** readiness moves on its own from v1.319.0. `previousNight` is 16% of the weight and
+  the Sleep Score's mean fell ~87 → ~70, so readiness's mean drops roughly **1.8 points** with nothing
+  else changed. Re-measure before drawing conclusions from the new numbers.
+- **Shipped from this entry:** the readiness `model_version` stamp (Q-273's readiness half) — merged
+  into the shared `model_versions` JSONB rather than replacing it, so `bodyBattery`'s stamp survives.
+  Sleep shipped without one and left an unmarked step in its trend chart; readiness will not.
 
 ### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
 

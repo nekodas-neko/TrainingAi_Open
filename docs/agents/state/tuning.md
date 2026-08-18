@@ -3,27 +3,36 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 505)
+**Updated:** 2026-08-18 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 506)
 
 ## Now
-Sleep Score recalibrated and shipped (**v1.319.0**, Q-503) — mean 84.1 → 69.5, sd 15.9 → 16.6, range
-32–99, every band populated. Evidence:
-[`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](../../reviews/2026-08-18-sleep-score-range-recalibration.md).
+The owner's three-pillar range pass is complete as far as it can go without them.
+- **Sleep — SHIPPED** (v1.319.0, Q-503): mean 84.1 → 69.5, sd 15.9 → 16.6, range 32–99, every band
+  populated. [`review`](../../reviews/2026-08-18-sleep-score-range-recalibration.md).
+- **Readiness — Q-504 REFUTED** (2026-08-18): the calibration was implemented and is *wrong* here.
+  It breaks three real invariants (contributions no longer sum to the score, all-neutral stops giving
+  50, no-check-in can reach 100) and the z-slope lever fails too — those contributors already
+  saturate. Readiness is in fact the healthiest pillar; its ceiling is the issue, and the fix is
+  **Q-500**. [`review`](../../reviews/2026-08-18-readiness-range-refuted.md).
+- **Activity — BLOCKED ON THE OWNER** (Q-505): needs a decision about what the score means, not a
+  number. [`review`](../../reviews/2026-08-18-activity-score-calibration.md).
 
 ## Next
-1. **Q-504 — Readiness range calibration.** Analysis is done and in the review's §6; it is held only
-   on blast radius, not on the owner. Re-anchor the five action thresholds to preserve firing rates
-   before shipping the calibration, and land **Q-273 (model versioning) first**.
-2. **Q-277 — Activity Score** (n=22, sd 7.3, range 56–91) is the most compressed pillar and has not
-   been analysed at all.
+1. **Q-500 is now the readiness fix** — not the footnote this baton previously called it. Its
+   `recoveryIndex` contributor has mean **35.3**, lowest of the nine by 20 points, and is what caps
+   readiness at 1 day ≥85. Still awaiting the owner.
+2. **Q-505 — Activity Score.** Analysed; waiting on the owner to choose between "score today"
+   (re-weight toward the same-day lane) and "score recent training" (keep weights, fix the daily
+   framing). Q-277 is the older discrimination finding this supersedes.
 3. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
 
 ## Blocked
-- **Q-500** (`RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5) — still awaiting the owner, and now **lower
-  priority**: it was a ~1-point correction aimed at the same range problem Q-504 fixes wholesale.
-  Re-measure it *after* Q-504 rather than stacking them.
+- **Q-500** (`RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5) — awaiting the owner, and **re-promoted**: with
+  Q-504 refuted it is the readiness fix, not a footnote to a bigger one.
+- **Q-505** (Activity Score) — needs an owner *decision*, not sign-off. Tuning recommends "score
+  today" and the entry says why.
 - **Q-501, Q-502** queued, not blocked — neither is a scoring change.
 
 ## Claimed paths
@@ -51,6 +60,16 @@ for this work:
 - **Q-272's direction #1 is refuted** — the Body Battery charge window is reachable on a median 6.7%
   of waking samples, so `CHARGE_RATE` scales a term that is barely active. `REST_THRESHOLD`/the
   reserve is the lever (Q-502 doc §2).
+- **A range calibration does NOT transfer to READINESS either, and for a different reason than
+  Activity.** It breaks three invariants the composite holds — contributions summing to the score
+  (the audit panel), all-neutral → 50, and no-check-in capping below 100. The z-slope alternative
+  fails because those contributors already saturate (hrvBalance median |z| 1.26 vs a 1.5 ceiling).
+  Readiness has no compression bug: contributors sd 17–32, composite sd ~12, against 7.7 expected
+  under independence.
+- **A range calibration does NOT transfer to Activity.** Stretching preserves ranking, and Activity's
+  ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
+  A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
+  Fix the weights first, measure, and only then consider a calibration.
 - Q numbers come from the band above, not the backlog's next-free pointer. No migration numbers.
 
 ## Gotchas that cost time
