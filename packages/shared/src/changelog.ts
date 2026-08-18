@@ -6,6 +6,16 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.319.0",
+    date: "2026-08-18",
+    changes: [
+      "Sleep Score has been recalibrated so it actually uses its range. It was averaging 87 with half of all nights landing between 86 and 92 — a genuinely bad night and a great one both read “high”, which made the number close to useless for telling them apart. Over the same nights it now averages 70 and spans 32 to 99, with your best nights near the top and your worst in the 30s. Nothing about your sleep changed, only how it is scored, so expect most nights to read lower than you are used to — a night in the 70s is now a good night.",
+      "Two specific things that were wrong: scoring exactly your own HRV and heart-rate baseline used to award 90 and 86 out of 100, so being merely normal read as near-perfect; and the REM target sat at 1.8 h when your own median is 1.86 h, so almost every night maxed that contributor out. Both now put your own norm in the middle of the range where it belongs.",
+      "The “your sleep score was low” rest-day hint now triggers at 42 rather than 60, so it still fires about as often as it did before rather than three times as often on the new scale.",
+      "Sleep scores from before this change are not recalculated, so the sleep trend chart will show a step where the two models meet — older days will look higher than they would today.",
+    ],
+  },
+  {
     version: "1.318.11",
     date: "2026-08-17",
     changes: [

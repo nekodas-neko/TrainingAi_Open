@@ -191,7 +191,12 @@ const BASELINE = {
   // the whole recipe, so a naive renderer prints double what scanning the label logs. Each is
   // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
   // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
-  'projectOverview.md': 6735,
+  // Raised 2026-08-18 (Tuning, Q-503 Sleep Score recalibration): 6735 -> 6751. One Known-Issues row
+  // for the shipped recalibration, marked ⚠️ not ✅ because two things are still owed — an unmarked
+  // step in the trend chart where the old and new model scores meet, and no device verification.
+  // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
+  // other lanes twice, which is the case the note below warns silently drops one side.
+  'projectOverview.md': 6751,
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
@@ -205,7 +210,10 @@ const BASELINE = {
   // since the entry was written, and the entry states one of them three different ways. Left in the
   // entry rather than a review doc because the next session to take this item reads the entry, sees
   // a green Task 3, and would close it. Recomputed from the merged file, same as the raise above.
-  'docs/implementation-backlog.md': 6947,
+  // Raised 2026-08-18 (Tuning, Q-504): 6947 -> 6979. One queue entry for the Readiness range
+  // recalibration, carrying the measured before/after table for the five action thresholds that ride
+  // on the readiness scale — the reason the item is held rather than shipped.
+  'docs/implementation-backlog.md': 6979,
   'CLAUDE.md': 1010,
 };
 
