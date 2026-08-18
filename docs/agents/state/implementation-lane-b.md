@@ -6,7 +6,30 @@
 **Updated:** 2026-08-18 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **357**)
 
 ## Now
-Nothing in flight. PRs #49, #50, #56, #58, #60 and #68 all merged. Fourteen items closed:
+Nothing in flight. **The meal-label (food sticker) work is the live thread** — Q-389 built it, Q-393
+added the ingredient breakdown, and what remains on it is two owner decisions and a print test.
+
+- **Q-393 SHIPPED** (v1.323.0, PR #94) — the per-serving ingredient breakdown, as a **square-only**
+  style. A round 50 mm label has **7 units of slack once the default's content is on it — zero
+  lines**, so the list needs the corners. Picker marks it SQUARE; the preview warns a round die crops
+  it and reports how many ingredients actually printed.
+  [Journal](../../overview/entries/2026-08-18-meal-label-ingredient-breakdown.md).
+  **⚠️ Carries a correction every later session needs: all Q-389/Q-393 module-pitch figures were ~24%
+  optimistic** — the quiet zone is drawn *inside* the code box, so the printed pitch divides by 33,
+  not 25. The default is **0.369 mm**, not 0.487. The app always showed the honest number; the docs
+  did not. **Do not quote the ÷25 figures again.**
+  **Option 2 (round, trimmed) was deliberately NOT built** — 0.353 mm true pitch, below every shipped
+  style, for three of five lines at 6.5 px. Owner decision, recommendation recorded against it.
+
+- **Q-390 SHIPPED** (v1.322.2, PR #81) — the deload flag was a sibling of the day label, so it added
+  a row and, in an `items-end` row, pushed that day's bar **12 px** off the shared baseline.
+  [Journal](../../overview/entries/2026-08-18-training-load-day-flag-inline.md).
+  Its spec took three CI rounds and the reasons are reusable: **future days are discarded** by
+  `weekly-stats` (`isFuture ? [] : …`), and **`seed.sql` fills days relative to when it runs**, so a
+  fresh CI database always has a session on the current week's Monday while an aged local one does
+  not. **Reproduce CI's database locally** (`createdb`, `migrate.js`, `seed.sql`) rather than reading
+  the job log — the log tail is filled by the Postgres container dump and never shows Playwright.
+ PRs #49, #50, #56, #58, #60 and #68 all merged. Fourteen items closed:
 
 - **Q-389 BUILT** (v1.320.0, PR #68) — printable saved-meal labels with a scannable code, four
   styles, and a scan-back that logs one serving. **Its queue entry is removed**; the two checks it
