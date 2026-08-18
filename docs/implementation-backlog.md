@@ -4496,6 +4496,59 @@ session working from a temporarily restored copy.
   its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
   `amrapScaleFactor` (Q-514); do not calibrate it.
 
+### [platform][readiness] Q-518 — the readiness model stamp survived 5h40m, then a sibling writer erased it
+
+- **Branch:** `fix/model-versions-jsonb-merge`
+- **Plan:** none — one conflict-arm expression. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-model-version-clobber.md`](reviews/2026-08-18-model-version-clobber.md)
+- **⚠️ This INVALIDATES a claim published today.** PR #85 reported the shared `model_versions` merge
+  *"held in production"*. It held for the readiness write and **does not survive the next
+  body-composition backfill**.
+- **Observed, same row (`oura_daily_derived`, day 2026-08-18), twice in one session:**
+
+  | read at | `model_versions` | `readiness_score` |
+  |---|---|---|
+  | **04:38:27** | `{"bodyComp": "atlas_2_1_0", "readiness": "v3:ri5:2026-08-18"}` | 76 |
+  | **10:18:40** | `{"bodyComp": "atlas_2_1_0"}` | 77 |
+
+  Rows 08-16/17/18 all carry `updated_at = 10:18:40`, so one job rewrote all three. Stamped rows across
+  the table went **1 → 0** (they had gone 0 → 1 earlier the same session, which is how it was noticed).
+- **Mechanism — `COALESCE` does not merge JSON.** `upsertOuraDailyDerived` sets every column as
+  `COALESCE(excluded.col, oura_daily_derived.col)`. Correct for scalars; for a `jsonb` column it picks
+  the first non-null **document whole**, so a non-null incoming value replaces the stored one entirely.
+  The merge is therefore left to each caller, and **only one of two callers does it**:
+
+  | writer | passes | merges? |
+  |---|---|---|
+  | `lib/health/readiness-payload.ts:544` | `{ ...existingVersions, readiness: … }` (reads the row first) | **yes** |
+  | `lib/data/postgres/slices/oura.ts:1664` | `{ bodyComp: BODY_COMP_MODEL_VERSION }` (flat literal) | **no** |
+
+  **The readiness code did nothing wrong** — it is the only participant honouring a convention the
+  shared writer does not enforce.
+- **Cost.** (1) **Q-501's purpose is defeated** — the stamp was the fix for "did this score move because
+  the inputs changed or the model did", and it does not survive a backfill. (2) Readiness was supposed
+  to be the pillar that *had* a stamp where sleep does not; in stored data it now does not either.
+  (3) Every future pillar that stamps has the same exposure — the next agent will copy readiness's
+  correct merge and still be clobbered.
+- **First action: move the merge into `upsertOuraDailyDerived`**, not into the bodyComp caller. For
+  `model_versions` the conflict arm should be
+  `COALESCE(existing.model_versions,'{}'::jsonb) || COALESCE(excluded.model_versions,'{}'::jsonb)` —
+  keeping every existing key and letting an incoming key win on collision, which is what both callers
+  already assume. **This is the pattern the codebase already chose one column over**:
+  `upsertOuraHeartrate`'s comment — *"this makes the guarantee the function's own, so every caller gets
+  it rather than each one remembering"* — and **Q-280 exists because two of its siblings missed it**.
+  Identical shape; fix it the same way.
+- **Do NOT patch the bodyComp caller alone** — that restores today's stamp and leaves the next writer to
+  rediscover the rule, which is how this happened.
+- **Re-verify by observation, not reasoning:** stamp a row via the readiness route, run the
+  body-composition backfill, re-read. Reasoning about this is what produced the wrong claim.
+- **Caveats.** The `||` expression above was **written, not run** — no test, no local DB. **The job that
+  ran at 10:18:40 was not identified directly**: the bodyComp backfill is the only `model_versions`
+  writer passing a flat object and its payload matches the surviving document exactly, but no
+  scheduler/trigger was traced, so **its cadence is unknown** and "short half-life" is an inference from
+  one observation. `readiness_score` also moved 76 → 77 between reads and **that is not explained here**.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

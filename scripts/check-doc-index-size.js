@@ -554,7 +554,11 @@ const BASELINE = {
 
 
   'projectOverview.md': 7122,
-  'docs/implementation-backlog.md': 8846,
+  // Raised 2026-08-18 (Tuning): -> 8919. Q-518 — the readiness model stamp is erased by a sibling
+  // writer within hours. Includes +20 that main was already carrying over its own baseline. The two
+  // timestamped readings are the entry: without them this reads as a design opinion about COALESCE
+  // rather than an observed clobber, and it is the evidence that invalidates PR #85's claim.
+  'docs/implementation-backlog.md': 8919,
   'CLAUDE.md': 1075,
 
 };
