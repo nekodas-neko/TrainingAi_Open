@@ -132,7 +132,16 @@ const root = path.join(__dirname, '..');
 // session misreading it — a stale container reading the variable as absent, and the fact that
 // nothing can verify either copy until the route exists.
 //
-// Raised 2026-08-18 (Review, Q-460…Q-462): projectOverview 6689 -> 6735, backlog 6781 -> 6895 (recomputed on a second merge).
+// Raised 2026-08-18 (BugFix intake, Q-389 multi-style + 25x25 redraw): all four label styles ship
+// with the user cycling between them, black band as the owner's default, the write-on line loses its
+// MADE word, and the mockups are redrawn with the 25x25 code a meal id actually needs. The build
+// consequence is the part worth carrying: the renderer becomes template-lookup rather than one
+// baked-in layout. Also records the measured pitch at 25x25 (band, the default, is tightest at
+// 0.487mm) and that it cannot be recovered without dropping content — with the drawn variant that
+// shows the cheapest way to. Merged with a concurrent session's work on the same entry rather than
+// over it, and rebuilt from origin/main's numbers: this file conflicted four times in one evening,
+// and splicing is how one side gets silently dropped.
+// Raised 2026-08-18 (Review, Q-460…Q-462): projectOverview 6689 -> 6735, backlog 6781 -> 6927 (recomputed on the third same-day merge of this file).
 // Three queue entries from the workout write-path sweep plus the Known-Issues row indexing them.
 // Entries and open-issue content, which is what these files are for; the sweep's prose lives in
 // docs/reviews/2026-08-18-workout-write-path.md, outside this ratchet.
@@ -187,7 +196,7 @@ const BASELINE = {
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
   // landed the same day and each pass would have silently un-done the other side.
-  'docs/implementation-backlog.md': 6895,
+  'docs/implementation-backlog.md': 6927,
   'CLAUDE.md': 1010,
 };
 
