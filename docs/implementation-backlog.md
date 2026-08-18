@@ -848,6 +848,38 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [platform] Q-553 — a Known Issue was in both the live list and the resolved archive; nothing checked
+
+- **Status: FILED AND FIXED in the same PR** (docs + a new CI check). Kept as the record of the class.
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-known-issue-duplication.md`](reviews/2026-08-18-known-issue-duplication.md)
+- **The invariant nothing enforced.** `CLAUDE.md`: *"Striking a Known Issue means MOVING it … Cut the
+  entry whole, append it to the archive, **leave nothing behind**."* Two entries were in both lists.
+- **Q-139 — `🔴 OPEN` live and `✅ fixed` archived, for ten days.** `projectOverview.md` carried 69
+  lines describing the bug as unfixed while the archive recorded it fixed 2026-08-08 in v1.270.25.
+  **Every session's mandated orientation read showed a red, highest-severity open issue for a
+  ten-day-old fix.** Both halves verified fixed **in source**, not taken on the archive's word — the
+  backstop the live row called still-open is closed at
+  `packages/shared/src/health/step-estimate.ts:176`, whose comment names Q-139.
+- **Q-81 — a byte-identical 31-line entry in both files.** A pure copy.
+- **⚠️ Both were also archived *early*.** `CLAUDE.md` says only move when nothing is owed, *including a
+  pending device check* — and both entries say one is outstanding (Q-139: not verified on device;
+  Q-81: whether the model fits the owner's real data). So the mistake was two-part: **copied rather
+  than moved, and moved before it was allowed.**
+- **Applied here:** cut the premature archive copies and kept the live entries (the conservative
+  direction — the live list is what everyone reads and where an owed check belongs). Q-81's copy was
+  identical so nothing was lost; Q-139's unique material was folded into the live entry first, and its
+  stale 69-line `🔴 OPEN` body replaced with a compact `⚠️ FIXED, not verified on device` row.
+  `docs/domains/activity/README.md` had the same stale claim (*"needs one owner decision"*, which had
+  been made) — updated.
+- **The check:** `scripts/check-known-issue-duplication.js`, now step **41 of 41** in Custom Rules.
+  **Its first version reported 4 and only 2 were real**, so two narrowings are written into its header:
+  a heading's identity is its **first** Q number (an archive heading may name a second issue in
+  passing), and **range headings are skipped** (a batch row spanning `Q-63…Q-69` overlapping one
+  archived member is a stale range wanting a human, not a red build).
+- **Not exercised:** static reconciliation. Q-139's own outstanding item is an on-device check after the
+  next history drain, and Q-81's needs production — neither possible here.
+
 ### [platform] Q-552 — two sources of truth for the next Q band; the prose one was wrong
 
 - **Branch:** `docs/q-block-ledger-procedure` · **(fixed in the same PR that filed it — see below)**
