@@ -327,7 +327,25 @@ below threshold and left in place for next time.
 
 ### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
 
-- **✅ SCOPE BOUNDED 2026-08-18 — this is the ONLY instance; the fix is one handler, not a class sweep.**
+- **⛔ RE-TAGGED TO LANE A 2026-08-18 — the "one call in one Lane B handler" shape below is not
+  buildable, and the obvious version of it is a silent no-op.** `lib/local-store` has **no
+  `deleteActivityLog`**; the `deleteActivityLog` that greps are `repo.deleteActivityLog`
+  (`lib/data/repository.ts:547`, `adapter.ts:2374`) — the *server* repository, which is what the
+  route already calls. The nearest local method is `upsertActivityLog`, and **its INSERT column list
+  and its `ON CONFLICT DO UPDATE SET` both omit `deleted_at` entirely** (27 columns, 27 placeholders,
+  `sqlite-backend.ts:2607`). So a read-merge upsert setting `deletedAt: now` compiles, type-checks,
+  passes lint, and **changes nothing** — `getActivityLogs` filters `deleted_at IS NULL`
+  (`sqlite-backend.ts:824`) against a column the write never touches. That was written and reverted
+  here before it shipped; it is the exact shape a future session will reach for first.
+- **What the fix actually needs:** a `deleteActivityLog(id)` on the local store —
+  `lib/local-store/index.ts` (interface) + `lib/local-store/sqlite-backend.ts` (soft-delete
+  statement, matching `deleteFoodLog`/`deleteInjury`) — **then** the one call in
+  `app/health/health-content.tsx`. Two of those three files are Lane A's by the ownership list, so
+  **Lane A takes the whole item**; splitting it leaves Lane B's call site pointing at a method that
+  does not exist. The Lane B half is four lines and is the last step, not the first.
+- **The `CLAUDE.md` rule this item asked for is already landed** (Lane B, same day) — the inverse of
+  the offline-first rule, in the Offline-First section. Do not re-add it.
+- **✅ SCOPE BOUNDED 2026-08-18 — the *audit* still holds: this is the ONLY instance.**
   Every mutating write to a local-first domain was audited for a local-store call **inside the
   handler**: `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE), `quick-edit-log-sheet`
   (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet` (DELETE+PATCH),
@@ -357,17 +375,18 @@ below threshold and left in place for next time.
   (`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, `sqlite-backend.ts:1628`) with
   the correct pull-clobber guard. The server delete is a **soft** delete with a `user_id`-scoped
   tombstone (`adapter.ts:2374`). Nothing is lost; something wrong is shown for a while.
-- **Fix shape:** delete the local row alongside the API call, as every other activity write path
-  already does (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`). One
-  call. Queuing the delete so it works offline is a **separate, larger** question for this domain —
-  do not fold it in silently.
-- **The rule this breaks is not written down anywhere.** `CLAUDE.md` states the forward direction
-  (*"if a domain WRITES to the local store, its UI MUST READ from the local store"*). The inverse is
-  what matters here: **a domain the UI reads local-first must have *every* write update the local
-  store — including deletes, and including writes made from a screen that itself reads server-side.**
-  That last clause is why nothing on the originating screen could reveal it. Worth adding to
-  `CLAUDE.md` alongside the fix.
-- **Lane B owns this** (`app/health/**`).
+- **Fix shape:** see the re-tag note at the top of this entry. The sibling paths cited here
+  (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`) are **upserts, not
+  deletes** — they are precedent for writing locally, not for a local-delete call that exists.
+  Queuing the delete so it works offline is a **separate, larger** question for this domain — do not
+  fold it in silently.
+- **The rule this breaks is now written down** — `CLAUDE.md`, Offline-First section, immediately
+  above the forward-direction rule it inverts: a domain the UI reads local-first must have *every*
+  write update the local store, deletes included, and including writes made from a screen that
+  itself reads server-side. That last clause is why nothing on the originating screen could reveal
+  it.
+- **Lane A owns this** (`lib/local-store/**` is the load-bearing half; `app/health/**` is four lines
+  at the end). Re-tagged from Lane B — see the top of this entry.
 - **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
   readers fall through to their API fallbacks and the inconsistency cannot appear there. The 5-minute
   floor is read from `MIN_SYNC_INTERVAL_MS`, not observed. On-device is the only real verification.

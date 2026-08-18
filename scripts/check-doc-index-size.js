@@ -752,8 +752,22 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9905,
-  'CLAUDE.md': 1075,
+  // Raised 2026-08-18 (Lane B, Q-488 re-tag): 9905 -> 9924. The entry said the fix was one call in
+  // one Lane B handler. It is not: the local store has no deleteActivityLog, and upsertActivityLog
+  // omits deleted_at from both its INSERT list and its DO UPDATE SET — so the obvious fix compiles,
+  // type-checks, lints clean and does nothing. Those nineteen lines are the column-list evidence and
+  // the re-tag to Lane A. A one-line "re-tagged to Lane A" would send the next session down the
+  // same dead end, because the dead end reads as correct in every check the sandbox can run.
+  'docs/implementation-backlog.md': 9924,
+  // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
+  // offline-first rule directly above it — a domain read local-first needs EVERY write to update
+  // the local store, deletes included, and including a write made from a screen that itself reads
+  // server-side. Only the written half was here, and the missing half is what shipped the bug:
+  // the delete looked correct from the screen that made it because that screen reads the server
+  // aggregate, while three local-first surfaces kept the row. It belongs beside the rule it
+  // inverts, not in a journal entry, because the next person to write a delete handler reads this
+  // section and not that entry.
+  'CLAUDE.md': 1077,
 
 };
 

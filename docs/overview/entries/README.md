@@ -80,27 +80,29 @@ different ways. Both are mechanical; neither is obvious until it happens.
 
 ### The limit now counts foldable entries, not all of them (changed 2026-08-18)
 
-**What happened.** Three sweeps ran in one day. The first went 61 → 32, the second 62 → 41 — and the
-directory was back over the 60-file limit **twenty minutes** after that second sweep, because 19 new
-entries landed from four other lanes in that window. At that point every lane's next feature PR fails
-CI on a tidiness rule, since a journal entry rides in *every* feature PR.
+**Third and fourth sweeps, 2026-08-18 (same day again).** Another lane swept 61 → 41 concurrently
+with this one: 20 of 61 unlinked, and **the floor held at 41** across both, so the rise predicted
+above did not continue on those runs and the trend is not a straight line. What did not change is the
+arithmetic — limit 60, floor 41, so the whole directory has **19 files of headroom**, which measured
+out at roughly twenty minutes on the busiest stretch of the day and about half a day at the average
+rate.
 
-**Why sweeping harder could not fix it.** 41 of those entries are linked by a durable doc and must
-not be folded (rule 1 above). They are a floor, not growth. The guard was counting them, so it fired
-on a condition its own prescribed remedy is forbidden to touch — which is not a guard, it is a
-periodic outage.
+**Why sweeping harder could not fix that.** Those 41 are linked by a durable doc and must not be
+folded (rule 1 above). They are a floor, not growth. The guard was counting them, so it fired on a
+condition its own prescribed remedy is forbidden to touch — which is not a guard, it is a periodic
+outage, and it lands on every lane at once because a journal entry rides in *every* feature PR.
 
 **The change.** `scripts/check-doc-index-size.js` now applies the 60 limit to the **unlinked** count,
 which is exactly what a sweep clears. It still catches what the guard was written for: if nobody
-sweeps, unlinked entries pile up and it fires (verified by simulating 61). A separate ceiling of
-**250 total** keeps the original 509-file readability failure caught, and its message says plainly
-that a sweep alone will not fix that one.
+sweeps, unlinked entries pile up and it fires (verified by simulating 61 against the real 41-entry
+floor). A separate ceiling of **250 total** keeps the original 509-file readability failure caught,
+and its message says plainly that a sweep alone will not fix that one.
 
 **The standing tension is unchanged and still undecided.** A fold-everything sweep and durable docs
-linking entries are incompatible; the docs win, so the floor stays and will keep growing. Resolving
-it means either the sweep rewriting citations to the history file it folded into (with an anchor), or
-durable docs citing the batched history rather than a loose entry. What changed today is only that
-the floor no longer blocks everyone's CI while that decision waits.
+linking entries are incompatible; the docs win, so the floor stays. Resolving it means either the
+sweep rewriting citations to the history file it folded into (with an anchor), or durable docs citing
+the batched history rather than a loose entry. What changed today is only that the floor no longer
+blocks everyone's CI while that decision waits.
 
 This is a standing chore in the same spirit as Dependabot remediation: it lives here permanently and
 is worked on a threshold, not every session. Below threshold, leave the entries; above it, compact.
