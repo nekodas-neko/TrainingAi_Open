@@ -472,6 +472,31 @@ below threshold and left in place for next time.
 - **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
   row. Do not run a full redecode while those are open.
 
+### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
+
+- **Lane B.** `components/oura-ble/db-footprint-card.tsx` only — the route, the repository method and
+  the slice all exist and are Lane A's, already shipped.
+- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **What exists already:** `GET /api/oura-ble/samples/pack` returns `{ buckets, sealBelowDs }` — how
+  many sealed buckets are packable right now, touching nothing. `POST` (optional body
+  `{ maxBuckets }`, default 25, cap 200) packs that many and returns
+  `{ buckets[], packed, refused, framesMoved, bytesWritten, remaining, ms }`. Both are admin-gated
+  and the POST is rate-limited to 10/min.
+- **Shape:** a third control in the card's ① Data section beside "Null historical decoded" and
+  "Reclaim disk — VACUUM FULL", following the same `ConfirmDialog` pattern. Show `remaining` from the
+  `GET` so the owner knows how many presses are left, and re-fetch the footprint after each press so
+  `oura_raw_samples` shrinking and `oura_raw_packed` growing are visible in the same table.
+- ⚠️ **The confirm copy must not say "no data is lost" the way the VACUUM one does.** It is true —
+  frames are moved, not deleted, and the packer refuses to delete a bucket it cannot prove equal —
+  but this is the one control in the app that issues a DELETE against archival frames, and copy that
+  reads identically to a lossless VACUUM trains the wrong instinct. Say what it does: moves sealed
+  buckets older than 7 days into compact blobs, after re-reading each blob and proving the frames
+  match.
+- **Surface a refusal.** `refused > 0` with a per-bucket reason means a bucket could not be proven
+  equal and was left intact — that is a finding, not a no-op, and it must not read as "packed 0".
+- **Verification:** the route is already proven end to end on `pnpm dev` (251 frames → 10 blobs, API
+  dump hashing identically before and after). This item is the affordance only.
+
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
 
 - **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
@@ -652,6 +677,16 @@ below threshold and left in place for next time.
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
+- 🚧 **Task 4 SHIPPED 2026-08-18 — the packer.** `lib/data/postgres/slices/oura-raw-pack.ts` +
+  `GET|POST /api/oura-ble/samples/pack`, admin-gated, bounded, idempotent, resumable, never automatic.
+  **This is the first code in the project that deletes an archival frame**, and it does so only after
+  re-reading the committed blob and proving the frames equal; a refusal is returned per bucket rather
+  than thrown. Four decisions the plan left open are settled in it: the hot window anchors to
+  `max(ring_timestamp_ds)` not `now()`; a wall-clock quiet guard (`max(recorded_at) < now() - 1 day`)
+  sits on top, because ds says when the ring recorded a frame and not when we received it; and
+  `body_sha256` hashes the frame *sequence*, not the blob, so it is an independent check rather than a
+  restatement of the re-read. Verified live: 251 seeded frames → **2,800 bytes of blob (≈29×)**, and
+  the API's full dump hashes identically before and after. ⚠️ **No button yet — Q-316, Lane B.**
 - 🚧 **Task 3 SHIPPED 2026-08-18 (v1.318.12) — the two-tier reader.**
   `lib/data/postgres/slices/oura-raw-frames.ts`: `readRawFrames` (ds range + tags, ascending) and
   `readRecentRawFrames` (newest-first, limited), returning **exactly the shape of the `select` they
@@ -673,9 +708,9 @@ below threshold and left in place for next time.
   regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
   with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
   row has moved** — `oura_raw_samples` and the ingest path are untouched.
-  **Remaining: Tasks 4–7** — the packer, the backfill, the hot-window prune, and the `measured_at`
-  range-query sweep. The packer's delete is the only destructive step in the plan and is gated on a
-  proven-equal re-read (§6); it has not been written.
+  **Remaining: Tasks 5–7** — the backfill (run the packer over all history in bounded batches, then
+  `VACUUM FULL` **after**, not during), the hot-window prune, and the `measured_at` range-query sweep.
+  The plan's gate still stands: a verified backfill on a copy of production before the real one.
 - ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
   plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
   and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
@@ -2636,47 +2671,30 @@ session working from a temporarily restored copy.
   snapshots are **partial days** (two of 14 carry under 3% of their available samples), and since rest
   is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
 
-### [readiness] ⛔ Q-500 — re-anchor the Recovery Index curve, `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5
+### [readiness] ✅ Q-500 — SHIPPED v1.320.0: Recovery Index anchor 6 h → 5 h
 
-- **Branch:** `fix/recovery-index-anchor`
-- **⛔ blocked: owner sign-off.** This changes a scoring constant and re-scores 40 days of readiness
-  history. Do not implement until the owner agrees.
-- **Added:** 2026-08-17 · Tuning agent · evidence:
-  [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md)
-- **Supersedes Q-271**, which this measurement found substantially wrong (see below).
-- **The change:** one constant in `packages/shared/src/health/readiness-composite.ts` —
-  `RECOVERY_INDEX_OPTIMAL_HOURS = 5` (was 6). **The estimator, smoothing window and 9% weight all
-  stay as they are.**
-- **Why 5.** Fitted against Oura's own `recovery_index` contributor over the 15 nights that carry both
-  it and an overnight HR series (2026-06-23 → 07-07), the zero-bias anchor is **4.63 h** (LOO
-  4.40–5.14) and RMSE is flat 4.5–5.25. **5** sits on that floor and keeps a small negative bias, so
-  it still errs toward under-scoring.
-- **Blast radius, all 41 days with stored hours:** 40 of 41 move (the other clamps at 100). Readiness
-  **mean +0.67 pts, max +1.44, none lower**. Days above 50 go 13 → 20; cost against neutral 50 falls
-  0.55 → −0.12 pts/day.
-- **What actually changes (§5.2 — this is the part to decide on).** Isolating the anchor from the
-  Q-501 drift and testing all six numeric decision points readiness feeds: **4 of 26 reconstructable
-  days cross a threshold** — 2026-07-28/29/31 go 74 → 75, tipping rest-day guidance to "train hard",
-  and 2026-08-16 goes 69 → 70, Moderate → **High**. **No day crosses the early-deload line (45), the
-  Low/Moderate line (50), or the AI `lowReadiness` line (60).** The displayed score moves on 18 of 26
-  days, always by exactly +1. That is the entire behavioural surface of the change.
-- **What Q-271 got wrong** (it measured 8 days and generalised): "never above 50, ever" — the
-  contributor exceeds 50 on **12 of 41** days and hits **100 on 2026-07-17**; "~2.2 pts/day" — it is
-  **0.71**. Its eight quoted values are exactly 2026-08-08 → 08-15. **The estimator is sound** —
-  r = +0.712 vs Oura's, beating every stabilisation-style alternative tested (+0.636 best). That
-  hypothesis was tested and failed; do not change the estimator.
-- **Sequencing:** land **Q-273** (model versioning) first or stamp a readiness version in the same PR,
-  else 40 days of history become incomparable with no marker — the Q-501 problem. Also fix the stale
-  `lib/health/recovery-index.ts` paths (here + `adapter.ts:5518`); it lives in `packages/shared/src/health/`.
-- **Follow-up:** re-derive the anchor on ~15 BLE-era nights. The fit is Cloud-era, and BLE overnight HR
-  is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
-  that is a `devices` finding.
-
-### [activity] ⛔ Q-505 — Activity Score: redesign as a daily effort meter with a target (2 owner decisions open)
+- **Shipped 2026-08-18** after the owner approved it (*"we will go with whatever your recommendation
+  is"*). One constant in `packages/shared/src/health/readiness-composite.ts`.
+  Evidence: [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md).
+- Fitted against Oura's own `recovery_index` contributor over the 15 pre-re-key nights where both
+  exist — the only external ground truth this app has. Our estimator tracks theirs at **r = +0.712**
+  (beating every alternative tested — do **not** change the argmin) but carried a systematic
+  **−10.2-point** bias. Zero-bias anchor **4.63 h**, LOO 4.40–5.14, RMSE flat 4.5–5.25; **5** sits on
+  that floor and keeps a small negative bias so the term still errs toward under-scoring.
+- **Thresholds deliberately NOT re-anchored, and this is the nuance in the rule.** The
+  `LOW_SLEEP_SCORE` precedent says re-anchor when the *scale* changes, to preserve firing rates. This
+  is not a scale change — it is a **bias correction** on one contributor. The 3 days that move 74 → 75
+  become "recovered" because the measurement was under-reporting, which is the fix working, not a
+  side-effect to cancel out. No day crosses the early-deload, Low/Moderate or low-readiness line.
+- **`READINESS_MODEL_VERSION` bumped to `v3:ri5:2026-08-18`** so this shift stays attributable.
+- **Follow-up (not blocking):** re-derive the anchor on ~15 BLE-era nights. This fit is Cloud-era and
+  BLE overnight HR is ~2× noisier, so the anchor is conservative for current data rather than wrong.
+### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
 
 - **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
-- **⛔ blocked: owner decision.** Not sign-off on a number — a decision about what the score means.
-  Both answers below are coherent and they are different products.
+- **No longer blocked.** All three decisions were resolved 2026-08-18 — the owner delegated them
+  (*"we will go with whatever your recommendation is, knowing we are going for best practice + future
+  proof"*). The reasoning is kept in the plan so it can be argued with, not just followed.
 - **Added:** 2026-08-18 · Tuning ·
   [`docs/reviews/2026-08-18-activity-score-calibration.md`](reviews/2026-08-18-activity-score-calibration.md)
 - **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
@@ -2700,14 +2718,23 @@ session working from a temporarily restored copy.
   Brief: steps/day, movement distribution, zone minutes (daily + against a weekly target), exercise
   minutes, a weekly-to-daily target split; hitting everything = 100; doubles as guidance
   ("keep it under X today on a deload").
-- **Two owner decisions remain open in that plan** — how hard over-exertion should hit readiness, and
-  what the colour bands mean once a *low* score can be correct on a rest day.
-- **⚠️ A prerequisite bug found while auditing the inputs: `daily_zone_minutes` computes zones against
-  `max_hr = 187` (220 − age) on all 27 days, while Body Battery resolves this owner's MEASURED max at
-  168** (`resolveBatteryHrMax`, Q-57). Every zone boundary sits ~19 bpm too high, which is why zone 2
-  averages **1 min/day** and zone 1 absorbs **554**. Two parts of the app disagree about the same
-  user's max HR — a One-Formula-One-Place violation independent of this work. **Fix it before
-  weighting any zone lane**, or the lane ships dead like `activeCalories` (non-null 1 of 47 days).
+- **The three resolved decisions:** (1) over-exertion is **fitted** against next-day HRV/RHR rather
+  than invented — if there is no correlation, ship a deliberately small weight and say so in the
+  comment; (2) bands go **target-relative**, with Activity getting its **own** band function so the
+  shared `scoreBand()` stays absolute for Sleep and Readiness; (3) the zone lane scores against
+  **`targetAnchorMax`**, the existing named answer for reachable targets.
+- **⚠️ CORRECTION 2026-08-18 — the zone HRmax is NOT a One-Formula-One-Place violation.** This entry
+  previously said two parts of the app disagreed about the owner's max HR and called it a bug to fix
+  first. Wrong: `resolveHrProfile` (`packages/shared/src/health/hr-profile.ts`) is already canonical
+  and deliberately returns `maxHr` (the ceiling) **and** `targetAnchorMax` (the reachable-target
+  anchor), with `resolveBatteryHrMax` a third for the battery's reserve. Its own comment explains why
+  the ceiling must not be the observed max. **A change was implemented and then reverted on reading
+  that.**
+- **What is true, and still gates the zone lane:** at the 187 ceiling zone 2 starts ~133 bpm, and over
+  **52,647** HR samples since 2026-07-07 only **134 (0.25%)** reach it — observed max **166**. Zone 2+
+  really is ~1 min/day for this training style; the reading is honest, not broken. Decision 3 resolves
+  it: score the lane against **`targetAnchorMax`**, which puts zone 2 near ~122 bpm (7% of samples
+  already exceed 110). **Measure the resulting distribution before assigning the lane a weight.**
 - **"Steps per hour" has no source** — `step_live_windows` holds **11 rows total**. Use the existing
   HR-derived `moveHours` proxy (`packages/shared/src/health/hourly-movement.ts`), which exists for
   exactly this reason; do not build hourly step ingest for it.

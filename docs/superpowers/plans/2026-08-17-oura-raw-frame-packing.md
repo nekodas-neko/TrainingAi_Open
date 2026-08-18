@@ -217,8 +217,39 @@ Verified end to end on `pnpm dev` by rehearsing the packer by hand over four see
 summary, per-tag counts, raw dump and ds span are **byte-identical across all three states** —
 all-hot, both-tiers, and hot-rows-deleted — with half the frames readable only from a blob.
 
-**Task 4 — the packer**, per §6. Admin-triggered first (a button beside Redecode/VACUUM), bounded per
-call, idempotent, resumable. **Not automatic on deploy**, same posture as Lever 1b/1c.
+**Task 4 — ✅ SHIPPED** as `lib/data/postgres/slices/oura-raw-pack.ts` +
+`GET|POST /api/oura-ble/samples/pack`. Admin-gated, bounded (default 25 buckets, cap 200),
+idempotent, resumable, rate-limited. **Not automatic on deploy**, same posture as Lever 1b/1c.
+The `GET` reports what is packable without touching anything.
+
+Four decisions the plan left open, settled here:
+
+- **The hot window is anchored to `max(ring_timestamp_ds)`, not to `now()`.** A ring that has not
+  synced for a month must not become fully packable just because time passed — phase 1's whole point
+  is that a bucket the ring may still deliver into stays hot.
+- **Plus a wall-clock quiet guard** (`max(recorded_at) < now() - 1 day`). The ds guard alone is not
+  enough: `ring_timestamp_ds` says when the ring *recorded* a frame, not when we received it, and a
+  re-drain delivers week-old ds values today. Without this a bucket being actively re-drained looks
+  eligible on its ds and gets packed mid-delivery.
+- **`body_sha256` hashes the frame *sequence*, not the blob.** Hashing the blob going in and
+  re-hashing the same blob coming out proves only that Postgres stored the bytes, which the re-read
+  already proves. Hashing `ds:hex` per frame makes it an independent check, so a codec bug that
+  round-trips a blob while mangling a frame cannot pass both. There is a test for exactly that case —
+  a self-consistent blob holding different frames.
+- **`ON CONFLICT DO NOTHING`, never `DO UPDATE`.** An existing blob is either already verified (then
+  re-verify and delete) or the residue of a failed verify (then it must be re-examined, not silently
+  overwritten).
+
+A refused bucket is returned in the result, not thrown: one bad bucket must not stop the ones behind
+it, and what prevents the real hazard is the verify, not aborting the run.
+
+**Verified live**, not only in tests: 251 seeded frames across 10 buckets driven through the route on
+`pnpm dev` — 250 moved into **2,800 bytes of blob** (≈29× against ~328 B/row), bounded 3-then-7 with
+`remaining` correct, idempotent on a second press, and the API's full frame dump **hashes identically
+before and after** (251 rows, same SHA). 13 tests, and the refuse-to-delete guard is mutation-checked.
+
+⚠️ **The admin button is NOT built** — `components/oura-ble/db-footprint-card.tsx` is Lane B's
+territory. Filed as Q-316. The route is fully usable without it.
 
 **Task 5 — backfill.** Run the packer over all history in bounded batches. 968 blobs is small; the
 delete side is 1.1M rows, so batch it and **`VACUUM FULL` after**, not during.
