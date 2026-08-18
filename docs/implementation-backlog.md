@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **548** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **552** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -285,6 +285,75 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
+
+- **Branch:** `fix/db-query-403-masks-outage`
+- **Added:** 2026-08-18 · **Lane A** (`app/api/admin/db-query/route.ts`). Tiny, and it cost a real
+  diagnosis today.
+- **What happened.** During the 2026-08-18 volume incident `prod_DB` went offline. Every
+  `/api/admin/db-query` call returned **`{"error":"Forbidden"}`**, which reads as "your credential was
+  revoked" — so the first several minutes went into checking env vars and the admin flag instead of
+  looking at the database. The Railway dashboard said "Service is offline" in one glance.
+- **Mechanism.** `authorize()` calls `requireAdmin(exportUserId)` inside a **bare `try/catch`**
+  (route.ts ~51-53). `requireAdmin` does a DB round-trip (`repo.getUserById`) and throws `AdminError`
+  when the user is missing or not admin — but **any other throw, including a connection failure, lands
+  in the same catch** and becomes 403. "Not authorised" and "could not check" are indistinguishable.
+- **Why it matters beyond this incident.** 403 is the one status a caller will not retry and will not
+  escalate; it actively points the investigation away from infrastructure. `/api/version` does **not**
+  touch the DB, so it returned 200 throughout and offered no contradiction.
+- **Fix shape:** catch `AdminError` specifically and return 403; let anything else surface as **503**
+  (or 500) so an outage looks like an outage. Same pattern applies to the session branch below it, and
+  to any other route wrapping `requireAdmin` in a bare catch — **grep for the shape, don't fix one site.**
+
+### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1
+- **Branch:** `perf/postgres-memory-footprint`
+- **Added:** 2026-08-18 · **Lane A.** Largest single line item on the bill and near-zero risk.
+- **Measured (Railway, ~19.6 days to 2026-08-18):** `prod_DB` averages **0.79 GB RAM** and **0.002
+  vCPU** — **$7.87/month of memory for a database that does essentially no work**, against 171 MB of
+  data. Its own CPU graph is flat at 0.0 across a 3-hour window.
+- **Candidates:** `shared_buffers` sized for the container rather than the data; the app pool is
+  `max: 10` and the rollup worker carries its own `PG_POOL_MAX=2`, so up to 12 backend processes each
+  with their own memory. `work_mem` is already 4 MB (noted on Q-534) and is not the problem.
+- **Careful with the "it's only 200 MB now" reading.** The 3-hour graph taken 2026-08-18 shows ~200 MB
+  **climbing** — the service had just restarted during the volume incident and Postgres memory grows as
+  caches warm. **0.79 GB is the warmed steady state and will return.** Measure over a full day, not
+  after a restart.
+- **Load-bearing constraint (`CLAUDE.md`):** total connections = `max` x replicas must stay under the
+  Railway connection limit, and the pool's error handler and timeouts must survive any change here.
+
+### [devices][platform] Q-550 — `oura_heartrate`: 27 MB of indexes on 6.8 MB of heap
+
+- **Branch:** `perf/oura-heartrate-index-audit`
+- **Added:** 2026-08-18 · **Lane A.** Small; the same shape as Q-534 at one-tenth the size.
+- **Measured 2026-08-18:** 34 MB total, 65,160 rows — **6.8 MB heap, 27 MB indexes**. Now the
+  third-largest table after the packing work, and indexes are 4x the data.
+- **`oura_heartrate_pkey` had zero lifetime scans** on a table that already carries a
+  `(user_id, timestamp)` unique constraint. **Re-measure before acting** — the counters reset at the
+  2026-08-17 crash, so a fresh zero means "not since recovery", not "never".
+- **Keep `oura_heartrate_user_updated` despite its zero.** Migration 130 added it for Track-B sync,
+  which is not wired yet, so its zero is expected and correct.
+
+### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 8
+- **Added:** 2026-08-18 · BLOCKED: owner, and deliberately **after** Q-545.
+- **The owner's stated goal:** *"The Goal was to move off railway if there were enough benefits"*, with
+  a target of **under $5/month** against today's ~$18.63.
+- **Do not decide this yet.** Q-545 moves the compute to the phone and shrinks the server to a thin
+  store, which changes the comparison materially — and Q-547 found that **a large share of the current
+  bill is deploy churn from two lanes shipping**, not steady-state cost. Deciding on today's numbers
+  would be deciding on an inflated, pre-fix baseline.
+- **What each side looks like, to be re-costed when the time comes.** *Stay:* realistic floor ~$8/month
+  after Q-545 + Q-549; keeps managed deploys, backups and the git-push workflow. *Leave:* a small VPS
+  (Hetzner CX22 class, ~4 EUR/month, 2 vCPU / 4 GB / 40 GB) runs both services with far more headroom
+  and lands near the target — at the cost of owning backups, TLS, deploys and the Postgres that is
+  currently managed. **Weigh that against 2026-08-18**, when a staged volume change took `prod_DB`
+  offline and Railway's own tooling recovered it.
+- **One hard input either way:** Railway **cannot shrink a volume** and bills on storage *used*, so the
+  5 GB provisioning is free and is not a reason to move.
+
 ### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
@@ -370,6 +439,86 @@ below threshold and left in place for next time.
 - **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
   baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
   cutting deploy frequency, not more tuning.
+### [platform][nutrition] Q-471 — the double-trip metric counts deliberate rerolls as redundant, and that is the AI-usage screen's top row
+
+- **Branch:** `fix/ai-fingerprint-granularity`
+- **Added:** 2026-08-18 · review sweep from **owner-supplied production screenshots** of More →
+  Developer → AI usage · [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** above Q-470/Q-469, because it decides how those are read. A misleading diagnostic
+  sends implementers at the wrong row.
+- **What the screen shows (30d):** 268 calls, 89 of them "redundant" (33%), topped by
+  `meal-plan-generate-meal` at **32 redundant · 4 distinct**.
+- **Why the top row is an artefact.** Redundancy is `(user_id, section, fingerprint)` repeating within
+  120 s (`lib/data/postgres/adapter.ts:4489`). Three sections fingerprint on a calorie target alone:
+  ```
+  meal-plan-generate-meal   String(Math.round(input.targetCalories))
+  meal-plan-top-up          String(Math.round(targets.calories))
+  meal-plan-generate        `${mealCount}:${dayTypes.join('/')}`
+  ```
+  Rerolling a meal is the feature working — tap reroll, dislike it, tap again — and every such call
+  carries the same rounded calorie target, so **every deliberate reroll after the first counts as
+  redundant**. "32 · 4" most plausibly reads as four meal slots rerolled ~8 times each.
+- **⚠️ The reroll path is already correctly guarded — do not "fix" it.** `meal-plan-review-step.tsx`
+  sets `rerolling` before the fetch and every control carries `disabled={rerolling != null}` (reroll
+  icon, instruction submit, both reorder arrows). There is no tap-spam here. This entry exists partly
+  to stop someone being sent to that file by the screen.
+- **So 44 of the 89 redundant calls (32 + 9 + 3) are artefact; the other 45 are real** (Q-470, Q-469).
+- **Fix shape:** fingerprint on what actually distinguishes one request from another — for
+  `generate-meal` at least the meal `position` plus `avoidNames` (which already changes on every
+  successful reroll); for `meal-plan-generate`, excluded foods and stores. The instrument's rule
+  ("ids/dates/keys only, never raw prompt text or health data") still holds — these are ids and keys.
+  Alternatively mark user-initiated repeats at the call site, which is the distinction the screen is
+  actually trying to draw. **Lane A.**
+
+### [workouts][platform] Q-470 — the background prescription regeneration has a rate limit but no in-flight guard, so a second page-load fires it again
+
+- **Branch:** `fix/prescription-regen-in-flight-guard`
+- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** mid. A real duplicate LLM generation for the same session-day, on the path that
+  decides prescribed load.
+- **This one is genuine, unlike Q-471's rows.** `prescription` fingerprints on
+  `{ programSessionId, today }` (`packages/shared/src/ai-periodization/generate-prescription.ts:295`)
+  — stable for one session on one day. **14 redundant across 8 distinct** is therefore the same
+  logical prescription generated twice within 120 s.
+- **Cause.** `regeneratePrescriptionInBackground` (`app/api/workout-data/route.ts:50-59`) is
+  fire-and-forget and called from **two** sites in the same `GET` handler — `:541` when
+  `reevalResult.needsRegenerate`, `:561` when `aiPrescriptionPending && !isPoll`. It carries
+  `rateLimit('prescribe:${userId}', 20, 60*60*1000)`, which caps a runaway loop but **does not
+  dedupe**:
+  - `/api/workout-data` is fetched via `cachedFetch`, which paints from cache and **then always
+    revalidates over the network** — so every open of the workout screen issues a real GET;
+  - until the first background generation lands, `needsRegenerate` / `aiPrescriptionPending` are still
+    true, so the second GET starts a second generation for the same session-day.
+- **The rate limit is not the bug and should stay** — its comment says it exists to stop "an unattended
+  poll loop" minting unlimited Gemini calls, and it does that. It was never an idempotency mechanism.
+  Note `:561` already excludes polls via `!isPoll`; `:541` has no such guard.
+- **Fix shape:** an in-flight marker keyed on `(userId, programSessionId, today)` — the same key the
+  fingerprint already uses — checked before spawning and cleared when the generation settles. A
+  process-local `Set` covers the common case; a short-lived DB marker survives multiple replicas,
+  which matters because Railway can run more than one. **Lane A.**
+
+### [cardio][platform] Q-469 — `running-plan-explain` re-asks the model for the same sentence on every card mount
+
+- **Branch:** `fix/running-plan-explain-cache`
+- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** low-mid. The most redundant *genuine* section, on a call that is explicitly not
+  load-bearing.
+- **Genuine, like Q-470.** Fingerprint is `{ type, durationMin }` — stable for a given day's
+  prescribed run. **31 redundant across 9 distinct**: the same run explained ~7 times on average.
+- **Cause.** `components/running/prescribed-run-card.tsx:41-53` fires it from a bare `useEffect` with
+  no cache. The author already handled the re-render risk — the comment says `gateReasons` is joined
+  into a stable string *"so a new array ref each render doesn't re-fire the fetch"* — but **mount is
+  the remaining trigger**: every navigation back to the running screen, and every remount from a
+  parent, re-asks for the same sentence.
+- **Why not higher:** the call is explicitly *"never load-bearing"* — the deterministic `rationale`
+  renders immediately and the AI copy only swaps in if it arrives — and the section is cheap (62 calls,
+  6,864 tokens total). **The reason to fix it is content consistency:** the wording changes between
+  mounts, so the same prescribed run is described differently each time the user opens the screen.
+- **Fix shape:** cache on the fingerprint inputs (`type`, `durationMin`, `rationale`, `gateKey`); the
+  app already has a client cache layer and the instant-paint rule points the same way. A day-scoped
+  key is enough — the prescription does not change within a day. **Lane B.**
 
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
@@ -814,6 +963,53 @@ string onto `var(--brand)` would repaint the protein macro with whatever accent 
 The selection-state literals and the macro palette are the same eight characters and must not share
 a fate — finding 1 is the former only.
 
+
+**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
+MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
+true S25 size in our own tokens — **canvas page "Reworked screens"**,
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
+meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
+none of the chrome, colour or type is copied.
+
+**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
+srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
+row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
+quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
+button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
+ingredients fill the S25 screen; the drawn version fits five with room left over.
+**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
+sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
+
+**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
+search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
+use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
+column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
+screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
+and this is the sixth.
+
+**14 — The other structural changes, in the order they pay off.**
+- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
+  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
+- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
+  space the day screen currently spends on nothing.
+- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
+  sheets, so a repeat log is one tap from the top of the list.
+- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
+  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
+- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
+  swipe on a saved meal, not beside the button pressed daily.
+
+- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
+  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
+  then convert screens one at a time behind the existing behaviour. **Do not start by editing
+  `nutrition-content.tsx`** — one added line fails Custom Rules.
+- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
+  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
+  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
+  anyway.
+- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
+  sync-payload change (Lane A) while everything above is Lane B.
+
 **What NOT to change — all three exist because a CLAUDE.md rule required them:**
 - `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
   correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
@@ -835,6 +1031,54 @@ a fate — finding 1 is the former only.
   `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
+
+### [nutrition][platform] Q-396 — a photo per saved meal, and the size cap is the whole design
+
+- **Branch:** `feat/saved-meal-thumbnail`
+- **Added:** 2026-08-18 · owner: *"can we have base64 saved images of meals? small icons?"*, while
+  reviewing the Q-395 rework — a meal you built weeks ago is hard to recognise from its name alone.
+- **Lane A.** Needs a Postgres migration, a local SQLite column and a sync-payload change. The Q-395
+  rework it serves is Lane B; the two can land independently because the UI degrades to no image.
+
+**The precedent exists and does not transfer.** `users.avatar` stores a **full `data:` URI in a text
+column**, validated by MIME whitelist and capped at **5 MB**
+(`app/api/user/avatar/route.ts:34-45`). That works because an avatar is **one row per user and is
+never in the sync delta**. A meal thumbnail is one per saved meal, and saved meals sync — so every
+image rides the outbox push, the pull delta, and the on-device SQLite mirror, on a phone, forever.
+Copying the 5 MB cap here would be the largest single regression the sync engine has ever taken.
+
+**Recommendation — a hard-capped thumbnail, stored as a data URI.**
+- **128 × 128 WebP, target ~6 KB, reject over 16 KB.** Downscale on-device with a canvas *before it
+  leaves the client*, and re-validate server-side — a client-side cap alone is not a cap. At 6 KB,
+  100 saved meals is ~600 KB across the whole sync surface, which is the same order as the text
+  already moving.
+- **Why base64 in a text column and not object storage:** the app is offline-first and has no blob
+  host. A URL renders nothing in airplane mode, which breaks the standing rule that *a local table
+  must hold everything needed to render the row offline*. A capped data URI is the only shape that
+  survives the canonical runtime. This is the rare case where the "obviously wrong" storage choice
+  is the right one, and the cap is what makes it so — **do not relax it later without re-reading
+  this paragraph**.
+- **What it costs if the cap slips:** nothing fails loudly. The outbox gets slower, the local DB
+  grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
+  named constant next to the column, not inline in the route.
+
+**The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
+on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
+weight, no upload path — and it already carries most of the recognition benefit in the drawings,
+where every thumbnail is exactly that placeholder. If the photo work is deferred, ship this and the
+Q-395 rows still look finished.
+
+**The full chain this has to touch, per the offline-sync rule — all in one PR:**
+`saved_meals` column → the web route's Zod schema → the `pushMutations` branch → `getSyncDelta`
+output → `pullDelta` mapping → `applyDelta` upsert columns → the local SQLite migration → **and its
+row in `RECONCILE_TABLES`/`RECONCILE_COLUMNS`**, which is the one most often missed and the one that
+silently breaks upgraded devices while every test and fresh install passes.
+
+- **Verification.** Not "it saved" — prove a non-null value **round-trips to the device and renders
+  with the network off**, which is the only test that distinguishes this from a URL. Then check the
+  outbox still drains on a throttled connection with a dozen meals carrying images.
+- **Not in scope:** photos on individual food items or on logged entries. One image per *saved
+  meal*, which is the surface the owner asked about and the only one where the row is durable.
 
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 

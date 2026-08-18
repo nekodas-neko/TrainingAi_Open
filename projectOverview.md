@@ -69,6 +69,42 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][workouts][cardio][nutrition] 🟠 The AI-usage screen's double-trips traced to cause — the top row is an artefact, two rows are real (Q-469…Q-471, 2026-08-18)
+
+- **First production-data finding of this review run.** The owner supplied three screenshots of
+  **More → Developer → AI usage**: 30 days, 268 calls, 651,639 tokens, **$0.09**, 2 failures, and
+  **89 redundant calls (33%)** across five sections. Traced through
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](docs/reviews/2026-08-18-ai-double-trips.md).
+- **Cost is irrelevant here and should stay that way.** $0.09 per 30 days — eliminating every
+  redundant call saves a fraction of a cent, and `CLAUDE.md` already records the decision not to
+  optimise AI spend. These are filed for **latency and content consistency**, and three of the five
+  sections are *generative*, so a repeat returns different content rather than the same answer twice.
+- **🟠 Q-471 — the screen's most alarming row is a measurement artefact.** Redundancy is
+  `(user_id, section, fingerprint)` repeating within 120 s, and three sections fingerprint on a
+  **calorie target alone**. Rerolling a meal is the feature working, and every reroll carries the same
+  rounded target — so `meal-plan-generate-meal`'s "32 redundant · 4 distinct" most plausibly reads as
+  four slots rerolled ~8 times each. **The reroll path is already correctly guarded**
+  (`disabled={rerolling != null}` on every control), so an implementer sent there by the screen would
+  find nothing to fix. **44 of the 89 are artefact; 45 are real.**
+- **🟠 Q-470 — the prescription regeneration double-fires for real.** It fingerprints on
+  `{ programSessionId, today }`, so 14 redundant / 8 distinct is the same logical prescription
+  generated twice. `regeneratePrescriptionInBackground` is fire-and-forget from two sites in
+  `GET /api/workout-data`, with a rate limit but **no in-flight guard** — and `cachedFetch` always
+  revalidates over the network, so every screen open issues a real GET while the triggering condition
+  is still true. The rate limit is not the bug and should stay.
+- **🟡 Q-469 — `running-plan-explain` re-asks on every card mount.** 31 redundant / 9 distinct, from a
+  bare `useEffect` with no cache. The author had already fixed the re-render case (the `gateKey` join);
+  mount is the remaining trigger. Not load-bearing — the deterministic rationale renders immediately —
+  but the **wording changes between mounts**, so the same run reads differently each visit.
+- **✅ Two prior findings corroborated by production, and one reaffirmed.** **Q-295 holds exactly** —
+  Coach is 17 of 268 calls (6.3%) and 330,221 of 651,639 tokens (50.7%), ~19,400 tokens/call.
+  **Q-170's latency fix is holding** — the 30-day Coach average of 5,840 ms looks like a regression but
+  the 7-day window reads **2,307 ms**, better than the 3.5 s the fix claimed; **do not reopen Q-170 on
+  the 30-day number**. And the error rate is 2/268 (0.7%), unremarkable on this evidence.
+- **Limits:** one user's account over the window shown, and the call sites were read rather than driven
+  — nothing here was reproduced locally.
+- **Nothing was fixed.** All three are queued.
+
 ### [app-shell][workouts][platform] 🟠 The AI Coach's write path reviewed for the first time — apply is exemplary, undo is unreachable and wrong (Q-467, Q-468, 2026-08-18)
 
 - **Never reviewed before.** The Coach appears in eight prior review docs and five backlog entries —

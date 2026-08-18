@@ -1,5 +1,33 @@
 # 2026-08-18 — the database reclaim: everything is built, two presses remain
 
+> ## ✅ DONE — the presses were run 2026-08-18, and every "never run" claim below is now historical.
+>
+> The owner executed the runbook with a one-off planning session. **Result: 805 MB → 171 MB.**
+>
+> | | Before | After |
+> |---|---:|---:|
+> | Database | 805 MB | **171 MB** |
+> | `oura_raw_samples` | 563 MB | 50 MB |
+> | `oura_raw_packed` | — | 13 MB (764 blobs) |
+>
+> **764 buckets packed, 941,233 frames moved, 0 refused**, then `VACUUM FULL` reclaimed **513 MB in
+> 2.1 s**. Frame count held at **1,120,970** throughout — verified by conservation against the exact
+> pre-pack count, with zero hot rows left inside any packed bucket and zero malformed blobs.
+>
+> **Read the rest of this doc as the record of how it was done, not as work outstanding.** Three
+> things it says are now superseded:
+>
+> 1. **The 500 MB target is WITHDRAWN.** Railway cannot shrink a volume (*"Down-sizing a volume is not
+>    currently supported"*) and bills on storage **used**, not provisioned — so 5 GB costs what 500 MB
+>    would at the same usage. The end-of-week deadline it cites does not exist any more.
+> 2. **There is no admin UI for the pack route.** The runbook assumes a button; there isn't one, so all
+>    six presses were hand-typed `fetch()` calls from a desktop console. Filed as **Q-544**, along with
+>    the reason a desktop was needed at all: `DbFootprintCard` sits behind a native-plugin early return.
+> 3. **`error_events` was not vacuumed and does not need to be.** It is 49 MB of residue from one
+>    already-fixed fault (Q-214) and ages out of the 30-day window around **2026-09-12** on its own.
+>
+> Full session record: [`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`](handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md).
+
 **Domain:** `platform` · **Lane A** · supersedes nothing; complements
 [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
 and Q-534.

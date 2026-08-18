@@ -167,6 +167,12 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`](../../handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md)
+  — **the storage decision, the `disk_full` recovery (805 MB → 171 MB), and the D-track pivot.** Filed
+  under `platform` because it spans the bill and the pipeline, so the `devices` glob below misses it.
+  Carries the three refuted CPU hypotheses and the measured portability of the rollup (1,110 lines,
+  17 DB-coupled) — both expensive to re-derive.
+
 - Handoffs: `ls docs/handoff-*-devices-*.md` — plus
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-40 — the chest-strap card stuck on "Connecting…"), filed under `cross` because it spans five pillars and so is not matched by the glob above.

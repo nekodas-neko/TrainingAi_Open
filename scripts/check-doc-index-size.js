@@ -180,16 +180,15 @@ const root = path.join(__dirname, '..');
 // the priority marker and the note that this is no longer a pick-one decision — only the default is
 // still open, and that is a stored preference belonging to Q-392.
 //
-// Raised 2026-08-18 (disk_full aftermath): the first on-device rawStats reading (209,326 rows, 0
-// rolled up, 31.2 MB) replaces "never measured" on Q-538 and its Known-Issues row; Q-544 files the
-// console gate that made a desktop VACUUM impossible; and CLAUDE.md gains a session-start DB-size
-// read, because the 500 MB volume that used to fail loudly is now 5 GB and cannot be shrunk back.
-// A measurement replacing a projection, one new entry, and one standing rule.
+// Raised 2026-08-18 (session wrap-up, Q-548..Q-551): four entries the session measured but had not
+// filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
+// oura_heartrate index ratio, and the owner decision on leaving Railway (deliberately deferred behind
+// Q-545 so it is not decided on a pre-fix, deploy-inflated baseline).
 //
-// Raised 2026-08-18 (owner-directed D-track focus, Q-545..Q-547): three queue entries for the
-// device-primary compute move. They carry the measured coupling (1,110 lines, 17 DB-touching) and the
-// three refuted CPU hypotheses inline, because an implementer that re-derives either wastes the
-// session — and the refutations are the expensive half of what this planning pass produced.
+// Raised 2026-08-18 (session wrap-up, Q-548..Q-551): four entries the session measured but had not
+// filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
+// oura_heartrate index ratio, and the owner decision on leaving Railway (deferred behind Q-545 so it
+// is not decided on a pre-fix, deploy-inflated baseline).
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -436,7 +435,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6921,
+  'projectOverview.md': 6957,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -456,7 +455,14 @@ const BASELINE = {
   // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
   // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
   // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
-  'docs/implementation-backlog.md': 8013,
+  // Raised 2026-08-18 (Q-395 round 3 + Q-396, BugFix intake). The owner sent MyFitnessPal
+  // screenshots and asked for a rework rather than a repaint, so Q-395 now carries the settled
+  // direction: the root cause is a list row carrying an editor, which supersedes the three
+  // srv/g options as a fork, plus the one-row-component decision and the sequencing warning
+  // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
+  // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
+  // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+  'docs/implementation-backlog.md': 8257,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
