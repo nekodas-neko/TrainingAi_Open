@@ -381,6 +381,14 @@ const BASELINE = {
   // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
   // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
   // against.
+  //
+  // Raised 2026-08-18 (Q-356, Lane A): 1044 -> 1056. The date-arithmetic section already said "never
+  // hardcode one side of a rolling window"; it did not cover the shape that broke every branch for
+  // two hours a day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines
+  // for the mechanism, the two correct fixture shapes, and the one thing a regression test for this
+  // class must do (construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock). This is the file every session reads before it can start, and the rule it
+  // sits beside is the reason this bug was filed rather than repeated.
 
   //
   // Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file. Lane A's delta was +29:
@@ -394,13 +402,28 @@ const BASELINE = {
   // PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
   // owner-reported bug in another pillar, and that only lands with the numbers attached.
 
-  'projectOverview.md': 6910,
+  //
+  // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
+  // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
+  // day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
+  // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
+  // must do: construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock. Recomputed from the merged file.
   //
   // Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
-  'docs/implementation-backlog.md': 7683,
-  'CLAUDE.md': 1044,
+
+  'projectOverview.md': 6910,
+  'docs/implementation-backlog.md': 7648,
+  //
+  // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
+  // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
+  // day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
+  // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
+  // must do: construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock. Recomputed from the merged file on each merge this branch took.
+  'CLAUDE.md': 1056,
 
 };
 
