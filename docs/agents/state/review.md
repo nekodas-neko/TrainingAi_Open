@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×35) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **555**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
+**Updated:** 2026-08-18 · **By:** thirty-eight sweeps (2026-08-17 ×2, 2026-08-18 ×36) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **556**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
 
 ## Now
 
-Thirty-seven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-eight sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -20,9 +20,49 @@ least once**, at the owner's request to work through the sections:
 **Sweep 11 closed the non-default-timezone gap** — a user was moved to `Pacific/Kiritimati` and the app driven as them. **Sweep 10 closed the offline/error-path gap on its server half** — `/api/sync/push` was pushed for real, including with the database stopped. What is still untested there is the **on-device** half (the local SQLite outbox itself, which the web sandbox cannot open).
 
 **Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
-left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
-remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
-against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+left the web build — every offline-first domain took its web fallback) and **a second account**
+(`claude_ro` sees only the owner). **Two former entries on this list are now closed:**
+`health-connect/ingest` (sweep 30 drove it) and the **offline paths** (sweep 38 drove them via
+`context.setOffline(true)`). **Both were assumed unreachable and neither was.** Before writing a
+surface off, spend ten minutes trying — that is two for two.
+
+### Sweep 38 — offline read surfaces, driven for real (2026-08-18)
+
+**Filed Q-555 (low).** Write-up:
+[`docs/reviews/2026-08-18-offline-read-surfaces.md`](../../reviews/2026-08-18-offline-read-surfaces.md).
+
+**Closed the second "structurally untested" item on this baton's own list**, after sweep 30 closed the
+first. `context.setOffline(true)` was the whole barrier. **Two for two on assumed-unreachable
+surfaces — try before writing one off.**
+
+**✅ The app works, and that is the headline.** Once the SW controls the page: a reload offline serves
+the precached `/offline` document, and an offline tab tap **navigates and paints 2515 chars against
+2486 online (~101%)** — no offline page, no skeleton, no blank.
+
+**Q-555 is the narrow gap.** In the **uncontrolled** state the same tap is a **silent no-op** (URL
+unchanged, no navigation, no offline page, no feedback) — and that state **is the first-ever load**,
+since the worker registers during it and claims afterwards. Low severity, self-heals, but the symptom
+is indistinguishable from a frozen app and on the APK the SW *is* offline cold-start.
+
+**⚠️ Five probe iterations; THREE produced plausible, specific, wrong answers, all publishable as
+written.** In order:
+1. *"No offline page on any surface"* — the reload ran while the SW was uncontrolled.
+   **Registration is not control**; one registration was already present on the failing load.
+2. *"38% of cached /health survived"* — the click never navigated (`navigated=false`); I measured the
+   **home page** against a `/health` baseline. **And the corroborating marker was wrong the same
+   way** — `Sleep|Readiness` are home-page widget labels.
+3. The `controller` flag was **true after two loads in one run, false after the identical sequence in
+   the next.** Activation races navigation; a fixed load count measures a coin flip.
+
+**→ The keeper, sharper than "print the independent variable":**
+**corroboration between two weak signals is not evidence when they can fail for the same reason.**
+Only the URL — which content overlap cannot fake — settled it. **Prefer one signal that cannot be
+faked over two that agree.**
+
+**⚠️ Honest characterisation of sweeps 36–38:** the most valuable output was repeatedly a **retraction
+of my own measurement**, not a defect in the app. For a review role that is an acceptable ratio — a
+false finding filed against five concurrent agents costs more than a missed one — but a successor
+should expect it rather than read this stretch as a clean run of discoveries.
 
 ### Sweep 37 — the module map's symbol claims all hold (2026-08-18)
 

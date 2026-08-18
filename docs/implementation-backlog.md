@@ -848,6 +848,35 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [app-shell][platform] Q-555 — offline, a tab tap is a silent no-op until the service worker claims the page
+
+- **Branch:** `fix/offline-first-load-navigation`
+- **Added:** 2026-08-18 · review sweep (offline read surfaces, driven for real) ·
+  [`docs/reviews/2026-08-18-offline-read-surfaces.md`](reviews/2026-08-18-offline-read-surfaces.md)
+- **Placement:** low. Narrow by construction — needs a first-ever load (or a cleared worker) plus
+  connection loss inside that window, and it self-heals on the next load.
+- **⚠️ Lead with the good news, because three of four results here are positive.** Both offline paths
+  **work** once the worker is in control: a full reload serves the precached `/offline` page verbatim,
+  and an offline tab tap navigates and paints **2515 chars against 2486 online (~101%)** with no
+  offline page and no skeleton. The offline-first design delivers.
+- **The defect is the uncontrolled window.** Measured:
+  | State | Offline tab tap |
+  |---|---|
+  | `controller: true` | navigates, paints ~101% of cached content |
+  | `controller: false` | **URL unchanged, no navigation, no offline page, no feedback at all** |
+- **The uncontrolled state is the first-ever page load** — the worker registers *during* that
+  navigation and claims only afterwards. So a genuine first session that loses connection inside that
+  window gets a tab bar where taps do nothing and nothing explains why.
+- **Why file something this narrow:** the symptom (*a tap that does nothing, silently*) is
+  indistinguishable from a frozen app, and on the APK the service worker **is** the offline cold-start
+  mechanism — so install day is exactly when a new user is most likely to be moving between networks.
+- **Not diagnosed:** whether the no-op is Next's router aborting a failed RSC fetch or the click
+  handler swallowing it. That needs the router's internals, not another probe.
+- **Not exercised — and this limit is load-bearing:** web build only. On web `cachedFetch` falls back
+  to `localStorage`, so what was verified is the **seed** path, **not** the native SQLite local store
+  that is the real source of truth on the APK. Re-check the first-load window **on device**, where the
+  worker's install timing and the WebView lifecycle differ.
+
 ### [platform] Q-554 — the orientation indexes named paths that do not exist, including a module that was never built
 
 - **Status: FILED AND FIXED in the same PR** (docs + a new CI check, Custom Rules now **42 of 42**).
