@@ -23,6 +23,14 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 
 ## Reference docs
 
+- [`docs/overview/entries/2026-08-18-running-explain-cache.md`](../../overview/entries/2026-08-18-running-explain-cache.md)
+  — **Q-469 (v1.324.3): the prescribed-run card re-asked the model for the same sentence on every
+  mount** — 31 redundant calls across 9 distinct runs, each worded differently. Now cached on the
+  local date plus the prescription fingerprint. The reason to fix it was **content consistency**, not
+  cost; the call is cheap and explicitly never load-bearing. Carries a testing gotcha worth knowing:
+  the unit project is `node` and cannot parse JSX, so a helper exported from a `.tsx` cannot be
+  imported by a test at all.
+
 - [`docs/reviews/2026-08-16-multi-user-load-test.md`](../../reviews/2026-08-16-multi-user-load-test.md)
   — §5: `avg_pace_sec_per_km` is populated on **7 of 46** activity logs while **39 carry both
   duration and distance**. Read from the column, never derived, written as an explicit null at save —
