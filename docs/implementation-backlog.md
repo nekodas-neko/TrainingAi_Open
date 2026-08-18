@@ -4222,6 +4222,48 @@ session working from a temporarily restored copy.
 - **Still unreviewed in this pillar:** `PEAK_BANDS` (its "stable per-bucket sample sizes" justification
   is an empirical claim nobody has measured) and the Karvonen zone boundaries (0.6/0.7/0.8/0.9).
 
+### [heart-rate] Q-516 — `PEAK_BANDS` is calibrated for a heart-rate range strength training never reaches
+
+- **Branch:** `fix/hr-recovery-peak-bands`
+- **Plan:** none yet — re-banding is cheap; **the honesty change in "first action" is the real work.**
+  Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md) Part 2
+- **The claim under test.** `hr-recovery-profile.ts` justifies its bands as *"Bands, not exact bpm, for
+  stable per-bucket sample sizes (spec §3)."* That is empirical, and it is **false** for this athlete.
+- **Observed range**, 208 episodes with `coverage_ok` (2026-05-27 → 08-17): min 59, p25 93.8,
+  **median 102**, p75 110, p95 121, **max 132**.
+
+  | band | episodes | share | mean `drop_60s` |
+  |---|---|---|---|
+  | **`<110`** (spec: *low-signal, de-emphasise*) | **149** | **71.6%** | **3.0** |
+  | `110–129` | 57 | 27.4% | **14.9** |
+  | `130–149` | **2** | 1.0% | 13.5 |
+  | `150–169` | **0** | 0% | — |
+  | `170+` | **0** | 0% | — |
+
+  The highest set-peak ever recorded is **132**, so the top two bands are **structurally unreachable**,
+  not merely sparse. `LOW_SIGNAL_BAND_LABEL = '<110'` sits at the **p75**, so the profile de-emphasises
+  three quarters of its own data. **One usable bucket** (`110–129`, n = 57).
+- **The de-emphasis is CORRECT, which makes it worse.** Mean `drop_60s` is **3.0** below 110 against
+  **14.9** above it — the spec's "near-meaningless … mostly measurement noise" is **supported**. So
+  re-banding does not recover hidden signal: **peak HR during a lifting set mostly does not reach the
+  range where HR recovery is informative.** These bands read as designed for cardio/interval work.
+- **Also:** `coverage_ok` is true on only **212 of 691** rows (31%) — two thirds of set-HR rows are
+  discarded before banding. Not investigated; recorded so 208 is not mistaken for the full sample.
+- **First action:** (1) re-band to the observed range (e.g. `<90 · 90–104 · 105–119 · 120+`) so four
+  buckets populate and the 110–129 signal is not diluted; **(2) — the important one — state plainly in
+  the feature and the docs that HR recovery is informative for roughly the 28% of sets peaking above
+  110.** A re-banded profile that averages noise into four buckets is **worse** than one honest bucket,
+  because it looks like it is working. **Do not ship (1) without (2).**
+- **Owner-facing question behind it:** if HR recovery is meant to track conditioning, the range exists
+  in cardio and chest-strap data (max 166 over 40,230 samples), not strength sets. Whether the feature
+  is targeted correctly is a product decision, not a constant.
+- **Caveat:** nothing about the recovery *math* (`drop_30s`…`drop_120s`, `sec_to_hrr50`) was checked —
+  only the banding and its populations. Cardio/chest-strap **episodes** were not examined; the claim
+  that the range exists there comes from raw `oura_heartrate`, since `set_hr_stats` is strength-derived
+  by construction.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

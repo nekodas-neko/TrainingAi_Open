@@ -132,3 +132,84 @@ be changed and checked in one place.
   and the drift documented here is enough to explain it.
 - Every figure is **the owner's** (`claude_ro` is row-scoped), 12,471 BLE samples over
   2026-07-06 → 08-18.
+
+---
+
+# Part 2 — `PEAK_BANDS`: calibrated for a heart-rate range strength training never reaches
+
+**Filed as:** Q-516
+
+`hr-recovery-profile.ts` bands recovery episodes by peak HR, justifying the scheme in its own comment
+as *"Bands, not exact bpm, for stable per-bucket sample sizes (spec §3)."* That is an empirical claim.
+It is false for this athlete.
+
+## 1. The observed range
+
+`claude_ro.set_hr_stats`, 208 episodes with `coverage_ok` (2026-05-27 → 08-17):
+
+| | peak_bpm |
+|---|---|
+| min | 59 |
+| p25 | 93.8 |
+| **median** | **102** |
+| p75 | 110 |
+| p95 | 121 |
+| **max** | **132** |
+
+## 2. Three of five buckets are unreachable or empty
+
+| band | episodes | share | mean `drop_60s` |
+|---|---|---|---|
+| **`<110`** (spec: *low-signal, de-emphasise*) | **149** | **71.6%** | **3.0** |
+| `110–129` | 57 | 27.4% | **14.9** |
+| `130–149` | **2** | 1.0% | 13.5 |
+| `150–169` | **0** | 0% | — |
+| `170+` | **0** | 0% | — |
+
+The owner's highest set-peak ever recorded is **132**, so the top two bands are **structurally
+unreachable** — not sparse, unreachable. And `LOW_SIGNAL_BAND_LABEL = '<110'` sits at the **p75**, so
+the profile explicitly de-emphasises three quarters of its own data.
+
+**The HR Recovery Profile has exactly one usable bucket** (`110–129`, n = 57).
+
+## 3. The de-emphasis is right, which makes it worse
+
+Mean `drop_60s` is **3.0 bpm** below 110 against **14.9** above it. The spec's claim that recovery
+below 110 is *"near-meaningless … mostly measurement noise"* is **supported by the data**. So this is
+not a case where re-banding recovers hidden signal — below 110 there genuinely isn't much.
+
+That is the uncomfortable version: the bands are wrong *and* fixing them does not by itself produce a
+working feature, because **peak HR during a lifting set mostly does not reach the range where HR
+recovery is informative.** These bands read as designed for cardio/interval work.
+
+## 4. Also: `coverage_ok` is true on 31% of rows
+
+212 of **691** `set_hr_stats` rows pass `coverage_ok`. So roughly **two thirds of set-HR rows are
+discarded before banding is even reached**. Not investigated here — recorded so the 208 is not
+mistaken for the full sample.
+
+## 5. Proposal
+
+1. **Re-band to the observed range** — something like `<90 · 90–104 · 105–119 · 120+` would populate
+   four buckets from this data instead of one. Cheap, and it stops the 110–129 signal being diluted by
+   a bucket holding 72% of episodes.
+2. **But do not treat that as the fix.** State plainly, in the feature and the docs, that HR recovery
+   is informative for roughly the **28%** of sets that peak above 110 — the rest cannot support it. A
+   re-banded profile that still averages noise into four buckets is worse than one honest bucket,
+   because it looks like it is working.
+3. **Decide whether the feature is targeted correctly at all.** If HR recovery is meant to track
+   conditioning, cardio sessions and the chest-strap data (max 166, 40,230 samples) are where the
+   range exists — not strength sets. That is an owner-facing product question, not a constant.
+
+**Do not re-band and ship without (2)**, which would convert a visibly-empty feature into an
+invisibly-noisy one.
+
+## 6. What was not exercised
+
+- **No code changed.** Nothing about the recovery *math* (`drop_30s`…`drop_120s`, `sec_to_hrr50`) was
+  checked — only the banding and its populations.
+- **`coverage_ok`'s 31% pass rate was not diagnosed.**
+- **Cardio/chest-strap episodes were not examined.** §5.3's claim that the range exists there is from
+  the raw `oura_heartrate` chest-strap max (166), **not** from any recovery episode built on it —
+  `set_hr_stats` is strength-set-derived by construction.
+- 208 episodes is a small sample and all of it is one athlete's strength training.

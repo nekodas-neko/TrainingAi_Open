@@ -70,3 +70,30 @@ through it. `PEAK_BANDS` and the Karvonen zone boundaries were not reviewed and 
 Q-272's "median 6.7% of waking samples" could not be reproduced — the same statistic now gives 15.0%
 pooled over 42 days. **Not filed as an error there**; the month split suggests it was measured on
 recent data alone, and the drift documented here explains the gap.
+
+## Part 2: the peak bands were built for a heart-rate range lifting never reaches
+
+`hr-recovery-profile.ts` justifies its bands as *"for stable per-bucket sample sizes"*. That is an
+empirical claim, so I measured it. Over 208 episodes the owner's set-peaks run **59–132**, median 102,
+p95 121.
+
+| band | episodes | share | mean `drop_60s` |
+|---|---|---|---|
+| `<110` (spec: de-emphasise) | **149** | **71.6%** | **3.0** |
+| `110–129` | 57 | 27.4% | **14.9** |
+| `130–149` | 2 | 1.0% | 13.5 |
+| `150–169` | 0 | 0% | — |
+| `170+` | 0 | 0% | — |
+
+The highest set-peak ever recorded is 132, so the top two bands are **structurally unreachable**. The
+low-signal cutoff sits at the p75, so the profile de-emphasises three quarters of its own data. **One
+usable bucket.**
+
+The uncomfortable part: the de-emphasis is *right*. `drop_60s` averages 3.0 below 110 against 14.9
+above, so the spec's "mostly measurement noise" holds. Re-banding recovers no hidden signal — peak HR
+in a lifting set simply does not reach the range where HR recovery is informative. So the proposal is
+re-band **and say so**: a four-bucket profile that averages noise looks like it is working, which is
+worse than one honest bucket.
+
+Also recorded: `coverage_ok` passes on only 212 of 691 rows (31%), so two thirds are discarded before
+banding. Not diagnosed.
