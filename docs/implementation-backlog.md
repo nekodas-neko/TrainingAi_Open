@@ -1638,45 +1638,6 @@ silently breaks upgraded devices while every test and fresh install passes.
   cannot be edited by accident — is best solved as part of this, not separately.
 - **Verification:** device-only. None of it is checkable from the sandbox.
 
-### [workouts][platform] Q-460 — the session-RPE route reports success for a write that matched nothing, and the sync path then discards the mutation
-
-- **Branch:** `fix/session-rpe-affected-row-check`
-- **Added:** 2026-08-18 · review sweep (workout write path, **measured against a second live account**) ·
-  [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)
-- **Placement:** upper-mid. A silently dropped write on the canonical runtime, with no error surface
-  and nothing left to retry.
-- **Measured three ways, live.** `POST /api/workout-sessions/rpe`:
-
-  | Call | Result | Row after |
-  |---|---|---|
-  | user B → user A's real session | `200 {"success":true}` | A's `session_rpe` **still NULL** |
-  | fabricated UUID (`…0000deadbeef`) | `200 {"success":true}` | no such row |
-  | A → A's own session (control) | `200` | written |
-
-- **The security half is CORRECT — do not file this as a leak.** `setSessionRpe`
-  (`lib/data/postgres/adapter.ts:814`) scopes the UPDATE with
-  `and(eq(id, …), eq(userId, …))`, so the cross-user call matched zero rows and changed nothing.
-- **What is missing is `CLAUDE.md` rule (a):** the affected-row count is never checked.
-  `app/api/workout-sessions/rpe/route.ts` ends:
-  ```ts
-  await repo.setSessionRpe(userId, parsed.data.workoutSessionId, parsed.data.sessionRpe)
-  return NextResponse.json({ success: true })
-  ```
-- **On device it is worse than a wrong status code.** `components/workout/done-screen.tsx:160-167`
-  writes locally and queues a `session_rpe` outbox mutation; `pushMutations`
-  (`adapter.ts:4105-4112`) does `await this.setSessionRpe(...)` then **`processed++` unconditionally**.
-  A mutation whose session row is absent server-side — not yet synced, deleted from another device, or
-  an id that drifted — is **counted as processed and removed from the outbox**. Local keeps the RPE,
-  the server never gets it, nothing retries. Permanent divergence, no error surface.
-- **Fix shape:** return the affected-row count from `setSessionRpe` and act on it in both callers —
-  the route with a 404, the push branch by pushing to `errors` so the client's bounded-retry /
-  dead-letter path can see it. **Lane A** (adapter + route).
-- **Do NOT "fix" its neighbour by copying this.** `setWorkoutSessionWarmupEnd` (`adapter.ts:820`) also
-  matches zero rows sometimes and that is **correct** — it carries `isNull(warmupEndedAt)`, so zero
-  rows means "already set". The question to ask of each is whether zero rows is an expected idempotent
-  outcome or an error.
-- **NOT device-verified** — reproduced on the web build; the outbox half is read from source, not run.
-
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 
 - **Branch:** `fix/start-set-bounce-blocks-automation`
