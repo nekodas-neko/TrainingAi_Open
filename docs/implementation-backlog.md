@@ -884,6 +884,8 @@ too, so the Balance card's "burned" figure is dragged down in step.
 ### [nutrition][app-shell] Q-389 — printable food labels for saved meals, scannable back into the app
 
 - **Branch:** `feat/saved-meal-printable-label`
+- **Plan:** [`docs/superpowers/plans/2026-08-17-saved-meal-printable-label.md`](superpowers/plans/2026-08-17-saved-meal-printable-label.md)
+  (2026-08-17, Lane B) — build order, tests, and the corrections folded into this entry below.
 - **Added:** 2026-08-17 · owner: *"for saved meals; I wanna be able to click the meal and have an
   image generated that shows the meal name + servings + macros so I can print onto a food label will
   probably need some mockups. but this way I cam create a saved meal; print the label put it on the
@@ -960,8 +962,13 @@ which also makes it testable and works offline.
     **⚠ This un-resolves the per-serving-vs-batch ambiguity flagged above, by choice.** On a recipe
     that makes two, a person reading the label cannot tell whether 312 kcal is one serving or the
     tub. That is acceptable *only* if the app settles it instead: **scanning the code must log a
-    defined amount (one serving), never infer one.** Settle this when the scan-back is built — the
-    label can no longer carry the answer.
+    defined amount (one serving), never infer one.**
+    **✅ Already satisfied — traced 2026-08-17:** `logMealItems` iterates `oneServingItems`, which
+    divides by `servings`, on both its local and web branches. The scan branch just calls it.
+    **⚠ But that exposes the live bug this feature can ship: `SavedMeal.totals` is the WHOLE
+    recipe.** A renderer reading `totals` prints 624 kcal on a tub whose QR logs 312 — the two halves
+    disagreeing silently on real food, with the per-serving line now removed. **Render
+    `totals / servings`**, and assert both halves against each other in one test.
 - **✅ ALL FOUR STYLES SHIP, and the user cycles between them** (owner, 2026-08-17). This is a
   different build from "pick one aesthetic", and it is cheap designed-in / expensive retrofitted:
   **the renderer takes a style name and looks up a template**, rather than one layout with the style
@@ -975,25 +982,34 @@ which also makes it testable and works offline.
   - **Four styles currently need four font families** — Geist, Geist Mono, Archivo, Instrument Serif
     — and every one must be embedded (see the typeface rule above). Worth consolidating, but not for
     free: dropping Archivo or Instrument Serif changes what the band and plaque styles *are*.
-  - **The smallest style now sets the standard for the whole set.** Codes range 12.2–15.9 mm across
-    the four; a style whose code will not scan is not a style choice, it is a broken label. Test-print
-    **black band (12.2 mm)** — if that scans, they all do.
-- **Mockups exist** — the four treatments at true scale, plus a working style-cycler that mounts the
-  same four files, so the demo cannot drift from the designs. They live in a design canvas, **not in
-  this repo**; ask the owner for the link, or redraw from this spec, which carries everything they
-  encode. **Default is black band** (owner, 2026-08-17).
+  - **The smallest style sets the standard for the whole set**, and black band is now both the
+    default and the smallest at 12.2 mm. A style whose code will not scan is not a style choice, it
+    is a broken label, so **test-print black band first** — if it scans, the others do. ⚠ Read the
+    module-pitch correction below before trusting that: at 25×25 the pitch is finer than the figures
+    the mockups were drawn to, and 12.2 mm may not survive it.
+- **Mockups exist** — the four circle-safe 50 × 50 mm treatments at true scale, each annotated with
+  its tradeoff and its code's physical size, plus a working style-cycler that mounts the same four
+  files so the demo cannot drift from the designs. They live in a design canvas, **not in this
+  repo**; ask the owner for the link, or redraw from this spec, which carries everything they encode.
+  **Default is black band** (owner, 2026-08-17). ⚠ The mockups draw a **21×21** code, which the
+  correction below shows is too small to hold a meal id — they are right about layout and
+  proportion, wrong about module count, and a 25×25 code in the same physical square has a finer
+  pitch than any figure they carry.
 - **⚠ Going circular shrank the code, and this is the live risk.** Square-with-macros allowed
-  ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**, i.e. 0.58–0.76 mm per module on a
-  21-module code. A modern phone reads that at close range, but the margin is thin and **ink spread
+  ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**. **⚠ Corrected 2026-08-17: that is
+  0.49–0.64 mm per module, not 0.58–0.76 — a 21×21 code cannot hold a meal id at all** (v1 holds 17
+  bytes; a UUID needs v2, **25×25**), so encode base64url of the 16 raw bytes (22 chars) with **no
+  prefix or URL**, which is the only form that fits v2 at EC **M**.
+  A modern phone reads that at close range, but the margin is thinner than this entry assumed and **ink spread
   on a home printer merges small modules** — that is the failure mode to expect, and it will look
   like "the scanner doesn't work" rather than like a print problem. Levers, cheapest first: drop the
-  MADE line (worth ~3.7 mm), then drop macros. **Test-print and scan before the layout is frozen.**
+  write-on rule (worth ~3.7 mm — plaque already does, and is the largest code), then drop macros. **Test-print and scan before the layout is frozen.**
 - **One constraint the mockups surface that the spec must not lose:** a QR needs a **quiet zone** —
   clear white margin on all four sides — and the code's physical size sets how much data it can
-  carry legibly. At 50 mm the four layouts give codes of ~16–28 mm, all fine for a 21×21-module
-  code holding just a meal id. **Settle the payload before fixing the size**: a longer payload
-  raises the module count, the same square gets finer, and a 16 mm code starts to struggle. Encode
-  the id alone if at all possible.
+  carry legibly. At 50 mm the circle-safe layouts give codes of 12.2–15.9 mm. **Settle the payload before
+  fixing the size**: a longer payload raises the module count, the same square gets finer, and a
+  16 mm code starts to struggle. **Encode the id alone — this is now a requirement, not a
+  preference** (see the corrected module maths above: the id alone already needs 25×25).
 - **What would count as done:** from a saved meal, produce a 50 × 50 mm printable label carrying the
   meal name, calories per serving with the serving count, a scannable code and a blank made-on line;
   scanning that code in the existing nutrition scanner resolves to that saved meal and logs one

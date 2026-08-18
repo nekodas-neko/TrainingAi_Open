@@ -128,15 +128,15 @@ const root = path.join(__dirname, '..');
 // session misreading it — a stale container reading the variable as absent, and the fact that
 // nothing can verify either copy until the route exists.
 //
-// Raised 2026-08-17 (BugFix intake, Q-389 multi-style + default): all four label styles ship with
+// Raised 2026-08-18 (BugFix intake, Q-389 multi-style + default): all four label styles ship with
 // the user cycling between them, black band as the owner's default, and the write-on line loses its
-// MADE word on every style. The build consequence is the part worth carrying: the renderer becomes
-// template-lookup rather than one baked-in layout, which is cheap designed-in and expensive
-// retrofitted. Also records where the style choice could be stored (one option needs a Lane A
-// migration), the four-font embedding cost, and that the default is now also the smallest code in
-// the set, so one test print settles scannability for all four.
-// Rebuilt from origin/main's numbers on merge rather than spliced — this file conflicted twice in
-// one evening with concurrent lane raises, and splicing is how one side gets silently dropped.
+// MADE word on every style. The build consequence is what matters: the renderer becomes
+// template-lookup rather than one baked-in layout — cheap designed-in, expensive retrofitted.
+// Merged with a concurrent session's work on the same entry rather than over it: that session's
+// logMealItems trace, the SavedMeal.totals whole-recipe bug, and its correction of this entry's own
+// module-pitch figures all survive, and the mockup note now says the drawn 21x21 code is too small
+// to hold a meal id. Rebuilt from origin/main's numbers — this file conflicted three times in one
+// evening with concurrent lane raises, and splicing is how one side gets silently dropped.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -172,8 +172,19 @@ const BASELINE = {
   // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
+  // Raised 2026-08-17 (Q-389 planning, Lane B): backlog 6781 -> 6791. Recomputed from the merged
+  // file — this collided with a concurrent raise to 6781, exactly the same-day collision this file
+  // keeps warning about, and splicing would have silently un-done that side. Three corrections folded into
+  // the existing Q-389 entry rather than filed separately, per the "a wrong correction is more
+  // expensive than a long one" precedent above: its QR module maths was ~16% optimistic (a 21x21
+  // code cannot hold a UUID at all — v1 holds 17 bytes, so the floor is v2 25x25 and the pitch is
+  // 0.49-0.64mm, on a margin the entry already calls thin); its per-serving worry is already
+  // satisfied by oneServingItems; and that in turn exposes the real bug, that SavedMeal.totals is
+  // the whole recipe, so a naive renderer prints double what scanning the label logs. Each is
+  // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
+  // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
   'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6800,
+  'docs/implementation-backlog.md': 6816,
   'CLAUDE.md': 1010,
 
 };
