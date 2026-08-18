@@ -161,6 +161,13 @@ const root = path.join(__dirname, '..');
 // wrong: the existing workoutKcal is a DAY total already rendering in the same screen's Energy
 // section, and the estimate is duration-only, so sitting it beside measured volume implies a
 // derivation that does not exist.
+//
+// Raised 2026-08-18 (BugFix intake, Q-392): +64 for one owner-reported queue entry — preferences are
+// localStorage-only, so a reinstall or a second browser starts from defaults. Most of the length is
+// the inventory table of which preference lives in which key and file, which is the work an
+// implementer would otherwise repeat. Also records that the pattern already exists (Q-241 made goals
+// server-authoritative and left hydrateGoalSeeds behind), and that users.food_region is a dead
+// column whose setting is device-only — the cheapest possible proof of the approach.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -352,7 +359,7 @@ const BASELINE = {
   // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
   // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
   // fourth time. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7327,
+  'docs/implementation-backlog.md': 7370,
   'CLAUDE.md': 1044,
 
 };

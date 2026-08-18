@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.321.2",
+    date: "2026-08-18",
+    changes: [
+      "Fixed the AI health insights inventing behaviour out of missing readings. A metric with no reading was being handed to the model as the words \u201cno data\u201d, which it read as a measurement of zero \u2014 so an account with no step data was told its tracker \u201cshows zero movement\u201d and that \u201cthis inactivity creates a significant gap\u201d. Unmeasured metrics are now left out entirely and named separately as not recorded, so an insight can say a reading is missing but can no longer treat it as something you did or did not do. A real zero is still a real zero.",
+    ],
+  },
+  {
     version: "1.321.1",
     date: "2026-08-18",
     changes: [

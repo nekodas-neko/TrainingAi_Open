@@ -502,6 +502,70 @@ blocker and the intended shape were both already named, so **do not re-derive th
   note says the server half is the correct home, so **route it to Lane A** with the display change
   riding along.
 
+### [platform][app-shell] Q-392 — preferences live only on the device, so a reinstall or a second browser starts from defaults
+
+- **Branch:** `feat/server-backed-user-preferences`
+- **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
+  - when i do a new install or open on computer - it loses all the saved preferences. We need to
+  make it persist across installs/etc."*
+- **Screenshot context** (Home, so it does not need to survive): the customised surface is exactly
+  what resets — the score-ring style behind Readiness / Heart Rate / Sleep / Activity, the three
+  chosen quick-log tiles (kg · Steps · Calories), card colours, and which widgets appear at all.
+
+**Confirmed: these are `localStorage` only, with no server copy.** Inventory as of this trace —
+
+| what | key | lives in |
+|---|---|---|
+| Home widgets / cards | `ta_ss_widgets`, `ta_ss_cards` | `lib/home/home-prefs.ts:29-30` |
+| Pill & card colours | `ta_pill_colors`, `ta_card_colors` | `home-prefs.ts:31,40` |
+| Score-ring style (20 options) | `ta_score_ring_style` | `home-prefs.ts:159` |
+| Weight lookback | `ta_weight_lookback` | `home-prefs.ts:57` |
+| Push / meal / health / day-review / calendar toggles | `ta_pref_*` | five call sites |
+| Rest & run status chips | `ta_pref_rest_chip`, `ta_pref_run_chip` | `lib/native/*-chip.ts` |
+| Background / wallpaper | `ta_background_settings` | `lib/stores/background-settings-store.ts:36` |
+| Food region | `ta_food_region` | four component sites |
+
+- **✅ The pattern to copy already exists and is proven — do not invent one.** **Q-241 (done
+  2026-08-14, v1.307.1)** made goals server-authoritative for exactly this reason, and left the
+  shape behind: the server owns the value, `PATCH /api/user/goals` writes it, and
+  `hydrateGoalSeeds()` (`home-prefs.ts:85`) pushes it into the same `localStorage` keys so first
+  paint stays instant. `app/api/user/` already holds `goals`, `profile`, `avatar`,
+  `equipped-title`, `bedtime-estimate`. **This item is extending that to the rest of the table
+  above**, not designing persistence from scratch.
+- **⚠ One row is already half-built, and is the cheapest possible proof.** `users.food_region`
+  **exists as a column** (`lib/data/postgres/schema.ts:31`, `NOT NULL DEFAULT 'AU'`) and **nothing
+  reads or writes it** — a grep of `app/api/**` and `lib/data/**` finds only the definition. The
+  region the app actually uses comes from `localStorage.getItem('ta_food_region') ?? 'AU'` at
+  `components/nutrition/capture-step.tsx:130,138`, `review-step.tsx:124`, and is set at
+  `components/profile/edit-profile-sheet.tsx:238`. So the column is dead, the setting is
+  device-only, and the landing spot is already in the schema. Wire this one first — it validates
+  the whole approach against a real preference for almost no work.
+- **Decisions the spec has to make:**
+  1. **A column per preference, or one JSONB blob?** Columns match `users.*` as it stands and keep
+     things queryable; a blob avoids a migration per new preference, which matters given how many
+     are listed above. **Either way the migration is Lane A's to claim, not intake's.**
+  2. **Conflict rule when two devices disagree.** Q-241 settled it for goals — server wins, local is
+     a seed — and the same rule should hold here rather than a second, different one.
+  3. **What deliberately stays device-local.** Not everything above should sync: `ta_pref_rest_chip`
+     and `ta_pref_run_chip` drive Android status-bar chips that mean nothing in a desktop browser,
+     and push-notification enablement is per-install by nature. Decide the list rather than syncing
+     the lot; a desktop browser inheriting a phone's notification state is its own bug.
+- **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
+  — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
+  destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
+  re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
+  This report establishes that reinstalls are part of the owner's normal routine, which changes
+  Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
+- **What would count as done:** sign in on a fresh install or a different browser and the chosen
+  ring style, widgets, colours, weight lookback and food region are already applied — no
+  re-configuration; changing one on either device and reopening the other shows the new value; and
+  the preferences that are deliberately per-install are documented as such rather than silently
+  not syncing.
+- **Surface:** browser-reproducible end to end (two profiles, or one profile and a private window)
+  against the seeded DB — no device needed to prove the sync. Only the native chip toggles need the
+  APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
+  the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
@@ -1040,27 +1104,6 @@ blocker and the intended shape were both already named, so **do not re-derive th
   `prefers-reduced-motion` (Playwright sets it via `contextOptions`), or suppress the bounce when a
   test hook is present. Keep the affordance on device; make the control automatable. A spec covering
   log-set → complete-workout is the follow-on this unblocks.
-
-### [platform] Q-353 — the health-insight prompt says "no data" where it means "absent", and the model reads it as zero
-
-- **Branch:** `fix/ai-insight-prompt-absent-vs-zero`
-- **Lane:** **A** — `app/api/ai/health-insight/route.ts` only.
-- **Added:** 2026-08-17 · the half of Q-452 Lane B could not take
-- **What Q-452 fixed and what it did not.** Q-452 gated `AiInsightCard` on the section having data,
-  so a zero-data account no longer gets an insight at all (verified: all four sections render the
-  card for the seeded user and none for a zero-data one). **That closes the fully-empty case only.**
-- **The underlying defect is in the prompt.** Ten lines across the four sections substitute the
-  literal string `"no data"` for an absent field (`:102, :105, :116-119, :125-126, :157-158`).
-  Handed `Steps: no data` the model does not report absence — it asserts **zero** and editorialises,
-  which is how a day-one account was told *"your activity tracker currently shows zero movement…
-  this inactivity creates a significant gap"*.
-- **So a partially-empty section still misreports.** A user with a readiness score but no body-temp
-  reading passes Q-452's gate and still hands the model `Body temp deviation: no data`. That is the
-  common case for anyone without a ring, not an edge case.
-- **Fix shape:** say *absent* rather than `"no data"` — omit the line entirely, or word it so the
-  model cannot read it as a measurement (`Body temp deviation: not recorded`), and state in the
-  system prompt that absent fields are unmeasured and must not be described as zero or as a
-  behaviour. Worth checking the other AI prompt builders for the same substitution.
 
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
