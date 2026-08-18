@@ -95,6 +95,8 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-470 — `regeneratePrescriptionInBackground` is fire-and-forget from two sites in `GET /api/workout-data` with a rate limit but no in-flight guard). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
 
+- [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-460 cannot be adjudicated from production — 74% of completed sessions lack an RPE, which is consistent with both a dropped write and a skipped prompt). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+
 ## Open issues
 
 ```bash
