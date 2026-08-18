@@ -351,47 +351,32 @@ below threshold and left in place for next time.
   readers fall through to their API fallbacks and the inconsistency cannot appear there. The 5-minute
   floor is read from `MIN_SYNC_INTERVAL_MS`, not observed. On-device is the only real verification.
 
-### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
+### [platform] Q-320 — `e.message` as a 500 body leaks the same SQL Q-483 just closed, at 14 sites
 
-- **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events` (owner's
-  rows, retained window), so the SQL-leaking response has, on this evidence, **never been served to
-  anyone**. Keep the fix — it is three lines and the disclosure is real — but do not re-price this
-  upward from the 500s alone.
-- **Branch:** `fix/no-raw-error-in-response-body`
-- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
-  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
-- **Placement:** upper-mid. Three files, a few lines each, and it is the only place in the app that
-  publishes table structure.
-- **Measured:**
-  ```
-  GET /api/workout-sessions/not-a-uuid/recap  →  500
-  {"error":"[ERROR]: Error: Failed query: select \"id\", \"user_id\", \"session_id\",
-   \"session_name\", \"started_at\", \"completed_at\", \"hr_synced_at\", \"warmup_ended_at\",
-   \"phase_id\", \"phase_type\", \"is_early_deload\", \"was_override\", \"intensity_mode\", …
-  ```
-  The control (a valid-but-missing UUID) returns `{"error":"Not found"}` 404, so this is specific to
-  the malformed id.
-- **It is the route's own catch, not a dev overlay — this ships in production:**
-  ```ts
-  const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/recap')
-  return NextResponse.json({ error: errMsg }, { status: 500 })
-  ```
-  `errorLog` (`packages/shared/src/logger.ts:1`) builds `` `${logPrefix} ${error}` `` and returns it.
-  **No environment check, no redaction.**
-- **Scope, measured:** four routes use `error: errMsg` / `error: errorLog(...)` as the response body —
-  `workout-sessions/[id]/{recap,energy,timing}` (all three leak) and `session-explain/insight`, which
-  **does not leak today** (a malformed `sessionId` is guarded upstream and returns a clean 404) but
-  carries the same pattern and would leak the moment an error reached its catch. Fix all four.
-- **What it is and is not.** Schema disclosure to an **authenticated** user, and this app's users are
-  its own account holders — not an anonymous-attacker hole. Worth fixing because it publishes table
-  structure nothing else exposes, into a JSON field a client may render, and because the fix costs
-  nothing: `reportServerError(error, …)` is already called on the line above, so redacting the
-  response loses no diagnostic information.
-- **Fix shape:** return a fixed string (`{ error: 'Internal error' }`) and keep `errorLog`'s output in
-  the server log only. Consider making `errorLog`'s return value unusable as a response body — or add
-  a Custom Rules step rejecting `error: errMsg` / `error: errorLog(` inside `NextResponse.json`, which
-  is the shape this repo already uses where prose would not hold.
-- **Lane A owns this** (`app/api/**`, `packages/shared/src/logger.ts`).
+- **Branch:** `fix/error-message-as-response-body`
+- **Added:** 2026-08-18 · Lane A, found while implementing Q-483 ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md) is
+  Q-483's source; this is the widening that entry's scope deliberately did not cover.
+- **How it was found.** The first draft of `scripts/check-no-raw-error-in-response.js` flagged these
+  as well as Q-483's four, and it was **right to**: `const msg = e instanceof Error ? e.message :
+  'Create failed'` followed by `NextResponse.json({ error: msg }, { status: 500 })` publishes a
+  Drizzle error's message, and a Drizzle error's message *is* `Failed query: select "id", "user_id",
+  …`. Same disclosure, different spelling.
+- **Why it is not folded into Q-483.** 14 sites across 8 files, and **several are deliberate**: the
+  same `msg` is returned on **4xx** paths where it is a real user-facing message ("An exercise with
+  that name already exists", "Not authorized"). Sorting the deliberate from the accidental is the
+  work here, and doing it inside Q-483 would have turned a three-line fix into an untested sweep.
+- **The sites** (`grep -n "error: msg\|error: message\|error: detail" app/api/**/route.ts`):
+  `admin/db-query`, `admin/exercises`, `admin/invites` (×3), `coach/apply/[id]/undo`, `exercises`
+  (×2), `friends`, `friends/[id]`, `phase-sets/[id]` (×2), `workout-templates` (×2).
+- **Fix shape:** at each site, split the two cases the single `msg` currently serves — a *chosen*
+  message on the 4xx branch (keep it) and a *caught* one on the 500 branch (replace with a fixed
+  string, as Q-483 did). Then widen `check-no-raw-error-in-response.js`, whose comment already
+  records why it is narrow and points here.
+- **Priced honestly, and low:** disclosure to an **authenticated** user, and Q-483's production check
+  found **zero** `22P02` rows, so the sibling shape has most likely never been served either.
+  Re-check that before pricing it upward.
+- **Lane A owns this** (`app/api/**`, `scripts/`).
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 
