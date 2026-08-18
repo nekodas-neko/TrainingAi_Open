@@ -494,7 +494,10 @@ export interface WorkoutRepository {
   createWorkoutSession(userId: string, sessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean): Promise<WorkoutSession>
   // Returns true if a new row was inserted, false if a session with this id already existed
   ensureWorkoutSession(userId: string, sessionId: string, programSessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean, intensityMode?: 'full' | 'deload' | null, wasOverride?: boolean): Promise<EnsuredWorkoutSession>
-  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<void>
+  /** Q-473 — true when this call stamped `completed_at`, false when it was already stamped (a
+   *  concurrent request or an outbox replay won). Callers derive idempotence from this, never from
+   *  a read taken before the write. */
+  completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<boolean>
   /** Q-460 — true when a row was updated. Zero rows means no such session for this user, which is
    *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
   setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>
