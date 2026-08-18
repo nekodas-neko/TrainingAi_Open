@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** fifteen sweeps (2026-08-17 ×2, 2026-08-18 ×13) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **482**)
+**Updated:** 2026-08-18 · **By:** sixteen sweeps (2026-08-17 ×2, 2026-08-18 ×14) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **484**)
 
 ## Now
 
-Fifteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Sixteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,29 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 16 — an id that is not a UUID (2026-08-18)
+
+**The third id case**, after another user's (protection holds) and valid-but-missing (Q-463). All 30
+dynamic route files, every method, twice — control UUID vs `not-a-uuid`, 39 pairs. Write-up:
+[`docs/reviews/2026-08-18-malformed-route-ids.md`](../../reviews/2026-08-18-malformed-route-ids.md).
+
+- **Q-483 (upper-mid)** — `GET /api/workout-sessions/not-a-uuid/recap` returns **500 with the full
+  SQL** and every column name of `workout_sessions`, from the route's **own** catch
+  (`error: errorLog(...)`). `errorLog` has **no environment gate**, so this ships in production. Three
+  routes leak, a fourth carries the pattern guarded upstream. Authenticated-only disclosure, and the
+  fix is free — `reportServerError` already ran on the line above.
+- **Q-482 (mid)** — 21 new route/method pairs across 14 routes 500 on a malformed id (Postgres
+  `22P02`), while answering a valid-but-missing one correctly. **Only 2 of 30 dynamic routes validate
+  the id at all.** Fix: a shared `parseUuidParam`, the `normalizeDateParam` precedent, plus a ratchet.
+
+**⚠️ Evidence-reading rule, in both entries:** a **500 is conclusive**; a **400 is not**, because the
+probe sent `{}` and a body-bearing method may fail its body schema before the id is used. Routes
+absent from the table are verified-correct only if GET or DELETE. Without that caveat the table reads
+as an all-clear for everything it omits.
+
+**Harness note:** the dev server died mid-probe and every request returned `HTTP 000`. That is not a
+finding about the app — check the server is alive before believing a run of zeros.
 
 ### Sweep 15 — the empty account, the n=1 account, and a probe that could not have worked (2026-08-18)
 

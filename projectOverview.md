@@ -103,6 +103,40 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] 🟠 A route id that is not a UUID reaches Postgres — and three routes reply with the SQL (Q-482, Q-483, 2026-08-18)
+
+- **The third case, after "another user's id" (protection holds) and "valid but missing" (Q-463):**
+  an id that is not a UUID at all. All 30 dynamic route files, every method, called twice — once with
+  a well-formed-but-nonexistent UUID as the **control**, once with `not-a-uuid`. 39 pairs.
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](docs/reviews/2026-08-18-malformed-route-ids.md).
+- **Q-483 is the sharp one.** `GET /api/workout-sessions/not-a-uuid/recap` answers **500** with the
+  stringified driver error — the complete `SELECT` and every column name of `workout_sessions`. It is
+  the route's **own** catch (`NextResponse.json({ error: errMsg })` where `errMsg = errorLog(error, …)`),
+  and `errorLog` has **no environment check and no redaction**, so it ships in production exactly as
+  here. Three routes leak (`workout-sessions/[id]/{recap,energy,timing}`); a fourth
+  (`session-explain/insight`) carries the pattern but is guarded upstream today. Disclosure is to an
+  **authenticated** user, so not an anonymous hole — but it publishes table structure nothing else
+  exposes, and `reportServerError` is already called on the line above, so redacting the response
+  costs no diagnostics.
+- **Q-482 is the breadth.** 22 of 39 pairs returned 5xx; one is already Q-463, leaving **21 new pairs
+  across 14 routes** (coach undo, friends, injuries, food-logs, meal-plans ×3 + review + structure +
+  meals, meal-types, saved-meals, supplements ×2 + log ×2, workout-review, and the three
+  workout-sessions GETs). Postgres rejects the cast with `22P02`. **Only 2 of the 30 dynamic route
+  files validate the id as a UUID at all.**
+- **The control is what makes it a finding:** every one of those routes answers a well-formed missing
+  id correctly (404, or an idempotent 200/204). Only the malformed id breaks them — a missing input
+  guard, not a broken route.
+- **Not a security hole.** A malformed id cannot read anyone's data: Postgres refuses the cast before
+  any row is touched and every route is `auth()`-scoped. It becomes a disclosure problem only where it
+  meets Q-483, which is why that is queued above it.
+- **⚠️ Reading the evidence:** a **500 is conclusive**; a **400 is not** — the probe sent `{}`, so a
+  body-bearing method may have failed its body schema before the id was used. Routes absent from the
+  table are only verified-correct if they are GET or DELETE.
+- **Fix shape:** a shared `parseUuidParam(id)` returning 400, the same precedent as
+  `normalizeDateParam` for date params, plus a Custom Rules step requiring it in new `[id]` routes.
+- **Observability needs no work:** every fault reached `error_events` tagged `[pg 22P02]`, via
+  `reportServerError` or `onRequestError`.
+
 ### [platform] 🟠 A revoked admin keeps one write for up to 24 hours, and the module docstring says it cannot (Q-479, 2026-08-18)
 
 - **The first sweep to test privilege *revocation* rather than cross-user data isolation.**

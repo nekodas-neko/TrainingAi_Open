@@ -343,6 +343,95 @@ below threshold and left in place for next time.
   is plain TypeScript in `sync-engine.ts` with no native dependency and the arithmetic above is read
   straight from it.
 
+### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
+
+- **Branch:** `fix/no-raw-error-in-response-body`
+- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
+- **Placement:** upper-mid. Three files, a few lines each, and it is the only place in the app that
+  publishes table structure.
+- **Measured:**
+  ```
+  GET /api/workout-sessions/not-a-uuid/recap  →  500
+  {"error":"[ERROR]: Error: Failed query: select \"id\", \"user_id\", \"session_id\",
+   \"session_name\", \"started_at\", \"completed_at\", \"hr_synced_at\", \"warmup_ended_at\",
+   \"phase_id\", \"phase_type\", \"is_early_deload\", \"was_override\", \"intensity_mode\", …
+  ```
+  The control (a valid-but-missing UUID) returns `{"error":"Not found"}` 404, so this is specific to
+  the malformed id.
+- **It is the route's own catch, not a dev overlay — this ships in production:**
+  ```ts
+  const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/recap')
+  return NextResponse.json({ error: errMsg }, { status: 500 })
+  ```
+  `errorLog` (`packages/shared/src/logger.ts:1`) builds `` `${logPrefix} ${error}` `` and returns it.
+  **No environment check, no redaction.**
+- **Scope, measured:** four routes use `error: errMsg` / `error: errorLog(...)` as the response body —
+  `workout-sessions/[id]/{recap,energy,timing}` (all three leak) and `session-explain/insight`, which
+  **does not leak today** (a malformed `sessionId` is guarded upstream and returns a clean 404) but
+  carries the same pattern and would leak the moment an error reached its catch. Fix all four.
+- **What it is and is not.** Schema disclosure to an **authenticated** user, and this app's users are
+  its own account holders — not an anonymous-attacker hole. Worth fixing because it publishes table
+  structure nothing else exposes, into a JSON field a client may render, and because the fix costs
+  nothing: `reportServerError(error, …)` is already called on the line above, so redacting the
+  response loses no diagnostic information.
+- **Fix shape:** return a fixed string (`{ error: 'Internal error' }`) and keep `errorLog`'s output in
+  the server log only. Consider making `errorLog`'s return value unusable as a response body — or add
+  a Custom Rules step rejecting `error: errMsg` / `error: errorLog(` inside `NextResponse.json`, which
+  is the shape this repo already uses where prose would not hold.
+- **Lane A owns this** (`app/api/**`, `packages/shared/src/logger.ts`).
+
+### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
+
+- **Branch:** `fix/dynamic-route-uuid-guard`
+- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
+- **Placement:** mid. Not a security hole (see below) — an error-shape and input-validation gap, with
+  a cheap shared fix and an obvious ratchet.
+- **Method.** All 30 dynamic route files, every method, called twice: once with a
+  well-formed-but-nonexistent UUID (**the control**) and once with `not-a-uuid`. 39 pairs. **22
+  returned 5xx**; one of those (`PUT /api/nutrition/meal-types/[id]`) also 500s on the control and is
+  already **Q-463**, leaving **21 new pairs across 14 routes**:
+
+  | Route | Methods 500ing | Control answers |
+  |---|---|---|
+  | `/api/coach/apply/[id]/undo` | POST | 404 |
+  | `/api/friends/[id]` | DELETE | 204 |
+  | `/api/injuries/[id]` | PATCH, DELETE | 404 / 200 |
+  | `/api/nutrition/food-logs/[id]` | DELETE | 200 |
+  | `/api/nutrition/meal-plans/[id]` | GET, PATCH, DELETE | 404 |
+  | `/api/nutrition/meal-plans/[id]/review` | POST | 404 |
+  | `/api/nutrition/meal-plans/[id]/structure` | PATCH | 404 |
+  | `/api/nutrition/meal-plans/meals/[mealId]` | PATCH | 404 |
+  | `/api/nutrition/meal-types/[id]` | DELETE | 200 |
+  | `/api/nutrition/saved-meals/[id]` | DELETE | 200 |
+  | `/api/supplements/[id]` | PATCH, DELETE | 404 / 200 |
+  | `/api/supplements/[id]/log` | POST, DELETE | 404 / 200 |
+  | `/api/workout-review/session/[sessionId]` | POST | 400 |
+  | `/api/workout-sessions/[id]/{energy,recap,timing}` | GET ×3 | 404 |
+
+- **The control is what makes this a finding**: every one of these answers a well-formed missing id
+  correctly. Only the malformed id breaks them, so it is a missing input guard, not a broken route.
+  Postgres rejects the cast with `22P02 invalid_text_representation`.
+- **Only 2 of the 30 dynamic route files validate the id as a UUID at all.** The rest do
+  `const { id } = await params` and pass the string to the repository.
+- **⚠️ Reading the evidence:** a **500 is conclusive** (the request reached the database). A **400 is
+  not** — the probe sent `{}`, so a body-bearing method may have failed its body schema before the id
+  was used. The table above lists only 500s, so every row is conclusive; do **not** read the routes
+  absent from it as verified-correct unless they are GET or DELETE.
+- **Not a security hole.** A malformed id cannot read anyone's data — Postgres refuses the cast before
+  any row is touched and every route is `auth()`-scoped. It becomes a disclosure problem only where it
+  meets **Q-483**, which is why that one is placed above this.
+- **Fix shape:** a shared `parseUuidParam(id)` returning 400 on failure, applied at the top of each
+  dynamic route — the same shape as `normalizeDateParam` for date params, which is this repo's own
+  precedent for exactly this class. Add a Custom Rules step requiring it in any new
+  `app/api/**/[id]` route so the count cannot grow back; `CLAUDE.md` already argues that for date
+  params (*"new routes get the guard at creation"*).
+- **Lane A owns this** (`app/api/**`).
+- **Observability is fine and needs no work:** every one of these reached `error_events` tagged
+  `[pg 22P02]` — the caught ones via `reportServerError`, the bodiless
+  `GET /api/nutrition/meal-plans/[id]` via `onRequestError`.
+
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
 - **Branch:** `fix/exercises-route-admin-db-check`
