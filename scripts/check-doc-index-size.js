@@ -349,7 +349,7 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6871,
+  'projectOverview.md': 6910,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -369,13 +369,12 @@ const BASELINE = {
   // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
   // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
   // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
-  // Raised 2026-08-18 (Tuning): 7462 -> 7516. Q-509/Q-510, both BLE-era input drift. Q-509's entry
-  // carries the anchor-vs-input ratio table because that ratio IS the finding — drop it and the entry
-  // reads as "refit says 3.31, ship 3.31", which is the exact conclusion the readiness code
-  // pre-registered against. +10 marking Q-501's "did it land" half resolved — both recalibrations are
-  // now verified live, and leaving the entry claiming otherwise would send the next reader chasing a
-  // ship that already happened. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7526,
+  // Raised 2026-08-18 (Tuning): 7514 -> 7596, recomputed from the MERGED file. Q-509/Q-510 (BLE-era
+  // input drift) plus Q-501's "did it land" half marked resolved. Q-509's entry carries the
+  // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
+  // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
+  // against.
+  'docs/implementation-backlog.md': 7596,
   'CLAUDE.md': 1044,
 
 };

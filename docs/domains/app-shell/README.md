@@ -60,6 +60,8 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-17-score-presentation-audit.md`](../../reviews/2026-08-17-score-presentation-audit.md) — **every surface rendering a pillar score, audited (Q-281), 2026-08-17.** Fourteen surfaces scored for contributors / trend / action: **nine render a score with no contributors and no trend**, and exactly one has all three. One real colour-only-state violation found and fixed (Home "accentring" band dot); `FactorBar` inspected and deliberately left alone. Also carries three corrections to **Q-278**'s premises — `score-audit/` has zero user-facing consumers, `scoreAvailability` has one, and daytime stress + resilience have no score surface at all.
 
+- [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-467 — the Coach's undo subsystem is fully built, `coach-history.tsx` already styles undone changes, and **nothing calls the undo route**). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
+
 ## Open issues
 
 ```bash
