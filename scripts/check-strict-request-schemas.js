@@ -8,7 +8,7 @@
 //
 // It is not hypothetical. The Water widget's web fallback posts `{localDate, waterIntake}` to that
 // route, `waterIntake` is in no schema, and the value is silently discarded — verified live, the
-// row's `water_ml` stays NULL behind a `200 {"success":true}` (Q-472).
+// row's `water_ml` stays NULL behind a `200 {"success":true}` (Q-319).
 //
 // Prose would not hold this: the same file already documents the `ai-chat` `localDate` regex that
 // rejected every real request for a full release. So this is a ratchet, the same shape as

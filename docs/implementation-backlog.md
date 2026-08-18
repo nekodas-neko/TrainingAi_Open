@@ -2014,7 +2014,7 @@ ehr     0     0     0     0   648   208   128   556     0
   reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
   `session_rpe = 7` and it did **not** hold.)
 
-### [body][app-shell] Q-472 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
+### [body][app-shell] Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
 
 - **Lane B.** `app/session-select/components/log-value-sheet.tsx` only.
 - **Added:** 2026-08-18, found while implementing Q-464 — **this is the live instance of that class**,
@@ -2085,7 +2085,7 @@ ehr     0     0     0     0   648   208   128   556     0
 - ⚠️ **Two corrections to this entry, both found while implementing it.**
   **(a) It IS a live bug.** The entry says "not a live bug — the app's own clients send the right
   keys". They do not: the Water widget's web fallback posts `waterIntake`, which no schema names, and
-  the value was discarded behind a `200`. Filed as **Q-472** (Lane B) with the measurement.
+  the value was discarded behind a `200`. Filed as **Q-319** (Lane B) with the measurement.
   **(b) The `sync/push` caveat is far wider than one route.** The entry singles out `sync/push`, but
   the same argument applies to **every schema `pushMutations` parses** — `activity-log`,
   `fitness-test`, `day-checkin`, `oura-summary`, mood, food-item, log-exercise, session-rpe,

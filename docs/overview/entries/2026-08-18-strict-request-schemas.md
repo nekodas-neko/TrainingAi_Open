@@ -25,7 +25,7 @@ After: the row's weight is **NULL** where three bogus writes previously landed.
 They do not. `MetaKey` includes `waterIntake`, and the Water widget's **web fallback** posts
 `{localDate, waterIntake}` to `/api/body-metadata` — which names no water field at all, because water
 lives on `/api/water-log`. Measured: `200 {"success":true}` with `water_ml` still NULL, against a
-`steps` control that wrote fine. Filed as **Q-472** (Lane B, the client's file). Strict turns that
+`steps` control that wrote fine. Filed as **Q-319** (Lane B, the client's file). Strict turns that
 silent loss into a visible failure, which is the point — the value was being lost either way.
 
 **The `sync/push` caveat is far wider than one route.** The entry singles out `sync/push` as needing

@@ -118,5 +118,5 @@ export const BodyMetadataPostSchema = z.object({
 // `log-value-sheet.tsx`) send `{ localDate, <field> }` and nothing else. The one field key they can
 // send that this schema does not name is `waterIntake`, and that write is **already lost today** —
 // water lives on `/api/water-log`, not here. Strict turns that silent loss into a visible failure,
-// which is the point; the client fix is Q-472.
+// which is the point; the client fix is Q-319.
 }).strict()
