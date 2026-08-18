@@ -52,6 +52,8 @@ canonical-display-source table in the same section).
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-452 — the sleep insight card generates an LLM paragraph for an account with no sleep data). Findings Q-450…Q-455; four areas recorded **clean**.
 
+- [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (the ingest auth model and value validation checked for this pillar and found sound; no findings specific to sleep). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
+
 ## Open issues
 
 ```bash

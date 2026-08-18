@@ -88,6 +88,89 @@ order.
 - The label prints **per-serving** figures and scanning logs **one serving** — asserted against each
   other in one unit test, because that is the pair that would otherwise drift.
 
+### [readiness][sleep][heart-rate][body][devices] 🟢 The ingest surface reviewed — auth model and value validation both sound; two schema gaps (Q-464, Q-465, 2026-08-18)
+
+- **Why a different lens.** These five pillars barely expose `[id]` write routes — they are
+  read-and-derive, and their writes arrive through **ingest** and **sync**, so the write-surface lens
+  used for workouts and nutrition does not reach them. Full method and limits:
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](docs/reviews/2026-08-18-ingest-and-input-validation.md).
+- **✅ No ingest route accepts a `userId` from the request body.** All ten checked derive identity from
+  the session, or — for `health-connect/ingest` — from a shared secret plus `WEBHOOK_USER_ID`; two
+  additionally sit behind `requireAdmin`. **There is no route where a caller can name whose data they
+  are writing.**
+- **✅ Value validation rejects physiologically impossible input and nothing landed in Postgres.**
+  Heart rate `-50` and `99999`, mood `999` and `-5`, body weight `99999` and `-40`, and a malformed
+  scale frame were all `400`. The weight messages name the bound violated (`"Too big: expected number
+  to be <=500"`) rather than saying "invalid". `CLAUDE.md`'s ingest-schema rule is being followed on
+  every route reachable here.
+- **🟡 Q-464 — request schemas are almost never `.strict()`.** Of **70** files defining a `z.object`
+  request schema, only **6** call `.strict()`, so Zod silently drops unknown keys. Demonstrated on
+  `POST /api/body-metadata`: `{"date":"2026-08-10","weightKg":81}` wrote weight 81 to **today** and
+  returned `{"success":true}` — the route correctly reads `localDate` and defaults to today, and the
+  non-strict schema is what turns a wrong key into a silent wrong-day write. **Not reachable from the
+  app's own clients**; filed because the repo already lost a full release to this class (the `ai-chat`
+  `localDate` regex). Eleven date-bearing write schemas are non-strict — but **`sync/push` needs care**,
+  since older-APK outbox payloads may carry fields the current schema does not name.
+- **🟡 Q-465 — `POST /api/day-checkin` creates a row from a completely empty body** (201, every metric
+  null). **The consequence is unproven and the entry says so**: both consumers were checked and neither
+  shows a user-visible bug. Worth closing anyway because the row is indistinguishable from a check-in
+  where the user answered nothing, and readiness is the pillar where "told us nothing" and "told us
+  neutral" must not collapse.
+- **NOT device-verified,** and `health-connect/ingest` was **read but not called** — it is
+  secret-gated and its validation is unverified by this sweep. The Oura BLE sample routes were not
+  exercised with real frames. Screens for these pillars are not re-reported: all five rendered clean in
+  the 2026-08-17 failure-cells sweep.
+- **Section coverage is now complete for this run** — every pillar reviewed at least once:
+  workouts (Q-460…Q-462) · nutrition/cardio/activity (Q-463) · sleep/readiness/heart-rate/body/devices
+  (Q-464, Q-465) · app-shell/platform (Q-450…Q-459). Still open by design: the **device runtime**
+  (nothing left the web build), **production data** (`claude_ro` never queried), and the
+  **offline/error paths**.
+- **🟡 Q-466, found while landing these PRs rather than by the probe:** CI re-downloads the Playwright
+  browser on every E2E run with no cache, and a slow CDN turns that into an indefinite stall — observed
+  **three times on 2026-08-18**, each costing a cancel-and-re-run cycle on a **required** check. `actions/cache`
+  on `~/.cache/ms-playwright` is the standard fix.
+- **Nothing was fixed.** All three are queued.
+
+### [platform][nutrition][cardio][activity] 🟠 Nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for one question (Q-463, 2026-08-18)
+
+- **Two halves.** The nutrition/cardio/activity mutations probed cross-user exactly as workouts were;
+  then — because the workout sweep's Q-462 looked like it might not be a one-off — **every dynamic
+  write route in the app** called with a fabricated UUID to ask one question uniformly: what happens
+  when the row you named does not exist? 33 endpoints answered. Full tables and limits:
+  [`docs/reviews/2026-08-18-write-surface-not-found.md`](docs/reviews/2026-08-18-write-surface-not-found.md).
+- **✅ Cross-user protection holds here too.** Nine mutations by a second live account against the
+  owner's real rows, with the owner's rows re-read from Postgres afterwards: the supplement is still
+  `Creatine`, the food log still `1.5`, the meal type still `Breakfast`, the activity log still alive.
+  **Combined with the workout sweep, every workout, nutrition, cardio and activity mutation reachable
+  in this harness has now been probed cross-user, and none leaked or destroyed another user's row.**
+  A control ran for every probe — four of them returned bodiless 500s that looked like faults, and the
+  controls returning 200 are what established those were genuine rejections rather than my bad payloads.
+- **🟠 Q-463 — the not-found answer is inconsistent, and five routes give it as a 500.** `PATCH
+  /api/injuries/[id]`, `PUT /api/nutrition/meal-types/[id]`, `PATCH /api/supplements/[id]`, `POST
+  /api/supplements/[id]/log` (all four with an **empty body**) and `DELETE /api/phase-sets/[id]` —
+  plus `/api/log-exercise`, already filed as Q-462, which this generalises. One cause: **16 bare
+  `throw new Error('… not found')`** in the repository layer with nothing mapping them at the route.
+  `PUT`/`DELETE` on `phase-sets/[id]` return **400 and 500** for the same condition with the same
+  message; neither is 404.
+- **Why it is not cosmetic.** A 5xx tells the sync client to **back off and retry** a mutation that can
+  never succeed (`CLAUDE.md`'s poison-pill rule classifies by status); an empty-body 500 makes the
+  client's `res.json()` throw on top of the original failure; and every correctly-refused request
+  writes a stack trace into **`error_events`**, the one fault view nobody watches, which prunes at 30
+  days and is read at every session start. `/api/nutrition/meal-plans/*` is the in-repo reference —
+  all five of its write endpoints already return a clean 404.
+- **✅ Recorded as clean rather than filed:** the seven `DELETE`s returning 200/204 for an absent row
+  are **defensible** — `DELETE` is idempotent by convention, the desired end state holds, and the
+  outbox is right to treat it as done. That is what distinguishes them from Q-460, where the desired
+  end state was a stored RPE and it did **not** hold. Written down so the benign half of the pattern
+  is not filed later.
+- **✅ The nutrition screen renders and reads correctly** — day totals, the water figure reflecting a
+  write made through the API minutes earlier, meal sections and per-meal macros, with zero page
+  errors, zero console errors and zero failing `/api/` responses.
+- **NOT device-verified.** Web build only. The 12 endpoints that returned 400 did so from body
+  validation *before* the id lookup and are **excluded as evidence** rather than counted as correct.
+  The meal-plan generation, running-plan write and barcode/scan paths were not exercised.
+- **Nothing was fixed.** Q-463 is queued directly above Q-462, the instance it generalises.
+
 ### [workouts][platform] 🟠 The workout write path probed cross-user for the first time — protection holds; a silent dropped write and an un-automatable core flow (Q-460…Q-462, 2026-08-18)
 
 - **The lens.** Every prior sweep of this pillar read the model (1RM, RPE, autoregulation, deload) or
