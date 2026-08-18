@@ -103,6 +103,33 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [app-shell] ✅ The other four render rules audited — all held, and every mechanical check over-reported (2026-08-18)
+
+- **Completes the render lens** that sweep 26 opened.
+  [`docs/reviews/2026-08-18-render-hot-paths.md`](docs/reviews/2026-08-18-render-hot-paths.md). Filed
+  nothing; Q-490 remains the only open item in this area.
+- **`key={index}` in editable lists — held.** 85 occurrences exist, but filtering to lists that are
+  **both editable and deletable** gives **zero**, and the known editable lists key on stable ids
+  (`meal.id`, `item.id`, `style.id`, `program.id`). **Reporting the 85 would have been wrong** — index
+  keys on a static list are correct React.
+- **A 1 Hz timer in the orchestrator — held.** `workout-screen.tsx:797` does hold a `setInterval`, and
+  it writes `recordTraceSample(...)` to a module singleton with **no `setState`** — which is the
+  pattern the rule wants, and its comment says so.
+- **Zustand selector breadth — held.** The orchestrator's `useShallow` pick is **62 fields**, which
+  looks alarming and is not: the hot-path *values* (`perSetWeights`, `rpeValues`) are **absent**; only
+  their *actions* are picked, and action references are stable. The leaves read the values via their
+  own narrow selectors (`active-set-card.tsx:40,44`). **Counting fields in a pick is not the test —
+  actions vs values is.**
+- **`readCacheSync` in a render body — held, and the grep flagged the rule itself.** 25 hits outside an
+  effect/callback; the three in the orchestrator are all false positives, and the first
+  (`workout-screen.tsx:264`) is **the comment stating the rule** — *"readCacheSync must never live in
+  that path"* — reported as a breach of that rule.
+- **The standing lesson, now six sweeps running:** every mechanical check here over-reported. The raw
+  counts — 85 index keys, 62 picked fields, 25 bare cache reads — are all defensible, and a review
+  that filed them would have produced three wrong entries and one absurd one. **The grep finds
+  candidates; the handler decides.**
+- **Not verified:** static analysis, no profiler, not on the APK.
+
 ### [nutrition][app-shell] 🟡 64 of 66 memos hold; the two that do not re-render every meal row on every keystroke (Q-490, 2026-08-18)
 
 - **`CLAUDE.md` warns that an inline object or arrow "defeats the memo silently" — a defeated memo
