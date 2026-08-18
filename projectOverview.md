@@ -103,6 +103,46 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform][devices] 🟠 A database outage reaches the sync client as HTTP 200, so it dead-letters the whole outbox instead of backing off (Q-475, Q-476, 2026-08-18)
+
+- **The first sweep to push a real batch at `/api/sync/push`, including one with the database
+  stopped.** [`docs/reviews/2026-08-18-outbox-under-failure.md`](docs/reviews/2026-08-18-outbox-under-failure.md).
+- **Say the good news first: the poison-pill rule holds.** Five mutations, poison placed third so four
+  siblings sit behind it → `processed: 4`, one error keyed by outbox **id**, all four sibling rows
+  written. The rule `CLAUDE.md` says cost three production incidents (#47, #74, #82) is genuinely
+  enforced at both the route and the adapter. Both findings below are about what happens *around*
+  that hardened core.
+- **Q-475 — measured with Postgres actually stopped.** The push returns **HTTP 200** with a per-item
+  error for every mutation, because `pushMutations` catches per-mutation — the same property that
+  makes the poison-pill rule work. So `res.ok` is true, `consecutive5xx` is **reset rather than
+  engaged**, the client keeps pushing at full cadence into a server that cannot write, and every
+  mutation burns an attempt. Backoff is 30 s → 2 m → 8 m → 32 m before dead-lettering, so **≈ 42.5
+  minutes of outage dead-letters every queued mutation** — an ordinary outage length, and this repo
+  has recorded two.
+- **Not data loss — the design holds there.** Rows are kept (`status='failed'`), the More-tab badge
+  reflects them and Tier-A domains toast. The cost is that a user emerges from a transient outage with
+  every pending write dead-lettered and a **per-item-only** retry UI (no "retry all"), asked to
+  hand-repair a queue that was never broken. The client's own comment already states the principle
+  being violated: *"Transport failures … say nothing about the mutation itself."*
+- **Q-476 — the worse failure gets the softer handling.** A mutation rejected by the route's
+  `MutationSchema` (unknown domain, malformed date) returns `errors: []`, which is how the client is
+  told everything succeeded — so the row is **deleted**, with no badge, no toast and no way back. A
+  mutation that fails one layer later, inside `pushMutations`, is kept, badged and retryable. Measured
+  both ways. **Latent, not live:** all 36 `queueMutation` call sites produce a schema-valid date today,
+  and the unknown-domain case needs a domain to be *removed* while devices hold queued rows.
+- **The opposite policy is written in the same request path and cannot run.** `pushMutations`'
+  `Unsupported domain` branch argues at length against exactly this silent drop — and is unreachable
+  behind the route's `z.enum`. The layer that got it right is the one that never executes.
+- **Same class as Q-548, filed the same day:** a DB outage surfacing as `{"error":"Forbidden"}` on
+  `/api/admin/db-query`. Two independent routes now known to misreport a database outage as something
+  else.
+- **Four clean results recorded** so they are not re-run: the poison pill isolates correctly; a
+  per-item failure never deletes data; an envelope-level 4xx quarantines its chunk and keeps draining;
+  and the `id`-keyed confirmation is real, with the `domain:date` fallback reachable only for pre-v13
+  clients.
+- **Not verified on:** Railway (inducing a production DB outage is not on) or the APK. The client half
+  is plain TypeScript with no native dependency.
+
 ### [workouts][platform] 🔴 Completing one workout twice at once counts it twice — the counter that has already drifted three times, measured drifting again (Q-473, Q-474, 2026-08-18)
 
 - **The first sweep to actually fire concurrent writes and read the result.** `CLAUDE.md` records a
