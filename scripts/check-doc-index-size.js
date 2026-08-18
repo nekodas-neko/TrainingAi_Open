@@ -369,7 +369,12 @@ const BASELINE = {
   // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
   // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
   // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7514,
+  // Raised 2026-08-18 (Tuning): 7514 -> 7596, recomputed from the MERGED file. Q-509/Q-510 (BLE-era
+  // input drift) plus Q-501's "did it land" half marked resolved. Q-509's entry carries the
+  // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
+  // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
+  // against.
+  'docs/implementation-backlog.md': 7596,
   'CLAUDE.md': 1044,
 
 };

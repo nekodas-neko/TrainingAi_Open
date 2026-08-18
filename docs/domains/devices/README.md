@@ -125,6 +125,8 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
   contributor near-constant** (0 of 33 days with |z| ≥ 1.2). Filed **Q-506**: fix the baseline, do not
   touch the thresholds.
 
+- [`docs/reviews/2026-08-18-ble-era-input-drift.md`](../../reviews/2026-08-18-ble-era-input-drift.md) — **the BLE-only Recovery Index refit, run on 42 nights, 2026-08-18** (Q-509 — the refit lands at 3.31 h against a shipped anchor of 5, and the anchor must **not** move: it and the input shrank by the same factor, so the hours estimator carries a multiplicative bias from the ~2× noisier BLE series. Q-510 — resilience is starved by the daytime-stress coverage check, which is persisted nowhere, and `worn_hours_ble` is NULL on all 96 rows).
+
 ## Open issues
 
 ```bash
