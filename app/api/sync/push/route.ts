@@ -45,6 +45,35 @@ export async function POST(req: NextRequest) {
   try {
     const repo = await getRepository();
     const result = await repo.pushMutations(userId, valid);
+
+    // Q-487: the outer catch below is the ONLY place this route reported to `error_events`, and
+    // `pushMutations` never reaches it — it catches per mutation, deliberately, because that is what
+    // makes the poison-pill rule work. So a push failure hit the server log and nothing else.
+    //
+    // The table it never reached is the one CLAUDE.md calls "the only view of faults that never
+    // reach a human", and the one the session-start ritual reads. The shape of the gap is an
+    // absence, which is why it survived: over the same retained window `/api/sync/pull` held 69
+    // fault rows and `/api/sync/push` held zero, having never appeared. Not less traffic — the sync
+    // provider runs push BEFORE pull in the same cycle.
+    //
+    // Only the retryable ones. A validation rejection is the client sending something wrong, not a
+    // server fault, and reporting those would bury real failures in routine noise — the same
+    // reasoning `app/api/exercises` uses to report only past its duplicate-name branch.
+    const retryable = result.errors.filter(e => e.retryable);
+    if (retryable.length > 0) {
+      // One row per push, not per mutation. A 100-mutation batch against a dead database would
+      // otherwise write 100 near-identical rows, and `error_events` is a table this repo has
+      // already had to reclaim 49 MB from once.
+      const domains = [...new Set(retryable.map(e => e.domain))].sort().join(', ');
+      reportServerError(
+        new Error(
+          `sync/push: ${retryable.length} of ${valid.length} mutation(s) failed with a retryable ` +
+          `server error [${domains}] — first: ${retryable[0].error}`,
+        ),
+        { userId, url: req.nextUrl.pathname },
+      );
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     console.error('[sync/push] pushMutations threw', err);
