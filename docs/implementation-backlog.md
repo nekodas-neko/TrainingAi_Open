@@ -381,6 +381,53 @@ below threshold and left in place for next time.
   is the shape this repo already uses where prose would not hold.
 - **Lane A owns this** (`app/api/**`, `packages/shared/src/logger.ts`).
 
+### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
+
+- **Branch:** `fix/tier-a-enqueue-visibility`
+- **Added:** 2026-08-18 · review sweep (swallowed failures on write paths) ·
+  [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](reviews/2026-08-18-tier-a-enqueue-silence.md)
+- **Placement:** mid. Narrow trigger, but the loss is unrecoverable and un-diagnosable, on the domain
+  the codebase itself calls worst-case. The fix is four lines.
+- **The four sites — the ONLY `queueMutation` calls in the app that swallow, and all Tier-A:**
+  ```
+  components/workout-screen.tsx:1320  queueMutation({domain:'workout_log'}).catch(() => {})
+  components/workout-screen.tsx:1324  queueMutation({domain:'workout_log'}).catch(() => {})
+  components/workout-screen.tsx:1527  queueMutation({domain:'complete_workout'}).catch(() => {})
+  components/workout-screen.tsx:1532  queueMutation({domain:'complete_workout'}).catch(() => {})
+  ```
+  `lib/local-store/dead-letter-signal.ts` defines Tier-A and says why: *"a lost workout is the app's
+  worst-case data loss."*
+- **Read this before judging the size: the surrounding design is GOOD and must not be undone.**
+  `logWorkoutLocally` writes locally first (and logs its own failure); the **primary** send is a direct
+  `POST /api/log-exercise`, deliberately *"independent of the on-device outbox / sync-push path (which
+  can fail silently)"*; the outbox enqueue is only the **fallback**. This is not a write with no outbox
+  — it is a well-layered write whose last layer is silent.
+- **It can throw.** `queueMutation` is a bare `runSQL` INSERT (`sqlite-backend.ts:2669`), so it throws
+  whenever the local DB is unavailable — which `CLAUDE.md` records as having happened **twice** on
+  Android (*"the local DB has been silently dead … every local read returned empty"*), plus the
+  partial-migration and `disk_full` cases.
+- **The sequence that loses a set:** the POST fails (offline — the case this fallback exists for)
+  **and** the local store is broken. Then the set is not sent, not queued, not recoverable; **nothing
+  is logged**; and `hapticLight()` + `setLoggedCount(c => c + 1)` have already told the user it worked.
+- **The inconsistency is the argument.** In the same function, `logWorkoutLocally` failing is
+  `console.warn`ed and `queueMutation` failing is not — the *less* consequential failure is the visible
+  one. The warn above shows the intent; this looks like an oversight, not a decision.
+- **Fix shape (do NOT change control flow):**
+  1. `.catch(err => console.warn('queueMutation failed:', err))` ×4 — matches the line above, makes the
+     condition diagnosable at all.
+  2. Signal the user, since this loss is unrecoverable — a toast, or route it through the existing
+     `lib/local-store/dead-letter-signal.ts` so the More-tab badge lights. The mechanism already exists.
+  - **Do NOT convert these to `await`.** They are fired without blocking on purpose so the UI stays
+    instant (`Saves feel instant`); awaiting puts a SQLite write in front of the haptic.
+- **Lane B owns this** (`components/**`).
+- **NOT reproduced, and cannot be here.** Inducing it needs a broken local SQLite on a device; in the
+  web sandbox `getLocalStore` returns null, so `store_?.` short-circuits and the enqueue never runs.
+  That `queueMutation` throws on a dead local DB is read from source, not observed. **On-device is the
+  only real verification.**
+- **Clean and worth not re-checking:** **26 of ~30** `queueMutation` sites correctly `await`, so a
+  throw reaches a `try` and suppresses the success toast — `components/health/metric-log-sheet.tsx:96`
+  is the reference shape.
+
 ### [body][platform][devices] Q-485 — an implausible weight is refused with a message on web and discarded without trace on the device path
 
 - **Branch:** `fix/push-coercion-visibility`

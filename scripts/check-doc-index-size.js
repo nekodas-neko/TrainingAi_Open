@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, Tier-A enqueue silence, Q-486): backlog 9312 -> 9359,
+// projectOverview 7339 -> 7369. One queue entry and its row. The lines that earn their place are the
+// three "do not": do not undo the layering (local write, then a direct POST as primary, then the
+// outbox — that ordering is deliberate and documented in the file), do not convert the four calls to
+// `await` (they are fire-and-forget so the UI stays instant), and do not treat this as reproduced —
+// it needs a broken local SQLite on a device and the web sandbox cannot reach the code path at all.
+
+//
 // Raised 2026-08-18 (Review, implausible-value sweep, Q-485): backlog 9264 -> 9312,
 // projectOverview 7309 -> 7339. One queue entry and its row, both carrying the two lines that stop
 // it being implemented wrongly: the shared BOUNDS are correct and must not be touched (One Formula,
@@ -610,7 +618,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7339,
+  'projectOverview.md': 7369,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -621,7 +629,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9312,
+  'docs/implementation-backlog.md': 9359,
   'CLAUDE.md': 1075,
 
 };

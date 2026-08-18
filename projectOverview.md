@@ -103,6 +103,36 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [workouts][devices] 🟠 The outbox enqueue for a workout is the only write in the app that fails silently — and it is the last line of defence (Q-486, 2026-08-18)
+
+- **Following the pattern sweep 18 named** (*this app validates well and tells you badly*) to its most
+  consequential surface: a **write** that fails and reports success.
+  [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](docs/reviews/2026-08-18-tier-a-enqueue-silence.md).
+- **Say the good part first, because it sets the size.** `workout-screen.tsx`'s log path is well
+  layered and I nearly mis-read it: `logWorkoutLocally` writes locally first **and logs its own
+  failure**; the **primary** send is a direct `POST /api/log-exercise`, deliberately *"independent of
+  the on-device outbox / sync-push path (which can fail silently)"*; the outbox enqueue is only the
+  **fallback**. This is not a write with no outbox — it is a good write whose last layer is silent.
+- **Four sites swallow, and they are the only four in the app that do** — `workout-screen.tsx`
+  :1320, :1324 (`workout_log`) and :1527, :1532 (`complete_workout`). All **Tier-A**, the tier
+  `lib/local-store/dead-letter-signal.ts` defines with *"a lost workout is the app's worst-case data
+  loss."* **26 of ~30** other `queueMutation` sites correctly `await`, so a throw suppresses their
+  success toast.
+- **It can throw:** `queueMutation` is a bare `runSQL` INSERT, so it fails whenever the local DB is
+  unavailable — which this file records as having happened **twice** on Android, plus the
+  partial-migration and `disk_full` cases.
+- **The sequence that loses a set:** the POST fails (offline — the case the fallback exists for) *and*
+  the local store is broken. Then the set is not sent, not queued, not recoverable, **nothing is
+  logged**, and `hapticLight()` + `setLoggedCount(c => c + 1)` have already told the user it worked.
+- **The inconsistency is the argument:** in the same function the *less* consequential failure
+  (`logWorkoutLocally`) is `console.warn`ed and the *more* consequential one is not.
+- **Fix shape — do NOT change control flow.** Log it (four lines, matching the warn above), and signal
+  the user through the existing dead-letter badge. **Do not convert these to `await`** — they are
+  fire-and-forget on purpose so the UI stays instant.
+- **NOT reproduced and cannot be here:** inducing it needs a broken local SQLite on a device; in the
+  web sandbox `getLocalStore` returns null so the enqueue never runs at all. **On-device is the only
+  real verification.**
+
 ### [body][platform][devices] 🟡 An implausible weight is refused on web and discarded without trace on the device path (Q-485, 2026-08-18)
 
 - **`CLAUDE.md` says "sync-push must mirror the web route" and the push branch's comment claims it
