@@ -320,6 +320,61 @@ below threshold and left in place for next time.
 - **Worth a sweep:** any other test inserting `now() - interval '…'` and querying a user-local day
   window has this exact hole. `grep -rn "now() - interval" lib/data/postgres/__tests__/`.
 
+### [workouts][app-shell] Q-390 — the deload "D" is its own flex row, so it lifts that day's bar out of line with the rest
+
+- **Branch:** `fix/training-load-day-flag-inline`
+- **Added:** 2026-08-18 · owner, with a screenshot of Health → Training: *"look at the format;
+  reccomend doing Mon (D) instead so it fits better."*
+- **What the screenshot shows** (it will not survive into an implementer's session): the TRAINING
+  LOAD card, week Mon–Sun. Mon carries a green striped bar with a small amber **D** on its own line
+  *below* the "Mon" label; Tue carries a solid orange bar with no flag; Wed–Sun are empty grey
+  slivers. **Mon's bar visibly sits higher than Tue's and collides with the "TRAINING LOAD"
+  heading above it**, which is the part the owner did not ask about and is the actual defect.
+- **Confirmed root cause, one line of markup.** `components/stats/weekly-stats-hub.tsx:98-107`
+  renders the flag as a *sibling* of the day label inside a column flex:
+  ```tsx
+  <div className="flex flex-1 flex-col items-center gap-1">   // :77 — the day column
+    <div style={{ height: totalHeight }}>…bars…</div>
+    <span className="text-[9px] …">{day.label}</span>
+    {day.isDeload  && <span className="text-[8px] … text-amber-500">D</span>}
+    {day.isTesting && <span className="text-[8px] … text-purple-500">T</span>}
+  ```
+  so each flag becomes an extra **row**, which is the "D on its own line" the owner sees.
+- **Why that is more than cosmetic.** The row of columns is
+  `<div className="flex items-end gap-1 h-14">` (`:62`) — **`items-end`, fixed 56 px**. The columns
+  are already taller than their container and overflow *upward*; adding a flag row makes that
+  column taller still, so its bar is pushed further up than its neighbours:
+
+  ```
+  column with a flag:  52 bar + 4 + 13.5 label + 4 + 8 flag = 81.5 px   (25.5 px above the container)
+  column with none:    52 bar + 4 + 13.5 label              = 69.5 px   (13.5 px above)
+  difference:                                                  12 px
+  ```
+
+  **The bars are therefore not on a common baseline whenever any day is flagged** — a deload or
+  testing day reads ~12 px taller than an identical unflagged day, on a chart whose whole purpose is
+  comparing days against each other. That is the misreading, and the collision with the heading is
+  the same 25.5 px overflow reaching the `mb-3` gap above.
+- **The owner's fix resolves both**, which is why it is the right one: inline the flag into the
+  label span (`Mon (D)`) and the extra row disappears, every column becomes the same height, and the
+  bars land on one baseline again.
+- **Three things to get right while doing it:**
+  1. **Keep the letter, not just the colour.** `CLAUDE.md`'s colour-only-state rule is currently
+     satisfied because the glyph *is* the non-colour channel. `(D)` keeps that; a coloured dot would
+     not.
+  2. **Both flags can be true at once** — the two `&&` blocks are independent, so a day can render
+     `D` and `T` together. `Mon (D)(T)` is ~10 characters in a column roughly 50 dp wide at the S25
+     viewport, which is where it will wrap or clip. Decide the combined form (`Mon (D·T)`?) rather
+     than discovering it on a testing-week screenshot.
+  3. **Check the container height after the change.** Columns overflow `h-14` by 13.5 px even with
+     no flag, so `h-14` is already too small for its contents; inlining removes the *difference* but
+     not the overflow. Either raise the container or move the labels out of the fixed-height row.
+- **Evidence that would confirm it end-to-end:** seed a week where one day is a deload and another
+  has identical volume without the flag, and check the two bars' top edges land at the same y. Today
+  they will differ by ~12 px.
+- **Surface:** browser-reproducible at the S25 viewport (≤640 px) — no device, no native path, no
+  production data needed. `weekly-stats-hub.tsx` is Lane B's (`components/**`).
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
