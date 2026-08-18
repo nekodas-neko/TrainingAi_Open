@@ -439,7 +439,13 @@ const BASELINE = {
   // earlier figure in Q-389/Q-393 divided by the module count and not by the module count plus the
   // quiet zone the renderer draws inside the code box, so all of them read ~24% large. That table is
   // what stops the next session sizing a label against a number the printer will not honour.
-  'docs/implementation-backlog.md': 7828,
+  // Raised 2026-08-18 (Q-395 round 2, BugFix intake). The owner asked for mockups and a UI
+  // review of the nutrition screens before any code. Four findings came back that the entry
+  // did not have: every control is 44 px against this repo's own 48 dp rule, the srv/g toggle
+  // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
+  // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
+  // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
+  'docs/implementation-backlog.md': 7867,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
