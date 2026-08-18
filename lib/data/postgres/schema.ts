@@ -1,8 +1,17 @@
 import {
   pgTable, text, boolean, timestamp, uuid,
   integer, doublePrecision, date, time, primaryKey, unique, jsonb, bigint, bigserial, smallint,
+  customType,
   type AnyPgColumn,
 } from 'drizzle-orm/pg-core'
+
+/** `bytea` — drizzle-orm/pg-core has no built-in for it. The driver hands back a Node `Buffer`,
+ *  which is a `Uint8Array`, so the codec in `lib/oura-ble/frame-pack.ts` consumes it directly. */
+const bytea = customType<{ data: Uint8Array; driverData: Buffer }>({
+  dataType: () => 'bytea',
+  toDriver: (v) => Buffer.from(v),
+  fromDriver: (v) => new Uint8Array(v),
+})
 
 export const users = pgTable('users', {
   id:           uuid('id').primaryKey().defaultRandom(),
@@ -1102,6 +1111,30 @@ export const ouraBleClockAnchors = pgTable('oura_ble_clock_anchors', {
   observedSource: text('observed_source').notNull().default('drain'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
+
+// Cold tier for raw BLE frames (migration 191, Q-541). One sealed blob per
+// `(user_id, epoch, tag, ds_bucket)`, replacing ~1,135 rows each. `oura_raw_samples` above keeps the
+// hot window and the ingest path untouched; a background packer moves everything older here and only
+// deletes a hot row once it has re-read the blob and proven the frames equal. Sealed blobs are never
+// updated, which is the property the row-per-frame table lacks and why it bloated (Q-534).
+//
+// `event_name`, `measured_at` and `decoded` are deliberately absent — derivable from `tag`, from the
+// clock anchors, and from the body respectively. Dropping the stored `measured_at` is what removes
+// the full-table re-stamp that caused the 2026-08-17 disk_full outage.
+export const ouraRawPacked = pgTable('oura_raw_packed', {
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  epoch:      integer('epoch').notNull(),
+  tag:        smallint('tag').notNull(),
+  /** floor(ring_timestamp_ds / 864000) — a day of *ring* time, not a calendar day, so a change to
+   *  the ds→wall-clock derivation never invalidates a bucket. */
+  dsBucket:   bigint('ds_bucket', { mode: 'number' }).notNull(),
+  frameCount: integer('frame_count').notNull(),
+  minDs:      bigint('min_ds', { mode: 'number' }).notNull(),
+  maxDs:      bigint('max_ds', { mode: 'number' }).notNull(),
+  bodySha256: text('body_sha256').notNull(),
+  blob:       bytea('blob').notNull(),
+  packedAt:   timestamp('packed_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.epoch, t.tag, t.dsBucket] })])
 
 // Durable watermark for the BLE rollup's incremental window (migration 184). Stage 1 of Q-213 kept
 // this in process memory, so every container restart re-derived the whole 35-day window once — six
