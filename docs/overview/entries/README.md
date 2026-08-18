@@ -84,6 +84,12 @@ first went 61 → 32. Nine days' worth of new entries arrived and the *linked* c
 The runaway limit is 60, so on this trend the next sweep clears fewer than it needs to and the one
 after that clears nothing. This is now a dated problem, not a theoretical one.
 
+**Third sweep, 2026-08-18 (same day again): 61 -> 41, and the floor held.** 20 of 61 were
+unlinked. The linked count was 41 after the second sweep and is 41 after this one — so the rise the
+paragraph above predicted did not continue on this run, and the trend is not yet a straight line.
+What did not change is the arithmetic: the runaway limit is 60, the floor is 41, and the whole
+directory now has 19 files of headroom. That is roughly half a day at the current rate.
+
 **The standing tension worth naming:** a fold-everything sweep and durable docs linking entries are
 incompatible, and today the docs win — which means the loose directory has a floor that grows.
 Resolving it properly means either the sweep rewriting citations to the history file it folded into
