@@ -333,11 +333,11 @@ below threshold and left in place for next time.
 - **Security note:** `wasm-unsafe-eval` is narrower than `unsafe-eval` (it permits WASM compilation
   only). State that in the PR rather than letting it read as a blanket eval relaxation.
 
-### [platform] Q-547 — measure the 0.22 vCPU before optimising it: three hypotheses already refuted
+### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
 - **Branch:** *(none — an owner measurement, then a finding)*
-- **Added:** 2026-08-18 · BLOCKED: owner measurement.
+- **Added:** 2026-08-18 · **Answered the same day.** No longer blocking. Remaining work is the quiet-window baseline named below.
 - **The number.** Railway, ~19.6 days to 2026-08-18: the app averages **0.22 vCPU** and **0.61 GB**
   (**$4.42 + $6.07/month**), against `prod_DB` at 0.002 vCPU. **The app is computing, not waiting on
   queries.** Storage, by contrast, is **$0.12/month, 0.6 percent of the bill** — so the entire
@@ -350,9 +350,26 @@ below threshold and left in place for next time.
 - **What is left.** Drains land ~19x/day for 1-6 active minutes — a ~3 percent duty cycle that **cannot**
   produce 0.22 vCPU sustained. So there is a baseline consumer between drains that source-reading has
   not found in three attempts.
-- **The measurement that splits it:** Railway's `TrainingAI` CPU graph at ~3-hour zoom. **Spiky at drain
-  times** means request-driven, and Q-545 removes it. **Flat between drains** means a baseline leak or
-  spin, and Q-545 will not fix it. **Size no CPU saving until this runs.**
+- **MEASURED 2026-08-18 — ANSWERED. It is spiky, so Q-545 is the right fix.** Owner pulled the 3-hour
+  graphs. `TrainingAI` CPU sits near **0.0 vCPU between events** and spikes to **1.0-1.2 vCPU** (once
+  2.0). Memory tracks it exactly: **~400 MB baseline, spiking to 800 MB-1.2 GB** on the same events —
+  the allocation signature of decoding frames and running SleepNet. `prod_DB` CPU is **flat at 0.0**,
+  confirming the app computes while the database only holds memory. **Request-driven, not a leak.**
+- **A second finding the measurement surfaced, and it may matter more than the first.** The TrainingAI
+  charts carry **~12-15 dashed vertical markers in three hours**, each paired with a ~10 MB network
+  ingress spike — apparently **deploys**, at roughly 5/hour. Both Implementation lanes have been
+  merging continuously and each merge restarts the service (cold start + `instrumentation.ts` schema
+  warm-up). **A large share of the measured CPU/RAM is development churn, not steady-state app cost**,
+  which means the $18.63/month projection is inflated by an atypical period. **Confirm those markers
+  are deploys before trusting any before/after comparison** — and take a baseline during a quiet window,
+  not a shipping day.
+- **Third correction: `prod_DB` reads ~200 MB and climbing on the 3-hour graph, not 0.79 GB.** It
+  restarted during the volume incident and Postgres memory grows as caches warm, so the billed 0.79 GB
+  is its warmed steady state and will return. Tuning `shared_buffers` still caps it; the cold reading
+  is not evidence the problem went away.
+- **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
+  baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
+  cutting deploy frequency, not more tuning.
 
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
