@@ -116,6 +116,12 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   nowhere, and `worn_hours_ble` is NULL on all 96 rows (**Q-510**).
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/reviews/2026-08-18-recalibrations-live-verified.md`](../../reviews/2026-08-18-recalibrations-live-verified.md)
+  — **both shipped recalibrations verified live in production, 2026-08-18**, hours after PR #77 found
+  neither had reached a stored row. Readiness is stamped `v3:ri5:2026-08-18` and the shared JSONB
+  **merge held** (`bodyComp` survived). Sleep has no stamp and was verified by **recomputation**:
+  08-17 stores 78 against a raw blend of 77.91 (old model), 08-18 stores 92 against a calibrated 92
+  (new). **The trend step falls between those two days**, and history is not back-filled.
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-452 insight-over-no-data, Q-453 `/api/training-stress` accepts a malformed date). Findings Q-450…Q-455; four areas recorded **clean**.
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (Q-465 — `POST /api/day-checkin` creates a check-in row from an empty body, indistinguishable from a check-in where the user answered nothing). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**

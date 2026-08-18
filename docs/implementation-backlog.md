@@ -2904,6 +2904,16 @@ session working from a temporarily restored copy.
   **So `updated_at` is not evidence of which model wrote a row** — it moves for reasons unrelated to
   the score. Anyone auditing "did the recalibration land?" by timestamp gets the wrong answer, and
   this is exactly why the `model_version` stamp matters more than it looks.
+- **✅ RESOLVED for the "did it land" question, 2026-08-18 ~05:00 UTC** — the prediction below came
+  true within the hour. **1 of 96** rows now carries `{"bodyComp": "atlas_2_1_0", "readiness":
+  "v3:ri5:2026-08-18"}` (so the JSONB **merge** held in production, not just in review), and sleep —
+  which has no stamp — was verified by recomputation instead: 2026-08-17 stores **78** against a raw
+  blend of **77.91** (old model), 2026-08-18 stores **92** against a calibrated **92** (new model,
+  raw blend 86.07). The trend step falls between those two days.
+  [`docs/reviews/2026-08-18-recalibrations-live-verified.md`](reviews/2026-08-18-recalibrations-live-verified.md).
+  **This entry's own substance is unaffected** — a stored derived row still cannot be re-derived from
+  the inputs beside it, and `updated_at` still does not identify the writing model; the sleep check
+  worked only because that pillar's *contributors* happen to be persisted.
 - **Consequence worth knowing:** stored scores are only rewritten when the readiness route recomputes,
   which happens on app open. Placeholder rows already exist through **2026-08-22** with null scores,
   so the first row to carry new-model values *and* the `v3:ri5:2026-08-18` stamp will be the next day

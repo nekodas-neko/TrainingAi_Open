@@ -65,3 +65,24 @@ check is inferred as the remaining candidate, not observed failing. Every figure
 The baton recorded the db-query `Forbidden` as "sustained, different from the burst 401". It recovered
 on its own a few minutes later, so it *was* the transient failure after all — the baton has been
 corrected, since the wrong version would have told a successor to stop using a working endpoint.
+
+## Postscript, same session: both recalibrations went live while this was being written
+
+PR #77 measured that neither had reached a stored row and predicted where the first one would appear.
+It appeared within the hour.
+
+Readiness now has **1 of 96** rows stamped `v3:ri5:2026-08-18`, and the shared `model_versions` JSONB
+reads `{"bodyComp": "atlas_2_1_0", "readiness": "v3:ri5:2026-08-18"}` — so the **merge** that code was
+deliberately written as held in production, which had only been argued for until now.
+
+Sleep has no stamp, so it was verified by recomputation instead: 2026-08-17 stores **78** against a
+raw weighted blend of **77.91** (old model), and 2026-08-18 stores **92** against a calibrated **92**
+(new model; its raw blend is 86.07). Each day matches exactly one candidate, by 8 and 6 points. **The
+step in the sleep trend falls between those two days.**
+
+Worth stating because it is counterintuitive: 08-18's score went *up* under the new model, even though
+the recalibration dropped the mean from 84.1 to 69.5. `SCORE_CALIBRATION` lifts the upper-middle, so a
+genuinely good night still reads as one. Checking "did it land?" by looking for a lower number on a
+good night gives the wrong answer.
+
+95 of 96 rows remain pre-recalibration and will stay so — history is not back-filled.

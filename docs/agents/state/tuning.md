@@ -43,11 +43,12 @@ Since then, working only scores no other lane holds:
 
 ## Next
 1. **Q-505 — build the Activity redesign** (Lane A). Decisions and sequencing are in the plan's §4.
-2. **Verify the two shipped recalibrations against production.** Checked 2026-08-18 and **nothing has
-   landed yet**: production runs 1.321.1, but **0 of 96 `oura_daily_derived` rows carry a `readiness`
-   model version** and every stored score is still pre-recalibration. Stored scores are only rewritten
-   when the route recomputes (on app open), and every existing row predates the deploy. Re-check after
-   the owner next opens the app; the first stamped row is where the trend step falls.
+2. ~~Verify the two shipped recalibrations against production~~ — **DONE 2026-08-18, both are LIVE.**
+   Readiness: 1 of 96 rows stamped `v3:ri5:2026-08-18`, and the shared JSONB **merge held**
+   (`bodyComp` survived). Sleep has no stamp so it was verified by recomputation — 08-17 stores 78
+   against a raw blend of 77.91 (old), 08-18 stores 92 against a calibrated 92 (new).
+   **The trend step falls between 2026-08-17 and 08-18**, and history is not back-filled, so 95 of 96
+   rows stay pre-recalibration. [`review`](../../reviews/2026-08-18-recalibrations-live-verified.md).
 3. **Re-run the Q-509 refit after any HR-smoothing change.** The anchor-vs-input ratio (§1.3 of that
    review) is the pass test: if it goes to ~1.0 the estimator was fine and the input needed
    conditioning. Until then, `RECOVERY_INDEX_OPTIMAL_HOURS` stays at 5.
@@ -146,6 +147,14 @@ for this work:
   7/10) and the honest outcome was a partial document. For sleep, the design harness was validated
   to mean-abs-error 4.3 first, and the final distribution was re-run through the **shipped
   TypeScript**, not the harness.
+- **An unstamped model is still verifiable: recompute both candidates from the persisted contributors
+  and see which the stored score matches.** That is how the sleep recalibration was confirmed live
+  without a version stamp (08-17 → raw blend, 08-18 → calibrated, differing by 8 and 6 points). It
+  needs the inputs persisted and the old model still legible, so it does not replace the stamp.
+- **A recalibration is not a uniform reduction.** 2026-08-18's sleep score went *up* under the new
+  model (blend 86.07 → 92) even though the recalibration dropped the mean 84.1 → 69.5 —
+  `SCORE_CALIBRATION` lifts the upper-middle. Checking "did it land?" by looking for a lower number on
+  a good night gives the wrong answer.
 - **`updated_at` does NOT tell you which model wrote a row.** On 2026-08-18 a bulk job bumped
   `updated_at` on ~every `oura_daily_derived` row at 03:55:01 without rewriting a single score. Auditing
   "did the recalibration land?" by timestamp gives the wrong answer — check the `model_version` stamp,
