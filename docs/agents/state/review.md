@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** nine sweeps (2026-08-17 ×2, 2026-08-18 ×7) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **475**)
+**Updated:** 2026-08-18 · **By:** ten sweeps (2026-08-17 ×2, 2026-08-18 ×8) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **477**)
 
 ## Now
 
-Nine sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Ten sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -17,10 +17,41 @@ least once**, at the owner's request to work through the sections:
 | `sleep` · `readiness` · `heart-rate` · `body` · `devices` | ingest auth, value validation, schema strictness | Q-464, Q-465 |
 | `app-shell` · `platform` | failure cells, repo-migration architecture, **the Coach write path** | Q-450…Q-459, Q-467, Q-468 |
 
+**Sweep 10 closed the offline/error-path gap on its server half** — `/api/sync/push` was pushed for real, including with the database stopped. What is still untested there is the **on-device** half (the local SQLite outbox itself, which the web sandbox cannot open).
+
 **Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 10 — the outbox under failure, with the database actually stopped (2026-08-18)
+
+**The first sweep to post a batch at `/api/sync/push` at all.** Write-up:
+[`docs/reviews/2026-08-18-outbox-under-failure.md`](../../reviews/2026-08-18-outbox-under-failure.md).
+
+**The poison-pill rule holds and that is worth leading with.** Five mutations, poison third, four
+siblings behind it → `processed: 4`, error keyed by outbox **id**, all four sibling rows written. The
+rule `CLAUDE.md` says cost three production incidents is genuinely enforced at both layers.
+
+**Filed Q-475 (high) and Q-476 (low-mid).**
+
+- **Q-475 — a DB outage arrives as HTTP 200.** Stopped Postgres → `{"processed":0,"errors":[…]}` with
+  **200**, because `pushMutations` catches per-mutation (the same property that makes the poison-pill
+  rule work). The client resets `consecutive5xx` instead of engaging backoff, keeps hammering, and
+  bumps `attempts` on every mutation: 30 s → 2 m → 8 m → 32 m, so **≈42.5 min of outage dead-letters
+  the whole outbox**. Not data loss — rows kept, badge, toast — but the retry UI is **per-item only**.
+  Same class as **Q-548**, filed the same day by another lane.
+- **Q-476 — the worse failure gets the softer handling.** A schema-rejected mutation returns
+  `errors: []`, which the client reads as success, so the row is **deleted** silently; an in-handler
+  failure is kept, badged and retryable. `pushMutations`' `Unsupported domain` branch argues against
+  exactly this and is unreachable behind the route's `z.enum`. **Latent, not live** — all 36
+  `queueMutation` call sites produce a safe date today.
+
+**Method note worth keeping: stopping the local cluster is cheap, safe and reversible**
+(`pg_ctl -D /var/lib/postgresql/local-dev -m fast stop`, then `scripts/local-db/setup.sh`). The two
+migration warnings on restart are the normal already-applied lines. This sweep's main finding came
+out of it, and no earlier sweep had tried it — error paths are reachable, they just need the harness
+broken on purpose.
 
 ### Sweep 9 — write concurrency, fired for the first time (2026-08-18)
 
