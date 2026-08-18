@@ -50,6 +50,15 @@ Both days' contributors are persisted, so the blend can be recomputed exactly:
 Unambiguous — the two candidates differ by 8 and 6 points respectively, and each day matches exactly
 one of them. **The step in the sleep trend falls between 2026-08-17 and 2026-08-18.**
 
+**Be precise about what this proves.** Each row's `sleep_contributors` are whatever sub-scores *that
+row's own model* produced, so the test asks only one question: is the stored score the plain blend of
+them, or the blend passed through `SCORE_CALIBRATION`? That identifies whether the **final calibration
+step** ran — the recalibration's distinguishing addition — and it is decisive for that. It does **not**
+independently verify the nine re-shaped contributor curves, because a curve change is invisible once
+its output is persisted as a sub-score. The curves shipped in the same release (v1.319.0) as the
+calibration, so the inference that they are live too is sound, but it is an inference and not a
+measurement.
+
 ### 2.1 The recalibration is not a uniform reduction, and this night shows it
 
 2026-08-18's score went **up**: raw blend 86.07 → calibrated 92. That is the calibration working as
@@ -60,11 +69,20 @@ reads as a genuinely good night. Anyone checking "did the recalibration land?" b
 
 ### 2.2 This is a reusable test
 
-Where a model ships without a version stamp, **recomputing both candidate models from the persisted
-contributors and checking which one the stored score matches** is a complete substitute, provided the
-two differ by more than rounding on the day in question. It cost one query and one short script here.
-It does not replace the stamp — it needs the inputs persisted and the old model still legible — but it
-means an unstamped recalibration is not unverifiable.
+Where a model ships without a version stamp, **checking whether the stored score is the plain
+combination of its own persisted inputs or the post-processed one** identifies which model wrote the
+row, provided the two differ by more than rounding that day. It cost one query and one short script.
+
+Its limit is the one in §2 above and it is worth stating as a general caveat, because it is easy to
+over-read: **the test only sees post-processing steps, never changes upstream of the persisted
+intermediate.** Persisted contributors are already the new curves' output on a new-model row and the
+old curves' output on an old-model row, so nothing about the curves themselves can be recovered from
+them. A worked example of getting this wrong: applying `SCORE_CALIBRATION` to *historical* rows'
+contributors and reading the result as "what the new model would have scored that night" produces a
+hybrid — new post-processing over old curves — that is not either model. It reads as the recalibration
+*raising* the mean, which is backwards.
+
+So this substitutes for a stamp on the last stage only. It does not replace the stamp.
 
 ---
 
@@ -85,6 +103,12 @@ means an unstamped recalibration is not unverifiable.
 ## 4. What was not exercised
 
 - **Nothing on-device**, and no code changed.
+- **The nine re-shaped sleep curves were not independently verified** — only the final calibration
+  step was, for the reason in §2. They shipped in the same release.
+- **The band consequences of the sleep recalibration are not re-opened here.** They were measured and
+  deliberately accepted at ship time (`scoreBand()`: the 50 boundary 1 → 6 days, the 70 boundary
+  12 → 15), and the recalibration review records that more days reading "Low" is the point rather than
+  a side effect.
 - **The readiness score itself was not recomputed** — unlike sleep, its contributors alone do not
   determine the score without the baseline state, so §1 rests on the stamp rather than on arithmetic.
 - **A single row.** One stamped readiness row and one new-model sleep row is enough to prove the code

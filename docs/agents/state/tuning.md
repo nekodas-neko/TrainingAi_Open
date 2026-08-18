@@ -139,6 +139,9 @@ for this work:
 - **The other lanes' territory is off-limits by the owner's instruction (2026-08-18):** *"Only pick up
   new tuning opportunities that the other lanes don't have."* Q-502 (Body Battery), Q-505 (Activity)
   and Q-501 are Lane A's to build. Check all four batons before picking a score to measure.
+- **The sleep recalibration's band consequences are settled, not open.** `scoreBand()`'s 50 boundary
+  moved 1 → 6 days and the 70 boundary 12 → 15, measured and deliberately accepted at ship time — more
+  days reading "Low" is the point. Do not re-open it as a finding.
 - Q numbers come from the band above, not the backlog's next-free pointer. No migration numbers.
 
 ## Gotchas that cost time
@@ -147,10 +150,14 @@ for this work:
   7/10) and the honest outcome was a partial document. For sleep, the design harness was validated
   to mean-abs-error 4.3 first, and the final distribution was re-run through the **shipped
   TypeScript**, not the harness.
-- **An unstamped model is still verifiable: recompute both candidates from the persisted contributors
-  and see which the stored score matches.** That is how the sleep recalibration was confirmed live
-  without a version stamp (08-17 → raw blend, 08-18 → calibrated, differing by 8 and 6 points). It
-  needs the inputs persisted and the old model still legible, so it does not replace the stamp.
+- **An unstamped model's LAST stage is still verifiable: is the stored score the plain combination of
+  its own persisted inputs, or the post-processed one?** That is how the sleep recalibration was
+  confirmed live without a stamp (08-17 → raw blend 77.91, 08-18 → calibrated 92, differing by 8 and
+  6 points). **It sees post-processing only, never changes upstream of the persisted intermediate** —
+  persisted contributors are already whatever curves that row's model used. Applying
+  `SCORE_CALIBRATION` to *historical* contributors to ask "what would the new model have scored?"
+  gives a hybrid (new post-processing over old curves) that reads as the recalibration *raising* the
+  mean — backwards. Tried it this session; it is a trap worth naming.
 - **A recalibration is not a uniform reduction.** 2026-08-18's sleep score went *up* under the new
   model (blend 86.07 → 92) even though the recalibration dropped the mean 84.1 → 69.5 —
   `SCORE_CALIBRATION` lifts the upper-middle. Checking "did it land?" by looking for a lower number on
