@@ -106,6 +106,14 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   anchor is provisional and upgrades exactly once. The shared-composite refactor that would remove
   the fallback entirely is still open as Q-42.
 
+- [`docs/reviews/2026-08-18-ble-era-input-drift.md`](../../reviews/2026-08-18-ble-era-input-drift.md)
+  — **the BLE-only Recovery Index refit `readiness-composite.ts` pre-registered, run on 42 nights,
+  2026-08-18.** It lands at **3.31 h** against the shipped anchor of 5 — and the anchor must **not**
+  move: the refit anchor and the input distribution shrank by the *same* factor (0.715× vs 0.72–0.74×),
+  which is a multiplicative bias in the hours estimator rather than a change in the owner (**Q-509**,
+  a `devices` finding). Also closes Q-508's open lead: all four `contributorsOk` gates pass **18/18**
+  August days, so resilience is starved by the daytime-stress **coverage** check — which is persisted
+  nowhere, and `worn_hours_ble` is NULL on all 96 rows (**Q-510**).
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-452 insight-over-no-data, Q-453 `/api/training-stress` accepts a malformed date). Findings Q-450…Q-455; four areas recorded **clean**.
