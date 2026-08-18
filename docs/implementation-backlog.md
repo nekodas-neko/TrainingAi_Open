@@ -556,28 +556,6 @@ below threshold and left in place for next time.
   process-local `Set` covers the common case; a short-lived DB marker survives multiple replicas,
   which matters because Railway can run more than one. **Lane A.**
 
-### [cardio][platform] Q-469 — `running-plan-explain` re-asks the model for the same sentence on every card mount
-
-- **Branch:** `fix/running-plan-explain-cache`
-- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
-  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
-- **Placement:** low-mid. The most redundant *genuine* section, on a call that is explicitly not
-  load-bearing.
-- **Genuine, like Q-470.** Fingerprint is `{ type, durationMin }` — stable for a given day's
-  prescribed run. **31 redundant across 9 distinct**: the same run explained ~7 times on average.
-- **Cause.** `components/running/prescribed-run-card.tsx:41-53` fires it from a bare `useEffect` with
-  no cache. The author already handled the re-render risk — the comment says `gateReasons` is joined
-  into a stable string *"so a new array ref each render doesn't re-fire the fetch"* — but **mount is
-  the remaining trigger**: every navigation back to the running screen, and every remount from a
-  parent, re-asks for the same sentence.
-- **Why not higher:** the call is explicitly *"never load-bearing"* — the deterministic `rationale`
-  renders immediately and the AI copy only swaps in if it arrives — and the section is cheap (62 calls,
-  6,864 tokens total). **The reason to fix it is content consistency:** the wording changes between
-  mounts, so the same prescribed run is described differently each time the user opens the screen.
-- **Fix shape:** cache on the fingerprint inputs (`type`, `durationMin`, `rationale`, `gateKey`); the
-  app already has a client cache layer and the instant-paint rule points the same way. A day-scoped
-  key is enough — the prescription does not change within a day. **Lane B.**
-
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
 - **Branch:** `feat/meal-label-ingredient-breakdown`

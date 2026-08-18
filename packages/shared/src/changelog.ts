@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.4",
+    date: "2026-08-18",
+    changes: [
+      "Finishing one workout no longer counts as several. If the Finish button was tapped rapidly, or an offline completion was re-sent, the programme\u2019s progress counter could jump by two or three off a single session \u2014 which pushed you into the next training phase, and into a deload, earlier than you had actually earned. The workout record itself was always correct; only the counter was wrong. It now advances exactly once no matter how many times the completion arrives.",
+    ],
+  },
+  {
     version: "1.324.3",
     date: "2026-08-18",
     changes: [
-      "Finishing one workout no longer counts as several. If the Finish button was tapped rapidly, or an offline completion was re-sent, the programme's progress counter could jump by two or three off a single session \u2014 which pushed you into the next training phase, and into a deload, earlier than you had actually earned. The workout record itself was always correct; only the counter was wrong. It now advances exactly once no matter how many times the completion arrives.",
+      "The one-line explanation on a prescribed run now stays the same wording each time you open the screen. It was being re-written by the AI on every visit \u2014 the same run described about seven different ways \u2014 because the card asked for a fresh sentence every time it mounted.",
     ],
   },
   {
