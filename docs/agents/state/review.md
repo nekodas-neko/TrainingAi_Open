@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-two sweeps (2026-08-17 ×2, 2026-08-18 ×20) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **488**)
+**Updated:** 2026-08-18 · **By:** twenty-three sweeps (2026-08-17 ×2, 2026-08-18 ×21) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **489**)
 
 ## Now
 
-Twenty-two sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-three sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,30 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 23 — a write that updates the server but not the local store (2026-08-18)
+
+**Took the successor sweep 22 named for itself, and it found something.** Write-up:
+[`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](../../reviews/2026-08-18-server-only-writes-to-local-first-domains.md).
+
+**Filed Q-488 (mid).** The activity delete (`health-content.tsx:684-700`) updates the server and the
+caches and **never the local store**. Three surfaces read `activity_logs` local-first, and `pullDelta`
+is throttled to **5 minutes** un-forced with nothing in the delete path forcing one. **It self-heals**
+via the soft-delete tombstone and `applyDelta`'s `sync_status='synced'` guard — visible
+inconsistency, not data loss, and the entry says so up front.
+
+**Why it survived, and the reusable part:** the originating screen is **correct**. It reads
+`day-log:<date>` from the server (a sanctioned cross-domain aggregate), so the activity vanishes
+*there* immediately and nothing on that screen could reveal it. **A server-reading screen writing to a
+local-first domain is a blind spot by construction** — that is where to look next in this class.
+
+**The rule is not written down and should be.** `CLAUDE.md` has the forward direction only. The
+inverse: *a domain the UI reads local-first must have **every** write update the local store —
+including deletes, and including writes from a screen that itself reads server-side.*
+
+**⚠️ Not reproduced** — `getLocalStore` returns null on web, so the local-first readers fall through to
+their API fallbacks and the inconsistency cannot appear in this harness. Second source-read-only
+finding of the run, labelled as such everywhere.
 
 ### Sweep 22 — case (b), seed-only read paths; the lens is now closed (2026-08-18)
 

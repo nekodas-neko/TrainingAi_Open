@@ -19,6 +19,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](../../reviews/2026-08-18-server-only-writes-to-local-first-domains.md) — **the activity delete audited end to end, 2026-08-18** (Q-488 — it updates the server and the caches but never the local store, so session-select, nutrition and the activity-history card keep showing the deleted activity until the next pull; self-heals via the tombstone). The Health Connect metrics PATCH is also server-only but its full pull chain checks out.
 - [`docs/reviews/2026-08-15-comprehensive-app-review.md`](../../reviews/2026-08-15-comprehensive-app-review.md)
   — §1.2 measured the Activity Score in production after v2: sd 5.9 over 19 days, range 66–91, 10
   distinct values. **v2 fixed the mechanism Q-137 blamed and the outcome did not move** (Q-277),

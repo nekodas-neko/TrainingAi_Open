@@ -325,6 +325,47 @@ below threshold and left in place for next time.
   asymmetry above cannot be reproduced after that window. It is recorded here because it will not be
   measurable later.
 
+### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
+
+- **Branch:** `fix/activity-delete-updates-local-store`
+- **Added:** 2026-08-18 · review sweep (staleness outside Q-262's test) ·
+  [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](reviews/2026-08-18-server-only-writes-to-local-first-domains.md)
+- **Placement:** mid. Visible inconsistency, **not data loss**, and it self-heals — but the fix is one
+  call and the shape is a rule the codebase implies and does not state.
+- **What.** `app/health/health-content.tsx:684-700` deletes via
+  `fetch("/api/activity-logs", { method: "DELETE" })`, toasts *"Deleted"*, calls
+  `invalidateActivityWrites()` and `refreshDayOverlay(...)`. **No `store.deleteActivityLog(...)`, no
+  `queueMutation`.**
+- **The screen the user is on is correct**, which is why this survived: `refreshDayOverlay` →
+  `fetchDayOverlay` reads `cachedFetch('day-log:<date>')`, which is **server-read by design** (a
+  cross-domain aggregate — the sanctioned exception). The activity vanishes there immediately.
+- **The local `activity_logs` row is untouched**, and three surfaces read it local-first:
+  - `app/session-select/session-select-content.tsx:500` — `store.getActivityLogs(weekStart)`
+  - `app/nutrition/nutrition-content.tsx:278` — today's calories burned
+  - `components/health/activity-history-card.tsx:91`
+- **How long:** `pullDelta` is throttled to `MIN_SYNC_INTERVAL_MS` = **5 minutes** unless forced
+  (`sync-engine.ts:77`), and `sync-provider.tsx:145,195` calls it **un-forced**. Nothing in the delete
+  path triggers a pull, so the floor is that window and the real duration is "until the next natural
+  sync".
+- **It self-heals — say so when triaging.** `applyDelta` applies the tombstone
+  (`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, `sqlite-backend.ts:1628`) with
+  the correct pull-clobber guard. The server delete is a **soft** delete with a `user_id`-scoped
+  tombstone (`adapter.ts:2374`). Nothing is lost; something wrong is shown for a while.
+- **Fix shape:** delete the local row alongside the API call, as every other activity write path
+  already does (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`). One
+  call. Queuing the delete so it works offline is a **separate, larger** question for this domain —
+  do not fold it in silently.
+- **The rule this breaks is not written down anywhere.** `CLAUDE.md` states the forward direction
+  (*"if a domain WRITES to the local store, its UI MUST READ from the local store"*). The inverse is
+  what matters here: **a domain the UI reads local-first must have *every* write update the local
+  store — including deletes, and including writes made from a screen that itself reads server-side.**
+  That last clause is why nothing on the originating screen could reveal it. Worth adding to
+  `CLAUDE.md` alongside the fix.
+- **Lane B owns this** (`app/health/**`).
+- **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
+  readers fall through to their API fallbacks and the inconsistency cannot appear there. The 5-minute
+  floor is read from `MIN_SYNC_INTERVAL_MS`, not observed. On-device is the only real verification.
+
 ### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
 
 - **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events` (owner's
