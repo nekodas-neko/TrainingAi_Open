@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **194** | `lib/data/postgres/migrations/` (head: `193_drop_oura_raw_samples_measured_index.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **545** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -694,6 +694,32 @@ blocker and the intended shape were both already named, so **do not re-derive th
   [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
 
 
+### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
+
+- **Branch:** `fix/admin-db-maintenance-off-native-gate`
+- **Added:** 2026-08-18, found while reclaiming 513 MB during the `disk_full` recovery.
+- **Lane B.** `components/oura-ble/**` + `app/admin/oura-ble/**`. No server change.
+- **What happens.** `components/oura-ble/oura-ble-debug.tsx:391` early-returns a "Native OuraBle
+  plugin unavailable" banner when the Capacitor plugin is absent. `<DbFootprintCard />` is rendered at
+  line 555 — *after* that return. So on any desktop browser the VACUUM FULL button, the Lever 1b
+  backfill button and the footprint readout do not render at all.
+- **Why that is wrong.** None of those three touch the plugin. `POST /api/oura-ble/samples/vacuum` is
+  a plain server-side call behind `auth()` + `requireAdmin`; it has nothing to do with BLE. It is
+  gated only by being rendered inside a component that gates on something else.
+- **Why it matters more than it looks.** Reclaiming disk becomes possible only from the phone — and
+  **`VACUUM FULL` takes an `ACCESS EXCLUSIVE` lock**, so the APK is the one client blocked while it
+  runs, with a WebView timeout free to swallow the response. Worse, if the APK is broken, uninstalled
+  or mid-rebuild, the disk cannot be reclaimed *at all* — which is exactly the situation where a full
+  volume is most likely. On 2026-08-18 the workaround was a `fetch()` from a desktop console.
+- **Fix shape:** move `DbFootprintCard` (and any other server-only card) above the availability
+  early-return. The genuinely native panels — `RawStoreStatusConsole`'s `rawStats()`, the SleepNet
+  dump, the sensor probe — correctly stay behind it.
+- **Second half: the pack backfill has no button at all.** `POST /api/oura-ble/samples/pack` shipped
+  with Q-541 Task 4 and its own comment says *"the button sends none"*, but nothing in `app/` or
+  `components/` references it. The 2026-08-18 run — 764 buckets, 941,233 frames — was five hand-typed
+  `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
+  levers have, beside them in the footprint card.
+
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
@@ -714,10 +740,31 @@ blocker and the intended shape were both already named, so **do not re-derive th
 - **Consequence:** the store has accumulated everything drained since 2026-07-27 at ~2–3 MB/day, with
   no bound and no visible failure state — exactly what the retention decision warned about (*"a rollup
   that silently falls behind turns Tier 1 into unbounded growth"*).
-- **Do first, it is cheap and unblocks measurement:** build the missing `rawStats()` panel in
-  `app/admin/oura-ble/` (already a known gap — `rawStoreOpen`/`lowDisk`/`totalRows`/`unrolledRows` are
-  wired in the plugin and rendered nowhere). **Nobody has ever observed the real size of this file.**
-  Then the bound + failure state; the full prune needs D2 Task 5.
+- ✅ **MEASURED ON DEVICE 2026-08-18 — the panel exists now and the owner read it.** First-ever
+  observation of this store, and it confirms the static analysis exactly:
+
+  | | |
+  |---|---:|
+  | total rows | **209,326** |
+  | **rolled up** | **0** |
+  | unrolled | 209,326 |
+  | on disk | **31.2 MB** |
+  | low disk | no |
+
+  **Zero rows are marked rolled up**, so `pruneRaw`'s `rolled_up = 1 AND synced = 1` predicate matches
+  nothing and the documented 14-day window cannot delete a single row. Both causes are now confirmed
+  from the device, not inferred.
+- **31.2 MB is a floor, not an accumulation.** The store was wiped by the 2026-08-17 reinstall and
+  rebuilt to 209,326 rows in ~1.5 days — that is the Full re-sync re-draining the ring's whole buffer
+  into a fresh cursor-0 store. Forward growth is ~23,000 rows/day at ~149 bytes/row ≈ **3.4 MB/day**,
+  matching the ~3.2 MB/day in `CLAUDE.md` and the ~1.2 GB/year the 2026-08-02 retention decision
+  predicted for an unpruned tier.
+- **It already exceeds Android Auto Backup's 25 MB per-app quota**, so the phone-side backup covers
+  none of it — see the `allowBackup` note below. That was a projection when this entry was filed; at
+  31.2 MB it is now a measurement.
+- **What is left here:** the bound and the visible failure state. The real prune still needs D2 Task 5
+  (the WebView rollup consumer) to set `rolled_up`, which is what this entry has always said and what
+  the device reading now proves.
 - **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).

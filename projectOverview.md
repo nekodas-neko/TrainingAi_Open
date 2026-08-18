@@ -631,7 +631,7 @@ the next device change.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
 
 
-### [devices][platform] 🟠 `oura_raw.db` is growing without bound on the phone, and nobody has ever seen how big it is (Q-538, 2026-08-17)
+### [devices][platform] 🟠 `oura_raw.db` grows without bound on the phone — now measured: 209,326 rows, **0 rolled up**, 31.2 MB (Q-538, 2026-08-17 · measured 2026-08-18)
 
 The documented "14-day rolling buffer" for on-device raw frames (owner retention decision,
 2026-08-02) **has not shipped**. `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
@@ -643,12 +643,17 @@ any of them**. Two independent causes, and fixing the first does not fix the sec
 The store has therefore accumulated everything drained since 2026-07-27 at roughly 2–3 MB/day. This
 can wedge the drain: ops-doc **I21** holds the cursor on `SQLITE_FULL`.
 
-- **Not measured, and cannot be from here:** the actual size of the file on the owner's S25. The admin
-  console has no `rawStats()` panel — the fields are wired in `lib/oura-ble/plugin.ts` and rendered
-  nowhere. Building that panel is the first step of Q-530 and the only way to see this.
+- ✅ **Measured on device 2026-08-18** — the panel exists and the owner read it: **209,326 total rows,
+  `rolled up` = 0, 31.2 MB on disk, `low disk` no.** Zero rolled-up rows means `pruneRaw`'s predicate
+  matches nothing, so both causes above are confirmed from the device rather than inferred.
+- **31.2 MB is a floor.** The store was wiped by the 2026-08-17 reinstall and rebuilt in ~1.5 days by
+  the Full re-sync re-draining the ring's buffer at cursor 0. Forward growth ≈ **3.4 MB/day**
+  (~149 bytes/row), matching the ~3.2 MB/day this repo already recorded and the ~1.2 GB/year the
+  2026-08-02 retention decision predicted for an unpruned tier.
 - **Related, and load-bearing for the D4 decision:** `AndroidManifest.xml:14` sets
   `allowBackup="true"` with no `dataExtractionRules`. Android Auto Backup's cloud quota is 25 MB/app
-  and this file passed it within two weeks, so **the device raw store has no working backup.**
+  and the file now measures **31.2 MB**, so **the device raw store has no working backup** — that was a
+  projection when this row was filed and is now a measurement.
 - Detail and the five costed options:
   [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md).
 

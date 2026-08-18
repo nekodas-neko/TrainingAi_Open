@@ -161,6 +161,10 @@ const root = path.join(__dirname, '..');
 // wrong: the existing workoutKcal is a DAY total already rendering in the same screen's Energy
 // section, and the estimate is duration-only, so sitting it beside measured volume implies a
 // derivation that does not exist.
+// Raised 2026-08-18 (disk_full recovery): the first on-device rawStats reading (209,326 rows, 0
+// rolled up, 31.2 MB) replaces "never measured" on Q-538 and its Known-Issues row, and Q-544 files
+// the console gate that made a desktop VACUUM impossible. A measurement replacing a projection, and
+// one new entry — entries, per the same split as the raises above.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -342,7 +346,7 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6871,
+  'projectOverview.md': 6876,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -352,7 +356,7 @@ const BASELINE = {
   // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
   // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
   // fourth time. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7257,
+  'docs/implementation-backlog.md': 7283,
   'CLAUDE.md': 1044,
 
 };
