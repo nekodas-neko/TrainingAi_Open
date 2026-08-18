@@ -172,6 +172,58 @@ export async function getLatestOuraCloudVitals(
 }
 
 /**
+ * Q-314 — the owner's declaration that the ring was deliberately re-keyed.
+ *
+ * A re-key restarts the ring's own clock, and the app cannot tell that apart from a history
+ * re-drain by counter shape alone: both make a batch's max ds fall below the epoch's high-water
+ * mark, and reading a re-drain as a reset re-timed the whole sleep history twice. A re-key is a
+ * deliberate act done with `open_oura` on a laptop, so it is declared rather than guessed.
+ *
+ * At most one may be outstanding, enforced by a partial unique index — a second declaration cannot
+ * mean anything the first does not, and two pending rows would open two epochs on two drains.
+ */
+export async function declareOuraRekey(db: Db, userId: string, note: string | null): Promise<{
+  id: number; declaredAt: Date; alreadyPending: boolean
+}> {
+  const existing = await getPendingRekeyDeclaration(db, userId)
+  // Idempotent rather than an error: pressing twice is the likeliest mistake, and the honest answer
+  // is "one is already waiting", not a failure that invites a third press.
+  if (existing) return { ...existing, alreadyPending: true }
+  const [row] = await db
+    .insert(s.ouraBleRekeyDeclarations)
+    .values({ userId, note })
+    .returning({ id: s.ouraBleRekeyDeclarations.id, declaredAt: s.ouraBleRekeyDeclarations.declaredAt })
+  return { ...row, alreadyPending: false }
+}
+
+export async function getPendingRekeyDeclaration(db: Db, userId: string): Promise<{ id: number; declaredAt: Date } | null> {
+  const [row] = await db
+    .select({ id: s.ouraBleRekeyDeclarations.id, declaredAt: s.ouraBleRekeyDeclarations.declaredAt })
+    .from(s.ouraBleRekeyDeclarations)
+    .where(and(eq(s.ouraBleRekeyDeclarations.userId, userId), isNull(s.ouraBleRekeyDeclarations.consumedAt)))
+    .limit(1)
+  return row ?? null
+}
+
+/** Marked consumed only once the anchor for `epoch` is written — see the ingest path. */
+export async function consumeRekeyDeclaration(db: Db, id: number, epoch: number): Promise<void> {
+  await db
+    .update(s.ouraBleRekeyDeclarations)
+    .set({ consumedAt: new Date(), openedEpoch: epoch })
+    .where(and(eq(s.ouraBleRekeyDeclarations.id, id), isNull(s.ouraBleRekeyDeclarations.consumedAt)))
+}
+
+/** Cancel a declaration made by mistake, before any drain has acted on it. Scoped to the user and
+ *  to the un-consumed row, so it can never retract an epoch that already exists. */
+export async function cancelPendingRekeyDeclaration(db: Db, userId: string): Promise<boolean> {
+  const rows = await db
+    .delete(s.ouraBleRekeyDeclarations)
+    .where(and(eq(s.ouraBleRekeyDeclarations.userId, userId), isNull(s.ouraBleRekeyDeclarations.consumedAt)))
+    .returning({ id: s.ouraBleRekeyDeclarations.id })
+  return rows.length > 0
+}
+
+/**
  * Has the ring ever reported at all?
  *
  * Split out from `getLatestOuraBleMeasuredAt` in Q-541 Task 7, because `/api/oura/stats` was using

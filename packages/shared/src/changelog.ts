@@ -6,10 +6,25 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.321.2",
+    version: "1.322.1",
     date: "2026-08-18",
     changes: [
       "On Health \u2192 Training Load, a deload or testing day is now marked inline next to the day name \u2014 \u201cMon (D)\u201d \u2014 instead of on a line of its own. The flag used to add a whole extra row to that day, which pushed its bar about 12 pixels higher than the others and made it collide with the heading above: two days with the same volume drew at visibly different heights on a chart whose whole job is comparing them.",
+    ],
+  },
+  {
+    version: "1.322.0",
+    date: "2026-08-18",
+    changes: [
+      "Re-pairing the ring no longer shifts the timestamps on your whole sleep history. When the ring re-sends buffered history after a re-pair, the app used to read that as the ring's clock having been reset and re-dated everything against it \u2014 which is what moved months of nights by twelve to fourteen hours, twice. A replay of history the ring already sent is now recognised as exactly that.",
+      "A genuine ring re-key is something you now tell the app about, rather than something it tries to work out from the data. It still notices one you forgot to mention, if the ring's counter really did restart.",
+    ],
+  },
+  {
+    version: "1.321.2",
+    date: "2026-08-18",
+    changes: [
+      "Fixed the AI health insights inventing behaviour out of missing readings. A metric with no reading was being handed to the model as the words \u201cno data\u201d, which it read as a measurement of zero \u2014 so an account with no step data was told its tracker \u201cshows zero movement\u201d and that \u201cthis inactivity creates a significant gap\u201d. Unmeasured metrics are now left out entirely and named separately as not recorded, so an insight can say a reading is missing but can no longer treat it as something you did or did not do. A real zero is still a real zero.",
     ],
   },
   {
