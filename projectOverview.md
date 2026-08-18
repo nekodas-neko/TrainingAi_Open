@@ -69,6 +69,30 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [activity][platform] 🟢 Cross-user isolation holds; one route reports a success it did not perform (Q-556, 2026-08-18)
+
+- **The last reachable "structurally untested" item — a second account — driven for real.** The local
+  harness already had a zero-data account with a saved session, so it needed no new infrastructure.
+  **Third time this run an "unreachable" surface was not.**
+  [`docs/reviews/2026-08-18-cross-user-isolation.md`](docs/reviews/2026-08-18-cross-user-isolation.md).
+- **✅ 10 of 11 probes rejected by the route's own ownership check** — reading A's recap/energy/timing,
+  deleting A's workout, **logging a set into A's session**, completing A's workout. **And the
+  enumeration control passed:** a nonexistent id and A's id return byte-identical responses, so no
+  route confirms which ids exist.
+- **🟢 Q-556 — `DELETE /api/activity-logs` returns `200 {"success":true}` for another user's row.**
+  **Not a leak, and that was checked:** the DB immediately after shows the row intact, `deleted_at`
+  NULL, still A's. The repo method returns `void`, so the handler cannot know and answers success
+  unconditionally. Filed because it is **inconsistent with every sibling** (house posture is 404 for
+  both cases) and because **offline-first makes a false success expensive** — a 2xx confirms and drops
+  an outbox mutation. That second path was **not demonstrated**.
+- **⚠️ The first run of this sweep reported eleven clean results and proved almost nothing** — six hit
+  routes that do not exist (HTML 404s, which read exactly like an access-control pass) and one failed
+  schema validation first. **A 404 from an unmatched route is not evidence of access control**, and the
+  tell was in the body, not the status.
+- **Not exercised:** one probe (`PATCH …/metrics`) still failed validation, so that check is unverified.
+  Local DB + web build; not production, not device; two accounts only.
+
+
 ### [app-shell][platform] 🟢 Offline read surfaces work; a tab tap is a silent no-op only before the SW claims (Q-555, 2026-08-18)
 
 - **The offline paths were driven for real for the first time** — this role's baton had listed them as

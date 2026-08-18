@@ -84,6 +84,22 @@ first went 61 → 32. Nine days' worth of new entries arrived and the *linked* c
 The runaway limit is 60, so on this trend the next sweep clears fewer than it needs to and the one
 after that clears nothing. This is now a dated problem, not a theoretical one.
 
+**Third sweep, 2026-08-18 (Review, sweep 39) — the floor HELD at 41, it did not rise.** 61 entries,
+41 linked, 20 foldable → 61 → 41. Three points now: **61→32, 62→41, 61→41.** The projection above
+("the next sweep clears fewer than it needs to") did **not** happen, and the reason is worth knowing
+rather than guessing: the eleven entries added between the second sweep and this one were all Review
+sweeps, which link their **`docs/reviews/…` write-up** from the domain indexes and leave the
+**journal entry itself unlinked**. So the linked floor grows with *durable-doc citations*, not with
+entry count — a session that cites its review doc instead of its journal entry costs the floor
+nothing.
+
+**That is the lever, and it is cheaper than either option in the tension below:** when a durable doc
+needs to cite a session, cite the **review/handoff document**, not the loose journal entry. The
+journal entry then folds on schedule. Current headroom: floor 41 against a limit of 60.
+
+This sweep also **started a new `history-2026-08-18.md`** rather than appending, because
+`history-2026-08-15.md` had reached 296 KB in the previous sweep — over the ~250 KB rule.
+
 **The standing tension worth naming:** a fold-everything sweep and durable docs linking entries are
 incompatible, and today the docs win — which means the loose directory has a floor that grows.
 Resolving it properly means either the sweep rewriting citations to the history file it folded into

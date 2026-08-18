@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-eight sweeps (2026-08-17 ×2, 2026-08-18 ×36) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **556**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
+**Updated:** 2026-08-18 · **By:** thirty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **557**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
 
 ## Now
 
-Thirty-eight sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-nine sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -19,12 +19,61 @@ least once**, at the owner's request to work through the sections:
 
 **Sweep 11 closed the non-default-timezone gap** — a user was moved to `Pacific/Kiritimati` and the app driven as them. **Sweep 10 closed the offline/error-path gap on its server half** — `/api/sync/push` was pushed for real, including with the database stopped. What is still untested there is the **on-device** half (the local SQLite outbox itself, which the web sandbox cannot open).
 
-**Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
-left the web build — every offline-first domain took its web fallback) and **a second account**
-(`claude_ro` sees only the owner). **Two former entries on this list are now closed:**
-`health-connect/ingest` (sweep 30 drove it) and the **offline paths** (sweep 38 drove them via
-`context.setOffline(true)`). **Both were assumed unreachable and neither was.** Before writing a
-surface off, spend ten minutes trying — that is two for two.
+**Still open by design:** the **device runtime** is the only one left — nothing in any sweep left the
+web build, and it genuinely needs hardware. **THREE former entries on this list are now closed, and
+none of them was ever actually unreachable:** `health-connect/ingest` (sweep 30 — just needed the env
+var set), the **offline paths** (sweep 38 — `context.setOffline(true)`), and **a second account**
+(sweep 39 — the harness already had a zero-data user with a saved session). **Three for three.**
+Before writing a surface off, spend ten minutes trying; "structurally unreachable" has been wrong
+every single time it was tested. Production data is partly open — `claude_ro` is row-scoped to the
+owner, so a *second real account* remains out of reach there specifically.
+
+### Sweep 39 — cross-user isolation, two real accounts (2026-08-18)
+
+**Filed Q-556 (low).** Write-up:
+[`docs/reviews/2026-08-18-cross-user-isolation.md`](../../reviews/2026-08-18-cross-user-isolation.md).
+
+**Closed the third and last reachable "untested" item.** The harness already had a zero-data account
+with a saved session — no new infrastructure needed. **Three for three on assumed-unreachable surfaces.**
+
+**✅ The ownership discipline holds.** 10 of 11 probes rejected by the route's own check — A's
+recap/energy/timing, deleting A's workout, **logging a set into A's session**, completing A's workout.
+**The enumeration control passed:** nonexistent and A's ids give byte-identical responses.
+
+**Q-556 — `DELETE /api/activity-logs` returns `200 {"success":true}` for a row it did not delete.**
+**Verified not a leak** (row intact, `deleted_at` NULL, still A's) because a 2xx cannot distinguish
+"ignored it safely" from "did it". The repo method returns `void` so the handler cannot know. Filed
+for **inconsistency** (house posture is 404-for-both, verified by the control) and because a false 2xx
+**confirms an outbox mutation away** — that second path is flagged, **not demonstrated**.
+
+**⚠️ The first run reported ELEVEN clean results and proved almost nothing.** Six hit routes that do
+not exist — I invented `DELETE /api/activity-logs/<id>` when the id goes in the **body** — and Next's
+HTML 404 reads exactly like an access-control rejection. A seventh failed Zod first. **Only 3 of 11
+reached the code under test.**
+**→ A 404 from an unmatched route is not evidence of access control, and the tell is in the BODY
+(HTML vs JSON), not the status.** Any future probe of this kind must assert it hit a real route.
+
+**⚠️ Fourth measurement error of the run, and they all share one shape: each produced a plausible
+result in the direction I expected.** Zeros looked like offline failure; 38% looked like partial cache
+retention; eleven 404s looked like solid isolation. **Expect your probe to be wrong in the direction
+of your hypothesis** — that is where the checking effort belongs.
+
+**Also did the compaction chore, because CI demanded it mid-sweep** (61 loose entries, limit 60).
+Folded 19 unlinked entries into a **new** `history-2026-08-18.md` — new rather than appended, since
+`history-2026-08-15.md` had hit 296 KB against the ~250 KB rule.
+
+**⚠️ And it produced a finding the sweep did not go looking for.** `entries/README.md` projected that
+the linked floor was rising and that "the next sweep clears fewer than it needs to". **It held at 41
+instead** — three points now: 61→32, 62→41, **61→41**. The reason matters: the eleven entries added
+since the last sweep were all Review sweeps, which link their **`docs/reviews/…` write-up** from the
+domain indexes and leave the **journal entry unlinked**. **The floor grows with durable-doc
+citations, not entry count.** So the lever is: **when a durable doc cites a session, cite the review
+or handoff doc, never the loose journal entry** — recorded in that README. Cheaper than either option
+in its "standing tension". Headroom now 41 against 60.
+
+**Gotcha worth carrying:** `git rm` failed on this sweep's *own* journal entry because it was still
+untracked, so it got folded into the history **and** left loose — a silent duplicate. **Exclude the
+current session's entry from any fold you run in the same PR.**
 
 ### Sweep 38 — offline read surfaces, driven for real (2026-08-18)
 
