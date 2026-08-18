@@ -462,7 +462,13 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
-  'docs/implementation-backlog.md': 8315,
+  // Raised 2026-08-18 (Q-397 + the Q-395 review fold-in, BugFix intake). Recomputed from the
+  // MERGED file after taking main's side of this baseline, rather than splicing the conflict
+  // hunks — two same-day raises spliced together silently drop one side. Q-397 records that the
+  // shipped ingredient label is the analysis Q-393 was corrected away from, with the measured
+  // mm-per-module table and the owner's choice of B2 as the default; Q-395 gains the six review
+  // notes and the 11-section prod checklist an implementation PR ticks off.
+  'docs/implementation-backlog.md': 8427,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
