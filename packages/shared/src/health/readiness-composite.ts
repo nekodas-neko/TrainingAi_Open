@@ -114,6 +114,11 @@ function plainScore(v: number | null): ReadinessContributor {
   return { score: Math.max(0, Math.min(100, Math.round(v))), provisional: false }
 }
 
+/** Stamped onto `oura_daily_derived.model_versions.readiness` so a score can be attributed to the
+ *  model that produced it. Bump whenever the weights, curves or z-slope change — Q-273.
+ *  Rows written before 2026-08-18 carry no stamp at all. */
+export const READINESS_MODEL_VERSION = 'v2:z2026-08-18'
+
 /** Oura's public guidance: a Recovery Index of ~6 hours or more (RHR reaching its low point in the
  *  first half of the night) indicates good recovery. `hoursToSettle` is measured from the HR minimum
  *  to wake, so MORE hours = earlier settle = better. */
@@ -139,6 +144,7 @@ export const READINESS_MODEL = {
   zPointsPerUnit: Z_POINTS_PER_UNIT,
   baselineMinNights: BASELINE_MIN_NIGHTS,
   recoveryIndexOptimalHours: RECOVERY_INDEX_OPTIMAL_HOURS,
+  modelVersion: READINESS_MODEL_VERSION,
   checkinEnergyScore: CHECKIN_ENERGY_SCORE,
   neutralScore: NEUTRAL.score,
   directions: {

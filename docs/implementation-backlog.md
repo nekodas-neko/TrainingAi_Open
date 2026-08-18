@@ -2655,61 +2655,39 @@ session working from a temporarily restored copy.
   doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
   `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
 
-### [readiness][workouts] Q-504 — recalibrate the Readiness range, and re-anchor the five thresholds that ride on it
+### [readiness] Q-504 — REFUTED: readiness should NOT get a range calibration; fix Q-500 instead
 
-- **Branch:** `fix/readiness-range-calibration` · **Lane:** A
-- **Added:** 2026-08-18 · Tuning · owner-directed range work ·
-  [`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](reviews/2026-08-18-sleep-score-range-recalibration.md) §6
-- **Not blocked on the owner** — they directed the range work explicitly. It is held only because of
-  blast radius, and the analysis is already done.
-- **Measured.** Even with v1.319.0's new Sleep Score feeding its `previousNight` term, readiness is
-  mean 68.9, sd 11.6, **IQR 64.4–75.7 (11 points)**, nothing above 87, nothing in the 30s or 40s.
-  Same structural cause as Sleep: a blend of nine contributors shrinks spread by ~1/sqrt(9).
-- **The fix is known and measured.** A `SCORE_CALIBRATION`-style transform on the composite, anchored
-  on its own percentiles (p2/p10/p25/p50/p75/p90/p98 -> 25/42/55/68/81/91/97), gives **mean 66.8,
-  sd 19.3, range 15–99, 4 days >= 90 and 6 below 50** — the owner's stated acceptance test.
-- **Why it is not shipped: five action thresholds ride on the readiness scale**, and the change moves
-  **12 of 26 days across at least one.** Days below each, now -> after: early-deload `<45` **1 -> 4**;
-  band `50` 1 -> 6; AI low-readiness `<60` 4 -> 8; band `70` 12 -> 15; rest-day "train hard" `>=75`
-  19 -> 17.
-  - The **band** moves (50, 70) are the intended outcome — more days reading "Low" is what a working
-    range looks like. Leave them.
-  - The **action** thresholds are not. Shipping as-is quadruples early-deload firing, which the owner
-    did not ask for. Re-anchor each to preserve its firing RATE, exactly as `LOW_SLEEP_SCORE`
-    60 -> 42 was handled in v1.319.0 (that PR's §5 is the worked example).
-- **Files:** `packages/shared/src/health/readiness-composite.ts` (the calibration),
-  `lib/health/readiness-payload.ts:47` (`EARLY_DELOAD_SCORE_MAX`),
-  `packages/shared/src/ai-periodization/ai-dynamic.ts:231`,
-  `packages/shared/src/health/rest-day-guidance.ts:36,46`, `lib/oura-models/inference/ots.ts:151`.
-- **Sequencing:** **Q-273 (model versioning) first, or stamp a readiness version in the same PR.**
-  Sleep shipped without one and its trend chart now has an unmarked step at the changeover — do not
-  repeat that on readiness. **Q-500 (Recovery Index anchor 6 -> 5) becomes lower priority** once this
-  lands: it was a 1-point correction aimed at the same range problem this fixes wholesale, and it
-  should be re-measured *after* this rather than stacked with it.
-
-### [readiness][body] Q-502 — Body Battery's tuning substrate is a biased sample of each day
-
-- **Branch:** `fix/body-battery-end-of-day-snapshot`
-- **Added:** 2026-08-17 · Tuning agent ·
-  [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md) §3
-- **Not blocked on the owner** — this is a data-capture fix, not a scoring change.
-- **Measured.** `GET /api/body-battery` computes on read and writes through, so each
-  `body_battery_daily` row is as of the last time the app was opened that day. Comparing
-  `hr_sample_count` against the samples actually in `oura_heartrate` for the same waking window:
-  2026-08-04 **74 of 3,991 (1.9%)**, 08-16 **64 of 2,656 (2.4%)**, 08-11 125 of 1,451 (8.6%), against
-  08-05 at 88% and 08-14 at 62%. Not `preferStrapBuckets` thinning — that cannot turn 3,991 into 74.
-- **Why it matters.** Draining spreads across the waking day; the charge window is concentrated in
-  genuine rest, which is back-loaded into the evening. A midday snapshot therefore captures more of
-  the day's drain than its charge, so **every charge/drain ratio computed from this table is biased
-  upward by an unknown amount** — including Q-272's headline 5.6×, and including the v1/v4 rows it is
-  compared against. No constant can be fitted against a target that moves with when the app was opened.
-- **The fix is already named** in [`docs/body-battery-tuning.md`](body-battery-tuning.md)'s caveats —
-  a scheduled end-of-day recompute — but recorded there as optional ("if rigour demands it") and
-  scoped only to `end_value`. It applies to `total_charged`/`total_drained` too, and it is a
-  prerequisite for Q-272 rather than a nicety. **Note there is no cron layer** (see
-  [`docs/module-map.md`](module-map.md) §0), so this needs a mechanism decision, not just a job.
-- **Sequencing:** do this **before** Q-272. Tuning constants against a biased substrate produces a
-  constant fitted to the owner's app-opening habits.
+- **Added:** 2026-08-18 · **Resolved the same day, by implementing it and finding it wrong.**
+  [`docs/reviews/2026-08-18-readiness-range-refuted.md`](reviews/2026-08-18-readiness-range-refuted.md)
+- **What this entry used to say:** readiness has Sleep's compression problem and the same
+  `SCORE_CALIBRATION` fix is measured and ready (mean 66.8, sd 19.1, range 15–99), held only on the
+  blast radius of five action thresholds. **Both halves of that are wrong.**
+- **Why the calibration is wrong here, not just risky.** It was implemented and the suite failed on
+  7 tests across 4 files. Three encode invariants the composite genuinely holds, and a post-hoc
+  transform on the blend breaks all three: **contributions no longer sum to the displayed score**
+  (the score-audit panel's whole job), **all-neutral input stops mapping to 50** (it gave 35), and
+  **skipping the check-in can reach 100** (a deliberate cap defeated). The first is disqualifying on
+  its own — readiness drives every training recommendation, and making its explanation panel stop
+  adding up is a worse outcome than a narrow range.
+- **Why the in-model lever fails too.** `Z_POINTS_PER_UNIT` would widen spread while preserving all
+  three invariants (z=0 → 50 at any slope). But the z-based contributors are **already wide and
+  already saturating**: `hrvBalance` sd **27.1** with a median implied |z| of **1.26** against a
+  ceiling at 1.5; `sleepBalance` sd **32.3**, both reaching the 0 and 100 rails. Raising the slope
+  pushes more days onto the rails and compresses the ends.
+- **There is no compression bug.** Contributors carry sd 17–32; the composite carries sd ~11–13.
+  Treating the weighted sds as independent predicts **7.7** — so readiness is already extracting
+  *more* spread than independence would give. Against the owner's test it is the healthiest pillar
+  (range 29–87, sd 13.0, with genuinely low days), unlike Sleep's 27-of-35 above 85.
+- **Its real weakness is the CEILING** — 1 of 34 days reaches 85 — and the term dragging it down is
+  `recoveryIndex`, **mean 35.3**, the lowest of the nine by 20 points. **That is Q-500.** This session
+  had demoted Q-500 to "lower priority since Q-504 fixes the range wholesale"; that is corrected —
+  **Q-500 is the readiness fix.**
+- **Also note:** readiness moves on its own from v1.319.0. `previousNight` is 16% of the weight and
+  the Sleep Score's mean fell ~87 → ~70, so readiness's mean drops roughly **1.8 points** with nothing
+  else changed. Re-measure before drawing conclusions from the new numbers.
+- **Shipped from this entry:** the readiness `model_version` stamp (Q-273's readiness half) — merged
+  into the shared `model_versions` JSONB rather than replacing it, so `bodyBattery`'s stamp survives.
+  Sleep shipped without one and left an unmarked step in its trend chart; readiness will not.
 
 ### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
 
