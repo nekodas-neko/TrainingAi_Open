@@ -246,7 +246,14 @@ const BASELINE = {
   // and +41 on the backlog (the Q-541 status block, and the new Q-315 entry for error_events
   // holding 4 live rows in 49 MB).
   'projectOverview.md': 6760,
-  'docs/implementation-backlog.md': 7020,
+  //
+  // Raised 2026-08-18 (Q-541 task 4, Lane A): 7020 -> 7055. Two things: the Q-541 status block gains
+  // the packer's settled decisions, and Q-316 is a NEW entry — the packer has no button because
+  // components/** is Lane B's, so the affordance is filed rather than written. Its 23 lines are what
+  // stop the next lane building the wrong thing: the route contract it should call, and the warning
+  // that its confirm copy must not read like the lossless VACUUM beside it, because this is the one
+  // control in the app that deletes archival frames.
+  'docs/implementation-backlog.md': 7055,
   'CLAUDE.md': 1010,
 };
 
