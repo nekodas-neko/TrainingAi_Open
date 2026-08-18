@@ -78,6 +78,12 @@ different ways. Both are mechanical; neither is obvious until it happens.
    link inside the entry loses a level when it moves. Missing this left 6 broken links pointing one
    directory too high.
 
+**The floor is measurably rising — second sweep, 2026-08-18 (same day).** 62 entries, of which
+**41 were linked** by a durable doc and only 21 were foldable, so the sweep went 62 → 41 where the
+first went 61 → 32. Nine days' worth of new entries arrived and the *linked* count grew by nine.
+The runaway limit is 60, so on this trend the next sweep clears fewer than it needs to and the one
+after that clears nothing. This is now a dated problem, not a theoretical one.
+
 **The standing tension worth naming:** a fold-everything sweep and durable docs linking entries are
 incompatible, and today the docs win — which means the loose directory has a floor that grows.
 Resolving it properly means either the sweep rewriting citations to the history file it folded into
