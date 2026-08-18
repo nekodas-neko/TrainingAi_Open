@@ -90,6 +90,17 @@ paragraph above predicted did not continue on this run, and the trend is not yet
 What did not change is the arithmetic: the runaway limit is 60, the floor is 41, and the whole
 directory now has 19 files of headroom. That is roughly half a day at the current rate.
 
+**Why the floor held, measured on that same third sweep — and the lever it gives you.** The eleven
+entries added between the second sweep and the third were all **Review** sweeps, and Review links its
+**`docs/reviews/…` write-up** from the domain indexes while leaving the **journal entry itself
+unlinked**. So the linked floor tracks *durable-doc citations*, not entry count: a session that cites
+its review or handoff document costs the floor nothing, while one that cites its loose journal entry
+raises it permanently.
+
+**That makes the fix cheaper than either option in the tension below:** when a durable doc needs to
+cite a session, **cite the review/handoff document, not the loose journal entry**. No sweep rewriting,
+no re-pointing of existing citations — just a habit that stops the floor growing from here.
+
 **The standing tension worth naming:** a fold-everything sweep and durable docs linking entries are
 incompatible, and today the docs win — which means the loose directory has a floor that grows.
 Resolving it properly means either the sweep rewriting citations to the history file it folded into
