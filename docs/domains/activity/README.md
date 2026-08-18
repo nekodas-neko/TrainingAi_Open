@@ -40,6 +40,8 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-450 — `/activity` reached without a type silently discards a completed activity: Start and Finish work, Save is a no-op). Findings Q-450…Q-455; four areas recorded **clean**.
 
+- [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — activity-log writes probed cross-user and hold; the not-found answer across the write surface measured). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
+
 ## Open issues
 
 ```bash

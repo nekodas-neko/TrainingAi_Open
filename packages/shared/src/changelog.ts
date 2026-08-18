@@ -6,11 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.320.0",
+    version: "1.321.0",
     date: "2026-08-18",
     changes: [
       "Readiness now scores the Recovery Index against a 5-hour target instead of 6. That number used to come from Oura\u2019s public wording; it has now been fitted against Oura\u2019s own version of the same measurement, using the 15 nights before your ring was re-keyed where both exist side by side. Ours tracks theirs closely but was reading about 10 points low every night. Expect readiness to read roughly half a point to one and a half points higher \u2014 no day goes down, and nothing about deload or rest-day advice changes on any day measured.",
-      "Readiness scores now record which version of the model produced them, so a future change to the scoring can be told apart from a change in your actual data. Sleep scores from before yesterday do not have this, which is why the sleep trend has a step in it.",
+      "Readiness scores now record which version of the model produced them, so a future scoring change can be told apart from a change in your actual data. Sleep scores from before yesterday do not have this, which is why the sleep trend has a step in it.",
+    ],
+  },
+  {
+    version: "1.320.0",
+    date: "2026-08-18",
+    changes: [
+      "Saved meals can now print a food label. Open a saved meal and tap the code icon to get a 50 \u00d7 50 mm label with the meal name, its calories and macros, a blank line to write the date on, and a scannable code \u2014 in four styles you can switch between. Scanning that code with the food scanner logs the meal straight away.",
+      "The figures on the label are for one serving, and so is what scanning it logs. On a batch recipe that makes two, the label shows what one portion is rather than the whole tub.",
     ],
   },
   {

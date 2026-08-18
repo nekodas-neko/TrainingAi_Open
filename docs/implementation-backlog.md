@@ -959,6 +959,160 @@ ehr     0     0     0     0   648   208   128   556     0
   **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
   and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
 
+### [platform][nutrition][workouts][devices] Q-463 — "the row you named does not exist" is answered five different ways, and five routes answer it with a 500
+
+- **Branch:** `fix/not-found-status-across-write-surface`
+- **Added:** 2026-08-18 · review sweep (nutrition/cardio/activity writes + an app-wide not-found probe) ·
+  [`docs/reviews/2026-08-18-write-surface-not-found.md`](reviews/2026-08-18-write-surface-not-found.md)
+- **Placement:** mid. Not a leak and not data loss — but it misclassifies a permanent failure as
+  transient on the sync path, and it degrades `error_events`, which is the one fault signal nobody
+  is watching.
+- **Generalises Q-462.** That entry filed `/api/log-exercise` returning 500 for an ownership refusal.
+  This one is the measurement showing it was not isolated — implement them together.
+- **Measured uniformly.** Every `app/api` route with a dynamic segment and a write method, called as
+  an **authenticated** user with a fabricated UUID (`00000000-0000-4000-8000-0000000fffff`). 33
+  endpoints answered:
+
+  | Answer | Count | Verdict |
+  |---|---|---|
+  | `404` + JSON error | 8 | correct |
+  | `200`/`204` on `DELETE` | 7 | **defensible, do not "fix"** — see below |
+  | `400` from body validation before the id lookup | 12 | not evidence; excluded |
+  | `403` (admin gate first) | 1 | correct |
+  | **`500`** | **5** | the finding |
+
+- **The five:**
+  ```
+  PATCH  /api/injuries/[id]              500  (empty body)
+  PUT    /api/nutrition/meal-types/[id]  500  (empty body)
+  PATCH  /api/supplements/[id]           500  (empty body)
+  POST   /api/supplements/[id]/log       500  (empty body)
+  DELETE /api/phase-sets/[id]            500  {"error":"Phase set not found"}
+  ```
+  Plus `POST /api/log-exercise` (Q-462), which has no dynamic segment so it is not in the 33.
+- **One cause, repeated.** Repository methods throw a bare `Error('… not found')` — **16 such throws**
+  across `lib/data/postgres/` and `packages/shared/src` — and these routes have nothing mapping them
+  to a status, so Next's default handler returns 500. Confirmed live in the dev log:
+  `Error: Supplement not found`, `Error: Food log not found`, `Error: Meal type not found`, each with
+  a full stack trace.
+- **One resource, two wrong answers on two verbs.** `PUT /api/phase-sets/[id]` →
+  `400 {"error":"Phase set not found"}`; `DELETE /api/phase-sets/[id]` →
+  `500 {"error":"Phase set not found"}`. Same resource, same condition, same message. Neither is 404.
+- **Three consequences, each against a rule this repo already wrote:**
+  1. **The sync client retries what can never succeed.** `CLAUDE.md`: *"A 4xx/validation failure is a
+     poison pill: quarantine it, don't retry forever. 5xx/429 = back off and retry."* A permanent
+     "not yours / not there" reported as 5xx is classified as transient.
+  2. **Four of the five return an empty body**, so a client calling `res.json()` on the failure throws
+     a parse exception on top and never renders its error state.
+  3. **It pollutes `error_events`** — *"the only view of faults that never reach a human"*, pruned at
+     30 days and read at every session start. Stack traces from correctly-refused requests make that
+     table worse at its job.
+- **Fix shape:** a typed `NotFoundError` / `NotOwnedError` in the repository layer plus **one** shared
+  mapper at the route boundary — not 16 call sites each remembering. **`/api/nutrition/meal-plans/*`
+  is the in-repo reference:** all five of its write endpoints already return a clean
+  `404 {"error":"Not found"}`. **Lane A** (repository + `app/api`).
+- **Do NOT also change the seven `DELETE`s that return 200/204 for an absent row.** That looks like the
+  same shape and is not: `DELETE` is idempotent by convention, the desired end state (row absent) holds,
+  and the outbox is right to treat it as done. It is recorded as **clean** in the review, with the
+  reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
+  `session_rpe = 7` and it did **not** hold.)
+
+### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
+
+- **Branch:** `fix/strict-request-schemas`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
+  the failure mode is silent data misplacement and this repo has already paid for the class once.
+- **Measured:** of **70** files defining a `z.object(...)` request schema across `app/api` and
+  `packages/shared/src/validation`, only **6** call `.strict()`. Zod's default silently drops unknown keys.
+- **Demonstrated live** on `POST /api/body-metadata`:
+
+  | Sent | Response | Row written |
+  |---|---|---|
+  | `{"date":"2026-08-10","weightKg":81}` | `200 {"success":true,"date":"2026-08-18"}` | weight 81 on **2026-08-18** |
+  | `{"date":"3026-08-18","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+  | `{"date":"not-a-date","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+
+- **Do NOT change the route — it is correct.** `app/api/body-metadata/route.ts:236` reads
+  `body.localDate` and defaults to today in the user's timezone when absent, which is the documented
+  pattern. The defect is that `date` is not in the contract, the schema is not strict, so the key is
+  dropped and the write lands on today with a success response.
+- **Why file it:** the repo has already lost a full release to this exact class — the `ai-chat`
+  `localDate` regex that rejected every real request, documented at length in `CLAUDE.md`. A strict
+  schema turns that mistake into a 400 at the boundary instead of a silent wrong-day write.
+- **Eleven date-bearing write schemas are non-strict**, including `sync/push`, `health-connect/ingest`,
+  `running-plan`, `running-plan/override`, `plan-meal-answers`, and the shared `body-metrics`,
+  `activity-log` and `fitness-test` schemas. `WorkoutEntryPatchSchema` is one of the six that **is**
+  strict — use it as the reference.
+- **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
+  hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
+- **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
+  APK may legitimately carry fields the current schema does not name; making that one strict could
+  reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
+  written reason. **Lane A.**
+
+### [platform] Q-466 — CI re-downloads the Playwright browser on every E2E run, and a slow CDN turns that into an indefinite stall
+
+- **Branch:** `ci/cache-playwright-browsers`
+- **Added:** 2026-08-18 · review sweep (observed while landing the section-coverage PRs) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** low-mid. Costs nothing when the CDN is healthy and blocks a PR entirely when it is not.
+- **What.** `.github/workflows/ci.yml:391-392` runs `npx playwright install --with-deps chromium` on
+  **every** E2E run, with no cache:
+  ```yaml
+  - name: Install Chromium
+    run: npx playwright install --with-deps chromium
+  ```
+  `actions/setup-node`'s `cache: 'pnpm'` (five jobs use it) caches the pnpm store, **not** the
+  Playwright browser binaries, which live in `~/.cache/ms-playwright`. So each run pulls ~150 MB of
+  Chromium plus system packages afresh.
+- **Observed three times on 2026-08-18**, on PR #47 and twice on PR #66, out of roughly 8–10 E2E runs
+  that day — a small sample, so treat the *rate* as indicative rather than measured, but three in one
+  day on one repo is not a coincidence. In both cases the step sat
+  `in_progress` for **6–22 minutes** with every other job already green, and the job had to be
+  cancelled and re-run; the re-run completed the same step in well under a minute. The tell is
+  distinctive and worth knowing: `Install Chromium` `in_progress` while `Run pnpm e2e` is still
+  `pending` means the download, not the specs.
+- **Why it is worth fixing rather than tolerating.** E2E is a **required check**, so this blocks the
+  merge outright rather than degrading it, and the recovery (cancel the run, re-run the workflow,
+  wait again) costs ~20 minutes of wall clock each time. With five concurrent agents landing PRs, that
+  is paid repeatedly.
+- **Fix shape:** add `actions/cache` for `~/.cache/ms-playwright`, keyed on the resolved
+  `@playwright/test` version from `pnpm-lock.yaml` so a version bump invalidates it — the standard
+  pattern from Playwright's own CI docs. Keep the `install` step (it must still run to place the
+  browser and system deps on a cache miss); the cache only removes the download.
+- **Note for the implementer:** `playwright.config.ts` deliberately prefers the sandbox's
+  `/opt/pw-browsers/chromium` when present and falls back to Playwright's managed download elsewhere,
+  which is why CI needs the install at all. That comment explains the design — do not "simplify" it
+  away while adding the cache.
+
+### [readiness] Q-465 — `POST /api/day-checkin` creates a check-in row from a completely empty body
+
+- **Branch:** `fix/day-checkin-requires-an-answer`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** low. **The consequence is unproven and the entry says so** — do not implement this as
+  if a known symptom were being fixed.
+- **Observed.** `POST /api/day-checkin` with a body of exactly `{}` returns **201** and writes a row
+  with every metric null:
+  ```
+  log_date    phase    physical_tiredness  mental_drain  hydration  sore_muscles
+  2026-08-18  evening  (null)              (null)        (null)     {}
+  ```
+  An unknown field is accepted and dropped too (`{"sleepQuality":"banana"}` → 201, nothing stored —
+  `day_checkins` has no such column). That half belongs to Q-464.
+- **Both consumers were checked and neither shows a user-visible bug.**
+  `components/morning-checkin-sheet.tsx:58-70` pre-fills from a saved row but coalesces every field
+  through `?? NEUTRAL_SCALES`, so an all-null row behaves identically to no row.
+  `app/api/workout-data/route.ts:471` feeds the check-in into `reevaluationKey(...)`, where an empty
+  row changes the key and can trigger a re-evaluation carrying no new information.
+- **Why it is still worth closing:** the row is indistinguishable from a real check-in in which the
+  user answered nothing, and readiness is precisely the pillar where *"the user told us nothing"* and
+  *"the user told us they feel neutral"* must not collapse to the same value.
+- **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
+  body carries no answers. **Lane A.**
+
 ### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
 
 - **Branch:** `fix/log-exercise-ownership-error-status`
@@ -1080,151 +1234,6 @@ too, so the Balance card's "burned" figure is dragged down in step.
 - **Surface:** no device or production data required — shared-module logic plus a service wrapper,
   reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
   control, if option 1 is chosen, would need a device check.
-
-### [nutrition][app-shell] Q-389 — printable food labels for saved meals, scannable back into the app
-
-- **Branch:** `feat/saved-meal-printable-label`
-- **Plan:** [`docs/superpowers/plans/2026-08-17-saved-meal-printable-label.md`](superpowers/plans/2026-08-17-saved-meal-printable-label.md)
-  (2026-08-17, Lane B) — build order, tests, and the corrections folded into this entry below.
-- **Added:** 2026-08-17 · owner: *"for saved meals; I wanna be able to click the meal and have an
-  image generated that shows the meal name + servings + macros so I can print onto a food label will
-  probably need some mockups. but this way I cam create a saved meal; print the label put it on the
-  meals and then scan/send photo of it to the app and it will know."*
-- **A feature request, not a defect.** Filed here so it is not lost, but per *Backlog-driven
-  implementation* it wants a planning session to produce a spec in `docs/superpowers/plans/` before
-  anyone builds. This entry is the intake record and the design decisions found while tracing — it
-  is **not** the implementation plan.
-
-**Two halves, and the second one is nearly free — if it is built the right way.**
-
-*Half 1 — generate the label.* `saved_meals` (`lib/data/postgres/schema.ts:566-574`) has `id`,
-`name` and `servings`; macros come from `saved_meal_items` → `food_items`. Everything the owner
-asked to print already exists.
-
-*Half 2 — "scan/send photo of it to the app and it will know".* The owner framed this as a photo,
-but the app **already has a scanner that reads QR codes today**:
-- `@capacitor-community/barcode-scanner` v4 is installed (`package.json:52`) and
-  `components/nutrition/barcode-scanner.tsx:82` calls `CapScanner.startScan()` with **no format
-  restriction**, so ML Kit returns QR alongside EAN.
-- The web fallback uses `BrowserMultiFormatReader` (`@zxing/browser`) — also multi-format.
-- `capture-step.tsx:138` `handleBarcode(code)` already receives the decoded string and routes it to
-  `/api/nutrition/barcode`. Adding a saved-meal branch there is a single conditional.
-
-**So the recommendation is a QR code carrying the saved-meal id, not a photo the AI reads.** A
-scanned QR returns the exact `uuid` — no model call, no latency, no cost, and no failure mode on a
-label that is smudged, frozen, curled or photographed at an angle. Vision/OCR of printed macros can
-misread a digit and log the wrong food, which is the one outcome this feature must not have. Keep
-the photo path as a later fallback if the owner wants it for labels printed before this shipped;
-do not make it the primary mechanism. (Precedent for the shape: `food_items.barcode` already exists
-so a rescan matches an item — Q-131.)
-
-**Do NOT generate the label with an image model.** `lib/exercise-image-gen.ts` uses `@google/genai`
-and is the obvious thing to reach for; it is the wrong tool here. A label is exact typography and
-exact numbers — an image model will garble both. Render deterministically (canvas or SVG → PNG),
-which also makes it testable and works offline.
-
-**Three decisions the spec has to make, all of which can go wrong quietly:**
-1. **Per-serving or whole-batch macros?** `servings` exists precisely because a batch makes N
-   portions (its own comment cites the owner's protein ice cream making two). A label reading
-   "Protein 60 g" is dangerously ambiguous on a tub of two. The label should state both the serving
-   count and which basis the macros are on, and the scan-back should log **one serving** by default,
-   not the whole recipe.
-2. **Print is outside this app's design system.** Every UI rule in `CLAUDE.md` is about screen
-   theme tokens on a dark-first app. A label is ink on white paper, often greyscale on a home or
-   thermal printer. It needs its own small palette-free treatment and must stay legible with **no
-   colour at all** — do not reach for `--accent-*` here.
-3. **A saved meal can change after a label is printed.** Editing the recipe leaves a physical label
-   claiming stale macros on a real tub of food. Decide: version the label (encode a revision in the
-   QR and warn on scan when it has moved), or accept it and show the *current* macros on scan. This
-   is the one genuinely hard question in the feature.
-
-- **✅ SETTLED by the owner, 2026-08-17 — the two open questions are answered, build to this:**
-  - **Label is 50 × 50 mm, and rotates between SQUARE and CIRCULAR dies.** One artwork must serve
-    both, so the binding constraint is the **inscribed circle**, not the square: the corners are
-    unusable. Usable area is a centred **130 × 137 px** box (189 × 189 px is the sheet). Compose
-    everything centred and radially symmetric. Every earlier rectangular sketch is superseded, and
-    so is every corner-anchored one.
-  - **Payload is name + calories + P/C/F macros + scanning code.** The owner first asked for
-    name + calories + code with macros optional, then chose the with-macros layout once shown what
-    macros cost (~3 mm off the code, a point size off the name). **Macros are IN** — build to that,
-    and note the code lands at ~16–17 mm as a result, which is the floor this design can take.
-  - **Typeface is a real dependency, not a detail.** The label renderer must **embed** whatever face
-    it uses — the candidates are Google Fonts (Geist, Archivo, Instrument Serif) and none can be
-    assumed present wherever the PNG/PDF is generated. A silently-substituted fallback changes the
-    metrics and the layout is tight enough that it will reflow.
-  - **The made-on date is a bare ruled line the owner writes on** — a rule and nothing else, with
-    **no "MADE" label beside it** (owner, 2026-08-17; deli ticket already did it this way and the
-    other styles now match). Not a rendered date, which removes a whole question: the label never
-    has to know when it was printed. Plaque carries no line at all, which is what buys it the
-    largest code.
-  - **No per-serving line** — the owner removed it (2026-08-17). The label shows calories and macros
-    as bare figures.
-    **⚠ This un-resolves the per-serving-vs-batch ambiguity flagged above, by choice.** On a recipe
-    that makes two, a person reading the label cannot tell whether 312 kcal is one serving or the
-    tub. That is acceptable *only* if the app settles it instead: **scanning the code must log a
-    defined amount (one serving), never infer one.**
-    **✅ Already satisfied — traced 2026-08-17:** `logMealItems` iterates `oneServingItems`, which
-    divides by `servings`, on both its local and web branches. The scan branch just calls it.
-    **⚠ But that exposes the live bug this feature can ship: `SavedMeal.totals` is the WHOLE
-    recipe.** A renderer reading `totals` prints 624 kcal on a tub whose QR logs 312 — the two halves
-    disagreeing silently on real food, with the per-serving line now removed. **Render
-    `totals / servings`**, and assert both halves against each other in one test.
-- **✅ ALL FOUR STYLES SHIP, and the user cycles between them** (owner, 2026-08-17). This is a
-  different build from "pick one aesthetic", and it is cheap designed-in / expensive retrofitted:
-  **the renderer takes a style name and looks up a template**, rather than one layout with the style
-  baked in. Build it that way from the first commit. The four are *black band* (Archivo, reversed
-  header — **the owner's chosen DEFAULT**, 2026-08-17), *editorial* (Geist, quietest), *deli ticket*
-  (mono, dashed rules) and *plaque* (Instrument Serif, double ring).
-  - **Where the style choice lives is undecided, and one option costs a migration.** Per saved meal
-    is the nicest and needs a new `saved_meals` column — **that is Lane A's to claim, not intake's**.
-    A global user setting avoids the schema change. Picked-at-print-time and not stored is cheapest
-    of all. Decide before building; the renderer's shape is the same either way.
-  - **Four styles currently need four font families** — Geist, Geist Mono, Archivo, Instrument Serif
-    — and every one must be embedded (see the typeface rule above). Worth consolidating, but not for
-    free: dropping Archivo or Instrument Serif changes what the band and plaque styles *are*.
-  - **The smallest style sets the standard for the whole set**, and black band is now both the
-    default and the smallest at 12.2 mm. A style whose code will not scan is not a style choice, it
-    is a broken label, so **test-print black band first** — if it scans, the others do. ⚠ Read the
-    module-pitch correction below before trusting that: at 25×25 the pitch is finer than the figures
-    the mockups were drawn to, and 12.2 mm may not survive it.
-- **Mockups exist** — the four circle-safe 50 × 50 mm treatments at true scale, each annotated with
-  its tradeoff and its code's physical size, plus a working style-cycler that mounts the same four
-  files so the demo cannot drift from the designs. They live in a design canvas, **not in this
-  repo**; ask the owner for the link, or redraw from this spec, which carries everything they encode.
-  **Default is black band** (owner, 2026-08-17). **Redrawn 2026-08-18 with the correct 25×25 code**,
-  so the drawings now match the version the payload actually needs.
-- **⚠ The measured pitch at 25×25, and the fact there is no room to recover it.** Same physical
-  squares, four more modules across: **band 0.487 mm** (the default, and the tightest), editorial
-  0.529, ticket 0.550, plaque 0.635. **The code cannot simply be grown** — the content already fills
-  the circle-safe box, and a taller stack pushes the top and bottom rows into the narrowing part of
-  the circle, where the meal name is the first thing to stop fitting. So the code only grows if
-  something goes. The cheapest version of that is drawn as variant **2b — black band with the
-  write-on rule dropped**: 16.4 mm and **0.656 mm** per module, better than every original style bar
-  plaque, at the cost of the handwritten date. **Test-print black band before the layout is frozen;
-  2b is the fix that keeps the style if it fails.**
-- **⚠ Going circular shrank the code, and this is the live risk.** Square-with-macros allowed
-  ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**. **⚠ Corrected 2026-08-17: that is
-  0.49–0.64 mm per module, not 0.58–0.76 — a 21×21 code cannot hold a meal id at all** (v1 holds 17
-  bytes; a UUID needs v2, **25×25**), so encode base64url of the 16 raw bytes (22 chars) with **no
-  prefix or URL**, which is the only form that fits v2 at EC **M**.
-  A modern phone reads that at close range, but the margin is thinner than this entry assumed and **ink spread
-  on a home printer merges small modules** — that is the failure mode to expect, and it will look
-  like "the scanner doesn't work" rather than like a print problem. Levers, cheapest first: drop the
-  write-on rule (worth ~3.7 mm — plaque already does, and is the largest code), then drop macros. **Test-print and scan before the layout is frozen.**
-- **One constraint the mockups surface that the spec must not lose:** a QR needs a **quiet zone** —
-  clear white margin on all four sides — and the code's physical size sets how much data it can
-  carry legibly. At 50 mm the circle-safe layouts give codes of 12.2–15.9 mm. **Settle the payload before
-  fixing the size**: a longer payload raises the module count, the same square gets finer, and a
-  16 mm code starts to struggle. **Encode the id alone — this is now a requirement, not a
-  preference** (see the corrected module maths above: the id alone already needs 25×25).
-- **What would count as done:** from a saved meal, produce a 50 × 50 mm printable label carrying the
-  meal name, calories per serving with the serving count, a scannable code and a blank made-on line;
-  scanning that code in the existing nutrition scanner resolves to that saved meal and logs one
-  serving, with no round-trip to an AI service; the label is legible printed in black and white.
-- **Surface: needs the device for the scan half.** QR decoding runs through the Capacitor plugin,
-  which is inert in the web sandbox (the `@zxing/browser` fallback can prove the *encoding* in
-  `pnpm dev`, but not the native path). Printing and legibility can only be judged on paper.
-  Generation and the label renderer are testable in the sandbox.
 
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
