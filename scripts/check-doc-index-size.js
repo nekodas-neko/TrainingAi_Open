@@ -788,7 +788,11 @@ const BASELINE = {
   // seven fewer, recomputed from the merged file on top of the raise above. Q-357 is the four
   // defeated memo call sites Q-490's review said did not exist ("no inline arrows exist
   // anywhere"); the new check freezes them rather than leaving them to be rediscovered.
-  'docs/implementation-backlog.md': 10124,
+// Raised 2026-08-18 (Lane A, Q-479 owner-deferred): backlog 10124 -> 10139. The ⛔ annotation on the
+// Q-479 entry — the owner accepted the risk, so the entry stays in the queue rather than being
+// removed, and has to carry "do NOT implement, the fix is green on PR #124" plus what would make it
+// live again. An accepted risk that reads like an open item is how the decision gets re-litigated.
+  'docs/implementation-backlog.md': 10139,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
