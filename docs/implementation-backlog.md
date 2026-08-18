@@ -355,6 +355,132 @@ below threshold and left in place for next time.
   does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
   alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
 
+### [readiness][platform] ✅ Q-394 — RESOLVED: `anchor-source.test.ts` was red on `main`, fixed by Q-356's fixture change
+
+- **✅ Resolved 2026-08-18, and NOT by this entry.** Verified after merging `main` at `74efac6`:
+  the test passes 3/3 locally where it failed 3/3 an hour earlier on the same tree plus docs.
+  **The likely fix is #90 (Q-356)** — *"Anchor the periodization fixture to the user-local day,
+  not a UTC offset"*. That is the same root shape: a fixture anchored to a UTC offset while the
+  query computes a user-local day window. **I did not bisect**, so treat the attribution as
+  strongly-indicated rather than proven; what is proven is that it fails before `74efac6` and
+  passes after.
+- **Kept rather than deleted for the one part that is still open:** Q-356's own entry flagged a
+  sweep — *any other test inserting `now() - interval '…'` and querying a user-local day window
+  has this hole*. This was the second test to hit it and it was found by accident, taking out two
+  unrelated PRs first. That sweep is worth doing, and the structural point below stands.
+- **Branch:** `fix/body-battery-anchor-source-test`
+- **Added:** 2026-08-18 · found while shepherding a docs-only PR (#89) whose `Tests` job went red.
+- **⚠ This blocks every lane, not one PR.** `main` is the broken base: two unrelated PRs failed the
+  same job within fifteen minutes (`claude/trainingai-bugfix-intake-sozcr7` at 05:30,
+  `claude/implementation-lane-b-0o7kb9` at 05:15), and CI runs only on `pull_request` here, so a
+  broken `main` is invisible until it takes out the next PR — which is what happened.
+- **Reproduced locally on a tree differing from `main` by two documentation files**, so the diff is
+  provably not the cause:
+  ```
+  FAIL  app/api/body-battery/__tests__/anchor-source.test.ts
+    > body-battery — anchor precedence (S2) > anchors on our own computed sleep score…
+      AssertionError: expected 'readiness' to be 'sleep'
+    > body-battery — anchor precedence (S2) > prefers today's persisted derived readiness…
+      AssertionError: expected 55 to be 77
+    anchor-source.test.ts:65   expect(body.anchor).toBe(77)   // received 55
+  ```
+  **3 failed locally, 2 in CI** — the count differs between environments, which is itself worth a
+  look: it suggests at least one assertion is sensitive to seeded data or ordering rather than purely
+  to the code change.
+- **Likely cause — not confirmed, and deliberately not guessed at further.** `main` has taken several
+  Tuning-lane recalibrations in the last few hours that touch this pillar: **#84** ("a threshold
+  pointing backwards, and a score with one value"), **#85**, **#87** ("protect a side effect worth
+  17.7 points") and **#88** (Body Battery range). The failures are about *anchor precedence* —
+  whether Body Battery anchors on persisted derived readiness or falls back to the computed sleep
+  score — so a recalibration that changed which source wins, without updating this test, fits the
+  evidence. **Whoever takes this must decide which side is wrong**: if the new precedence is correct
+  the test needs updating, and if the test still encodes the intended contract the recalibration
+  regressed it. Do not simply re-baseline the expected numbers to make it green.
+- **What would count as fixed:** `anchor-source.test.ts` passes on a clean checkout of `main`, and
+  the entry records which of the two readings was right — the test or the behaviour — so the next
+  recalibration does not silently repeat it.
+- **Worth considering separately:** CI runs on `pull_request` only, so nothing tests `main` after a
+  merge. Every squash-merge lands unverified against whatever else landed beside it, and the cost
+  shows up as an unrelated lane's red PR. A push-triggered run on `main` would have caught this at
+  the merge that caused it rather than two PRs later. Not this entry's work.
+- **Surface:** reproducible in the sandbox against the seeded local DB — no device, no production
+  data. `app/api/body-battery/**` is Lane A's.
+
+### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
+
+- **Branch:** `feat/meal-label-ingredient-breakdown`
+- **Added:** 2026-08-18 · owner: *"could we have a small font showing the break down of the meal i.e
+  Pasta / [macros] / (100g pasta, 200g mince, etc etc) so its the full summary of the meal."*
+- **Follow-up to Q-389, which shipped 2026-08-18 (v1.320.0)** — the label renderer exists
+  (`components/nutrition/meal-label-render.ts`, canvas, four styles, style passed as a parameter),
+  so this is a new layout variant inside a working system, not new machinery.
+
+**The measurement first, because it decides the shape.** On a **round** 50 × 50 mm label the usable
+area is a centred **130 × 137 px** box, and the shipped default already spends all of it:
+
+```
+band header 34 + calories 22 + macros 12 + code 46 + gaps 16  =  130 px
+                                                     leaving  =    7 px
+```
+
+**That is zero ingredient lines.** A list cannot be added to the round label without removing
+something already on it. A **square** label gets the corners back — 171 × 171 usable, **1.64× the
+area and 34 px more height** — and a full five-ingredient list fits there comfortably, with the code
+moving *beside* the calories rather than under them.
+
+- **⚠ It cannot go in the QR instead.** `packages/shared/src/nutrition/label-payload.ts:22-23` sets
+  `QR_V2_M_BYTE_CAPACITY = 26`; the shipped payload is the bare 22-char id, leaving four bytes.
+  Q-389's journal records that **a unit test asserts the length against that budget precisely so a
+  later "let's also put the name in" fails in CI rather than on paper.** An ingredient list is
+  hundreds of bytes. It goes on the paper or it does not go.
+- **Data is available and needs no new shape.** `NutritionIngredient`
+  (`packages/shared/src/types/nutrition.ts:91-97`) already carries `name` and `weightG`, which is
+  exactly "200g Beef mince". For a saved meal it comes from `saved_meal_items` →
+  `food_items`; the plumbing to get it as far as the label sheet is the only new work on the data
+  side.
+- **Three options drawn at true size in the design canvas** (ask the owner for the link):
+  1. **Square, full list** — all five ingredients, code beside the calories at 62 px / **0.656 mm per
+     module**, the roomiest code of anything drawn for this feature, because the corners paid for it.
+     Cost: the artwork does **not** survive a round die, which reverses Q-389's settled
+     "one artwork serves both".
+  2. **Round, trimmed** — three ingredients then "+2 more — scan", calories and macros merged onto
+     one line. **⚠ Forces the code down to 44 px = 0.465 mm per module, below the 0.487 that was
+     already the tightest in the set** — so it trades scan reliability for a partial list, and a
+     partial list is what the request was trying to avoid.
+  3. **Round, scan only** — no list; the code already resolves to the full breakdown in the app.
+     Keeps the code and the name at full size.
+- **The honest framing for the decision:** the printed list is only worth its cost when reading a
+  tub **without** a phone. With a phone in hand, option 3 gives the *whole* breakdown where option 2
+  gives three of five lines at 6.5 px. So the real question is not "can we fit it" but "is this label
+  read away from a phone" — and if the answer is yes, the round die is what has to give, not the code.
+- **✅ Answered 2026-08-18 — two of the owner's follow-up questions, checked against shipped code:**
+  1. **"Will the QR work?"** The shipped renderer uses a **real encoder** — `qrcode@1.5.4`,
+     `QRCode.create(encodeMealLabelToken(mealId), { errorCorrectionLevel: 'M' })`
+     (`components/nutrition/meal-label-render.ts:125`), and its own comment already reasons about
+     exactly this: *"the code is 12.2–16.4 mm on these layouts, so ink spread on a home printer is
+     the expected failure and M is the level that survives it."* EC level M tolerates ~15% damage,
+     which is the margin that absorbs spread. **What is still unproven is the print**, and nobody has
+     run one — it is one of the two physical checks Q-389 already owes. **The mockup codes are
+     placeholder patterns and will not scan; do not test with those.**
+  2. **"Can the image be saved for a label-printer app?"** **Already shipped.**
+     `meal-label-sheet.tsx` does `canvas.toBlob(…, 'image/png')` → `navigator.share({ files })`
+     behind a "Share or save" button, with `<a download>` as the browser fallback. On Android the
+     share sheet is where a label-printer app appears, which is why it was built that way rather than
+     as a Capacitor plugin. **No work needed here.**
+- **⚠ "Cycle through them and choose a default" is two requests, and the second one is new.**
+  Cycling is nearly free — the renderer already takes the style as a parameter and four styles ship,
+  so the breakdown variants are more entries in the same registry. But **Q-389 deliberately ships the
+  style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
+  straight on **Q-392** (preferences live only on the device). If a label default is written to
+  `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
+  **Build the default on whatever Q-392 settles**, not beside it.
+- **What would count as done:** a saved meal's label can render its ingredient list with weights;
+  whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
+  without an explicit owner decision recorded here; and if a square-only variant ships, the app makes
+  clear which labels are square-only rather than letting a round die silently crop the list.
+- **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
+  layout and overflow need no device. **The two checks that matter are still physical** — print it and
+  scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
 
 ### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
 
