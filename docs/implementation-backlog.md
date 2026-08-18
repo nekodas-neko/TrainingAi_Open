@@ -5544,6 +5544,65 @@ session working from a temporarily restored copy.
   scheduler/trigger was traced, so **its cadence is unknown** and "short half-life" is an inference from
   one observation. `readiness_score` also moved 76 → 77 between reads and **that is not explained here**.
 
+### [sleep] Q-519 — manual bedtime entry for a night the ring missed, writing exactly one column
+
+- **Branch:** `feat/manual-bedtime-entry`
+- **Plan:** none needed — contained, and it reuses the existing per-field merge.
+- **Added:** 2026-08-19 · Tuning agent, from an **owner report** ·
+  [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](reviews/2026-08-19-partial-night-manual-bedtime.md)
+- **The report.** The owner forgot to put the ring on before bed and fitted it at ~4 am. The session
+  reads **4:23–8:03 am, 3h 5m, 84% efficiency, 30m latency** against trailing averages of 8h and 92%.
+  Their stated concern: *"I don't want it to change estimated bed time values."*
+- **Quantified.** `GET /api/user/bedtime-estimate` averages sleep starts over **14 days**.
+  `minutesFromNoon(04:23)` = **983** vs ~**660** for an 11 pm bedtime, so one such night moves the mean
+  to 683 — **the estimated bedtime reads ~23 minutes later for two weeks**. `nightSessions()` cannot
+  help: it reassembles a night split by a wake-up (Q-76) and needs an earlier fragment, which does not
+  exist when the ring was off.
+- **The design (owner's proposal, and better than a flag alone).** `lib/data/health-source.ts` merges
+  **per field, not per row** — its own comment: *"a manual weight must not stop the ring's HRV … from"*
+  being kept. `manual` is rank 5, `oura_ble` rank 3. So writing **only `sleep_start`** at `manual`:
+
+  | column | source after | value |
+  |---|---|---|
+  | `sleep_start` | **manual (5)** | the real bedtime |
+  | `duration_hours`, `efficiency`, `average_hrv_ms`, `lowest_heart_rate`, `respiratory_rate` | oura_ble (3) — **untouched** | as measured |
+
+  **No new schema, no new merge logic.**
+- **⚠️ THE INVARIANT THIS RESTS ON.** `duration_hours`, `time_in_bed_hours` and `efficiency` are
+  **stored columns, not derived from `sleep_end − sleep_start`.** That is the *only* reason this is
+  safe. **If anyone later recomputes duration or efficiency from the span, this silently produces a
+  9-hour night at 34% efficiency.** Say so in a comment beside the write.
+- **Manual bedtime writes `sleep_start` and NOTHING else** — not duration, not efficiency, not a
+  synthesised `sleep_end`.
+- **What it does not fix:** the 3h 5m still reaches the sleep score, readiness's `previousNight`
+  contributor, resilience's `sr`, and the Body Battery anchor. That is Q-520, deliberately separate.
+- **Before relying on it, prove the merge with a test** — that writing `sleep_start` at `manual` leaves
+  `average_hrv_ms` at `oura_ble`. This review read that behaviour from the source and its comments and
+  **did not demonstrate it**. Also **audit whether any consumer recomputes duration/efficiency from the
+  span**; that audit is part of this item, not a finding of the review.
+- **Reversal cost:** low — it is one column written by one new path.
+
+### [sleep] Q-520 — a partial-night flag, so an unworn night stops distorting the scores
+
+- **Branch:** `feat/partial-night-flag`
+- **Plan:** none yet. **Do Q-519 first** — it removes the timing noise, and whether this is worth
+  building is easier to judge afterwards.
+- **Added:** 2026-08-19 · Tuning agent ·
+  [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](reviews/2026-08-19-partial-night-manual-bedtime.md) §4
+- **The problem Q-519 leaves behind.** A genuinely-measured-but-incomplete night reads as a bad night
+  to the **sleep score**, **readiness's `previousNight`**, **resilience**, the **Body Battery anchor**,
+  and the trailing "vs recent nights" baselines.
+- **Shape:** a nullable marker on the session excluding the **duration-derived** metrics (time asleep,
+  efficiency, latency, restless periods) from the score and the baselines, while the **physiological**
+  columns keep flowing — HRV, HR, breathing are real measurements of real sleep in the observed window,
+  and the EMA baselines need them (Q-506 showed how fragile those already are).
+- **Make it MANUAL, not auto-detected.** An automatic "looks partial" rule would eventually suppress a
+  genuinely bad short night — exactly what the recalibrated sleep score (Q-503) exists to surface. The
+  cost of wrongly hiding a real bad night exceeds the cost of a tap.
+- **Do not implement this as "delete the night".** That discards valid physiology; on the reported night
+  HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
+- **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)
