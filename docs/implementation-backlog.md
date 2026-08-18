@@ -375,6 +375,63 @@ below threshold and left in place for next time.
 - **Surface:** browser-reproducible at the S25 viewport (≤640 px) — no device, no native path, no
   production data needed. `weekly-stats-hub.tsx` is Lane B's (`components/**`).
 
+### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
+
+- **Branch:** `feat/day-training-card-kcal-stat`
+- **Added:** 2026-08-18 · owner, with a screenshot of the day screen (Tuesday 18 August):
+  *"the training shohld have a stat saying the calories burnt from the workout."*
+- **What the screenshot shows:** a day detail with READY 76 / HR 51 / SLEEP 92 / MOVE 65 across the
+  top. Under **TRAINING**, one session card — "Push, 8:24am → 9:13am · 49 min" — listing five
+  exercises, footed by three stats: **VOLUME KG 2,364 · EXERCISES 5 · SETS 10**. Directly below,
+  the **ACTIVITY** card for a treadmill walk *does* show "101 kcal" alongside bpm and steps. That
+  contrast is the report: the activity gets a calorie figure and the workout does not.
+
+**This was already considered and deliberately deferred — the reasoning is on file.**
+`projectOverview.md` (Q-247's entry) says outright: *"Deliberately not done: a per-workout kcal
+estimate in the day screen's Training section. It needs `estWorkoutKcal` per session, which is the
+Q-230 bundle hazard from a client component — doing it properly means computing it server-side in
+`/api/day-log`."* The owner asking for it is what moves this from *deferred* to *queued*; the
+blocker and the intended shape were both already named, so **do not re-derive them.**
+
+- **Where it goes:** `components/health/day-detail/day-sections.tsx:112-116` — the `TrainingSection`
+  stat row (`Volume kg` / `Exercises` / `Sets`, all derived client-side from the sets data).
+  `data.workoutDurations[sessionName]` on the same component already carries `{start, end, minutes}`
+  **per session**, so the duration the estimator needs is present; the profile inputs are not.
+- **⚠ The existing `workoutKcal` is a DAY total, not a session figure — this is the thing to get
+  right.** `computeActiveEnergy` (`packages/shared/src/health/daily-energy.ts:104-107`) sums
+  `estWorkoutKcal` over *every* strength session in the day, and that day-level number **already
+  renders on this very screen**, as the "Workouts" row of the ENERGY section
+  (`components/health/day-detail/energy-summary.ts:33`). So this is not "surface the field that
+  exists" — a card is per session, and two sessions in one day would both show the day total.
+  It needs a **per-session** call to the same shared estimator, server-side per the deferral note.
+- **⚠ And it is a duration-only estimate.** `daily-energy.ts:106` is
+  `estWorkoutKcal({ durationMin, …, activityId: 8, intensity: 'moderate' })` — a flat MET 8 over the
+  clock. **Load, volume and reps are not inputs.** A 49-minute session moving 2,364 kg and a
+  49-minute session moving 800 kg produce the *same* number. Placing it in the same row as VOLUME KG
+  / EXERCISES / SETS — three measured facts — implies it is derived from them, and it is not. Either
+  label it so the basis is legible ("~kcal", "est."), or put it somewhere the implication is weaker.
+  This is a presentation decision, not a formula one; the formula is fine for what it is.
+- **Consistency requirement:** once a per-session figure ships, the session cards on a day must sum
+  to the ENERGY section's "Workouts" row on the same screen. `energy-summary.ts`'s own header states
+  the principle it was built on — *"the day screen disagreeing with Nutrition about how much was
+  burned is worse than either being slightly off"* — and this adds a third place on one screen for
+  the two to disagree. Assert the sum in a test.
+- **Empty state:** `computeActiveEnergy` returns zeros and `estWorkoutKcal` returns `null` when
+  age / weight / sex are missing (`workout-energy.ts:109-110`). A profile-less user must not see a
+  confident `0 kcal` — same class as Q-278 (a score that could not be computed rendering identically
+  to a real one). Decide what the stat shows when the estimate is unavailable.
+- **Not a duplicate:** nothing in the backlog covers it, and `projectOverview.md`'s only mention is
+  the deferral quoted above. **Q-312 is unrelated** despite touching `estWorkoutKcal` — that is the
+  synthetic *test* constants scrubbing METs below 1.0 in CI, not the production MET table.
+- **What would count as done:** each session card on the day screen carries a calories figure for
+  *that session*, computed server-side in `/api/day-log` from the session's own duration, labelled so
+  it does not read as measured; the figures sum to the ENERGY section's Workouts row; and a user with
+  an incomplete profile sees an honest absence rather than a zero.
+- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — no device or
+  production data needed. Spans `app/api/day-log` (Lane A) and `components/**` (Lane B); the deferral
+  note says the server half is the correct home, so **route it to Lane A** with the display change
+  riding along.
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
