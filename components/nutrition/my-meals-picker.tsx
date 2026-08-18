@@ -223,7 +223,7 @@ export function MyMealsPicker({
                         className={cn(
                           'min-h-[36px] rounded-full border px-3 text-xs font-semibold transition-colors',
                           m.keep
-                            ? 'border-[#22c55e]/50 bg-[#22c55e]/15 text-[#22c55e]'
+                            ? 'border-brand/50 bg-brand/15 text-brand'
                             : 'border-border bg-background/50',
                           !m.keep && atLimit && 'opacity-40',
                         )}
@@ -267,13 +267,13 @@ function KeepRow({ title, subtitle, checked, disabled, onToggle }: {
       aria-pressed={checked}
       className={cn(
         'w-full min-h-[48px] flex items-center gap-3 rounded-xl border px-3 py-2 text-left transition-colors',
-        checked ? 'border-[#22c55e]/50 bg-[#22c55e]/15' : 'border-border bg-muted/50 active:bg-muted/30',
+        checked ? 'border-brand/50 bg-brand/15' : 'border-border bg-muted/50 active:bg-muted/30',
         disabled && 'opacity-40',
       )}
     >
       <span className={cn(
         'flex-none w-5 h-5 grid place-items-center rounded-md border',
-        checked ? 'border-[#22c55e] bg-[#22c55e]' : 'border-border',
+        checked ? 'border-brand bg-brand' : 'border-border',
       )}>
         {checked && <Check className="w-3.5 h-3.5 text-black" />}
       </span>

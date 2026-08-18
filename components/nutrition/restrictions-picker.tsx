@@ -180,8 +180,8 @@ function Chip({ label, severity, onClick }: {
       className={cn(
         'min-h-[36px] rounded-full border px-3 text-xs font-medium transition-colors',
         !isSelected && 'border-border bg-muted/50 text-foreground active:bg-muted/30',
-        isSelected && !isAllergy && 'border-[#22c55e]/50 bg-[#22c55e]/15 text-[#22c55e]',
-        isAllergy && 'border-[#ef4444]/50 bg-[#ef4444]/15 text-[#ef4444]',
+        isSelected && !isAllergy && 'border-brand/50 bg-brand/15 text-brand',
+        isAllergy && 'border-destructive/50 bg-destructive/15 text-destructive',
       )}
     >
       {label}

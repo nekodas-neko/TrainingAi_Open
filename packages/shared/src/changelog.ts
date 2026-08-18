@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.324.6",
+    version: "1.324.7",
     date: "2026-08-18",
     changes: [
       "Losing the database connection no longer throws away everything waiting to sync. If the server was unreachable for around 45 minutes \u2014 an ordinary outage \u2014 every pending change on the phone was marked failed and had to be retried one at a time by hand, even though nothing was wrong with any of them. The app now recognises the difference between the server being down and a change being genuinely rejected: it waits and retries on its own, and only real rejections show up as failures.",
+    ],
+  },
+  {
+    version: "1.324.6",
+    date: "2026-08-18",
+    changes: [
+      "The nutrition screens now follow your chosen accent colour. Selected chips, checkboxes, the meal plan card and the delete warnings were all painted a fixed green or red, so changing your accent left them behind \u2014 and in light mode they stayed at a shade the rest of the app deliberately darkens for readability.",
     ],
   },
   {

@@ -18,6 +18,17 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, non-default-timezone sweep, Q-477/Q-478): backlog 8908 -> 9005,
+// projectOverview 7068 -> 7122 (the last 8 record that #112 fixed Q-473 and that Review re-ran the
+// original reproduction against the merged code — 'shipped' and 'fixed' are different claims and
+// the measurement is what separates them). Two queue entries and the one Known-Issues row indexing them.
+// Both entries carry their measured layer table inline (server / todayInTz(tz) / todayInTz() /
+// localDateString(), with the value each produced for the same user at the same instant) because the
+// finding IS that table, and reproducing it needs a moment when three calendar dates are
+// simultaneously live plus a fresh login to re-stamp the JWT. The sweep's prose is in
+// docs/reviews/2026-08-18-timezone-non-default-user.md, which this ratchet does not govern.
+
+//
 // Raised 2026-08-18 (Review, outbox-under-failure sweep, Q-475/Q-476): backlog 8802 -> 8908,
 // projectOverview 7028 -> 7068. Two queue entries and the one Known-Issues row indexing them.
 // Q-475 carries its backoff arithmetic inline (30 s / 2 m / 8 m / 32 m, five attempts, ~42.5 min to
@@ -542,8 +553,8 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7068,
-  'docs/implementation-backlog.md': 8908,
+  'projectOverview.md': 7122,
+  'docs/implementation-backlog.md': 8846,
   'CLAUDE.md': 1075,
 
 };
