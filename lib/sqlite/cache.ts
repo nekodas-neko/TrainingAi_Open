@@ -352,21 +352,34 @@ function unwrapToday<T>(stored: unknown): T | null {
   return envelope.data;
 }
 
+// Both guards below compare a date the SERVER stamped in the user's timezone against a
+// date this client computes — so `tz` is not optional in spirit even though it is in the
+// signature. Omit it and the comparison silently becomes "is the server's date equal to
+// Brisbane's date", which is false for |Δ| hours out of every 24 for a user Δ hours from
+// Brisbane: 14 hours a day in New York (Q-478). Pass `useUserTimezone()` from any
+// component; the default keeps a Brisbane user's behaviour byte-for-byte unchanged.
+
 // body-metadata carries its own freshness date at `today.date` rather than needing
 // the generic {date, data} envelope above — shared guard so the fetch-hit `onData`
 // callback (three call sites: session-select, health, nutrition) can't drift from
 // the already-guarded synchronous seed reads. A payload with no `today` record at
 // all (nothing logged yet) is not stale — only a `today` stamped with a past date is.
-export function isBodyMetadataFresh(data: { today?: { date: string } | null } | null | undefined): boolean {
-  return data?.today == null || data.today.date === todayInTz();
+export function isBodyMetadataFresh(
+  data: { today?: { date: string } | null } | null | undefined,
+  tz?: string,
+): boolean {
+  return data?.today == null || data.today.date === todayInTz(tz);
 }
 
 // workout-data/workout-card payloads carry a server-stamped `dataDate`; the per-exercise
 // `loggedTodayInSession` flag is only meaningful when that build date is today (the key is
 // date-less + TTL_LONG, so a cached payload survives past midnight). A payload with no
 // dataDate (older cache entry) is treated as not-today — the flag falls back to false.
-export function isWorkoutDataToday(data: { dataDate?: string } | null | undefined): boolean {
-  return data?.dataDate === todayInTz();
+export function isWorkoutDataToday(
+  data: { dataDate?: string } | null | undefined,
+  tz?: string,
+): boolean {
+  return data?.dataDate === todayInTz(tz);
 }
 
 // Sync seed read (mirrors readCacheSync) for a today-guarded key — used in the

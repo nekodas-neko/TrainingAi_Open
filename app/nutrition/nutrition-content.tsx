@@ -6,7 +6,7 @@ import { useTabVisibility } from "@/components/shell/tab-visibility";
 import dynamic from "next/dynamic";
 import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
-import { Settings, UtensilsCrossed, ChevronLeft, ChevronRight, MoonIcon, Plus } from "lucide-react";
+import { Settings, ChevronLeft, ChevronRight, MoonIcon } from "lucide-react";
 import { MacroRing } from "@/components/nutrition/macro-ring";
 import { MealCard } from "@/components/nutrition/meal-card";
 import { FoodLoggerSheet } from "@/components/nutrition/food-logger-sheet";
@@ -30,7 +30,7 @@ import { Button } from "@/components/ui/button";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { Switch } from "@/components/ui/switch";
 import { SupplementsSection } from "@/components/nutrition/supplements-section";
-import type { MealType, FoodLogWithItem, NutritionTargets } from "@trainingai/shared/types/nutrition";
+import type { MealType, FoodLogWithItem, NutritionTargets, MealPlan } from "@trainingai/shared/types/nutrition";
 import type { SupplementWithStatus } from "@trainingai/shared/types/supplement";
 import { toast } from "sonner";
 import { cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
@@ -56,7 +56,6 @@ const MealPlanManageSheet = dynamic(
   () => import("@/components/nutrition/meal-plan-manage-sheet").then(m => m.MealPlanManageSheet),
   { ssr: false },
 );
-import type { MealPlan } from "@trainingai/shared/types/nutrition";
 import type { MealPlansResponse } from "@/app/api/nutrition/meal-plans/route";
 const MealPlanSetupSheet = dynamic(
   () => import("@/components/nutrition/meal-plan-setup-sheet").then(m => m.MealPlanSetupSheet),
@@ -66,7 +65,7 @@ import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/r
 import { WaterLogSheet } from "@/components/profile/water-log-sheet";
 import { mealTypeForHour } from "@trainingai/shared/nutrition/log-plan-meal";
 import { NutritionActionRow } from "@/components/nutrition/nutrition-action-row";
-import { Droplets } from "lucide-react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 
 const MEAL_PLAN_REVIEW_DAYS = 28;
 
@@ -90,6 +89,7 @@ function formatDateLabel(dateStr: string, todayStr: string): string {
 }
 
 export default function NutritionContent({ userId }: { userId?: string }) {
+  const tz = useUserTimezone();
   const todayStr = todayInTz();
   const searchParams = useSearchParams();
   const [selectedDate, setSelectedDate] = useState(todayStr);
@@ -145,7 +145,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     const cachedAdherence = readCacheSync<NutritionAdherenceResponse>('nutrition-adherence');
     if (cachedAdherence) setAdherence(cachedAdherence);
     const meta = readCacheSync<{ today: BodyMetaRow | null; activeEnergyKcalToday?: number | null }>('body-metadata');
-    if (meta && isBodyMetadataFresh(meta)) {
+    if (meta && isBodyMetadataFresh(meta, tz)) {
       if (meta.activeEnergyKcalToday != null) setActiveEnergyKcalToday(meta.activeEnergyKcalToday);
       if (meta.today?.waterMl != null) setTodayWaterMl(meta.today.waterMl);
     }
@@ -341,7 +341,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         cachedFetch<{ today: BodyMetaRow | null; activeEnergyKcalToday?: number | null }>(
           'body-metadata', '/api/body-metadata', TTL_MEDIUM,
           d => {
-            if (isBodyMetadataFresh(d)) {
+            if (isBodyMetadataFresh(d, tz)) {
               setActiveEnergyKcalToday(d.activeEnergyKcalToday ?? null);
               setTodayWaterMl(d.today?.waterMl ?? null);
             }
@@ -349,7 +349,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         ),
       ]);
     } catch { /* non-fatal */ }
-  }, [userId]);
+  }, [userId, tz]);
 
   const handleFoodLogged = useCallback((newLog?: FoodLogWithItem) => {
     if (newLog) {
