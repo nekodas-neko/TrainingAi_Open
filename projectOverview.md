@@ -2826,11 +2826,23 @@ mutation as well as clean. **Do that for each addition before counting it as cov
 Ownership enforced by a join or a pre-check (`ensureWorkoutSession`) is untouched by this method.
 Local Postgres only; no device, no production data.
 
-### [platform][app-shell][workouts] AI Coach is NOT verified on device (2026-08-09, v1.271.0–v1.273.0) · needs: browser
+### [platform][app-shell][workouts] AI Coach — MOSTLY device-verified now; three items still owed (2026-08-09 → 2026-08-18)
 
-**This is the device gate for Q-157 phases 1 and 2, recorded because no S25 was available in the
+**⚠ Partially cleared 2026-08-18 from owner screenshots of a real swap on the S25 — screenshots, not
+a full smoke run, so it is evidence rather than a completed checklist.** What those images show
+working on the device: the **composer clearing the gesture bar** (the item this row called "the one
+that matters"), **header clearance** under the status bar and punch-hole, **Samsung WebView rendering**
+of the widget cards including the green result card, and **real touch on the option rows** — the owner
+tapped two of them and the swap applied end to end.
+
+**Still owed, and the row stays open for these:** the composer **with the keyboard open**; **offline
+behaviour in real airplane mode** (only `navigator.onLine` has ever been exercised); and the
+**tier-3 `/coach/confirm/[toolCallId]` screen**, which an exercise swap does not reach — `program_phase`
+is the only tier-3 domain, so confirming a swap proves nothing about it.
+
+**This was the device gate for Q-157 phases 1 and 2, recorded because no S25 was available in the
 session that built it.** Everything below was verified in Chromium at 412×891 in both themes and
-against the local dev database; none of it proves anything about the phone.
+against the local dev database; the phone has now covered the four items named above.
 
 - **A second full-screen surface since this row was written:** `/coach/confirm/[toolCallId]`, the
   tier-3 hold-to-confirm screen, has the same navless bottom-anchored shape as the composer and
