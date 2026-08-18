@@ -59,6 +59,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   correction worth reading before any print test: every module-pitch figure in Q-389/Q-393 is ~24%
   optimistic**, since the quiet zone is drawn *inside* the code box (band is 0.369 mm, not 0.487).
   The round trimmed variant was measured at 0.353 mm and deliberately **not** built.
+- [`docs/overview/entries/2026-08-18-meal-label-inline-centred.md`](../../overview/entries/2026-08-18-meal-label-inline-centred.md)
+  — **Q-397, the label that actually shipped to the agreed design (v1.324.0), and the reasoning
+  worth keeping.** Q-393's "the list does not fit a round label" was true only for a **stacked**
+  list; running the ingredients as one **wrapping** run spends width instead of height, so the
+  complete list fits a round die with a code *larger* than the old default (0.529 vs 0.369 mm per
+  module). **`inlineCentred` is the new default.** Process lesson recorded there and in Q-397: the
+  correction was made in chat and never written back into the queue entry, so the superseded
+  analysis shipped as a work order.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

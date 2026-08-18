@@ -471,6 +471,12 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+  // Raised 2026-08-18 (Q-397, Lane B): backlog 8257 -> 8573. `main` was **376 lines over this
+  // baseline on its own**, so the Custom Rules job was failing on every branch, not just this one —
+  // several entries landed without the raise that should have ridden with them. Recomputed from the
+  // merged file: main's content, minus Q-397 (shipped by this PR), plus its closing annotation on
+  // Q-393. Recorded rather than nudged, because the second time a shared ratchet is quietly
+  // exceeded is the point at which people start assuming it is broken instead of binding.
   // Raised 2026-08-18 (Q-397 + the Q-395 review fold-in, BugFix intake). Recomputed from the
   // MERGED file after taking main's side of this baseline, rather than splicing the conflict
   // hunks — two same-day raises spliced together silently drop one side. Q-397 records that the
