@@ -92,6 +92,7 @@ import * as period from './slices/periodization'
 import * as userStatsSlice from './slices/user-stats'
 import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
+import { packOuraRawBuckets, countPackableBuckets } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
 import type {
@@ -6681,6 +6682,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraStorageStats() { return oura.getOuraStorageStats(this.db) }
   async nullHistoricalDecoded(userId: string, maxRows?: number) { return oura.nullHistoricalDecoded(this.db, userId, maxRows) }
   async vacuumOuraRawSamples() { return oura.vacuumOuraRawSamples() }
+  async packOuraRawBuckets(userId: string, maxBuckets?: number) { return packOuraRawBuckets(this.db, userId, maxBuckets) }
+  async countPackableBuckets(userId: string) { return countPackableBuckets(this.db, userId) }
   async getOuraTimeseriesDelta(userId: string, opts: { heartrate?: oura.TimeseriesCursor | null; bucket?: oura.TimeseriesCursor | null; budget?: number }) { return oura.getOuraTimeseriesDelta(userId, opts) }
   async getOuraDailyDerived(userId: string, from: string, to: string) { return oura.getOuraDailyDerived(this.db, userId, from, to) }
   async persistBodyCompFromMetrics(userId: string) { return oura.persistBodyCompFromMetrics(this.db, userId) }

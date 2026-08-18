@@ -472,6 +472,31 @@ below threshold and left in place for next time.
 - **Related:** Q-534 (the same table's index and vacuum problems) and the `disk_full` Known-Issues
   row. Do not run a full redecode while those are open.
 
+### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
+
+- **Lane B.** `components/oura-ble/db-footprint-card.tsx` only — the route, the repository method and
+  the slice all exist and are Lane A's, already shipped.
+- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **What exists already:** `GET /api/oura-ble/samples/pack` returns `{ buckets, sealBelowDs }` — how
+  many sealed buckets are packable right now, touching nothing. `POST` (optional body
+  `{ maxBuckets }`, default 25, cap 200) packs that many and returns
+  `{ buckets[], packed, refused, framesMoved, bytesWritten, remaining, ms }`. Both are admin-gated
+  and the POST is rate-limited to 10/min.
+- **Shape:** a third control in the card's ① Data section beside "Null historical decoded" and
+  "Reclaim disk — VACUUM FULL", following the same `ConfirmDialog` pattern. Show `remaining` from the
+  `GET` so the owner knows how many presses are left, and re-fetch the footprint after each press so
+  `oura_raw_samples` shrinking and `oura_raw_packed` growing are visible in the same table.
+- ⚠️ **The confirm copy must not say "no data is lost" the way the VACUUM one does.** It is true —
+  frames are moved, not deleted, and the packer refuses to delete a bucket it cannot prove equal —
+  but this is the one control in the app that issues a DELETE against archival frames, and copy that
+  reads identically to a lossless VACUUM trains the wrong instinct. Say what it does: moves sealed
+  buckets older than 7 days into compact blobs, after re-reading each blob and proving the frames
+  match.
+- **Surface a refusal.** `refused > 0` with a per-bucket reason means a bucket could not be proven
+  equal and was left intact — that is a finding, not a no-op, and it must not read as "packed 0".
+- **Verification:** the route is already proven end to end on `pnpm dev` (251 frames → 10 blobs, API
+  dump hashing identically before and after). This item is the affordance only.
+
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
 
 - **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
@@ -652,6 +677,16 @@ below threshold and left in place for next time.
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
+- 🚧 **Task 4 SHIPPED 2026-08-18 — the packer.** `lib/data/postgres/slices/oura-raw-pack.ts` +
+  `GET|POST /api/oura-ble/samples/pack`, admin-gated, bounded, idempotent, resumable, never automatic.
+  **This is the first code in the project that deletes an archival frame**, and it does so only after
+  re-reading the committed blob and proving the frames equal; a refusal is returned per bucket rather
+  than thrown. Four decisions the plan left open are settled in it: the hot window anchors to
+  `max(ring_timestamp_ds)` not `now()`; a wall-clock quiet guard (`max(recorded_at) < now() - 1 day`)
+  sits on top, because ds says when the ring recorded a frame and not when we received it; and
+  `body_sha256` hashes the frame *sequence*, not the blob, so it is an independent check rather than a
+  restatement of the re-read. Verified live: 251 seeded frames → **2,800 bytes of blob (≈29×)**, and
+  the API's full dump hashes identically before and after. ⚠️ **No button yet — Q-316, Lane B.**
 - 🚧 **Task 3 SHIPPED 2026-08-18 (v1.318.12) — the two-tier reader.**
   `lib/data/postgres/slices/oura-raw-frames.ts`: `readRawFrames` (ds range + tags, ascending) and
   `readRecentRawFrames` (newest-first, limited), returning **exactly the shape of the `select` they
@@ -673,9 +708,9 @@ below threshold and left in place for next time.
   regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
   with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
   row has moved** — `oura_raw_samples` and the ingest path are untouched.
-  **Remaining: Tasks 4–7** — the packer, the backfill, the hot-window prune, and the `measured_at`
-  range-query sweep. The packer's delete is the only destructive step in the plan and is gated on a
-  proven-equal re-read (§6); it has not been written.
+  **Remaining: Tasks 5–7** — the backfill (run the packer over all history in bounded batches, then
+  `VACUUM FULL` **after**, not during), the hot-window prune, and the `measured_at` range-query sweep.
+  The plan's gate still stands: a verified backfill on a copy of production before the real one.
 - ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
   plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
   and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
