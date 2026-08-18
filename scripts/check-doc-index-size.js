@@ -349,7 +349,6 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6910,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -374,7 +373,6 @@ const BASELINE = {
   // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
   // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
   // against.
-  'docs/implementation-backlog.md': 7596,
   //
   // Raised 2026-08-18 (Q-356, Lane A): 1044 -> 1056. The date-arithmetic section already said "never
   // hardcode one side of a rolling window"; it did not cover the shape that broke every branch for
@@ -383,6 +381,21 @@ const BASELINE = {
   // class must do (construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock). This is the file every session reads before it can start, and the rule it
   // sits beside is the reason this bug was filed rather than repeated.
+  // Raised 2026-08-18 (Tuning): 7596 -> 7636. Q-511 — the audit of "did the sleep recalibration miss
+  // a consumer of the sleep scale?" (it did not) turned up that the Body Battery anchor flip was worth
+  // 17.7 points and the recalibration removed 82% of it. The entry is long because most of it is a
+  // PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
+  // owner-reported bug in another pillar, and that only lands with the numbers attached.
+
+  'projectOverview.md': 6910,
+  'docs/implementation-backlog.md': 7601,
+  //
+  // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
+  // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
+  // day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
+  // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
+  // must do: construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock. Recomputed from the merged file.
   'CLAUDE.md': 1056,
 
 };

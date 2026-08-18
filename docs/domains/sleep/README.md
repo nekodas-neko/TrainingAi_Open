@@ -54,6 +54,13 @@ canonical-display-source table in the same section).
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (the ingest auth model and value validation checked for this pillar and found sound; no findings specific to sleep). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
+- [`docs/reviews/2026-08-18-battery-anchor-discontinuity.md`](../../reviews/2026-08-18-battery-anchor-discontinuity.md)
+  — **the audit of "did the sleep recalibration miss a consumer of the sleep scale?", 2026-08-18.**
+  It did not — exactly one comparison threshold exists on that scale codebase-wide and it was
+  re-anchored. The audit instead measured Body Battery's sleep→readiness anchor flip at **−17.7
+  points** (sd 10.2, worst −51), and found the recalibration removed ~82% of it as a side effect
+  (**Q-511**). **The sleep and readiness scales being comparable is now load-bearing** — do not lift
+  sleep back toward its old mean.
 ## Open issues
 
 ```bash

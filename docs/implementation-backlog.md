@@ -3191,6 +3191,46 @@ session working from a temporarily restored copy.
   visible, and it must not be answered by lowering the constant until the score fires, which is the
   Q-506 mistake.
 
+### [body][sleep] Q-511 — the Body Battery anchor flip is worth 17.7 points, and the sleep recalibration removed 82% of it
+
+- **Branch:** `feat/instrument-provisional-anchor` (low priority; **nothing to change in scoring**)
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-battery-anchor-discontinuity.md`](reviews/2026-08-18-battery-anchor-discontinuity.md)
+- **Why it exists:** the audit of "did the sleep recalibration miss any consumer of the sleep scale?"
+  **Answer: no.** There is exactly **one** comparison threshold on the sleep scale in the whole
+  codebase (`rest-day-guidance.ts`'s `LOW_SLEEP_SCORE`) and it was re-anchored in the same PR. The
+  other consumers take the score as a *value* and inherit the shift directly.
+- **What the audit turned up instead.** `body-battery/anchor.ts` uses `ownSleepScore` as the day's
+  anchor **raw** (clamped 0–100), and a provisional sleep anchor can upgrade to readiness mid-morning.
+  Its own docstring records the consequence — *"shifted the ENTIRE day's curve … the number visibly
+  jumped"*, an **owner report from 2026-08-02**. The jump is `readiness − sleepScore`, and it had
+  never been measured. Over the 33 days carrying both: mean sleep 87.2, mean readiness 69.5,
+  **mean jump −17.7**, sd 10.2, range **−51 … +6**, mean |jump| 18.1.
+- **The recalibration mostly fixed it, as a side effect.** The review's 65-night replay moved sleep
+  84.1 → 69.5 (**−14.6**), so the gap goes −17.7 → **≈ −3.1**: the two anchor sources were ~18 points
+  apart and are now ~3. Nothing targeted Body Battery; it fell out of putting sleep on a realistic
+  range, because readiness already was.
+- **⚠️ PROTECT THIS.** If a later session reads the new sleep distribution as "too harsh" and lifts it
+  back toward the old mean, **it re-opens an owner-reported bug in a different pillar.** The sleep and
+  readiness scales being comparable is now load-bearing for Body Battery.
+- **What did NOT go away:** the per-day disagreement (sd 10.2). The scores agree *on average*, which
+  is not the same as agreeing. ±10-point flips remain routine, so **the freeze-once rule stays
+  load-bearing and must not be relaxed** on the grounds that the scores now agree.
+- **The flip RATE is not observable.** `body_battery_daily` has **never** persisted
+  `anchor_source = 'sleep'` (41 days `readiness`, 9 `default`, 0 `sleep`) because a sleep anchor is
+  provisional and gets overwritten. So the end-state table cannot separate "the flip happens daily"
+  from "readiness is always there first". Magnitude is solid; frequency is unknown. The owner's report
+  proves it fires at least sometimes.
+- **First action:** none in scoring. If the flip is reported again, **instrument the provisional
+  anchor** — record it and its source when first written, not only the final one; that turns an
+  unmeasurable rate into a measurable one. Otherwise low priority.
+- **Recorded, not filed:** nine days (2026-07-08 → 07-16, right after the re-key) anchored at a flat
+  **50** (`anchor_source = 'default'`) — no readiness and no sleep score existed, so Body Battery
+  started each of those days at a fixed midpoint regardless of recovery. Last occurrence was over a
+  month ago, so it reads as a post-re-key coverage gap that closed on its own. *Something that stopped
+  is not something that was fixed* — noted as unexplained rather than closed.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

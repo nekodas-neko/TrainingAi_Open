@@ -3,11 +3,24 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/ble-era-input-drift` · **Q band:** 500–529 (next free: 511)
+**Updated:** 2026-08-18 · **By:** `tuning/battery-range-clean` · **Q band:** 500–529 (next free: 512)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Body Battery range — CLEAN, nothing filed.** Over 50 days: mean 51.5, **sd 29.2**, full 0–100
+  range, bands Charged 28% / Good 26% / Low 26% / Drained 20%. **It already passes the owner's
+  acceptance test** — the only pillar that did without work. Thresholds 75/50/25 sit right for this
+  distribution. [`entry`](../../overview/entries/2026-08-18-battery-range-clean.md).
+- **Sleep-scale consumer audit — CLEAN, plus one side effect worth protecting** (Q-511). Exactly
+  **one** comparison threshold exists on the sleep scale codebase-wide (`LOW_SLEEP_SCORE`) and it was
+  re-anchored in the recalibration PR, so nothing was missed. The audit did find that Body Battery's
+  anchor takes the sleep score **raw**, and its sleep→readiness flip was worth **−17.7 points** (sd
+  10.2, worst −51) — the owner's 2026-08-02 "the number visibly jumped" report, quantified. The
+  recalibration cut ~82% of that systematic offset as a **side effect**. The symmetric readiness-scale
+  audit found Q-500's threshold table listed **six of eight** — `ots.ts:151` and a `< 40` line inside
+  an **LLM prompt string** were missing; the conclusion holds (checked, not assumed) and that review is
+  amended in place. [`review`](../../reviews/2026-08-18-battery-anchor-discontinuity.md).
 - **BLE-era input drift — MEASURED, propose-only** (Q-509, Q-510). The Recovery Index refit on 42
   BLE nights lands at **3.31 h** against the shipped anchor of 5 — and **the anchor must not move**:
   the refit anchor and the input distribution shrank by the *same* factor (0.715× vs 0.72–0.74×), which
@@ -67,6 +80,17 @@ Since then, working only scores no other lane holds:
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
 
+## The lane is drained — everything left is blocked or needs elapsed time
+Every score in the app now has a calibration review, and both recalibrated scales have been audited
+for missed consumers. What remains:
+- **Blocked on Lane A:** Q-506 (temperature baseline), Q-509 (HR smoothing), Q-510 (persist stress
+  coverage), Q-505 (build Activity), Q-502. Each of these must land before the Tuning follow-up on it
+  can be measured.
+- **Needs elapsed time:** watching the new Sleep distribution; re-measuring resilience and the
+  post-recalibration anchor gap once enough new-model rows exist (there is currently **one**).
+Do not manufacture work here. If a successor finds nothing actionable, say so rather than
+re-measuring a settled score — the "do not re-litigate" list below exists to make that cheap.
+
 ## Blocked
 - **Nothing is blocked on the owner.** They delegated all open decisions on 2026-08-18
   (*"whatever your recommendation is… best practice + future proof"*). Q-500 shipped; Q-505's three
@@ -118,6 +142,23 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **Body Battery's range is settled and healthy** — sd 29.2 over 50 days, all four bands 20–28%, full
+  0–100. Do not re-open it as a range problem. Its open questions are Q-272 (charge/drain), Q-276
+  (does it agree with readiness at all) and Q-511 (the anchor), none of which are about the spread.
+  Note its stored charge/drain now read 23.1/36.0 where the 2026-08-17 review measured 7/10 — nobody
+  changed the model, so that is an **unexplained** change in the data, not a fix.
+- **A scale-consumer audit misses thresholds inside LLM prompt strings.** Grepping for numeric
+  comparisons against a score variable will never find `external_readiness < 40` written as prose in
+  `ai-periodization/prompt.ts` — yet it is a real threshold on our own score
+  (`externalReadiness = liveReadinessForDay(...)`). When auditing a scale, grep the prompt builders
+  too. This is how Q-500's table came to list six of eight.
+- **⚠️ DO NOT lift the sleep scale back toward its old mean.** It will look tempting — the new
+  distribution reads harsh. But the sleep and readiness scales being within a few points of each other
+  is now **load-bearing for Body Battery**: its anchor takes the sleep score raw, and the
+  sleep→readiness flip was worth −17.7 points before the recalibration and ~−3 after (Q-511). Lifting
+  sleep re-opens an owner-reported bug in a different pillar. Also: the scores agreeing *on average* is
+  not the same as agreeing, so **the anchor's freeze-once rule stays load-bearing** (per-day sd is
+  still 10.2).
 - **When a refit's anchor moves by the same factor its input moved, the input is what changed.** That
   is the Q-509 test, and it is reusable for any anchored contributor: a real physiological shift moves
   the data while leaving the correct anchor put. Do not ship a constant that is silently absorbing a

@@ -276,6 +276,17 @@ decision points in the app, and the question worth answering is whether any day 
 | `< 60` → rest-day guidance | `packages/shared/src/health/rest-day-guidance.ts:46` |
 | `70` → band Moderate / High | `scoreBand()` |
 | `>= 75` → rest-day guidance "train hard" | `packages/shared/src/health/rest-day-guidance.ts:36` |
+| `< 60` → lowers the high-OTS threshold by 10% | `lib/oura-models/inference/ots.ts:151` |
+| `< 40` → LLM `rest_day_recommended` instruction | `packages/shared/src/ai-periodization/prompt.ts:168` |
+
+> **Amended 2026-08-18 (Tuning).** The last two rows were **missing from this table when it shipped** —
+> found by re-running the enumeration as a sleep-scale audit (Q-511) and doing the readiness side for
+> symmetry. **The conclusion below is unaffected**, and this was verified rather than assumed:
+> `ots.ts` shares the **60** line, which the measurement already covers ("no day crosses the
+> `lowReadiness` line (60)"); and for the **40** line in the AI prompt — `external_readiness` is our own
+> score, via `liveReadinessForDay` — no day sits anywhere near it. The only readiness values in
+> 35–48 across all of production are **37, 48, 48**, so a uniform +1 shift moves nothing across 40 or
+> 45. The table was incomplete; the answer was right.
 
 Method: reconstruct the exact unrounded composite from the persisted contributors (it reproduces the
 stored rounded score on **26 of 33** days — the other seven predate the `checkin` contributor or hit
