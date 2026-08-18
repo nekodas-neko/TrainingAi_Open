@@ -145,6 +145,13 @@ const root = path.join(__dirname, '..');
 // Three queue entries from the workout write-path sweep plus the Known-Issues row indexing them.
 // Entries and open-issue content, which is what these files are for; the sweep's prose lives in
 // docs/reviews/2026-08-18-workout-write-path.md, outside this ratchet.
+//
+// Raised 2026-08-18 (BugFix intake, Q-390): one owner-reported queue entry. The owner asked for a
+// cosmetic change — render the deload flag as "Mon (D)" rather than on its own line — and the trace
+// found the flag is an extra flex row inside an items-end container, so a flagged day's bar sits
+// ~12px higher than an unflagged one on a chart whose purpose is comparing days. The entry carries
+// the geometry, because that is the part an implementer would otherwise fix cosmetically and leave
+// broken. Rebuilt from origin/main's numbers rather than spliced.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -250,7 +257,7 @@ const BASELINE = {
   // carrying the measured cause and the two coherent answers inline — the item is blocked on the
   // owner choosing between them, and an implementer must not have to open the review to learn that.
   // Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
-  'docs/implementation-backlog.md': 7067,
+  'docs/implementation-backlog.md': 7122,
   'CLAUDE.md': 1010,
 };
 
