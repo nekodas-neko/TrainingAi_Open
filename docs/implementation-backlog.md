@@ -282,7 +282,7 @@ below threshold and left in place for next time.
 > entry required, and now passes with the fix, **fails with `health-content.tsx` reverted to
 > `main`**, and passes again restored. The extraction was made *after* that first proof, so the
 > whole fix/revert/restore cycle was re-run against the final code.
-> Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
+> Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
@@ -1540,7 +1540,7 @@ session working from a temporarily restored copy.
 > `xpath=following::input[1]` selector for `page.getByLabel('Daily Water Goal')`, which passes with
 > the association, **fails with `goal-targets-section.tsx` reverted to `main`**, and passes restored.
 > The brittle selector was the symptom, so deleting it is the proof.
-> Journal: [`entries/2026-08-16-goal-label-association.md`](overview/entries/2026-08-16-goal-label-association.md).
+> Journal: [`entries/2026-08-16-goal-label-association.md`](overview/history-2026-08-15.md).
 
 > **Q-259 CLOSED as not achievable, 2026-08-16 — and the measurement is the point.** The entry asked
 > for a guard that fails when Q-240's `invalidateGoalRecommendations()` is deleted. **No such guard
@@ -1565,7 +1565,7 @@ session working from a temporarily restored copy.
 > The spec built for this survives as `e2e/goal-invalidation.spec.ts`, relabelled: it covers the
 > Q-260 shape on the Progress panel (a goal with no device copy, reached client-side), proven by two
 > mutations, and its header records why it is not a Q-240 guard.
-> Journal: [`entries/2026-08-16-goal-invalidation-not-guardable.md`](overview/entries/2026-08-16-goal-invalidation-not-guardable.md).
+> Journal: [`entries/2026-08-16-goal-invalidation-not-guardable.md`](overview/history-2026-08-15.md).
 
 > **Q-262 ANSWERED and removed, 2026-08-16 — the answer is "no", for all six keys.**
 > [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](reviews/2026-08-16-goal-invalidation-audit.md)
@@ -1585,7 +1585,7 @@ session working from a temporarily restored copy.
 > **Scope limit, stated because it would be easy to over-read:** only this one group was audited.
 > The others may well contain load-bearing keys — `cache-groups.ts`'s own comments flag
 > `freshWithinTtl` entries inside them — and Q-263 files that.
-> Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/entries/2026-08-16-invalidation-audit.md).
+> Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/history-2026-08-15.md).
 
 ### [platform] Q-530 — an admin snapshot endpoint, so a migration's first real run is not production
 

@@ -8,7 +8,7 @@ the bucket. What remains is Phase B, the cut itself. The A4b sections below are 
 them describe things that are still true and one records a measurement that turned out to be short;
 see **What A4b actually cost** before trusting the 16-file list.
 
-Journal: [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](overview/entries/2026-08-16-public-repo-cut-a4b.md).
+Journal: [`overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 
 ---
 
