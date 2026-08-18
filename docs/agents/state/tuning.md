@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/battery-range-clean` · **Q band:** 500–529 (next free: 512)
+**Updated:** 2026-08-18 · **By:** `tuning/acwr-calibration` · **Q band:** 500–529 (next free: 514)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -80,16 +80,27 @@ Since then, working only scores no other lane holds:
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
 
-## The lane is drained — everything left is blocked or needs elapsed time
-Every score in the app now has a calibration review, and both recalibrated scales have been audited
-for missed consumers. What remains:
-- **Blocked on Lane A:** Q-506 (temperature baseline), Q-509 (HR smoothing), Q-510 (persist stress
-  coverage), Q-505 (build Activity), Q-502. Each of these must land before the Tuning follow-up on it
-  can be measured.
-- **Needs elapsed time:** watching the new Sleep distribution; re-measuring resilience and the
-  post-recalibration anchor gap once enough new-model rows exist (there is currently **one**).
-Do not manufacture work here. If a successor finds nothing actionable, say so rather than
-re-measuring a settled score — the "do not re-litigate" list below exists to make that cheap.
+## Pillar coverage — this is the real scoreboard, not "every score has a review"
+The owner asked on 2026-08-18 whether **all pillars** had been tuned against historical data. The
+answer was **no**, and the previous baton wrongly said the lane was drained. It was drained of
+*health-score* work. Track pillars, not scores:
+
+| pillar | calibration coverage |
+|---|---|
+| sleep | ✅ recalibrated (Q-503) + consumer audit (Q-511) |
+| readiness | ✅ Q-500 shipped, Q-504 refuted, threshold table completed (Q-511) |
+| activity | ✅ specified (Q-505) — build is Lane A's |
+| body | ✅ battery range clean; anchor measured (Q-511) |
+| devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
+| **workouts** | 🟡 **STARTED 2026-08-18** — ACWR done (Q-512/513). **1RM, expected RPE, progression, monotony/strain still untouched** |
+| **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05`, HR-recovery bands, zone boundaries |
+| **nutrition** | ❌ **none.** `DEFAULT_STEP_GOAL 8000`, `ZONE_MINUTES_GOAL 22`, `SESSION_VOLUME_GOAL_KG 5200`, `ACTIVE_ENERGY_BMR_FRACTION 0.24` — round numbers never checked against what the owner actually does |
+| **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
+| app-shell, platform | n/a — no scoring surface |
+
+**Next unblocked work, in order:** finish workouts (1RM/RPE/progression), then nutrition goal
+defaults, then heart-rate. Data exists for all three (77 sessions, 1,029 set logs, 3.5 months; body
+metrics and food logs; BLE HR since the re-key).
 
 ## Blocked
 - **Nothing is blocked on the owner.** They delegated all open decisions on 2026-08-18
@@ -142,6 +153,13 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **ACWR's thresholds are RIGHT — do not tune them** (Q-512/513). Over 77 sessions the
+  decision-driving variant reads mean 0.99, median 1.05, sd 0.32, bands 18/69/13/0%. The `> 1.5`
+  emergency deload has **never fired** (max 1.48) and that is **correct** — an emergency deload that
+  fires often is not an emergency. **This near-miss is the opposite call to Q-506's**, and the
+  difference is the input: there one biomarker's baseline was 18.7× wrong, here the distribution is
+  healthy. *A near-miss is a symptom, not a diagnosis — check the input first.* The bugs are the
+  call-site windows, not the constants.
 - **Body Battery's range is settled and healthy** — sd 29.2 over 50 days, all four bands 20–28%, full
   0–100. Do not re-open it as a range problem. Its open questions are Q-272 (charge/drain), Q-276
   (does it agree with readiness at all) and Q-511 (the anchor), none of which are about the spread.

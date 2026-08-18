@@ -3497,6 +3497,57 @@ session working from a temporarily restored copy.
   month ago, so it reads as a post-re-key coverage gap that closed on its own. *Something that stopped
   is not something that was fixed* — noted as unexplained rather than closed.
 
+### [workouts] Q-512 — `health-insight`'s ACWR is structurally null on every day (110/110)
+
+- **Branch:** `fix/health-insight-acwr-window`
+- **Plan:** none — a one-line fix either way. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §2
+- **Mechanism.** `app/api/ai/health-insight/route.ts` calls `computeVolumeAcwr` with
+  `getWorkoutSessionsFrom(userId, subDays(new Date(), 7))` — a **7-day** list. The helper gates on
+  `spanDays >= minSpanDays` (**21**), and `spanDays` is measured from the earliest session *in the list
+  passed to it*. **A 7-day list can never span 21 days**, so the gate can never pass.
+- **Confirmed by replay over 110 days: 0 non-null.** Not a coverage problem more history would fix —
+  structural. The route computes the load object and reads `.acwr` from it every time, always `null`.
+- **First action:** either widen the fetch to **28 days** to match `signals.ts` (if the insight is meant
+  to mention training load), or drop the `computeVolumeAcwr` call and the `.acwr` read (if it is not).
+- **Do NOT lower `minSpanDays`** to rescue this caller — that degrades *every* caller's ACWR to fix one
+  that is mis-wired.
+
+### [workouts][platform] Q-513 — the score-audit panel and the next-session engine disagree on the ACWR band on 38% of days
+
+- **Branch:** `fix/build-day-audit-acwr-window`
+- **Plan:** none — a window change. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §3
+- **Three callers, three windows**, all feeding one `computeVolumeAcwr` and all banded with the same
+  `ACWR_THRESHOLDS`: `signals.ts` **28 days** (the intended 7:28, drives the engine),
+  `health-insight` **7 days** (always null, Q-512), `score-audit/build-day-audit.ts` **all history**
+  (chronic becomes the **lifetime** weekly average).
+- **Measured** over the same days:
+
+  | | 28-day (engine) | all-history (audit panel) |
+  |---|---|---|
+  | mean | 0.99 | **1.07** |
+  | `optimal` share | **69.3%** | 49.4% |
+  | `high` share | 12.5% | **29.2%** |
+  | `very_high` share | 0% | **3.4%** |
+  | days > 1.5 (emergency-deload line) | **0** | **3** |
+
+  Mean |difference| **0.150**, max **0.395**, **different band on 33 of 88 days (38%)**.
+- **Mechanism, and it worsens over time.** The lifetime weekly average is *lower* than the recent
+  baseline — 20,572 kg/wk lifetime vs 23,239 kg/wk over the last 28 days (**1.13×**) — so the smaller
+  denominator inflates the ratio (observed inflation 1.08). **Any sustained volume increase widens the
+  gap indefinitely**; it is not a fixed offset that could be tolerated.
+- **Why it matters.** `build-day-audit` *is* the score-audit panel, whose whole contract is to show a
+  score beside **the inputs that produced it**. On 38% of days it shows a training-load band the engine
+  never saw, and on three days it shows `very_high`/past the emergency-deload line while the engine saw
+  at most `high`.
+- **First action:** pass a **28-day** window in `build-day-audit`, matching `signals.ts`. If a lifetime
+  view is independently wanted it needs a different name — it is not ACWR. Then re-measure.
+- **Upper bound caveat:** `build-day-audit`'s `programTooNew` gate can null its ACWR independently, so
+  38% bounds the days the panel actually renders a band.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

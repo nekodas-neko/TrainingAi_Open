@@ -445,7 +445,12 @@ const BASELINE = {
   // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
   // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
   // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
-  'docs/implementation-backlog.md': 7867,
+  // Raised 2026-08-18 (Tuning): -> 7918. Q-512/Q-513 — the FIRST calibration review of the workouts
+  // pillar. Both entries carry their measured tables because the conclusion is counterintuitive: the
+  // ACWR thresholds are RIGHT and must not be touched (the >1.5 emergency deload has never fired, and
+  // that is correct), while two of the three call sites computing ACWR are wrong. Strip the tables and
+  // the next reader tunes the thresholds instead of fixing the windows.
+  'docs/implementation-backlog.md': 7918,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

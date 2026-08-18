@@ -93,6 +93,8 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-468 — Coach `undo` writes `beforeState` back without checking the target still holds what the change set; undoing two stacked swaps leaves an exercise nobody chose). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
 
+- [`docs/reviews/2026-08-18-acwr-calibration.md`](../../reviews/2026-08-18-acwr-calibration.md) — **the first calibration review of this pillar, 2026-08-18.** `ACWR_THRESHOLDS` **is correctly placed and must not be tuned** — over 77 sessions the decision-driving variant reads mean 0.99, median 1.05, bands 18/69/13/0%, and the `> 1.5` emergency deload has never fired (max 1.48), which is correct behaviour. The bugs are the call sites: **Q-512** — `health-insight` passes a 7-day list into a helper gating on a 21-day span, so its ACWR is null on **110/110** days; **Q-513** — `build-day-audit` passes the *full history*, making chronic a lifetime average, so the score-audit panel and the engine land in a **different band on 38% of days** (and the gap widens with any sustained volume increase).
+
 ## Open issues
 
 ```bash
