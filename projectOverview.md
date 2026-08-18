@@ -189,7 +189,15 @@ order.
 - **Not verified on:** Railway (inducing a production DB outage is not on) or the APK. The client half
   is plain TypeScript with no native dependency.
 
-### [workouts][platform] 🔴 Completing one workout twice at once counts it twice — the counter that has already drifted three times, measured drifting again (Q-473, Q-474, 2026-08-18)
+### [workouts][platform] 🟠 Completing one workout twice at once counted it twice — Q-473 FIXED and re-verified, Q-474 still open (Q-473, Q-474, 2026-08-18)
+
+- **✅ Q-473 shipped in #112 and was re-verified by Review against the original reproduction.**
+  `completeWorkoutSession` now returns its affected-row count and `completeWorkoutFromPayload`
+  derives `alreadyCompleted` from that write instead of from a read taken before it — the exact
+  shape the finding recommended. **Re-measured on the merged code, same harness, four fresh trials
+  of four concurrent completes: `sessions_in_phase` = 1, 1, 1, 1** (was 3, 3, 2, 1), workout
+  completed exactly once each time. **Q-474 is still open**, so this row stays here rather than
+  moving to the resolved archive.
 
 - **The first sweep to actually fire concurrent writes and read the result.** `CLAUDE.md` records a
   real incident in this class (*"5 rapid taps once fired 4 `complete-workout` POSTs"*) and a standing

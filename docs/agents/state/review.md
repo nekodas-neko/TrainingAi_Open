@@ -24,6 +24,20 @@ left the web build — every offline-first domain took its web fallback), **prod
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
 
+### Fix verification — Q-473 confirmed fixed by re-running the reproduction (2026-08-18)
+
+**#112 landed the Q-473 fix the same day, taking the option this role recommended** —
+`completeWorkoutSession` returns its affected-row count and the caller decides from the write.
+Review re-ran the original reproduction on the merged code: four fresh trials, four concurrent
+completes each, **`sessions_in_phase` = 1, 1, 1, 1** (was 3, 3, 2, 1). Confirmed fixed; the
+`projectOverview.md` row was amended from 🔴 to 🟠 rather than archived, because **Q-474 is still
+open**.
+
+**Worth making a habit.** Verifying an implementer's fix costs one re-run when the reproduction is
+already written down, and it is the only thing that distinguishes "shipped" from "fixed" — a
+distinction `CLAUDE.md` cares about enough to have a rule for. Keep reproductions in the review doc
+in a form that can be replayed.
+
 ### Sweep 11 — the app run as a user who is not in Brisbane (2026-08-18)
 
 **The blind spot `CLAUDE.md` names, entered for the first time** — all 30 local user rows are
