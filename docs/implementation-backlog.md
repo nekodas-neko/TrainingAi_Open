@@ -3987,9 +3987,14 @@ session working from a temporarily restored copy.
   never reports below 6 gives a delta of **+6.3**, worse. The set is unrepresentable either way.
 - **Re-measure after.** Back-off 4.1% vs push 7.9% is asymmetric the other way; whether that is right is
   the next question, and it must be asked against unbiased input.
-- **Caveat that bounds the counts:** the back-off arm needs a second signal (`rm1Trend === 'down'` OR
-  missed reps) which this replay does **not** model, so 39/14 count windows clearing the *RPE* gate, not
-  cuts actually issued. **The 64% ratio is the finding, not the absolute counts.** Only sets carrying
+- **Caveat that bounds the counts — read this with the 64%.** The back-off arm needs a second signal
+  (`rm1Trend === 'down'` OR `repCompletionRate < 0.95`), which the replay does **not** model. Measured:
+  the owner is short of the prescribed reps on only **14 of 196 sets (7.1%)**, exact on 75%, over on
+  17.9%, mean completion **1.046** — so `missedReps` is rarely the corroborator and most back-offs must
+  come via a falling 1RM. **The number of cuts actually issued is well below 39, and the number the fix
+  prevents is well below 25.** The defect is real and one-directional, but "64% of back-off *triggers*"
+  is not "64% of load cuts on your training". The ratio is the finding; sizing the absolute impact needs
+  `rm1Trend` modelled, which this review does not do. Only sets carrying
   both `rpe` and `intensity_pct` are visible (570 of 1,029 set logs).
 - **Related, recorded not filed:** `calcAmrap1RM` / `amrapScaleFactor` (the 1.0/0.97/0.93/0.88/0.82
   rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls

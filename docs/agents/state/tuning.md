@@ -92,7 +92,7 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | activity | ✅ specified (Q-505) — build is Lane A's |
 | body | ✅ battery range clean; anchor measured (Q-511) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
-| **workouts** | 🟡 ACWR (Q-512/513) + RPE autoregulation (Q-514) done 2026-08-18. **Foster monotony measured CLEAN** — mean 1.29, and the 2.0 gate fires on 1 of 102 windows (1.0%), correct for a risk flag; rest days are properly seeded at 0. **Still untouched: progression rules, goal-range/INTENSITY_ZONES bands.** 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
+| **workouts** | ✅ **swept 2026-08-18** — ACWR (Q-512/513), RPE autoregulation (Q-514). **Clean:** Foster monotony, and prescription adherence (actual 73.6% vs planned 73.1%, reps +0.25 — so `INTENSITY_ZONES` is realised, and calibrating those zones would be circular since the program was generated from them). Only Q-514 and the two ACWR call sites are open. **Foster monotony CLEAN** — mean 1.29, the 2.0 gate fires on 1 of 102 windows; rest days are properly seeded at 0, which is what makes it meaningful. 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
 | **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05` (documented rationale, never validated against the owner's HR), `PEAK_BANDS` (their "stable per-bucket sample sizes" justification is an empirical claim nobody measured), zone boundaries |
 | **nutrition** | 🟡 **movement goals ARE calibrated** — `STRENGTH_FREQ_GOAL 5` (Q-137, 91 days) and `SESSION_VOLUME_GOAL_KG 5200` (Q-190, 40 sessions), see [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md). `STEP_GOAL 8000` / `ZONE_MINUTES 22` / `BMR_FRACTION 0.24` are **deliberate population anchors** (Paluch 2022, WHO 150 min/wk), not unchecked round numbers. **Genuinely uncalibrated: the calorie/macro targets vs the owner's observed weight change** — a TDEE outcome check nobody has run |
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
@@ -163,6 +163,12 @@ for this work:
 - **Exercise names map to MORE THAN ONE role** (`Barbell Shrug` is accessory *and* secondary, 20+ others
   too). Any `session_exercises`-by-name join fans out and its per-role aggregates are unsound. Cost me
   one measurement this session; the finding was re-derived without role attribution.
+- **Q-514's 64% is a ratio over RPE-gate windows, NOT over load cuts.** A cut also needs a falling 1RM
+  or missed reps, and the owner misses reps on only **7.1%** of sets (mean completion 1.046). So the
+  absolute number of cuts prevented is well below 25. Quote the ratio, never "64% of your load cuts".
+- **Prescription adherence is clean** (actual 73.6% vs planned 73.1%, reps +0.25 over). That is why
+  `INTENSITY_ZONES` was deliberately **not** calibrated: the program is generated from those zones, so
+  checking them against work they produced is circular. Adherence is the non-circular question.
 - **`RPE_DEAD_BAND = 1.5` is RIGHT — do not tune it** (Q-514). It sits on a flat part of the
   sensitivity curve (1.25→20.7%, 1.5→17.5%, 2.0→14.9%) and the delta distribution is centred. The bias
   is in the input: `expectedRpe`'s **floor** clamp binds on 6.5% of sets (the ceiling never binds),

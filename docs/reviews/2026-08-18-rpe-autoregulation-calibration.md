@@ -135,6 +135,28 @@ delta of +6.3 — worse, not better. The set is unrepresentable either way; the 
 the opposite direction, and whether *that* is right is the next question — but it must be asked
 against unbiased input, not this one.
 
+### 5.1 How much this actually costs, bounded honestly
+
+The 64% is a ratio over windows clearing the **RPE gate**. A load cut additionally needs a second
+signal — `rm1Trend === 'down'` **or** `repCompletionRate < 0.95`. Measured over the 196 sets carrying a
+`planned_reps`:
+
+| | sets | share |
+|---|---|---|
+| short of target | 14 | **7.1%** |
+| exactly on target | 147 | 75.0% |
+| over target | 35 | 17.9% |
+
+mean completion **1.046** — the owner meets or beats the prescribed reps on 93% of sets. So
+`missedReps` is rarely the corroborating signal, and most back-offs would have to come through a
+falling 1RM.
+
+**This bounds the finding and should be read with it: the number of load cuts actually issued is well
+below 39, and the number prevented by the fix is well below 25.** The defect is real and
+one-directional, but "64% of back-off *triggers*" is not "64% of load cuts on your training". The
+ratio is the finding; the absolute impact is smaller and this review cannot size it without modelling
+`rm1Trend`, which it does not.
+
 ---
 
 ## 6. What was not exercised
@@ -152,6 +174,15 @@ against unbiased input, not this one.
   the unlogged remainder differs systematically is unknown.
 - **Nothing on-device**; no owner-reported symptom prompted this.
 - Every figure is **the owner's** (`claude_ro` is row-scoped), 41 sessions, 27 exercises.
+
+### 6.1 Also measured, and clean: prescription adherence
+
+Comparing logged work against what was prescribed, over the 275 sets carrying a `planned_pct`:
+mean actual **73.6%** against mean planned **73.1%** (delta **−0.47**), and mean reps **+0.25** over
+target. The owner follows the prescription closely, so `INTENSITY_ZONES` is being *realised* rather
+than merely written — which is why this review does not attempt to calibrate those zones. They are
+prescriptive textbook periodisation, the program was generated from them, and checking them against
+work they produced would be circular. **Adherence is the non-circular question, and it is clean.**
 
 ## 7. Recorded, not filed
 

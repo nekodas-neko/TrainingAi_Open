@@ -92,3 +92,26 @@ Exercise names map to **more than one role** across programs — `Barbell Shrug`
 secondary, and twenty-odd others are similarly split — so a name-based join fans out and its per-role
 means are unsound. The 6.89-vs-7.5 comparison in the review needs no role attribution, so it is stated
 without one.
+
+## Sizing the finding honestly
+
+The 64% is a ratio over windows clearing the **RPE gate**. A load cut also needs a falling 1RM or
+missed reps — and the owner is short of the prescribed reps on only **14 of 196 sets (7.1%)**, exact on
+75%, over on 17.9%. So `missedReps` is rarely the corroborator and most back-offs must come through a
+falling 1RM.
+
+**Read the two together: the number of cuts actually issued is well below 39, and the number the fix
+prevents is well below 25.** The defect is real and one-directional, but "64% of back-off *triggers*"
+is not "64% of load cuts on your training", and this review cannot size the absolute impact without
+modelling `rm1Trend`, which it does not.
+
+## Also clean: prescription adherence
+
+Over the 275 sets carrying a `planned_pct`, actual intensity averages **73.6%** against a planned
+**73.1%** (delta −0.47), and reps land **+0.25** over target. The owner follows the prescription
+closely.
+
+That is why `INTENSITY_ZONES` was deliberately **not** calibrated. Those zones are prescriptive
+textbook periodisation and the program was generated from them, so checking them against the work they
+produced would be circular. **Adherence is the non-circular question, and it is clean** — the zones are
+being realised, not merely written.
