@@ -971,27 +971,6 @@ blocker and the intended shape were both already named, so **do not re-derive th
   test hook is present. Keep the affordance on device; make the control automatable. A spec covering
   log-set → complete-workout is the follow-on this unblocks.
 
-### [platform] Q-353 — the health-insight prompt says "no data" where it means "absent", and the model reads it as zero
-
-- **Branch:** `fix/ai-insight-prompt-absent-vs-zero`
-- **Lane:** **A** — `app/api/ai/health-insight/route.ts` only.
-- **Added:** 2026-08-17 · the half of Q-452 Lane B could not take
-- **What Q-452 fixed and what it did not.** Q-452 gated `AiInsightCard` on the section having data,
-  so a zero-data account no longer gets an insight at all (verified: all four sections render the
-  card for the seeded user and none for a zero-data one). **That closes the fully-empty case only.**
-- **The underlying defect is in the prompt.** Ten lines across the four sections substitute the
-  literal string `"no data"` for an absent field (`:102, :105, :116-119, :125-126, :157-158`).
-  Handed `Steps: no data` the model does not report absence — it asserts **zero** and editorialises,
-  which is how a day-one account was told *"your activity tracker currently shows zero movement…
-  this inactivity creates a significant gap"*.
-- **So a partially-empty section still misreports.** A user with a readiness score but no body-temp
-  reading passes Q-452's gate and still hands the model `Body temp deviation: no data`. That is the
-  common case for anyone without a ring, not an edge case.
-- **Fix shape:** say *absent* rather than `"no data"` — omit the line entirely, or word it so the
-  model cannot read it as a measurement (`Body temp deviation: not recorded`), and state in the
-  system prompt that absent fields are unmeasured and must not be described as zero or as a
-  behaviour. Worth checking the other AI prompt builders for the same substitution.
-
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
 - **Branch:** `fix/ring-measurement-power-budget`
