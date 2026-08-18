@@ -327,6 +327,12 @@ below threshold and left in place for next time.
 
 ### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
 
+- **✅ SCOPE BOUNDED 2026-08-18 — this is the ONLY instance; the fix is one handler, not a class sweep.**
+  Every mutating write to a local-first domain was audited for a local-store call **inside the
+  handler**: `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE), `quick-edit-log-sheet`
+  (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet` (DELETE+PATCH),
+  `done-activity-screen` (PATCH) — **all eight write locally**. Only this handler does not.
+  [`docs/reviews/2026-08-18-local-first-write-coverage.md`](reviews/2026-08-18-local-first-write-coverage.md)
 - **Branch:** `fix/activity-delete-updates-local-store`
 - **Added:** 2026-08-18 · review sweep (staleness outside Q-262's test) ·
   [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](reviews/2026-08-18-server-only-writes-to-local-first-domains.md)

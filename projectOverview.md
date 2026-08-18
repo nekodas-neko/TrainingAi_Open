@@ -103,6 +103,28 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] ✅ Q-488 is the only one — every other write to a local-first domain updates the store (2026-08-18)
+
+- **Answers the question an implementer taking Q-488 has to ask:** is this a handler or a class?
+  [`docs/reviews/2026-08-18-local-first-write-coverage.md`](docs/reviews/2026-08-18-local-first-write-coverage.md).
+  **It is one handler.** Every mutating write to a local-first domain was audited for a local-store
+  call **inside the handler** — `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE),
+  `quick-edit-log-sheet` (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet`
+  (DELETE+PATCH), `done-activity-screen` (PATCH). **All eight write locally.** Only Q-488's does not.
+- **⚠️ The obvious check is unsound, and its own output proves it.** Asking whether the *file* touches
+  the local store reports `health-content.tsx` — the Q-488 file — as fine, because it uses the store
+  elsewhere and just not in the delete handler. **File-level coverage says nothing about a handler.**
+- **Two server-only writers, both clean, one for a reason worth keeping.** The Health Connect metrics
+  PATCH arrives via the pull (chain verified in sweep 23). And
+  `meal-plan-setup-sheet.tsx:387` creates saved meals server-only — fine, because `saved_meals` is
+  **push-only** in the outbox and kept current by **hydrate-on-read** instead
+  (`saved-meals-sheet.tsx:111` hydrates from the API; `food-logger-sheet.tsx:196` falls back to it).
+  **So "no pull mapping" is not evidence of a gap** — a future audit testing pull coverage alone would
+  file that one wrongly.
+- **Not verified:** static audit and source reading, not on the APK. The handler-window heuristic reads
+  a fixed span around each call site, so a local write further away would be missed — for the eight
+  above the call is within a few lines.
+
 ### [activity][app-shell] 🟠 Deleting an activity leaves it in the local store, so three other screens keep showing it (Q-488, 2026-08-18)
 
 - **The successor sweep 22 named for itself:** a stale value arising *outside* Q-262's test — a write

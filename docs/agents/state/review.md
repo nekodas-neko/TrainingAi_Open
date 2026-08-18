@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-three sweeps (2026-08-17 ×2, 2026-08-18 ×21) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **489**)
+**Updated:** 2026-08-18 · **By:** twenty-four sweeps (2026-08-17 ×2, 2026-08-18 ×22) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **489**)
 
 ## Now
 
-Twenty-three sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-four sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,30 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 24 — is Q-488 the only one? (2026-08-18)
+
+**Filed nothing; bounded Q-488.** Write-up:
+[`docs/reviews/2026-08-18-local-first-write-coverage.md`](../../reviews/2026-08-18-local-first-write-coverage.md).
+
+**Q-488 is the sole instance — its fix is one handler, not a class sweep.** All eight other
+delete/patch handlers on local-first domains write to the store inside the handler. That is the
+question an implementer has to answer before budgeting the work, so it was amended onto the entry
+rather than filed separately.
+
+**⚠️ The obvious version of this check is unsound and its own output proves it.** Asking whether the
+*file* touches the local store clears `health-content.tsx` — the Q-488 file — because it uses the
+store elsewhere. **File-level coverage says nothing about a handler**; audit the handler window.
+
+**⚠️ "No pull mapping" is not evidence of a gap.** `meal-plan-setup-sheet.tsx` creates saved meals
+server-only and is **fine**: `saved_meals` is **push-only** in the outbox and kept fresh by
+**hydrate-on-read** (`saved-meals-sheet.tsx:111` hydrates; `food-logger-sheet.tsx:196` falls back to
+the API). A future audit testing pull coverage alone would file it wrongly.
+
+**Pattern across sweeps 21–24:** four consecutive sweeps in the staleness family, and in every one the
+*mechanical* test was wrong in a different way — over-reporting seed-only keys, clearing a file that
+contains the bug, treating hydrate-on-read as absent. **In this codebase, freshness is maintained by
+at least four mechanisms and no single grep sees them all.** Read the handler.
 
 ### Sweep 23 — a write that updates the server but not the local store (2026-08-18)
 
