@@ -631,6 +631,41 @@ moving *beside* the calories rather than under them.
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
 
+### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
+
+- **Branch:** `docs/coach-write-usage-decision`
+- **Added:** 2026-08-18 · review sweep (this run's findings checked against production) ·
+  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md)
+- **Placement:** low as work — **this is not a defect**. Filed because it re-prices Q-467/Q-468 (both
+  amended) and because "is this earning its complexity?" is an owner question a reviewer should not
+  answer alone.
+- **Measured.** `claude_ro.coach_changes` is **empty**: `total 0, ever_undone 0, first null, last null`.
+  Not "no undos" — **no applied changes at all, ever.**
+- **The Coach is not unused.** 5 threads / 16 messages (8 user, 8 assistant), latest 2026-08-13; the
+  AI-usage screen shows 17 Coach calls in 30 days. The widget vocabulary is rendering:
+
+  | | count |
+  |---|---|
+  | assistant messages | 8 |
+  | carrying any tool call | **8 of 8** |
+  | carrying a `choice_list` | 5 |
+  | carrying a **`change_preview`** | **1** |
+  | **changes applied** | **0** |
+
+  Across five conversations the model proposed a change **once**, and it was not accepted.
+- **What this does NOT mean.** Apply is **not** broken — the previous sweep applied a patch through the
+  real route successfully, and all four client call sites are wired. Whether the zero is because the
+  model rarely proposes (1 preview in 8 assistant messages) or because the single proposal was simply
+  declined is **not determinable from this data**, and the entry deliberately does not guess.
+- **Scope caveat that governs the whole entry:** `claude_ro` is **row-scoped to one user**. Zero means
+  *the owner* has never applied a Coach change; other accounts are structurally invisible here. Do not
+  restate this as "no user has ever used it".
+- **What would answer it:** a wider window, a second account, or instrumenting how often the model
+  emits a `change_preview` at all. None available from this endpoint.
+- **The decision this is really asking for:** five domain handlers, apply, preview, undo,
+  `coach_changes` and ~1,100 lines under `lib/coach/domains/` currently produce no writes. Keep and
+  drive adoption, or narrow? **Owner's call, not Lane A's.**
+
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
 - **Branch:** `feat/coach-undo-control`
@@ -665,6 +700,13 @@ moving *beside* the calories rather than under them.
   than an error. **Lane B** — the route already exists.
 - **⛔ Do Q-468 first, or in the same change.** Wiring the button onto today's undo would ship the
   defect below.
+- **🔎 AMENDED 2026-08-18 from production — re-scoped, not closed.** `claude_ro.coach_changes` is
+  **empty**: no Coach change has ever been applied by this account, so **there has never been anything
+  to undo** and the harm this entry describes has not yet happened. The code path is still wrong and
+  the first real use will meet it — but the "upper-mid" placement was priced on an exposure that does
+  not exist yet. See **Q-472** and
+  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
+  (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
 ### [workouts][platform] Q-468 — `undo` restores its captured state without checking the target still holds what the change set
 
@@ -700,6 +742,10 @@ moving *beside* the calories rather than under them.
   what the change **set** (`to`) and refuse with 409 + drift when they disagree, exactly as apply
   does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
   alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
+- **🔎 AMENDED 2026-08-18 from production — zero live instances.** Production has **not one
+  `target_id` with more than one change** (`coach_changes` is empty entirely), so the stacked-change
+  scenario that triggers this has never occurred. The defect reproduces locally and is real; its
+  exposure today is nil. Re-priced alongside Q-467 and Q-472.
 
 ### [readiness][platform] ✅ Q-394 — RESOLVED: `anchor-source.test.ts` was red on `main`, fixed by Q-356's fixture change
 
@@ -1907,6 +1953,13 @@ ehr     0     0     0     0   648   208   128   556     0
   *"the user told us they feel neutral"* must not collapse to the same value.
 - **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
   body carries no answers. **Lane A.**
+- **🔎 AMENDED 2026-08-18 from production — REFUTED in practice; drop the priority.** Across all 50 of
+  the owner's check-in rows, checked against **every** answer column (including the six morning ones:
+  `wake_mood`, `perceived_recovery`, `motivation`, `sleep_quality_feel`, `resting_soreness`,
+  `illness_context`), **zero are truly empty** — 45 morning and 5 evening, all carrying answers. The
+  route will write a hollow row if handed `{}`, but nothing in real use has done so.
+  ⚠️ **A first version of that query said "45 of 50 entirely empty" and was WRONG** — it tested only
+  the evening columns. Recorded so the false number is not picked up from anywhere it leaked.
 
 ### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
 
