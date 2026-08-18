@@ -79,4 +79,36 @@ describe('BodyMetadataPostSchema', () => {
     expect(BodyMetadataPostSchema.safeParse({ calories: 100000 }).success).toBe(false)
     expect(BodyMetadataPostSchema.safeParse({ localDate: 'yesterday' }).success).toBe(false)
   })
+
+  // Q-464. Zod drops an unknown key by default, so a mistyped or wrong-named field became a
+  // SUCCESSFUL write of the wrong thing. Measured on this schema before `.strict()`:
+  // `{"date":"2026-08-10","weightKg":81}` answered 200 and wrote the weight on TODAY, because the
+  // contract's key is `localDate`. The same for a year-3026 date and for 'not-a-date' — all three
+  // silently landed on today.
+  it('rejects an unknown key instead of dropping it', () => {
+    // The exact three that were measured landing on the wrong day.
+    for (const date of ['2026-08-10', '3026-08-18', 'not-a-date']) {
+      expect(BodyMetadataPostSchema.safeParse({ date, weightKg: 81 }).success).toBe(false)
+    }
+    // `waterIntake` is what the Water widget's web fallback actually sends, and water does not live
+    // on this route at all (Q-472). It used to be discarded behind a 200.
+    expect(BodyMetadataPostSchema.safeParse({ localDate: '2026-08-18', waterIntake: 750 }).success).toBe(false)
+    // A typo'd known key is caught too, which is the general case.
+    expect(BodyMetadataPostSchema.safeParse({ weightkg: 81 }).success).toBe(false)
+  })
+
+  it('still accepts every key its own clients send', () => {
+    // metric-log-sheet.tsx sends { localDate, <LogField> }; log-value-sheet.tsx sends
+    // { localDate, <MetaKey> }. Every one of those minus waterIntake, which is Q-472's bug.
+    // A plausible value per field — the per-field bounds are asserted separately above, and reusing
+    // one number here would fail on them rather than on strictness.
+    const plausible: Record<string, number> = {
+      weightKg: 82, steps: 9200, bodyFat: 18, calories: 2400,
+      protein: 160, carb: 250, fat: 80, distanceKm: 6,
+    }
+    for (const [field, value] of Object.entries(plausible)) {
+      const r = BodyMetadataPostSchema.safeParse({ localDate: '2026-08-18', [field]: value })
+      expect(r.success, `${field} must remain accepted`).toBe(true)
+    }
+  })
 })

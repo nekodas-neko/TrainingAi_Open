@@ -1851,6 +1851,39 @@ ehr     0     0     0     0   648   208   128   556     0
   reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
   `session_rpe = 7` and it did **not** hold.)
 
+### [body][app-shell] Q-472 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
+
+- **Lane B.** `app/session-select/components/log-value-sheet.tsx` only.
+- **Added:** 2026-08-18, found while implementing Q-464 — **this is the live instance of that class**,
+  which Q-464's own entry said it did not have.
+- **Measured live on `pnpm dev`:**
+
+  | Sent to `POST /api/body-metadata` | Response | Row after |
+  |---|---|---|
+  | `{"localDate":"2026-08-18","waterIntake":750}` | `200 {"success":true}` | `water_ml` **still NULL** |
+  | `{"localDate":"2026-08-18","steps":4242}` (control) | `200` | steps written |
+
+- **The mechanism.** `MetaKey` includes `waterIntake`, and the sheet's **web fallback** (the branch
+  taken when the local store is unavailable) does
+  `fetch('/api/body-metadata', … JSON.stringify({ localDate: localDateString(), [widget.key]: numVal }))`.
+  `BodyMetadataPostSchema` names no water field at all — water lives on **`/api/water-log`** — so the
+  key was silently dropped, the route returned success, and the sheet painted an optimistic value
+  that the next fetch reverts.
+- **The device path is FINE and must not be "fixed" with it.** The local-store branch maps
+  `waterIntake → waterMl` and writes + syncs correctly. Only the web fallback is wrong.
+- ⚠️ **Since Q-464 shipped, this now fails LOUDLY** — `BodyMetadataPostSchema` is `.strict()`, so the
+  same call returns `400 {"error":"Unrecognized key: \"waterIntake\""}` and the sheet shows
+  "Failed to save — reverting". That is the intended improvement (a visible failure beats a silent
+  one, and the value was already being lost either way), but it makes this user-visible rather than
+  invisible, which raises its priority.
+- **Fix shape:** in the web fallback, route `waterIntake` to `POST /api/water-log` — the same
+  endpoint `components/profile/water-log-sheet.tsx` already uses — instead of `/api/body-metadata`.
+  Check the water route's payload shape (it takes a delta, not an absolute, per `validWaterMlDeltaOrNull`)
+  before wiring it; a straight rename of the key would be wrong.
+- **Verification:** with the local store unavailable, log a water value from the session-select
+  metric tile and confirm `body_metrics.water_ml` changes. The 400 above is the current behaviour to
+  start from.
+
 ### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
 
 - **Branch:** `fix/strict-request-schemas`
@@ -1881,6 +1914,26 @@ ehr     0     0     0     0   648   208   128   556     0
   strict — use it as the reference.
 - **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
   hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
+- 🚧 **The ratchet and the demonstrated schema SHIPPED 2026-08-18; 89 non-strict remain.**
+  `scripts/check-strict-request-schemas.js` runs in the Custom Rules job (now **39** steps) with a
+  shrink-only per-file baseline: a file not listed must have zero, a listed one may only shrink, and
+  reaching zero requires deleting its row. `BodyMetadataPostSchema` — the one the entry demonstrated
+  — is strict, and all four measured wrong-key writes now 400 instead of landing on today.
+- ⚠️ **Two corrections to this entry, both found while implementing it.**
+  **(a) It IS a live bug.** The entry says "not a live bug — the app's own clients send the right
+  keys". They do not: the Water widget's web fallback posts `waterIntake`, which no schema names, and
+  the value was discarded behind a `200`. Filed as **Q-472** (Lane B) with the measurement.
+  **(b) The `sync/push` caveat is far wider than one route.** The entry singles out `sync/push`, but
+  the same argument applies to **every schema `pushMutations` parses** — `activity-log`,
+  `fitness-test`, `day-checkin`, `oura-summary`, mood, food-item, log-exercise, session-rpe,
+  complete-workout. An outbox payload is written to local SQLite by whatever bundle was current when
+  the user acted and sits there until the device syncs, so tightening any of those can reject a
+  mutation queued by an older bundle and dead-letter real data. Plus `health-connect/ingest`, whose
+  client is the owner's Tasker profile and is not in this repo. Both classes are named with their
+  reasons in the script's header rather than silently skipped.
+- **What is left is the sweep**, deliberately not done here: 89 non-strict schemas, each needing its
+  clients checked the way `BodyMetadataPostSchema`'s two were. The ratchet is the mechanism; the
+  sweep is separate and much larger, exactly as `check-hex-literals` says of its own 471.
 - **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a

@@ -462,7 +462,23 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
-  'docs/implementation-backlog.md': 8257,
+  //
+  // Raised 2026-08-18 (Q-464 ratchet, Lane A): 8257 -> 8310. Two blocks, both carrying measurements
+  // a successor would otherwise have to re-derive. Q-464 gains the two corrections found while
+  // implementing it — that it IS a live bug after all, and that its `sync/push` caveat applies to
+  // every schema pushMutations parses rather than one route — plus what the 89 remaining schemas
+  // still need. And a new Q-472 for the live one: the Water widget's web fallback posts a key no
+  // schema names, so the value was discarded behind a 200, and since Q-464 shipped it now fails
+  // loudly instead — which is the intended improvement but makes it user-visible.
+  //
+  // Raised 2026-08-18 (Q-464 ratchet, Lane A): 8257 -> 8310. Two blocks, both carrying measurements
+  // a successor would otherwise re-derive. Q-464 gains the two corrections found while implementing
+  // it — that it IS a live bug after all, and that its `sync/push` caveat applies to every schema
+  // pushMutations parses rather than one route — plus what the 89 remaining schemas still need. And
+  // a new Q-472 for the live one: the Water widget's web fallback posts a key no schema names, so
+  // the value was discarded behind a 200, and since Q-464 shipped it fails loudly instead — the
+  // intended improvement, but it makes the bug user-visible.
+  'docs/implementation-backlog.md': 8310,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
