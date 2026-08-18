@@ -631,6 +631,41 @@ moving *beside* the calories rather than under them.
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
 
+### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
+
+- **Branch:** `docs/coach-write-usage-decision`
+- **Added:** 2026-08-18 · review sweep (this run's findings checked against production) ·
+  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md)
+- **Placement:** low as work — **this is not a defect**. Filed because it re-prices Q-467/Q-468 (both
+  amended) and because "is this earning its complexity?" is an owner question a reviewer should not
+  answer alone.
+- **Measured.** `claude_ro.coach_changes` is **empty**: `total 0, ever_undone 0, first null, last null`.
+  Not "no undos" — **no applied changes at all, ever.**
+- **The Coach is not unused.** 5 threads / 16 messages (8 user, 8 assistant), latest 2026-08-13; the
+  AI-usage screen shows 17 Coach calls in 30 days. The widget vocabulary is rendering:
+
+  | | count |
+  |---|---|
+  | assistant messages | 8 |
+  | carrying any tool call | **8 of 8** |
+  | carrying a `choice_list` | 5 |
+  | carrying a **`change_preview`** | **1** |
+  | **changes applied** | **0** |
+
+  Across five conversations the model proposed a change **once**, and it was not accepted.
+- **What this does NOT mean.** Apply is **not** broken — the previous sweep applied a patch through the
+  real route successfully, and all four client call sites are wired. Whether the zero is because the
+  model rarely proposes (1 preview in 8 assistant messages) or because the single proposal was simply
+  declined is **not determinable from this data**, and the entry deliberately does not guess.
+- **Scope caveat that governs the whole entry:** `claude_ro` is **row-scoped to one user**. Zero means
+  *the owner* has never applied a Coach change; other accounts are structurally invisible here. Do not
+  restate this as "no user has ever used it".
+- **What would answer it:** a wider window, a second account, or instrumenting how often the model
+  emits a `change_preview` at all. None available from this endpoint.
+- **The decision this is really asking for:** five domain handlers, apply, preview, undo,
+  `coach_changes` and ~1,100 lines under `lib/coach/domains/` currently produce no writes. Keep and
+  drive adoption, or narrow? **Owner's call, not Lane A's.**
+
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
 - **Branch:** `feat/coach-undo-control`
@@ -665,6 +700,13 @@ moving *beside* the calories rather than under them.
   than an error. **Lane B** — the route already exists.
 - **⛔ Do Q-468 first, or in the same change.** Wiring the button onto today's undo would ship the
   defect below.
+- **🔎 AMENDED 2026-08-18 from production — re-scoped, not closed.** `claude_ro.coach_changes` is
+  **empty**: no Coach change has ever been applied by this account, so **there has never been anything
+  to undo** and the harm this entry describes has not yet happened. The code path is still wrong and
+  the first real use will meet it — but the "upper-mid" placement was priced on an exposure that does
+  not exist yet. See **Q-472** and
+  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
+  (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
 ### [workouts][platform] Q-468 — `undo` restores its captured state without checking the target still holds what the change set
 
@@ -700,6 +742,10 @@ moving *beside* the calories rather than under them.
   what the change **set** (`to`) and refuse with 409 + drift when they disagree, exactly as apply
   does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
   alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
+- **🔎 AMENDED 2026-08-18 from production — zero live instances.** Production has **not one
+  `target_id` with more than one change** (`coach_changes` is empty entirely), so the stacked-change
+  scenario that triggers this has never occurred. The defect reproduces locally and is real; its
+  exposure today is nil. Re-priced alongside Q-467 and Q-472.
 
 ### [readiness][platform] ✅ Q-394 — RESOLVED: `anchor-source.test.ts` was red on `main`, fixed by Q-356's fixture change
 
@@ -873,6 +919,77 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
+### [nutrition] Q-397 — the shipped ingredient label is the SUPERSEDED design; inline wrapping is what was agreed
+
+- **Branch:** `fix/meal-label-inline-ingredients`
+- **Added:** 2026-08-18, after the owner asked whether the agreed label reached an implementer. It
+  did — v1.323.0, PR #94 — but **what shipped is the analysis Q-393 was corrected away from.**
+  Lane B built the entry faithfully; **the entry was wrong.** Filed by the author of that entry.
+- **Lane B.** Canvas only (`components/nutrition/meal-label-render.ts`), no schema, no route.
+
+**What the owner actually asked for**, verbatim across two messages: *"can you show me this model
+with it centered and having the food go across the screen like (200g Beef mince, 150g pasta, 100g
+pasata, +2more) so it stays on one line and wraps when needed"*, then the layout
+*"/ Beef Pasta Bake / 512KCAL / P38 C46 F18 / (ingredients) / {QR Code}"*, then
+*"lets keep them all as options to cycle through and choose a default."*
+
+**What shipped instead.** One new style, `square`, **square-die only**, printing the ingredients
+**one per line, left-aligned** (`meal-label-render.ts` — `MAX_LINES = 5`, `lineH = 9`, a
+`ctx.fillText` per ingredient), with calories and macros **beside** the code rather than centred
+above it. Its own comment restates the superseded reasoning: *"the round box is 130 × 137 and the
+shipped default already fills all of it, leaving 7 units — zero ingredient lines."*
+
+**Why that reasoning is wrong, and it is the whole point.** It is true **for a stacked list**. The
+owner's suggestion was to run the ingredients as **one wrapping line**, which spends *width* instead
+of *height* — at 6.5 px in a 124 px column that is ~31 characters per line, so five ingredients are
+**2–3 wrapped lines rather than 5 stacked ones**, and the height handed back goes into the code.
+Measured on the drawn artboards:
+
+| Layout | Code | mm/module |
+|---|---|---|
+| Shipped default (`band`, no list) | 12.2 mm | **0.487** |
+| Stacked list on a round die (the rejected option) | 11.6 mm | 0.465 |
+| **Inline, round, 3 + "+2 more"** | 15.6 mm | **0.624** |
+| **Inline, round, ALL FIVE** | 13.2 mm | **0.529** |
+
+So the full list fits a **round** label with a code **larger than the one already shipping**. There
+was never a trade to make between the list, the round die and a readable code — inline wrapping buys
+all three. Q-393's heading (*"which does not fit on a round one"*) and its three costed options all
+predate that correction and should have been rewritten; they were not.
+
+**What to build.**
+1. **Wrap the ingredient run as one line**, comma-separated, `+N more` when it overflows the line
+   budget — not one `fillText` per ingredient.
+2. **A round-capable ingredients style**, since that is what inline wrapping unlocks. Drop
+   `squareOnly` for it; keep the square variant for anyone who wants the stacked alignment.
+3. **The centred layout the owner specified** — name / calories / macros / ingredients / code, each
+   centred — as its own style. Note the black band costs ~10 px over a plain centred name, which is
+   why the all-five centred variant drops the band; band + centred + all five puts the code at
+   0.392 mm/module, well under shipped, and must not be built.
+4. **All of these are cycleable styles with a stored default**, per the owner's "keep them all as
+   options". The registry (`MEAL_LABEL_STYLES`) already supports this; the default is a stored
+   preference and routes through Q-392.
+
+**✅ THE DEFAULT IS DECIDED — B2, owner, 2026-08-18** (*"Yes have B2 as the default"*): round-safe,
+inline-wrapped, the **complete** ingredient list, centred as name / calories / macros / ingredients /
+code. Measured **0.529 mm per module**, against the **0.487** that `DEFAULT_MEAL_LABEL_STYLE = 'band'`
+ships today — so the new default prints a *more* forgiving code than the current one **and** carries
+the breakdown, on either die. Change that constant in the same PR; do not leave B2 as an opt-in
+style the owner has to go and find.
+
+**Do not read this as "ship B2 only."** The other four stay in the picker — that is what "keep them
+all as options" asked for, and the shipped square style is the right pick for anyone who prefers the
+stacked alignment and is using square stock.
+
+- **Verification.** Recompute mm/module per style and assert it in the existing unit test — the
+  preview's own size figure was wrong once already (fixed in v1.323.0), so a number nobody asserts
+  is a number that drifts. Then a physical test print, which is the only real check.
+- **Process note, recorded because it is the reusable lesson:** the correction was made *to the
+  owner in chat* and drawn on the canvas, and never written back into the queue entry. The queue is
+  the record. **When a finding is corrected mid-conversation, the entry gets rewritten in the same
+  session** — a superseded analysis left in the backlog is not stale documentation, it is a work
+  order.
+
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
 - **Branch:** `feat/nutrition-visual-uplift`
@@ -1009,6 +1126,47 @@ and this is the sixth.
   anyway.
 - **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
   sync-payload change (Lane A) while everything above is Lane B.
+
+
+**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
+- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
+  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
+  second ring component.
+- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
+  search across everything · tabs **Recent · Frequent · Saved meals** · a bottom row of
+  **Barcode · Photo · Describe**. Photo is kept because it exists today and the owner did not ask
+  to remove it.
+- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
+  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
+- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
+  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
+- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
+  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
+- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
+  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
+  unrelated screen.
+
+**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
+page/section to what's in prod right now — we don't want to silently lose any sections."* The first
+draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
+(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
+MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
+**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
+**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
+and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
+quietly loses a section is the failure mode this entry exists to prevent.
+
+**17 — A section that has nowhere to go under the new tabs: `My Foods`.** The shipped capture step
+offers it (`onMyFoods` → `FoodLibrarySheet`) and the three agreed tabs are Recent, Frequent and
+Saved meals. Recommendation: make it a **fourth tab**, not a button — it is a list of foods like the
+other three, and a tab is where someone will look for it. Flagged rather than decided.
+
+**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
+assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
+`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
+`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
+delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
+whether or not anyone draws them first.
 
 **What NOT to change — all three exist because a CLAUDE.md rule required them:**
 - `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
@@ -1676,6 +1834,11 @@ silently breaks upgraded devices while every test and fresh install passes.
   rows means "already set". The question to ask of each is whether zero rows is an expected idempotent
   outcome or an error.
 - **NOT device-verified** — reproduced on the web build; the outbox half is read from source, not run.
+- **🔎 CHECKED 2026-08-18 against production — it cannot adjudicate this, do not cite it either way.**
+  Of the owner's **77 completed sessions, 57 (74.0%) carry no `session_rpe`**. That looks supportive
+  and is **not evidence**: the mechanism this entry describes leaves the value in the *local* store,
+  which `claude_ro` cannot see, so a dropped write and a user who skipped the optional prompt produce
+  an identical server row. Separating them needs the device.
 
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 
@@ -1999,6 +2162,13 @@ ehr     0     0     0     0   648   208   128   556     0
   *"the user told us they feel neutral"* must not collapse to the same value.
 - **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
   body carries no answers. **Lane A.**
+- **🔎 AMENDED 2026-08-18 from production — REFUTED in practice; drop the priority.** Across all 50 of
+  the owner's check-in rows, checked against **every** answer column (including the six morning ones:
+  `wake_mood`, `perceived_recovery`, `motivation`, `sleep_quality_feel`, `resting_soreness`,
+  `illness_context`), **zero are truly empty** — 45 morning and 5 evening, all carrying answers. The
+  route will write a hollow row if handed `{}`, but nothing in real use has done so.
+  ⚠️ **A first version of that query said "45 of 50 entirely empty" and was WRONG** — it tested only
+  the evening columns. Recorded so the false number is not picked up from anywhere it leaked.
 
 ### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
 
@@ -3939,6 +4109,119 @@ session working from a temporarily restored copy.
   started each of those days at a fixed midpoint regardless of recovery. Last occurrence was over a
   month ago, so it reads as a post-re-key coverage gap that closed on its own. *Something that stopped
   is not something that was fixed* — noted as unexplained rather than closed.
+
+### [workouts] Q-512 — `health-insight`'s ACWR is structurally null on every day (110/110)
+
+- **Branch:** `fix/health-insight-acwr-window`
+- **Plan:** none — a one-line fix either way. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §2
+- **Mechanism.** `app/api/ai/health-insight/route.ts` calls `computeVolumeAcwr` with
+  `getWorkoutSessionsFrom(userId, subDays(new Date(), 7))` — a **7-day** list. The helper gates on
+  `spanDays >= minSpanDays` (**21**), and `spanDays` is measured from the earliest session *in the list
+  passed to it*. **A 7-day list can never span 21 days**, so the gate can never pass.
+- **Confirmed by replay over 110 days: 0 non-null.** Not a coverage problem more history would fix —
+  structural. The route computes the load object and reads `.acwr` from it every time, always `null`.
+- **First action:** either widen the fetch to **28 days** to match `signals.ts` (if the insight is meant
+  to mention training load), or drop the `computeVolumeAcwr` call and the `.acwr` read (if it is not).
+- **Do NOT lower `minSpanDays`** to rescue this caller — that degrades *every* caller's ACWR to fix one
+  that is mis-wired.
+
+### [workouts][platform] Q-513 — the score-audit panel and the next-session engine disagree on the ACWR band on 38% of days
+
+- **Branch:** `fix/build-day-audit-acwr-window`
+- **Plan:** none — a window change. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §3
+- **Three callers, three windows**, all feeding one `computeVolumeAcwr` and all banded with the same
+  `ACWR_THRESHOLDS`: `signals.ts` **28 days** (the intended 7:28, drives the engine),
+  `health-insight` **7 days** (always null, Q-512), `score-audit/build-day-audit.ts` **all history**
+  (chronic becomes the **lifetime** weekly average).
+- **Measured** over the same days:
+
+  | | 28-day (engine) | all-history (audit panel) |
+  |---|---|---|
+  | mean | 0.99 | **1.07** |
+  | `optimal` share | **69.3%** | 49.4% |
+  | `high` share | 12.5% | **29.2%** |
+  | `very_high` share | 0% | **3.4%** |
+  | days > 1.5 (emergency-deload line) | **0** | **3** |
+
+  Mean |difference| **0.150**, max **0.395**, **different band on 33 of 88 days (38%)**.
+- **Mechanism, and it worsens over time.** The lifetime weekly average is *lower* than the recent
+  baseline — 20,572 kg/wk lifetime vs 23,239 kg/wk over the last 28 days (**1.13×**) — so the smaller
+  denominator inflates the ratio (observed inflation 1.08). **Any sustained volume increase widens the
+  gap indefinitely**; it is not a fixed offset that could be tolerated.
+- **Why it matters.** `build-day-audit` *is* the score-audit panel, whose whole contract is to show a
+  score beside **the inputs that produced it**. On 38% of days it shows a training-load band the engine
+  never saw, and on three days it shows `very_high`/past the emergency-deload line while the engine saw
+  at most `high`.
+- **First action:** pass a **28-day** window in `build-day-audit`, matching `signals.ts`. If a lifetime
+  view is independently wanted it needs a different name — it is not ACWR. Then re-measure.
+- **Upper bound caveat:** `build-day-audit`'s `programTooNew` gate can null its ACWR independently, so
+  38% bounds the days the panel actually renders a band.
+
+### [workouts] Q-514 — 64% of the engine's back-off load cuts are an expected-RPE clamp artefact
+
+- **Branch:** `fix/expected-rpe-clamp-exclusion`
+- **Plan:** none — a predicate plus a filter. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](reviews/2026-08-18-rpe-autoregulation-calibration.md)
+- **`RPE_DEAD_BAND = 1.5` is correctly placed — do NOT move it.** Sensitivity over 377 per-exercise
+  windows: 0.5 → 48.3%, 1.0 → 29.4%, 1.25 → 20.7%, **1.5 → 17.5%**, 2.0 → 14.9%. It sits on a flat part
+  of the curve and the delta distribution is centred (mean −0.05). **The input is what is biased.**
+- **The floor clamp splits the data in two.** `expectedRpe` clamps to the 5–10 slider range. The
+  **ceiling never binds** (raw expected tops out at exactly 10.0, 0 sets clamped); the **floor binds on
+  37 of 570 sets (6.5%)**, hiding raw values as low as **−10.4**. Those are not warm-ups —
+  `intensity_pct` **49.6–66.7** (median 54.3) at **7–13 reps** (median 10), ordinary accessory work. At
+  54.3% reps-to-failure is ~19, so a 10-rep set has ~9 RIR and a "true" expected RPE near 0.6; the model
+  can only say **5**, and the owner reports **6.9**.
+
+  | population | n | mean delta |
+  |---|---|---|
+  | floor-clamped | 37 | **+1.89** |
+  | everything else | 533 | **−0.34** |
+
+  A **2.2-point systematic offset**, in the direction the back-off arm reads as "RPE ran high".
+- **Cost, replaying the shipped grouping** (per exercise, trailing 3 sessions, ≥3 sets, threshold 1.5):
+
+  | | shipped | excluding floor-clamped |
+  |---|---|---|
+  | back-off (≥ +1.5) | **39 (10.3%)** | **14 (4.1%)** |
+  | push (≤ −1.5) | 27 (7.2%) | **27 (7.9%)** |
+  | sd of delta | 1.16 | 0.96 |
+
+  **25 of 39 back-off triggers vanish — 64%** — while the push arm is *untouched*. That asymmetry is
+  what makes it a bias fix rather than a de-sensitisation. 64% of back-off windows contain ≥1
+  floor-clamped set. Each trigger is a **5–10% load cut**.
+- **First action:** exclude sets whose **raw (pre-clamp)** expected RPE falls outside the slider range
+  from the autoregulation delta. They carry no information — the model cannot state its expectation, so
+  the gap to the reported value measures nothing. Matches the codebase's existing principle of passing
+  `null` rather than fabricating a neutral (`computeResilienceForDay`). Contained: one predicate beside
+  `expectedRpe`, plus a filter in `signals.ts`'s `perExRpeDelta` loop (~line 293). **No curve change.**
+- **Corroborated by the app's own other model.** `ACCESSORY_SPEC` (`goal-ranges.ts`) prescribes
+  accessory work to **RPE 7.5–8.5** (*"ALL genuinely challenging (>= RPE 7.5)"*). The floor-clamped sets
+  report a mean actual RPE of **6.89** — below every target in that table and below the dataset mean of
+  7.49. **By the app's other model these sets are easy**, while the autoregulation delta reads them at
+  +1.89 and cuts load. Two models in one codebase disagreeing in *sign* about the same sets.
+  (A stronger version — attributing the clamped sets to the `accessory` role — was **abandoned as
+  unsound**: exercise names map to more than one role across programs, so a name-based join fans out.)
+- **Do NOT widen the clamp** to allow expected RPE below 5 — an expectation of 0.6 against an owner who
+  never reports below 6 gives a delta of **+6.3**, worse. The set is unrepresentable either way.
+- **Re-measure after.** Back-off 4.1% vs push 7.9% is asymmetric the other way; whether that is right is
+  the next question, and it must be asked against unbiased input.
+- **Caveat that bounds the counts — read this with the 64%.** The back-off arm needs a second signal
+  (`rm1Trend === 'down'` OR `repCompletionRate < 0.95`), which the replay does **not** model. Measured:
+  the owner is short of the prescribed reps on only **14 of 196 sets (7.1%)**, exact on 75%, over on
+  17.9%, mean completion **1.046** — so `missedReps` is rarely the corroborator and most back-offs must
+  come via a falling 1RM. **The number of cuts actually issued is well below 39, and the number the fix
+  prevents is well below 25.** The defect is real and one-directional, but "64% of back-off *triggers*"
+  is not "64% of load cuts on your training". The ratio is the finding; sizing the absolute impact needs
+  `rm1Trend` modelled, which this review does not do. Only sets carrying
+  both `rpe` and `intensity_pct` are visible (570 of 1,029 set logs).
+- **Related, recorded not filed:** `calcAmrap1RM` / `amrapScaleFactor` (the 1.0/0.97/0.93/0.88/0.82
+  rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls
+  would be wasted; removing it is a Review-lane call.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

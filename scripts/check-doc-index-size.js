@@ -435,7 +435,6 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6957,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -478,7 +477,17 @@ const BASELINE = {
   // a new Q-472 for the live one: the Water widget's web fallback posts a key no schema names, so
   // the value was discarded behind a 200, and since Q-464 shipped it fails loudly instead — the
   // intended improvement, but it makes the bug user-visible.
-  'docs/implementation-backlog.md': 8310,
+  // Raised 2026-08-18 (Q-397 + the Q-395 review fold-in, BugFix intake). Recomputed from the
+  // MERGED file after taking main's side of this baseline, rather than splicing the conflict
+  // hunks — two same-day raises spliced together silently drop one side. Q-397 records that the
+  // shipped ingredient label is the analysis Q-393 was corrected away from, with the measured
+  // mm-per-module table and the owner's choice of B2 as the default; Q-395 gains the six review
+  // notes and the 11-section prod checklist an implementation PR ticks off.
+  // Raised 2026-08-18 (Tuning): -> 8540, recomputed from the MERGED file. Q-512/513/514 — the first
+  // calibration sweep of the workouts pillar. The entries carry their measured tables because every
+  // conclusion is counterintuitive: the ACWR thresholds and RPE_DEAD_BAND are RIGHT and must not move,
+  // while the call sites and the clamped input feeding them are wrong. Strip the tables and the next
+  // reader tunes a constant instead of fixing the input — three times over.
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -486,6 +495,14 @@ const BASELINE = {
   // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
   // must do: construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock. Recomputed from the merged file on each merge this branch took.
+
+  'projectOverview.md': 6991,
+  //
+  // Recomputed 2026-08-18 (Q-464 ratchet, Lane A) from the MERGED file. Lane A's delta was +53: the
+  // two corrections found while implementing Q-464 — that it IS a live bug, and that its sync/push
+  // caveat applies to every schema pushMutations parses rather than one route — plus a new Q-472 for
+  // the live one, which since Q-464 shipped fails loudly instead of silently.
+  'docs/implementation-backlog.md': 8593,
   'CLAUDE.md': 1075,
 
 };

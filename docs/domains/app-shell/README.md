@@ -67,6 +67,8 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-467 — the Coach's undo subsystem is fully built, `coach-history.tsx` already styles undone changes, and **nothing calls the undo route**). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
 
+- [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-472 — `coach_changes` is empty: the Coach's write capability has produced zero writes, which re-prices Q-467/Q-468 to zero production exposure). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+
 ## Open issues
 
 ```bash
