@@ -894,13 +894,18 @@ order.
   highlights **Tue**, on a day that was Wednesday the 19th for that user. Source is
   `calendar-widget.tsx:110`, `localDateString()` — the **device's** zone, a *third* answer following
   neither the setting nor the server. `CLAUDE.md` warns of two client "today" sources; there are three.
-- **Q-478 is the sharp, cheap half — do it first.** `isWorkoutDataToday` and `isBodyMetadataFresh`
-  (`lib/sqlite/cache.ts:361,369`) compare a **server-stamped** date to a **client `DEFAULT_TZ`** date,
-  so they return false for |Δoffset| hours a day — **14 hours a day for a New York user**. Confirmed
-  false against a live response with a real row planted on the user's true today. Consequences:
-  session-select's early return leaves `setMetaLoading(false)` unrun (**loading state never clears**),
-  Health's today values never set, the workout screen strips `loggedTodayInSession` from every
-  exercise, and the "Trained today" badge never appears.
+- **✅ Q-478 SHIPPED 2026-08-18 (v1.324.8) — the sharp, cheap half is done.** `isWorkoutDataToday` and
+  `isBodyMetadataFresh` compared a **server-stamped** date to a **client `DEFAULT_TZ`** date, so they
+  returned false for |Δoffset| hours a day — **14 hours a day for a New York user** — leaving Health's
+  today values unset, the workout screen stripping `loggedTodayInSession` from every exercise, and the
+  "Trained today" badge absent. Both now take a `tz`, all nine call sites pass one, and
+  `scripts/check-tz-aware-cache-guards.js` fails Custom Rules on a call that does not.
+  [`Journal`](docs/overview/entries/2026-08-18-tz-aware-cache-guards.md). Two corrections to the
+  original finding, both made in place: session-select's skeleton **does** clear — a second
+  unconditional `setMetaLoading(false)` runs after the await, so the cost is a round-trip-long skeleton,
+  not a stuck one; and `unwrapToday`/`cachedFetchToday` were deliberately left alone (client-written,
+  client-read, self-consistent). **The rest of this row — Q-477 — is still open**, including its
+  ratchet on bare `todayInTz()` across client code, which this narrower check does not provide.
 - **Nothing is missing except the argument.** `useUserTimezone()` is a context available tree-wide and
   `goals-section.tsx:114` already uses it correctly. In `workout-select-content.tsx`, lines 31 and 32
   sit inside a function that *takes* `tz`: line 32 uses it, line 31 cannot, because the helper has no

@@ -16,8 +16,9 @@ import { todayInTz, todayMidnightUtc, toAestDay, shiftDateStr } from "@traininga
 import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
 import { PullToSync } from "@/components/pull-to-sync";
-import type { BodyMetaRow } from "@/app/api/body-metadata/route";
+import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
+import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
 import { invalidateReadinessInputs, invalidateWorkoutSummaries, invalidateOuraSync, invalidateActivityWrites, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite } from "@/lib/cache-groups";
 import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL, DAY_LOG_TTL } from '@trainingai/shared/cache-ttl';
@@ -39,7 +40,6 @@ import type { WeeklyStatsResponse } from "@/app/api/weekly-stats/route";
 import type { MuscleSetsEntry } from "@/app/api/weekly-muscle-sets/route";
 import type { StrengthTrendEntry } from "@/app/api/strength-trend/route";
 import type { DayLogResult, DayExercise } from "@/app/api/day-log/route";
-import type { WeekToDate } from "@/app/api/body-metadata/route";
 import type { ProgressSummaryResponse } from "@/app/api/progress-summary/route";
 import type { ProgramSession } from "@trainingai/shared/types/program";
 import type { ActivityLog, ActivityType } from "@trainingai/shared/types";
@@ -103,6 +103,7 @@ interface HealthContentProps {
 }
 
 export default function HealthContent({ userId, sex: sexProp, heightCm: heightCmProp }: HealthContentProps) {
+  const tz = useUserTimezone();
   const searchParams = useSearchParams();
   const router = useTransitionRouter();
   const { epoch: tabEpoch } = useTabVisibility();
@@ -191,11 +192,11 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     setWeekToDate(data.weekToDate ?? null);
     setMetaLoading(false);
     if (data.latestWeightKg !== undefined) setLatestWeightMeta({ kg: data.latestWeightKg ?? null, date: data.latestWeightDate ?? null });
-    if (isBodyMetadataFresh(data)) {
+    if (isBodyMetadataFresh(data, tz)) {
       setMetaToday(data.today ?? null);
       if (data.activeEnergyKcalToday !== undefined) setActiveEnergyKcalToday(data.activeEnergyKcalToday ?? null);
     }
-  }, []);
+  }, [tz]);
 
   // Seed from sessionStorage mirror synchronously before first paint
   useLayoutEffect(() => {
