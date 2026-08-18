@@ -18,6 +18,11 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, CLAUDE.md prose counts, Q-492): backlog 9520 -> 9557,
+// projectOverview 7631 -> 7655. One queue entry and its row. The measurement they carry is the
+// count-by-count table, which is the whole finding — a summary of it would leave the next reader
+// re-deriving nine numbers to know which are trustworthy.
+//
 // Raised 2026-08-18 (Review, aria-expanded collapsibles, Q-491): backlog 9477 -> 9520,
 // projectOverview 7603 -> 7631. One queue entry and its row. The lines that earn their place are the
 // MEMBERSHIP diff, not the count: CLAUDE.md's nine and today's nine are different sets (one fixed,
@@ -692,7 +697,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7631,
+  'projectOverview.md': 7655,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -703,7 +708,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9520,
+  'docs/implementation-backlog.md': 9557,
   'CLAUDE.md': 1075,
 
 };
