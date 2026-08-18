@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **552** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -285,6 +285,160 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
+
+- **Branch:** `fix/db-query-403-masks-outage`
+- **Added:** 2026-08-18 · **Lane A** (`app/api/admin/db-query/route.ts`). Tiny, and it cost a real
+  diagnosis today.
+- **What happened.** During the 2026-08-18 volume incident `prod_DB` went offline. Every
+  `/api/admin/db-query` call returned **`{"error":"Forbidden"}`**, which reads as "your credential was
+  revoked" — so the first several minutes went into checking env vars and the admin flag instead of
+  looking at the database. The Railway dashboard said "Service is offline" in one glance.
+- **Mechanism.** `authorize()` calls `requireAdmin(exportUserId)` inside a **bare `try/catch`**
+  (route.ts ~51-53). `requireAdmin` does a DB round-trip (`repo.getUserById`) and throws `AdminError`
+  when the user is missing or not admin — but **any other throw, including a connection failure, lands
+  in the same catch** and becomes 403. "Not authorised" and "could not check" are indistinguishable.
+- **Why it matters beyond this incident.** 403 is the one status a caller will not retry and will not
+  escalate; it actively points the investigation away from infrastructure. `/api/version` does **not**
+  touch the DB, so it returned 200 throughout and offered no contradiction.
+- **Fix shape:** catch `AdminError` specifically and return 403; let anything else surface as **503**
+  (or 500) so an outage looks like an outage. Same pattern applies to the session branch below it, and
+  to any other route wrapping `requireAdmin` in a bare catch — **grep for the shape, don't fix one site.**
+
+### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1
+- **Branch:** `perf/postgres-memory-footprint`
+- **Added:** 2026-08-18 · **Lane A.** Largest single line item on the bill and near-zero risk.
+- **Measured (Railway, ~19.6 days to 2026-08-18):** `prod_DB` averages **0.79 GB RAM** and **0.002
+  vCPU** — **$7.87/month of memory for a database that does essentially no work**, against 171 MB of
+  data. Its own CPU graph is flat at 0.0 across a 3-hour window.
+- **Candidates:** `shared_buffers` sized for the container rather than the data; the app pool is
+  `max: 10` and the rollup worker carries its own `PG_POOL_MAX=2`, so up to 12 backend processes each
+  with their own memory. `work_mem` is already 4 MB (noted on Q-534) and is not the problem.
+- **Careful with the "it's only 200 MB now" reading.** The 3-hour graph taken 2026-08-18 shows ~200 MB
+  **climbing** — the service had just restarted during the volume incident and Postgres memory grows as
+  caches warm. **0.79 GB is the warmed steady state and will return.** Measure over a full day, not
+  after a restart.
+- **Load-bearing constraint (`CLAUDE.md`):** total connections = `max` x replicas must stay under the
+  Railway connection limit, and the pool's error handler and timeouts must survive any change here.
+
+### [devices][platform] Q-550 — `oura_heartrate`: 27 MB of indexes on 6.8 MB of heap
+
+- **Branch:** `perf/oura-heartrate-index-audit`
+- **Added:** 2026-08-18 · **Lane A.** Small; the same shape as Q-534 at one-tenth the size.
+- **Measured 2026-08-18:** 34 MB total, 65,160 rows — **6.8 MB heap, 27 MB indexes**. Now the
+  third-largest table after the packing work, and indexes are 4x the data.
+- **`oura_heartrate_pkey` had zero lifetime scans** on a table that already carries a
+  `(user_id, timestamp)` unique constraint. **Re-measure before acting** — the counters reset at the
+  2026-08-17 crash, so a fresh zero means "not since recovery", not "never".
+- **Keep `oura_heartrate_user_updated` despite its zero.** Migration 130 added it for Track-B sync,
+  which is not wired yet, so its zero is expected and correct.
+
+### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 8
+- **Added:** 2026-08-18 · BLOCKED: owner, and deliberately **after** Q-545.
+- **The owner's stated goal:** *"The Goal was to move off railway if there were enough benefits"*, with
+  a target of **under $5/month** against today's ~$18.63.
+- **Do not decide this yet.** Q-545 moves the compute to the phone and shrinks the server to a thin
+  store, which changes the comparison materially — and Q-547 found that **a large share of the current
+  bill is deploy churn from two lanes shipping**, not steady-state cost. Deciding on today's numbers
+  would be deciding on an inflated, pre-fix baseline.
+- **What each side looks like, to be re-costed when the time comes.** *Stay:* realistic floor ~$8/month
+  after Q-545 + Q-549; keeps managed deploys, backups and the git-push workflow. *Leave:* a small VPS
+  (Hetzner CX22 class, ~4 EUR/month, 2 vCPU / 4 GB / 40 GB) runs both services with far more headroom
+  and lands near the target — at the cost of owning backups, TLS, deploys and the Postgres that is
+  currently managed. **Weigh that against 2026-08-18**, when a staged volume change took `prod_DB`
+  offline and Railway's own tooling recovered it.
+- **One hard input either way:** Railway **cannot shrink a volume** and bills on storage *used*, so the
+  5 GB provisioning is free and is not a reason to move.
+
+### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
+- **Branch:** `feat/device-rollup-port`
+- **Added:** 2026-08-18. **Owner-directed: "do the D-track first, that should have a lot of focus."**
+- **Lane A.** `lib/oura-ble/**`, `lib/data/**`, `lib/local-store/**`. JS/server + client; no Kotlin.
+- **The gap, in the owner's words:** *"I assumed all the ring data would go directly to the phone and
+  once it's aggregated and calculated it sends to DB."* That is the D-track north star verbatim. Today
+  it is inverted — the phone ships raw frames up and **Railway** decodes them and runs SleepNet.
+- **Why it is a port, not a rewrite — measured 2026-08-18:** `aggregateOuraRawSamples` is
+  `adapter.ts:4958-6067`, **1,110 lines, of which only 17 touch `this.db`/`.select(`/an `oura.*` slice
+  helper.** The rest is computation over already-shared helpers (`sleepNet`, `computeDailySummaries`,
+  `computeSleepScore`, `computeResilienceForDay`, `computeStepsByDay`, `resolveDsToMs`,
+  `decodeEventBody`). Extract it behind a small `RollupIO` port with two implementations — Postgres and
+  local SQLite. **Do not hand-write a second device rollup**; that is the duplicate-implementation bug
+  `CLAUDE.md`'s One Formula, One Place rule exists to prevent.
+- **Half the device side already exists and is inert.** D2 Task 1 shipped
+  `upsertOuraDailySummary`/`upsertOuraBucket`/`upsertOuraHeartrate` to `LocalStore`; Tasks 2-3 shipped
+  the native store and the `getUnrolledRaw`/`markRolledUp` bridge, **device-verified**. A repo-wide grep
+  finds **no caller** for either bridge method. The device drains and stores correctly, then nothing
+  consumes it.
+- **It closes Q-538 as a side effect.** Measured on device 2026-08-18: 209,326 rows, **0 rolled up**,
+  31.2 MB. `pruneRaw` needs `rolled_up = 1`, and `markRolledUp` is what this task finally calls.
+- **Safety, non-negotiable:** never `markRolledUp` before the derived forms are durably written locally.
+  Marking a frame consumed while its output is unstored frees the pruner to delete raw that produced
+  nothing. And **do not touch the ingest writer or the history cursor** — device-verified, and a botched
+  change there loses drained spans forever (ops-doc I18/I21).
+- **Extraction gate:** the server rollup must produce identical `sleep_sessions`/`body_metrics` output
+  over a sample of historical days before and after. The extraction ships **no** behaviour change.
+
+### [platform][devices] Q-546 — WASM cannot instantiate in production: `script-src` has no `wasm-unsafe-eval`
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 4
+- **Branch:** `fix/csp-wasm-unsafe-eval`
+- **Added:** 2026-08-18 · **Lane A** (`next.config.ts`). Independent of everything else — do it early.
+- **Verified today.** `next.config.ts:10` sets `script-src 'self' 'unsafe-inline'` (plus `'unsafe-eval'`
+  in dev only) `https://accounts.google.com`. There is no `wasm-unsafe-eval`, so **no WASM session can
+  start in production**, and every on-device neural plan (D2 Task 6 — SleepNet + step_counter) is
+  blocked behind it.
+- **The trap is the one the master plan predicted:** *"the parity test runs under Node (no CSP) and
+  would false-green."* `lib/oura-models/__tests__/wasm-parity.test.ts` passes under vitest and proves
+  nothing about the device. It is a genuine parity proof against the TorchScript golden and a **useless
+  CSP proof**.
+- **Fix:** add `wasm-unsafe-eval` to the production `script-src`, then **assert on the S25 that a real
+  WASM session instantiates under the deployed header** — a green test is not the gate here, a device is.
+- **Security note:** `wasm-unsafe-eval` is narrower than `unsafe-eval` (it permits WASM compilation
+  only). State that in the PR rather than letting it read as a blanket eval relaxation.
+
+### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
+- **Branch:** *(none — an owner measurement, then a finding)*
+- **Added:** 2026-08-18 · **Answered the same day.** No longer blocking. Remaining work is the quiet-window baseline named below.
+- **The number.** Railway, ~19.6 days to 2026-08-18: the app averages **0.22 vCPU** and **0.61 GB**
+  (**$4.42 + $6.07/month**), against `prod_DB` at 0.002 vCPU. **The app is computing, not waiting on
+  queries.** Storage, by contrast, is **$0.12/month, 0.6 percent of the bill** — so the entire
+  805 MB to 171 MB exercise moved it by about nine cents.
+- **Three hypotheses tested and refuted — do not re-file them:** (a) a server cron — there is none,
+  every `setInterval` in the repo is client-side; (b) the rollup re-decoding the 35-day window —
+  **Q-213 already fixed it**, a persisted watermark narrows the window to the touched span (see the
+  comment at `adapter.ts:4981`); (c) an epoch-mismatched watermark forcing the full window — anchors,
+  frames and watermark all read **epoch 0**.
+- **What is left.** Drains land ~19x/day for 1-6 active minutes — a ~3 percent duty cycle that **cannot**
+  produce 0.22 vCPU sustained. So there is a baseline consumer between drains that source-reading has
+  not found in three attempts.
+- **MEASURED 2026-08-18 — ANSWERED. It is spiky, so Q-545 is the right fix.** Owner pulled the 3-hour
+  graphs. `TrainingAI` CPU sits near **0.0 vCPU between events** and spikes to **1.0-1.2 vCPU** (once
+  2.0). Memory tracks it exactly: **~400 MB baseline, spiking to 800 MB-1.2 GB** on the same events —
+  the allocation signature of decoding frames and running SleepNet. `prod_DB` CPU is **flat at 0.0**,
+  confirming the app computes while the database only holds memory. **Request-driven, not a leak.**
+- **A second finding the measurement surfaced, and it may matter more than the first.** The TrainingAI
+  charts carry **~12-15 dashed vertical markers in three hours**, each paired with a ~10 MB network
+  ingress spike — apparently **deploys**, at roughly 5/hour. Both Implementation lanes have been
+  merging continuously and each merge restarts the service (cold start + `instrumentation.ts` schema
+  warm-up). **A large share of the measured CPU/RAM is development churn, not steady-state app cost**,
+  which means the $18.63/month projection is inflated by an atypical period. **Confirm those markers
+  are deploys before trusting any before/after comparison** — and take a baseline during a quiet window,
+  not a shipping day.
+- **Third correction: `prod_DB` reads ~200 MB and climbing on the 3-hour graph, not 0.79 GB.** It
+  restarted during the volume incident and Postgres memory grows as caches warm, so the billed 0.79 GB
+  is its warmed steady state and will return. Tuning `shared_buffers` still caps it; the cold reading
+  is not evidence the problem went away.
+- **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
+  baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
+  cutting deploy frequency, not more tuning.
 ### [platform][nutrition] Q-471 — the double-trip metric counts deliberate rerolls as redundant, and that is the AI-usage screen's top row
 
 - **Branch:** `fix/ai-fingerprint-granularity`
@@ -1141,6 +1295,19 @@ silently breaks upgraded devices while every test and fresh install passes.
   3. **`work_mem` is 4 MB** and the failing query sorts 1.1M rows. Raising it for that path, or
      giving the query an index that avoids the sort, removes the temp-disk dependency that turned a
      full volume into a user-visible error.
+> **⚠️ The 500 MB target is withdrawn — 2026-08-18, and this is settled rather than deferred.**
+> Railway **cannot shrink a volume**: *"Down-sizing a volume is not currently supported, but
+> increasing size is supported."* And it does not need to, because Railway bills *"only … the amount
+> of storage used by your volumes,"* not the provisioned size — so the 5 GB volume costs exactly what
+> a 500 MB one would at the same usage. Reverting would mean a dump/restore onto a fresh volume,
+> i.e. real downtime and risk on the database holding the ring archive, to save nothing. **Do not
+> attempt it.** Treat every "return to stock 500 MB" line below as historical context for why the
+> work was prioritised, not as an outstanding action.
+>
+> What was genuinely lost is the tripwire: 500 MB is what made the bloat scream rather than creep, and
+> 5 GB is ~30 years of headroom at the post-packing rate. Replace it deliberately — a database-size
+> line in the session-start orientation read, beside the existing `error_events` check.
+
 - **The target is concrete:** the owner raised the volume 500 MB → 5 GB as a temporary mitigation
   and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
   estimating, and say whether 500 MB is reachable without touching retention.
@@ -1217,6 +1384,32 @@ silently breaks upgraded devices while every test and fresh install passes.
   [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
 
 
+### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
+
+- **Branch:** `fix/admin-db-maintenance-off-native-gate`
+- **Added:** 2026-08-18, found while reclaiming 513 MB during the `disk_full` recovery.
+- **Lane B.** `components/oura-ble/**` + `app/admin/oura-ble/**`. No server change.
+- **What happens.** `components/oura-ble/oura-ble-debug.tsx:391` early-returns a "Native OuraBle
+  plugin unavailable" banner when the Capacitor plugin is absent. `<DbFootprintCard />` is rendered at
+  line 555 — *after* that return. So on any desktop browser the VACUUM FULL button, the Lever 1b
+  backfill button and the footprint readout do not render at all.
+- **Why that is wrong.** None of those three touch the plugin. `POST /api/oura-ble/samples/vacuum` is
+  a plain server-side call behind `auth()` + `requireAdmin`; it has nothing to do with BLE. It is
+  gated only by being rendered inside a component that gates on something else.
+- **Why it matters more than it looks.** Reclaiming disk becomes possible only from the phone — and
+  **`VACUUM FULL` takes an `ACCESS EXCLUSIVE` lock**, so the APK is the one client blocked while it
+  runs, with a WebView timeout free to swallow the response. Worse, if the APK is broken, uninstalled
+  or mid-rebuild, the disk cannot be reclaimed *at all* — which is exactly the situation where a full
+  volume is most likely. On 2026-08-18 the workaround was a `fetch()` from a desktop console.
+- **Fix shape:** move `DbFootprintCard` (and any other server-only card) above the availability
+  early-return. The genuinely native panels — `RawStoreStatusConsole`'s `rawStats()`, the SleepNet
+  dump, the sensor probe — correctly stay behind it.
+- **Second half: the pack backfill has no button at all.** `POST /api/oura-ble/samples/pack` shipped
+  with Q-541 Task 4 and its own comment says *"the button sends none"*, but nothing in `app/` or
+  `components/` references it. The 2026-08-18 run — 764 buckets, 941,233 frames — was five hand-typed
+  `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
+  levers have, beside them in the footprint card.
+
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
@@ -1237,10 +1430,31 @@ silently breaks upgraded devices while every test and fresh install passes.
 - **Consequence:** the store has accumulated everything drained since 2026-07-27 at ~2–3 MB/day, with
   no bound and no visible failure state — exactly what the retention decision warned about (*"a rollup
   that silently falls behind turns Tier 1 into unbounded growth"*).
-- **Do first, it is cheap and unblocks measurement:** build the missing `rawStats()` panel in
-  `app/admin/oura-ble/` (already a known gap — `rawStoreOpen`/`lowDisk`/`totalRows`/`unrolledRows` are
-  wired in the plugin and rendered nowhere). **Nobody has ever observed the real size of this file.**
-  Then the bound + failure state; the full prune needs D2 Task 5.
+- ✅ **MEASURED ON DEVICE 2026-08-18 — the panel exists now and the owner read it.** First-ever
+  observation of this store, and it confirms the static analysis exactly:
+
+  | | |
+  |---|---:|
+  | total rows | **209,326** |
+  | **rolled up** | **0** |
+  | unrolled | 209,326 |
+  | on disk | **31.2 MB** |
+  | low disk | no |
+
+  **Zero rows are marked rolled up**, so `pruneRaw`'s `rolled_up = 1 AND synced = 1` predicate matches
+  nothing and the documented 14-day window cannot delete a single row. Both causes are now confirmed
+  from the device, not inferred.
+- **31.2 MB is a floor, not an accumulation.** The store was wiped by the 2026-08-17 reinstall and
+  rebuilt to 209,326 rows in ~1.5 days — that is the Full re-sync re-draining the ring's whole buffer
+  into a fresh cursor-0 store. Forward growth is ~23,000 rows/day at ~149 bytes/row ≈ **3.4 MB/day**,
+  matching the ~3.2 MB/day in `CLAUDE.md` and the ~1.2 GB/year the 2026-08-02 retention decision
+  predicted for an unpruned tier.
+- **It already exceeds Android Auto Backup's 25 MB per-app quota**, so the phone-side backup covers
+  none of it — see the `allowBackup` note below. That was a projection when this entry was filed; at
+  31.2 MB it is now a measurement.
+- **What is left here:** the bound and the visible failure state. The real prune still needs D2 Task 5
+  (the WebView rollup consumer) to set `rolled_up`, which is what this entry has always said and what
+  the device reading now proves.
 - **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).
