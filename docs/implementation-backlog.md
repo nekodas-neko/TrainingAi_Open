@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **191** | `lib/data/postgres/migrations/` (head: `190_q536_relabel_raw_sample_epochs.sql`) |
+| Next free Postgres migration | **193** | `lib/data/postgres/migrations/` (head: `192_claude_ro_views_oura_raw_packed.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -570,6 +570,16 @@ below threshold and left in place for next time.
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
+- 🚧 **Tasks 0–2 SHIPPED 2026-08-17 (v1.318.11), additively.** Task 0 answered structurally rather
+  than by counting — `epoch` is **not** in the dedup unique constraint, so a cross-epoch duplicate
+  was never insertable, and the count the plan proposed now returns "none" for the wrong reason
+  because migration 190 merged the epochs. Migration **191** creates `oura_raw_packed`; **192**
+  regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
+  with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
+  row has moved** — `oura_raw_samples` and the ingest path are untouched.
+  **Remaining: Tasks 3–7** — the two-tier reader, the packer, the backfill, the hot-window prune, and
+  the `measured_at` range-query sweep. The packer's delete is the only destructive step in the plan
+  and is gated on a proven-equal re-read (§6); it has not been written.
 - ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
   plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
   and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
@@ -991,10 +1001,17 @@ which also makes it testable and works offline.
   its tradeoff and its code's physical size, plus a working style-cycler that mounts the same four
   files so the demo cannot drift from the designs. They live in a design canvas, **not in this
   repo**; ask the owner for the link, or redraw from this spec, which carries everything they encode.
-  **Default is black band** (owner, 2026-08-17). ⚠ The mockups draw a **21×21** code, which the
-  correction below shows is too small to hold a meal id — they are right about layout and
-  proportion, wrong about module count, and a 25×25 code in the same physical square has a finer
-  pitch than any figure they carry.
+  **Default is black band** (owner, 2026-08-17). **Redrawn 2026-08-18 with the correct 25×25 code**,
+  so the drawings now match the version the payload actually needs.
+- **⚠ The measured pitch at 25×25, and the fact there is no room to recover it.** Same physical
+  squares, four more modules across: **band 0.487 mm** (the default, and the tightest), editorial
+  0.529, ticket 0.550, plaque 0.635. **The code cannot simply be grown** — the content already fills
+  the circle-safe box, and a taller stack pushes the top and bottom rows into the narrowing part of
+  the circle, where the meal name is the first thing to stop fitting. So the code only grows if
+  something goes. The cheapest version of that is drawn as variant **2b — black band with the
+  write-on rule dropped**: 16.4 mm and **0.656 mm** per module, better than every original style bar
+  plaque, at the cost of the handwritten date. **Test-print black band before the layout is frozen;
+  2b is the fix that keeps the style if it fails.**
 - **⚠ Going circular shrank the code, and this is the live risk.** Square-with-macros allowed
   ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**. **⚠ Corrected 2026-08-17: that is
   0.49–0.64 mm per module, not 0.58–0.76 — a 21×21 code cannot hold a meal id at all** (v1 holds 17
