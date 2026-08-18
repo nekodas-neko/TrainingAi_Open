@@ -288,7 +288,14 @@ const BASELINE = {
   // carries the warning that its confirm copy must not read like the lossless VACUUM beside it).
   'projectOverview.md': 6862,
   'docs/implementation-backlog.md': 7144,
-  'CLAUDE.md': 1010,
+  // Raised 2026-08-18: 1010 -> 1044. The "Decisions That Come Back To Me" section, which sets the
+  // default shape for anything gated on an owner decision — recommendation first, alternatives with
+  // what each is better at, reversal cost, plain English — and pushes cheap reversible choices back
+  // down to the session rather than surfacing them. It belongs in the index: it governs every
+  // session's behaviour rather than recording one session's work. Drafted at 49 lines and cut to 34
+  // before raising, since a rule about brevity that arrives verbose argues against itself.
+  // Recomputed from the MERGED file after three same-day collisions with concurrent raises.
+  'CLAUDE.md': 1044,
 
 };
 
