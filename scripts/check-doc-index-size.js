@@ -18,6 +18,15 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, production verification round 2): backlog 9359 -> 9384,
+// projectOverview 7369 -> 7406. No new queue entries — six existing ones amended in place with what
+// production says, which is the cheapest possible place to carry it. The backlog growth is those
+// amendments; the projectOverview row carries the pull-69 / push-0 table because that asymmetry is
+// the evidence for Q-475 and cannot be re-derived after error_events prunes at 30 days. It also
+// carries the two queries that look like evidence and are NOT (water is too sparse; null-weight-with-
+// steps is the expected shape), so the next reader does not pick them up.
+
+//
 // Raised 2026-08-18 (Review, Tier-A enqueue silence, Q-486): backlog 9312 -> 9359,
 // projectOverview 7339 -> 7369. One queue entry and its row. The lines that earn their place are the
 // three "do not": do not undo the layering (local write, then a direct POST as primary, then the
@@ -618,7 +627,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7369,
+  'projectOverview.md': 7411,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -629,7 +638,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9359,
+  'docs/implementation-backlog.md': 9384,
   'CLAUDE.md': 1075,
 
 };

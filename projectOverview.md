@@ -103,6 +103,48 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] 🟠 Q-475 shipped mid-sweep; the production evidence is about the half its fix did not cover (Q-487, 2026-08-18)
+
+- **This run's fourteen findings checked against production**, the same exercise that corrected four
+  findings in sweep 8.
+  [`docs/reviews/2026-08-18-production-verification-round-2.md`](docs/reviews/2026-08-18-production-verification-round-2.md).
+  Nothing new filed; **six entries amended**.
+- **⚠️ Q-475 was implemented while this sweep ran** — `#115` classifies the cause server-side
+  (`isRetryableWriteError`), stops the client counting a retryable failure against
+  `MAX_MUTATION_ATTEMPTS`, and engages the whole-queue backoff. **The dead-lettering and missing
+  backoff are genuinely fixed.** What the evidence below is about is **not**: `reportServerError` is
+  called only in the route's *outer* catch, which `pushMutations` never reaches, so a push failure
+  still never reaches `error_events`. **Filed as Q-487**, scoped to the observability half.
+- **The production shape, and it is an absence:**
+
+  | Route | Faults in `error_events` | Span |
+  |---|---|---|
+  | `/api/sync/pull` | **69** | 2026-07-19 → 2026-08-13 |
+  | `/api/sync/push` | **0** | none, ever |
+
+  Over the same window the database refused connections **125 times across six days** (39 on
+  2026-08-12), with one pull row reading `[cause: timeout exceeded when trying to connect]`.
+- **The zero is evidence, not absent traffic.** `components/sync-provider.tsx` runs
+  `await pushMutations(userId)` at :139 and `pullDelta` at :145 — **push first, same cycle**. Push is
+  not less exposed than pull; it runs before it. So the zero means **"push cannot report"**, which is
+  precisely what Q-475 describes: `pushMutations` catches per-mutation, returns 200 with the failure
+  in the body, and never calls `reportServerError`. **The one table designed to catch faults that
+  never reach a human has a blind spot exactly where that finding lives.**
+- **Q-482 and Q-483 confirmed never triggered** — zero `22P02` rows ever, so a malformed route id has
+  not reached production and the SQL-leaking 500 has never been served. Both were filed low; **do not
+  re-price them upward from the local 500s alone.**
+- **Q-484 latent confirmed** — `claude_ro.injuries` is **empty**; the route that accepts a 10 MB note
+  has stored nothing at all.
+- **Q-481 and Q-485 cannot be adjudicated from production, and one of them has a trap.** Water: 4 days
+  logged, max 1000 ml — too thin for a double-count to show, so read it as the feature being unused,
+  not as the replay not happening. Weight: 35 of 114 rows have steps and a NULL weight, which is **the
+  expected shape** (steps daily from the ring, weight only on scale use) and **must not be cited** as
+  coerced-away weights — the same trap as Q-460's "74% lack an RPE".
+- **The standing constraint:** `claude_ro` is row-scoped to one user and `error_events` prunes at 30
+  days. Every count is *the owner's, recently* — a zero means the owner never hit it, never that no
+  user did. Push *traffic volume* could not be measured directly; the argument that push runs is from
+  the call site, not a counter.
+
 ### [workouts][devices] 🟠 The outbox enqueue for a workout is the only write in the app that fails silently — and it is the last line of defence (Q-486, 2026-08-18)
 
 - **Following the pattern sweep 18 named** (*this app validates well and tells you badly*) to its most
