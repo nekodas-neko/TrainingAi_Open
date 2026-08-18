@@ -15,6 +15,11 @@ import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
  * volume, one flagged, must have their bar top edges at the same y. Asserting "the label contains
  * (D)" would pass with the bug reintroduced in any other shape.
  *
+ * **CI-vs-local hazard this spec already hit once:** it originally seeded fixed weekdays (Mon/Tue).
+ * `seed.sql` fills relative to when it runs, so on CI's fresh database an ordinary seeded session
+ * can share the probe's day — and `isDeload` is `every(isDeloadSession)`, so one such session
+ * silently removes the "(D)" the assertions hang off. It now picks days the seed has not filled.
+ *
  * **Mutation-checked, twice.** Restoring the flags as sibling `<span>`s fails it — but only on the
  * label assertion, which is the weaker half. So it was re-checked with a *geometry-only* mutation:
  * label left inline (so the "(D)" assertion still passes) and one empty sibling span added back to
@@ -52,13 +57,34 @@ test.beforeAll(async () => {
          SELECT workout_session_id FROM exercise_logs WHERE exercise_name = $1)`, [MARKER])
 
     const mon = mondayOf(new Date())
-    // Two days of the SAME volume in the week on screen: one a deload (flagged "D"), one an
-    // ordinary session (no flag). That pairing is the whole experiment — same height in, so any
-    // difference out is the layout bug.
-    for (const [offset, phase] of [[0, 'deload'], [1, null]] as const) {
-      const at = new Date(mon)
-      at.setUTCDate(mon.getUTCDate() + offset)
-      at.setUTCHours(2, 0, 0, 0)   // ~noon Brisbane, safely inside the local day
+    const weekDays = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(mon)
+      d.setUTCDate(mon.getUTCDate() + i)
+      d.setUTCHours(2, 0, 0, 0)   // ~noon Brisbane, safely inside the local day
+      return d
+    })
+
+    // Use days the seed has NOT already filled. `isDeload` is `every(isDeloadSession)`, so one
+    // ordinary seeded session sharing the probe's day silently removes the "(D)" this asserts on —
+    // and `seed.sql` fills relative to when it runs, so which weekdays are occupied differs between
+    // a long-lived local database and CI's fresh one. Choosing free days makes the spec independent
+    // of that instead of destroying seeded rows to make room.
+    const busy = await c.query(
+      `SELECT DISTINCT (completed_at AT TIME ZONE 'Australia/Brisbane')::date AS d
+         FROM workout_sessions
+        WHERE user_id = $1 AND completed_at >= $2 AND completed_at < $3`,
+      [userId, weekDays[0].toISOString(), new Date(weekDays[6].getTime() + 86400_000).toISOString()],
+    )
+    const taken = new Set(busy.rows.map(r => String(r.d).slice(0, 10)))
+    const brisbaneDay = (d: Date) => new Date(d.getTime() + 10 * 3600_000).toISOString().slice(0, 10)
+    const free = weekDays.filter(d => !taken.has(brisbaneDay(d)))
+    if (free.length < 2) {
+      throw new Error(`need two session-free days this week, found ${free.length} (taken: ${[...taken].join(', ')})`)
+    }
+
+    // Two days of the SAME volume: one a deload (flagged "D"), one an ordinary session (no flag).
+    // That pairing is the whole experiment — same height in, so any difference out is the layout bug.
+    for (const [at, phase] of [[free[0], 'deload'], [free[1], null]] as const) {
       const ws = await c.query(
         `INSERT INTO workout_sessions (user_id, session_name, started_at, completed_at, phase_type)
          VALUES ($1, $2, $3, $3, $4) RETURNING id`,
