@@ -4057,6 +4057,119 @@ session working from a temporarily restored copy.
   month ago, so it reads as a post-re-key coverage gap that closed on its own. *Something that stopped
   is not something that was fixed* — noted as unexplained rather than closed.
 
+### [workouts] Q-512 — `health-insight`'s ACWR is structurally null on every day (110/110)
+
+- **Branch:** `fix/health-insight-acwr-window`
+- **Plan:** none — a one-line fix either way. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §2
+- **Mechanism.** `app/api/ai/health-insight/route.ts` calls `computeVolumeAcwr` with
+  `getWorkoutSessionsFrom(userId, subDays(new Date(), 7))` — a **7-day** list. The helper gates on
+  `spanDays >= minSpanDays` (**21**), and `spanDays` is measured from the earliest session *in the list
+  passed to it*. **A 7-day list can never span 21 days**, so the gate can never pass.
+- **Confirmed by replay over 110 days: 0 non-null.** Not a coverage problem more history would fix —
+  structural. The route computes the load object and reads `.acwr` from it every time, always `null`.
+- **First action:** either widen the fetch to **28 days** to match `signals.ts` (if the insight is meant
+  to mention training load), or drop the `computeVolumeAcwr` call and the `.acwr` read (if it is not).
+- **Do NOT lower `minSpanDays`** to rescue this caller — that degrades *every* caller's ACWR to fix one
+  that is mis-wired.
+
+### [workouts][platform] Q-513 — the score-audit panel and the next-session engine disagree on the ACWR band on 38% of days
+
+- **Branch:** `fix/build-day-audit-acwr-window`
+- **Plan:** none — a window change. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §3
+- **Three callers, three windows**, all feeding one `computeVolumeAcwr` and all banded with the same
+  `ACWR_THRESHOLDS`: `signals.ts` **28 days** (the intended 7:28, drives the engine),
+  `health-insight` **7 days** (always null, Q-512), `score-audit/build-day-audit.ts` **all history**
+  (chronic becomes the **lifetime** weekly average).
+- **Measured** over the same days:
+
+  | | 28-day (engine) | all-history (audit panel) |
+  |---|---|---|
+  | mean | 0.99 | **1.07** |
+  | `optimal` share | **69.3%** | 49.4% |
+  | `high` share | 12.5% | **29.2%** |
+  | `very_high` share | 0% | **3.4%** |
+  | days > 1.5 (emergency-deload line) | **0** | **3** |
+
+  Mean |difference| **0.150**, max **0.395**, **different band on 33 of 88 days (38%)**.
+- **Mechanism, and it worsens over time.** The lifetime weekly average is *lower* than the recent
+  baseline — 20,572 kg/wk lifetime vs 23,239 kg/wk over the last 28 days (**1.13×**) — so the smaller
+  denominator inflates the ratio (observed inflation 1.08). **Any sustained volume increase widens the
+  gap indefinitely**; it is not a fixed offset that could be tolerated.
+- **Why it matters.** `build-day-audit` *is* the score-audit panel, whose whole contract is to show a
+  score beside **the inputs that produced it**. On 38% of days it shows a training-load band the engine
+  never saw, and on three days it shows `very_high`/past the emergency-deload line while the engine saw
+  at most `high`.
+- **First action:** pass a **28-day** window in `build-day-audit`, matching `signals.ts`. If a lifetime
+  view is independently wanted it needs a different name — it is not ACWR. Then re-measure.
+- **Upper bound caveat:** `build-day-audit`'s `programTooNew` gate can null its ACWR independently, so
+  38% bounds the days the panel actually renders a band.
+
+### [workouts] Q-514 — 64% of the engine's back-off load cuts are an expected-RPE clamp artefact
+
+- **Branch:** `fix/expected-rpe-clamp-exclusion`
+- **Plan:** none — a predicate plus a filter. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](reviews/2026-08-18-rpe-autoregulation-calibration.md)
+- **`RPE_DEAD_BAND = 1.5` is correctly placed — do NOT move it.** Sensitivity over 377 per-exercise
+  windows: 0.5 → 48.3%, 1.0 → 29.4%, 1.25 → 20.7%, **1.5 → 17.5%**, 2.0 → 14.9%. It sits on a flat part
+  of the curve and the delta distribution is centred (mean −0.05). **The input is what is biased.**
+- **The floor clamp splits the data in two.** `expectedRpe` clamps to the 5–10 slider range. The
+  **ceiling never binds** (raw expected tops out at exactly 10.0, 0 sets clamped); the **floor binds on
+  37 of 570 sets (6.5%)**, hiding raw values as low as **−10.4**. Those are not warm-ups —
+  `intensity_pct` **49.6–66.7** (median 54.3) at **7–13 reps** (median 10), ordinary accessory work. At
+  54.3% reps-to-failure is ~19, so a 10-rep set has ~9 RIR and a "true" expected RPE near 0.6; the model
+  can only say **5**, and the owner reports **6.9**.
+
+  | population | n | mean delta |
+  |---|---|---|
+  | floor-clamped | 37 | **+1.89** |
+  | everything else | 533 | **−0.34** |
+
+  A **2.2-point systematic offset**, in the direction the back-off arm reads as "RPE ran high".
+- **Cost, replaying the shipped grouping** (per exercise, trailing 3 sessions, ≥3 sets, threshold 1.5):
+
+  | | shipped | excluding floor-clamped |
+  |---|---|---|
+  | back-off (≥ +1.5) | **39 (10.3%)** | **14 (4.1%)** |
+  | push (≤ −1.5) | 27 (7.2%) | **27 (7.9%)** |
+  | sd of delta | 1.16 | 0.96 |
+
+  **25 of 39 back-off triggers vanish — 64%** — while the push arm is *untouched*. That asymmetry is
+  what makes it a bias fix rather than a de-sensitisation. 64% of back-off windows contain ≥1
+  floor-clamped set. Each trigger is a **5–10% load cut**.
+- **First action:** exclude sets whose **raw (pre-clamp)** expected RPE falls outside the slider range
+  from the autoregulation delta. They carry no information — the model cannot state its expectation, so
+  the gap to the reported value measures nothing. Matches the codebase's existing principle of passing
+  `null` rather than fabricating a neutral (`computeResilienceForDay`). Contained: one predicate beside
+  `expectedRpe`, plus a filter in `signals.ts`'s `perExRpeDelta` loop (~line 293). **No curve change.**
+- **Corroborated by the app's own other model.** `ACCESSORY_SPEC` (`goal-ranges.ts`) prescribes
+  accessory work to **RPE 7.5–8.5** (*"ALL genuinely challenging (>= RPE 7.5)"*). The floor-clamped sets
+  report a mean actual RPE of **6.89** — below every target in that table and below the dataset mean of
+  7.49. **By the app's other model these sets are easy**, while the autoregulation delta reads them at
+  +1.89 and cuts load. Two models in one codebase disagreeing in *sign* about the same sets.
+  (A stronger version — attributing the clamped sets to the `accessory` role — was **abandoned as
+  unsound**: exercise names map to more than one role across programs, so a name-based join fans out.)
+- **Do NOT widen the clamp** to allow expected RPE below 5 — an expectation of 0.6 against an owner who
+  never reports below 6 gives a delta of **+6.3**, worse. The set is unrepresentable either way.
+- **Re-measure after.** Back-off 4.1% vs push 7.9% is asymmetric the other way; whether that is right is
+  the next question, and it must be asked against unbiased input.
+- **Caveat that bounds the counts — read this with the 64%.** The back-off arm needs a second signal
+  (`rm1Trend === 'down'` OR `repCompletionRate < 0.95`), which the replay does **not** model. Measured:
+  the owner is short of the prescribed reps on only **14 of 196 sets (7.1%)**, exact on 75%, over on
+  17.9%, mean completion **1.046** — so `missedReps` is rarely the corroborator and most back-offs must
+  come via a falling 1RM. **The number of cuts actually issued is well below 39, and the number the fix
+  prevents is well below 25.** The defect is real and one-directional, but "64% of back-off *triggers*"
+  is not "64% of load cuts on your training". The ratio is the finding; sizing the absolute impact needs
+  `rm1Trend` modelled, which this review does not do. Only sets carrying
+  both `rpe` and `intensity_pct` are visible (570 of 1,029 set logs).
+- **Related, recorded not filed:** `calcAmrap1RM` / `amrapScaleFactor` (the 1.0/0.97/0.93/0.88/0.82
+  rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls
+  would be wasted; removing it is a Review-lane call.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

@@ -468,7 +468,12 @@ const BASELINE = {
   // shipped ingredient label is the analysis Q-393 was corrected away from, with the measured
   // mm-per-module table and the owner's choice of B2 as the default; Q-395 gains the six review
   // notes and the 11-section prod checklist an implementation PR ticks off.
-  'docs/implementation-backlog.md': 8427,
+  // Raised 2026-08-18 (Tuning): -> 8540, recomputed from the MERGED file. Q-512/513/514 — the first
+  // calibration sweep of the workouts pillar. The entries carry their measured tables because every
+  // conclusion is counterintuitive: the ACWR thresholds and RPE_DEAD_BAND are RIGHT and must not move,
+  // while the call sites and the clamped input feeding them are wrong. Strip the tables and the next
+  // reader tunes a constant instead of fixing the input — three times over.
+  'docs/implementation-backlog.md': 8540,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
