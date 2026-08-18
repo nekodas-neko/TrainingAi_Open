@@ -435,7 +435,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6957,
+  'projectOverview.md': 6991,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -462,15 +462,12 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
-  // Raised 2026-08-18 (Tuning): -> 8308, recomputed from the MERGED file. Q-512/Q-513 — the FIRST
-  // calibration review of the workouts pillar. Both entries carry their measured tables because the
-  // conclusion is counterintuitive: the ACWR thresholds are RIGHT and must not be touched (the >1.5
-  // emergency deload has never fired, and that is correct), while two of the three call sites
-  // computing ACWR are wrong. Strip the tables and the next reader tunes the thresholds instead.
-  // +50 for Q-514 (expected-RPE clamp): its two tables ARE the argument — the +1.89/-0.34 split shows
-  // the bias is one-directional, and the 39->14 / 27->27 pair is what distinguishes a bias fix from a
-  // de-sensitisation. Without both, the obvious response is to raise RPE_DEAD_BAND, which is wrong.
-  'docs/implementation-backlog.md': 8370,
+  // Raised 2026-08-18 (Tuning): -> 8428, recomputed from the MERGED file. Q-512/513/514 — the first
+  // calibration sweep of the workouts pillar. The entries carry their measured tables because every
+  // conclusion is counterintuitive: the ACWR thresholds and RPE_DEAD_BAND are RIGHT and must not move,
+  // while the call sites and the clamped input feeding them are wrong. Strip the tables and the next
+  // reader tunes a constant instead of fixing the input — three times over.
+  'docs/implementation-backlog.md': 8428,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

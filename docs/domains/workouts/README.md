@@ -98,6 +98,8 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](../../reviews/2026-08-18-rpe-autoregulation-calibration.md) — **RPE autoregulation calibrated, 2026-08-18** (Q-514 — `RPE_DEAD_BAND = 1.5` is correctly placed and must not move; the bias is in the input. `expectedRpe`'s **floor** clamp binds on 6.5% of sets — ordinary 50–67% × 7–13-rep accessory work, not warm-ups — giving them a **+1.89** mean delta against **−0.34** for everything else. Excluding them removes **64% of back-off triggers and zero push triggers**, so two thirds of the engine's 5–10% load cuts were a clamp artefact. Also: `calcAmrap1RM`/`amrapScaleFactor` have **no production call site**).
 
+- [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-460 cannot be adjudicated from production — 74% of completed sessions lack an RPE, which is consistent with both a dropped write and a skipped prompt). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+
 ## Open issues
 
 ```bash

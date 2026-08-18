@@ -153,6 +153,8 @@ layer**) through §16. Read it before building any shared helper.
 
 - [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-471 — the double-trip fingerprints are too coarse on three meal-plan sections, so deliberate rerolls read as redundant and the screen's top row is an artefact). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
 
+- [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (the `error_events` read done properly — nothing unrecorded in 7 or 30 days; the 5,771-hit `[pg 21000]` on `hr-ingest` is already recorded and fixed). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+
 ## Open issues
 
 ```bash
