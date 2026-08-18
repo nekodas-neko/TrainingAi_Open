@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** seven sweeps (2026-08-17 ×2, 2026-08-18 ×5) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **472**)
+**Updated:** 2026-08-18 · **By:** eight sweeps (2026-08-17 ×2, 2026-08-18 ×6) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **473**)
 
 ## Now
 
-Seven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Eight sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -18,9 +18,36 @@ least once**, at the owner's request to work through the sections:
 | `app-shell` · `platform` | failure cells, repo-migration architecture, **the Coach write path** | Q-450…Q-459, Q-467, Q-468 |
 
 **Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
-left the web build — every offline-first domain took its web fallback), **production data** (the owner's AI-usage
-screenshots drove sweep 7, but `claude_ro` has still never been queried directly), the **offline and error paths** (everything ran
+left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
+remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 8 — this run's own findings, checked against production (2026-08-18)
+
+**`claude_ro` queried directly for the first time in this run.** Write-up:
+[`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md).
+
+**More corrections than discoveries, which is the point.** Filed **Q-472** (the Coach's write
+capability has produced **zero** writes — `coach_changes` empty, though 8/8 assistant messages carry
+tools and **1** carried a `change_preview`; apply is *not* broken, and why it is zero is not
+determinable here). **Amended four of my own entries:**
+
+- **Q-467, Q-468** — real defects, **zero production exposure**; top-of-queue placement was priced on
+  exposure that does not exist. Re-scoped, not closed.
+- **Q-465 — refuted in practice.** Zero truly-empty check-ins across all 50 rows. ⚠️ **My first query
+  said "45 of 50 entirely empty" and was WRONG** — it tested only the seven evening columns and ignored
+  six morning ones. Recorded in the entry so the false number cannot be picked up.
+- **Q-460 — production cannot adjudicate it.** 74% of completed sessions lack an RPE, which is
+  consistent with both a dropped write and a skipped optional prompt; **do not cite it either way.**
+
+**✅ `error_events` read (the session-start ritual, owed and now done).** Nothing unrecorded in 7 or
+30 days. The 5,771-hit `[pg 21000]` on `hr-ingest` that dominates the table is **already recorded and
+fixed** — I checked before filing, and a duplicate for the loudest line would have been the easy
+mistake.
+
+**Method note for the next session: `claude_ro` is row-scoped to ONE user and prunes at 30 days.**
+Every count is *the owner's, recently*. A zero means the owner never did the thing — never "no user
+did". And check a table's full column list before writing an "is empty" predicate.
 
 ### Sweep 7 — the AI-usage screen's double-trips, from owner screenshots (2026-08-18)
 
