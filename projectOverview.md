@@ -103,6 +103,52 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [app-shell][platform] 🟠 The app run as a user who is not in Brisbane: the server follows their timezone, 100 of 125 client call sites do not (Q-477, Q-478, 2026-08-18)
+
+- **The blind spot `CLAUDE.md` names, entered for the first time.** All 30 user rows in the local DB
+  are `Australia/Brisbane`, and ten review sweeps had never moved a user out of the default zone —
+  *"invisible while the device sits in the zone the data was recorded in"*, exactly as written. This
+  sweep set a user to `Pacific/Kiritimati` (UTC+14), re-logged in so the JWT carried it, and drove the
+  app at a moment when three calendar dates were simultaneously live (Midway 08-17, UTC/Brisbane
+  08-18, Kiritimati 08-19). [`docs/reviews/2026-08-18-timezone-non-default-user.md`](docs/reviews/2026-08-18-timezone-non-default-user.md).
+- **The server is clean and that is worth stating.** `app/api/**` contains **zero** argument-less
+  `todayInTz()` calls — 53 `todayInTz(tz)`, 4 from the session, 4 `formatInTimeZone(..., tz, ...)`.
+  Live: `POST /api/day-checkin` → `logDate: 2026-08-19`; `GET /api/workout-data` →
+  `dataDate: 2026-08-19`. Both correct. Every finding here is client-side.
+- **The inversion that sets the severity.** While a user is on Brisbane, client and server agree and
+  nothing is wrong — which is why this has never surfaced. **Setting the timezone is what breaks it:**
+  the server moves, the client's 91 argument-less `todayInTz()` calls do not.
+  `edit-profile-sheet.tsx:190` ships an **"Auto-detect timezone"** button, so the intended one-tap
+  action for any user outside Brisbane is precisely the action that desynchronises them.
+- **Observed on screen** (Health → Training): the Training Calendar highlights **18** and Training Load
+  highlights **Tue**, on a day that was Wednesday the 19th for that user. Source is
+  `calendar-widget.tsx:110`, `localDateString()` — the **device's** zone, a *third* answer following
+  neither the setting nor the server. `CLAUDE.md` warns of two client "today" sources; there are three.
+- **Q-478 is the sharp, cheap half — do it first.** `isWorkoutDataToday` and `isBodyMetadataFresh`
+  (`lib/sqlite/cache.ts:361,369`) compare a **server-stamped** date to a **client `DEFAULT_TZ`** date,
+  so they return false for |Δoffset| hours a day — **14 hours a day for a New York user**. Confirmed
+  false against a live response with a real row planted on the user's true today. Consequences:
+  session-select's early return leaves `setMetaLoading(false)` unrun (**loading state never clears**),
+  Health's today values never set, the workout screen strips `loggedTodayInSession` from every
+  exercise, and the "Trained today" badge never appears.
+- **Nothing is missing except the argument.** `useUserTimezone()` is a context available tree-wide and
+  `goals-section.tsx:114` already uses it correctly. In `workout-select-content.tsx`, lines 31 and 32
+  sit inside a function that *takes* `tz`: line 32 uses it, line 31 cannot, because the helper has no
+  parameter for it.
+- **Severity, honestly: latent for the current user base, structural for the stated direction.** No
+  user has a non-Brisbane zone today, so nothing is broken in production. It is filed above "someday"
+  because the app ships the button that triggers it, this file's 2026-08-02 amendment says explicitly
+  not to assume the owner's own device, and a Play Store listing is the stated intent. Recommended
+  first step is a **CI ratchet** on bare `todayInTz()`/`localDateString()` in client code, shrink-only,
+  the same shape as the hex-literal and TTL-divergence checks — freeze the count at 100 before
+  sweeping.
+- **Two clean results recorded:** every API route threads the user's timezone, and
+  `cachedFetchToday`/`unwrapToday` are self-consistent (client-written and client-read) — mislabelled
+  rather than broken, and deliberately not filed as the same defect.
+- **Not verified on:** the APK — the 9 `localDateString()` sites read the *phone's* zone there, a third
+  value this harness cannot reproduce. Not against production, where all users are Brisbane and the
+  symptom does not arise.
+
 ### [platform][devices] 🟠 A database outage reaches the sync client as HTTP 200, so it dead-letters the whole outbox instead of backing off (Q-475, Q-476, 2026-08-18)
 
 - **The first sweep to push a real batch at `/api/sync/push`, including one with the database
