@@ -345,6 +345,11 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-18-platform-decision-brief-rule.md`](../../handoff-2026-08-18-platform-decision-brief-rule.md)
+  — the `CLAUDE.md` rule governing how a decision is brought to the owner (#69), and the merge
+  friction that shipping it exposed: **three of four CI rounds were base collisions on the doc-index
+  BASELINE object**, none on the content being changed. Filed as **Q-543**, with the resolution
+  method that avoids silently reverting another lane's raise.
 - [`handoff-2026-08-17-platform-prod-snapshot-endpoint-plan.md`](../../handoff-2026-08-17-platform-prod-snapshot-endpoint-plan.md)
   — Q-530, the designed half of Q-251: a prod-shaped DB snapshot built by paginating the **existing**
   `claude_ro` views rather than writing a second scoping map. Carries the measurement that inverts

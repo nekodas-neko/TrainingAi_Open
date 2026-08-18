@@ -348,7 +348,11 @@ const BASELINE = {
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
   // not: the route exists and is verified, and nobody has pressed it against production. Without
   // that split the entry reads as done and the 49 MB never gets reclaimed.
-  'docs/implementation-backlog.md': 7219,
+  // Raised 2026-08-18 (owner-directed session, Q-543): -> 7257. One entry for the doc-index BASELINE
+  // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
+  // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
+  // fourth time. Recomputed from the MERGED file.
+  'docs/implementation-backlog.md': 7257,
   'CLAUDE.md': 1044,
 
 };
