@@ -3,14 +3,48 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** two sweeps, both 2026-08-17 · **Q band:** 450–499 (next free: **460**)
+**Updated:** 2026-08-18 · **By:** three sweeps (2026-08-17 ×2, 2026-08-18) · **Q band:** 450–499 (next free: **463**)
 
 ## Now
 
-Two sweeps have run under this role, both on 2026-08-17, and both are **merged** (#16, #38).
-**Four of the ten findings have already been implemented** by the Implementation lanes — Q-450 (#31),
+Three sweeps have run under this role. All are **merged** (#16, #38, and the workout write-path PR below).
+
+### Sweep 3 — the workout write path, driven live and probed cross-user (2026-08-18)
+
+Owner-requested: review the workout logic and screens. Took the gap this baton named — **the write
+surface**, which every prior sweep had left (`GET` only). Write-up:
+[`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md).
+
+**Filed — Q-460 … Q-462.** Q-460/461 upper-mid (above Q-353), Q-462 low.
+
+| Q | | What |
+|---|---|---|
+| Q-460 | 🟠 | `POST /api/workout-sessions/rpe` returns `{"success":true}` for a write that matched nothing; `pushMutations` then `processed++`s it and **drops the outbox mutation**. Rule (a). **Lane A.** |
+| Q-461 | 🟠 | `Start Set 2`'s infinite `animate-bounce` blocks Playwright's stability check → **the core write path cannot be E2E-driven past set 1**. Testability only; a human is unaffected. **Lane B.** |
+| Q-462 | 🟡 | An ownership refusal on `/api/log-exercise` surfaces as a 500. Block is correct; reporting is not. |
+
+**CLEAN — and the headline is a clean result:**
+
+1. **Cross-user write protection holds across the whole workout surface.** A second live account
+   against the owner's real ids: `workout-entry` PATCH/DELETE → 404, `workout-sessions` DELETE → 404,
+   `log-exercise` → refused, `prescribe` → 404; owner's rows re-read and unchanged.
+2. **The outbox cannot be wedged** by one bad workout mutation (per-mutation `try/catch`).
+3. **The flow runs end to end** on web — zero uncaught page errors, zero failing `/api/` responses.
+4. **Two near-misses cleared:** the "▲ +2.00 kg" 1RM delta is exact (stored PR is 98, not the 97.5
+   header, which is the previous session's estimate); the warm-up "92% = 70 kg" is a fixed target
+   percentage with plate-rounded weight, by design.
+
+**Method lesson worth keeping: run a control for every ownership probe.** An early `PATCH` returned
+`400 Invalid body`, which reads exactly like protection and was actually my payload breaching the
+schema's `max(500)`. The same-call-as-owner control is what exposed it. Also: the UI drive produced no
+`POST /api/log-exercise` and that is **not** a bug — the POST fires when an *exercise* completes, not
+per set.
+
+### Sweeps 1–2 (2026-08-17, both merged: #16, #38)
+
+**Four of the thirteen findings have already been implemented** by the Implementation lanes — Q-450 (#31),
 Q-451 (#33), Q-452 (#39), Q-457 (#44) — so a Q number missing from the backlog queue is finished, not
-dropped. Six remain open: Q-453, Q-454, Q-455, Q-456, Q-458, Q-459.
+dropped. Nine remain open: Q-453, Q-454, Q-455, Q-456, Q-458, Q-459, Q-460, Q-461, Q-462.
 
 ### Sweep 2 — the public/private boundary as an architectural property
 
@@ -98,10 +132,10 @@ had walked past repeatedly.**
 Pick a lens nothing has covered recently. What this sweep deliberately left, roughly in order of how
 much it is worth:
 
-- **The write surface.** Only `GET` was swept. The same anonymous / degenerate-input matrix against
-  POST/PATCH/DELETE is the obvious next step, and `CLAUDE.md`'s write-path ownership rules
-  (affected-row counts, raw bodies into `.set()`, client-supplied ids on tables with no `user_id`)
-  say exactly what to look for.
+- **The rest of the write surface.** Sweep 3 covered the **workout** mutations only. Still unprobed:
+  the program / phase-set / progression-style / template routes, and every non-workout domain. And
+  rule (b) — **raw request bodies passed into Drizzle `.set()`** — was never systematically audited in
+  any sweep; it is the one of the three ownership rules with no evidence behind it.
 - **The offline path and the error path.** Two of the four failure cells named in the role brief were
   **not** exercised — everything here ran against a healthy server with a live network.
 - **Production data.** This sweep used only the fresh local seed, so it says nothing about prod drift.

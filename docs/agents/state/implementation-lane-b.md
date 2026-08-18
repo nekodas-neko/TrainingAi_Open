@@ -6,7 +6,24 @@
 **Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **357**)
 
 ## Now
-Nothing in flight once PR #50 lands. Eleven items closed today:
+Nothing in flight. PRs #49, #50, #56 and #58 all merged. Thirteen items closed today:
+
+- **Q-389 planned** (PR #56, docs-only) —
+  [plan](../../superpowers/plans/2026-08-17-saved-meal-printable-label.md). **Three trace findings
+  changed the entry:** a 21×21 QR **cannot** hold a meal id (v1 holds 17 bytes; a UUID needs v2
+  25×25, so the pitch is ~16% finer than recorded and the payload must be base64url of the 16 raw
+  bytes with no prefix); the "log one serving" requirement is **already met** by
+  `oneServingItems`/`logMealItems`; and that exposes the real bug — **`SavedMeal.totals` is the whole
+  recipe**, so a naive renderer prints double what scanning the label logs. A parallel session then
+  picked up the 25×25 correction, redrew the mockups and chose **black band** as the default of four
+  cycleable styles; the plan is reconciled to that (PR #58).
+  [Journal](../../overview/entries/2026-08-17-saved-meal-label-plan.md).
+
+- **Q-51 corrected** (PR #58, docs-only) — its ✅ Task 3 reads as closing the entry and does not.
+  Task 3 measured **home** cold start (FCP 472 ms, 439 of it the document fetch); the entry's callout
+  is **first mount of `/workout`** (1086–1348 ms, `rscCount: 0`, entirely client-side), which nothing
+  has measured. File sizes re-measured and both have **grown**: `workout-screen.tsx` 1,831,
+  `session-select-content.tsx` 1,457.
 
 - **Q-281 audit half** (v1.318.10, PR #50) — every surface rendering a pillar score enumerated:
   [`docs/reviews/2026-08-17-score-presentation-audit.md`](../../reviews/2026-08-17-score-presentation-audit.md).
@@ -56,19 +73,33 @@ Nothing in flight once PR #50 lands. Eleven items closed today:
 Work the queue top-down and take the highest Lane-B-owned item, re-verifying its premise against
 `main` first. **The queue re-prioritises daily** — re-read it rather than trusting this list.
 
-**Lane B's implementable queue is drained.** The queue was walked end to end on 2026-08-17: what
-remains for this lane is either held by its own entry, blocked on the owner, or needs a planning PR
-first. Concretely:
+**The queue was walked end to end on 2026-08-17.** Two Lane B items are now *buildable*; the rest are
+held, blocked, or cross-lane.
 
-1. **Q-531** — ⛔ blocked on an owner decision, see below.
-2. **Q-281's UI half** — deliberately held by the entry: it is presentation over numbers that
+**Buildable — take these first:**
+
+1. **Q-389 implementation (PR 2).** The plan is written, the owner has settled every design
+   question, and the aesthetic is chosen. Start at the plan's §5: `label-payload.ts` → encoder
+   dependency → the four-style renderer → preview/delivery → the scan branch. **Do not ship
+   `label-payload.ts` alone** — a shared module with no consumer is the shape Q-301 is filed about.
+   The print test and the scan half are owner/device-side (§7).
+2. **Q-51's residual** — but **measure `/workout` first mount before refactoring anything.** The
+   split is real (1,831 and 1,457 lines, both grown) and Task 1 proved extraction moves **zero**
+   bytes, so the honest case is readability, not perf. It is a large refactor of the core workout
+   flow with no component-test route and device-only verification: scope it deliberately rather than
+   starting it at the end of a session.
+
+**Not startable:**
+
+3. **Q-531** — ⛔ blocked on an owner decision, see below.
+4. **Q-281's UI half** — deliberately held by the entry: it is presentation over numbers that
    Q-500/Q-272/Q-275/Q-277 are about to change, so building it now means building it twice. When it
    is unheld, the audit's recommendation is **trend, not contributors** — only 1 of 14 surfaces shows
    a trend, and contributors are genuinely inapplicable to a chip or a timeline row.
-3. **Q-305's surface half** — needs the cross-item design decision the entry raises (one shared
+5. **Q-305's surface half** — needs the cross-item design decision the entry raises (one shared
    treatment across Q-278 / Q-302 / Q-305, or a third bespoke card) and therefore a planning PR
    first, per the backlog protocol.
-4. **Q-278** — cross-lane: its scope item 1 (generalise `ScoreAvailability`) is `lib/health/`, Lane
+6. **Q-278** — cross-lane: its scope item 1 (generalise `ScoreAvailability`) is `lib/health/`, Lane
    A's. Only the surface sweep is Lane B's, and it depends on item 1. **Read Q-281's audit before
    planning it** — two of its premises are refuted there.
 
