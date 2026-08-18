@@ -198,7 +198,11 @@ const BASELINE = {
   // yet. Without that the section reads as progress against the 500 MB deadline when there is none.
   // Carries the re-measured 819 MB (up from 786) and the Q-315 pointer. Recomputed from the merged
   // file.
-  'projectOverview.md': 6744,
+  // Raised 2026-08-18 (Tuning, Q-503 Sleep Score recalibration): 6735 -> 6751. One Known-Issues row
+  // for the shipped recalibration, marked ⚠️ not ✅ because two things are still owed — an unmarked
+  // step in the trend chart where the old and new model scores meet, and no device verification.
+  // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
+  // other lanes twice, which is the case the note below warns silently drops one side.
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
@@ -230,7 +234,19 @@ const BASELINE = {
   // one: 6894 + the other side's delta = 6988. Both prose blocks above are kept and only the number
   // was rebuilt — splicing either conflict hunk would have silently un-done the other lane's raise,
   // which is what every note in this file keeps warning about.
-  'docs/implementation-backlog.md': 6988,
+  // Raised 2026-08-18 (Tuning, Q-504): 6947 -> 6979. One queue entry for the Readiness range
+  // recalibration, carrying the measured before/after table for the five action thresholds that ride
+  // on the readiness scale — the reason the item is held rather than shipped.
+  //
+  // Recomputed 2026-08-18 (Q-541 task 3, Lane A) from the MERGED files, both numbers rebuilt rather
+  // than spliced: this branch's raises met concurrent ones on both files in the same day, which is
+  // the collision every note above warns about. Lane A's own deltas were +9 on projectOverview (the
+  // disk-full item now states that Tasks 0-3 shipped and the database has NOT shrunk by a byte,
+  // without which the section reads as progress against the 500 MB deadline where there is none)
+  // and +41 on the backlog (the Q-541 status block, and the new Q-315 entry for error_events
+  // holding 4 live rows in 49 MB).
+  'projectOverview.md': 6760,
+  'docs/implementation-backlog.md': 7020,
   'CLAUDE.md': 1010,
 };
 

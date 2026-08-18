@@ -26,7 +26,10 @@ describe('restDayGuidance', () => {
   })
 
   it('adds a low-sleep suggestion in the rest band when sleepScore is low', () => {
-    const g = restDayGuidance({ readinessScore: 40, soreMuscles: [], sleepScore: 45, consecutiveRestDays: 0 })
+    // sleepScore 45 -> 35: LOW_SLEEP_SCORE was re-anchored 60 -> 42 with the 2026-08-17 Sleep Score
+    // recalibration, so 45 is no longer a low night on the new scale (it sits around the owner's 9th
+    // percentile boundary). 35 is unambiguously low under the recalibrated distribution.
+    const g = restDayGuidance({ readinessScore: 40, soreMuscles: [], sleepScore: 35, consecutiveRestDays: 0 })
     expect(g.band).toBe('rest')
     expect(g.suggestions.some(s => s.toLowerCase().includes('sleep score was low'))).toBe(true)
   })

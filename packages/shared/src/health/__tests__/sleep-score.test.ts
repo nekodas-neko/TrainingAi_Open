@@ -124,12 +124,17 @@ describe('computeSleepScore', () => {
     expect(excellent.score).toBeGreaterThanOrEqual(96)
   })
 
-  it('lets a near-perfect night with strong HRV reach 100', () => {
+  it('puts a near-perfect night with strong HRV at the top of the range without pinning it', () => {
     const perfect = computeSleepScore(night({
       durationHours: 9, efficiency: 98, onsetLatencySec: 12 * 60, restlessPeriods: 0,
       remSleepHours: 2.0, deepSleepHours: 1.7, averageHrvMs: 62,
     }), TZ, { hrvBaselineMs: 55 })!
-    expect(perfect.score).toBe(100)
+    // Was `toBe(100)`. The 2026-08-17 recalibration moved the REM ceiling from 2.2 h to 3.0 h, so
+    // 2.0 h of REM is now a good-not-maximal 82 rather than a flat 100 — the owner's own MEDIAN is
+    // 1.86 h, which is what made the old curve unable to separate any two nights. This night is
+    // excellent on every axis and maximal on none, so it belongs just under the ceiling.
+    expect(perfect.score).toBeGreaterThanOrEqual(98)
+    expect(perfect.score).toBeLessThanOrEqual(100)
   })
 
   // HRV is opt-in: only present when a baseline is supplied AND the night has an HRV reading.
@@ -252,8 +257,14 @@ describe('sleep score — autonomic + schedule contributors', () => {
       const allTimeMeanHr = improving.reduce((a, n) => a + (n as unknown as { avgHeartRate: number }).avgHeartRate, 0) / improving.length
       const oldWay = computeSleepScore(night(25, { averageHrvMs: 63, avgHeartRate: 60 }), tz,
         { ...b, hrvBaselineMs: allTimeMeanHrv, hrBaselineBpm: allTimeMeanHr })!
-      expect(oldWay.components.hrv).toBe(100)
-      expect(oldWay.components.hr).toBe(100)
+      // Asserted as a RELATION, not as a literal 100: the 2026-08-17 recalibration moved the
+      // HRV/HR curves so that scoring your own baseline reads ~70 rather than ~90, and the ceiling
+      // now needs a ratio of 1.35 rather than 1.1. The regression being guarded is that a stale
+      // all-time-mean baseline INFLATES both contributors against the same night — which is a
+      // comparison, and survives any recalibration. Pinning it to 100 only held while the curves
+      // saturated early.
+      expect(oldWay.components.hrv).toBeGreaterThan(typical.components.hrv)
+      expect(oldWay.components.hr).toBeGreaterThan(typical.components.hr)
     })
 
     it('ignores nights older than the window', () => {

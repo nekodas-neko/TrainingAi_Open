@@ -2608,6 +2608,38 @@ session working from a temporarily restored copy.
   is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
 
+### [readiness][workouts] Q-504 — recalibrate the Readiness range, and re-anchor the five thresholds that ride on it
+
+- **Branch:** `fix/readiness-range-calibration` · **Lane:** A
+- **Added:** 2026-08-18 · Tuning · owner-directed range work ·
+  [`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](reviews/2026-08-18-sleep-score-range-recalibration.md) §6
+- **Not blocked on the owner** — they directed the range work explicitly. It is held only because of
+  blast radius, and the analysis is already done.
+- **Measured.** Even with v1.319.0's new Sleep Score feeding its `previousNight` term, readiness is
+  mean 68.9, sd 11.6, **IQR 64.4–75.7 (11 points)**, nothing above 87, nothing in the 30s or 40s.
+  Same structural cause as Sleep: a blend of nine contributors shrinks spread by ~1/sqrt(9).
+- **The fix is known and measured.** A `SCORE_CALIBRATION`-style transform on the composite, anchored
+  on its own percentiles (p2/p10/p25/p50/p75/p90/p98 -> 25/42/55/68/81/91/97), gives **mean 66.8,
+  sd 19.3, range 15–99, 4 days >= 90 and 6 below 50** — the owner's stated acceptance test.
+- **Why it is not shipped: five action thresholds ride on the readiness scale**, and the change moves
+  **12 of 26 days across at least one.** Days below each, now -> after: early-deload `<45` **1 -> 4**;
+  band `50` 1 -> 6; AI low-readiness `<60` 4 -> 8; band `70` 12 -> 15; rest-day "train hard" `>=75`
+  19 -> 17.
+  - The **band** moves (50, 70) are the intended outcome — more days reading "Low" is what a working
+    range looks like. Leave them.
+  - The **action** thresholds are not. Shipping as-is quadruples early-deload firing, which the owner
+    did not ask for. Re-anchor each to preserve its firing RATE, exactly as `LOW_SLEEP_SCORE`
+    60 -> 42 was handled in v1.319.0 (that PR's §5 is the worked example).
+- **Files:** `packages/shared/src/health/readiness-composite.ts` (the calibration),
+  `lib/health/readiness-payload.ts:47` (`EARLY_DELOAD_SCORE_MAX`),
+  `packages/shared/src/ai-periodization/ai-dynamic.ts:231`,
+  `packages/shared/src/health/rest-day-guidance.ts:36,46`, `lib/oura-models/inference/ots.ts:151`.
+- **Sequencing:** **Q-273 (model versioning) first, or stamp a readiness version in the same PR.**
+  Sleep shipped without one and its trend chart now has an unmarked step at the changeover — do not
+  repeat that on readiness. **Q-500 (Recovery Index anchor 6 -> 5) becomes lower priority** once this
+  lands: it was a 1-point correction aimed at the same range problem this fixes wholesale, and it
+  should be re-measured *after* this rather than stacked with it.
+
 ### [readiness][body] Q-502 — Body Battery's tuning substrate is a biased sample of each day
 
 - **Branch:** `fix/body-battery-end-of-day-snapshot`
