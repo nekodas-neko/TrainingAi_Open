@@ -166,12 +166,23 @@ const BASELINE = {
   // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
+  // Raised 2026-08-17 (Q-389 planning, Lane B): backlog 6781 -> 6791. Recomputed from the merged
+  // file — this collided with a concurrent raise to 6781, exactly the same-day collision this file
+  // keeps warning about, and splicing would have silently un-done that side. Three corrections folded into
+  // the existing Q-389 entry rather than filed separately, per the "a wrong correction is more
+  // expensive than a long one" precedent above: its QR module maths was ~16% optimistic (a 21x21
+  // code cannot hold a UUID at all — v1 holds 17 bytes, so the floor is v2 25x25 and the pitch is
+  // 0.49-0.64mm, on a margin the entry already calls thin); its per-serving worry is already
+  // satisfied by oneServingItems; and that in turn exposes the real bug, that SavedMeal.totals is
+  // the whole recipe, so a naive renderer prints double what scanning the label logs. Each is
+  // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
+  // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
   'projectOverview.md': 6689,
   //
-  // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6781 -> 6791. RECOMPUTED FROM THE MERGED FILE, not
-  // spliced — both sides of this line moved on the same day (Lane A's +10 status block and the
-  // Q-530 raise to 6781), which is precisely the collision the notes above keep warning about.
-  'docs/implementation-backlog.md': 6791,
+  // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
+  // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
+  // landed the same day and each pass would have silently un-done the other side.
+  'docs/implementation-backlog.md': 6801,
   'CLAUDE.md': 1010,
 
 };
