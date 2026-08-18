@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×27) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **493**)
+**Updated:** 2026-08-18 · **By:** thirty sweeps (2026-08-17 ×2, 2026-08-18 ×28) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **497** — ⚠️ only 3 left in band)
 
 ## Now
 
-Twenty-nine sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -22,7 +22,56 @@ least once**, at the owner's request to work through the sections:
 **Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
-against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 30 — the secret-gated ingest route, driven for real (2026-08-18)
+
+**Filed Q-493 (high), Q-494 (high), Q-496 (medium), Q-495 (low).** Write-up:
+[`docs/reviews/2026-08-18-health-connect-ingest.md`](../../reviews/2026-08-18-health-connect-ingest.md).
+
+**Closed the last reachable item on this baton's own open list.** `health-connect/ingest` had sat
+untested since sweep 1 because it needs `HEALTH_CONNECT_INGEST_SECRET` set — every earlier sweep read
+it and moved on. Setting the secret locally took about a minute. **The lesson: "needs configuration"
+kept a surface untested for 29 sweeps, and it was never a real barrier.** Check the remaining open
+list for others of that shape before assuming they are as blocked as they look.
+
+**Q-493 — the SEC-I3 brute-force gate is bypassed by rotating one header.** Every limiter keys on
+`x-forwarded-for`'s **leftmost** hop, which the client supplies. Both attacks return 401 throughout
+*by design*, so the status code proves nothing — **the observable is the `rate_limits` table**: fixed
+header → 1 key at 20 (gate engaged), rotating → **30 keys at 1, all reaching the compare**. Seven
+sites, incl. `admin/day-review`. The R1 security-hardening plan *propagated* the pattern.
+
+**⚠️ One dependency deliberately left unverified:** whether Railway's proxy sanitises the header.
+Probing production's limiter to find out was not done unasked. Recorded in all four artifacts as
+unverified, with the note that the fix does not depend on it.
+
+**Q-494 — a far-future date permanently captures every `desc(date).limit(1)` read.** 81 kg → **499 kg**,
+unbeatable until the year 9999. The ranked source merge protects a column *on a given date*; it is
+structurally silent about a row on a date nothing else will ever write.
+
+**⚠️ Ran that generalisation as a follow-up lens in the same sweep, and it paid twice.** (1) All ten
+`desc(...).limit(1)` readers were enumerated — the other nine read server-derived or device-monotonic
+columns, and `workoutSessions.completedAt`, the one that *was* exposed, is already guarded. So the
+lens **closed** rather than opening a new front. (2) Far more useful: it surfaced that
+`packages/shared/src/validation/ingest-clock.ts` **already exists for exactly this**, guards
+`scale-ble/samples` and (downstream) `oura-ble/samples`, and that the workout path got its own guard
+at **Q-24 §7** — whose comment says `completedAtMs` *"was accepted unbounded and uncompared"*, the
+same sentence that describes `date` here. **`health-connect/ingest` is the only health-write ingest
+path with no clock bound anywhere in its chain.** Q-494 went from "a range check is missing" to "the
+sibling-surface rule was missed twice, and here is the module to use."
+
+**Generalise every finding once before filing it.** Ten minutes of `grep` turned a bespoke fix into a
+one-formula-one-place fix and told the implementer which helper to call. It also bounded the finding
+— without it, "any latest-X reader has this shape" would have gone in the baton as an open worry, and
+it is not one.
+
+**Method note — the observable was not the status code.** Two of four findings were invisible in the
+HTTP response (the limiter deliberately returns an identical 401; the coercion returns
+`{"success":true}`). Both needed a direct read of what actually landed in Postgres. **A route probe
+that only reads response bodies would have found neither.**
+
+**Cleanup is part of the sweep:** every row created in `body_metrics`, `error_events` and
+`rate_limits` was deleted and the pre-probe 81 kg reading verified restored.
 
 ### Sweep 29 — every count in `CLAUDE.md`, verified mechanically (2026-08-18)
 
