@@ -599,7 +599,13 @@ const BASELINE = {
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
   // invalidates PR #85's claim.
-  'docs/implementation-backlog.md': 9138,
+  // Raised 2026-08-18 (Q-399, Q-400 — BugFix intake). Two owner reports against v1.324.6, both
+  // on the label that shipped hours earlier. Q-399 carries the worked arithmetic proving the new
+  // default can never draw an ingredient line at any name size, and the harder finding behind it:
+  // the centred stack cannot carry the full list AND a better code than the old default, so the
+  // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
+  // both its paths only work on web, which is the green-on-web dead-on-device class.
+  'docs/implementation-backlog.md': 9214,
   'CLAUDE.md': 1075,
 
 };
