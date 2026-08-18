@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, malformed-route-id sweep, Q-482/Q-483): backlog 9049 -> 9138,
+// projectOverview 7243 -> 7277. Two queue entries and the row indexing them. Q-482 carries its
+// 14-route table inline because the finding IS the list — an implementer needs to know which routes
+// to guard, and re-deriving it means re-running 39 probes. Both carry the evidence-reading caveat
+// (a 500 is conclusive, a 400 is not, because the probe sent an empty body) — without it the routes
+// absent from the table read as verified-correct, which they are not.
+
+//
 // Raised 2026-08-18 (Review, empty/n=1 account sweep): projectOverview 7213 -> 7243. No queue entry
 // — the sweep found nothing to file. The row exists for the method correction inside it: a probe
 // that greps a JSON response for NaN/Infinity detects neither, because JSON.stringify serialises
@@ -586,12 +594,12 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7243,
+  'projectOverview.md': 7277,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
   // invalidates PR #85's claim.
-  'docs/implementation-backlog.md': 9049,
+  'docs/implementation-backlog.md': 9138,
   'CLAUDE.md': 1075,
 
 };
