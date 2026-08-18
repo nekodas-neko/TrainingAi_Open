@@ -152,6 +152,15 @@ const root = path.join(__dirname, '..');
 // ~12px higher than an unflagged one on a chart whose purpose is comparing days. The entry carries
 // the geometry, because that is the part an implementer would otherwise fix cosmetically and leave
 // broken. Rebuilt from origin/main's numbers rather than spliced.
+//
+// Raised 2026-08-18 (BugFix intake, Q-391): one owner-reported queue entry. The owner asked for a
+// calories-burnt stat on the day screen's Training card. The trace found the feature had already
+// been considered and deliberately deferred, with both the blocker (estWorkoutKcal from a client
+// component) and the intended shape (server-side in /api/day-log) already on record — so the entry
+// cites that rather than re-deriving it, and carries the two things that would otherwise be got
+// wrong: the existing workoutKcal is a DAY total already rendering in the same screen's Energy
+// section, and the estimate is duration-only, so sitting it beside measured volume implies a
+// derivation that does not exist.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -211,7 +220,13 @@ const BASELINE = {
   // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
   // other lanes twice, which is the case the note below warns silently drops one side.
 
-  'projectOverview.md': 6843,
+  //
+  // Raised 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A): 6843 -> 6853. Ten lines on the
+  // disk-full item, and they carry the one distinction that item most needs: the outage's MECHANISM
+  // is gone, not merely mitigated — with every reader deriving the timestamp, the re-stamp that
+  // rewrote 681,005 rows is a no-op. Plus the caveat that keeps the number honest: 136 MB is the
+  // measured index size, not a reclaim that has happened, since the drop runs on the next deploy and
+  // the space only returns to the file after a VACUUM FULL.
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
@@ -255,6 +270,12 @@ const BASELINE = {
   // and +41 on the backlog (the Q-541 status block, and the new Q-315 entry for error_events
   // holding 4 live rows in 49 MB).
   //
+  // Raised 2026-08-18 (Q-541 task 4, Lane A): 7020 -> 7055. Two things: the Q-541 status block gains
+  // the packer's settled decisions, and Q-316 is a NEW entry — the packer has no button because
+  // components/** is Lane B's, so the affordance is filed rather than written. Its 23 lines are what
+  // stop the next lane building the wrong thing: the route contract it should call, and the warning
+  // that its confirm copy must not read like the lossless VACUUM beside it, because this is the one
+  // control in the app that deletes archival frames.
   // Raised 2026-08-18 (Q-389 shipped, Lane B): projectOverview -> 6862, backlog -> 7109, BOTH
   // recomputed from the merged files after a fourth same-day ratchet collision on this branch.
   // The backlog number is DOWN on the incoming 7276 because Q-389's 145-line entry was removed on
@@ -265,13 +286,52 @@ const BASELINE = {
   // sandbox. Neither can go to the resolved archive while it is still owed, and neither is
   // discoverable from the diff. The backlog SHRANK by 145 lines in the same PR - Q-389's entry was
   // removed on completion - so the net across both index files is well down.
-  'projectOverview.md': 6862,
   // Raised 2026-08-18 (Tuning, Q-505): 7020 -> 7056. One queue entry for the Activity Score decision,
   // carrying the measured cause and the two coherent answers inline — the item is blocked on the
   // owner choosing between them, and an implementer must not have to open the review to learn that.
   // Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
-  'docs/implementation-backlog.md': 7109,
-  'CLAUDE.md': 1010,
+  //
+  // Recomputed 2026-08-18 (Q-541 task 4, Lane A) from the MERGED files — all three numbers rebuilt,
+  // not spliced, because both files moved on both sides of this merge. Lane A's own delta was the
+  // Q-541 status block for the packer plus the new Q-316 entry (the packer has no button, because
+  // components/** belongs to the other lane, and the entry carries the warning that its confirm copy
+  // must not read like the lossless VACUUM beside it).
+
+  //
+  // Recomputed 2026-08-18 (Q-541 task 4, Lane A) from the MERGED files — every number rebuilt, no
+  // hunk spliced. Lane A's own delta was the Q-541 packer status block plus the new Q-316 entry
+  // (the packer has no button, because components/** belongs to the other lane, and the entry
+  // carries the warning that its confirm copy must not read like the lossless VACUUM beside it).
+
+
+  //
+  // Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files. Lane A's
+  // own deltas: +10 on projectOverview, carrying the distinction that item most needs — the outage's
+  // MECHANISM is gone, not merely mitigated, because with every reader deriving the timestamp the
+  // re-stamp that rewrote 681,005 rows is a no-op — plus the caveat that keeps the 136 MB honest (it
+  // is the measured index size, not a reclaim that has happened). On the backlog, finding 4 is
+  // struck in place with the three consequences the entry did not anticipate, so the next session
+  // does not re-derive them or assume findings 1-3 went with it.
+  // Raised 2026-08-18: 1010 -> 1044. The "Decisions That Come Back To Me" section, which sets the
+  // default shape for anything gated on an owner decision — recommendation first, alternatives with
+  // what each is better at, reversal cost, plain English — and pushes cheap reversible choices back
+  // down to the session rather than surfacing them. It belongs in the index: it governs every
+  // session's behaviour rather than recording one session's work. Drafted at 49 lines and cut to 34
+  // before raising, since a rule about brevity that arrives verbose argues against itself.
+  // Recomputed from the MERGED file after three same-day collisions with concurrent raises.
+
+  //
+  // Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files, on each of
+  // the two merges this branch took. Lane A's delta: +10 on projectOverview carrying the one
+  // distinction that item needs — the outage's MECHANISM is gone rather than mitigated, because with
+  // every reader deriving the timestamp the re-stamp that rewrote 681,005 rows is a no-op — plus the
+  // caveat that keeps the 136 MB honest (measured index size, not a reclaim that has happened). On
+  // the backlog, finding 4 is struck in place with the three consequences the entry did not
+  // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
+  'projectOverview.md': 6871,
+  'docs/implementation-backlog.md': 7207,
+  'CLAUDE.md': 1044,
+
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;

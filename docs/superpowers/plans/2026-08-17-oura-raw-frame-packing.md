@@ -217,8 +217,39 @@ Verified end to end on `pnpm dev` by rehearsing the packer by hand over four see
 summary, per-tag counts, raw dump and ds span are **byte-identical across all three states** —
 all-hot, both-tiers, and hot-rows-deleted — with half the frames readable only from a blob.
 
-**Task 4 — the packer**, per §6. Admin-triggered first (a button beside Redecode/VACUUM), bounded per
-call, idempotent, resumable. **Not automatic on deploy**, same posture as Lever 1b/1c.
+**Task 4 — ✅ SHIPPED** as `lib/data/postgres/slices/oura-raw-pack.ts` +
+`GET|POST /api/oura-ble/samples/pack`. Admin-gated, bounded (default 25 buckets, cap 200),
+idempotent, resumable, rate-limited. **Not automatic on deploy**, same posture as Lever 1b/1c.
+The `GET` reports what is packable without touching anything.
+
+Four decisions the plan left open, settled here:
+
+- **The hot window is anchored to `max(ring_timestamp_ds)`, not to `now()`.** A ring that has not
+  synced for a month must not become fully packable just because time passed — phase 1's whole point
+  is that a bucket the ring may still deliver into stays hot.
+- **Plus a wall-clock quiet guard** (`max(recorded_at) < now() - 1 day`). The ds guard alone is not
+  enough: `ring_timestamp_ds` says when the ring *recorded* a frame, not when we received it, and a
+  re-drain delivers week-old ds values today. Without this a bucket being actively re-drained looks
+  eligible on its ds and gets packed mid-delivery.
+- **`body_sha256` hashes the frame *sequence*, not the blob.** Hashing the blob going in and
+  re-hashing the same blob coming out proves only that Postgres stored the bytes, which the re-read
+  already proves. Hashing `ds:hex` per frame makes it an independent check, so a codec bug that
+  round-trips a blob while mangling a frame cannot pass both. There is a test for exactly that case —
+  a self-consistent blob holding different frames.
+- **`ON CONFLICT DO NOTHING`, never `DO UPDATE`.** An existing blob is either already verified (then
+  re-verify and delete) or the residue of a failed verify (then it must be re-examined, not silently
+  overwritten).
+
+A refused bucket is returned in the result, not thrown: one bad bucket must not stop the ones behind
+it, and what prevents the real hazard is the verify, not aborting the run.
+
+**Verified live**, not only in tests: 251 seeded frames across 10 buckets driven through the route on
+`pnpm dev` — 250 moved into **2,800 bytes of blob** (≈29× against ~328 B/row), bounded 3-then-7 with
+`remaining` correct, idempotent on a second press, and the API's full frame dump **hashes identically
+before and after** (251 rows, same SHA). 13 tests, and the refuse-to-delete guard is mutation-checked.
+
+⚠️ **The admin button is NOT built** — `components/oura-ble/db-footprint-card.tsx` is Lane B's
+territory. Filed as Q-316. The route is fully usable without it.
 
 **Task 5 — backfill.** Run the packer over all history in bounded batches. 968 blobs is small; the
 delete side is 1.1M rows, so batch it and **`VACUUM FULL` after**, not during.
@@ -226,9 +257,31 @@ delete side is 1.1M rows, so batch it and **`VACUUM FULL` after**, not during.
 **Task 6 — hot-window prune.** Only after Task 5 has verified clean: a throttled prune matching the
 existing `shouldPrune` pattern in `adapter.ts`, deleting hot rows whose bucket is sealed and packed.
 
-**Task 7 — measured_at range queries.** `idx_oura_raw_samples_user_measured` is dropped by the index work in Q-534; any
-surviving read that filters by wall-clock converts its range to a ds range through the anchors first.
-Confirm the set is empty or convert it.
+**Task 7 — ✅ SHIPPED, and it turned out to include the Q-534 index drop itself.** The set was not
+empty: two readers filtered on the stored `measured_at`. Both now convert their wall-clock window to
+a ring ds range through the anchors and read ds-keyed (two-tier, for free) —
+`getOuraRawSamplesForTags` via `resolveMsToDs`, `getLatestOuraBleMeasuredAt` via
+`max(ring_timestamp_ds)` across both tiers. **Migration 193 drops the index: 136 MB.**
+
+Three things this forced that the plan had not anticipated:
+
+- **The stored `measured_at` and `event_name` columns became dead**, so the redecode's re-stamp/
+  refresh loop was writing values nothing reads. It is now a documented no-op. **That loop is what
+  filled the disk on 2026-08-17** — `measured_at` being indexed made a changed-value UPDATE
+  ineligible for HOT, so production recorded 1,324,792 updates against 740,966 rows with **19** HOT.
+  Q-46's `IS DISTINCT FROM` guard bounded it but could not remove it, because the Q-71/Q-536 clock
+  fixes made every row genuinely distinct. Deriving at read time removes the operation, and with it
+  the reason the documented remedy for five ops-doc failure modes was a disk-fill hazard.
+- **`/api/oura/stats` was reading `connected` off "we can name a last-measured time"**, and those
+  stopped being the same question once the time became derived — a ring with frames but no resolvable
+  anchor would have read as disconnected and silently taken the Health tab's whole Ring section with
+  it. Split into `hasOuraBleSamples`, which is also the cheaper query.
+- **A test fixture stamped `measured_at` by hand with no clock anchor** — a state production cannot
+  be in, since anchors are append-only and every stamp came from one. Its ds and wall-clock columns
+  described different histories, which was invisible while nothing derived one from the other.
+
+Deliberately NOT done: dropping the now-dead `measured_at` and `event_name` **columns**. That is a
+data-dropping migration and owner-gated; the index drop is reversible with one `CREATE INDEX`.
 
 ## 8. Call sites this touches
 

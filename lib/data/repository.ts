@@ -911,6 +911,9 @@ export interface WorkoutRepository {
   getLatestOuraCloudVitals(userId: string): Promise<{ date: string; vo2Max: number | null; vascularAge: number | null } | null>
   /** Newest `measured_at` across the user's BLE raw samples — the ring's freshness truth. */
   getLatestOuraBleMeasuredAt(userId: string): Promise<Date | null>
+  /** Has the ring ever reported? Answers "is it connected" without needing a resolvable clock
+   *  anchor — see the note on the implementation for why those are different questions. */
+  hasOuraBleSamples(userId: string): Promise<boolean>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────
@@ -979,6 +982,11 @@ export interface WorkoutRepository {
   getOuraStorageStats(): Promise<OuraStorageStats>
   nullHistoricalDecoded(userId: string, maxRows?: number): Promise<{ nulled: number; remaining: number }>
   vacuumOuraRawSamples(): Promise<{ beforeBytes: number; afterBytes: number; reclaimedBytes: number; ms: number }>
+  /** Q-541 Task 4 — move sealed buckets of raw frames into `oura_raw_packed`. Bounded per call,
+   *  idempotent, resumable; deletes a hot row only after re-reading its blob and proving the frames
+   *  equal. Admin-triggered only — never runs on deploy. */
+  packOuraRawBuckets(userId: string, maxBuckets?: number): Promise<import('./postgres/slices/oura-raw-pack').PackRunResult>
+  countPackableBuckets(userId: string): Promise<{ buckets: number; sealBelowDs: number | null }>
   /**
    * Track-B dedicated timeseries pull (B2). Serves `oura_heartrate` + coarse `oura_bucket`
    * on a SINGLE pooled connection (never the shared getSyncDelta fan-out) with an exact

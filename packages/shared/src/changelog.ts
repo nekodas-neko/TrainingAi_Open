@@ -6,6 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.321.1",
+    date: "2026-08-18",
+    changes: [
+      "The times on your ring's raw events are now worked out fresh from the ring's clock every time they are read, instead of being written onto each event once and left there. The stored copy went stale twice this year when the clock maths was corrected, and rewriting a million of them is what filled the disk last week \u2014 that rewrite no longer happens at all, and Redecode no longer performs it.",
+      "Freed 136 MB by removing an index that only existed to support the old stored timestamps.",
+      "Fixed: the Health tab's Ring section decided whether your ring was connected by asking whether it could name a last-reading time. Those are different questions, and the section would have vanished silently for a ring that had reported but whose clock could not be pinned down. It now asks whether the ring has reported at all.",
+    ],
+  },
+  {
+    version: "1.321.0",
+    date: "2026-08-18",
+    changes: [
+      "Readiness now scores the Recovery Index against a 5-hour target instead of 6. That number used to come from Oura\u2019s public wording; it has now been fitted against Oura\u2019s own version of the same measurement, using the 15 nights before your ring was re-keyed where both exist side by side. Ours tracks theirs closely but was reading about 10 points low every night. Expect readiness to read roughly half a point to one and a half points higher \u2014 no day goes down, and nothing about deload or rest-day advice changes on any day measured.",
+      "Readiness scores now record which version of the model produced them, so a future scoring change can be told apart from a change in your actual data. Sleep scores from before yesterday do not have this, which is why the sleep trend has a step in it.",
+    ],
+  },
+  {
     version: "1.320.0",
     date: "2026-08-18",
     changes: [

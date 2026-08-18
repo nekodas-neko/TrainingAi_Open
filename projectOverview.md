@@ -368,6 +368,16 @@ differ — vacuum alone re-crosses it in ~5 days, with the index+row work ~7 wee
 under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
 **do not run another Full re-sync until this is resolved**; that is what triggered it.
 
+**Progress, 2026-08-18 — part 2.** Q-534's **finding 4 is done**: both readers of the stored
+`measured_at` were rewritten to convert their window through the clock anchors and read ds-keyed, and
+migration **193** drops `idx_oura_raw_samples_user_measured` — **136 MB**, the single largest
+reclaim available without moving a row. It also **removes the outage's mechanism rather than
+mitigating it**: with every reader deriving the time, the stored column is dead, so the redecode's
+re-stamp — the non-HOT full-table rewrite that filled the disk — is now a no-op. Findings 1–3 of
+Q-534 (payload-in-index, autovacuum never having run, `work_mem`) are still open. ⚠️ The 136 MB is
+the measured size in production, **not a reclaim that has happened** — the drop runs on the next
+deploy's `ensureSchema`, and the space returns to the file only after a `VACUUM FULL`.
+
 **Progress, 2026-08-18.** Q-541 Tasks 0–3 have shipped (v1.318.11–12) — the `oura_raw_packed` table,
 the codec, and the two-tier reader every raw-frame read now goes through. **⚠️ None of it has moved a
 row**: nothing writes a blob yet, so the database has not shrunk by a byte and the size numbers above
@@ -1001,15 +1011,14 @@ one backlog entry per finding, **Q-271 … Q-284**.
   0.00 h**. On 2026-08-11 and 2026-08-13 the fragment is the *entire* record for the date. These feed
   `previousNight` (16% of readiness) and `sleepBalance` (10%). **This is the sweep Q-225 asked for,
   and it found at least one more night sharing 08-13's signature.**
-- **🟠 The Recovery Index anchor is ~1 h too high — Q-271 SUPERSEDED by Q-500 (2026-08-17).** The
-  original finding ("never above 50, ever", "~2.2 points/day") was measured over **eight** days: over 41
-  the contributor exceeds 50 on **12**, hits **100 on 2026-07-17**, and costs **0.71** points/day. What
-  is real is a systematic **−10.2-point** bias — fitted against Oura's own `recovery_index` contributor
-  on the 15 nights where both exist, the zero-bias anchor is **4.63 h** (LOO 4.40–5.14), not 6. The
-  shipped estimator is **sound** (r = +0.712, beating every alternative tested) and must not change.
-  Proposal: `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5, moving 40 of 41 days by at most **1.44** readiness
-  points. **⛔ Blocked on owner sign-off.**
-  [`docs/reviews/2026-08-17-readiness-calibration.md`](docs/reviews/2026-08-17-readiness-calibration.md)
+- **✅ The Recovery Index anchor is fixed — Q-500 SHIPPED v1.320.0 (2026-08-18).** Q-271's headline
+  ("never above 50, ever", "~2.2 pts/day") was measured over **eight** days and did not survive: over
+  41 the contributor exceeds 50 on **13** and costs **0.55** pts/day. The real defect was a systematic
+  **−10.2-point** bias, fitted against Oura's own contributor over the 15 nights where both exist —
+  zero-bias anchor **4.63 h**, shipped as **5**. The estimator is sound (r = +0.712, beating every
+  alternative) and unchanged. Thresholds deliberately not re-anchored: this is a bias correction, not
+  a scale change. `READINESS_MODEL_VERSION` → `v3:ri5:2026-08-18`.
+  [`review`](docs/reviews/2026-08-17-readiness-calibration.md)
 - **🟠 A stored readiness score cannot be re-derived from the inputs stored beside it (Q-501, 2026-08-17).**
   `oura_daily_summary` rows get recomputed; the derived readiness rows built from them do not follow, so
   **5 of 33** persisted `recoveryIndex` sub-scores disagree with their stored hours (worst: 2026-07-20,
