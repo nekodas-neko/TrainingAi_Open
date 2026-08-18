@@ -69,6 +69,25 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][app-shell] 🟢 Printable saved-meal labels shipped (Q-389) — TWO owed checks, both physical (2026-08-18, v1.320.0)
+
+- **⚠️ Owed 1 — the print test, and it is a real gate not a formality.** The code is **25×25
+  modules** (a UUID cannot fit 21×21), so on the circle-safe layouts the pitch is **0.49–0.66 mm per
+  module** — band, the default, is the tightest. **Print black band and scan it before relying on
+  this**: if the default scans, the other three do. Ink spread on a home printer merging fine modules
+  is the expected failure, and it will present as "the scanner doesn't work" rather than as a print
+  problem. The preview sheet prints the measured mm-per-module under the label so the number is
+  visible rather than assumed.
+- **⚠️ Owed 2 — the scan-back on device.** QR decoding runs through the Capacitor plugin, which is
+  inert in the sandbox, so **the scan branch has never executed against a real camera.** The decode,
+  the meal lookup and the logging are unit-tested and the label half is E2E-guarded; the camera path
+  is not.
+- **Delivery is Web Share, not a Capacitor plugin** — deliberate, because `@capacitor/share` would
+  have meant a new APK. `navigator.share({files})` reaches the system sheet (where a print app
+  lives); `<a download>` is the browser fallback. **The share path is also device-unverified.**
+- The label prints **per-serving** figures and scanning logs **one serving** — asserted against each
+  other in one unit test, because that is the pair that would otherwise drift.
+
 ### [readiness][sleep][heart-rate][body][devices] 🟢 The ingest surface reviewed — auth model and value validation both sound; two schema gaps (Q-464, Q-465, 2026-08-18)
 
 - **Why a different lens.** These five pillars barely expose `[id]` write routes — they are

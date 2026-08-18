@@ -260,6 +260,16 @@ const BASELINE = {
   // stop the next lane building the wrong thing: the route contract it should call, and the warning
   // that its confirm copy must not read like the lossless VACUUM beside it, because this is the one
   // control in the app that deletes archival frames.
+  // Raised 2026-08-18 (Q-389 shipped, Lane B): projectOverview -> 6862, backlog -> 7109, BOTH
+  // recomputed from the merged files after a fourth same-day ratchet collision on this branch.
+  // The backlog number is DOWN on the incoming 7276 because Q-389's 145-line entry was removed on
+  // completion, which is what finishing an item is supposed to do to this file. A shipped feature whose
+  // two remaining checks are both PHYSICAL and cannot be automated at all: a test print (the QR is
+  // 0.49-0.66mm per module, so ink spread is the expected failure and it presents as "the scanner is
+  // broken"), and the camera scan path, which the Capacitor plugin makes unreachable from the
+  // sandbox. Neither can go to the resolved archive while it is still owed, and neither is
+  // discoverable from the diff. The backlog SHRANK by 145 lines in the same PR - Q-389's entry was
+  // removed on completion - so the net across both index files is well down.
   // Raised 2026-08-18 (Tuning, Q-505): 7020 -> 7056. One queue entry for the Activity Score decision,
   // carrying the measured cause and the two coherent answers inline — the item is blocked on the
   // owner choosing between them, and an implementer must not have to open the review to learn that.
@@ -270,8 +280,14 @@ const BASELINE = {
   // Q-541 status block for the packer plus the new Q-316 entry (the packer has no button, because
   // components/** belongs to the other lane, and the entry carries the warning that its confirm copy
   // must not read like the lossless VACUUM beside it).
-  'projectOverview.md': 6843,
-  'docs/implementation-backlog.md': 7289,
+
+  //
+  // Recomputed 2026-08-18 (Q-541 task 4, Lane A) from the MERGED files — every number rebuilt, no
+  // hunk spliced. Lane A's own delta was the Q-541 packer status block plus the new Q-316 entry
+  // (the packer has no button, because components/** belongs to the other lane, and the entry
+  // carries the warning that its confirm copy must not read like the lossless VACUUM beside it).
+  'projectOverview.md': 6862,
+  'docs/implementation-backlog.md': 7144,
   'CLAUDE.md': 1010,
 
 };
