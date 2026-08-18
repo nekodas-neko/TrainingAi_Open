@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **194** | `lib/data/postgres/migrations/` (head: `193_drop_oura_raw_samples_measured_index.sql`) |
+| Next free Postgres migration | **196** | `lib/data/postgres/migrations/` (head: `195_claude_ro_views_rekey_declarations.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -596,45 +596,27 @@ blocker and the intended shape were both already named, so **do not re-derive th
 - **Verification:** the affordance must be shown to work while the key is present, and the warning
   shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
 
-### [devices][platform] Q-314 — a history re-drain is detected as a ring-clock reset, and every re-pair reopens Q-536
+### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
-- **Branch:** `fix/ble-clock-reset-vs-redrain`
-- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts` (the ingest anchor path
-  around `isClockEpochReset`).
-- **Added:** 2026-08-17, from the Q-536 diagnosis. **Q-536 is now shipped and confirmed on the
-  owner's device** (v1.318.2 + the 10:47 redecode: the midday cluster went 43 nights → 4, and the
-  survivors are short daytime fragments, not bedtimes). This entry is the mechanism that caused it,
-  it is **still live**, and it will do the same thing again on the next re-pair.
-- **What happens.** `isClockEpochReset(batchMaxDs, epochMaxDs)` (`clock.ts`) opens a new clock epoch
-  whenever a batch's max `ds` regresses more than `EPOCH_REGRESSION_TOLERANCE_DS` (36,000 ds = 1 h)
-  below the epoch's high-water mark. After a re-pair the app holds no sync cursor, so the ring
-  replays days of buffered history — a regression of **4.75 days** on 2026-08-17 — and that reads as
-  a reset. It is not: the counter is continuous across the boundary (epoch 3's first sample above
-  epoch 2's ceiling is ds 37,112,507 against 37,112,321, a gap of **18.6 s**), and the minimum
-  anchor lag agrees across all four epochs to within **50 s**.
-- **Why it is expensive.** A spurious epoch becomes `currentEpoch(anchors)`, and its offset is
-  estimated from a burst in which >90% of anchors carry re-drain backlog — so it lands ~14 h wrong.
-  `aggregateOuraRawSamples` resolves every ds against `currentEpoch`, so **one re-pair re-times the
-  entire sleep history**. It has now happened twice (2026-07-30 → epoch 1, +12.17 h; 2026-08-17 →
-  epoch 3, +14.16 h); the first self-healed within 7 minutes when epoch 2 opened, the second did not.
-- **The open design question — this is why it is filed rather than fixed.** How do you tell a
-  re-drain from a genuine re-key? Candidates, none yet chosen:
-  - **Absolute floor.** `clock.ts`'s own comment says a real reset "drops the counter to near zero",
-    so require `batchMaxDs` below some absolute threshold rather than merely below the high-water
-    mark. Clean against both observed events (17.4 M and 33.0 M ds, neither near zero) — but the
-    threshold is a guess, and a re-key not synced for longer than it would be missed.
-  - **Overlap test.** A re-drain replays ds values already stored; a reset produces genuinely new
-    low ones. Checkable against `oura_raw_samples`, at the cost of a query on the biggest table in
-    the DB in the ingest path.
-  - **Make it explicit.** A re-key is a deliberate act (`clearKey` / re-pair). Have that path
-    declare the new epoch instead of inferring it from counter shape.
-  - ⚠️ **There is no observed true reset in the data** — both epoch openings were re-drains — so any
-    threshold chosen here is unvalidated against the case it exists for. Getting this wrong in the
-    other direction (missing a real re-key) is worse and quieter than the current failure.
-- **Do not fix by lowering `robustOffsetMs`'s percentile.** Measured on the drained epochs: p1 is
-  already +1.28 h contaminated and only the two smallest anchors are clean. See Q-536.
-- **Verification:** unit tests over both measured re-drain events and a synthetic true reset; the
-  re-pair path can only really be exercised on device.
+- **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
+  Lane A's and already shipped (Q-314).
+- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Why it matters more than a convenience.** The whole point of Q-314 is that a re-key is
+  **declared** rather than inferred, because inferring it from counter shape re-timed the owner's
+  entire sleep history twice. A declaration nobody can make in the app is a declaration that will be
+  forgotten at exactly the moment it is needed — right after a re-key, on a laptop, mid-`open_oura`.
+- **What exists:** `GET /api/oura-ble/rekey` → `{ pending: { id, declaredAt } | null }`;
+  `POST` (optional `{note}`, idempotent — declaring twice returns the pending one and says so);
+  `DELETE` cancels an un-consumed one. Admin-gated, POST rate-limited 5/min.
+- **Shape:** a control in the BLE admin console. It must say plainly that **nothing happens until the
+  ring next reports** — the effect is deferred because the new ds is not knowable at declaration
+  time, and a button that looks like it acted immediately would invite a second press or a "did it
+  work?" Show `pending` from the `GET` so the waiting state is visible, and offer cancel while it is
+  pending.
+- ⚠️ **Do not offer cancel once it is consumed.** The API refuses, correctly: the epoch it opened
+  already exists and every timestamp derived from it depends on that row as the audit trail.
+- **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
+  idempotency and the 401). This item is the affordance only.
 
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 
@@ -3065,6 +3047,102 @@ session working from a temporarily restored copy.
 - **Worth checking in the same pass:** whether the other baselines cold-start the same way and simply
   recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
   they say nothing about night 5.
+
+### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
+
+- **Branch:** `fix/stress-override-input`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-stress-resilience-calibration.md`](reviews/2026-08-18-stress-resilience-calibration.md) §1
+- **What it drives.** `STRESS_HIGH_DAY_THRESHOLD_MIN = 120` raises a stress override in
+  `computeAiDynamicNextSession`, easing the day's prescribed session. The constant is flagged in
+  source as a judgement call (*"tune here, nowhere else"*) and has never been calibrated.
+- **The firing rate is fine.** Over n = 25 days carrying `stress_high_minutes`: mean 58.8, median 60,
+  sd 47.0, and the override fires on **4 of 25 days (16%)**.
+- **The signal points the wrong way.** `corr(stress_high_minutes, readiness_score)` = **+0.400**:
+
+  | group | days | mean readiness | mean sleep | worst readiness |
+  |---|---|---|---|---|
+  | **fires (≥ 120)** | 4 | **79.0** | 92.8 | 69 |
+  | quiet (< 120) | 21 | **65.0** | 84.9 | **29** |
+
+  The four days that would ease training are 2026-07-17 (readiness 69), 07-23 (80), 07-24 (84) and
+  07-27 (83). The two genuinely bad days — 07-21 (readiness 37, sleep score 31) and 07-26
+  (readiness 29) — carry 0 and 30 minutes and never fire.
+- **Two explanations tested and rejected.** *Not exercise*: 19 of 25 are completed-workout days,
+  spread evenly (4 of 4 at 0 minutes, 3 of 4 at ≥ 120). *Not purely wear coverage*: it is a partial
+  confound (`corr(stress_high, recovery_high)` = +0.304, and both zero-days are zero on **both**
+  counts) but net stress still correlates **+0.379** with readiness. For contrast
+  `daytime_stress_scaled` — the day's mean level rather than a bucket count — correlates **−0.111**,
+  the right sign and no magnitude.
+- **Do NOT tune the threshold.** Moving a constant that sits on a signal pointing backwards changes
+  *which* good days get eased, not whether the right ones do. Same shape as Q-506, failure inverted:
+  there the input was dead, here it is alive and anti-correlated.
+- **A precision illusion to know about.** `STRESS_BUCKET_MS` is 30 min, so the value is always a
+  multiple of 30 — observed set is exactly `{0,30,60,90,120,150,180}`. The threshold has **seven**
+  meaningful positions and 120 sits on an atom: `>= 121` halves the firing rate (4 days → 2). Express
+  and justify any future change in **buckets**, not minutes.
+- **First action**, in preference order: (1) explain the sign before touching the constant; (2)
+  consider `daytime_stress_scaled` as the override input instead — right sign, a mean so coverage
+  cancels, already persisted, and it needs its own threshold from scratch (its range is −0.14 to
+  +0.23, nothing like 120); (3) failing both, gate the override on daytime coverage, which removes the
+  measurable confound without removing the feature.
+- **n = 25 is small** — at that size r = +0.40 sits near the conventional significance boundary, so the
+  strength is provisional. The group means are the durable part. Re-measure at n ≈ 60.
+
+### [readiness] Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)
+
+- **Branch:** `fix/resilience-longterm-sleep-recovery`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** Blocked on a question this repo
+  cannot answer (see first action).
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-stress-resilience-calibration.md`](reviews/2026-08-18-stress-resilience-calibration.md) §2
+- **Measured.** `resilience_level` is present on **13 of 96 rows**, and on every one of them
+  `resilience_level` = **5** (min = max) and `resilience_granular` = **5.99** (min = max), with
+  confidence ≤ 0.57. **5.99 is the clamp bound** — `findGranularResilienceLevel` ends in
+  `Math.max(1.01, Math.min(5.99, …))`, so that exact value is what it returns when the computation
+  runs off the top of the scale. The score has never produced an informative reading and is surfaced
+  as a band label.
+- **The port is not hard-wired.** The pinned golden (`stress_resilience_2_2_1.golden.json`) produces
+  level **1.0** / granular **1.01** — the *bottom* clamp. The pinning is input-driven.
+- **Mechanism.** `longTermStress` and `longTermRestorativeTime` are weighted means;
+  `longTermSleepRecovery` is not — it replicates a `[N,1] × [N]` broadcast from the `.pt` and reduces
+  to `(Σ all weights × Σ list) / Σ used weights`, i.e. **the plain sum of the window** when every day
+  is valid. Verified exactly against the golden: its list is 13 × 0.6 and today's index is 29.99013,
+  and `13 × 0.6 + 29.99013 = 37.79013` = `out_7` to every stored digit. Solving the golden's own
+  outputs for the recovery weights (`out_8 = w_d·out_6 + w_s·out_7`, summing to 1) gives
+  **w_d = 0.30, w_s = 0.70** — so 70% of `longTermRecovery` is a quantity that grows with the number
+  of valid days. Production per-day indices run **0.0 – 55.6**, so a 5–7 day window sum lands around
+  **130–240** against the golden's 37.79 — above every band boundary, every day.
+- **The golden cannot catch this**, and that is the transferable lesson: its list is 13 *identical*
+  values of 0.6, two orders of magnitude below production, so the fixture pins the arithmetic without
+  ever exercising the sum's scale. A golden proves a port computes the same function; it says nothing
+  about whether the inputs are on the scale it was captured at.
+- **Second oddity, observed not diagnosed.** `resilience_daily_sleep_recovery` barely tracks sleep:
+  sleep score 93 → **0.0**, 87 → 12.8, 83 → 10.2, 80 → 9.9, 78 → 13.5, while sleep score **31 → 17.3**.
+  `dailySleepRecovery = clamp(polyval(sleepRecoveryScalerCoef, sr))` where `sr` blends our sleep score,
+  hrvBalance, recoveryIndex and RHR contributors — a vendor polynomial fitted against *Oura's*
+  distribution fed *our* contributors is the obvious suspect, but this was not chased down.
+- **It is also dormant.** The 2026-08-05 review recorded `resilience_level` on **13 of 79** rows;
+  today it is **13 of 96** — the same 13, with the newest dated **2026-08-05**, while
+  `daytime_stress_scaled` grew 11 → 25 over the same period. Likely the daily-index gate: only **12 of
+  96** rows carry a `resilience_daily_stress` and they cluster (07-20 → 07-27, then 08-09, 08-10,
+  08-16, 08-21), and a level needs `validCount >= windowMinLength` inside the 14-day window.
+  **Unconfirmed** — `/api/admin/db-query` began returning `Forbidden` to every query before the
+  per-gate coverage could be pulled. Check which of `contributorsOk`'s four inputs is missing on
+  recent days first.
+- **Do NOT touch the algorithm or the constants** — the file says so and the golden is the contract.
+- **First action:** establish whether the sum is **faithful to the vendor**. If it is, Oura feeds a
+  per-day index on a far smaller scale than ours and the defect is in what we supply; if not, it is a
+  port bug. **This repo cannot settle it** — the vendor source is in the private archive — and that
+  decision gates everything else. Then: add a golden case with realistic list magnitudes (the current
+  fixture passes under either reading); and **until the level varies, stop surfacing it as a band** — a
+  score that has returned "strong" on 100% of days is worse than absent, because it reads as a
+  measurement.
+- **Re-measure after both recalibrations reach stored rows.** The call site passes our `sleepScore`
+  *and* `comp.contributors.recoveryIndex.score`, so v1.319.0 (sleep mean 84.1 → 69.5) and v1.321.0
+  (Recovery Index anchor) both feed `sr`. All 13 rows predate both, and the direction is *downward* on
+  the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

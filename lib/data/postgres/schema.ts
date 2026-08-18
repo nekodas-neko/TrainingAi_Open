@@ -1136,6 +1136,19 @@ export const ouraRawPacked = pgTable('oura_raw_packed', {
   packedAt:   timestamp('packed_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.userId, t.epoch, t.tag, t.dsBucket] })])
 
+// A deliberate ring re-key, declared by the owner (migration 194, Q-314). The next ingest batch
+// consumes the pending row and opens the epoch it names, instead of the epoch being inferred from a
+// ds regression — which a history re-drain produces too, and which re-timed the whole sleep history
+// twice. At most one may be pending per user (partial unique index).
+export const ouraBleRekeyDeclarations = pgTable('oura_ble_rekey_declarations', {
+  id:          bigserial('id', { mode: 'number' }).primaryKey(),
+  userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  declaredAt:  timestamp('declared_at', { withTimezone: true }).notNull().defaultNow(),
+  note:        text('note'),
+  consumedAt:  timestamp('consumed_at', { withTimezone: true }),
+  openedEpoch: integer('opened_epoch'),
+})
+
 // Durable watermark for the BLE rollup's incremental window (migration 184). Stage 1 of Q-213 kept
 // this in process memory, so every container restart re-derived the whole 35-day window once — six
 // minutes of a pegged main thread, measured in production, on every deploy. `lastRolledDs` is a ring
