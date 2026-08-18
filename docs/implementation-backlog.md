@@ -848,6 +848,41 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [app-shell][health] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
+
+- **Branch:** `fix/card-fetch-error-states`
+- **Added:** 2026-08-18 · review sweep (three lenses) ·
+  [`docs/reviews/2026-08-18-silent-card-failures.md`](reviews/2026-08-18-silent-card-failures.md)
+- **Placement:** low-medium. Cosmetic in the common case. The sharp edge is diagnosability: a
+  rate-limited or erroring card is **indistinguishable from an empty one**, which makes an owner
+  report of *"the card is gone"* unanswerable.
+- **⚠️ One correction to `CLAUDE.md`'s premise.** The rule says `cachedFetch` *"swallows `!res.ok`"*.
+  It does **not** unconditionally — `cachedFetchCore` accepts
+  `onError?: (info: CacheFetchErrorInfo) => void`. It swallows *unless the caller opts in*. That makes
+  this a **coverage** problem with an existing mechanism, not a missing capability, and the rule's
+  wording should name `onError` so the next reader knows the hook is there.
+- **Adoption:** 78 components call `cachedFetch`; **18 reference `onError`** — an upper bound, since
+  some are unrelated matches (`components/ai/code-block.tsx`, `components/ai/response.tsx`).
+- **Verified by hand, two instances:**
+  - `components/health/hr-recovery-profile-card.tsx` — `cachedFetch` at :48 with no `onError`, then
+    `:57 if (!profile || profile.bands.length === 0) return null`. `profile` stays `null` on failure,
+    so a failed request and an empty profile render identically.
+  - `components/health/strength-progress-card.tsx` — `:36 ).catch(() => {})` (the smell `CLAUDE.md`
+    names), then `:40 if (withData.length === 0) return null`.
+- **Scoped honestly:** a crude filter produced **12** candidates; **2 were verified**. The other ten
+  are a **worklist, not a defect count** — several `return null` paths there are legitimate empty
+  states, and telling them apart needs per-file judgement.
+- **Why it matters more than it looks:** `cachedFetch` treats **any** `!res.ok` alike, **including a
+  429 from the app's own rate limiter**. A user who trips a limit watches health cards vanish instead
+  of seeing "try again in a minute", and the same silence covers a 500. Offline it is worse —
+  `cachedFetch` cannot revalidate at all.
+- **Fix:** pass `onError` and render a compact error state. In-repo references that already do it:
+  `components/health/observed-hr-card.tsx`, `components/workout/workout-load-error.tsx`. Amend the
+  `CLAUDE.md` wording in the same PR.
+- **Not exercised:** the vanish was **not reproduced in a browser** — no card was driven to a 429 or
+  500 to watch it disappear. That is the obvious next step and would turn the ten candidates into a
+  count.
+
 ### [platform] Q-498 — three unauthenticated routes buffer an unbounded request body; one parses it before any check
 
 - **Branch:** `security/body-size-guard-coverage`
