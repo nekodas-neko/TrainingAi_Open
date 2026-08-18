@@ -106,7 +106,11 @@ order.
   (Q-464, Q-465) · app-shell/platform (Q-450…Q-459). Still open by design: the **device runtime**
   (nothing left the web build), **production data** (`claude_ro` never queried), and the
   **offline/error paths**.
-- **Nothing was fixed.** Both are queued.
+- **🟡 Q-466, found while landing these PRs rather than by the probe:** CI re-downloads the Playwright
+  browser on every E2E run with no cache, and a slow CDN turns that into an indefinite stall — observed
+  **twice on 2026-08-18**, each costing a cancel-and-re-run cycle on a **required** check. `actions/cache`
+  on `~/.cache/ms-playwright` is the standard fix.
+- **Nothing was fixed.** All three are queued.
 
 ### [platform][nutrition][cardio][activity] 🟠 Nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for one question (Q-463, 2026-08-18)
 

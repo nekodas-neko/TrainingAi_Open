@@ -135,6 +135,30 @@ passthrough to the driver is not validation"* is being followed on every route r
 zero uncaught page errors, zero console errors and zero failing `/api/` responses in the 2026-08-17
 failure-cells sweep.
 
+---
+
+## Q-466 — CI re-downloads the Playwright browser on every E2E run
+
+**Severity: low-medium. Free when the CDN is healthy; a hard block when it is not.** `[platform]`
+
+Not from the ingest probe — observed while landing this run's PRs, and filed here rather than dropped.
+
+`.github/workflows/ci.yml:391-392` runs `npx playwright install --with-deps chromium` on every E2E
+run with no cache. `actions/setup-node`'s `cache: 'pnpm'` covers the pnpm store, **not**
+`~/.cache/ms-playwright`, so each run pulls ~150 MB of Chromium afresh.
+
+**Observed twice on 2026-08-18** — PR #47 and PR #66, out of roughly 6–8 E2E runs that day, so the
+*rate* is indicative rather than measured. Both times the step sat `in_progress` for 6–22 minutes with
+every other job green, and had to be cancelled and re-run; the re-run finished the same step in under
+a minute. The tell: `Install Chromium` `in_progress` while `Run pnpm e2e` is still `pending` means the
+download, not the specs.
+
+E2E is a **required check**, so this blocks the merge rather than degrading it, and each recovery costs
+~20 minutes. **Fix shape:** `actions/cache` on `~/.cache/ms-playwright` keyed on the resolved
+`@playwright/test` version. Keep the install step — it must still run on a cache miss — and leave
+`playwright.config.ts`'s sandbox-binary preference alone; its comment explains why CI needs the
+install at all.
+
 ## Section coverage — complete
 
 With this sweep every pillar has now been reviewed at least once in this run:

@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** five sweeps (2026-08-17 ×2, 2026-08-18 ×3) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **466**)
+**Updated:** 2026-08-18 · **By:** five sweeps (2026-08-17 ×2, 2026-08-18 ×3) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **467**)
 
 ## Now
 
@@ -37,6 +37,11 @@ entry says so**).
 session- or secret-gated, two behind `requireAdmin`), and value validation rejected every
 physiologically impossible probe with nothing reaching Postgres — HR `-50`/`99999`, mood `999`/`-5`,
 weight `99999`/`-40`, malformed scale hex. The weight errors even name the bound violated.
+
+**Also filed from this run, not from the probe — Q-466:** CI re-downloads the Playwright browser on
+every E2E run with no cache; observed stalling **twice on 2026-08-18**, each costing a cancel-and-re-run
+on a required check. If E2E sits on `Install Chromium` while `Run pnpm e2e` is still `pending`, that is
+the download, not the specs — cancel and re-run rather than diagnosing the specs.
 
 **Not covered:** `health-connect/ingest` was read but **not called** (secret-gated, no secret here), and
 the Oura BLE sample routes were not exercised with real frames.

@@ -140,6 +140,8 @@ layer**) through §16. Read it before building any shared helper.
 
 - [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — 16 bare `throw new Error('… not found')` in the repository layer reach five routes as 500s; the sync client classifies 5xx as retryable). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
 
+- [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — also carries **Q-466**: CI re-downloads the Playwright browser on every E2E run with no cache, and stalled twice on 2026-08-18 on a required check.
+
 ## Open issues
 
 ```bash
