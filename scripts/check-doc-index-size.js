@@ -426,7 +426,13 @@ const BASELINE = {
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
   'projectOverview.md': 6910,
-  'docs/implementation-backlog.md': 7782,
+  // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
+  // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
+  // bare "make it nicer" is not implementable — the length is the three findings that carry a
+  // CI check (hex literals vs the runtime-themeable --brand, the shrink-only ratchet already
+  // aimed at them, and both landing files sitting ON the 800-line limit so line one fails),
+  // kept separate from the two that need mockups first.
+  'docs/implementation-backlog.md': 7800,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
