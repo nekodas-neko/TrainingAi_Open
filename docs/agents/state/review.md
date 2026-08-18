@@ -75,6 +75,19 @@ in its "standing tension". Headroom now 41 against 60.
 untracked, so it got folded into the history **and** left loose — a silent duplicate. **Exclude the
 current session's entry from any fold you run in the same PR.**
 
+**⚠️ And then a parallel agent's sweep (#152) landed the SAME `history-2026-08-18.md` — an add/add
+conflict.** Their fold was a **superset** (20 entries, containing all 19 of mine), so the resolution
+was to take theirs whole and discard mine; my fold added nothing. **That is twice now this
+compaction has been done in duplicate** (the first was #130). **Before running the compaction chore,
+check the open-PR list for another sweep already doing it** — it is a whole-directory operation, so
+two sessions doing it concurrently is guaranteed conflict, unlike ordinary per-entry work.
+
+**What survived the merge is the part worth keeping:** they had independently measured the same
+61→41 and that the floor held, but **not why**. The causal explanation — the floor tracks *durable-doc
+citations*, not entry count — and the lever it gives (cite the review/handoff doc, never the loose
+journal entry) is only in my side, and was layered onto their version by rebuilding the README from
+`origin/main` rather than splicing hunks.
+
 ### Sweep 38 — offline read surfaces, driven for real (2026-08-18)
 
 **Filed Q-555 (low).** Write-up:
