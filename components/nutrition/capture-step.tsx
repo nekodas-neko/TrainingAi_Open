@@ -8,6 +8,7 @@ import type { NutritionScanResult, FoodItem } from '@trainingai/shared/types/nut
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
+import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
 
 interface Props {
   onScanResult: (result: NutritionScanResult) => void
@@ -17,9 +18,12 @@ interface Props {
   preselectedMealTypeId?: string | null
   onLibrarySelect?: (item: FoodItem) => void
   userId?: string
+  /** A scanned saved-meal label (Q-389). The parent owns the logging, since it already holds the
+   *  date, the meal-type bucket and the onLogged callback. */
+  onScannedSavedMeal?: (mealId: string) => void
 }
 
-export function CaptureStep({ onScanResult, onManual, onMyFoods, onSavedMeals, preselectedMealTypeId, onLibrarySelect, userId }: Props) {
+export function CaptureStep({ onScanResult, onManual, onMyFoods, onSavedMeals, preselectedMealTypeId, onLibrarySelect, userId, onScannedSavedMeal }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [describeText, setDescribeText] = useState('')
   const [showDescribe, setShowDescribe] = useState(false)
@@ -137,6 +141,17 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, onSavedMeals, p
 
   async function handleBarcode(code: string) {
     setShowBarcode(false)
+
+    // A printed saved-meal label (Q-389), recognised by SHAPE rather than a prefix: the QR payload
+    // is 22 base64url characters and cannot afford one, because anything longer pushes the code from
+    // 25×25 to 29×29 and the printed modules below the size a phone reads. An EAN-13 is 13 digits
+    // and cannot collide, so a non-match falls straight through to the barcode lookup below.
+    const scannedMealId = decodeMealLabelToken(code)
+    if (scannedMealId && onScannedSavedMeal) {
+      onScannedSavedMeal(scannedMealId)
+      return
+    }
+
     setLoading(true)
     setError(null)
     setBarcodeOutcome(null)

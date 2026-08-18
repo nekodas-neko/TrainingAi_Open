@@ -19,6 +19,8 @@ import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 import { SavedMealCard } from './saved-meal-card'
+import { MealLabelSheet } from './meal-label-sheet'
+import { BulkDeleteConfirm } from './bulk-delete-confirm'
 import { IngredientRow, type QtyUnit } from './ingredient-row'
 import { qtyFromInput, steppedQty } from './saved-meal-qty'
 import { IngredientSearch, type ExternalFood } from './ingredient-search'
@@ -66,6 +68,8 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
 
   // Build tab state
   const [editingMeal, setEditingMeal] = useState<SavedMeal | null>(null)
+  // Q-389's label preview. Kept here rather than per-card so only one canvas is ever mounted.
+  const [labelMeal, setLabelMeal] = useState<SavedMeal | null>(null)
   const [mealName, setMealName] = useState('')
   const [mealServings, setMealServings] = useState(1)
   const [query, setQuery] = useState('')
@@ -534,23 +538,12 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         {tab === 'meals' ? (
           <div className="flex-1 overflow-y-auto px-1 space-y-3">
             {confirmBulkDelete && selectedIds && (
-              <div className="rounded-xl border border-[#ef4444]/40 bg-[#ef4444]/5 p-3">
-                <p className="text-sm font-medium">
-                  Delete {selectedIds.size} saved meal{selectedIds.size === 1 ? '' : 's'}?
-                </p>
-                <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
-                  Food you have already logged is unaffected, and any meal plan built from these
-                  keeps its own copy.
-                </p>
-                <div className="mt-2 flex gap-2">
-                  <Button variant="secondary" size="sm" className="flex-1 min-h-[44px]" onClick={() => setConfirmBulkDelete(false)} disabled={bulkDeleting}>
-                    Cancel
-                  </Button>
-                  <Button variant="destructive" size="sm" className="flex-1 min-h-[44px]" onClick={() => void deleteSelected()} disabled={bulkDeleting}>
-                    {bulkDeleting ? 'Deleting…' : 'Delete them'}
-                  </Button>
-                </div>
-              </div>
+              <BulkDeleteConfirm
+                count={selectedIds.size}
+                deleting={bulkDeleting}
+                onCancel={() => setConfirmBulkDelete(false)}
+                onConfirm={() => void deleteSelected()}
+              />
             )}
             {/* Search earns its place once the library grows — generated plan meals land here too,
                 so this list gets long faster than a hand-built one would. */}
@@ -600,6 +593,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   onLog={() => quickLog(meal)}
                   onEdit={() => openBuild(meal)}
                   onDelete={() => deleteMeal(meal)}
+                  onLabel={() => setLabelMeal(meal)}
                 />
               ))
             )}
@@ -789,6 +783,11 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           </>
         )}
       </SheetContent>
+      <MealLabelSheet
+        meal={labelMeal}
+        open={labelMeal != null}
+        onOpenChange={o => { if (!o) setLabelMeal(null) }}
+      />
     </Sheet>
   )
 }
