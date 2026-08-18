@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-six sweeps (2026-08-17 ×2, 2026-08-18 ×24) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **491**)
+**Updated:** 2026-08-18 · **By:** twenty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×25) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **491**)
 
 ## Now
 
-Twenty-six sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-seven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,26 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 27 — the other four render rules; all held (2026-08-18)
+
+**Filed nothing.** Took the list sweep 26 left. Write-up:
+[`docs/reviews/2026-08-18-render-hot-paths.md`](../../reviews/2026-08-18-render-hot-paths.md).
+
+**`key={index}`:** 85 occurrences, **zero** in a list that is both editable and deletable; the known
+editable lists key on stable ids. **Orchestrator timer:** the one `setInterval` writes a module
+singleton, never state — the pattern the rule wants. **Zustand breadth:** the 62-field `useShallow`
+pick holds *actions* (stable refs), not the hot-path *values*, which the leaves read via their own
+selectors. **`readCacheSync` in a render body:** 25 hits, three in the orchestrator, all false
+positives — and the first is **the comment stating the rule**.
+
+**⚠️ Sixth consecutive sweep where every mechanical check over-reported**, and this time one flagged
+the prose of the rule it was checking. The raw counts (85 / 62 / 25) are all defensible; filing them
+would have produced three wrong entries and one absurd one. **The grep finds candidates; the handler
+decides** — this is the most reusable thing this run produced and it is now proven six times.
+
+**Render lens closed.** With sweep 26, that section is in good shape and **Q-490 is its only open
+item**.
 
 ### Sweep 26 — are the memos actually memoising? (2026-08-18)
 

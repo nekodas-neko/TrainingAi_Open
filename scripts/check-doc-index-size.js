@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, render rules part 2): projectOverview 7576 -> 7603. No queue entry —
+// all four rules held. The row is worth its lines because it records the three raw counts that look
+// like findings and are not (85 index keys, all on static lists; a 62-field useShallow pick holding
+// actions rather than hot-path values; 25 bare readCacheSync hits, three of them false positives in
+// the orchestrator and one of those the COMMENT stating the rule). Without it the next sweep
+// re-derives all three and may file them.
+
+//
 // Raised 2026-08-18 (Review, memo-stability audit, Q-490): backlog 9439 -> 9477, projectOverview
 // 7551 -> 7576. One queue entry and its row. Both lead with the CLEAN number (64 of 66 memos hold,
 // no inline arrows anywhere) because without it the entry reads as though memoisation is broken
@@ -675,7 +683,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7576,
+  'projectOverview.md': 7603,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
