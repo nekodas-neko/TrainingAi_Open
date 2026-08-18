@@ -580,6 +580,18 @@ blocker and the intended shape were both already named, so **do not re-derive th
 - **Verification:** `pg_total_relation_size` before and after via `/api/admin/db-query`, and
   `SELECT count(*) FROM error_events` unchanged either side. Do not assume the count is 4 by the time
   it runs — read it first.
+- 🚧 **The ROUTE shipped 2026-08-18 (Lane A); the PRESS has not happened.** `POST /api/admin/vacuum`
+  with `{"table":"error_events"}`, admin-gated, 4/min, allowlisted to `error_events` and
+  `oura_raw_samples`; `GET` lists what may be vacuumed. The table name is interpolated into
+  `VACUUM (FULL) <table>` because VACUUM accepts no bind parameter, so **the allowlist is the safety
+  boundary, not validation** — checked with `hasOwnProperty` (an `in` check accepts `toString`, and
+  there is a mutation-checked test for exactly that) in both the route and the slice. Verified live
+  on `pnpm dev`: a disallowed name and a missing body both 400, and a real run on the local
+  `oura_raw_samples` reclaimed **5.7 MB of 6 MB**.
+  **Still outstanding: someone has to press it against production.** No button — that is Q-316's
+  territory (`components/**`, Lane B) — so until then it is a curl with an admin session cookie.
+  The same route is what reclaims the space after Q-541's backfill and after migration 193's index
+  drop, which is why it was generalised rather than copied.
 
 ### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
 
