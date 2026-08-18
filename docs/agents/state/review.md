@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirteen sweeps (2026-08-17 ×2, 2026-08-18 ×11) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **481**)
+**Updated:** 2026-08-18 · **By:** fourteen sweeps (2026-08-17 ×2, 2026-08-18 ×12) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **482**)
 
 ## Now
 
-Thirteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Fourteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,28 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 14 — the same mutation pushed twice (2026-08-18)
+
+**The gap between sweeps 9 and 10** — concurrent writes measured, outbox-under-failure measured, but
+never the same mutation arriving **twice in sequence**, which at-least-once delivery guarantees.
+Write-up: [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](../../reviews/2026-08-18-outbox-replay-idempotency.md).
+
+**Filed Q-481 (mid).** Same mutation id ×3 → `water_ml = 750` for 250 logged, every push answering
+`{"processed":1,"errors":[]}`. The server keeps **no record of processed mutation ids**, and the
+client's `try { await fetch(…) } catch { break }` leaves a committed-but-unacknowledged mutation
+`pending` with nothing marking it in-flight. **`waterMlDelta` is the only non-idempotent branch of the
+19** — every other domain upserts on `(user_id, date)` or a client-supplied row id.
+
+**The entry leads with what NOT to do:** the additive write is deliberate (SYNC-P7 — concurrent adds
+must sum, not clobber), so the fix is mutation-id dedupe for that one branch, never an absolute total.
+That is the way this gets implemented wrongly.
+
+**Three clean results**, one load-bearing: `complete_workout` replayed 3× → counter = **1**, a second
+independent confirmation of the **Q-473** fix covering the *replay* vector its comment named (sweep 9
+covered the concurrent one). And `activity_logs` replayed 3× gives **one** row — which looks like it
+contradicts sweep 9's "5 concurrent → 5 rows" and does not: **different writers**, web route vs
+outbox. Worth remembering before reasoning about one path from the other.
 
 ### Sweep 13 — verifying the server side; a clean sweep, written up as one (2026-08-18)
 

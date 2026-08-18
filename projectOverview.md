@@ -138,6 +138,35 @@ order.
 - **Not verified on:** the APK or production; `ISACTIVE_RECHECK_MS` is read from source, not observed
   over a real 24-hour window.
 
+### [nutrition][platform] 🟠 A water quick-add replayed by the outbox triple-counts — the one non-idempotent mutation of nineteen (Q-481, 2026-08-18)
+
+- **The gap between sweeps 9 and 10**: concurrent writes were measured, and the outbox under failure
+  was measured, but not the same mutation arriving **twice in sequence** — which is what at-least-once
+  delivery guarantees will eventually happen.
+  [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](docs/reviews/2026-08-18-outbox-replay-idempotency.md).
+- **Measured:** one mutation id pushed three times → `water_ml = 750` for 250 ml logged, every push
+  answering `{"processed":1,"errors":[]}`. The server keeps **no record of processed mutation ids**.
+- **Reachable by ordinary means on the canonical runtime.** The client wraps its push in
+  `try { await fetch(…) } catch { break }`, so a request that **reaches the server and commits** but
+  whose response is lost — signal drop, OS killing a backgrounded app, timeout — leaves the mutation
+  `pending` with nothing marking it in-flight. The next sync re-pushes it. On a phone on mobile data
+  that is routine.
+- **The write is correct and must not be "fixed".** `incrementWaterLog` adds inside the upsert and the
+  push branch routes to it deliberately (SYNC-P7: *"an increment, not an absolute set … so concurrent
+  adds sum instead of last-writer-wins clobbering"*). Atomic-and-additive is right for concurrency and
+  is exactly what makes a replay wrong; an absolute total reintroduces the clobber it was written to
+  prevent. The fix is **mutation-id dedupe for this one branch**, not a change of semantics.
+- **Bounded:** all 19 push branches enumerated, and this is the only non-idempotent one — every other
+  domain upserts on `(user_id, date)` or a client-supplied row id.
+- **Three clean results, one of them load-bearing:** `complete_workout` replayed 3× → counter = 1,
+  which is the **second independent confirmation of the Q-473 fix** and covers the vector its original
+  comment named (an outbox mutation re-pushed after its response was lost); absolute `body_metrics`
+  is idempotent; and `activity_logs` replayed 3× gives **one** row — which looks like it contradicts
+  sweep 9's "5 concurrent → 5 rows" and does not: **different writers**, the web route minting a
+  server-side id and the outbox carrying a client-generated one.
+- **Not verified on:** the APK. The replay was simulated by re-posting the same envelope (what the
+  client does); the client-side trigger was read from source, not induced.
+
 ### [platform] ✅ The server side of the timezone problem does not exist — verified at every layer below the routes (Q-480, 2026-08-18)
 
 - **A verification sweep, written up because a clean result is a result.**
