@@ -511,7 +511,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     await cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: { steps: number; calories: number; waterMl: number } | null; activeEnergyKcalToday?: number | null }>(
       'body-metadata', '/api/body-metadata', TTL_MEDIUM,
       (data) => {
-        if (!isBodyMetadataFresh(data)) return;
+        if (!isBodyMetadataFresh(data, tz)) return;
         setMetaToday(data.today ?? null);
         setMetaRecent(data.recent ?? []);
         setWeekToDate(data.weekToDate ?? null);
@@ -520,7 +520,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
       },
     );
     setMetaLoading(false);
-  }, [userId]);
+  }, [userId, tz]);
 
   useEffect(() => { fetchMeta(); }, [fetchMeta]);
 

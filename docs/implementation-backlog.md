@@ -327,7 +327,25 @@ below threshold and left in place for next time.
 
 ### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
 
-- **✅ SCOPE BOUNDED 2026-08-18 — this is the ONLY instance; the fix is one handler, not a class sweep.**
+- **⛔ RE-TAGGED TO LANE A 2026-08-18 — the "one call in one Lane B handler" shape below is not
+  buildable, and the obvious version of it is a silent no-op.** `lib/local-store` has **no
+  `deleteActivityLog`**; the `deleteActivityLog` that greps are `repo.deleteActivityLog`
+  (`lib/data/repository.ts:547`, `adapter.ts:2374`) — the *server* repository, which is what the
+  route already calls. The nearest local method is `upsertActivityLog`, and **its INSERT column list
+  and its `ON CONFLICT DO UPDATE SET` both omit `deleted_at` entirely** (27 columns, 27 placeholders,
+  `sqlite-backend.ts:2607`). So a read-merge upsert setting `deletedAt: now` compiles, type-checks,
+  passes lint, and **changes nothing** — `getActivityLogs` filters `deleted_at IS NULL`
+  (`sqlite-backend.ts:824`) against a column the write never touches. That was written and reverted
+  here before it shipped; it is the exact shape a future session will reach for first.
+- **What the fix actually needs:** a `deleteActivityLog(id)` on the local store —
+  `lib/local-store/index.ts` (interface) + `lib/local-store/sqlite-backend.ts` (soft-delete
+  statement, matching `deleteFoodLog`/`deleteInjury`) — **then** the one call in
+  `app/health/health-content.tsx`. Two of those three files are Lane A's by the ownership list, so
+  **Lane A takes the whole item**; splitting it leaves Lane B's call site pointing at a method that
+  does not exist. The Lane B half is four lines and is the last step, not the first.
+- **The `CLAUDE.md` rule this item asked for is already landed** (Lane B, same day) — the inverse of
+  the offline-first rule, in the Offline-First section. Do not re-add it.
+- **✅ SCOPE BOUNDED 2026-08-18 — the *audit* still holds: this is the ONLY instance.**
   Every mutating write to a local-first domain was audited for a local-store call **inside the
   handler**: `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE), `quick-edit-log-sheet`
   (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet` (DELETE+PATCH),
@@ -357,17 +375,18 @@ below threshold and left in place for next time.
   (`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, `sqlite-backend.ts:1628`) with
   the correct pull-clobber guard. The server delete is a **soft** delete with a `user_id`-scoped
   tombstone (`adapter.ts:2374`). Nothing is lost; something wrong is shown for a while.
-- **Fix shape:** delete the local row alongside the API call, as every other activity write path
-  already does (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`). One
-  call. Queuing the delete so it works offline is a **separate, larger** question for this domain —
-  do not fold it in silently.
-- **The rule this breaks is not written down anywhere.** `CLAUDE.md` states the forward direction
-  (*"if a domain WRITES to the local store, its UI MUST READ from the local store"*). The inverse is
-  what matters here: **a domain the UI reads local-first must have *every* write update the local
-  store — including deletes, and including writes made from a screen that itself reads server-side.**
-  That last clause is why nothing on the originating screen could reveal it. Worth adding to
-  `CLAUDE.md` alongside the fix.
-- **Lane B owns this** (`app/health/**`).
+- **Fix shape:** see the re-tag note at the top of this entry. The sibling paths cited here
+  (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`) are **upserts, not
+  deletes** — they are precedent for writing locally, not for a local-delete call that exists.
+  Queuing the delete so it works offline is a **separate, larger** question for this domain — do not
+  fold it in silently.
+- **The rule this breaks is now written down** — `CLAUDE.md`, Offline-First section, immediately
+  above the forward-direction rule it inverts: a domain the UI reads local-first must have *every*
+  write update the local store, deletes included, and including writes made from a screen that
+  itself reads server-side. That last clause is why nothing on the originating screen could reveal
+  it.
+- **Lane A owns this** (`lib/local-store/**` is the load-bearing half; `app/health/**` is four lines
+  at the end). Re-tagged from Lane B — see the top of this entry.
 - **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
   readers fall through to their API fallbacks and the inconsistency cannot appear there. The 5-minute
   floor is read from `MIN_SYNC_INTERVAL_MS`, not observed. On-device is the only real verification.
@@ -667,54 +686,6 @@ below threshold and left in place for next time.
   no `isActiveCheckedAt`, the throttle never engaged, and the DB was re-read every time. Use `-b` and
   `-c` on the same file.
 
-### [app-shell][platform] Q-478 — two cache guards compare a server-stamped date against a client `DEFAULT_TZ` date, so they return false for hours a day for any non-Brisbane user
-
-- **Branch:** `fix/cache-today-guards-take-tz`
-- **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
-  [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
-- **Placement:** above Q-477 and **do it first** — it is about a dozen edits, it is the
-  highest-damage consequence of that finding, and it is independently useful.
-- **What.** `lib/sqlite/cache.ts`:
-  ```ts
-  export function isWorkoutDataToday(data)  { return data?.dataDate === todayInTz() }                    // :369
-  export function isBodyMetadataFresh(data) { return data?.today == null || data.today.date === todayInTz() } // :361
-  ```
-  Both compare a **server-stamped** date to a **client `DEFAULT_TZ`** date. Measured: server stamps
-  `dataDate: 2026-08-19` for a `Pacific/Kiritimati` user; the client compares `2026-08-18`; the guard
-  is **false** and stays false while the user's local date differs from Brisbane's.
-- **How much of the day.** Two zones whose offsets differ by Δ hours have different calendar dates for
-  |Δ| hours out of 24. Brisbane is UTC+10 → a New York user (UTC−4 in summer) is Δ=14, so the guards
-  are false **14 hours a day**. Kiritimati is Δ=4.
-- **Confirmed against a live response** with a real `body_metrics` row planted on the user's true today:
-  ```
-  server today row date : 2026-08-19  (steps 7777)
-  client todayInTz()    : 2026-08-18
-  isBodyMetadataFresh   : False
-  ```
-- **What each call site then does:**
-  - `app/session-select/session-select-content.tsx:514` — `if (!isBodyMetadataFresh(data)) return;` is
-    an **early return** and `setMetaLoading(false)` is below it, so **the loading state never clears**.
-  - `app/health/health-content.tsx:194` — today's metrics and active energy are set *inside* the
-    guard, so the Health screen's today values stay blank while the data sits in the response.
-  - `components/workout-screen.tsx:324-326` — `freshExercises` rewrites every exercise to
-    `loggedTodayInSession: false`, so the workout screen shows everything as not-yet-logged today.
-  - `app/workout-select/workout-select-content.tsx:31` — the "Trained today" badge never appears.
-- **The clearest illustration in the codebase**, two adjacent lines inside
-  `getLastTrainedLabel(session, tz)`:
-  ```ts
-  if (isWorkoutDataToday(data) && …) return "Trained today";   // :31  DEFAULT_TZ
-  const todayKey = dayKeyInTz(tz, 0);                          // :32  the user's tz
-  ```
-  The user's timezone is already a parameter of that function. One line uses it; the line above cannot,
-  because the helper takes no `tz`.
-- **Fix shape:** give the helpers an optional `tz` and pass `useUserTimezone()` at every call site —
-  about a dozen edits, **no behaviour change for a Brisbane user**, and it removes the whole
-  compare-server-date-to-client-date class. Give `cachedFetchToday`/`unwrapToday` the same treatment
-  for consistency, but note they are **not** broken: their envelope date is client-written and
-  client-read, so they are self-consistent (mislabelled — they hold "Brisbane-today" data). Do not
-  file that as the same defect.
-- **Lane B owns this** (`lib/sqlite/cache.ts` is shared, but every call site is Lane B surface —
-  claim `lib/sqlite/cache.ts` in the baton before starting).
 
 ### [platform][readiness] Q-489 — five sites turn an ms offset into a calendar day; in a DST zone, three of them compute "today" when they mean "yesterday"
 
@@ -799,6 +770,35 @@ below threshold and left in place for next time.
   identity and React's shallow compare, not a profiler run. The call-site scan matches JSX elements
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
+
+### [activity][platform] Q-556 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
+
+- **Branch:** `fix/activity-log-delete-affected-rows`
+- **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
+  [`docs/reviews/2026-08-18-cross-user-isolation.md`](reviews/2026-08-18-cross-user-isolation.md)
+- **Placement:** low. **Not a leak — verified, not assumed.** As user B, deleting user A's activity
+  log returns `200 {"success":true}`; the database immediately after shows the row **intact**,
+  `deleted_at` NULL, still owned by A, A's count unchanged. The scoping is deliberate and already
+  tested (`repository-ownership-scoping.test.ts:326`).
+- **The route cannot report what happened.** `deleteActivityLog(userId, id): Promise<void>` returns
+  nothing, so the handler `await`s it and answers `{ success: true }` unconditionally.
+- **Why file it anyway:**
+  1. **Inconsistent with every sibling.** The house posture — verified by an enumeration control in
+     the same run — is **404 for both a nonexistent id and someone else's**. This route is **200 for
+     both**. Both are safe against enumeration, but they cannot both be the convention.
+  2. **Offline-first makes a false success expensive.** A queued mutation receiving a 2xx is confirmed
+     and dropped from the outbox, so a delete that matched zero rows *for a different reason* (sync
+     ordering; row not yet on the server) is indistinguishable and gets confirmed away.
+     **⚠️ That path was NOT demonstrated** — it is why the response matters, not an observed bug.
+  3. Same family as the existing rule *"after a user-scoped UPDATE whose row id came from the client,
+     check the affected-row count"*, applied to a DELETE.
+- **Fix:** return the affected-row count from `deleteActivityLog`; answer 404 when zero, matching siblings.
+- **✅ Everything else held.** 10 of 11 probes rejected by the route's own ownership check — A's recap/
+  energy/timing, deleting A's workout, logging a set **into A's session**, completing A's workout.
+  **The enumeration control passed:** nonexistent and A's ids return byte-identical responses.
+- **Not exercised:** `PATCH /api/activity-logs/<id>/metrics` returned `400 Invalid body` (my payload was
+  wrong), so that route's ownership check is **still unverified**. Local DB + web build; not production,
+  not on device; two accounts only — says nothing about admin-vs-user boundaries.
 
 ### [app-shell][platform] Q-555 — offline, a tab tap is a silent no-op until the service worker claims the page
 
@@ -1304,8 +1304,11 @@ below threshold and left in place for next time.
      a shrink-only per-file baseline — same shape as `check-hex-literals.js` and
      `check-cache-ttl-divergence.js`, both of which exist because prose alone did not hold a count.
      That freezes the number at 100 and puts every future addition in a diff.
-  2. Sweep highest-visibility first: the calendar today-marker, then **Q-478** (small, and the
-     highest-damage consequence — do it before the bulk sweep), then write paths, then display.
+  2. Sweep highest-visibility first: the calendar today-marker, then write paths, then display.
+     **Q-478 is done** (2026-08-18) — the two cache today-guards now take a `tz`, and
+     `scripts/check-tz-aware-cache-guards.js` keeps every call site passing one. Its ratchet is a
+     narrower shape than step 1 asks for: it guards two named helpers, not bare `todayInTz()`.
+     Step 1 is still owed.
   **Do NOT** make `todayInTz`'s default throw or read a global — the function is shared with server
   code that passes `tz` explicitly, and a global reintroduces the ambiguity somewhere harder to see.
 - **Lane B owns the sweep** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`); the CI ratchet is
