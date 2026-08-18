@@ -764,6 +764,52 @@ below threshold and left in place for next time.
 - **Lane B owns this** (`lib/sqlite/cache.ts` is shared, but every call site is Lane B surface —
   claim `lib/sqlite/cache.ts` in the baton before starting).
 
+### [platform][readiness] Q-489 — five sites turn an ms offset into a calendar day; in a DST zone, three of them compute "today" when they mean "yesterday"
+
+- **Branch:** `fix/ms-offset-calendar-day`
+- **Added:** 2026-08-18 · review sweep (the AI/stats time-window rule) ·
+  [`docs/reviews/2026-08-18-ms-offset-to-calendar-day.md`](reviews/2026-08-18-ms-offset-to-calendar-day.md)
+- **Placement:** low. **Unreachable today** (every user is `Australia/Brisbane`, no DST) and, when
+  reachable, **one hour per year per DST-zone user**. Filed because it is measured, it is the exact
+  hand-rolled date arithmetic `CLAUDE.md` bans, and the fix is a one-line swap to a helper that
+  already exists and is already used elsewhere.
+- **⚠️ Do NOT file the other seven instances of the banned pattern — most are correct.** The rule's
+  harm is *"ms-offset windows straddle two AEST days and merge them"*, which is about **day-bucketed**
+  aggregation. `muscle-recovery`, `workout-load-history` and `friends/feed` use a **rolling instant**
+  filter feeding consumers that work in hours (`computeMuscleRecovery` reads
+  `ws.startedAt.getTime()`), and for a physiological window that is *more* correct than a calendar
+  day. A sweep that greps the pattern and files all 12 files mostly false positives.
+- **The five that produce a calendar day:**
+  ```
+  lib/data/postgres/adapter.ts:1710   toAestDay(new Date(Date.now() - 14 * 86_400_000), timezone)
+  lib/data/postgres/adapter.ts:1722   toAestDay(new Date(Date.now() - 86_400_000), timezone)
+  lib/achievements.ts:50              formatInTimeZone(new Date(Date.now() - 86_400_000), tz, 'yyyy-MM-dd')
+  packages/shared/src/ai-periodization/signals.ts:197
+                                      toAestDay(new Date(Date.now() - 24 * 3_600_000), tz)
+  app/api/progress-summary/route.ts:31
+                                      formatInTimeZone(new Date(Date.now() - 7*24*60*60*1000), tz, 'yyyy-MM-dd')
+  ```
+- **Measured in `America/New_York` across the 2026 transitions:**
+  ```
+  ok             local 2026-03-08 00:30   now-24h → 2026-03-07   true yesterday 2026-03-07
+  ok             local 2026-11-01 00:30   now-24h → 2026-10-31   true yesterday 2026-10-31
+  ** MISMATCH ** local 2026-11-01 23:30   now-24h → 2026-11-01   true yesterday 2026-10-31
+  ```
+  On the **25-hour fall-back day**, in its last hour, `now − 24h` lands on **today**.
+- **What the three "yesterday" sites then do:** `adapter.ts:1722` drops yesterday's row from
+  `getOuraDailyDerived`'s range (an AI-dynamic prescription input); `achievements.ts:50` breaks a
+  streak-continuity comparison; `signals.ts:197` feeds the periodization signal chain.
+- **Fix shape:** `shiftDateStr(todayInTz(tz), -1)` for the three, `-14` and `-7` for the other two.
+  `shiftDateStr` (`packages/shared/src/date-utils.ts:154`) does the arithmetic on the date string with
+  `Date.UTC` overflow normalisation — what the rule asks for — and
+  `lib/data/postgres/slices/oura.ts:1182` **already uses exactly this shape**. Nothing new is needed.
+- **Q-477 is what makes this reachable at all** — the Profile timezone setting and its auto-detect
+  button are how a user ends up in a DST zone. Same family; neither is urgent.
+- **Lane A owns this** (`lib/data/**`, `packages/shared/**`, `app/api/**`).
+- **Not verified:** the mismatch was measured with `date-fns-tz` directly, not by driving the app with
+  a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
+  but not Postgres's). The consequence at each call site is read from source.
+
 ### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
 
 - **Branch:** `docs/claude-md-repo-tz-line`

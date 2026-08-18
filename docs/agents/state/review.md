@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-four sweeps (2026-08-17 ×2, 2026-08-18 ×22) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **489**)
+**Updated:** 2026-08-18 · **By:** twenty-five sweeps (2026-08-17 ×2, 2026-08-18 ×23) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **490**)
 
 ## Now
 
-Twenty-four sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-five sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,29 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 25 — the banned ms-offset window, sorted (2026-08-18)
+
+**Filed Q-489 (low).** `CLAUDE.md` bans `Date.now() − N×86400000` for stats/AI windows and records six
+copies shipping in `lib/ai-chat/tools.ts`. **That file is clean** — the 2026-07-06 fix held — but 12
+instances remain elsewhere. Write-up:
+[`docs/reviews/2026-08-18-ms-offset-to-calendar-day.md`](../../reviews/2026-08-18-ms-offset-to-calendar-day.md).
+
+**⚠️ Most of the 12 are CORRECT — do not file them.** The rule's harm is day-bucket *merging*;
+`muscle-recovery`, `workout-load-history` and `friends/feed` use rolling **instant** windows feeding
+hours-based consumers (`computeMuscleRecovery` reads `ws.startedAt.getTime()`), where a calendar day
+would be *less* correct.
+
+**Five sites produce a calendar day, and the failure is measured** — in `America/New_York` on the
+**25-hour fall-back day**, at 23:30 local, `now − 24h` lands on **today**. Three of them compute
+"yesterday" that way. **Unreachable today** (all users Brisbane, no DST); **one hour a year per
+DST-zone user** when reachable. `shiftDateStr` already exists and is already used in this shape at
+`slices/oura.ts:1182` — one-line swaps.
+
+**Fifth consecutive sweep where the mechanical version of the check was wrong.** Sweeps 21–25:
+over-reported seed-only keys, cleared the file containing the bug, treated hydrate-on-read as absent,
+and now would have filed seven correct rolling windows as defects. **The grep finds candidates; the
+handler decides.** That is the single most reusable thing this run produced.
 
 ### Sweep 24 — is Q-488 the only one? (2026-08-18)
 

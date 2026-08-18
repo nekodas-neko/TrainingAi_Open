@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, ms-offset → calendar day, Q-489): backlog 9393 -> 9439, projectOverview
+// 7523 -> 7551. One queue entry and its row, and the lines that earn their place are the NEGATIVE
+// ones: most instances of the banned ms-offset pattern are CORRECT (rolling instant windows feeding
+// hours-based consumers like computeMuscleRecovery), so an implementer who greps the pattern and
+// "fixes" all twelve would break muscle recovery. Both also carry the measured DST table, which
+// cannot be re-derived without re-running the transition arithmetic.
+
+//
 // Raised 2026-08-18 (Review, local-first write coverage): backlog 9387 -> 9393, projectOverview
 // 7501 -> 7523. No new entry — the sweep BOUNDS Q-488 (it is one handler, not a class), which is the
 // question an implementer has to answer before budgeting the work, so it rides on that entry. The
@@ -659,7 +667,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7523,
+  'projectOverview.md': 7551,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -670,7 +678,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9393,
+  'docs/implementation-backlog.md': 9439,
   'CLAUDE.md': 1075,
 
 };
