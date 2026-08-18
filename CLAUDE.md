@@ -391,6 +391,18 @@ The timezone rule covers "today"; this covers **ranges and construction**, which
   clock (`now − 2 days`) or inject the clock — never hardcode one side of a rolling window.** This
   is a different failure from the hour-dependence rule below: that one fires twice a day, this one
   fires once and then stays red forever.
+- **Deriving BOTH sides from the clock is not enough if they come from different timezones** (Q-356,
+  2026-08-18). `periodization-soft-delete.test.ts` inserted at `now() - interval '2 hours'` — a UTC
+  offset — and queried a window derived from the *user's* timezone. Between 00:00 and 02:00 Brisbane
+  (14:00–16:00 UTC) "two hours ago" is the previous local day, so the row fell outside the window and
+  **the whole file went red, 21 of 21, on every branch, for two hours every day**. It survived weeks
+  because it only fired in that window. Two correct shapes: compute the user-local day **first** and
+  anchor the fixture to **midday on that day** (midnight is a boundary, and a boundary is where an
+  off-by-one stops being visible), or read the local day **back from the row you just inserted**, as
+  `oura-workout-soft-delete.test.ts` does. And a regression test for this class must not wait for the
+  window — pick a fixed-offset zone (`Etc/GMT±N`) whose local time is *currently* near 01:00 and run
+  the case there, so it fires on every CI run. `faketime` does not help: it shifts node's clock, not
+  Postgres's.
 - **Client code has two "today" sources** — `todayInTz()` vs the device's own timezone. Pick one per feature and don't mix them for keys that must match server bucketing. Repo day-window helpers currently hardcode `DEFAULT_TZ` — thread the session tz through when touching them, and never re-declare `DEFAULT_TZ` locally.
 
 ---

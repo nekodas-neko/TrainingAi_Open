@@ -375,7 +375,15 @@ const BASELINE = {
   // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
   // against.
   'docs/implementation-backlog.md': 7596,
-  'CLAUDE.md': 1044,
+  //
+  // Raised 2026-08-18 (Q-356, Lane A): 1044 -> 1056. The date-arithmetic section already said "never
+  // hardcode one side of a rolling window"; it did not cover the shape that broke every branch for
+  // two hours a day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines
+  // for the mechanism, the two correct fixture shapes, and the one thing a regression test for this
+  // class must do (construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock). This is the file every session reads before it can start, and the rule it
+  // sits beside is the reason this bug was filed rather than repeated.
+  'CLAUDE.md': 1056,
 
 };
 

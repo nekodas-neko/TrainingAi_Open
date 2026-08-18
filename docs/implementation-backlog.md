@@ -355,41 +355,6 @@ below threshold and left in place for next time.
   does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
   alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
 
-### [platform] Q-356 — `periodization-soft-delete.test.ts` fails every day between 14:00 and 16:00 UTC, for every branch
-
-- **Branch:** `fix/periodization-soft-delete-local-midnight`
-- **Lane:** **A** — `lib/data/postgres/__tests__/`. Lane B diagnosed and reproduced it but does not
-  own the path.
-- **Added:** 2026-08-17 · found when it turned a Lane B PR's Tests job red
-- **⚠️ This blocks merges repo-wide for two hours a day, on any branch.** It is not specific to
-  whatever PR happens to be open when it fires.
-- **The mechanism, reproduced.** `beforeEach` inserts a session at `now() - interval '1 hour'`
-  (a UTC instant) and then derives the query window from the **user's** timezone:
-  ```sql
-  SELECT to_char((now() AT TIME ZONE 'Australia/Brisbane')::date, 'YYYY-MM-DD') AS today
-  ```
-  `weekStart = weekEnd = today`. Between 00:00 and 02:00 Brisbane — 14:00–16:00 UTC — "an hour ago"
-  is **the previous Brisbane day**, so the session falls outside `[today, today]`,
-  `getWeeklySetsByMuscleGroup` counts zero, and all five assertions fail. Measured at 14:35 UTC:
-  ```
-  Brisbane today:    2026-08-18
-  session completed: 2026-08-17 23:35 Brisbane  → date 2026-08-17
-  ```
-- **The comment above the insert asserts the opposite** — *"Started an hour ago so the session sits
-  inside today's user-local week regardless of the hour the suite runs at"* — which is true for 22
-  hours a day and false for two. Fix the comment with the code.
-- **Reproduce without waiting for the window:** seed a fresh database (`current_date` is irrelevant;
-  the seed anchors on Brisbane today) and run
-  `DATABASE_URL=… npx vitest run lib/data/postgres/__tests__/periodization-soft-delete.test.ts`
-  between 14:00 and 16:00 UTC. Outside that window it passes, which is why it has survived.
-- **Fix shape:** anchor the inserted session to the *user-local* day rather than to a UTC offset —
-  e.g. insert `completed_at` at local midday for the Brisbane date the window is computed from, so
-  both sides come from the same day by construction. This is the same rule CLAUDE.md already states
-  for tests (*"derive the fixture from the clock or inject the clock — never hardcode one side of a
-  rolling window"*), in the shape where both sides are derived but from **different timezones**.
-- **Worth a sweep:** any other test inserting `now() - interval '…'` and querying a user-local day
-  window has this exact hole. `grep -rn "now() - interval" lib/data/postgres/__tests__/`.
-
 ### [workouts][app-shell] Q-390 — the deload "D" is its own flex row, so it lifts that day's bar out of line with the rest
 
 - **Branch:** `fix/training-load-day-flag-inline`
