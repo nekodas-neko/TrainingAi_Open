@@ -990,6 +990,49 @@ stacked alignment and is using square stock.
   session** — a superseded analysis left in the backlog is not stale documentation, it is a work
   order.
 
+### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
+
+- **Branch:** `feat/meal-plan-to-saved-meals`
+- **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
+  used too much; it will be created - then likely not used again. It would be good if each item from
+  the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
+  sections."*
+- **Lane B** for the UI. **Lane A** if the plan→meal copy needs a column or a sync change — check
+  before starting, and hand that half over rather than taking a migration number.
+
+**What this replaces.** The meal plan is five surfaces — `meal-plan-section`, `meal-plan-review-card`,
+`meal-plan-setup-sheet`, `meal-plan-edit-sheet`, `meal-plan-manage-sheet` — plus its own row shape,
+its own staleness banner and its own editing model. All of it exists to maintain a thing the owner
+builds once and then stops opening. That is a lot of surface earning very little.
+
+**The reframe, and it is the owner's:** a plan is not somewhere you live, it is a **batch generator**.
+Each meal it produces gets a **Save** action; saved, it becomes an ordinary `saved_meals` row and
+inherits everything that already works — the detail screen, the macro split, the printable label and
+its QR, logging in one tap. The plan can then be discarded without losing anything worth keeping.
+
+**What to build.**
+1. **A `Save` action per plan meal, and a `Save all N`.** Saving writes `saved_meals` +
+   `saved_meal_items` from the plan's own items — the same rows the meal builder writes, so there is
+   exactly one representation of a meal in the app. A saved row shows its QR affordance in place of
+   the Save button, which is also how you see at a glance what you have already kept.
+2. **A `plan` tag on the resulting My Meals row**, so provenance is visible and nothing else about
+   the row is special.
+3. **Then delete surface, do not add it.** Once meals live in My Meals, `meal-plan-section` on the
+   day screen and `meal-plan-review-card`'s staleness nag have no job — the plan is not a live thing
+   to keep fresh any more. **Confirm that with the owner before removing anything**; this entry
+   proposes the reduction, it does not authorise it.
+
+- **⚠ Do not merge the two data models.** `saved_meals` is the destination, the plan stays its own
+  tables. Copy on save; never make a plan row and a meal row the same record. A plan is a schedule of
+  suggestions and a saved meal is a recipe you own — collapsing them means editing a saved meal
+  silently rewrites a plan, or deleting a plan takes your meals with it.
+- **Idempotence matters more than it looks.** "Save all" pressed twice must not produce nine
+  duplicates. Key the copy on `(plan id, plan item id)` and make a repeat save a no-op that reports
+  what already existed.
+- **Verification:** save one plan meal, then prove the resulting row logs, prints a label, and that
+  the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
+  indistinguishable from a hand-built one, so the label path is the test that proves it.
+
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
 - **Branch:** `feat/nutrition-visual-uplift`
@@ -1080,6 +1123,17 @@ string onto `var(--brand)` would repaint the protein macro with whatever accent 
 The selection-state literals and the macro palette are the same eight characters and must not share
 a fate — finding 1 is the former only.
 
+
+**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
+- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
+  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
+- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
+  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
+  weight, and moving them is churn — but editing them two tabs from where they are judged is the
+  friction the shortcut removes.
+- **"Complete Today's Logging" is a button at the foot of the day's log** — see **Q-387**, where the
+  decision and its wiring live.
+- **The meal plan becomes a generator of saved meals** — see **Q-398**.
 
 **11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
 MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
@@ -2238,6 +2292,31 @@ too, so the Balance card's "burned" figure is dragged down in step.
 - **Surface:** no device or production data required — shared-module logic plus a service wrapper,
   reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
   control, if option 1 is chosen, would need a device check.
+
+
+**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
+meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
+one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
+option 3 (silent inference) cannot be corrected by the person who knows the answer.
+
+**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
+— not in the header, not beside the ring. It is a statement about a day that has finished, and its
+position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
+is everything you ate. Only completed days are used to work out your maintenance calories."*
+Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
+must be reversible, since the whole point is that a wrong day poisons the estimate.
+
+**Ship the counter with it, not after it.** The button feeds something invisible today, and that
+invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
+had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
+for, so the two land together rather than one inventing a second version of the other.
+
+**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
+`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
+assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
+quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
+honest one, so the estimate starts from days marked after this ships and the counter shows that
+plainly.
 
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 

@@ -473,7 +473,13 @@ const BASELINE = {
   // conclusion is counterintuitive: the ACWR thresholds and RPE_DEAD_BAND are RIGHT and must not move,
   // while the call sites and the clamped input feeding them are wrong. Strip the tables and the next
   // reader tunes a constant instead of fixing the input — three times over.
-  'docs/implementation-backlog.md': 8540,
+  // Raised 2026-08-18 (Q-387 decision, Q-398, Q-395 round 5 — BugFix intake). Four blocking
+  // design questions were put to the owner and answered: the completeness control is an explicit
+  // button at the foot of the log (Q-387 options 2 and 3 are now closed, with the reasons), the
+  // meal plan becomes a generator of saved meals rather than five surfaces to maintain (Q-398),
+  // targets stay in Profile with a shortcut, and the design pass covers the full journey. Q-398
+  // is long because most of it is the two traps: do not merge the data models, and make it idempotent.
+  'docs/implementation-backlog.md': 8619,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
