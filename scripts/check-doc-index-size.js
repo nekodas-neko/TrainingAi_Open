@@ -174,6 +174,12 @@ const root = path.join(__dirname, '..');
 // The length is mostly the measurement that decides it: a round 50mm label has 7px left after the
 // shipped content, i.e. zero ingredient lines, while a square one has 1.64x the area. Also records
 // that the QR is not an escape hatch — the payload budget is 26 bytes with a CI test asserting it.
+//
+// Raised 2026-08-18 (BugFix intake, Q-394): main is red — anchor-source.test.ts fails on a clean
+// checkout, taking out every open PR, and CI runs on pull_request only so nothing caught it at the
+// merge. Filed with the reproduction and the explicit instruction not to re-baseline the numbers to
+// green, since the recalibrations that plausibly caused it may be right and the test wrong, or the
+// reverse — and that decision is the actual work.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -405,7 +411,7 @@ const BASELINE = {
   // Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
-  'docs/implementation-backlog.md': 7738,
+  'docs/implementation-backlog.md': 7778,
   'CLAUDE.md': 1044,
 
 };

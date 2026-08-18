@@ -355,6 +355,46 @@ below threshold and left in place for next time.
   does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
   alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
 
+### [readiness][platform] Q-394 — `anchor-source.test.ts` fails on `main`, so every open PR is red
+
+- **Branch:** `fix/body-battery-anchor-source-test`
+- **Added:** 2026-08-18 · found while shepherding a docs-only PR (#89) whose `Tests` job went red.
+- **⚠ This blocks every lane, not one PR.** `main` is the broken base: two unrelated PRs failed the
+  same job within fifteen minutes (`claude/trainingai-bugfix-intake-sozcr7` at 05:30,
+  `claude/implementation-lane-b-0o7kb9` at 05:15), and CI runs only on `pull_request` here, so a
+  broken `main` is invisible until it takes out the next PR — which is what happened.
+- **Reproduced locally on a tree differing from `main` by two documentation files**, so the diff is
+  provably not the cause:
+  ```
+  FAIL  app/api/body-battery/__tests__/anchor-source.test.ts
+    > body-battery — anchor precedence (S2) > anchors on our own computed sleep score…
+      AssertionError: expected 'readiness' to be 'sleep'
+    > body-battery — anchor precedence (S2) > prefers today's persisted derived readiness…
+      AssertionError: expected 55 to be 77
+    anchor-source.test.ts:65   expect(body.anchor).toBe(77)   // received 55
+  ```
+  **3 failed locally, 2 in CI** — the count differs between environments, which is itself worth a
+  look: it suggests at least one assertion is sensitive to seeded data or ordering rather than purely
+  to the code change.
+- **Likely cause — not confirmed, and deliberately not guessed at further.** `main` has taken several
+  Tuning-lane recalibrations in the last few hours that touch this pillar: **#84** ("a threshold
+  pointing backwards, and a score with one value"), **#85**, **#87** ("protect a side effect worth
+  17.7 points") and **#88** (Body Battery range). The failures are about *anchor precedence* —
+  whether Body Battery anchors on persisted derived readiness or falls back to the computed sleep
+  score — so a recalibration that changed which source wins, without updating this test, fits the
+  evidence. **Whoever takes this must decide which side is wrong**: if the new precedence is correct
+  the test needs updating, and if the test still encodes the intended contract the recalibration
+  regressed it. Do not simply re-baseline the expected numbers to make it green.
+- **What would count as fixed:** `anchor-source.test.ts` passes on a clean checkout of `main`, and
+  the entry records which of the two readings was right — the test or the behaviour — so the next
+  recalibration does not silently repeat it.
+- **Worth considering separately:** CI runs on `pull_request` only, so nothing tests `main` after a
+  merge. Every squash-merge lands unverified against whatever else landed beside it, and the cost
+  shows up as an unrelated lane's red PR. A push-triggered run on `main` would have caught this at
+  the merge that caused it rather than two PRs later. Not this entry's work.
+- **Surface:** reproducible in the sandbox against the seeded local DB — no device, no production
+  data. `app/api/body-battery/**` is Lane A's.
+
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
 - **Branch:** `feat/meal-label-ingredient-breakdown`
