@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/battery-range-clean` · **Q band:** 500–529 (next free: 512)
+**Updated:** 2026-08-18 · **By:** `tuning/acwr-calibration` · **Q band:** 500–529 (next free: 515)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -80,16 +80,29 @@ Since then, working only scores no other lane holds:
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
 
-## The lane is drained — everything left is blocked or needs elapsed time
-Every score in the app now has a calibration review, and both recalibrated scales have been audited
-for missed consumers. What remains:
-- **Blocked on Lane A:** Q-506 (temperature baseline), Q-509 (HR smoothing), Q-510 (persist stress
-  coverage), Q-505 (build Activity), Q-502. Each of these must land before the Tuning follow-up on it
-  can be measured.
-- **Needs elapsed time:** watching the new Sleep distribution; re-measuring resilience and the
-  post-recalibration anchor gap once enough new-model rows exist (there is currently **one**).
-Do not manufacture work here. If a successor finds nothing actionable, say so rather than
-re-measuring a settled score — the "do not re-litigate" list below exists to make that cheap.
+## Pillar coverage — this is the real scoreboard, not "every score has a review"
+The owner asked on 2026-08-18 whether **all pillars** had been tuned against historical data. The
+answer was **no**, and the previous baton wrongly said the lane was drained. It was drained of
+*health-score* work. Track pillars, not scores:
+
+| pillar | calibration coverage |
+|---|---|
+| sleep | ✅ recalibrated (Q-503) + consumer audit (Q-511) |
+| readiness | ✅ Q-500 shipped, Q-504 refuted, threshold table completed (Q-511) |
+| activity | ✅ specified (Q-505) — build is Lane A's |
+| body | ✅ battery range clean; anchor measured (Q-511) |
+| devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
+| **workouts** | ✅ **swept 2026-08-18** — ACWR (Q-512/513), RPE autoregulation (Q-514). **Clean:** Foster monotony, and prescription adherence (actual 73.6% vs planned 73.1%, reps +0.25 — so `INTENSITY_ZONES` is realised, and calibrating those zones would be circular since the program was generated from them). Only Q-514 and the two ACWR call sites are open. **Foster monotony CLEAN** — mean 1.29, the 2.0 gate fires on 1 of 102 windows; rest days are properly seeded at 0, which is what makes it meaningful. 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
+| **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05` (documented rationale, never validated against the owner's HR), `PEAK_BANDS` (their "stable per-bucket sample sizes" justification is an empirical claim nobody measured), zone boundaries |
+| **nutrition** | 🟡 **movement goals ARE calibrated** — `STRENGTH_FREQ_GOAL 5` (Q-137, 91 days) and `SESSION_VOLUME_GOAL_KG 5200` (Q-190, 40 sessions), see [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md). `STEP_GOAL 8000` / `ZONE_MINUTES 22` / `BMR_FRACTION 0.24` are **deliberate population anchors** (Paluch 2022, WHO 150 min/wk), not unchecked round numbers. **Genuinely uncalibrated: the calorie/macro targets vs the owner's observed weight change** — a TDEE outcome check nobody has run |
+| **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
+| app-shell, platform | n/a — no scoring surface |
+
+**Next unblocked work, in order:** finish workouts (1RM/RPE/progression), then the **nutrition TDEE
+outcome check** (does the recommended calorie target track the owner's actual weight trend?), then
+heart-rate (`HR_REST_THRESHOLD 0.05` has a documented rationale but was never validated against the
+owner's HR; `PEAK_BANDS` claim "stable per-bucket sample sizes" — an empirical claim never measured). Data exists for all three (77 sessions, 1,029 set logs, 3.5 months; body
+metrics and food logs; BLE HR since the re-key).
 
 ## Blocked
 - **Nothing is blocked on the owner.** They delegated all open decisions on 2026-08-18
@@ -142,6 +155,34 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **Foster monotony is clean — do not re-open it.** 7-day monotony over 102 windows: mean 1.29,
+  median 1.34, sd 0.31, range 0.41–2.32; `HIGH_MONOTONY = 2.0` fires on **1 window (1.0%)**, which is
+  right for a risk flag. `assemble-plan-context` seeds all 7 days at 0 so rest days count, which is the
+  correct Foster definition — that detail is what makes the threshold meaningful, so do not "optimise"
+  it to training days only.
+- **Exercise names map to MORE THAN ONE role** (`Barbell Shrug` is accessory *and* secondary, 20+ others
+  too). Any `session_exercises`-by-name join fans out and its per-role aggregates are unsound. Cost me
+  one measurement this session; the finding was re-derived without role attribution.
+- **Q-514's 64% is a ratio over RPE-gate windows, NOT over load cuts.** A cut also needs a falling 1RM
+  or missed reps, and the owner misses reps on only **7.1%** of sets (mean completion 1.046). So the
+  absolute number of cuts prevented is well below 25. Quote the ratio, never "64% of your load cuts".
+- **Prescription adherence is clean** (actual 73.6% vs planned 73.1%, reps +0.25 over). That is why
+  `INTENSITY_ZONES` was deliberately **not** calibrated: the program is generated from those zones, so
+  checking them against work they produced is circular. Adherence is the non-circular question.
+- **`RPE_DEAD_BAND = 1.5` is RIGHT — do not tune it** (Q-514). It sits on a flat part of the
+  sensitivity curve (1.25→20.7%, 1.5→17.5%, 2.0→14.9%) and the delta distribution is centred. The bias
+  is in the input: `expectedRpe`'s **floor** clamp binds on 6.5% of sets (the ceiling never binds),
+  giving them a **+1.89** mean delta against **−0.34** for everything else, which fires the back-off
+  arm. Excluding them removes **64% of back-off triggers and zero push triggers** — the asymmetry is
+  the proof it is bias, not sensitivity. **Third instance today of "the threshold is right, the input
+  is wrong"** (Q-506, Q-512, Q-514). Check the input's distribution before touching any constant.
+- **ACWR's thresholds are RIGHT — do not tune them** (Q-512/513). Over 77 sessions the
+  decision-driving variant reads mean 0.99, median 1.05, sd 0.32, bands 18/69/13/0%. The `> 1.5`
+  emergency deload has **never fired** (max 1.48) and that is **correct** — an emergency deload that
+  fires often is not an emergency. **This near-miss is the opposite call to Q-506's**, and the
+  difference is the input: there one biomarker's baseline was 18.7× wrong, here the distribution is
+  healthy. *A near-miss is a symptom, not a diagnosis — check the input first.* The bugs are the
+  call-site windows, not the constants.
 - **Body Battery's range is settled and healthy** — sd 29.2 over 50 days, all four bands 20–28%, full
   0–100. Do not re-open it as a range problem. Its open questions are Q-272 (charge/drain), Q-276
   (does it agree with readiness at all) and Q-511 (the anchor), none of which are about the spread.

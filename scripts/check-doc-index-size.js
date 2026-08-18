@@ -461,6 +461,17 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+  // Raised 2026-08-18 (Q-397 + the Q-395 review fold-in, BugFix intake). Recomputed from the
+  // MERGED file after taking main's side of this baseline, rather than splicing the conflict
+  // hunks — two same-day raises spliced together silently drop one side. Q-397 records that the
+  // shipped ingredient label is the analysis Q-393 was corrected away from, with the measured
+  // mm-per-module table and the owner's choice of B2 as the default; Q-395 gains the six review
+  // notes and the 11-section prod checklist an implementation PR ticks off.
+  // Raised 2026-08-18 (Tuning): -> 8540, recomputed from the MERGED file. Q-512/513/514 — the first
+  // calibration sweep of the workouts pillar. The entries carry their measured tables because every
+  // conclusion is counterintuitive: the ACWR thresholds and RPE_DEAD_BAND are RIGHT and must not move,
+  // while the call sites and the clamped input feeding them are wrong. Strip the tables and the next
+  // reader tunes a constant instead of fixing the input — three times over.
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -469,8 +480,9 @@ const BASELINE = {
   // must do: construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock. Recomputed from the merged file on each merge this branch took.
 
+
   'projectOverview.md': 6991,
-  'docs/implementation-backlog.md': 8318,
+  'docs/implementation-backlog.md': 8496,
   'CLAUDE.md': 1075,
 
 };
