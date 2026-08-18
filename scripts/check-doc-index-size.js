@@ -425,7 +425,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6910,
+  'projectOverview.md': 6946,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -445,7 +445,7 @@ const BASELINE = {
   // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
   // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
   // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
-  'docs/implementation-backlog.md': 7867,
+  'docs/implementation-backlog.md': 7948,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

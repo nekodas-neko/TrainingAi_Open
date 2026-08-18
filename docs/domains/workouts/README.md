@@ -93,6 +93,8 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-468 — Coach `undo` writes `beforeState` back without checking the target still holds what the change set; undoing two stacked swaps leaves an exercise nobody chose). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
 
+- [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-470 — `regeneratePrescriptionInBackground` is fire-and-forget from two sites in `GET /api/workout-data` with a rate limit but no in-flight guard). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
+
 ## Open issues
 
 ```bash

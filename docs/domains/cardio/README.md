@@ -44,6 +44,8 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 
 - [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — the activity/cardio mutations were probed cross-user and hold; `PATCH /api/activity-logs/[id]/metrics` returns a correct 404). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
 
+- [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-469 — `running-plan-explain` re-asks the model for the same sentence on every card mount, so the wording changes between visits). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
+
 ## Open issues
 
 ```bash
