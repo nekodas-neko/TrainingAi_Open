@@ -285,6 +285,95 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
+
+- **Branch:** `fix/no-raw-error-in-response-body`
+- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
+- **Placement:** upper-mid. Three files, a few lines each, and it is the only place in the app that
+  publishes table structure.
+- **Measured:**
+  ```
+  GET /api/workout-sessions/not-a-uuid/recap  →  500
+  {"error":"[ERROR]: Error: Failed query: select \"id\", \"user_id\", \"session_id\",
+   \"session_name\", \"started_at\", \"completed_at\", \"hr_synced_at\", \"warmup_ended_at\",
+   \"phase_id\", \"phase_type\", \"is_early_deload\", \"was_override\", \"intensity_mode\", …
+  ```
+  The control (a valid-but-missing UUID) returns `{"error":"Not found"}` 404, so this is specific to
+  the malformed id.
+- **It is the route's own catch, not a dev overlay — this ships in production:**
+  ```ts
+  const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/recap')
+  return NextResponse.json({ error: errMsg }, { status: 500 })
+  ```
+  `errorLog` (`packages/shared/src/logger.ts:1`) builds `` `${logPrefix} ${error}` `` and returns it.
+  **No environment check, no redaction.**
+- **Scope, measured:** four routes use `error: errMsg` / `error: errorLog(...)` as the response body —
+  `workout-sessions/[id]/{recap,energy,timing}` (all three leak) and `session-explain/insight`, which
+  **does not leak today** (a malformed `sessionId` is guarded upstream and returns a clean 404) but
+  carries the same pattern and would leak the moment an error reached its catch. Fix all four.
+- **What it is and is not.** Schema disclosure to an **authenticated** user, and this app's users are
+  its own account holders — not an anonymous-attacker hole. Worth fixing because it publishes table
+  structure nothing else exposes, into a JSON field a client may render, and because the fix costs
+  nothing: `reportServerError(error, …)` is already called on the line above, so redacting the
+  response loses no diagnostic information.
+- **Fix shape:** return a fixed string (`{ error: 'Internal error' }`) and keep `errorLog`'s output in
+  the server log only. Consider making `errorLog`'s return value unusable as a response body — or add
+  a Custom Rules step rejecting `error: errMsg` / `error: errorLog(` inside `NextResponse.json`, which
+  is the shape this repo already uses where prose would not hold.
+- **Lane A owns this** (`app/api/**`, `packages/shared/src/logger.ts`).
+
+### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
+
+- **Branch:** `fix/dynamic-route-uuid-guard`
+- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
+- **Placement:** mid. Not a security hole (see below) — an error-shape and input-validation gap, with
+  a cheap shared fix and an obvious ratchet.
+- **Method.** All 30 dynamic route files, every method, called twice: once with a
+  well-formed-but-nonexistent UUID (**the control**) and once with `not-a-uuid`. 39 pairs. **22
+  returned 5xx**; one of those (`PUT /api/nutrition/meal-types/[id]`) also 500s on the control and is
+  already **Q-463**, leaving **21 new pairs across 14 routes**:
+
+  | Route | Methods 500ing | Control answers |
+  |---|---|---|
+  | `/api/coach/apply/[id]/undo` | POST | 404 |
+  | `/api/friends/[id]` | DELETE | 204 |
+  | `/api/injuries/[id]` | PATCH, DELETE | 404 / 200 |
+  | `/api/nutrition/food-logs/[id]` | DELETE | 200 |
+  | `/api/nutrition/meal-plans/[id]` | GET, PATCH, DELETE | 404 |
+  | `/api/nutrition/meal-plans/[id]/review` | POST | 404 |
+  | `/api/nutrition/meal-plans/[id]/structure` | PATCH | 404 |
+  | `/api/nutrition/meal-plans/meals/[mealId]` | PATCH | 404 |
+  | `/api/nutrition/meal-types/[id]` | DELETE | 200 |
+  | `/api/nutrition/saved-meals/[id]` | DELETE | 200 |
+  | `/api/supplements/[id]` | PATCH, DELETE | 404 / 200 |
+  | `/api/supplements/[id]/log` | POST, DELETE | 404 / 200 |
+  | `/api/workout-review/session/[sessionId]` | POST | 400 |
+  | `/api/workout-sessions/[id]/{energy,recap,timing}` | GET ×3 | 404 |
+
+- **The control is what makes this a finding**: every one of these answers a well-formed missing id
+  correctly. Only the malformed id breaks them, so it is a missing input guard, not a broken route.
+  Postgres rejects the cast with `22P02 invalid_text_representation`.
+- **Only 2 of the 30 dynamic route files validate the id as a UUID at all.** The rest do
+  `const { id } = await params` and pass the string to the repository.
+- **⚠️ Reading the evidence:** a **500 is conclusive** (the request reached the database). A **400 is
+  not** — the probe sent `{}`, so a body-bearing method may have failed its body schema before the id
+  was used. The table above lists only 500s, so every row is conclusive; do **not** read the routes
+  absent from it as verified-correct unless they are GET or DELETE.
+- **Not a security hole.** A malformed id cannot read anyone's data — Postgres refuses the cast before
+  any row is touched and every route is `auth()`-scoped. It becomes a disclosure problem only where it
+  meets **Q-483**, which is why that one is placed above this.
+- **Fix shape:** a shared `parseUuidParam(id)` returning 400 on failure, applied at the top of each
+  dynamic route — the same shape as `normalizeDateParam` for date params, which is this repo's own
+  precedent for exactly this class. Add a Custom Rules step requiring it in any new
+  `app/api/**/[id]` route so the count cannot grow back; `CLAUDE.md` already argues that for date
+  params (*"new routes get the guard at creation"*).
+- **Lane A owns this** (`app/api/**`).
+- **Observability is fine and needs no work:** every one of these reached `error_events` tagged
+  `[pg 22P02]` — the caught ones via `reportServerError`, the bodiless
+  `GET /api/nutrition/meal-plans/[id]` via `onRequestError`.
+
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
 - **Branch:** `fix/exercises-route-admin-db-check`
@@ -1200,6 +1289,102 @@ blocker and the intended shape were both already named, so **do not re-derive th
   against the seeded DB — no device needed to prove the sync. Only the native chip toggles need the
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
+
+### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
+
+- **Branch:** `fix/inline-centred-line-budget`
+- **Added:** 2026-08-18 · owner, on v1.324.6 with the style selected: *"I dont see the B2 default we
+  wanted... where is my b2 default? should of shipped?"* It **did** ship (Q-397, #105) and is
+  correctly the default and correctly selected. It just draws no ingredients.
+- **Lane B.** One constant in `components/nutrition/meal-label-render.ts`. No schema, no route.
+
+**Proven arithmetic, not a data problem.** `drawSquareCentredLabel` walks the column top-down and
+then asks how many 8-unit lines fit above the code:
+
+```
+L = (189 − 137) / 2 = 26        bottom = 189 − 26 = 163
+y  = 30 (L+4)
+  + nameSize(12) + 7            →  49
+  + caloriesSize(21) + 6        →  76
+  + macroSize(7.5) + 5          →  88.5
+  + rule gap(8)                 →  96.5
+codeTop  = 163 − 0 − codeUnits(66) = 97
+maxLines = floor((97 − 96.5 − 2) / 8) = floor(−0.19) → clamped to 0
+```
+
+**Zero lines, and it is not marginal — it is negative.** `fitText` shrinking a long name does not
+rescue it: at nameSize 12/10/8/6/**4** the answer is 0 every time, because the name contributes at
+most 12 of the 66.5 units consumed. For **one** line the code box must be **≤ 56.5 units**; it ships
+at **66**.
+
+**The tell was in the spec's own comment.** It reasons *"58 units is what the stack can spare once
+name, calories, macros and five ingredient lines have taken their height"* — and the value shipped is
+66. But 58 does not fit either (it yields 0 lines as well); the budget was computed against a
+different set of gaps than the ones drawn. **Do not simply set it to 58.**
+
+**Confirming symptom, visible in the owner's screenshot:** the sheet's *"Printing N ingredients"* line
+is absent. That copy is gated on `metrics.ingredientLines > 0`, so the renderer is already reporting
+0 — the plumbing works and is telling the truth. `savedMealToIngredients` is **not** the fault; the
+local store joins `food_items` and populates `foodItem`, and the per-portion calories on the label
+(208 kcal, P 32 C 8 F 5) prove the items resolved.
+
+**What to fix, in order of preference.**
+1. **Recompute the budget from the drawn gaps rather than guessing a constant.** Derive `codeUnits`
+   from the space actually left (`bottom − y − reserved lines × 8`) so the code takes what remains
+   after N lines, instead of a hardcoded box the layout cannot honour.
+2. If a fixed constant is kept, it must be **≤ 56.5 for one line, ≤ 40.5 for three** — and three is
+   what the style promises. 40.5 units is a 10.7 mm box, symbol ~8.1 mm, **~0.32 mm per module**,
+   which is *below* the 0.487 that `band` shipped with. **That is the real finding:** the centred
+   stack cannot carry the full list *and* a better code than the old default, so one of the two has
+   to give. The mockup that promised both was drawn at tighter type (6.5 px list, smaller headline,
+   smaller gaps) than the spec that shipped.
+3. **Whatever is chosen, the picker copy must match it.** "The full ingredient list" is currently
+   false, and a style that quietly prints fewer lines than it claims is how this was missed.
+
+- **Regression test, and it is cheap:** `meal-label-code-size.test.ts` already exists. Add a case
+  asserting `ingredientLines >= 1` for a two-ingredient meal in every style whose spec sets
+  `ingredients: true`. A style that claims a list and draws none should fail CI, not a test print.
+- **Verification:** the preview must show the ingredient run **and** the "Printing N ingredients"
+  line, then a physical print at 50 mm.
+
+### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
+
+- **Branch:** `fix/label-save-to-gallery`
+- **Added:** 2026-08-18 · owner, on v1.324.6: *"the share button doesnt do anything - it should give
+  a download to gallery/images when clicking it."*
+- **Lane A** if it needs a Capacitor plugin or a Kotlin bridge (it does — see below), which also
+  means **a new APK**. State that in the PR: this half does not reach the device through a Railway
+  deploy.
+
+**Why it does nothing.** `meal-label-sheet.tsx` has two paths and both miss on the canonical runtime:
+1. `navigator.canShare?.({ files: [file] })` — share-*with-files* is narrower than share-with-text
+   and is not reliably available in the Samsung WebView, so the guard correctly returns false and
+   falls through. The guard is right; there is just nothing behind it.
+2. The fallback is `<a download>` on a blob URL — and **the code's own comment says this is
+   unreliable inside the WebView**, which is why it was written as the fallback. It is a silent
+   no-op there: no error, no file, no toast. Exactly what the owner reports.
+
+So the feature has only ever worked in `pnpm dev`. This is the failure class CLAUDE.md names
+directly — green on web, dead on the device, because the failing path is unreachable in the sandbox.
+
+**What to build.** A native save, not a better guess at a web API.
+- Write the PNG with **`@capacitor/filesystem`**, then make it visible to the gallery. On Android a
+  file written to app storage is invisible to the Photos app until it is registered with
+  **MediaStore** — writing to `Directory.Documents` and hoping is the trap here. Either use a
+  community MediaStore plugin or add a small Kotlin bridge beside `OuraBlePlugin`.
+- Keep the **share sheet** as a second, explicitly-labelled action: saving to the gallery and handing
+  the PNG to a label-printer app are different intents, and the owner asked for the first. One button
+  doing whichever happens to be available is what produced this bug.
+- **Fail loudly.** Every branch ends in a toast — saved, shared, or failed. A silent path is what made
+  this invisible for a release.
+
+- **⚠ Do not "fix" this by removing the `canShare` guard.** Calling `navigator.share` with files where
+  it is unsupported rejects, and the existing catch swallows `AbortError` — which would turn a dead
+  button into a dead button that also lies in the log.
+- **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
+  Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
+- **Related:** the label this saves is currently missing its ingredient list — **Q-399**. Fix that
+  first or the first file that lands in the gallery is the wrong artwork.
 
 ### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 
