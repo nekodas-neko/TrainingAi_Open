@@ -3,11 +3,18 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 507)
+**Updated:** 2026-08-18 · **By:** `tuning/stress-resilience-calibration` · **Q band:** 500–529 (next free: 509)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Daytime stress + resilience — MEASURED, propose-only** (Q-507, Q-508). The last two scores with
+  no calibration review, and now none remain. `STRESS_HIGH_DAY_THRESHOLD_MIN = 120` fires at a
+  healthy-looking 16% but on the **wrong days** (high-stress minutes correlate **+0.40** with
+  readiness; the four firing days average readiness 79 against 65). **Resilience has emitted exactly
+  one value ever** — level 5, granular at the 5.99 clamp, all 13 rows — because
+  `longTermSleepRecovery` is a window *sum* where its siblings are means, carrying 70% of the
+  recovery weight. [`review`](../../reviews/2026-08-18-stress-resilience-calibration.md).
 - **Illness radar — MEASURED, propose-only** (Q-506). It has never produced an action-bearing flag in
   46 days, and the cause is a **cold-start-poisoned temperature baseline** (stored dev 253.7 vs a true
   nightly sd of 13.5 — **18.7×**) on the biomarker carrying **40%** of the weight. Same `tempZ` also
@@ -35,8 +42,11 @@ Since then, working only scores no other lane holds:
 3. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z in that
    review's §2 table moves by ~19×, so the radar may then fire *too* often. That is a calibration
    question and it is Tuning's, unlike the fix itself.
-4. **Daytime stress (22/40 days) and resilience (13/40) have never been calibration-reviewed**, and
-   nothing is queued on either by any lane. They are the remaining un-tuned scores.
+4. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). Its call site passes
+   **our** sleep score *and* the Recovery Index contributor, so both v1.319.0 and v1.321.0 feed it,
+   all 13 existing rows predate both, and the move is *downward* on the term that is saturating.
+   **Every score in the app now has a calibration review** — there is no un-reviewed pillar left to
+   pick up cold.
 5. **Re-derive Q-500's anchor on ~15 BLE-era nights.** The shipped fit is Cloud-era and BLE overnight
    HR is ~2× noisier, so 5 h is conservative for current data rather than wrong.
 6. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
@@ -56,6 +66,7 @@ explicit instruction (*"free reign; tune as needed"*), which overrides the stand
 for this work:
 `packages/shared/src/health/sleep-score.ts` · `packages/shared/src/health/rest-day-guidance.ts` ·
 `packages/shared/src/changelog.ts` · `package.json`.
+**Nothing is claimed now** — Q-506/507/508 are all docs-only and propose-only.
 **Q-504 will need the same claim plus** `readiness-composite.ts`, `lib/health/readiness-payload.ts`,
 `ai-periodization/ai-dynamic.ts`, `lib/oura-models/inference/ots.ts` — check Lane A's baton first.
 
@@ -93,6 +104,14 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **A golden vector proves a port computes the same function; it says nothing about scale.** The
+  resilience golden's `dailySleepRecoveryList` is 13 *identical* values of 0.6, two orders of magnitude
+  below what production produces, so it pins the arithmetic while never exercising the summation that
+  saturates the score. When a pinned port misbehaves in production, check the fixture's input
+  *magnitudes* against real ones before doubting the port.
+- **A healthy firing rate is not evidence a threshold is right.** The stress override fires on 16% of
+  days, which is exactly what you would choose — and on the four *best* days, while staying silent on
+  readiness 29. Always check *which* days a threshold selects, not just how many.
 - **A threshold is not the lever when the input feeding it is broken.** The illness radar peaks at 38
   against a `watch` threshold of 40, which is exactly the shape that tempts a two-point threshold
   nudge. The z it is built on is divided by ~19× too much. Lowering the threshold would have hidden a

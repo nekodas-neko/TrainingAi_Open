@@ -2996,6 +2996,94 @@ session working from a temporarily restored copy.
   recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
   they say nothing about night 5.
 
+### [readiness][activity] Q-507 — the stress override fires on the best days: high-stress minutes correlate +0.40 with readiness
+
+- **Branch:** `fix/stress-override-input`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-stress-resilience-calibration.md`](reviews/2026-08-18-stress-resilience-calibration.md) §1
+- **What it drives.** `STRESS_HIGH_DAY_THRESHOLD_MIN = 120` raises a stress override in
+  `computeAiDynamicNextSession`, easing the day's prescribed session. The constant is flagged in
+  source as a judgement call (*"tune here, nowhere else"*) and has never been calibrated.
+- **The firing rate is fine.** Over n = 25 days carrying `stress_high_minutes`: mean 58.8, median 60,
+  sd 47.0, and the override fires on **4 of 25 days (16%)**.
+- **The signal points the wrong way.** `corr(stress_high_minutes, readiness_score)` = **+0.400**:
+
+  | group | days | mean readiness | mean sleep | worst readiness |
+  |---|---|---|---|---|
+  | **fires (≥ 120)** | 4 | **79.0** | 92.8 | 69 |
+  | quiet (< 120) | 21 | **65.0** | 84.9 | **29** |
+
+  The four days that would ease training are 2026-07-17 (readiness 69), 07-23 (80), 07-24 (84) and
+  07-27 (83). The two genuinely bad days — 07-21 (readiness 37, sleep score 31) and 07-26
+  (readiness 29) — carry 0 and 30 minutes and never fire.
+- **Two explanations tested and rejected.** *Not exercise*: 19 of 25 are completed-workout days,
+  spread evenly (4 of 4 at 0 minutes, 3 of 4 at ≥ 120). *Not purely wear coverage*: it is a partial
+  confound (`corr(stress_high, recovery_high)` = +0.304, and both zero-days are zero on **both**
+  counts) but net stress still correlates **+0.379** with readiness. For contrast
+  `daytime_stress_scaled` — the day's mean level rather than a bucket count — correlates **−0.111**,
+  the right sign and no magnitude.
+- **Do NOT tune the threshold.** Moving a constant that sits on a signal pointing backwards changes
+  *which* good days get eased, not whether the right ones do. Same shape as Q-506, failure inverted:
+  there the input was dead, here it is alive and anti-correlated.
+- **A precision illusion to know about.** `STRESS_BUCKET_MS` is 30 min, so the value is always a
+  multiple of 30 — observed set is exactly `{0,30,60,90,120,150,180}`. The threshold has **seven**
+  meaningful positions and 120 sits on an atom: `>= 121` halves the firing rate (4 days → 2). Express
+  and justify any future change in **buckets**, not minutes.
+- **First action**, in preference order: (1) explain the sign before touching the constant; (2)
+  consider `daytime_stress_scaled` as the override input instead — right sign, a mean so coverage
+  cancels, already persisted, and it needs its own threshold from scratch (its range is −0.14 to
+  +0.23, nothing like 120); (3) failing both, gate the override on daytime coverage, which removes the
+  measurable confound without removing the feature.
+- **n = 25 is small** — at that size r = +0.40 sits near the conventional significance boundary, so the
+  strength is provisional. The group means are the durable part. Re-measure at n ≈ 60.
+
+### [readiness] Q-508 — resilience has emitted exactly one value in its lifetime (level 5, granular pinned at the 5.99 clamp)
+
+- **Branch:** `fix/resilience-longterm-sleep-recovery`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** Blocked on a question this repo
+  cannot answer (see first action).
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-stress-resilience-calibration.md`](reviews/2026-08-18-stress-resilience-calibration.md) §2
+- **Measured.** `resilience_level` is present on **13 of 96 rows**, and on every one of them
+  `resilience_level` = **5** (min = max) and `resilience_granular` = **5.99** (min = max), with
+  confidence ≤ 0.57. **5.99 is the clamp bound** — `findGranularResilienceLevel` ends in
+  `Math.max(1.01, Math.min(5.99, …))`, so that exact value is what it returns when the computation
+  runs off the top of the scale. The score has never produced an informative reading and is surfaced
+  as a band label.
+- **The port is not hard-wired.** The pinned golden (`stress_resilience_2_2_1.golden.json`) produces
+  level **1.0** / granular **1.01** — the *bottom* clamp. The pinning is input-driven.
+- **Mechanism.** `longTermStress` and `longTermRestorativeTime` are weighted means;
+  `longTermSleepRecovery` is not — it replicates a `[N,1] × [N]` broadcast from the `.pt` and reduces
+  to `(Σ all weights × Σ list) / Σ used weights`, i.e. **the plain sum of the window** when every day
+  is valid. Verified exactly against the golden: its list is 13 × 0.6 and today's index is 29.99013,
+  and `13 × 0.6 + 29.99013 = 37.79013` = `out_7` to every stored digit. Solving the golden's own
+  outputs for the recovery weights (`out_8 = w_d·out_6 + w_s·out_7`, summing to 1) gives
+  **w_d = 0.30, w_s = 0.70** — so 70% of `longTermRecovery` is a quantity that grows with the number
+  of valid days. Production per-day indices run **0.0 – 55.6**, so a 5–7 day window sum lands around
+  **130–240** against the golden's 37.79 — above every band boundary, every day.
+- **The golden cannot catch this**, and that is the transferable lesson: its list is 13 *identical*
+  values of 0.6, two orders of magnitude below production, so the fixture pins the arithmetic without
+  ever exercising the sum's scale. A golden proves a port computes the same function; it says nothing
+  about whether the inputs are on the scale it was captured at.
+- **Second oddity, observed not diagnosed.** `resilience_daily_sleep_recovery` barely tracks sleep:
+  sleep score 93 → **0.0**, 87 → 12.8, 83 → 10.2, 80 → 9.9, 78 → 13.5, while sleep score **31 → 17.3**.
+  `dailySleepRecovery = clamp(polyval(sleepRecoveryScalerCoef, sr))` where `sr` blends our sleep score,
+  hrvBalance, recoveryIndex and RHR contributors — a vendor polynomial fitted against *Oura's*
+  distribution fed *our* contributors is the obvious suspect, but this was not chased down.
+- **Do NOT touch the algorithm or the constants** — the file says so and the golden is the contract.
+- **First action:** establish whether the sum is **faithful to the vendor**. If it is, Oura feeds a
+  per-day index on a far smaller scale than ours and the defect is in what we supply; if not, it is a
+  port bug. **This repo cannot settle it** — the vendor source is in the private archive — and that
+  decision gates everything else. Then: add a golden case with realistic list magnitudes (the current
+  fixture passes under either reading); and **until the level varies, stop surfacing it as a band** — a
+  score that has returned "strong" on 100% of days is worse than absent, because it reads as a
+  measurement.
+- **Re-measure after both recalibrations reach stored rows.** The call site passes our `sleepScore`
+  *and* `comp.contributors.recoveryIndex.score`, so v1.319.0 (sleep mean 84.1 → 69.5) and v1.321.0
+  (Recovery Index anchor) both feed `sr`. All 13 rows predate both, and the direction is *downward* on
+  the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

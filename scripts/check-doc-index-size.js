@@ -364,7 +364,12 @@ const BASELINE = {
   // against a baseline whose deviation is 18.7x too large. The measured biomarker table and the
   // cold-start numbers are the entry: without them the next reader lowers the threshold instead of
   // fixing the baseline, which is the mistake Q-504 already made and reverted.
-  'docs/implementation-backlog.md': 7366,
+  // Raised 2026-08-18 (Tuning): 7366 -> 7454. Q-507/Q-508, the last two un-calibrated scores. Both
+  // entries carry measured tables rather than conclusions on purpose: Q-507's whole point is that a
+  // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
+  // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
+  // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
+  'docs/implementation-backlog.md': 7454,
   'CLAUDE.md': 1044,
 
 };
