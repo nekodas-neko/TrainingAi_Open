@@ -495,7 +495,9 @@ export interface WorkoutRepository {
   // Returns true if a new row was inserted, false if a session with this id already existed
   ensureWorkoutSession(userId: string, sessionId: string, programSessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean, intensityMode?: 'full' | 'deload' | null, wasOverride?: boolean): Promise<EnsuredWorkoutSession>
   completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<void>
-  setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<void>
+  /** Q-460 — true when a row was updated. Zero rows means no such session for this user, which is
+   *  an error here (unlike `setWorkoutSessionWarmupEnd`, where zero rows means "already set"). */
+  setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean>
   setWorkoutSessionWarmupEnd(userId: string, workoutSessionId: string, warmupEndedAt: Date): Promise<void>
   logExercise(log: Omit<ExerciseLog, 'id' | 'sets'>): Promise<ExerciseLog>
   logExerciseAndSets(

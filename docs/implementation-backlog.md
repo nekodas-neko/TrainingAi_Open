@@ -285,6 +285,61 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [workouts][platform] Q-473 — completing one workout twice at once counts it twice: `sessions_in_phase` over-increments, in the function whose comment promises it cannot
+
+- **Branch:** `fix/complete-workout-increment-race`
+- **Added:** 2026-08-18 · review sweep (write-concurrency lens) ·
+  [`docs/reviews/2026-08-18-write-concurrency.md`](reviews/2026-08-18-write-concurrency.md)
+- **Placement:** high for a Review finding. It is **measured, reproducible, and silent**, it lands on
+  the one counter `CLAUDE.md` says has already drifted three separate times, and the fix is small.
+- **Measured, not inferred.** Four concurrent `POST /api/complete-workout` for **one** workout
+  session, fresh row, counter reset to 0, trials spaced past the `5 / 60 s` limit:
+
+  | Trial | Codes | `completed_at` set | `sessions_in_phase` after |
+  |---|---|---|---|
+  | A | 200 ×4 | 1 row | **3** |
+  | B | 200 ×4 | 1 row | **3** |
+  | C | 200 ×4 | 1 row | **2** |
+  | D | 200 ×4 | 1 row | 1 |
+
+  A fifth burst that the limiter cut to two survivors gave **2**. Reproduced in **4 of 5**. The
+  workout row is correct every time — only the counter is wrong.
+- **The shape** (`packages/shared/src/workout/complete-workout.ts:56-77`): read `completedAt` →
+  write → `if (programSessionId && !alreadyCompleted) incrementSessionsInPhase(...)`. The idempotency
+  decision comes from the **earlier read**, so every request that read before the winner wrote
+  believes it is the first.
+- **`completeWorkoutSession` is already guarded and that is the whole point** — `adapter.ts:806-814`
+  carries `isNull(completedAt)` in its `WHERE`, so exactly one request stamps the column. It just
+  returns `void`, and the affected-row count that would settle this is thrown away.
+- **The function's own comment claims this is handled:** *"Idempotent: a retried/replayed completion
+  (network retry, or an outbox mutation re-pushed after its response was lost) must not … double-
+  increment the sessions_in_phase stored counter."* Worth fixing the comment's honesty alongside the
+  code.
+- **Two live vectors.** (1) Rapid taps — `CLAUDE.md` records *"5 rapid taps once fired 4
+  `complete-workout` POSTs"*. (2) **Outbox replay** — `pushMutations`' `complete_workout` branch calls
+  the same shared function, so a re-pushed mutation takes the same path. That is the exact case the
+  comment names.
+- **Why it hurts:** `sessions_in_phase` advances the periodization phase (baseline → accumulation →
+  intensification → realisation → deload). Over-counting moves the lifter into the next phase, and
+  into a deload, **early**, off a session that was never trained. Nothing reconciles the counter
+  against `workout_sessions`, so it surfaces only as "my programme advanced too soon".
+- **Fix shape (implementer's call, two options, both already in this codebase):**
+  1. *Cheapest, and it is `CLAUDE.md`'s own write-path rule (a).* Have `completeWorkoutSession`
+     return its affected-row count and derive `alreadyCompleted` from **that** instead of the prior
+     read. The guarded UPDATE exists; only its return value is missing.
+  2. *If a transaction is wanted anyway:* copy `upsertPersonalRecordIfBetter`
+     (`adapter.ts:2987-3004`), which does the same read-then-conditionally-write correctly with
+     `db.transaction` + `SELECT … .for('update')`.
+  Prefer (1) — smaller, no new transaction on a hot path, and it fixes the pattern rather than
+  wrapping it. Whichever lands, `CLAUDE.md`'s **Stored Counters** rule asks for a reconcile-on-read
+  (`reconcileSessionsInPhase` already exists) — check it covers the drift already in the DB.
+- **Lane A owns this** — `packages/shared/**` and `lib/data/**`.
+- **Not verified on:** production (correct — it writes), the APK, or a multi-replica deployment.
+  Local `pnpm dev` is a single node; more replicas widen the window, not narrow it.
+- **Setting up a repro? Read Q-474 first** — populating `workout_sessions.program_session_id` (the
+  obvious-looking column) makes the periodization block silently skip and the race look absent. The
+  live column is `session_id`.
+
 ### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
 
 - **Branch:** `fix/db-query-403-masks-outage`
@@ -641,6 +696,39 @@ moving *beside* the calories rather than under them.
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
 
+### [workouts][platform] Q-474 — `workout_sessions` has two foreign keys to `program_sessions`, and the dead one owns the name the live one is used under
+
+- **Branch:** `chore/workout-sessions-dead-program-session-id`
+- **Added:** 2026-08-18 · review sweep (write-concurrency lens) ·
+  [`docs/reviews/2026-08-18-write-concurrency.md`](reviews/2026-08-18-write-concurrency.md)
+- **Placement:** low. **Nothing is broken today** — nothing uses the dead column. File it as the
+  maintenance hazard it is, not as a bug.
+- **What.** `lib/data/postgres/schema.ts` declares both:
+  ```ts
+  sessionId:        uuid('session_id').references(() => programSessions.id, ...)          // 157 — live
+  programSessionId: uuid('program_session_id').references(() => programSessions.id, ...)  // 168 — dead
+  ```
+  `program_session_id` came from `079_ai_dynamic_periodization.sql:19` ("for prescription trigger
+  linkage"). `grep workoutSessions.programSessionId` across `lib app packages` returns **zero hits** —
+  nothing writes it, nothing reads it.
+- **Confirmed in production:** 0 of the owner's 91 `workout_sessions` rows have `program_session_id`
+  set; 45 have `session_id`. (`claude_ro` is row-scoped to one user, so that is the owner's rows —
+  but a column no code references cannot be populated for anyone else either.)
+- **The trap, which is the actual finding.** The identifier `programSessionId` means the **live**
+  column everywhere in code, while the column actually named `program_session_id` is inert:
+  - `getWorkoutSessionProgramSessionId()` — named for the dead column — selects
+    `s.workoutSessions.sessionId` (`slices/periodization.ts:299-306`).
+  - `ensureWorkoutSession(userId, sessionId, programSessionId, …)` writes its `programSessionId`
+    argument into the `sessionId` field (`adapter.ts:772-780`).
+- **It has already cost a session.** The Q-473 repro fixture populated `program_session_id`, the
+  periodization block took the `null` branch, the counter never moved, and the honest reading of that
+  run was "the race does not exist". It does. The next person to build that fixture hits the same wall.
+- **Fix shape:** rename the reader (and comment the schema) — zero-risk, removes most of the trap on
+  its own. Dropping the column is cleaner but is a **data-losing migration**, so it needs owner
+  confirmation under `CLAUDE.md` and a Lane A migration number; it is not obviously worth that on its
+  own, and would ride better alongside other schema work.
+- **Lane A owns this** — schema and migrations.
+
 ### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
 
 - **Branch:** `docs/coach-write-usage-decision`
@@ -929,6 +1017,49 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
+### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
+
+- **Branch:** `feat/meal-plan-to-saved-meals`
+- **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
+  used too much; it will be created - then likely not used again. It would be good if each item from
+  the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
+  sections."*
+- **Lane B** for the UI. **Lane A** if the plan→meal copy needs a column or a sync change — check
+  before starting, and hand that half over rather than taking a migration number.
+
+**What this replaces.** The meal plan is five surfaces — `meal-plan-section`, `meal-plan-review-card`,
+`meal-plan-setup-sheet`, `meal-plan-edit-sheet`, `meal-plan-manage-sheet` — plus its own row shape,
+its own staleness banner and its own editing model. All of it exists to maintain a thing the owner
+builds once and then stops opening. That is a lot of surface earning very little.
+
+**The reframe, and it is the owner's:** a plan is not somewhere you live, it is a **batch generator**.
+Each meal it produces gets a **Save** action; saved, it becomes an ordinary `saved_meals` row and
+inherits everything that already works — the detail screen, the macro split, the printable label and
+its QR, logging in one tap. The plan can then be discarded without losing anything worth keeping.
+
+**What to build.**
+1. **A `Save` action per plan meal, and a `Save all N`.** Saving writes `saved_meals` +
+   `saved_meal_items` from the plan's own items — the same rows the meal builder writes, so there is
+   exactly one representation of a meal in the app. A saved row shows its QR affordance in place of
+   the Save button, which is also how you see at a glance what you have already kept.
+2. **A `plan` tag on the resulting My Meals row**, so provenance is visible and nothing else about
+   the row is special.
+3. **Then delete surface, do not add it.** Once meals live in My Meals, `meal-plan-section` on the
+   day screen and `meal-plan-review-card`'s staleness nag have no job — the plan is not a live thing
+   to keep fresh any more. **Confirm that with the owner before removing anything**; this entry
+   proposes the reduction, it does not authorise it.
+
+- **⚠ Do not merge the two data models.** `saved_meals` is the destination, the plan stays its own
+  tables. Copy on save; never make a plan row and a meal row the same record. A plan is a schedule of
+  suggestions and a saved meal is a recipe you own — collapsing them means editing a saved meal
+  silently rewrites a plan, or deleting a plan takes your meals with it.
+- **Idempotence matters more than it looks.** "Save all" pressed twice must not produce nine
+  duplicates. Key the copy on `(plan id, plan item id)` and make a repeat save a no-op that reports
+  what already existed.
+- **Verification:** save one plan meal, then prove the resulting row logs, prints a label, and that
+  the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
+  indistinguishable from a hand-built one, so the label path is the test that proves it.
+
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
 - **Branch:** `feat/nutrition-visual-uplift`
@@ -1019,6 +1150,17 @@ string onto `var(--brand)` would repaint the protein macro with whatever accent 
 The selection-state literals and the macro palette are the same eight characters and must not share
 a fate — finding 1 is the former only.
 
+
+**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
+- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
+  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
+- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
+  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
+  weight, and moving them is churn — but editing them two tabs from where they are judged is the
+  friction the shortcut removes.
+- **"Complete Today's Logging" is a button at the foot of the day's log** — see **Q-387**, where the
+  decision and its wiring live.
+- **The meal plan becomes a generator of saved meals** — see **Q-398**.
 
 **11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
 MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
@@ -1735,50 +1877,6 @@ silently breaks upgraded devices while every test and fresh install passes.
   cannot be edited by accident — is best solved as part of this, not separately.
 - **Verification:** device-only. None of it is checkable from the sandbox.
 
-### [workouts][platform] Q-460 — the session-RPE route reports success for a write that matched nothing, and the sync path then discards the mutation
-
-- **Branch:** `fix/session-rpe-affected-row-check`
-- **Added:** 2026-08-18 · review sweep (workout write path, **measured against a second live account**) ·
-  [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)
-- **Placement:** upper-mid. A silently dropped write on the canonical runtime, with no error surface
-  and nothing left to retry.
-- **Measured three ways, live.** `POST /api/workout-sessions/rpe`:
-
-  | Call | Result | Row after |
-  |---|---|---|
-  | user B → user A's real session | `200 {"success":true}` | A's `session_rpe` **still NULL** |
-  | fabricated UUID (`…0000deadbeef`) | `200 {"success":true}` | no such row |
-  | A → A's own session (control) | `200` | written |
-
-- **The security half is CORRECT — do not file this as a leak.** `setSessionRpe`
-  (`lib/data/postgres/adapter.ts:814`) scopes the UPDATE with
-  `and(eq(id, …), eq(userId, …))`, so the cross-user call matched zero rows and changed nothing.
-- **What is missing is `CLAUDE.md` rule (a):** the affected-row count is never checked.
-  `app/api/workout-sessions/rpe/route.ts` ends:
-  ```ts
-  await repo.setSessionRpe(userId, parsed.data.workoutSessionId, parsed.data.sessionRpe)
-  return NextResponse.json({ success: true })
-  ```
-- **On device it is worse than a wrong status code.** `components/workout/done-screen.tsx:160-167`
-  writes locally and queues a `session_rpe` outbox mutation; `pushMutations`
-  (`adapter.ts:4105-4112`) does `await this.setSessionRpe(...)` then **`processed++` unconditionally**.
-  A mutation whose session row is absent server-side — not yet synced, deleted from another device, or
-  an id that drifted — is **counted as processed and removed from the outbox**. Local keeps the RPE,
-  the server never gets it, nothing retries. Permanent divergence, no error surface.
-- **Fix shape:** return the affected-row count from `setSessionRpe` and act on it in both callers —
-  the route with a 404, the push branch by pushing to `errors` so the client's bounded-retry /
-  dead-letter path can see it. **Lane A** (adapter + route).
-- **Do NOT "fix" its neighbour by copying this.** `setWorkoutSessionWarmupEnd` (`adapter.ts:820`) also
-  matches zero rows sometimes and that is **correct** — it carries `isNull(warmupEndedAt)`, so zero
-  rows means "already set". The question to ask of each is whether zero rows is an expected idempotent
-  outcome or an error.
-- **NOT device-verified** — reproduced on the web build; the outbox half is read from source, not run.
-- **🔎 CHECKED 2026-08-18 against production — it cannot adjudicate this, do not cite it either way.**
-  Of the owner's **77 completed sessions, 57 (74.0%) carry no `session_rpe`**. That looks supportive
-  and is **not evidence**: the mechanism this entry describes leaves the value in the *local* store,
-  which `claude_ro` cannot see, so a dropped write and a user who skipped the optional prompt produce
-  an identical server row. Separating them needs the device.
-
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 
 - **Branch:** `fix/start-set-bounce-blocks-automation`
@@ -1953,6 +2051,39 @@ ehr     0     0     0     0   648   208   128   556     0
   reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
   `session_rpe = 7` and it did **not** hold.)
 
+### [body][app-shell] Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
+
+- **Lane B.** `app/session-select/components/log-value-sheet.tsx` only.
+- **Added:** 2026-08-18, found while implementing Q-464 — **this is the live instance of that class**,
+  which Q-464's own entry said it did not have.
+- **Measured live on `pnpm dev`:**
+
+  | Sent to `POST /api/body-metadata` | Response | Row after |
+  |---|---|---|
+  | `{"localDate":"2026-08-18","waterIntake":750}` | `200 {"success":true}` | `water_ml` **still NULL** |
+  | `{"localDate":"2026-08-18","steps":4242}` (control) | `200` | steps written |
+
+- **The mechanism.** `MetaKey` includes `waterIntake`, and the sheet's **web fallback** (the branch
+  taken when the local store is unavailable) does
+  `fetch('/api/body-metadata', … JSON.stringify({ localDate: localDateString(), [widget.key]: numVal }))`.
+  `BodyMetadataPostSchema` names no water field at all — water lives on **`/api/water-log`** — so the
+  key was silently dropped, the route returned success, and the sheet painted an optimistic value
+  that the next fetch reverts.
+- **The device path is FINE and must not be "fixed" with it.** The local-store branch maps
+  `waterIntake → waterMl` and writes + syncs correctly. Only the web fallback is wrong.
+- ⚠️ **Since Q-464 shipped, this now fails LOUDLY** — `BodyMetadataPostSchema` is `.strict()`, so the
+  same call returns `400 {"error":"Unrecognized key: \"waterIntake\""}` and the sheet shows
+  "Failed to save — reverting". That is the intended improvement (a visible failure beats a silent
+  one, and the value was already being lost either way), but it makes this user-visible rather than
+  invisible, which raises its priority.
+- **Fix shape:** in the web fallback, route `waterIntake` to `POST /api/water-log` — the same
+  endpoint `components/profile/water-log-sheet.tsx` already uses — instead of `/api/body-metadata`.
+  Check the water route's payload shape (it takes a delta, not an absolute, per `validWaterMlDeltaOrNull`)
+  before wiring it; a straight rename of the key would be wrong.
+- **Verification:** with the local store unavailable, log a water value from the session-select
+  metric tile and confirm `body_metrics.water_ml` changes. The 400 above is the current behaviour to
+  start from.
+
 ### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
 
 - **Branch:** `fix/strict-request-schemas`
@@ -1983,6 +2114,26 @@ ehr     0     0     0     0   648   208   128   556     0
   strict — use it as the reference.
 - **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
   hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
+- 🚧 **The ratchet and the demonstrated schema SHIPPED 2026-08-18; 89 non-strict remain.**
+  `scripts/check-strict-request-schemas.js` runs in the Custom Rules job (now **39** steps) with a
+  shrink-only per-file baseline: a file not listed must have zero, a listed one may only shrink, and
+  reaching zero requires deleting its row. `BodyMetadataPostSchema` — the one the entry demonstrated
+  — is strict, and all four measured wrong-key writes now 400 instead of landing on today.
+- ⚠️ **Two corrections to this entry, both found while implementing it.**
+  **(a) It IS a live bug.** The entry says "not a live bug — the app's own clients send the right
+  keys". They do not: the Water widget's web fallback posts `waterIntake`, which no schema names, and
+  the value was discarded behind a `200`. Filed as **Q-319** (Lane B) with the measurement.
+  **(b) The `sync/push` caveat is far wider than one route.** The entry singles out `sync/push`, but
+  the same argument applies to **every schema `pushMutations` parses** — `activity-log`,
+  `fitness-test`, `day-checkin`, `oura-summary`, mood, food-item, log-exercise, session-rpe,
+  complete-workout. An outbox payload is written to local SQLite by whatever bundle was current when
+  the user acted and sits there until the device syncs, so tightening any of those can reject a
+  mutation queued by an older bundle and dead-letter real data. Plus `health-connect/ingest`, whose
+  client is the owner's Tasker profile and is not in this repo. Both classes are named with their
+  reasons in the script's header rather than silently skipped.
+- **What is left is the sweep**, deliberately not done here: 89 non-strict schemas, each needing its
+  clients checked the way `BodyMetadataPostSchema`'s two were. The ratchet is the mechanism; the
+  sweep is separate and much larger, exactly as `check-hex-literals` says of its own 471.
 - **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
@@ -2177,6 +2328,31 @@ too, so the Balance card's "burned" figure is dragged down in step.
 - **Surface:** no device or production data required — shared-module logic plus a service wrapper,
   reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
   control, if option 1 is chosen, would need a device check.
+
+
+**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
+meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
+one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
+option 3 (silent inference) cannot be corrected by the person who knows the answer.
+
+**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
+— not in the header, not beside the ring. It is a statement about a day that has finished, and its
+position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
+is everything you ate. Only completed days are used to work out your maintenance calories."*
+Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
+must be reversible, since the whole point is that a wrong day poisons the estimate.
+
+**Ship the counter with it, not after it.** The button feeds something invisible today, and that
+invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
+had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
+for, so the two land together rather than one inventing a second version of the other.
+
+**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
+`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
+assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
+quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
+honest one, so the estimate starts from days marked after this ships and the counter shows that
+plainly.
 
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
@@ -4202,6 +4378,59 @@ session working from a temporarily restored copy.
   only the banding and its populations. Cardio/chest-strap **episodes** were not examined; the claim
   that the range exists there comes from raw `oura_heartrate`, since `set_hr_stats` is strength-derived
   by construction.
+
+### [nutrition] Q-517 — adaptive-TDEE can hand the user a maintenance below their own BMR
+
+- **Branch:** `fix/adaptive-tdee-bmr-floor`
+- **Plan:** none — one constant becomes a computed value. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](reviews/2026-08-18-nutrition-tdee-calibration.md)
+- **`adaptive-tdee.ts` already anticipated this.** Its header warns an ungated estimate *"would tell
+  the user their maintenance is 1200 kcal — actively harmful advice"*. This measures whether the gates
+  hold. **They hold 75% of the time; the lowest value that gets through is 1,052 kcal.**
+- **Input condition (not a defect, nothing filed):** the food log captures **~45%** of actual intake —
+  44 logged days of 110, mean **1,223 kcal**, 43% of logged days under 1,200, 4.8 entries/day. Against
+  75 weigh-ins over 109 days (slope **+8.0 g/day** = **+62 kcal/day** balance) and a Cunningham BMR of
+  **1,698** × 1.55 = predicted TDEE **2,632**, implied actual intake is **~2,694**. Taking the log at
+  face value implies maintenance **1,161 — below BMR**, which is arithmetic proof of under-logging.
+- **Replay of the shipped gates**, every rolling window:
+
+  | outcome | 14-day (97) | 28-day (83) |
+  |---|---|---|
+  | blocked, coverage/span | 72 | 61 |
+  | `implausible_result` | 2 | 0 |
+  | **PASSED** | **23 (24%)** | **22 (27%)** |
+  | passing range | **1,052–2,219** | **1,246–1,889** |
+
+- **`MIN_PLAUSIBLE_MAINTENANCE = 1000` sits just below the artefact** — this owner's lands at **1,052**,
+  clearing it by 52 kcal. The module's own comment predicted the failure at 1,200; the floor was set
+  200 below that prediction and the real value slipped between them.
+- **The values are also unstable** — 1,052–2,219 for the same person within weeks (a 1,167 kcal range).
+- **Why the coverage gates cannot catch it:** `MIN_LOGGED_FRACTION` counts **days carrying a log**, not
+  whether each day's log is **complete**. A day with only breakfast counts as fully logged — exactly
+  this owner's pattern — so a 45%-complete record sails through a 70%-coverage gate. **The gates
+  measure the wrong kind of incompleteness.**
+- **It reaches the user's target.** `TdeeAdaptationCard` writes the accepted value through
+  `PUT /api/nutrition/targets`, which its own docstring calls the source of truth for the daily target,
+  mirroring into `users.calorie_goal`. A 1,052 maintenance is one tap from becoming the calorie goal of
+  someone whose BMR is 1,698.
+- **First action: replace `MIN_PLAUSIBLE_MAINTENANCE` with the user's own BMR.** Maintenance below BMR
+  is impossible *by definition*, not implausible by taste, and `cunninghamBmr` is already imported in
+  the same package. Measured: 14-day passing 23 → **11**, range **1,902–2,219**; 28-day 22 → **10**,
+  range **1,707–1,889**. Every harmful value blocked.
+- **It makes the estimate SAFE, not CORRECT.** Survivors still sit ~500 kcal under the formula's 2,632
+  — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
+- **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of
+  windows and structurally cannot see within-day incompleteness, so raising it drops good windows and
+  keeps bad ones; (2) **do not scale logged intake up** by an under-logging multiplier inferred from
+  the weight trend — that is circular, since maintenance is derived from the same trend, and would
+  reproduce the assumed TDEE as if measured.
+- **Durable fix, larger and separate:** detect within-day incompleteness (expected vs logged meals, or
+  an intake floor relative to BMR) and treat such a day as **unlogged** rather than low. A feature, not
+  a constant.
+- **Recorded, not filed:** `tdeeAdjustment` (`tdee-adaptation.ts`) is **dead code** — referenced only by
+  its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
+  `amrapScaleFactor` (Q-514); do not calibrate it.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

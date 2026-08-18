@@ -291,6 +291,9 @@ jobs:
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 
+      - name: Non-strict request schemas do not increase
+        run: node scripts/check-strict-request-schemas.js
+
       - name: Hex colour literals do not increase
         run: node scripts/check-hex-literals.js
 
