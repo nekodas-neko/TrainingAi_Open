@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
 import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
+import { todayInTz } from '@trainingai/shared/date-utils'
 
 /**
  * Q-390 — a flagged day's bar sat ~12 px above an identical unflagged one.
@@ -37,14 +38,27 @@ async function withDb<T>(fn: (c: Client) => Promise<T>): Promise<T> {
   try { return await fn(c) } finally { await c.end() }
 }
 
-/** Monday of the week containing `d`, in the app's Brisbane day-keying. */
-function mondayOf(d: Date): Date {
-  const local = new Date(d.getTime() + 10 * 3600_000)   // UTC+10, no DST
-  const dow = (local.getUTCDay() + 6) % 7
-  const mon = new Date(local)
-  mon.setUTCDate(local.getUTCDate() - dow)
-  return mon
+/**
+ * The seven Brisbane date strings of the week containing today, Monday first.
+ *
+ * Built from date STRINGS rather than shifted `Date`s: `toISOString().slice(0, 10)` is the banned
+ * UTC-date pattern, and CI's lint rightly rejected the first version of this even though it shifted
+ * by +10 h before slicing. `todayInTz()` is the app's own answer to "what day is it for this user",
+ * so the probe and the screen agree by construction rather than by coincidence.
+ */
+function weekDateStrings(): string[] {
+  const today = todayInTz()
+  const dow = (new Date(`${today}T12:00:00Z`).getUTCDay() + 6) % 7   // 0 = Monday
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(`${today}T12:00:00Z`)
+    d.setUTCDate(d.getUTCDate() - dow + i)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
+  })
 }
+
+/** Midday Brisbane on a given Brisbane date, as the UTC instant to store. */
+const noonBrisbane = (dateStr: string) => `${dateStr}T02:00:00Z`
 
 test.beforeAll(async () => {
   await withDb(async c => {
@@ -56,13 +70,7 @@ test.beforeAll(async () => {
       `DELETE FROM workout_sessions WHERE id IN (
          SELECT workout_session_id FROM exercise_logs WHERE exercise_name = $1)`, [MARKER])
 
-    const mon = mondayOf(new Date())
-    const weekDays = Array.from({ length: 7 }, (_, i) => {
-      const d = new Date(mon)
-      d.setUTCDate(mon.getUTCDate() + i)
-      d.setUTCHours(2, 0, 0, 0)   // ~noon Brisbane, safely inside the local day
-      return d
-    })
+    const week = weekDateStrings()
 
     // Use days the seed has NOT already filled. `isDeload` is `every(isDeloadSession)`, so one
     // ordinary seeded session sharing the probe's day silently removes the "(D)" this asserts on —
@@ -70,30 +78,31 @@ test.beforeAll(async () => {
     // a long-lived local database and CI's fresh one. Choosing free days makes the spec independent
     // of that instead of destroying seeded rows to make room.
     const busy = await c.query(
-      `SELECT DISTINCT (completed_at AT TIME ZONE 'Australia/Brisbane')::date AS d
+      `SELECT DISTINCT to_char(completed_at AT TIME ZONE 'Australia/Brisbane', 'YYYY-MM-DD') AS d
          FROM workout_sessions
-        WHERE user_id = $1 AND completed_at >= $2 AND completed_at < $3`,
-      [userId, weekDays[0].toISOString(), new Date(weekDays[6].getTime() + 86400_000).toISOString()],
+        WHERE user_id = $1
+          AND (completed_at AT TIME ZONE 'Australia/Brisbane')::date BETWEEN $2::date AND $3::date`,
+      [userId, week[0], week[6]],
     )
-    const taken = new Set(busy.rows.map(r => String(r.d).slice(0, 10)))
-    const brisbaneDay = (d: Date) => new Date(d.getTime() + 10 * 3600_000).toISOString().slice(0, 10)
-    const free = weekDays.filter(d => !taken.has(brisbaneDay(d)))
+    const taken = new Set<string>(busy.rows.map((r: { d: string }) => r.d))
+    const free = week.filter(d => !taken.has(d))
     if (free.length < 2) {
       throw new Error(`need two session-free days this week, found ${free.length} (taken: ${[...taken].join(', ')})`)
     }
 
     // Two days of the SAME volume: one a deload (flagged "D"), one an ordinary session (no flag).
     // That pairing is the whole experiment — same height in, so any difference out is the layout bug.
-    for (const [at, phase] of [[free[0], 'deload'], [free[1], null]] as const) {
+    for (const [day, phase] of [[free[0], 'deload'], [free[1], null]] as const) {
+      const at = noonBrisbane(day)
       const ws = await c.query(
         `INSERT INTO workout_sessions (user_id, session_name, started_at, completed_at, phase_type)
          VALUES ($1, $2, $3, $3, $4) RETURNING id`,
-        [userId, MARKER, at.toISOString(), phase],
+        [userId, MARKER, at, phase],
       )
       await c.query(
         `INSERT INTO exercise_logs (workout_session_id, exercise_name, volume, logged_at)
          VALUES ($1, $2, 5000, $3)`,
-        [ws.rows[0].id, MARKER, at.toISOString()],
+        [ws.rows[0].id, MARKER, at],
       )
     }
   })
