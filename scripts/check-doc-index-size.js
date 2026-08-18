@@ -468,7 +468,13 @@ const BASELINE = {
   // that section list as a checklist an implementation PR ticks off, the six review notes, one
   // section (My Foods) that has no home under the agreed tabs, and the eleven sheets nobody has
   // drawn yet — listed so they are not assumed done.
-  'docs/implementation-backlog.md': 8298,
+  // Raised 2026-08-18 (Q-397, BugFix intake). Q-393 shipped the analysis it had been corrected
+  // away from: the correction (inline-wrapped ingredients spend width, not height, so the full
+  // list fits a ROUND label with a bigger code than ships today) was made to the owner in chat
+  // and drawn, and never written back into the entry. The new entry carries the measured table
+  // so the numbers cannot be re-litigated, and the process note that a correction made mid-
+  // conversation has to be written into the queue in the same session.
+  'docs/implementation-backlog.md': 8358,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

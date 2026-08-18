@@ -873,6 +873,66 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
+### [nutrition] Q-397 — the shipped ingredient label is the SUPERSEDED design; inline wrapping is what was agreed
+
+- **Branch:** `fix/meal-label-inline-ingredients`
+- **Added:** 2026-08-18, after the owner asked whether the agreed label reached an implementer. It
+  did — v1.323.0, PR #94 — but **what shipped is the analysis Q-393 was corrected away from.**
+  Lane B built the entry faithfully; **the entry was wrong.** Filed by the author of that entry.
+- **Lane B.** Canvas only (`components/nutrition/meal-label-render.ts`), no schema, no route.
+
+**What the owner actually asked for**, verbatim across two messages: *"can you show me this model
+with it centered and having the food go across the screen like (200g Beef mince, 150g pasta, 100g
+pasata, +2more) so it stays on one line and wraps when needed"*, then the layout
+*"/ Beef Pasta Bake / 512KCAL / P38 C46 F18 / (ingredients) / {QR Code}"*, then
+*"lets keep them all as options to cycle through and choose a default."*
+
+**What shipped instead.** One new style, `square`, **square-die only**, printing the ingredients
+**one per line, left-aligned** (`meal-label-render.ts` — `MAX_LINES = 5`, `lineH = 9`, a
+`ctx.fillText` per ingredient), with calories and macros **beside** the code rather than centred
+above it. Its own comment restates the superseded reasoning: *"the round box is 130 × 137 and the
+shipped default already fills all of it, leaving 7 units — zero ingredient lines."*
+
+**Why that reasoning is wrong, and it is the whole point.** It is true **for a stacked list**. The
+owner's suggestion was to run the ingredients as **one wrapping line**, which spends *width* instead
+of *height* — at 6.5 px in a 124 px column that is ~31 characters per line, so five ingredients are
+**2–3 wrapped lines rather than 5 stacked ones**, and the height handed back goes into the code.
+Measured on the drawn artboards:
+
+| Layout | Code | mm/module |
+|---|---|---|
+| Shipped default (`band`, no list) | 12.2 mm | **0.487** |
+| Stacked list on a round die (the rejected option) | 11.6 mm | 0.465 |
+| **Inline, round, 3 + "+2 more"** | 15.6 mm | **0.624** |
+| **Inline, round, ALL FIVE** | 13.2 mm | **0.529** |
+
+So the full list fits a **round** label with a code **larger than the one already shipping**. There
+was never a trade to make between the list, the round die and a readable code — inline wrapping buys
+all three. Q-393's heading (*"which does not fit on a round one"*) and its three costed options all
+predate that correction and should have been rewritten; they were not.
+
+**What to build.**
+1. **Wrap the ingredient run as one line**, comma-separated, `+N more` when it overflows the line
+   budget — not one `fillText` per ingredient.
+2. **A round-capable ingredients style**, since that is what inline wrapping unlocks. Drop
+   `squareOnly` for it; keep the square variant for anyone who wants the stacked alignment.
+3. **The centred layout the owner specified** — name / calories / macros / ingredients / code, each
+   centred — as its own style. Note the black band costs ~10 px over a plain centred name, which is
+   why the all-five centred variant drops the band; band + centred + all five puts the code at
+   0.392 mm/module, well under shipped, and must not be built.
+4. **All of these are cycleable styles with a stored default**, per the owner's "keep them all as
+   options". The registry (`MEAL_LABEL_STYLES`) already supports this; the default is a stored
+   preference and routes through Q-392.
+
+- **Verification.** Recompute mm/module per style and assert it in the existing unit test — the
+  preview's own size figure was wrong once already (fixed in v1.323.0), so a number nobody asserts
+  is a number that drifts. Then a physical test print, which is the only real check.
+- **Process note, recorded because it is the reusable lesson:** the correction was made *to the
+  owner in chat* and drawn on the canvas, and never written back into the queue entry. The queue is
+  the record. **When a finding is corrected mid-conversation, the entry gets rewritten in the same
+  session** — a superseded analysis left in the backlog is not stale documentation, it is a work
+  order.
+
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
 - **Branch:** `feat/nutrition-visual-uplift`
