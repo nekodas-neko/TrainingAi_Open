@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { VACUUM_FULL_TABLES, type VacuumFullTable } from '@/lib/data/postgres/slices/oura'
@@ -23,8 +23,8 @@ export async function GET() {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
   return NextResponse.json(
     { tables: Object.entries(VACUUM_FULL_TABLES).map(([table, what]) => ({ table, what })) },
@@ -37,8 +37,8 @@ export async function POST(req: Request) {
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   // Whole-table maintenance holding an ACCESS EXCLUSIVE lock — keep it rare and deliberate.

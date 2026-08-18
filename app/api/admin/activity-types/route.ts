@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 
@@ -17,8 +17,8 @@ export async function GET() {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const repo = await getRepository()
@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const body = ActivityTypeBody.safeParse(await req.json())
@@ -50,8 +50,8 @@ export async function PATCH(req: NextRequest) {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const { id, ...rest } = await req.json()
@@ -71,8 +71,8 @@ export async function DELETE(req: NextRequest) {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const { searchParams } = new URL(req.url)

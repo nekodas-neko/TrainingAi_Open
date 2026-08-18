@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
 import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
@@ -37,8 +37,8 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   try {
     await requireAdmin(userId, session.user?.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   if (!rateLimit(`${userId}:sleep-feel-calibration`, 20, 60_000)) {

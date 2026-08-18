@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
 import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetweenDateStrs } from '@trainingai/shared/date-utils'
@@ -52,8 +52,8 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
     // exactly as the session path requires.
     try {
       await requireAdmin(exportUserId)
-    } catch {
-      return { ok: false, status: 403, error: 'Forbidden' }
+    } catch (err) {
+      return adminFailureOutcome(err)
     }
 
     const repo = await getRepository()
@@ -66,8 +66,8 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
   if (!userId) return { ok: false, status: 401, error: 'Unauthorized' }
   try {
     await requireAdmin(userId, session.user?.isAdmin)
-  } catch {
-    return { ok: false, status: 403, error: 'Forbidden' }
+  } catch (err) {
+    return adminFailureOutcome(err)
   }
   return { ok: true, userId, tz: session.user?.timezone ?? DEFAULT_TZ, via: 'session' }
 }

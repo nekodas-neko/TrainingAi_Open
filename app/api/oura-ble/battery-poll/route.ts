@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 import { rateLimit } from '@/lib/rate-limit'
@@ -22,8 +22,8 @@ export async function POST(req: Request) {
 
   try {
     await requireAdmin(userId, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   if (!rateLimit(`oura-ble-battery-poll:${userId}`, 60, 60_000)) {

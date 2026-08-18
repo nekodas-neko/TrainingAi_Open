@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 
 // Raw frame dump for the /admin/oura-ble tester — all recent frames for the given
@@ -17,8 +17,8 @@ export async function GET(req: Request) {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const url = new URL(req.url)

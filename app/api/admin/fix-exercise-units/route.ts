@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 
 export async function GET() {
@@ -11,8 +11,8 @@ export async function GET() {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const repo = await getRepository()
@@ -32,8 +32,8 @@ export async function POST(req: NextRequest) {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   let rawBody: unknown

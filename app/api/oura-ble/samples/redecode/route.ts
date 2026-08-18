@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { runRedecodeOffLoop } from '@/lib/oura-ble/rollup-worker'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
@@ -43,8 +43,8 @@ export async function POST(req: Request) {
 
   try {
     await requireAdmin(userId, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   // Full-table rewrite pass — keep it rare.
@@ -144,8 +144,8 @@ export async function GET(req: Request) {
   const userId = session.user.id
   try {
     await requireAdmin(userId, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const repo = await getRepositoryAsync()
