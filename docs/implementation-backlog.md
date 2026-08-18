@@ -285,6 +285,76 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
 
 
+### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
+
+- **Branch:** `feat/coach-undo-control`
+- **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
+  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
+- **Placement:** upper-mid. An AI-initiated write to the data that decides what the user is told to
+  lift, with no in-app way back.
+- **A complete undo subsystem exists and has no caller.** All of this is built:
+  `POST /api/coach/apply/[id]/undo` (auth-gated, rate-limited, ownership-scoped, with a well-reasoned
+  "until the next workout started after the change" window); `undoCoachChange()` with a double-undo
+  guard; an `undo()` handler in **all five** domains; `captureBefore()` in each, existing solely for
+  it; the `coach_changes.undone_at` column; and `components/coach/coach-history.tsx` already styling
+  undone changes with strikethrough, muted colour and a "· undone" suffix.
+- **Nothing calls it.** Every client fetch to a Coach endpoint, enumerated across `app/`,
+  `components/` and `lib/`:
+  ```
+  /api/coach   /api/coach/threads   /api/coach/preview   /api/coach/apply   /api/coach/options
+  ```
+  `/api/coach/apply/[id]/undo` appears in **no** client file, and `coach-history.tsx` renders the
+  list read-only — no Undo button anywhere.
+- **⚠️ This is NOT the known "no user-facing entry point" note** (this file, in the Coach phase-1
+  entry). That note is about phase 1 shipping the **apply** path without an entry point; phases 2–3
+  then wired apply — `change-preview.tsx`, `number-dial.tsx`, `confirm-content.tsx` and
+  `lib/coach/pending-change.ts` all POST to it and it works. **Undo was never wired with it.** The
+  asymmetry is the finding; do not close this as already-known.
+- **Why this severity:** the user approves changes per row, which implies reversibility, and the
+  history screen then styles for an undo that cannot be reached. The only way back is to ask the Coach
+  to change it again — a *new* change against current state, not a restore, and for `early_deload` or
+  `program_phase` possibly not expressible at all.
+- **Fix shape:** an Undo control in `coach-history.tsx` for changes that are not `undoneAt` and still
+  inside the window, treating the route's 409 ("you've trained since") as a first-class state rather
+  than an error. **Lane B** — the route already exists.
+- **⛔ Do Q-468 first, or in the same change.** Wiring the button onto today's undo would ship the
+  defect below.
+
+### [workouts][platform] Q-468 — `undo` restores its captured state without checking the target still holds what the change set
+
+- **Branch:** `fix/coach-undo-drift-check`
+- **Added:** 2026-08-18 · review sweep (the Coach write path) ·
+  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
+- **Placement:** directly with Q-467. **Latent today** (nothing can call undo) and **exactly what
+  Q-467 would expose** the moment a button is wired.
+- **The asymmetry.** `applyCoachPatch` refuses to write over a moved target — every domain runs
+  `driftAgainst(...)` and returns `stale` → 409 with a per-field drift report. `undoCoachChange` has
+  no equivalent: it reads `beforeState` and writes it back. The route's guard asks *"have you trained
+  since?"*, not *"has this row changed since?"*.
+- **Measured live, entirely within the Coach's own flow — no external edit needed:**
+
+  | Step | Action | `session_exercises.exercise_name` |
+  |---|---|---|
+  | 0 | initial | `Barbell Bench Press` |
+  | 1 | Coach change **A**: Barbell → Dumbbell | `Dumbbell Bench Press` |
+  | 2 | Coach change **B**: Dumbbell → Incline | `Incline Bench Press` |
+  | 3 | **Undo A** → `200` | **`Barbell Bench Press`** |
+  | 4 | **Undo B** → `200` | **`Dumbbell Bench Press`** |
+
+- **Two things are wrong.** After step 3 `coach_changes` shows A struck through and B as `NOT UNDONE`
+  — the history claims "Swapped Dumbbell → Incline" is in effect while the row says `Barbell Bench
+  Press`, so the screen that exists to report what the Coach did is wrong. And after step 4 — undoing
+  **everything** — the exercise is `Dumbbell Bench Press` when it started as `Barbell Bench Press`:
+  undoing every Coach change does not return the programme to where it began, and leaves it holding a
+  value the user never chose.
+- **All five domains share the gap.** No `undo()` in any handler checks current state; only
+  `session-exercise` re-verifies ownership on the way back. (The lone `drift` string in `goals.ts` is
+  a comment about a drifting local-storage copy, not a check.)
+- **Fix shape:** run `driftAgainst` on the way back too — compare the target's current values against
+  what the change **set** (`to`) and refuse with 409 + drift when they disagree, exactly as apply
+  does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
+  alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
+
 ### [platform] Q-356 — `periodization-soft-delete.test.ts` fails every day between 14:00 and 16:00 UTC, for every branch
 
 - **Branch:** `fix/periodization-soft-delete-local-midnight`
@@ -2951,6 +3021,16 @@ session working from a temporarily restored copy.
   **So `updated_at` is not evidence of which model wrote a row** — it moves for reasons unrelated to
   the score. Anyone auditing "did the recalibration land?" by timestamp gets the wrong answer, and
   this is exactly why the `model_version` stamp matters more than it looks.
+- **✅ RESOLVED for the "did it land" question, 2026-08-18 ~05:00 UTC** — the prediction below came
+  true within the hour. **1 of 96** rows now carries `{"bodyComp": "atlas_2_1_0", "readiness":
+  "v3:ri5:2026-08-18"}` (so the JSONB **merge** held in production, not just in review), and sleep —
+  which has no stamp — was verified by recomputation instead: 2026-08-17 stores **78** against a raw
+  blend of **77.91** (old model), 2026-08-18 stores **92** against a calibrated **92** (new model,
+  raw blend 86.07). The trend step falls between those two days.
+  [`docs/reviews/2026-08-18-recalibrations-live-verified.md`](reviews/2026-08-18-recalibrations-live-verified.md).
+  **This entry's own substance is unaffected** — a stored derived row still cannot be re-derived from
+  the inputs beside it, and `updated_at` still does not identify the writing model; the sleep check
+  worked only because that pillar's *contributors* happen to be persisted.
 - **Consequence worth knowing:** stored scores are only rewritten when the readiness route recomputes,
   which happens on app open. Placeholder rows already exist through **2026-08-22** with null scores,
   so the first row to carry new-model values *and* the `v3:ri5:2026-08-18` stamp will be the next day
@@ -3120,6 +3200,78 @@ session working from a temporarily restored copy.
   *and* `comp.contributors.recoveryIndex.score`, so v1.319.0 (sleep mean 84.1 → 69.5) and v1.321.0
   (Recovery Index anchor) both feed `sr`. All 13 rows predate both, and the direction is *downward* on
   the term that is currently saturating. See Q-501 for why stored rows have not moved yet.
+
+### [devices][readiness] Q-509 — the BLE-era Recovery Index refit lands at 3.31 h against a shipped anchor of 5: the input moved, not the physiology
+
+- **Branch:** `fix/ble-recovery-index-hours-bias`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a `devices` finding by the
+  readiness code's own pre-registered rule, **not** a scoring change.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-ble-era-input-drift.md`](reviews/2026-08-18-ble-era-input-drift.md) §1
+- **The rule this fires.** `readiness-composite.ts` says above the constant: *"If a BLE-only refit
+  lands well below 5, the input changed and that is a `devices` finding, not a scoring one."* Written
+  when only 15 Cloud-era nights existed; there are now **42 BLE-era nights**, so the refit is runnable.
+- **The refit.** BLE-era `recovery_index_hours`, n = 42 (07-07 → 08-18): mean **2.657 h**, median
+  **2.377**, sd 1.591, range 0.35–8.28. Same zero-bias procedure as Q-500 (solve for the anchor at
+  which our mean sub-score equals Oura's 15-night mean of 69.0, same clamping):
+
+  | fit | window | n | anchor |
+  |---|---|---|---|
+  | Q-500 (shipped basis) | Cloud-era 06-23 → 07-07 | 15 | **4.63 h** |
+  | this refit | BLE-era 07-07 → 08-18 | **42** | **3.31 h** |
+
+- **The check that makes it convincing — anchor and input moved by the SAME factor:** mean hours
+  3.59 → 2.657 (**0.74×**), median 3.28 → 2.377 (**0.72×**), zero-bias anchor 4.63 → 3.31 (**0.715×**).
+  A genuine physiological shift moves the hours while leaving the correct anchor where it is. An anchor
+  that must shrink by exactly the factor its input shrank by is absorbing a **multiplicative bias in
+  the estimator**. Mechanism already measured in Q-500's review: at matched sampling density (107 vs
+  108 samples/night) the BLE series is ~**2× noisier** (median sample-to-sample |Δbpm| 1.0 → 2.0).
+- **A level shift, not a drift.** 2026-07: n 24, mean 2.73, median 2.35, 2 nights ≥ 5 h. 2026-08: n 18,
+  mean 2.56, median 2.48, 1 night ≥ 5 h. Flat across both BLE months — the step is at the re-key.
+- **Cost today.** At the shipped anchor of 5 the contributor is mean **50.8**, median 47.5, reaching
+  100 on **3 of 42** nights. At the old anchor of 6 it was mean 43.4 and 1 of 42 — so **Q-500 worked**
+  (+7.4 points) and nothing here argues against it.
+- **Do NOT move `RECOVERY_INDEX_OPTIMAL_HOURS`.** A second anchor change inside two days, same
+  direction, fitted to an input that moved for measurement reasons, is how a scoring constant gets
+  quietly re-purposed into a bias correction.
+- **First action:** treat the hours estimator's BLE behaviour as the work item. It is a global argmin
+  over an overnight HR series; at 2× the sample-to-sample noise it settles at a systematically
+  different point. **Concrete experiment:** smooth the BLE series to Cloud-like noise *before* the
+  argmin and re-measure the ratio — if it goes to ~1.0 the estimator is fine and the input needed
+  conditioning. Re-run the refit after any HR-smoothing change; the ratio above is the pass test.
+- **Caveat.** The two fits are different windows and sizes (15 Cloud vs 42 BLE, six weeks apart), so a
+  real seasonal/behavioural change is not excluded by this data alone — the flat BLE-era level and the
+  anchor-tracks-input result argue against it without proving it. The smoothing experiment does not
+  depend on the comparison at all, which is why it is the first action.
+
+### [devices][readiness] Q-510 — resilience's missing days are the daytime-stress coverage gate, and that coverage is not persisted anywhere
+
+- **Branch:** `feat/persist-daytime-stress-coverage`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** Closes the lead Q-508 left open.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-ble-era-input-drift.md`](reviews/2026-08-18-ble-era-input-drift.md) §2
+- **It is NOT the contributor gate.** Over 2026-08-01 → 08-18, from `oura_daily_summary`:
+  `recovery_index_hours` **18/18**, `hrv_avg_ms` **18/18**, `rhr_avg_bpm` **18/18**,
+  `hrv_baseline_mean_x8` **18/18**. A daytime stress series exists on 14/18 (from 08-05). A resilience
+  daily index is produced on **3/18** (08-09, 08-10, 08-16). All four `contributorsOk` inputs pass
+  every single day, so the blocker is inside `preprocessStress` — and since `daytime_stress_scaled` is
+  non-null on those days, `final_check_stress_coverage`
+  (`resolutionMinutes × nonNaN >= minDaytimeStressHours × 60`) is the live candidate.
+- **It cannot be confirmed from the database.** Neither side of that inequality is persisted:
+  `minDaytimeStressHours` is a vendored constant and the per-day non-NaN bucket count is never stored.
+  The stored extreme-bucket counts do not separate the cases — 08-07, 08-13 and 08-17 all carry 90
+  minutes of extremes and produce no index, while 08-16 carries the same 90 and does.
+- **`worn_hours_ble` is NULL on all 96 rows** — recorded as 0 of 79 in the 2026-08-05 review, and 13
+  days later still empty. It is the field an auditor would look in first for this answer.
+- **First action:** persist the daytime-stress coverage on the derived row (non-NaN bucket count, or
+  the hours it implies). One number, already computed inside `preprocessStress`, and without it "why
+  did resilience produce nothing today" is unanswerable from data. Then: **populate `worn_hours_ble`
+  or drop the column** — a field that has never held a value on any row reads as an available signal
+  in every column-listing audit.
+- **Only after that**, decide whether `minDaytimeStressHours` is too strict for this wear pattern.
+  That *is* a calibration question and it is Tuning's — but it cannot be asked until the coverage is
+  visible, and it must not be answered by lowering the constant until the score fires, which is the
+  Q-506 mistake.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

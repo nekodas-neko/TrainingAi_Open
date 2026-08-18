@@ -349,7 +349,6 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6871,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -377,7 +376,20 @@ const BASELINE = {
   // row-walking phase became a no-op, so the `scanned=1098158` figures it quotes are historical.
   // Plus the new Q-318 entry carrying the exact response contract, so the other lane does not have
   // to read the route to build against it.
-  'docs/implementation-backlog.md': 7491,
+  // Raised 2026-08-18 (Tuning): 7514 -> 7596, recomputed from the MERGED file. Q-509/Q-510 (BLE-era
+  // input drift) plus Q-501's "did it land" half marked resolved. Q-509's entry carries the
+  // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
+  // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
+  // against.
+
+  'projectOverview.md': 6910,
+  //
+  // Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file. Lane A's delta was +29:
+  // Q-535 now states the 502 is NOT gone yet and why the default was left alone, that half its own
+  // premise expired the same day (the row-walking phase became a no-op, so its scanned figures are
+  // historical), and a new Q-318 carrying the exact response contract so the other lane need not
+  // read the route to build against it.
+  'docs/implementation-backlog.md': 7643,
   'CLAUDE.md': 1044,
 
 };
