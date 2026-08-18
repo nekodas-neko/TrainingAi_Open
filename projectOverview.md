@@ -103,6 +103,34 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform][readiness] 🟡 Five sites turn an ms offset into a calendar day; in a DST zone three compute "today" for "yesterday" (Q-489, 2026-08-18)
+
+- **`CLAUDE.md` bans this shape and records six copies shipping in one file.** `lib/ai-chat/tools.ts`
+  is clean now, but 12 instances remain elsewhere and nobody had sorted the ones that matter from the
+  ones that do not. [`docs/reviews/2026-08-18-ms-offset-to-calendar-day.md`](docs/reviews/2026-08-18-ms-offset-to-calendar-day.md).
+- **⚠️ Most of the 12 are CORRECT and filing them would be wrong.** The rule's harm is *"ms-offset
+  windows straddle two AEST days and merge them"* — that is about **day-bucketed** aggregation.
+  `muscle-recovery`, `workout-load-history` and `friends/feed` use a **rolling instant** filter feeding
+  consumers that work in hours (`computeMuscleRecovery` reads `ws.startedAt.getTime()`), which for a
+  physiological window is *more* correct than a calendar day.
+- **Five sites do produce a calendar day, and the failure is measured** in `America/New_York`:
+  ```
+  ** MISMATCH **  local 2026-11-01 23:30   now-24h → 2026-11-01   true yesterday 2026-10-31
+  ```
+  On the **25-hour fall-back day**, in its last hour, `now − 24h` lands on **today**. Three of the five
+  are computing "yesterday" that way — the `getOuraDailyDerived` range start (an AI-dynamic
+  prescription input), the achievements streak comparison, and the periodization signal chain.
+- **Severity stated plainly: unreachable today** — every user is `Australia/Brisbane`, no DST — and
+  **one hour per year per DST-zone user** when reachable. Filed because it is measured, it is exactly
+  the hand-rolled date arithmetic this file bans, and **`shiftDateStr` already exists and is already
+  used in this shape** at `slices/oura.ts:1182`. One-line swaps.
+- **Q-477 is what makes it reachable at all** — the Profile timezone setting and its auto-detect
+  button. Same family; neither urgent.
+- **Two clean results:** `lib/ai-chat/tools.ts` carries none of the banned pattern (the 2026-07-06 fix
+  held), and the rolling-window uses must not be "fixed".
+- **Not verified:** measured with `date-fns-tz` directly, not by driving the app with a DST-zone user
+  at that hour — the app cannot be time-travelled here.
+
 ### [platform] ✅ Q-488 is the only one — every other write to a local-first domain updates the store (2026-08-18)
 
 - **Answers the question an implementer taking Q-488 has to ask:** is this a handler or a class?
