@@ -18,6 +18,13 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, load-bearing cache audit): projectOverview 7411 -> 7439. No queue entry
+// — the audit found no gap. The row is the *result table* plus two things that would otherwise be
+// rediscovered the hard way: session-select-content.tsx:896's "never invalidated" comment is the
+// comment on the Q-117 FIX, not a live defect (it reads exactly like one), and case (b) of Q-262's
+// test — seed-only read paths — remains unaudited and is the likelier source of a stale-value report.
+
+//
 // Raised 2026-08-18 (Review, production verification round 2): backlog 9359 -> 9384,
 // projectOverview 7369 -> 7406. No new queue entries — six existing ones amended in place with what
 // production says, which is the cheapest possible place to carry it. The backlog growth is those
@@ -627,7 +634,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7411,
+  'projectOverview.md': 7439,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
