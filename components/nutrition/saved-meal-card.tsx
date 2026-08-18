@@ -72,7 +72,7 @@ export const SavedMealCard = memo(function SavedMealCard({
   return (
     <div className={cn(
       'rounded-2xl border bg-card overflow-hidden transition-colors',
-      selected ? 'border-[#22c55e]/60 bg-[#22c55e]/5' : 'border-border/50',
+      selected ? 'border-brand/60 bg-brand/5' : 'border-border/50',
     )}>
       {/* A card containing other controls is a div with role=button, never a nested <button> —
           Samsung's WebView strips the inner one. */}
@@ -94,7 +94,7 @@ export const SavedMealCard = memo(function SavedMealCard({
           {selecting && (
             <span className={cn(
               'mt-0.5 flex-none w-5 h-5 grid place-items-center rounded-md border',
-              selected ? 'border-[#22c55e] bg-[#22c55e]' : 'border-border',
+              selected ? 'border-brand bg-brand' : 'border-border',
             )}>
               {selected && <Check className="w-3.5 h-3.5 text-black" />}
             </span>
@@ -172,7 +172,7 @@ export const SavedMealCard = memo(function SavedMealCard({
 
       {!selecting && (
         confirmingDelete ? (
-          <div className="border-t border-[#ef4444]/30 bg-[#ef4444]/5 px-4 py-3">
+          <div className="border-t border-destructive/30 bg-destructive/5 px-4 py-3">
             <p className="text-xs font-medium">Delete “{meal.name}”?</p>
             <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
               Meals you have already logged keep their food. Any meal plan built from this one keeps
@@ -214,7 +214,7 @@ export const SavedMealCard = memo(function SavedMealCard({
               variant="secondary" size="sm" className="min-h-[44px] min-w-[44px] px-3"
               onClick={() => setConfirmingDelete(true)} aria-label={`Delete ${meal.name}`}
             >
-              <Trash2 className="w-3.5 h-3.5 text-[#ef4444]" />
+              <Trash2 className="w-3.5 h-3.5 text-destructive" />
             </Button>
           </div>
         )

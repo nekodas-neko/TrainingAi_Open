@@ -217,7 +217,7 @@ export function MealPlanEditSheet({ plan, onOpenChange, onChanged }: Props) {
                   className={cn(
                     'min-h-[36px] flex-1 rounded-xl border px-3 text-xs font-semibold capitalize transition-colors',
                     i === variantIdx
-                      ? 'border-[#22c55e]/50 bg-[#22c55e]/15 text-[#22c55e]'
+                      ? 'border-brand/50 bg-brand/15 text-brand'
                       : 'border-border bg-muted/50',
                   )}
                 >

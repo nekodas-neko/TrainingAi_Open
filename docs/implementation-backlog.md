@@ -1051,6 +1051,12 @@ blocker and the intended shape were both already named, so **do not re-derive th
   (`components/health/day-detail/energy-summary.ts:33`). So this is not "surface the field that
   exists" — a card is per session, and two sessions in one day would both show the day total.
   It needs a **per-session** call to the same shared estimator, server-side per the deferral note.
+- **⚠ The deferral note undersells the blocker: it is not a bundle-size hazard, it is impossible.**
+  `estWorkoutKcal` → `getEnergyFeatureSpec()` (`lib/oura-models/constants/index.ts:442`) → `readJson`,
+  which calls **`fs.readFileSync`**. That cannot run in a client component at all, so there is no
+  "accept the bundle cost" option — the per-session figure has to come from the server. **That makes
+  this cross-lane: `/api/day-log` is Lane A's.** Lane B can render it the moment the field exists.
+  Verified 2026-08-18 while working the queue.
 - **⚠ And it is a duration-only estimate.** `daily-energy.ts:106` is
   `estWorkoutKcal({ durationMin, …, activityId: 8, intensity: 'moderate' })` — a flat MET 8 over the
   clock. **Load, volume and reps are not inputs.** A 49-minute session moving 2,364 kg and a
@@ -1224,6 +1230,20 @@ is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both 
 `nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
 the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
 files to it to buy room.
+
+- **✅ FINDINGS 1 AND 2 SHIPPED 2026-08-18 (v1.324.4, Lane B).** Every `#22c55e` and `#ef4444` in
+  the nutrition surface is now `brand` / `destructive`, so selected chips, checkboxes and the plan
+  card follow the user's chosen accent and light mode's deliberately-darkened value. **Repo total
+  471 → 428**, and **eight nutrition files came off the hex baseline entirely**, which holds them at
+  zero from here — the ratchet now makes this class structurally unable to come back in those files.
+  One site needed more than a swap: `meal-plan-section.tsx` passed its literal to `accentCardStyle()`,
+  which needs real colour channels and **returns an accent-less card for anything that is not a hex**,
+  so handing it a `var()` would have silently dropped the tint. Its gradient is now built locally with
+  `color-mix` on `var(--color-brand)`, mirroring that helper's output including the `willChange` layer
+  promotion.
+- **Finding 3 did not bite and is still true.** Replacing literals with tokens is line-for-line, so
+  nothing was added to either 800-line file — but `nutrition-content.tsx` is still exactly at the
+  limit, so **the extraction is still the first commit of any change that adds a line.**
 
 **4 — Edit Meal is three times taller than it needs to be (the design half).**
 Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro

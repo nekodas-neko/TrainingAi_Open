@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.6",
+    date: "2026-08-18",
+    changes: [
+      "The nutrition screens now follow your chosen accent colour. Selected chips, checkboxes, the meal plan card and the delete warnings were all painted a fixed green or red, so changing your accent left them behind \u2014 and in light mode they stayed at a shade the rest of the app deliberately darkens for readability.",
+    ],
+  },
+  {
     version: "1.324.5",
     date: "2026-08-18",
     changes: [
