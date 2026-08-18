@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×25) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **491**)
+**Updated:** 2026-08-18 · **By:** twenty-eight sweeps (2026-08-17 ×2, 2026-08-18 ×26) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **492**)
 
 ## Now
 
-Twenty-seven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-eight sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,26 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 28 — the `aria-expanded` list, re-checked (2026-08-18)
+
+**Filed Q-491 (low).** Write-up:
+[`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](../../reviews/2026-08-18-aria-expanded-collapsibles.md).
+
+**Still 9, but not the same 9.** `more/profile-tab` is **fixed**; `components/weights-summary.tsx`
+has the defect and **was never listed**; `deload-explanation` and `signal-sections` have **moved**, so
+the rule's paths are stale. Citing the count alone would have hidden that **the list is what drifted**.
+
+**⚠️ The pattern is the real output — third stale hand-maintained count in `CLAUDE.md` this run:**
+Q-480 (repo helpers "hardcode `DEFAULT_TZ`" — they take a parameter every caller passes), Q-490
+(*"both long-standing memos"* — there are **66**), Q-491 (a different nine). **Every ratcheted count
+is current**: hex literals, TTL divergence, component size, doc-index size, backlog pointers.
+`CLAUDE.md` drew this lesson for hex literals and it applies to its own prose. **A count in prose is a
+claim with a decay date; a count in a script is a fact.**
+
+**A standing suggestion for a successor:** sweep `CLAUDE.md` for remaining prose counts and propose
+replacing each with a script citation. Three were wrong out of three checked. That is a docs-only PR
+with a high hit rate and it makes the file self-maintaining where it currently is not.
 
 ### Sweep 27 — the other four render rules; all held (2026-08-18)
 

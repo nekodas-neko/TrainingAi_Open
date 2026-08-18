@@ -103,6 +103,34 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [app-shell] 🟡 Nine collapsibles still ship no `aria-expanded` — and it is the third hand-maintained count in `CLAUDE.md` found stale this run (Q-491, 2026-08-18)
+
+- **A named list with a date is checkable, which is the reason to write one.** `CLAUDE.md` names nine
+  chevron toggles lacking `aria-expanded`, re-counted 2026-08-09. Re-checked:
+  [`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](docs/reviews/2026-08-18-aria-expanded-collapsibles.md).
+- **Still 9, but not the same 9.** `more/profile-tab.tsx` is **fixed** (0 chevrons remain);
+  `components/weights-summary.tsx` has the defect and **was never on the list**; `deload-explanation`
+  and `signal-sections` have **moved**, so the paths in the rule are stale. The other six are unchanged.
+- **One partially compensates:** `weights-summary.tsx` carries `aria-label={collapsed ? "Expand" :
+  "Collapse"}`, so state does reach a screen reader — just not through the attribute that also
+  expresses the control→region relationship.
+- **Severity low and the reason is honest:** no known screen-reader user. Filed because the stated
+  direction is a **Play Store listing**, where accessibility is a review surface, and because the
+  recommended fix removes a maintenance burden rather than adding one.
+- **Prefer the ratchet over the sweep.** Nine attributes are easy to add and will drift again.
+  `CLAUDE.md`'s own rule says to prefer Radix `Collapsible`, **which supplies both attributes for
+  free**; then a shrink-only Custom Rules count so the list stops needing a human.
+- **⚠️ The pattern is worth more than the finding — third stale hand-maintained count this run:**
+  Q-480 (repo helpers described as hardcoding a timezone they take as a parameter), Q-490 (*"both
+  long-standing memos"* — there are **66**), and this one. **Every ratcheted count is current** — hex
+  literals, TTL divergence, component size, doc-index size, backlog pointers. This file already drew
+  that lesson for hex literals (*"recorded here as improving and it was not … because this line was
+  prose and nothing measured it"*); it applies to its own prose. **A count in prose is a claim with a
+  decay date; a count in a script is a fact.**
+- **Not verified: no screen-reader testing** — the claim is that the attribute is absent, not that an
+  announcement is wrong. Not on the APK, where TalkBack is the relevant reader. `coach-content.tsx`
+  was examined and **excluded** (its chevron is a back button).
+
 ### [app-shell] ✅ The other four render rules audited — all held, and every mechanical check over-reported (2026-08-18)
 
 - **Completes the render lens** that sweep 26 opened.

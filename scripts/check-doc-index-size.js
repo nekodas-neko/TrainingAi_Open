@@ -18,6 +18,15 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, aria-expanded collapsibles, Q-491): backlog 9477 -> 9520,
+// projectOverview 7603 -> 7631. One queue entry and its row. The lines that earn their place are the
+// MEMBERSHIP diff, not the count: CLAUDE.md's nine and today's nine are different sets (one fixed,
+// one never listed, two moved), so citing the count alone would hide that the list is what drifted.
+// Both also carry the meta-pattern — three hand-maintained counts in CLAUDE.md found stale this run
+// (Q-480, Q-490, Q-491) while every ratcheted count is current — which is the argument for fixing
+// this with a script rather than a sweep.
+
+//
 // Raised 2026-08-18 (Review, render rules part 2): projectOverview 7576 -> 7603. No queue entry —
 // all four rules held. The row is worth its lines because it records the three raw counts that look
 // like findings and are not (85 index keys, all on static lists; a 62-field useShallow pick holding
@@ -683,7 +692,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7603,
+  'projectOverview.md': 7631,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -694,7 +703,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9477,
+  'docs/implementation-backlog.md': 9520,
   'CLAUDE.md': 1075,
 
 };

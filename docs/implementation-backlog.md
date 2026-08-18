@@ -848,6 +848,49 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
+
+- **Branch:** `fix/aria-expanded-collapsibles-ratchet`
+- **Added:** 2026-08-18 · review sweep (control semantics) ·
+  [`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](reviews/2026-08-18-aria-expanded-collapsibles.md)
+- **Placement:** low. **No known screen-reader user today.** Filed because the stated direction is a
+  **Play Store listing**, where accessibility is a review surface rather than a preference, and
+  because the recommended fix is a ratchet that removes a maintenance burden rather than adding one.
+- **Still 9, but not the same 9.** `CLAUDE.md` names a specific nine (re-counted 2026-08-09). Re-checked:
+  - **`more/profile-tab.tsx` is fixed** — 0 chevrons remain.
+  - **`components/weights-summary.tsx` has the defect and was never on the list.**
+  - `deload-explanation` and `signal-sections` **moved** (`app/session-select/components/`,
+    `app/session-explain/components/`) — the paths in the rule are stale.
+  - The other six are unchanged: `health/day-overlay-sheet`, `workout/active-workout-screen`,
+    `workout/ai-prescription-card`, `workout/added-weight-toggle`, `nutrition/meal-card`,
+    `nutrition/saved-meals-sheet`.
+- **One partially compensates:** `weights-summary.tsx` carries
+  `aria-label={collapsed ? "Expand" : "Collapse"}`, so state does reach a screen reader — just not
+  through the attribute that also expresses the control→region relationship. Better than the other
+  eight; still not the rule.
+- **Fix shape — prefer the ratchet over the sweep.** Adding `aria-expanded={isOpen}` (+ `aria-controls`
+  where the region has an id) to nine sites is easy and will drift again. `CLAUDE.md`'s own rule says
+  to prefer Radix `Collapsible`, **which supplies both attributes for free** — converting the worst
+  offenders is the better trade. Then add a Custom Rules step counting chevron collapsibles without
+  `aria-expanded`, shrink-only, so the list stops needing a human.
+- **⚠️ The pattern is worth more than the finding — third stale hand-maintained count this run:**
+
+  | Rule | Recorded | Actual |
+  |---|---|---|
+  | *"Repo day-window helpers currently hardcode `DEFAULT_TZ`"* (**Q-480**) | broken | a parameter every caller passes |
+  | *"both long-standing memos in the codebase"* (**Q-490**) | 2 | **66** |
+  | *"9 hand-rolled chevron toggles"* (this) | a specific 9 | a **different** 9 |
+
+  Every **ratcheted** count is current — hex literals, TTL divergence, component size, doc-index size,
+  backlog pointers. `CLAUDE.md` already drew this lesson for hex literals (*"recorded here as improving
+  and it was not … because this line was prose and nothing measured it"*); it applies to its own prose.
+  **A count in prose is a claim with a decay date; a count in a script is a fact.** Consider a
+  standing follow-up to replace remaining prose counts with script citations.
+- **Lane B owns this** (`components/**`, `app/**` surfaces); the ratchet script is a `scripts/` addition.
+- **Not verified: no screen-reader testing.** The claim is that the attribute is absent, not that a
+  specific announcement is wrong. Not on the APK, where TalkBack is the relevant reader.
+  `app/coach/coach-content.tsx` was examined and **excluded** — its chevron is a back button.
+
 ### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
 
 - **Branch:** `docs/claude-md-repo-tz-line`
