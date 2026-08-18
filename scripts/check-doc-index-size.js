@@ -349,7 +349,7 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6871,
+  'projectOverview.md': 6910,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -369,7 +369,7 @@ const BASELINE = {
   // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
   // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
   // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7462,
+  'docs/implementation-backlog.md': 7514,
   'CLAUDE.md': 1044,
 
 };

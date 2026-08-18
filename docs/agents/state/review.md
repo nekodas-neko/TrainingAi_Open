@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** five sweeps (2026-08-17 ×2, 2026-08-18 ×3) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **467**)
+**Updated:** 2026-08-18 · **By:** six sweeps (2026-08-17 ×2, 2026-08-18 ×4) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **469**)
 
 ## Now
 
-Five sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Six sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -15,12 +15,42 @@ least once**, at the owner's request to work through the sections:
 | `workouts` | write path cross-user + live drive | Q-460…Q-462 |
 | `nutrition` · `cardio` · `activity` | writes cross-user + app-wide not-found probe | Q-463 |
 | `sleep` · `readiness` · `heart-rate` · `body` · `devices` | ingest auth, value validation, schema strictness | Q-464, Q-465 |
-| `app-shell` · `platform` | failure cells, repo-migration architecture | Q-450…Q-459 |
+| `app-shell` · `platform` | failure cells, repo-migration architecture, **the Coach write path** | Q-450…Q-459, Q-467, Q-468 |
 
 **Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
 left the web build — every offline-first domain took its web fallback), **production data**
-(`claude_ro` was never queried in any of the five), the **offline and error paths** (everything ran
+(`claude_ro` was never queried in any of the six), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 6 — the AI Coach's write path (2026-08-18) — the first review ever to cover it
+
+Owner picked this from a shortlist of remaining angles. Write-up:
+[`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md).
+
+**Why it was the right pick:** the Coach appears in eight prior review docs and five backlog entries,
+all about cost/latency/model-ID/navigation. **No review doc mentioned `coach_changes`,
+`applyCoachChange` or undo.** It is the only place an LLM-initiated flow writes to the data deciding
+what the user is told to lift (five domains).
+
+**Filed — Q-467, Q-468**, both at the top of the queue:
+
+- **Q-467** — the whole undo subsystem is built (route + window guard + five `undo()` handlers +
+  `captureBefore` + `undone_at` + history styling for undone changes) and **nothing calls it**. Every
+  client Coach fetch was enumerated; the undo path is in none. ⚠️ **Not** the known "no user-facing
+  entry point" note — that is phase 1's *apply* path, since wired.
+- **Q-468** — `undo` writes `beforeState` back with no drift check, while `apply` has one. Apply A,
+  apply B, undo A → the row holds A's "before" while the history still shows B as in effect; undo both
+  → the programme ends on a value the user never chose. **Do Q-468 with or before Q-467.**
+
+**CLEAN, and worth protecting:** the apply path is the best-built write path I have read in this repo
+— model never in the write path (documented, with why the SDK's binary tool-approval was rejected),
+`fieldsMatchDomain` blocking cross-domain field aiming, ownership by join, Zod whitelist quoting
+`CLAUDE.md` rule (b), admin gate on shared-catalogue creation, merged-away rows unselectable, no
+half-applied patches. **Double-apply refused with a 409 drift report; cross-user undo 404s.**
+
+**Not covered:** only `session_exercise` driven end to end (other four handlers read, not run);
+`/api/coach/preview` unprobed; the model was never in the loop, so nothing here says whether it
+*proposes* good patches — that is a separate lens.
 
 ### Sweep 5 — the ingest surface: sleep, readiness, heart-rate, body, devices (2026-08-18)
 

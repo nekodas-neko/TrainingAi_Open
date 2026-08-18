@@ -91,6 +91,8 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-460 the session-RPE route reports success for a write that matched nothing and the outbox then discards it, Q-461 the Start Set bounce makes the core flow un-automatable, Q-462 an ownership refusal reported as a 500). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
 
+- [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-468 — Coach `undo` writes `beforeState` back without checking the target still holds what the change set; undoing two stacked swaps leaves an exercise nobody chose). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
+
 ## Open issues
 
 ```bash
