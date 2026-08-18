@@ -141,6 +141,10 @@ const root = path.join(__dirname, '..');
 // shows the cheapest way to. Merged with a concurrent session's work on the same entry rather than
 // over it, and rebuilt from origin/main's numbers: this file conflicted four times in one evening,
 // and splicing is how one side gets silently dropped.
+// Raised 2026-08-18 (Review, Q-460…Q-462): projectOverview 6689 -> 6735, backlog 6781 -> 6927 (recomputed on the third same-day merge of this file).
+// Three queue entries from the workout write-path sweep plus the Known-Issues row indexing them.
+// Entries and open-issue content, which is what these files are for; the sweep's prose lives in
+// docs/reviews/2026-08-18-workout-write-path.md, outside this ratchet.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -187,7 +191,7 @@ const BASELINE = {
   // the whole recipe, so a naive renderer prints double what scanning the label logs. Each is
   // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
   // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
-  'projectOverview.md': 6689,
+  'projectOverview.md': 6735,
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
@@ -214,9 +218,13 @@ const BASELINE = {
   // statement. Filed rather than taken, per "no orphaned findings", and it earns its 27 lines by
   // carrying the measurement, the reason nothing re-grows (Q-539 already fixed the write path), and
   // the free-disk caveat that decides whether it can run after the volume is cut back.
-  'docs/implementation-backlog.md': 6894,
+  //
+  // Recomputed 2026-08-18 from the MERGED file after Lane A's Q-541/Q-315 raises met a concurrent
+  // one: 6894 + the other side's delta = 6988. Both prose blocks above are kept and only the number
+  // was rebuilt — splicing either conflict hunk would have silently un-done the other lane's raise,
+  // which is what every note in this file keeps warning about.
+  'docs/implementation-backlog.md': 6988,
   'CLAUDE.md': 1010,
-
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;

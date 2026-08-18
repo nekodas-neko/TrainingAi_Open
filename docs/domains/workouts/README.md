@@ -89,6 +89,8 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-451 — a no-program account's Workout tab is an empty card with a dead "Start Workout" button). Findings Q-450…Q-455; four areas recorded **clean**.
 
+- [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-460 the session-RPE route reports success for a write that matched nothing and the outbox then discards it, Q-461 the Start Set bounce makes the core flow un-automatable, Q-462 an ownership refusal reported as a 500). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
+
 ## Open issues
 
 ```bash
