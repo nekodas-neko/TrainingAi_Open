@@ -15,7 +15,7 @@ import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, he
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { isClockEpochReset, resolveDsToMs, resolveMsToDs, currentEpoch, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { classifyClockRegression, resolveDsToMs, resolveMsToDs, currentEpoch, type ClockAnchor } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
@@ -4805,27 +4805,39 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // update meant a single row's lag dated all of history, and that lag grew with time
     // since the last sync (see lib/oura-ble/clock.ts).
     //
-    // A batch whose max ds sits materially *below* the epoch's high-water mark is a ring
-    // clock reset (re-key / dead battery), not reordering: open the next epoch. Previously
-    // this was simply ignored, so every post-reset frame resolved weeks into the past and
-    // fell below the rollup cutoff — silently contributing nothing, forever.
+    // A batch whose max ds sits below the epoch's high-water mark USED to be treated as a ring clock
+    // reset outright. Q-314: a history re-drain produces exactly the same shape, and reading it as a
+    // reset re-timed the owner's entire sleep history twice. `classifyClockRegression` decides now —
+    // a declared re-key opens an epoch, a counter that genuinely restarted opens one as a net, and a
+    // replay of history the ring already sent does not.
     const batchMaxDs = Math.max(...rows.map(r => r.ringTimestampDs))
-    // Two single-row reads, not the whole anchor table — this runs on every ingest batch and was
-    // the hottest scan in the database (Q-143). Everything below needs exactly these two facts.
-    const [head, storedNewest] = await Promise.all([
+    // Three single-row reads, not the whole anchor table — this runs on every ingest batch and was
+    // the hottest scan in the database (Q-143). Everything below needs exactly these facts.
+    const [head, storedNewest, pendingRekey] = await Promise.all([
       this.getOuraClockEpochHead(userId),
       this.getNewestOuraClockAnchorByUtc(userId),
+      this.getPendingRekeyDeclaration(userId),
     ])
     const epochNow = head?.epoch ?? null
     const epochMaxDs = head?.maxAnchorDs ?? -Infinity
 
     let epoch = epochNow ?? 0
     let shouldObserve = epochNow == null || batchMaxDs > epochMaxDs
-    if (epochNow != null && isClockEpochReset(batchMaxDs, epochMaxDs)) {
-      epoch = epochNow + 1
-      shouldObserve = true
-      console.warn(`[oura-ble] ring clock reset detected (batchMaxDs=${batchMaxDs} << epoch ${epochNow} max ${epochMaxDs}); opening epoch ${epoch}`)
+    if (epochNow != null) {
+      const verdict = classifyClockRegression(batchMaxDs, epochMaxDs, pendingRekey != null)
+      if (verdict.action === 'open-epoch') {
+        epoch = epochNow + 1
+        shouldObserve = true
+        console.warn(`[oura-ble] opening clock epoch ${epoch} (${verdict.reason}; batchMaxDs=${batchMaxDs}, epoch ${epochNow} max ${epochMaxDs})`)
+      } else if (verdict.reason === 'redrain') {
+        // Deliberately loud but harmless. This is the case that used to corrupt the history, and it
+        // is also the ordinary consequence of a re-pair — so it must be visible without being an
+        // error, and the batch still extends the current epoch as it should.
+        console.warn(`[oura-ble] ds regression treated as a history re-drain, NOT a reset (batchMaxDs=${batchMaxDs} is ${(batchMaxDs / epochMaxDs * 100).toFixed(0)}% of epoch ${epochNow} max ${epochMaxDs}); staying in epoch ${epochNow}. If the ring really was re-keyed, declare it: POST /api/oura-ble/rekey`)
+      }
     }
+    // Consumed only once the anchor for the new epoch is actually written, below.
+    const consumeRekey = pendingRekey != null && epoch !== (epochNow ?? 0) ? pendingRekey.id : null
     let newest = storedNewest
     if (shouldObserve) {
       const anchorUtc = new Date()
@@ -4834,6 +4846,9 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       // Stamped `now`, so it is necessarily the newest by anchor_utc — same row the old
       // full-table reduce would have selected after pushing it.
       newest = { anchorDs: batchMaxDs, anchorUtcMs: anchorUtc.getTime() }
+      // After the anchor, never before: a declaration marked consumed without an epoch to point at
+      // would be silently lost, and the owner would have no way to tell it had not taken effect.
+      if (consumeRekey != null) await this.consumeRekeyDeclaration(consumeRekey, epoch)
     }
 
     // Reads still run on the single-newest-anchor path; only the recording changes here, so
@@ -6621,6 +6636,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getLatestOuraCloudVitals(userId: string) { return oura.getLatestOuraCloudVitals(this.db, userId) }
   async getLatestOuraBleMeasuredAt(userId: string) { return oura.getLatestOuraBleMeasuredAt(this.db, userId) }
   async hasOuraBleSamples(userId: string) { return oura.hasOuraBleSamples(this.db, userId) }
+  async declareOuraRekey(userId: string, note: string | null) { return oura.declareOuraRekey(this.db, userId, note) }
+  async getPendingRekeyDeclaration(userId: string) { return oura.getPendingRekeyDeclaration(this.db, userId) }
+  async consumeRekeyDeclaration(id: number, epoch: number) { return oura.consumeRekeyDeclaration(this.db, id, epoch) }
+  async cancelPendingRekeyDeclaration(userId: string) { return oura.cancelPendingRekeyDeclaration(this.db, userId) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }
