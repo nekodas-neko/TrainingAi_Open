@@ -39,6 +39,15 @@ export function resolveCompletedAt(
 // Idempotent: a retried/replayed completion (network retry, or an outbox
 // mutation re-pushed after its response was lost) must not re-consume the
 // prescription or double-increment the sessions_in_phase stored counter.
+//
+// Q-473 — that idempotence is the guarded UPDATE's, not this function's. It used to be decided
+// from the read above the write, which holds for a *sequential* replay and fails for a
+// simultaneous one: four concurrent completions of one session all read `completedAt = null`,
+// all believed they were first, and `sessions_in_phase` advanced up to three times off a single
+// workout (measured in 4 of 5 trials). The counter drives phase progression, so over-counting
+// moves the lifter into the next phase — and into a deload — early, off sessions never trained.
+// `completeWorkoutSession` carries `isNull(completed_at)` in its WHERE, so the database already
+// picks exactly one winner; all that was missing was reading which one that is.
 export async function completeWorkoutFromPayload(
   userId: string,
   payload: CompleteWorkoutPayload,
@@ -57,10 +66,10 @@ export async function completeWorkoutFromPayload(
   if (!existing) {
     throw new Error(`completeWorkoutFromPayload: session ${workoutSessionId} not owned by user ${userId}`)
   }
-  const alreadyCompleted = existing.completedAt != null
 
   const completedAt = resolveCompletedAt(completedAtMs, existing.startedAt)
-  await repo.completeWorkoutSession(workoutSessionId, userId, completedAt)
+  const stamped = await repo.completeWorkoutSession(workoutSessionId, userId, completedAt)
+  const alreadyCompleted = !stamped
 
   const programSessionId = await repo.getWorkoutSessionProgramSessionId(userId, workoutSessionId)
   if (programSessionId && !alreadyCompleted) {

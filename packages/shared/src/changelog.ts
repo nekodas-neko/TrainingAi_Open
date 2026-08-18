@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.324.4",
+    version: "1.324.5",
     date: "2026-08-18",
     changes: [
       "Editing or deleting something that does not exist \u2014 or is not yours \u2014 now says so, instead of reporting a server error. Six write actions answered with a generic failure and, in four cases, an empty response the app could not even read, which also meant the phone treated a permanent refusal as a temporary glitch and kept retrying it.",
+    ],
+  },
+  {
+    version: "1.324.4",
+    date: "2026-08-18",
+    changes: [
+      "Finishing one workout no longer counts as several. If the Finish button was tapped rapidly, or an offline completion was re-sent, the programme\u2019s progress counter could jump by two or three off a single session \u2014 which pushed you into the next training phase, and into a deload, earlier than you had actually earned. The workout record itself was always correct; only the counter was wrong. It now advances exactly once no matter how many times the completion arrives.",
     ],
   },
   {
