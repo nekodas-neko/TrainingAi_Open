@@ -45,6 +45,12 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   on the S25. Carries the measurement behind Q-210: the plan **scales a saved meal and never adds to
   it**, so a 63P/15C meal in an 83C slot cannot get there at any allowed factor. Slice A shipped as
   v1.292.0 ([`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)).
+- [`docs/superpowers/plans/2026-08-17-saved-meal-printable-label.md`](../../superpowers/plans/2026-08-17-saved-meal-printable-label.md)
+  — **Q-389, printable saved-meal labels with a scannable code (plan, not built).** Carries three
+  corrections to the intake entry: a 21×21 QR **cannot** hold a meal id (v2 25×25 minimum, so the
+  module pitch is 0.49–0.64 mm, ~16% finer than recorded); the "log one serving" requirement is
+  already met by `oneServingItems`/`logMealItems`; and consequently **`SavedMeal.totals` is the whole
+  recipe**, so a label must render `totals / servings` or it prints double what scanning it logs.
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.
