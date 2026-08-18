@@ -37,6 +37,7 @@ layer**) through §16. Read it before building any shared helper.
   — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
   the Q-number collision and the conflict-markers-on-`main` incident. **Also records that PR #1401 did
   not make the public-repo migration** and how to port it.
+- [`docs/reviews/2026-08-18-orientation-index-paths.md`](../../reviews/2026-08-18-orientation-index-paths.md) — **the orientation indexes named paths that do not exist, 2026-08-18** (Q-554 — `module-map.md:232` carried a row for `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket`, **neither of which has ever existed**; the real port is the row below and is itself flagged "NOT yet wired", so the map presented planned work as existing infrastructure. Plus three stale domain rows — `app/history/`, `docs/oura-models/`, `app/overview/` — and 49 malformed history display labels (a stray `../` made them resolve to a non-existent root `overview/`).) Now enforced by `scripts/check-index-doc-paths.js`, step 42 of 42, over **748 paths**.
 - [`docs/reviews/2026-08-18-known-issue-duplication.md`](../../reviews/2026-08-18-known-issue-duplication.md) — **a Known Issue in two lists at once, 2026-08-18** (Q-553 — **Q-139 read `🔴 OPEN` in `projectOverview.md` and `✅ fixed` in the resolved archive for ten days**, 69 lines describing a bug fixed 2026-08-08; **Q-81** was a byte-identical 31-line entry in both. Both were also **archived early** — the rule forbids moving while a device check is owed, and both name one. Fixed here, and now enforced by `scripts/check-known-issue-duplication.js`, step 41 of 41.)
 - [`docs/reviews/2026-08-18-card-429-reproduction.md`](../../reviews/2026-08-18-card-429-reproduction.md) — **Q-499 reproduced in a browser, 2026-08-18** (`/api/weights-summary` forced to 429 by route interception at the S25 viewport: **`Estimated 1RM` went 1 node → 0, no error wording anywhere**; **control holds** — blocking a different endpoint left it at 1). **The vanish is invisible on a warm cache and visible on a cold one**, so it reads as intermittent. Also **Q-552** — the Q-number block ledger omitted 544–551, so the README's own *"next block of 50 above 529"* instruction would have collided with fourteen live numbers; claimed 552–601 and added the missing grep-before-claiming step.
 - [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](../../reviews/2026-08-16-goal-invalidation-audit.md)
@@ -243,7 +244,7 @@ Live at the time of writing (2026-07-30):
   than reading code — see the journal entry for why that distinction matters. Plan:
   [`plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md`](../../superpowers/plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md).
   **Stage 2 shipped 2026-08-13** — the rollup now runs in a `worker_threads` realm; see
-  [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)
+  [`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)
   for the worker-bundle constraint (`onnxruntime-node` cannot be webpack-bundled, so it needs its own
   esbuild output) and the in-process fallback that keeps a broken bundle harmless.
 
@@ -288,7 +289,7 @@ Live at the time of writing (2026-07-30):
   shape decision before anyone starts it, and that Q-7b/Q-104/Q-114 are device-gated despite an
   earlier handoff listing them as ready.
 
-- **[`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)**
+- **[`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)**
   — 🆕 much sharper burst evidence for the standing Q-107 DB-pool-contention fault (two ~20-minute
   bursts hitting 15-20+ unrelated routes at once, a cleaner signature than the 2026-08-08
   measurement), found while diagnosing an unrelated `[sleep]` bug (Q-225) via a full local

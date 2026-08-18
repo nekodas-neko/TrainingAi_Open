@@ -115,7 +115,7 @@ cause of one class was a posted step window coming from a *different stream* tha
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-36 — the guided walk that could never sync, and the calendar blind spot behind it), filed under `cross` because it spans five pillars and so is not matched by the glob above.
 - Journal: `grep -rl 'step\|activity.score' docs/overview/entries/` — plus
-  [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
+  [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-140 — removed the Log Activity sheet's redundant "Interval walk" shortcut; Guided Walk keeps
   its own separate entry point on the Cardio Hub screen).
 

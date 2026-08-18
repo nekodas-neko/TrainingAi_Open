@@ -51,7 +51,7 @@ grep -n '\[body\]' docs/implementation-backlog.md   # Q-56 today
 - ~~"Burned"/"Balance" cards read a broken, HC-only calorie source~~ **fixed 2026-08-05 (Q-96,
   v1.266.4)** — both now read `activeEnergyKcalToday` (`computeActiveEnergy()`), the same source
   already correctly feeding `EnergyBudgetCard`. See
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 
 Live at the time of writing (2026-07-30):
 

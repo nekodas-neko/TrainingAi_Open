@@ -69,6 +69,27 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟢 The orientation indexes named paths that do not exist, one of them never built (Q-554, 2026-08-18)
+
+- **Filed and fixed in the same PR**, kept as the record of the class.
+  [`docs/reviews/2026-08-18-orientation-index-paths.md`](docs/reviews/2026-08-18-orientation-index-paths.md).
+- **`CLAUDE.md` has had a path check since Q-153; `docs/module-map.md` and the eleven domain indexes
+  had none** — though sessions are told to read them before building a helper or working in a pillar.
+- **⚠️ `module-map.md:232` described a module that has never existed** — `lib/oura-ble/steps-motion-decoder.ts`
+  → `decodeStepsPacket`, **zero references tree-wide**. The real port is the row below
+  (`lib/oura-models/…`), itself flagged there as **"NOT yet wired"**. So the map presented *planned
+  wiring* as existing infrastructure, in the table read specifically **to avoid re-implementing what
+  already exists**. Marked `⚠️ NOT BUILT`.
+- **Three stale rows fixed** — `app/history/` (workouts), `docs/oura-models/` (devices), `app/overview/`
+  (app-shell); none exist. **Plus 49 malformed display paths** (`docs/../overview/…`) across all eleven
+  indexes: link targets were correct, the visible labels were not.
+- **Now enforced:** `scripts/check-index-doc-paths.js`, step **42 of 42**, covering **748 paths across 12
+  docs**. Its first pass reported 59 of 787 — nearly all noise — and the fixes then re-triggered it,
+  since naming a path as *absent* still names it; four `DELIBERATE` entries carry their reasons.
+- **Not exercised:** existence only. It does **not** check that the description beside a path is true —
+  a row naming a real file while describing behaviour it lacks still passes.
+
+
 ### [platform] 🟢 A Known Issue was in both the live list and the resolved archive; nothing checked (Q-553, 2026-08-18)
 
 - **Filed and fixed in the same PR**, kept as the record of the class.

@@ -848,6 +848,41 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [platform] Q-554 — the orientation indexes named paths that do not exist, including a module that was never built
+
+- **Status: FILED AND FIXED in the same PR** (docs + a new CI check, Custom Rules now **42 of 42**).
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-orientation-index-paths.md`](reviews/2026-08-18-orientation-index-paths.md)
+- **The gap.** `scripts/check-claude-md-paths.js` guards `CLAUDE.md` for the reason in its header —
+  *"a wrong path in a rulebook is worse than a wrong path in code: nothing compiles it, so it rots
+  silently and is copied confidently"* (Q-153). Sessions are also told to read `docs/module-map.md`
+  before building any shared helper and `docs/domains/<pillar>/README.md` before working in a pillar.
+  **Nothing checked either.**
+- **⚠️ `docs/module-map.md:232` carried a row for a module that has never existed.**
+  `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket(cols27)`: **zero references to either in
+  the whole tree.** What exists is the row twenty lines below — `lib/oura-models/steps-motion-decoder.ts`
+  → `runStepsMotionDecoder(input)`, golden-verified and described there as **"NOT yet wired"** into the
+  BLE decode or the step pipeline. So row 232 described *that wiring*, in the present tense, in a table
+  whose stated purpose is **"what already exists and where … to stop new work re-implementing
+  infrastructure the app already has."** It produced both errors at once: someone looking for the
+  decoder finds nothing, someone checking whether the wiring is done reads that it is.
+- **Three stale domain-index rows:** `workouts` listed a UI route `app/history/` (gone — history renders
+  via `components/exercise-history-sheet.tsx`), `devices` listed `docs/oura-models/` (no such dir; the
+  ops reference is `docs/oura-ble-operations.md`), `app-shell` listed `app/overview/` (no such route).
+- **49 malformed display paths.** Every domain index rendered history links as
+  `` `docs/../overview/history-…md` `` — **link target correct, visible label wrong** (`docs/../overview/`
+  normalises to `overview/`, which does not exist). Fixed across all eleven; link targets untouched.
+- **The check:** `scripts/check-index-doc-paths.js` — **748 paths across 12 docs**. Deliberately
+  narrower than its sibling: root-anchored backticked paths only; globs/ellipses/templates skipped; a
+  path named *while saying it is gone* needs a `DELIBERATE` entry with a reason.
+- **⚠️ Those narrowings were earned, not designed.** The first pass reported **59 of 787**, all but four
+  being relative fragments, globs, or the display-path bug. **And the fixes then re-triggered the
+  check** — writing *"there is no `app/overview/` route"* names the path in backticks just as surely as
+  claiming it exists. Four `DELIBERATE` entries now carry their reason.
+- **Not exercised:** existence only. The check does **not** verify that the description beside a path is
+  accurate — row 232 was caught only because its path was wrong too. A row naming a real file while
+  describing behaviour it does not have still passes.
+
 ### [platform] Q-553 — a Known Issue was in both the live list and the resolved archive; nothing checked
 
 - **Status: FILED AND FIXED in the same PR** (docs + a new CI check). Kept as the record of the class.
