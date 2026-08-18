@@ -19,6 +19,7 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-18-implausible-value-silent-drop.md`](../../reviews/2026-08-18-implausible-value-silent-drop.md) — **the same out-of-range value sent down both write paths, 2026-08-18** (Q-485 — web refuses it with a message, sync-push writes the row, drops the field and reports `errors: []`, with no log and no `error_events` row; 12 of 14 value checks in `pushMutations` coerce silently while 2 throw). **The bounds themselves mirror correctly** — both paths share one validation module.
 - [`docs/reviews/2026-08-18-unvalidated-create-bodies.md`](../../reviews/2026-08-18-unvalidated-create-bodies.md) — **oversized and unvalidated request bodies, 2026-08-18** (Q-484 — `POST /api/injuries` accepts and stores a 10 MB `notes` and an unvalidated `startedDate`, while `PATCH /api/injuries/[id]` — the schema `CLAUDE.md` cites as the reference — caps the same fields at 100/1,000 chars with a date regex).
 - [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](../../reviews/2026-08-15-pillar-model-soundness-review.md)
   — §5: reviewed and **came back clean**. The 17-vs-68 composition-column gap is benign (those

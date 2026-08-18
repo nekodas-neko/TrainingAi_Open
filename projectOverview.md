@@ -103,6 +103,36 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [body][platform][devices] 🟡 An implausible weight is refused on web and discarded without trace on the device path (Q-485, 2026-08-18)
+
+- **`CLAUDE.md` says "sync-push must mirror the web route" and the push branch's comment claims it
+  does. Nobody had sent the same out-of-range value down both paths.**
+  [`docs/reviews/2026-08-18-implausible-value-silent-drop.md`](docs/reviews/2026-08-18-implausible-value-silent-drop.md).
+- **Measured** (`weightKg: 10000`, bound 500): web → **400** `{"error":"Too big: expected number to be
+  <=500"}`; sync push → **200** `{"processed":1,"errors":[]}` with the row written, `steps` kept and
+  `weight_kg` NULL.
+- **The drop is invisible in all three places it could be recorded:** `errors: []` so the client
+  confirms and deletes the mutation, **no** `console.*` in the coercion block, and **no**
+  `error_events` row (verified by query).
+- **The bounds are not the problem and must not be "fixed".** Both paths import the same
+  `packages/shared/src/validation/body-metrics.ts` — `One Formula, One Place` holding. The comment
+  claiming the mirror is accurate about *bounds*; it does not describe *behaviour*.
+- **The same function already has the visible behaviour, on 2 of 14 checks.** 12 sites coerce
+  silently (weight, bodyFat, calories, macros, steps, distance, RHR, HRV, water, measurements); 2
+  throw (`waterMlDelta`, `sleep_session`), which become `errors[]` entries and reach the More-tab
+  dead-letter badge. Both throws are defensible; the open question is why **weight** — the headline
+  body metric — is in the silent group.
+- **⚠️ The fix is NOT "throw everywhere".** A throw quarantines the mutation, which the poison-pill
+  rule forbids for a validation failure; twelve new dead-letter paths would trade an invisible failure
+  for red badges the user cannot act on. Recommended order: (1) log the coercion server-side — one
+  line, no client change, worth doing regardless; (2) a `warnings[]` channel separate from `errors[]`
+  that the client can surface without dead-lettering; (3) a per-field product decision on
+  incomplete-vs-meaningless, which an implementer should not make in passing.
+- **Reachability is low and stated as such:** bounds are generous, so ordinary UI input never trips
+  them. The path that reaches it is the one the code comment already names — *"a corrupted local
+  payload"* — plus a misreading BLE scale.
+- **Not verified on:** the APK; the client half was read from `sync-engine.ts` rather than induced.
+
 ### [platform][body][nutrition] 🟡 The create routes nobody gave a schema — a 10 MB note is accepted where the edit path caps it at 1,000 (Q-484, 2026-08-18)
 
 - **`CLAUDE.md` says oversized input is "a rejection, not a skip". Nothing had tested it.**
