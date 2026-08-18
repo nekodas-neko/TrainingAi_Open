@@ -118,6 +118,10 @@ const root = path.join(__dirname, '..');
 // lines of questions with the answers plus the QR quiet-zone/payload constraint the mockups
 // surfaced. Amended in place rather than filed as a second entry, per this role's dedup rule.
 //
+// Raised 2026-08-17 (Lane A, Q-541 tasks 0-2): backlog 6721 -> 6731. A status block on the Q-541
+// entry saying which tasks shipped and which remain, and that nothing reads the new table yet. The
+// item stays in the queue, so this is queue state rather than narrative — and the distinction it
+// carries is the one an implementer most needs: the destructive step has not been written.
 // Raised 2026-08-17 (BugFix intake, Q-389 round-label revision): backlog 6721 -> 6735. The owner
 // added that labels rotate between square and CIRCULAR dies, which changes the binding constraint
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
@@ -175,15 +179,19 @@ const BASELINE = {
   // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
   'projectOverview.md': 6689,
   //
-  // Raised 2026-08-17 (Q-51 re-verification, Lane B): backlog 6791 -> 6811. A correction to an
+  // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
+  // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
+  // landed the same day and each pass would have silently un-done the other side.
+  //
+  // Raised 2026-08-17 (Q-51 re-verification, Lane B): backlog 6801 -> 6821. A correction to an
   // existing entry whose Task 3 reads as closing it and does not: Task 3 measured HOME cold start
   // (FCP 472ms, 439 of it the document fetch), while the entry's own callout is about first mount of
   // /WORKOUT (1086-1348ms, rscCount 0, entirely client-side). Different screen, different number,
   // still unmeasured. Also re-measures the two file sizes the premise rests on — both have grown
   // since the entry was written, and the entry states one of them three different ways. Left in the
   // entry rather than a review doc because the next session to take this item reads the entry, sees
-  // a green Task 3, and would close it.
-  'docs/implementation-backlog.md': 6811,
+  // a green Task 3, and would close it. Recomputed from the merged file, same as the raise above.
+  'docs/implementation-backlog.md': 6821,
   'CLAUDE.md': 1010,
 
 };

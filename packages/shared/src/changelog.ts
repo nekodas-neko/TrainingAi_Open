@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.318.11",
+    date: "2026-08-17",
+    changes: [
+      "Internal groundwork for shrinking the ring-data store, which is the bulk of the database and what filled the disk in August. Nothing is stored differently yet \u2014 this adds the new compact format and the table that will hold it, both proven to return the original bytes exactly. Your raw ring history is untouched.",
+    ],
+  },
+  {
     version: "1.318.10",
     date: "2026-08-17",
     changes: [
