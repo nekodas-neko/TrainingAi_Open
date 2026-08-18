@@ -15,10 +15,26 @@ describe('isRetryableWriteError — measured outage shapes', () => {
     ))).toBe(true)
   })
 
-  it('the pool could not reconnect: DrizzleQueryError → Error ECONNREFUSED', () => {
+  it('the pool could not reconnect over TCP: DrizzleQueryError → Error ECONNREFUSED', () => {
     expect(isRetryableWriteError(drizzleWrap(
-      Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5433'), { code: 'ECONNREFUSED' }),
+      Object.assign(new Error('connect ECONNREFUSED 127.0.0.1:5433'), { code: 'ECONNREFUSED', syscall: 'connect' }),
     ))).toBe(true)
+  })
+
+  // Found by a live `pnpm dev` push with the database stopped, after every unit test passed. The
+  // dev DATABASE_URL is the Unix-socket form, and a socket to a dead server is simply missing —
+  // so the errno is ENOENT, and the first version of this classifier called a real outage
+  // permanent. Production is TCP, which is why nothing but the rehearsal would have caught it.
+  it('the pool could not reconnect over a Unix socket: ENOENT with syscall connect', () => {
+    expect(isRetryableWriteError(drizzleWrap(
+      Object.assign(new Error('connect ENOENT /tmp/.s.PGSQL.5433'), { code: 'ENOENT', syscall: 'connect' }),
+    ))).toBe(true)
+  })
+
+  it('a bare ENOENT with no failed connect behind it stays non-retryable', () => {
+    expect(isRetryableWriteError(
+      Object.assign(new Error('ENOENT: no such file or directory, open \'x.json\''), { code: 'ENOENT', syscall: 'open' }),
+    )).toBe(false)
   })
 })
 

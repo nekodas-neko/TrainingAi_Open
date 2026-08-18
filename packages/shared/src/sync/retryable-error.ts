@@ -15,7 +15,16 @@
 // level down the `cause` chain:
 //
 //   DrizzleQueryError "Failed query: SELECT 1"  →  cause: pg DatabaseError { code: '57P01' }
-//   DrizzleQueryError "Failed query: SELECT 1"  →  cause: Error          { code: 'ECONNREFUSED' }
+//   DrizzleQueryError "Failed query: SELECT 1"  →  cause: Error { code: 'ECONNREFUSED', syscall: 'connect' }
+//   DrizzleQueryError "Failed query: insert …"  →  cause: Error { code: 'ENOENT', syscall: 'connect' }
+//
+// That third shape is why `syscall === 'connect'` is checked as well as the code list, and it was
+// found only by pushing at a live `pnpm dev` with the database stopped — not by the unit tests,
+// which all passed. A **Unix-socket** connection to a dead server fails with `ENOENT` ("no such
+// file": the socket is gone), not `ECONNREFUSED`. Production is TCP and gives ECONNREFUSED, but the
+// dev DATABASE_URL is the socket form, so the first live rehearsal classified a real outage as a
+// permanent failure. A bare `ENOENT` is far too generic to trust on its own; paired with
+// `syscall: 'connect'` it means exactly one thing — we could not open a connection.
 
 // Node socket-level failures: the server is unreachable, not the payload wrong.
 const RETRYABLE_SYSCALL_CODES = new Set([
@@ -62,7 +71,10 @@ const RETRYABLE_MESSAGE_FRAGMENTS = [
  */
 export function isRetryableWriteError(err: unknown, depth = 0): boolean {
   if (depth > 5 || err == null || typeof err !== 'object') return false
-  const e = err as { code?: unknown; message?: unknown; cause?: unknown }
+  const e = err as { code?: unknown; message?: unknown; cause?: unknown; syscall?: unknown }
+
+  // A failed `connect(2)` is unreachability by definition, whatever errno it carries.
+  if ((e as { syscall?: unknown }).syscall === 'connect') return true
 
   if (typeof e.code === 'string') {
     if (RETRYABLE_SYSCALL_CODES.has(e.code)) return true

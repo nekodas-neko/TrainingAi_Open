@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.6",
+    date: "2026-08-18",
+    changes: [
+      "Losing the database connection no longer throws away everything waiting to sync. If the server was unreachable for around 45 minutes \u2014 an ordinary outage \u2014 every pending change on the phone was marked failed and had to be retried one at a time by hand, even though nothing was wrong with any of them. The app now recognises the difference between the server being down and a change being genuinely rejected: it waits and retries on its own, and only real rejections show up as failures.",
+    ],
+  },
+  {
+    version: "1.324.5",
+    date: "2026-08-18",
+    changes: [
+      "Editing or deleting something that does not exist \u2014 or is not yours \u2014 now says so, instead of reporting a server error. Six write actions answered with a generic failure and, in four cases, an empty response the app could not even read, which also meant the phone treated a permanent refusal as a temporary glitch and kept retrying it.",
+    ],
+  },
+  {
     version: "1.324.4",
     date: "2026-08-18",
     changes: [
