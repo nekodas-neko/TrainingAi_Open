@@ -108,7 +108,7 @@ order.
   **offline/error paths**.
 - **🟡 Q-466, found while landing these PRs rather than by the probe:** CI re-downloads the Playwright
   browser on every E2E run with no cache, and a slow CDN turns that into an indefinite stall — observed
-  **twice on 2026-08-18**, each costing a cancel-and-re-run cycle on a **required** check. `actions/cache`
+  **three times on 2026-08-18**, each costing a cancel-and-re-run cycle on a **required** check. `actions/cache`
   on `~/.cache/ms-playwright` is the standard fix.
 - **Nothing was fixed.** All three are queued.
 

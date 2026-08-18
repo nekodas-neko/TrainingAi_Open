@@ -1067,8 +1067,9 @@ ehr     0     0     0     0   648   208   128   556     0
   `actions/setup-node`'s `cache: 'pnpm'` (five jobs use it) caches the pnpm store, **not** the
   Playwright browser binaries, which live in `~/.cache/ms-playwright`. So each run pulls ~150 MB of
   Chromium plus system packages afresh.
-- **Observed twice on 2026-08-18**, on PR #47 and PR #66, out of roughly 6–8 E2E runs that day — a
-  small sample, so treat the *rate* as indicative rather than measured. In both cases the step sat
+- **Observed three times on 2026-08-18**, on PR #47 and twice on PR #66, out of roughly 8–10 E2E runs
+  that day — a small sample, so treat the *rate* as indicative rather than measured, but three in one
+  day on one repo is not a coincidence. In both cases the step sat
   `in_progress` for **6–22 minutes** with every other job already green, and the job had to be
   cancelled and re-run; the re-run completed the same step in well under a minute. The tell is
   distinctive and worth knowing: `Install Chromium` `in_progress` while `Run pnpm e2e` is still

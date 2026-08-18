@@ -147,8 +147,9 @@ Not from the ingest probe — observed while landing this run's PRs, and filed h
 run with no cache. `actions/setup-node`'s `cache: 'pnpm'` covers the pnpm store, **not**
 `~/.cache/ms-playwright`, so each run pulls ~150 MB of Chromium afresh.
 
-**Observed twice on 2026-08-18** — PR #47 and PR #66, out of roughly 6–8 E2E runs that day, so the
-*rate* is indicative rather than measured. Both times the step sat `in_progress` for 6–22 minutes with
+**Observed three times on 2026-08-18** — PR #47 and twice on PR #66, out of roughly 8–10 E2E runs that
+day, so the *rate* is indicative rather than measured, but three in one day on one repo is not a
+coincidence. Both times the step sat `in_progress` for 6–22 minutes with
 every other job green, and had to be cancelled and re-run; the re-run finished the same step in under
 a minute. The tell: `Install Chromium` `in_progress` while `Run pnpm e2e` is still `pending` means the
 download, not the specs.

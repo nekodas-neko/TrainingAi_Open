@@ -39,7 +39,7 @@ physiologically impossible probe with nothing reaching Postgres — HR `-50`/`99
 weight `99999`/`-40`, malformed scale hex. The weight errors even name the bound violated.
 
 **Also filed from this run, not from the probe — Q-466:** CI re-downloads the Playwright browser on
-every E2E run with no cache; observed stalling **twice on 2026-08-18**, each costing a cancel-and-re-run
+every E2E run with no cache; observed stalling **three times on 2026-08-18**, each costing a cancel-and-re-run
 on a required check. If E2E sits on `Install Chromium` while `Run pnpm e2e` is still `pending`, that is
 the download, not the specs — cancel and re-run rather than diagnosing the specs.
 
