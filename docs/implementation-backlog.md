@@ -2034,6 +2034,107 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
+### [nutrition][app-shell] Q-401 — two calorie budgets on one screen, 274 apart, and the card that explains it is suppressed
+
+- **Branch:** `feat/combine-energy-and-macro-widgets`
+- **Added:** 2026-08-18 · owner, on the Nutrition tab: *"why are these values different? should it not
+  match the nutrition goal? I was hopping we could combine these 2 widgets/displays"*
+- **Lane B** for the merge. The suppression rule in finding 3 is also Lane B (one condition in a
+  component). No schema, no route, no migration.
+
+**Both numbers are correct and they measure different things.** Traced, not guessed
+(`lib/health/energy-balance-service.ts:180-181`):
+- **Ring — "1900 left"** = `nutrition_targets.calories` (1,900) − eaten. A **fixed** goal you set
+  once. It does not move when you train.
+- **Energy Balance — "1,626 kcal left today"** = maintenance (1,826) + `CALORIE_ADJUSTMENT_BY_GOAL`
+  (**recomp = −200**, `goal-recommendation.ts:19`) − eaten. A **dynamic** budget that rises with what
+  you actually burn.
+
+1,826 − 200 = **1,626** against a set **1,900**: a **274 kcal** gap, both labelled "left", stacked one
+above the other with nothing reconciling them.
+
+**Finding 1 — the app already knows.** `driftsFromRecommendation` is
+`|currentKcal − recommendedKcal| > 100` → |1,900 − 1,626| = 274 → **true**, today, on the owner's
+device.
+
+**Finding 2 — and it is arguably telling the owner something real.** For a *recomp* goal the
+recommendation sits 200 **under** maintenance; the stored goal is 74 **over** it. Whatever the merge
+looks like, that is a fact the screen should be able to say out loud.
+
+**Finding 3 — ⚠ the only surface that explains it is gated shut exactly when it is needed.**
+`tdee-adaptation-card.tsx:44-48` requires `maintenance.source === "calibrated"`. The owner's card
+reads *"Log food on 4 more days to calibrate"*, i.e. `source === 'formula'` — so the Calorie Nudge is
+correctly hidden, and the two numbers sit there unexplained. **The gate is right for the *action* and
+wrong for the *explanation*.** Suggesting a new target off a formula-derived maintenance would move
+the user sideways with false authority — that comment is correct and should stay. Saying *why the two
+numbers differ* costs nothing and needs no calibration. **Split the condition:** explain always, offer
+to apply only when calibrated.
+
+**The merge, and the one decision inside it.**
+- **One card.** Ring and macro bars on top; energy balance as a strip beneath; the reconciliation in
+  a sentence rather than as two numbers to subtract.
+- **The ring keeps the SET goal (1,900), not the recommendation.** This is the load-bearing choice:
+  the macro grams under it (0/150 P, 0/190 C, 0/60 F) are derived from that same `nutrition_targets`
+  row. Point the ring at 1,626 while the bars still read 1,900-derived grams and the card contradicts
+  itself internally — a worse bug than the one being fixed.
+- **Energy balance keeps its zone bar**, which is the part the ring cannot express: it is the only
+  thing on the screen that accounts for what you burned.
+- **Related:** the calibration this is waiting on is what **Q-387** unblocks — until completed days
+  can be identified, `source` stays `formula` and this explanation is the only thing the user gets.
+
+- **Not in scope:** changing anyone's targets, or auto-applying the recommendation. This entry makes
+  the disagreement legible; **Q-302**'s nudge already owns the applying.
+- **Verification:** with a formula-derived maintenance and a drifting goal, the merged card must state
+  the gap and the reason. Then check the **Home** widget renders the same two figures — it shows both
+  as well (Nutrition 0/1900 and Energy Balance 1,626), so a fix on Nutrition alone leaves Home
+  contradicting it. **Sibling sweep: both surfaces in the same PR.**
+
+
+**ROOT CAUSE FOUND, and it is not staleness — it is two TDEE models. (2026-08-18)**
+The owner asked whether both numbers were not already AI-derived. They were. They come from the same
+BMR and disagree by exactly the activity level the goal wizard was told about:
+
+| | formula | value |
+|---|---|---|
+| BMR implied by the shipped maintenance | 1,826 ÷ 1.2 | **1,522** |
+| Goal wizard, `calculateBaseline` | BMR × **1.375** (light) − 200 | **1,892** ≈ the stored **1,900** |
+| Energy balance, `buildEnergyBalance` | BMR × **1.2** (sedentary) − 200 | **1,626** |
+
+**Gap = BMR × (1.375 − 1.2) = 266 kcal.** Observed on device: **274**. The 8 kcal is rounding and
+weight drift since the goal was set. That is the entire discrepancy accounted for.
+
+**Neither is wrong; they are different contracts.**
+`goal-recommendation.ts:5` bakes a **self-reported** activity multiplier into the target, so the
+number already assumes your training and never moves. `daily-energy.ts:20` uses
+`SEDENTARY_MULTIPLIER = 1.2` **deliberately**, and its comment says why: *"measured movement is added
+explicitly, so a higher activity multiplier here would double-count it."* One assumes activity, the
+other measures it. Run both and you get two budgets — which is what the screen shows.
+
+**✅ OWNER DECISION, 2026-08-18: one number, and it rises with activity.** *"if its saying its
+1800-200; then that should be the calorie goal? and it can increase with activity?... can we look at
+having them all the same?"*
+
+**Recommendation: adopt the measured model everywhere.** It is the only one that can be right on both
+a rest day and a training day — an assumed multiplier is wrong on every day that is not average, and
+the app already measures the real thing. Concretely:
+1. **Today's goal = sedentary base + today's measured activity + goal delta.** The stored
+   `nutrition_targets.calories` becomes the **rest-day floor**, not the truth, and the day's figure is
+   derived from it.
+2. **The goal wizard must switch to the sedentary multiplier** when it feeds this. Leaving it at
+   `light`/`moderate` while activity is also added measured is a double-count — the exact thing
+   `daily-energy.ts` warns about, and the reason the two numbers drifted apart in the first place.
+   **This is the load-bearing change; the merge in this entry is cosmetic without it.**
+3. **Macros have to follow, and not uniformly.** Protein is dosed per kg of bodyweight
+   (`PROTEIN_G_PER_KG_BY_GOAL`), so it must **not** scale with activity; the earned calories belong to
+   carbs. Scale all three and the ring and the bars disagree again in a new way.
+4. **Say where the extra came from.** A budget that grows during the day is confusing unless it is
+   labelled — *"1,626 + 312 earned from training"* rather than a number that silently changes.
+
+**⚠ What this costs, stated plainly:** the goal stops being a fixed number you can memorise, and it is
+at its lowest in the morning before you have trained. That is the honest trade for a number that is
+right on both kinds of day. **One formula, one place** — after this there must be exactly one TDEE
+implementation, and `calculateBaseline`'s multiplier table stops being a second one.
+
 ### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
 
 - **Branch:** `fix/inline-centred-line-budget`
