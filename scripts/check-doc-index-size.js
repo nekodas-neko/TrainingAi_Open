@@ -783,7 +783,7 @@ const BASELINE = {
   // seven fewer, recomputed from the merged file on top of the raise above. Q-357 is the four
   // defeated memo call sites Q-490's review said did not exist ("no inline arrows exist
   // anywhere"); the new check freezes them rather than leaving them to be rediscovered.
-  'docs/implementation-backlog.md': 10001,
+  'docs/implementation-backlog.md': 10036,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

@@ -2088,6 +2088,88 @@ at its lowest in the morning before you have trained. That is the honest trade f
 right on both kinds of day. **One formula, one place** — after this there must be exactly one TDEE
 implementation, and `calculateBaseline`'s multiplier table stops being a second one.
 
+
+**✅ OWNER CONFIRMED THE MODEL AND NARROWED THE MERGE, 2026-08-18.** *"i want the lowest number that
+assumes no exercise/movement - and only has BMR essentially. then we adjust/increase that number
+activity. can you make it consistent throughout the whole app that distinction."* Plus: *"id rather
+keep the regular nutrition one; and just add the bar from the energy balance to it to replace the
+current nutrition progress bar."*
+
+**1 — The baseline is BMR × sedentary, everywhere, and activity is only ever ADDED.** That is the
+contract. `SEDENTARY_MULTIPLIER = 1.2` (`daily-energy.ts:20`) is the one baseline; anything that also
+adds measured movement must start from it. **`ACTIVITY_MULTIPLIERS` in `goal-recommendation.ts:5`
+stops being a second TDEE model** — the wizard keeps asking the activity question if it is useful for
+step goals and water, but it must not fold that multiplier into the calorie target.
+
+**2 — Sweep it, do not patch one caller.** Grep every use of `ACTIVITY_MULTIPLIERS`, `calculateBaseline`
+and any local `bmr *` before deciding the change is done. The rule this falls under is **One Formula,
+One Place**: after this PR there is exactly one place that turns a BMR into a daily target, and
+exactly one place that adds today's movement to it. A second copy is what produced Q-401 in the first
+place.
+
+**3 — The merge is now a one-line swap, not a new card.** Keep `MacroRing` and Home's nutrition widget
+as they are — ring, macro rows, everything. **Replace only the calorie progress bar** with the energy
+zone bar (`barBands`/`barPosition` from `packages/shared/src/nutrition/calorie-balance.ts`, already
+shared and already used by three surfaces). The progress fill answers *"how full is the tank"*; the
+zone answers *"am I on target"*, which is the question a budget that moves with activity actually has.
+Home's bar is the gradient fill in `home-card-widget.tsx` (`goalPct`, `scaleX`).
+
+**4 — Say where the budget came from, in one line under the bar:** *"1,626 base + 274 earned from
+training"*. Without it a number that changes during the day looks like a bug — which is exactly how
+this entry started.
+
+**5 — Both surfaces in the same PR.** Home and Nutrition, per the sibling-surface rule. And note
+**Q-402**: Home's energy card never refetches, so it will show a stale zone bar until that is fixed —
+swapping the bar in without it makes the staleness *more* visible.
+
+### [nutrition][app-shell] Q-402 — Home's energy-balance widget never refetches; only an app restart updates it
+
+- **Branch:** `fix/energy-balance-widget-refetch`
+- **Added:** 2026-08-18 · owner: *"noting the widget energy bar doesnt update natively; requires a
+  restart of the app."*
+- **Lane B.** One hook, `app/health/hooks/use-health-calcs.ts`. No schema, no route.
+
+**Confirmed cause — the hook fetches once and has nothing to make it fetch again.**
+`useEnergyBalanceToday()` seeds from cache in one effect and then:
+
+```ts
+useEffect(() => {
+  const today = todayInTz()
+  cachedFetch<EnergyBalanceResponse>(`energy-balance:${today}`, …, ENERGY_BALANCE_TTL, d => setData(d ?? null))
+}, [])          // ← empty deps: once per mount, never again
+```
+
+`HomeEnergyBalanceCard` lives in the persistent tab shell, so it does **not** unmount when you switch
+tabs — the effect never re-runs and `data` keeps whatever the first fetch returned. Killing the app is
+the only thing that remounts it. That is precisely the reported behaviour.
+
+**The invalidation is NOT the missing piece — that part already works.** `lib/cache-groups.ts` clears
+`energy-balance:` from **six** write groups. The entry is correctly evicted; nothing asks the hook to
+go and get a new one. This is the *other half* of the standing cache rule: invalidating a key and
+re-rendering the component that reads it are two different things, and the repo has no
+subscribe-to-invalidation mechanism at all (checked — no cache event, no listener; `TAB_NAV_EVENT`
+exists but is navigation only).
+
+**Why Nutrition looks fine and Home does not.** The Nutrition tab does not use this hook —
+`nutrition-content.tsx` fetches the payload itself and re-fetches on its own date and logging changes,
+then passes it down to `CalorieBalanceBar`. So the same number is live on one surface and frozen on
+the other, which is also why this reads as "the widget" rather than "energy balance".
+
+**What to fix.** Give the hook a reason to re-run, and prefer a mechanism the whole app can use over a
+one-off:
+1. **Preferred — a cache-invalidation signal.** Have `invalidateCache()` emit, and let a small
+   `useCachedValue(key, url, ttl)` hook resubscribe. This is the general fix; **every other
+   seed-and-fetch-once hook in the app has the same latent bug**, and finding them one owner report at
+   a time is the expensive path.
+2. **Minimum viable** — refetch on tab focus / on the shell's navigation event, plus after any local
+   write that queues a `body_metrics` or `food_logs` mutation.
+- **⚠ Do not "fix" this by lowering `ENERGY_BALANCE_TTL`.** A shorter TTL does not help: the effect
+  never runs again, so the TTL is never consulted. It would only add load and hide the real defect.
+- **Verification:** log food from Home without leaving the tab and watch the bar move. Then repeat on
+  the **APK**, since the persistent shell is what makes this reproduce and a browser reload masks it.
+- **Related:** **Q-401** replaces this widget's progress bar with the energy zone bar, which makes the
+  staleness more visible, not less — do this one first or alongside it.
+
 ### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
 
 - **Branch:** `fix/inline-centred-line-budget`
