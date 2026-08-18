@@ -110,11 +110,30 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   })
 
   // Every style must paint. Black band is the default and is checked first because it is also the
-  // one whose code is tightest, so a regression there matters most.
-  for (const style of ['Black band', 'Editorial', 'Deli ticket', 'Plaque']) {
+  // one whose code is tightest, so a regression there matters most. "Square" is Q-393's ingredient
+  // layout, which takes a different draw path entirely — it would be the easiest one to break
+  // silently, since it is the only style that renders from a second data source.
+  for (const style of ['Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Square']) {
     await page.getByRole('radio', { name: new RegExp(style, 'i') }).click()
     await expect
       .poll(inkFraction, { message: `${style} should paint ink onto the canvas`, timeout: 20_000 })
       .toBeGreaterThan(0.01)
   }
+
+  // Q-393. The square style is the only one that prints the ingredient breakdown, and it is the
+  // only one that renders from a second data source — so it is the easiest to break silently. This
+  // asserts the list actually reached the paper: an earlier version checked only that the canvas had
+  // ink and that the square-only warning showed, and BOTH still passed with the ingredient path
+  // switched off, because the style then fell through to the round painter. Mutation-checked.
+  await expect(
+    page.getByText(/Printing 1 ingredient\b/),
+    'the square style must report the ingredients it actually drew',
+  ).toBeVisible({ timeout: 20_000 })
+
+  // The square style spends the corners, so a round die crops the list. The app has to say so
+  // rather than let that happen silently, and this is the assertion that keeps it saying so.
+  await expect(
+    page.getByRole('status').filter({ hasText: /Square dies only/i }),
+    'a square-only layout must warn that a round die crops it',
+  ).toBeVisible()
 })

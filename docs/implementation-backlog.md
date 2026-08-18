@@ -360,6 +360,34 @@ moving *beside* the calories rather than under them.
   straight on **Q-392** (preferences live only on the device). If a label default is written to
   `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
   **Build the default on whatever Q-392 settles**, not beside it.
+- **✅ SHIPPED 2026-08-18 (v1.323.0, Lane B) — option 1, and NOT option 2.** `square` is now a style
+  in the registry: full per-serving ingredient list, code at 70 units, marked **SQUARE** in the
+  picker with a standing warning under the preview that a round die crops the list. The preview also
+  reports how many ingredients actually printed and how many were summarised, so a truncated list
+  cannot ship silently. Guarded by `e2e/meal-label.spec.ts`, mutation-checked — an earlier version of
+  that guard **passed** with the ingredient path switched off (the style fell through to the round
+  painter and still painted ink), which is why the spec now asserts the reported count.
+- **⚠️ CORRECTION, measured — every module-pitch figure in this entry and in Q-389 is ~24% too
+  optimistic.** The renderer draws the 4-module quiet zone **inside** the code box
+  (`cell = codeW / (moduleCount + 8)`), so the pitch actually printed divides by **33**, not 25:
+
+  | style | code | pitch as documented (÷25) | **pitch as drawn (÷33)** |
+  |---|---|---|---|
+  | band (default) | 12.17 mm | 0.487 mm | **0.369 mm** |
+  | editorial | 13.23 mm | 0.529 mm | **0.401 mm** |
+  | ticket | 13.76 mm | 0.550 mm | **0.417 mm** |
+  | plaque | 15.87 mm | 0.635 mm | **0.481 mm** |
+  | **square (new)** | 18.52 mm | 0.741 mm | **0.561 mm** |
+
+  The app was already showing the honest number; only the docs were wrong. This makes the print test
+  **more** important, not less, and it is why `square` was sized at 70 units — its 0.561 mm is the
+  only style above the 0.487 that everything here was assumed to have.
+- **⛔ Option 2 (round, trimmed) is NOT shipped, and needs an owner decision.** At 44 units its true
+  pitch is **0.353 mm** — below every shipped style, not merely below the "0.487 floor" this entry
+  names. It buys three of five ingredient lines at 6.5 px in exchange for the least reliable code in
+  the set. Recommendation: do not build it; the square die is the answer to wanting the list on paper.
+- **Still open:** option 2 above, and **the stored default**, which stays blocked on **Q-392** exactly
+  as this entry says — the style remains picked-at-print-time and nothing was persisted.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
   whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
   without an explicit owner decision recorded here; and if a square-only variant ships, the app makes

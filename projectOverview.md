@@ -111,9 +111,9 @@ order.
 ### [nutrition][app-shell] 🟢 Printable saved-meal labels shipped (Q-389) — TWO owed checks, both physical (2026-08-18, v1.320.0)
 
 - **⚠️ Owed 1 — the print test, and it is a real gate not a formality.** The code is **25×25
-  modules** (a UUID cannot fit 21×21), so on the circle-safe layouts the pitch is **0.49–0.66 mm per
-  module** — band, the default, is the tightest. **Print black band and scan it before relying on
-  this**: if the default scans, the other three do. Ink spread on a home printer merging fine modules
+  modules**. **Re-measured 2026-08-18 and finer than first recorded**: the quiet zone is drawn
+  *inside* the code box, so the printed pitch divides by 33, not 25 — band, the default, is
+  **0.369 mm**, not 0.487. **Print black band and scan it**: if the default scans, every style does. Ink spread on a home printer merging fine modules
   is the expected failure, and it will present as "the scanner doesn't work" rather than as a print
   problem. The preview sheet prints the measured mm-per-module under the label so the number is
   visible rather than assumed.
