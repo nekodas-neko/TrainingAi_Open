@@ -356,7 +356,12 @@ const BASELINE = {
   // deployed, 0 of 96 derived rows carried a readiness model version and a bulk job had bumped
   // updated_at on all of them without rewriting a score. It belongs in the entry because it is what
   // stops the next person auditing the ship by timestamp. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7271,
+  // Raised 2026-08-18 (Tuning): 7271 -> 7323. Q-506 — the illness radar has never produced an
+  // action-bearing flag in 46 days because one of its four biomarkers is scored against a baseline
+  // whose deviation is 18.7x too large. The measured biomarker table and the cold-start numbers are
+  // the entry: without them the next reader lowers the threshold instead of fixing the baseline,
+  // which is the mistake Q-504 already made and reverted. Recomputed from the MERGED file.
+  'docs/implementation-backlog.md': 7323,
   'CLAUDE.md': 1044,
 
 };
