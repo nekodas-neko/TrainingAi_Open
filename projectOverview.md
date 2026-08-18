@@ -69,6 +69,29 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟢 The module map's `path → symbol` claims all hold — 110 of 110, now ratcheted (2026-08-18)
+
+- **A clean sweep, recorded because a null result is easy to under-report.**
+  [`docs/reviews/2026-08-18-module-map-symbol-claims.md`](docs/reviews/2026-08-18-module-map-symbol-claims.md).
+- **Took Q-554's stated limit as the lens.** That check proves a path *resolves*, never that the prose
+  beside it is true. The mechanically checkable part of the prose is the `→ symbolName` claim — the
+  part a reader acts on. **All 110 name a symbol that exists in the file they attribute it to.**
+- **This bounds the Q-554 worry rather than leaving it open.** Row 232 (a map row for a module never
+  built) was **not** the tip of a pattern of sloppy attribution — it was one row, and its path was
+  wrong too, which is why the cheaper check caught it. The map's attribution is in good shape.
+- **⚠️ A correction inside the measurement.** The first probe reported 72 of 110 rows resolvable —
+  implying 38 broken paths, flatly contradicting the check shipped an hour earlier. The **probe** was
+  wrong: it omitted the `lib/…` → `packages/shared/src/…` remap (Q-153). **A new measurement that
+  contradicts an existing green check is a bug in the measurement until proven otherwise.**
+- **Ratcheted:** `scripts/check-module-map-symbols.js`, step **43 of 43**. A presence check, not a
+  resolver — the failure worth catching (a symbol that moved, leaving the map pointing at its old
+  home) shows up as absence. It earns its place at zero violations because *"One Formula, One Place"*
+  names this map as how you find the existing implementation, so a row pointing at the wrong file is
+  how the second copy gets written — **by someone who checked first, as instructed.**
+- **Not exercised:** a row naming a real file and a real function while describing behaviour neither
+  has still passes. That half remains unmeasured.
+
+
 ### [platform] 🟢 The orientation indexes named paths that do not exist, one of them never built (Q-554, 2026-08-18)
 
 - **Filed and fixed in the same PR**, kept as the record of the class.
