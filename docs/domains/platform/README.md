@@ -26,6 +26,13 @@ layer**) through §16. Read it before building any shared helper.
 
 ## Reference docs
 
+- [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md)
+  — **the database reclaim, 2026-08-18.** 819 MB against a 500 MB target with an end-of-week deadline.
+  Everything is built and merged — migration 193's index drop (136 MB, needs no press), the Q-541
+  frame packer (~630 MB) and a `VACUUM FULL` route for `error_events` (49 MB) — but **the last two
+  have never run against production**, because a sandbox session cannot authenticate there. Carries
+  the paste-ready runbook, the three ways to unblock it, and what protects the run.
+
 - [`docs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`](../../handoff-2026-08-17-cross-comprehensive-review-six-rounds.md)
   — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
   the Q-number collision and the conflict-markers-on-`main` incident. **Also records that PR #1401 did

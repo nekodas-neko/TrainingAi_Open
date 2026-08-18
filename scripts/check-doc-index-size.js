@@ -302,6 +302,13 @@ const BASELINE = {
   // hunk spliced. Lane A's own delta was the Q-541 packer status block plus the new Q-316 entry
   // (the packer has no button, because components/** belongs to the other lane, and the entry
   // carries the warning that its confirm copy must not read like the lossless VACUUM beside it).
+  //
+  // Raised 2026-08-18 (Q-315 route, Lane A): 7144 -> 7156. Twelve lines splitting Q-315 into the half
+  // that shipped and the half that has not: the route exists and is verified, and nobody has pressed
+  // it against production. Without that split the entry reads as done and the 49 MB never gets
+  // reclaimed. Carries the one thing an implementer must not get wrong — the allowlist is the safety
+  // boundary because the table name is interpolated, and `in` accepts `toString` where
+  // `hasOwnProperty` does not.
 
 
   //
@@ -328,8 +335,20 @@ const BASELINE = {
   // caveat that keeps the 136 MB honest (measured index size, not a reclaim that has happened). On
   // the backlog, finding 4 is struck in place with the three consequences the entry did not
   // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
+
+  //
+  // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file. Lane A's delta was +12,
+  // splitting Q-315 into the half that shipped and the half that has not: the route exists and is
+  // verified, and nobody has pressed it against production. Without that split the entry reads as
+  // done and the 49 MB never gets reclaimed.
+
   'projectOverview.md': 6910,
-  'docs/implementation-backlog.md': 7277,
+  //
+  // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
+  // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
+  // not: the route exists and is verified, and nobody has pressed it against production. Without
+  // that split the entry reads as done and the 49 MB never gets reclaimed.
+  'docs/implementation-backlog.md': 7289,
   'CLAUDE.md': 1044,
 
 };
