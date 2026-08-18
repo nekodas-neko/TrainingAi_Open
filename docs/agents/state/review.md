@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-two sweeps (2026-08-17 ×2, 2026-08-18 ×30) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **499 — the LAST in band. The sweep after it claims 530–579**, adds that row to the table in `docs/agents/README.md` §Q-numbers, and says so in its PR. That file's own instruction: "claim the next block of 50 above 529". Tuning holds 500–529, so 500–529 is NOT yours.)
+**Updated:** 2026-08-18 · **By:** thirty-three sweeps (2026-08-17 ×2, 2026-08-18 ×31) — **all eleven pillars covered** · **Q band:** 450–499 · **⚠️ BAND EXHAUSTED — Q-499 was the last. Your first act is to claim 530–579**, add that row to the Q-number table in [`docs/agents/README.md`](../README.md) (its own instruction: *"claim the next block of 50 above 529"*), and say so in your first PR. **500–529 is Tuning's — do not take it.**
 
 ## Now
 
-Thirty-two sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-three sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,36 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 33 — three lenses, two clean (2026-08-18)
+
+**Filed Q-499 (low-medium) — the last number in the band.** Write-up:
+[`docs/reviews/2026-08-18-silent-card-failures.md`](../../reviews/2026-08-18-silent-card-failures.md).
+
+**Two lenses came up clean, and they are written up first on purpose.** A lens that confirms is still
+a lens; the cost of not recording it is a successor spending the afternoon again.
+- **Internal error text in responses** — 7 route files return `err.message`; every one is admin- or
+  session-gated, two apparent hits are logs not responses, and `admin/db-query` returning the raw SQL
+  error is **correct by design**.
+- **AI rate-limit coverage** — 7 routes looked unlimited; **all seven make zero LLM calls** and matched
+  on the `ai` path segment alone. Every route that actually calls an LLM has a limit.
+
+**⚠️ Sixth consecutive sweep where the mechanical check over-reported.** This is no longer a caution,
+it is the base rate. Budget for it: **a grep result is a candidate list, and the per-file check is the
+sweep**, not a formality before writing up. Both clean results above came from doing that check.
+
+**Q-499 — and it opens by correcting the rule that names it.** `CLAUDE.md` says `cachedFetch`
+*"swallows `!res.ok`"*. It does not unconditionally — `cachedFetchCore` takes an `onError` callback
+and swallows only when the caller declines it. Coverage problem, not a missing capability. 78
+components call `cachedFetch`, **18** reference `onError`. **Two verified by hand**, both conflating
+failure with emptiness. The sharp edge is diagnosability: `cachedFetch` treats any `!res.ok` alike
+**including a 429 from the app's own limiter**, so "the card is gone" is an unanswerable bug report.
+
+**Scoped at 2 confirmed of 12 candidates, and said so.** The ten unverified are a worklist, not a
+count — the same discipline the two clean lenses above demanded.
+
+**The obvious next step is named and was not taken:** drive a card to a 429/500 in a browser and watch
+it vanish. That would promote the ten candidates to a number. It needs nothing this harness lacks.
 
 ### Sweep 32 — request-body size guards; the guard is right, the coverage is not (2026-08-18)
 

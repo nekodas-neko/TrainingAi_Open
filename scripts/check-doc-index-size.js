@@ -18,6 +18,11 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, silent card failures, Q-499): backlog -> 9762, projectOverview -> 7773.
+// One queue entry and its row. Both keep the 78/18 and 12-candidates/2-confirmed splits, because the
+// honest scope IS the finding here -- a row that said "12 cards vanish" would be a defect count this
+// sweep did not earn, and the next reader would inherit it as fact.
+//
 // Raised 2026-08-18 (Review, unbounded request bodies, Q-498): backlog 9690 -> 9727,
 // projectOverview 7722 -> 7747. One queue entry and its row. Both keep the 113/7/93/3
 // coverage split and the line numbers showing the ingest route parses at 40 and checks the secret
@@ -715,7 +720,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7747,
+  'projectOverview.md': 7773,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -726,7 +731,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9727,
+  'docs/implementation-backlog.md': 9762,
   'CLAUDE.md': 1075,
 
 };

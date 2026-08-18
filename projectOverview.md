@@ -69,6 +69,32 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][health] 🟢 Three lenses — two clean, and cards that cannot tell "no data" from "the fetch failed" (Q-499, 2026-08-18)
+
+- **Two lenses came up clean and are recorded so nobody re-runs them.**
+  [`docs/reviews/2026-08-18-silent-card-failures.md`](docs/reviews/2026-08-18-silent-card-failures.md).
+  **(1) Internal error text in responses** — 7 route files return `err.message`, every one admin- or
+  session-gated, two apparent hits are logs not responses, and `admin/db-query` returning the raw SQL
+  error is **correct by design**. **(2) AI rate-limit coverage** — 7 routes looked unlimited; all seven
+  make **zero LLM calls** and matched on the `ai` path segment alone. **Every route that actually
+  calls an LLM has a rate limit.** Sixth consecutive sweep where the mechanical check over-reported.
+- **🟢 Q-499 — and a correction to the rule that names it.** `CLAUDE.md` says `cachedFetch` *"swallows
+  `!res.ok`"*; it does **not** unconditionally — `cachedFetchCore` takes an `onError` callback and
+  swallows only when the caller declines it. So this is **coverage with an existing mechanism**, not a
+  missing capability, and the rule's wording should say so.
+- **78 components call `cachedFetch`; 18 reference `onError`** (an upper bound — some are unrelated
+  matches). **Two verified by hand**, both conflating failure with emptiness:
+  `health/hr-recovery-profile-card.tsx` (`return null` while `profile` stays null on failure) and
+  `health/strength-progress-card.tsx` (`.catch(() => {})` then `return null`).
+- **Scoped honestly:** 12 candidates from a crude filter, **2 confirmed** — the other ten are a
+  worklist, not a defect count.
+- **Why it matters more than it looks:** `cachedFetch` treats any `!res.ok` alike, **including a 429
+  from the app's own limiter** — a rate-limited user watches health cards vanish rather than seeing
+  "try again in a minute", and the same silence covers a 500.
+- **Not exercised:** the vanish was **not reproduced in a browser**; no card was driven to a 429 or
+  500. No device, no production.
+
+
 ### [platform] 🟡 Three unauthenticated routes buffer an unbounded request body; one parses it before any check (Q-498, 2026-08-18)
 
 - **Lens taken from sweep 31's method note** — *find bounds declared one way and enforced another*.
