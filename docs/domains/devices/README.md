@@ -125,6 +125,8 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (the scale/ring ingest routes reject malformed frames and take no `userId` from the body; two sit behind `requireAdmin`). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
+- [`docs/reviews/2026-08-18-outbox-under-failure.md`](../../reviews/2026-08-18-outbox-under-failure.md) — **the outbox pushed for real, including with the database stopped, 2026-08-18** (Q-475 — a DB outage returns HTTP 200 with per-item errors, so the client resets its 5xx backoff and dead-letters every queued mutation after ~43 minutes of downtime, leaving a per-item-only retry UI; Q-476 — a schema-rejected mutation is deleted with no badge, toast or retry). **The poison-pill rule itself holds** — poison isolated by outbox id, all four siblings written.
+
 - [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
   — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
   at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's

@@ -106,4 +106,17 @@ export const BodyMetadataPostSchema = z.object({
   thighCm:    measurementCm,
   hipCm:      measurementCm,
   neckCm:     measurementCm,
-})
+// Q-464 — `.strict()`, so an unknown key is a 400 instead of being silently dropped.
+//
+// Measured on this exact schema: `{"date":"2026-08-10","weightKg":81}` answered
+// `200 {"success":true,"date":"2026-08-18"}` and wrote the weight on TODAY, because the contract's
+// key is `localDate` and `date` was discarded. `"3026-08-18"` and `"not-a-date"` did the same. The
+// route is correct — it reads `body.localDate` and defaults to today in the user's timezone; what
+// was missing is that `date` is not in the contract and nothing said so.
+//
+// Verified safe before flipping: both POST clients (`metric-log-sheet.tsx`,
+// `log-value-sheet.tsx`) send `{ localDate, <field> }` and nothing else. The one field key they can
+// send that this schema does not name is `waterIntake`, and that write is **already lost today** —
+// water lives on `/api/water-log`, not here. Strict turns that silent loss into a visible failure,
+// which is the point; the client fix is Q-319.
+}).strict()

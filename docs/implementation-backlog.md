@@ -285,6 +285,64 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [platform][devices] Q-475 — a database outage reaches the client as HTTP 200, so the backoff written for it never fires and ~43 minutes of downtime dead-letters the whole outbox
+
+- **Branch:** `fix/sync-push-classify-retryable-errors`
+- **Added:** 2026-08-18 · review sweep (offline-sync failure paths) ·
+  [`docs/reviews/2026-08-18-outbox-under-failure.md`](reviews/2026-08-18-outbox-under-failure.md)
+- **Placement:** high. Measured against a genuinely stopped database, it converts a *transient*
+  server problem into per-user manual repair, and the fix is a classification change rather than a
+  redesign.
+- **Measured.** Local Postgres stopped (`pg_ctl -m fast stop`), then two ordinary valid mutations
+  pushed to `/api/sync/push`:
+  ```
+  HTTP 200
+  {"processed":0,"errors":[{"id":"d1","domain":"body_metrics","date":"2026-08-09",
+    "error":"Error: Failed query: insert into \"body_metrics\" …"}, {"id":"d2", …}]}
+  ```
+  **200, not 500.** `pushMutations` catches per-mutation — which is exactly what makes the poison-pill
+  rule work — so at the wire a dead connection is indistinguishable from a validation rejection.
+- **What the client does with that** (`lib/local-store/sync-engine.ts:798-833`): `res.ok` is true, so
+  `consecutive5xx = 0; push5xxUntil = 0` — the whole-queue backoff is **reset rather than engaged**,
+  and the client keeps pushing at full cadence into a server that cannot write. Every mutation then
+  goes through `recordMutationFailures` → `attempts++` → dead-letters at `MAX_MUTATION_ATTEMPTS = 5`.
+- **The arithmetic.** Per-item backoff is `30_000 * 4 ** (attempts - 1)` — 30 s → 2 m → 8 m → 32 m,
+  fifth attempt dead-letters. **≈ 42.5 minutes of outage dead-letters every queued mutation.** That is
+  an ordinary outage length; this repo has recorded two (the session-165 pool incident and the
+  2026-08-17 `disk_full`).
+- **The client already states the principle it is violating**, three lines below:
+  ```ts
+  // Transport failures (catch/!res.ok above) are
+  // deliberately NOT counted — they say nothing about the mutation itself.
+  ```
+  A dead database says nothing about the mutation either. It is counted only because it does not
+  *look* like a transport failure.
+- **Cost — not data loss, and that matters.** `status='failed'` keeps the row, the More-tab badge
+  reflects it, the four Tier-A domains fire a toast, and `retryFailedMutation` restores it. The cost is
+  that after a ~43-minute outage a user finds **every** pending write dead-lettered, a red badge, a
+  toast claiming a workout failed to sync — and a retry UI that is **per-item only**
+  (`components/more/sync-health-card.tsx:109-123`, no "retry all"), so N stranded mutations mean N
+  taps, each firing its own full `pushMutations`. They are asked to hand-repair a queue that was never
+  broken.
+- **Fix shape — two options, prefer the first:**
+  1. **Classify at the source.** The per-mutation catch already knows a connection error from a
+     validation error and flattens both into `String(err)`. Mark the error retryable (a `retryable`
+     flag or a `code` on the error entry) and have `recordMutationFailures` skip the attempt bump for
+     those — the same treatment transport failures already get by policy.
+  2. **Escalate a whole-batch failure.** If every mutation in a batch failed with the same
+     connection-shaped error, return 500 and let the client's existing 5xx path do the right thing
+     with no client change. Cheaper, but blind to a partial outage.
+  (1) fixes the classification instead of inferring it from a count, and (2) can layer on later.
+- **Same class as Q-548, filed the same day on a different route** — there a DB outage surfaced as
+  `{"error":"Forbidden"}` and burned minutes of a real diagnosis on a credential hunt. Two independent
+  routes now known to misreport a database outage as something else; a third look at how outages
+  surface across `app/api/**` would probably be worth someone's hour, but is not this entry.
+- **Lane split:** the server half is Lane A (`app/api/sync/push`, `lib/data/postgres/adapter.ts`); the
+  client half is Lane A too (`lib/local-store/**`). One lane, one PR.
+- **Not verified on:** Railway (inducing a production DB outage is not on), or the APK. The client half
+  is plain TypeScript in `sync-engine.ts` with no native dependency and the arithmetic above is read
+  straight from it.
+
 ### [workouts][platform] Q-473 — completing one workout twice at once counts it twice: `sessions_in_phase` over-increments, in the function whose comment promises it cannot
 
 - **Branch:** `fix/complete-workout-increment-race`
@@ -728,6 +786,54 @@ moving *beside* the calories rather than under them.
   confirmation under `CLAUDE.md` and a Lane A migration number; it is not obviously worth that on its
   own, and would ride better alongside other schema work.
 - **Lane A owns this** — schema and migrations.
+
+### [platform][devices] Q-476 — the worse sync failure gets the softer handling: a schema-rejected mutation is deleted forever with no badge, no toast and no retry
+
+- **Branch:** `fix/sync-push-drop-reports-error`
+- **Added:** 2026-08-18 · review sweep (offline-sync failure paths) ·
+  [`docs/reviews/2026-08-18-outbox-under-failure.md`](reviews/2026-08-18-outbox-under-failure.md)
+- **Placement:** low-mid. **Not a live outage** — see reachability below. File it as the trap it is.
+- **The asymmetry, which is the finding:**
+
+  | Failure | Caught | Outbox row | User signal | Recoverable |
+  |---|---|---|---|---|
+  | Fails **inside** `pushMutations` (bad value, FK, ownership) | adapter loop | kept, `status='failed'` | badge + toast (Tier-A) | yes, Retry button |
+  | Fails the route's **`MutationSchema`** (unknown domain, malformed date) | route, before the adapter | **deleted** | **none** | **no** |
+
+- **Measured:**
+  ```
+  3 mutations, middle one domain "retired_domain"  →  {"processed": 2, "errors": []}
+  1 mutation, date "06-08-2026"                    →  {"processed": 0, "errors": []}
+  ```
+  An empty `errors` array is how the client is told everything succeeded: `resolveFailedOutboxIds`
+  returns an empty map, `confirmed` takes the whole chunk, `deleteMutations` removes all of it —
+  including the one that was never written.
+- **The route calls this "quarantined". It is not.** Quarantine is what the other path does: hold the
+  row, badge it, let the user retry. This is deletion.
+- **The opposite policy is written in the same request path, for exactly this case, and cannot run.**
+  `adapter.ts:4355-4362`'s `Unsupported domain` branch argues *"…treats it as succeeded and deletes it
+  forever. Report it as a retryable failure instead: the client's existing bounded-retry/dead-letter
+  path (`MAX_MUTATION_ATTEMPTS`) already caps how long it survives"*. It is **unreachable** —
+  `MutationSchema.domain` is `z.enum(SYNCED_MUTATION_DOMAINS)`, so an unknown domain never reaches the
+  adapter. The layer that got the policy right is the one that never runs.
+- **Reachability, stated honestly:**
+  - *Malformed date — latent, not live.* The date argument at **all 36 `queueMutation` call sites** is
+    `todayInTz()`, an `<input type="date">` value, or a stored `YYYY-MM-DD`. Nothing produces a
+    rejected date today. There is no client-side validation behind that — it holds because every
+    author has happened to get it right.
+  - *Unknown domain — needs a domain removed* from `SYNCED_MUTATION_DOMAINS` while devices hold queued
+    rows of it. Tomorrow's problem, and note `SYNCED_MUTATION_DOMAINS` exists because the **inverse**
+    mistake once silently dropped every new-food log on the APK (the D-1 incident its own comment
+    cites).
+- **Why it is worth the entry anyway:** a `workout_log` that dead-letters gets a toast because, in the
+  dead-letter module's own words, *"a lost workout is the app's worst-case data loss"*. The same
+  workout dropped one layer earlier gets nothing at all — no badge, no toast, no row, no way back.
+- **Fix shape:** have the route's drop path return an error entry instead of silence, so the existing
+  dead-letter machinery handles it — row kept, badge shown, `MAX_MUTATION_ATTEMPTS` still capping it,
+  which is the argument the adapter comment already makes. That also makes the unreachable adapter
+  branch redundant rather than merely dead. Cheap companion: validate `domain` and `date` in
+  `queueMutation` at write time, so an unsyncable mutation is refused where the user can still see it.
+- **Lane A owns this** — `app/api/sync/push` and `lib/local-store/**`.
 
 ### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
 
@@ -1993,6 +2099,39 @@ ehr     0     0     0     0   648   208   128   556     0
   **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
   and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
 
+### [body][app-shell] Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
+
+- **Lane B.** `app/session-select/components/log-value-sheet.tsx` only.
+- **Added:** 2026-08-18, found while implementing Q-464 — **this is the live instance of that class**,
+  which Q-464's own entry said it did not have.
+- **Measured live on `pnpm dev`:**
+
+  | Sent to `POST /api/body-metadata` | Response | Row after |
+  |---|---|---|
+  | `{"localDate":"2026-08-18","waterIntake":750}` | `200 {"success":true}` | `water_ml` **still NULL** |
+  | `{"localDate":"2026-08-18","steps":4242}` (control) | `200` | steps written |
+
+- **The mechanism.** `MetaKey` includes `waterIntake`, and the sheet's **web fallback** (the branch
+  taken when the local store is unavailable) does
+  `fetch('/api/body-metadata', … JSON.stringify({ localDate: localDateString(), [widget.key]: numVal }))`.
+  `BodyMetadataPostSchema` names no water field at all — water lives on **`/api/water-log`** — so the
+  key was silently dropped, the route returned success, and the sheet painted an optimistic value
+  that the next fetch reverts.
+- **The device path is FINE and must not be "fixed" with it.** The local-store branch maps
+  `waterIntake → waterMl` and writes + syncs correctly. Only the web fallback is wrong.
+- ⚠️ **Since Q-464 shipped, this now fails LOUDLY** — `BodyMetadataPostSchema` is `.strict()`, so the
+  same call returns `400 {"error":"Unrecognized key: \"waterIntake\""}` and the sheet shows
+  "Failed to save — reverting". That is the intended improvement (a visible failure beats a silent
+  one, and the value was already being lost either way), but it makes this user-visible rather than
+  invisible, which raises its priority.
+- **Fix shape:** in the web fallback, route `waterIntake` to `POST /api/water-log` — the same
+  endpoint `components/profile/water-log-sheet.tsx` already uses — instead of `/api/body-metadata`.
+  Check the water route's payload shape (it takes a delta, not an absolute, per `validWaterMlDeltaOrNull`)
+  before wiring it; a straight rename of the key would be wrong.
+- **Verification:** with the local store unavailable, log a water value from the session-select
+  metric tile and confirm `body_metrics.water_ml` changes. The 400 above is the current behaviour to
+  start from.
+
 ### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
 
 - **Branch:** `fix/strict-request-schemas`
@@ -2023,6 +2162,26 @@ ehr     0     0     0     0   648   208   128   556     0
   strict — use it as the reference.
 - **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
   hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
+- 🚧 **The ratchet and the demonstrated schema SHIPPED 2026-08-18; 89 non-strict remain.**
+  `scripts/check-strict-request-schemas.js` runs in the Custom Rules job (now **39** steps) with a
+  shrink-only per-file baseline: a file not listed must have zero, a listed one may only shrink, and
+  reaching zero requires deleting its row. `BodyMetadataPostSchema` — the one the entry demonstrated
+  — is strict, and all four measured wrong-key writes now 400 instead of landing on today.
+- ⚠️ **Two corrections to this entry, both found while implementing it.**
+  **(a) It IS a live bug.** The entry says "not a live bug — the app's own clients send the right
+  keys". They do not: the Water widget's web fallback posts `waterIntake`, which no schema names, and
+  the value was discarded behind a `200`. Filed as **Q-319** (Lane B) with the measurement.
+  **(b) The `sync/push` caveat is far wider than one route.** The entry singles out `sync/push`, but
+  the same argument applies to **every schema `pushMutations` parses** — `activity-log`,
+  `fitness-test`, `day-checkin`, `oura-summary`, mood, food-item, log-exercise, session-rpe,
+  complete-workout. An outbox payload is written to local SQLite by whatever bundle was current when
+  the user acted and sits there until the device syncs, so tightening any of those can reject a
+  mutation queued by an older bundle and dead-letter real data. Plus `health-connect/ingest`, whose
+  client is the owner's Tasker profile and is not in this repo. Both classes are named with their
+  reasons in the script's header rather than silently skipped.
+- **What is left is the sweep**, deliberately not done here: 89 non-strict schemas, each needing its
+  clients checked the way `BodyMetadataPostSchema`'s two were. The ratchet is the mechanism; the
+  sweep is separate and much larger, exactly as `check-hex-literals` says of its own 471.
 - **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
