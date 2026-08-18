@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, outbox-under-failure sweep, Q-475/Q-476): backlog 8802 -> 8908,
+// projectOverview 7028 -> 7068. Two queue entries and the one Known-Issues row indexing them.
+// Q-475 carries its backoff arithmetic inline (30 s / 2 m / 8 m / 32 m, five attempts, ~42.5 min to
+// dead-letter the queue) because the whole finding is that number: the entry is unreadable as a
+// priority call without it, and re-deriving it means stopping a database. The sweep's prose is in
+// docs/reviews/2026-08-18-outbox-under-failure.md, which this ratchet does not govern.
+
+//
 // Raised 2026-08-18 (Review, write-concurrency sweep, Q-473/Q-474): backlog 8634 -> 8722,
 // projectOverview 6991 -> 7028. Two queue entries and the one Known-Issues row indexing them —
 // entries, per the same split as every raise above. Q-473's entry carries its four-trial
@@ -535,8 +543,8 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7028,
-  'docs/implementation-backlog.md': 8802,
+  'projectOverview.md': 7068,
+  'docs/implementation-backlog.md': 8908,
   'CLAUDE.md': 1075,
 
 };
