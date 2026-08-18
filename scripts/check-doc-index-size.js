@@ -485,7 +485,11 @@ const BASELINE = {
   // Raised 2026-08-18 (Tuning): -> 8592. Q-515 — first calibration of the heart-rate pillar. The tables
   // are the entry: the July/August collapse and the fraction sweep together show that tuning the
   // constant cannot fix it, which is the opposite of what the entry title suggests on its own.
-  'docs/implementation-backlog.md': 8722,
+  // Raised 2026-08-18 (Tuning): -> 8775, recomputed from the MERGED file. Q-517 — adaptive-TDEE can hand
+  // the user a maintenance below their own BMR. The replay table is the entry: 75% of windows are
+  // correctly refused, which is why the obvious response (tighten the coverage gates) is wrong, and
+  // the 1,052-vs-1,000 near-miss is only legible with the numbers beside it.
+  'docs/implementation-backlog.md': 8775,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
