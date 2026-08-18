@@ -804,14 +804,29 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }
   }
 
-  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<void> {
-    await this.db.update(s.workoutSessions)
+  /**
+   * Q-473 — returns whether this call is the one that stamped `completed_at`.
+   *
+   * The `isNull(completedAt)` guard already made exactly one concurrent request the winner; the
+   * affected-row count that says *which* one was thrown away. `completeWorkoutFromPayload` was
+   * therefore deciding idempotence from a read taken before the write, so four simultaneous
+   * completions of one session each believed they were first and `sessions_in_phase` advanced up
+   * to three times off a single workout.
+   *
+   * Note this is the opposite reading of zero rows from `setSessionRpe` above: there it means "no
+   * such session for this user" and is an error; here the guard makes it mean "someone else got
+   * there first", which is the normal idempotent path.
+   */
+  async completeWorkoutSession(workoutSessionId: string, userId: string, completedAt: Date): Promise<boolean> {
+    const rows = await this.db.update(s.workoutSessions)
       .set({ completedAt })
       .where(and(
         eq(s.workoutSessions.id, workoutSessionId),
         eq(s.workoutSessions.userId, userId),
         isNull(s.workoutSessions.completedAt),
       ))
+      .returning({ id: s.workoutSessions.id })
+    return rows.length > 0
   }
 
   /**
