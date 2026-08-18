@@ -213,7 +213,12 @@ const BASELINE = {
   // Raised 2026-08-18 (Tuning, Q-504): 6947 -> 6979. One queue entry for the Readiness range
   // recalibration, carrying the measured before/after table for the five action thresholds that ride
   // on the readiness scale — the reason the item is held rather than shipped.
-  'docs/implementation-backlog.md': 6979,
+  // Raised 2026-08-18 (Tuning, Q-505): 6979 -> 7015. One queue entry for the Activity Score decision,
+  // carrying the measured cause (60% of live weight on near-constant 7-day terms, two same-day
+  // contributors almost never present) and the two coherent answers — because the item is blocked on
+  // the owner choosing between them, and an implementer must not have to open the review to find that
+  // out.
+  'docs/implementation-backlog.md': 7015,
   'CLAUDE.md': 1010,
 };
 

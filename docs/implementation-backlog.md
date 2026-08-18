@@ -2567,6 +2567,42 @@ session working from a temporarily restored copy.
   is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
 
+### [activity] ⛔ Q-505 — Activity Score is scoring your last week, not your day — decide which it should be
+
+- **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
+- **⛔ blocked: owner decision.** Not sign-off on a number — a decision about what the score means.
+  Both answers below are coherent and they are different products.
+- **Added:** 2026-08-18 · Tuning ·
+  [`docs/reviews/2026-08-18-activity-score-calibration.md`](reviews/2026-08-18-activity-score-calibration.md)
+- **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
+  same-day steps **r = +0.417** — and **2026-08-12 scored 76 on 828 steps while 2026-08-16 scored 64
+  on 8,935**. Steps span 29x across the window; the score moves 25 points.
+- **Why (three measured causes):**
+  1. `strengthFreq` (25) + `strengthVolume` (20) are **45 of 100** and both roll over 7 days. The
+     owner has logged **exactly one session/day for 27 consecutive days**, so `strengthFreq` is
+     near-constant by construction.
+  2. `activeCalories` is non-null on **1 of 47 days** and zone-2+ minutes are **0 on 22 of 27**. Both
+     get excluded and the weights renormalise, leaving roughly **steps 24% · moveHours 16% ·
+     strengthFreq 33% · strengthVolume 27%** — 60% on the near-constant terms.
+  3. `adjustment` is **0 on all 22 days**: `ACWR_TAPER_START = 1.5` has never been reached, so the
+     only place ACWR enters this score is inert.
+- **A range calibration is NOT the fix here, unlike Sleep (Q-503).** Stretching preserves ranking, so
+  it would make the "828 steps beat 8,935 steps" ordering *more* emphatic. Do not copy the Sleep
+  technique onto this pillar.
+- **The decision:** (a) it should score **today** — re-weight toward steps/moveHours/zoneMinutes and
+  demote the rolling strength terms; a rest day then reads low, which is honest, at the cost of
+  volatility. Or (b) it should score **recent training** — keep the weights, accept that flatness is
+  the correct output for a consistent trainer, and fix the *daily* framing presentationally.
+  **Tuning recommends (a)**; the card sits on a daily surface beside Sleep and Readiness, and there is
+  real 29x step variation being averaged away.
+- **If (a):** re-weight first, then measure the new distribution, then apply a range calibration only
+  if still compressed — and re-anchor any threshold on the activity scale in the same PR (Q-503's §5
+  is the worked example).
+- **Related, not fixed by this:** Q-278 (the score is absent on more than half of days and the UI does
+  not distinguish that from a real score) and Q-277 (the original discrimination finding). Also worth
+  doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
+  `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
+
 ### [readiness][workouts] Q-504 — recalibrate the Readiness range, and re-anchor the five thresholds that ride on it
 
 - **Branch:** `fix/readiness-range-calibration` · **Lane:** A
