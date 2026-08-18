@@ -772,7 +772,13 @@ const BASELINE = {
   // Ratchets DOWN 2026-08-18 (Lane B, Q-478 shipped). The entry was removed and
   // Q-477's pointer to it rewritten. Shrink-only means locking the lower number in, so the space
   // an implemented item vacates cannot quietly refill.
-  'docs/implementation-backlog.md': 9907,
+  // Raised 2026-08-18 (Q-401 — BugFix intake). Recomputed from the MERGED file after taking
+  // main's side; this branch absorbed several same-day raises from other lanes and splicing the
+  // hunks is how one side's raise silently disappears. The Nutrition tab shows two calorie
+  // budgets 274 apart, and the entry proves they are two TDEE models rather than staleness:
+  // BMR x (1.375 - 1.2) = 266 kcal. It also records the owner's decision to adopt one number
+  // that rises with measured activity, and why the wizard's multiplier is the real change.
+  'docs/implementation-backlog.md': 10008,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
