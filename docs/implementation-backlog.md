@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **191** | `lib/data/postgres/migrations/` (head: `190_q536_relabel_raw_sample_epochs.sql`) |
+| Next free Postgres migration | **193** | `lib/data/postgres/migrations/` (head: `192_claude_ro_views_oura_raw_packed.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -570,6 +570,16 @@ below threshold and left in place for next time.
   time from the anchor — so a clock correction re-stamps nothing at all.
 - **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
   the standalone `text` → `bytea` migration rather than doing the work twice.
+- 🚧 **Tasks 0–2 SHIPPED 2026-08-17 (v1.318.11), additively.** Task 0 answered structurally rather
+  than by counting — `epoch` is **not** in the dedup unique constraint, so a cross-epoch duplicate
+  was never insertable, and the count the plan proposed now returns "none" for the wrong reason
+  because migration 190 merged the epochs. Migration **191** creates `oura_raw_packed`; **192**
+  regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
+  with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
+  row has moved** — `oura_raw_samples` and the ingest path are untouched.
+  **Remaining: Tasks 3–7** — the two-tier reader, the packer, the backfill, the hot-window prune, and
+  the `measured_at` range-query sweep. The packer's delete is the only destructive step in the plan
+  and is gated on a proven-equal re-read (§6); it has not been written.
 - ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
   plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
   and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
@@ -884,6 +894,8 @@ too, so the Balance card's "burned" figure is dragged down in step.
 ### [nutrition][app-shell] Q-389 — printable food labels for saved meals, scannable back into the app
 
 - **Branch:** `feat/saved-meal-printable-label`
+- **Plan:** [`docs/superpowers/plans/2026-08-17-saved-meal-printable-label.md`](superpowers/plans/2026-08-17-saved-meal-printable-label.md)
+  (2026-08-17, Lane B) — build order, tests, and the corrections folded into this entry below.
 - **Added:** 2026-08-17 · owner: *"for saved meals; I wanna be able to click the meal and have an
   image generated that shows the meal name + servings + macros so I can print onto a food label will
   probably need some mockups. but this way I cam create a saved meal; print the label put it on the
@@ -950,31 +962,71 @@ which also makes it testable and works offline.
     it uses — the candidates are Google Fonts (Geist, Archivo, Instrument Serif) and none can be
     assumed present wherever the PNG/PDF is generated. A silently-substituted fallback changes the
     metrics and the layout is tight enough that it will reflow.
-  - **The made-on date is a blank ruled line the owner writes on**, not a rendered date. This
-    removes a whole question: the label no longer has to know when it was printed.
+  - **The made-on date is a bare ruled line the owner writes on** — a rule and nothing else, with
+    **no "MADE" label beside it** (owner, 2026-08-17; deli ticket already did it this way and the
+    other styles now match). Not a rendered date, which removes a whole question: the label never
+    has to know when it was printed. Plaque carries no line at all, which is what buys it the
+    largest code.
   - **No per-serving line** — the owner removed it (2026-08-17). The label shows calories and macros
     as bare figures.
     **⚠ This un-resolves the per-serving-vs-batch ambiguity flagged above, by choice.** On a recipe
     that makes two, a person reading the label cannot tell whether 312 kcal is one serving or the
     tub. That is acceptable *only* if the app settles it instead: **scanning the code must log a
-    defined amount (one serving), never infer one.** Settle this when the scan-back is built — the
-    label can no longer carry the answer.
-- **Mockups exist** — four centred, circle-safe 50 × 50 mm treatments at true scale (editorial ·
-  black band · deli ticket · plaque), each annotated with its tradeoff and its code's physical size.
-  They live in a design canvas, **not in this repo**; ask the owner for the link, or redraw from this
-  spec, which carries everything they encode. No aesthetic has been picked yet.
+    defined amount (one serving), never infer one.**
+    **✅ Already satisfied — traced 2026-08-17:** `logMealItems` iterates `oneServingItems`, which
+    divides by `servings`, on both its local and web branches. The scan branch just calls it.
+    **⚠ But that exposes the live bug this feature can ship: `SavedMeal.totals` is the WHOLE
+    recipe.** A renderer reading `totals` prints 624 kcal on a tub whose QR logs 312 — the two halves
+    disagreeing silently on real food, with the per-serving line now removed. **Render
+    `totals / servings`**, and assert both halves against each other in one test.
+- **✅ ALL FOUR STYLES SHIP, and the user cycles between them** (owner, 2026-08-17). This is a
+  different build from "pick one aesthetic", and it is cheap designed-in / expensive retrofitted:
+  **the renderer takes a style name and looks up a template**, rather than one layout with the style
+  baked in. Build it that way from the first commit. The four are *black band* (Archivo, reversed
+  header — **the owner's chosen DEFAULT**, 2026-08-17), *editorial* (Geist, quietest), *deli ticket*
+  (mono, dashed rules) and *plaque* (Instrument Serif, double ring).
+  - **Where the style choice lives is undecided, and one option costs a migration.** Per saved meal
+    is the nicest and needs a new `saved_meals` column — **that is Lane A's to claim, not intake's**.
+    A global user setting avoids the schema change. Picked-at-print-time and not stored is cheapest
+    of all. Decide before building; the renderer's shape is the same either way.
+  - **Four styles currently need four font families** — Geist, Geist Mono, Archivo, Instrument Serif
+    — and every one must be embedded (see the typeface rule above). Worth consolidating, but not for
+    free: dropping Archivo or Instrument Serif changes what the band and plaque styles *are*.
+  - **The smallest style sets the standard for the whole set**, and black band is now both the
+    default and the smallest at 12.2 mm. A style whose code will not scan is not a style choice, it
+    is a broken label, so **test-print black band first** — if it scans, the others do. ⚠ Read the
+    module-pitch correction below before trusting that: at 25×25 the pitch is finer than the figures
+    the mockups were drawn to, and 12.2 mm may not survive it.
+- **Mockups exist** — the four circle-safe 50 × 50 mm treatments at true scale, each annotated with
+  its tradeoff and its code's physical size, plus a working style-cycler that mounts the same four
+  files so the demo cannot drift from the designs. They live in a design canvas, **not in this
+  repo**; ask the owner for the link, or redraw from this spec, which carries everything they encode.
+  **Default is black band** (owner, 2026-08-17). **Redrawn 2026-08-18 with the correct 25×25 code**,
+  so the drawings now match the version the payload actually needs.
+- **⚠ The measured pitch at 25×25, and the fact there is no room to recover it.** Same physical
+  squares, four more modules across: **band 0.487 mm** (the default, and the tightest), editorial
+  0.529, ticket 0.550, plaque 0.635. **The code cannot simply be grown** — the content already fills
+  the circle-safe box, and a taller stack pushes the top and bottom rows into the narrowing part of
+  the circle, where the meal name is the first thing to stop fitting. So the code only grows if
+  something goes. The cheapest version of that is drawn as variant **2b — black band with the
+  write-on rule dropped**: 16.4 mm and **0.656 mm** per module, better than every original style bar
+  plaque, at the cost of the handwritten date. **Test-print black band before the layout is frozen;
+  2b is the fix that keeps the style if it fails.**
 - **⚠ Going circular shrank the code, and this is the live risk.** Square-with-macros allowed
-  ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**, i.e. 0.58–0.76 mm per module on a
-  21-module code. A modern phone reads that at close range, but the margin is thin and **ink spread
+  ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**. **⚠ Corrected 2026-08-17: that is
+  0.49–0.64 mm per module, not 0.58–0.76 — a 21×21 code cannot hold a meal id at all** (v1 holds 17
+  bytes; a UUID needs v2, **25×25**), so encode base64url of the 16 raw bytes (22 chars) with **no
+  prefix or URL**, which is the only form that fits v2 at EC **M**.
+  A modern phone reads that at close range, but the margin is thinner than this entry assumed and **ink spread
   on a home printer merges small modules** — that is the failure mode to expect, and it will look
   like "the scanner doesn't work" rather than like a print problem. Levers, cheapest first: drop the
-  MADE line (worth ~3.7 mm), then drop macros. **Test-print and scan before the layout is frozen.**
+  write-on rule (worth ~3.7 mm — plaque already does, and is the largest code), then drop macros. **Test-print and scan before the layout is frozen.**
 - **One constraint the mockups surface that the spec must not lose:** a QR needs a **quiet zone** —
   clear white margin on all four sides — and the code's physical size sets how much data it can
-  carry legibly. At 50 mm the four layouts give codes of ~16–28 mm, all fine for a 21×21-module
-  code holding just a meal id. **Settle the payload before fixing the size**: a longer payload
-  raises the module count, the same square gets finer, and a 16 mm code starts to struggle. Encode
-  the id alone if at all possible.
+  carry legibly. At 50 mm the circle-safe layouts give codes of 12.2–15.9 mm. **Settle the payload before
+  fixing the size**: a longer payload raises the module count, the same square gets finer, and a
+  16 mm code starts to struggle. **Encode the id alone — this is now a requirement, not a
+  preference** (see the corrected module maths above: the id alone already needs 25×25).
 - **What would count as done:** from a saved meal, produce a 50 × 50 mm printable label carrying the
   meal name, calories per serving with the serving count, a scannable code and a blank made-on line;
   scanning that code in the existing nutrition scanner resolves to that saved meal and logs one
@@ -5338,6 +5390,26 @@ aimed somewhere other than the owner's complaint, and the roadmap says so in its
 **Explicitly not in scope:** Compose, Phase 3, and any architecture change. If 1–3 close the gap,
 that is a result worth having *before* committing to Stage 5/6, and it is exactly the measurement
 the goal layout's §7 off-ramp says is missing.
+
+- **⚠️ Task 3 does NOT close this entry, and it reads as if it does. Re-checked 2026-08-17 (Lane B).**
+  Task 3 measured **home cold start** — FCP 472 ms, of which 439 ms is the document round trip and
+  ~15 ms is JavaScript. That is a sound result *about home*. The callout at the top of this entry is
+  about a **different screen and a different number**: first mount of `/workout`, measured warm at
+  **1086 ms and 1348.7 ms with `rscCount: 0`**, i.e. entirely client-side. Nothing has measured that
+  one. "There is no JavaScript problem to solve on this screen" is true of the screen Task 3 looked
+  at and unproven of the screen the callout implicates.
+- **The file sizes are still the premise, and they have grown**, re-measured 2026-08-17 on `main`:
+  `components/workout-screen.tsx` **1,831** (entry says 1,815) and
+  `app/session-select/session-select-content.tsx` **1,457** (entry says 1,453/1,414/1,417 in three
+  places). Both remain the two largest `.tsx` in the app; the next three are `config-screen.tsx`
+  (997), `config/program-editor-sheet.tsx` (963) and `health/health-content.tsx` (911).
+- **What is actually left here is a large refactor with a contested justification, and it should be
+  scoped before it is started.** Splitting the workout orchestrator touches the app's core flow, has
+  **no automated component-test route** (both vitest projects are node-only) and is **device-only to
+  verify**. Task 1 already found that extraction moves *zero* bytes (a static child shares its
+  parent's chunk), so the readability case is the honest one and the perf case needs the /workout
+  first-mount measurement above before anyone commits. **Do the measurement first** — the same
+  mistake this entry made once already is assuming which cost is where.
 
 ### [platform] Q-311 — the E2E CI job puts a credential-shaped literal in a file that is about to be public (Q-49 blocker-adjacent)
 

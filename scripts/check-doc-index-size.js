@@ -118,6 +118,10 @@ const root = path.join(__dirname, '..');
 // lines of questions with the answers plus the QR quiet-zone/payload constraint the mockups
 // surfaced. Amended in place rather than filed as a second entry, per this role's dedup rule.
 //
+// Raised 2026-08-17 (Lane A, Q-541 tasks 0-2): backlog 6721 -> 6731. A status block on the Q-541
+// entry saying which tasks shipped and which remain, and that nothing reads the new table yet. The
+// item stays in the queue, so this is queue state rather than narrative — and the distinction it
+// carries is the one an implementer most needs: the destructive step has not been written.
 // Raised 2026-08-17 (BugFix intake, Q-389 round-label revision): backlog 6721 -> 6735. The owner
 // added that labels rotate between square and CIRCULAR dies, which changes the binding constraint
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
@@ -127,6 +131,16 @@ const root = path.join(__dirname, '..');
 // "blocked on the owner" to the settled decision, plus the two operational notes that stop the next
 // session misreading it — a stale container reading the variable as absent, and the fact that
 // nothing can verify either copy until the route exists.
+//
+// Raised 2026-08-18 (BugFix intake, Q-389 multi-style + 25x25 redraw): all four label styles ship
+// with the user cycling between them, black band as the owner's default, the write-on line loses its
+// MADE word, and the mockups are redrawn with the 25x25 code a meal id actually needs. The build
+// consequence is the part worth carrying: the renderer becomes template-lookup rather than one
+// baked-in layout. Also records the measured pitch at 25x25 (band, the default, is tightest at
+// 0.487mm) and that it cannot be recovered without dropping content — with the drawn variant that
+// shows the cheapest way to. Merged with a concurrent session's work on the same entry rather than
+// over it, and rebuilt from origin/main's numbers: this file conflicted four times in one evening,
+// and splicing is how one side gets silently dropped.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -162,16 +176,44 @@ const BASELINE = {
   // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
-  // Raised 2026-08-18 (Tuning, Q-503): 6689 -> 6705. One Known-Issues row for the shipped Sleep
-  // Score recalibration — marked ⚠️ rather than ✅ because two things are still owed (an unmarked
-  // step in the trend chart, and no device verification), and naming what is owed is the whole job
-  // of that section.
+  // Raised 2026-08-17 (Q-389 planning, Lane B): backlog 6781 -> 6791. Recomputed from the merged
+  // file — this collided with a concurrent raise to 6781, exactly the same-day collision this file
+  // keeps warning about, and splicing would have silently un-done that side. Three corrections folded into
+  // the existing Q-389 entry rather than filed separately, per the "a wrong correction is more
+  // expensive than a long one" precedent above: its QR module maths was ~16% optimistic (a 21x21
+  // code cannot hold a UUID at all — v1 holds 17 bytes, so the floor is v2 25x25 and the pitch is
+  // 0.49-0.64mm, on a margin the entry already calls thin); its per-serving worry is already
+  // satisfied by oneServingItems; and that in turn exposes the real bug, that SavedMeal.totals is
+  // the whole recipe, so a naive renderer prints double what scanning the label logs. Each is
+  // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
+  // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
+  // Raised 2026-08-18 (Tuning, Q-503 Sleep Score recalibration): 6689 -> 6704. One Known-Issues row
+  // for the shipped recalibration, marked ⚠️ not ✅ because two things are still owed — an unmarked
+  // step in the trend chart where old and new model scores meet, and no device verification. Naming
+  // what is still owed is the whole job of that section.
+  //
+  // Recomputed from the MERGED file, not spliced from the conflict hunks: this raise collided with a
+  // same-day raise from another lane, which is the exact case the note further down warns silently
+  // drops one side.
   'projectOverview.md': 6705,
-  // Raised 2026-08-18 (Tuning, Q-504): 6781 -> 6813. One queue entry for the Readiness range
-  // recalibration. It is longer than a pointer because it carries the measured before/after table for
-  // the five action thresholds that ride on the readiness scale — the reason the item is held rather
-  // than shipped, and the thing an implementer must not have to rediscover.
-  'docs/implementation-backlog.md': 6813,
+  //
+  // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
+  // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
+  // landed the same day and each pass would have silently un-done the other side.
+  //
+  // Raised 2026-08-17 (Q-51 re-verification, Lane B): backlog 6833 -> 6853. A correction to an
+  // existing entry whose Task 3 reads as closing it and does not: Task 3 measured HOME cold start
+  // (FCP 472ms, 439 of it the document fetch), while the entry's own callout is about first mount of
+  // /WORKOUT (1086-1348ms, rscCount 0, entirely client-side). Different screen, different number,
+  // still unmeasured. Also re-measures the two file sizes the premise rests on — both have grown
+  // since the entry was written, and the entry states one of them three different ways. Left in the
+  // entry rather than a review doc because the next session to take this item reads the entry, sees
+  // a green Task 3, and would close it. Recomputed from the merged file, same as the raise above.
+  // Raised 2026-08-18 (Tuning, Q-504): 6853 -> 6884. One queue entry for the Readiness range
+  // recalibration, longer than a pointer because it carries the measured before/after table for the
+  // five action thresholds riding on the readiness scale — the reason the item is held rather than
+  // shipped, which an implementer must not have to rediscover. Recomputed from the merged file.
+  'docs/implementation-backlog.md': 6885,
   'CLAUDE.md': 1010,
 
 };

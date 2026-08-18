@@ -159,18 +159,36 @@ re-read of the same frames. That is what keeps the archival guarantee intact.
 
 ## 7. Tasks
 
-**Task 0 — investigate the epoch/dedup question (§3 note).** Determine whether any two rows share
-`(user_id, ring_timestamp_ds, tag, body_hex)` across different epochs. If the answer is "none", record
-it and move on; if not, that is a separate finding and gets its own entry rather than being folded in
-here. **Do this first — it is cheap and it could change the bucket key.**
+**Task 0 — ✅ ANSWERED 2026-08-17, and the proposed method is now the wrong one.** The question was
+whether any two rows share `(user_id, ring_timestamp_ds, tag, body_hex)` across different epochs.
+They cannot: **that tuple *is* the unique constraint**, and it does not include `epoch` —
+`oura_raw_samples_user_id_ring_timestamp_ds_tag_body_hex_key`, confirmed against production and
+against `schema.ts:1064`. A second such row was never insertable, so this is structural rather than
+a property of the current data. The bucket key keeps `epoch`, which is there for time-derivation
+correctness and not for dedup.
 
-**Task 1 — migration: `oura_raw_packed`.** Table + PK per §5. Lane A owns the number; the pointer says
-**189** but re-check it at implementation time. No change to `oura_raw_samples`.
+⚠️ **Do not answer this by counting, which is what this task originally proposed.** Migration 190
+(Q-536) collapsed every one of the owner's samples to `epoch = 0`, so a cross-epoch duplicate count
+now returns "none" **for the wrong reason** — there is only one epoch left to be cross. The count
+would look like confirmation and would be evidence of nothing.
 
-**Task 2 — the codec** (`lib/oura-ble/frame-pack.ts`): `pack(frames) → bytea` and
-`unpack(blob) → frames`, pure and dependency-free. **Property-test it** — round-trip an arbitrary frame
-list and assert equality, including empty bodies, maximum-length bodies (1,024 bytes, the Zod ceiling),
-and large ds gaps. Pin at least one vector from real production hex.
+**Task 1 — ✅ SHIPPED as migration `191_oura_raw_packed.sql`.** Table + PK per §5, plus a
+`(user_id, ds_bucket)` index for the range-across-tags read shape the PK cannot serve (it puts `tag`
+ahead of `ds_bucket`). Additive only — `oura_raw_samples` and the ingest path are untouched.
+**Migration `192` regenerates the `claude_ro` views**, which a new table requires: the schema is
+default-deny, and `claude-ro-readonly-role.test.ts` failed on the coverage count until it landed
+(81 views against 82 tables). Its filename pin was re-pointed in the same commit, per `CLAUDE.md`.
+
+**Task 2 — ✅ SHIPPED** as `lib/oura-ble/frame-pack.ts`, pure and dependency-free. 7 codec tests
+(200 seeded round-trips, the edges, an unsorted input, malformed-blob rejection, the hex helpers) and
+2 DB-backed tests proving a blob survives the `bytea` column and the pg driver byte for byte — the
+join where a byte format usually breaks. Pinned vector: the owner's five oldest tag-0x76 frames.
+Measured on it, **63 bytes packed against ~1,640 as rows** — the 26× the plan projected.
+
+Two things learned while writing it, both now in the code: `packFrames` **sorts** rather than
+trusting the caller, because an unsorted list would otherwise encode a negative delta and unpack to
+different data instead of failing; and a **zero delta is legal** — two frames may share a `ds`, since
+the dedup key includes `body_hex`.
 
 **Task 3 — the two-tier reader.** Every read in §8 becomes "cold blobs ∪ hot rows for this ds range".
 The read shapes are already uniform — nearly all of them are
