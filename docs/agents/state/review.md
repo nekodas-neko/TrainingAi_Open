@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** eighteen sweeps (2026-08-17 ×2, 2026-08-18 ×16) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **486**)
+**Updated:** 2026-08-18 · **By:** nineteen sweeps (2026-08-17 ×2, 2026-08-18 ×17) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **487**)
 
 ## Now
 
-Eighteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Nineteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,31 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 19 — the last line of defence for a workout, failing silently (2026-08-18)
+
+**Followed sweep 18's named pattern to its worst case: a write that fails and reports success.**
+Write-up: [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](../../reviews/2026-08-18-tier-a-enqueue-silence.md).
+
+**Filed Q-486 (mid).** Four `queueMutation` calls swallow — `workout-screen.tsx:1320,1324`
+(`workout_log`) and `:1527,1532` (`complete_workout`) — and they are the **only four in the app**, all
+**Tier-A**. `queueMutation` is a bare `runSQL` INSERT, so it throws whenever the local DB is dead,
+which `CLAUDE.md` records happening **twice** on Android. To lose a set, the POST must fail (offline)
+*and* the store be broken; then nothing is sent, queued, logged, or recoverable — and the haptic has
+already fired.
+
+**I nearly mis-sized this.** The surrounding design is good: local write first (its failure *is*
+logged), a direct POST as primary explicitly *"independent of the outbox … (which can fail
+silently)"*, outbox as fallback. **26 of ~30** other `queueMutation` sites correctly `await`. Read the
+layering before judging the hole — the entry leads with that.
+
+**Three "do not"s in the entry:** do not undo the layering, do not convert the four to `await` (they
+are fire-and-forget so the UI stays instant), do not treat it as reproduced.
+
+**⚠️ Cannot be reproduced in this harness at all** — `getLocalStore` returns null on web, so
+`store_?.` short-circuits and the code path never runs. This is the first finding of the run that is
+**source-read only**, and it is labelled as such everywhere it appears. On-device is the only real
+verification.
 
 ### Sweep 18 — an implausible value down both write paths (2026-08-18)
 
