@@ -867,6 +867,35 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [activity][platform] Q-556 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
+
+- **Branch:** `fix/activity-log-delete-affected-rows`
+- **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
+  [`docs/reviews/2026-08-18-cross-user-isolation.md`](reviews/2026-08-18-cross-user-isolation.md)
+- **Placement:** low. **Not a leak — verified, not assumed.** As user B, deleting user A's activity
+  log returns `200 {"success":true}`; the database immediately after shows the row **intact**,
+  `deleted_at` NULL, still owned by A, A's count unchanged. The scoping is deliberate and already
+  tested (`repository-ownership-scoping.test.ts:326`).
+- **The route cannot report what happened.** `deleteActivityLog(userId, id): Promise<void>` returns
+  nothing, so the handler `await`s it and answers `{ success: true }` unconditionally.
+- **Why file it anyway:**
+  1. **Inconsistent with every sibling.** The house posture — verified by an enumeration control in
+     the same run — is **404 for both a nonexistent id and someone else's**. This route is **200 for
+     both**. Both are safe against enumeration, but they cannot both be the convention.
+  2. **Offline-first makes a false success expensive.** A queued mutation receiving a 2xx is confirmed
+     and dropped from the outbox, so a delete that matched zero rows *for a different reason* (sync
+     ordering; row not yet on the server) is indistinguishable and gets confirmed away.
+     **⚠️ That path was NOT demonstrated** — it is why the response matters, not an observed bug.
+  3. Same family as the existing rule *"after a user-scoped UPDATE whose row id came from the client,
+     check the affected-row count"*, applied to a DELETE.
+- **Fix:** return the affected-row count from `deleteActivityLog`; answer 404 when zero, matching siblings.
+- **✅ Everything else held.** 10 of 11 probes rejected by the route's own ownership check — A's recap/
+  energy/timing, deleting A's workout, logging a set **into A's session**, completing A's workout.
+  **The enumeration control passed:** nonexistent and A's ids return byte-identical responses.
+- **Not exercised:** `PATCH /api/activity-logs/<id>/metrics` returned `400 Invalid body` (my payload was
+  wrong), so that route's ownership check is **still unverified**. Local DB + web build; not production,
+  not on device; two accounts only — says nothing about admin-vs-user boundaries.
+
 ### [app-shell][platform] Q-555 — offline, a tab tap is a silent no-op until the service worker claims the page
 
 - **Branch:** `fix/offline-first-load-navigation`
