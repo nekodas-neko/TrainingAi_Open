@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **545** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **548** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -284,6 +284,75 @@ below threshold and left in place for next time.
 > whole fix/revert/restore cycle was re-run against the final code.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
+
+### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
+- **Branch:** `feat/device-rollup-port`
+- **Added:** 2026-08-18. **Owner-directed: "do the D-track first, that should have a lot of focus."**
+- **Lane A.** `lib/oura-ble/**`, `lib/data/**`, `lib/local-store/**`. JS/server + client; no Kotlin.
+- **The gap, in the owner's words:** *"I assumed all the ring data would go directly to the phone and
+  once it's aggregated and calculated it sends to DB."* That is the D-track north star verbatim. Today
+  it is inverted — the phone ships raw frames up and **Railway** decodes them and runs SleepNet.
+- **Why it is a port, not a rewrite — measured 2026-08-18:** `aggregateOuraRawSamples` is
+  `adapter.ts:4958-6067`, **1,110 lines, of which only 17 touch `this.db`/`.select(`/an `oura.*` slice
+  helper.** The rest is computation over already-shared helpers (`sleepNet`, `computeDailySummaries`,
+  `computeSleepScore`, `computeResilienceForDay`, `computeStepsByDay`, `resolveDsToMs`,
+  `decodeEventBody`). Extract it behind a small `RollupIO` port with two implementations — Postgres and
+  local SQLite. **Do not hand-write a second device rollup**; that is the duplicate-implementation bug
+  `CLAUDE.md`'s One Formula, One Place rule exists to prevent.
+- **Half the device side already exists and is inert.** D2 Task 1 shipped
+  `upsertOuraDailySummary`/`upsertOuraBucket`/`upsertOuraHeartrate` to `LocalStore`; Tasks 2-3 shipped
+  the native store and the `getUnrolledRaw`/`markRolledUp` bridge, **device-verified**. A repo-wide grep
+  finds **no caller** for either bridge method. The device drains and stores correctly, then nothing
+  consumes it.
+- **It closes Q-538 as a side effect.** Measured on device 2026-08-18: 209,326 rows, **0 rolled up**,
+  31.2 MB. `pruneRaw` needs `rolled_up = 1`, and `markRolledUp` is what this task finally calls.
+- **Safety, non-negotiable:** never `markRolledUp` before the derived forms are durably written locally.
+  Marking a frame consumed while its output is unstored frees the pruner to delete raw that produced
+  nothing. And **do not touch the ingest writer or the history cursor** — device-verified, and a botched
+  change there loses drained spans forever (ops-doc I18/I21).
+- **Extraction gate:** the server rollup must produce identical `sleep_sessions`/`body_metrics` output
+  over a sample of historical days before and after. The extraction ships **no** behaviour change.
+
+### [platform][devices] Q-546 — WASM cannot instantiate in production: `script-src` has no `wasm-unsafe-eval`
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 4
+- **Branch:** `fix/csp-wasm-unsafe-eval`
+- **Added:** 2026-08-18 · **Lane A** (`next.config.ts`). Independent of everything else — do it early.
+- **Verified today.** `next.config.ts:10` sets `script-src 'self' 'unsafe-inline'` (plus `'unsafe-eval'`
+  in dev only) `https://accounts.google.com`. There is no `wasm-unsafe-eval`, so **no WASM session can
+  start in production**, and every on-device neural plan (D2 Task 6 — SleepNet + step_counter) is
+  blocked behind it.
+- **The trap is the one the master plan predicted:** *"the parity test runs under Node (no CSP) and
+  would false-green."* `lib/oura-models/__tests__/wasm-parity.test.ts` passes under vitest and proves
+  nothing about the device. It is a genuine parity proof against the TorchScript golden and a **useless
+  CSP proof**.
+- **Fix:** add `wasm-unsafe-eval` to the production `script-src`, then **assert on the S25 that a real
+  WASM session instantiates under the deployed header** — a green test is not the gate here, a device is.
+- **Security note:** `wasm-unsafe-eval` is narrower than `unsafe-eval` (it permits WASM compilation
+  only). State that in the PR rather than letting it read as a blanket eval relaxation.
+
+### [platform] Q-547 — measure the 0.22 vCPU before optimising it: three hypotheses already refuted
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
+- **Branch:** *(none — an owner measurement, then a finding)*
+- **Added:** 2026-08-18 · BLOCKED: owner measurement.
+- **The number.** Railway, ~19.6 days to 2026-08-18: the app averages **0.22 vCPU** and **0.61 GB**
+  (**$4.42 + $6.07/month**), against `prod_DB` at 0.002 vCPU. **The app is computing, not waiting on
+  queries.** Storage, by contrast, is **$0.12/month, 0.6 percent of the bill** — so the entire
+  805 MB to 171 MB exercise moved it by about nine cents.
+- **Three hypotheses tested and refuted — do not re-file them:** (a) a server cron — there is none,
+  every `setInterval` in the repo is client-side; (b) the rollup re-decoding the 35-day window —
+  **Q-213 already fixed it**, a persisted watermark narrows the window to the touched span (see the
+  comment at `adapter.ts:4981`); (c) an epoch-mismatched watermark forcing the full window — anchors,
+  frames and watermark all read **epoch 0**.
+- **What is left.** Drains land ~19x/day for 1-6 active minutes — a ~3 percent duty cycle that **cannot**
+  produce 0.22 vCPU sustained. So there is a baseline consumer between drains that source-reading has
+  not found in three attempts.
+- **The measurement that splits it:** Railway's `TrainingAI` CPU graph at ~3-hour zoom. **Spiky at drain
+  times** means request-driven, and Q-545 removes it. **Flat between drains** means a baseline leak or
+  spin, and Q-545 will not fix it. **Size no CPU saving until this runs.**
 
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 

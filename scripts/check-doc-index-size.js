@@ -185,6 +185,11 @@ const root = path.join(__dirname, '..');
 // console gate that made a desktop VACUUM impossible; and CLAUDE.md gains a session-start DB-size
 // read, because the 500 MB volume that used to fail loudly is now 5 GB and cannot be shrunk back.
 // A measurement replacing a projection, one new entry, and one standing rule.
+//
+// Raised 2026-08-18 (owner-directed D-track focus, Q-545..Q-547): three queue entries for the
+// device-primary compute move. They carry the measured coupling (1,110 lines, 17 DB-touching) and the
+// three refuted CPU hypotheses inline, because an implementer that re-derives either wastes the
+// session — and the refutations are the expensive half of what this planning pass produced.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -451,7 +456,7 @@ const BASELINE = {
   // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
   // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
   // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
-  'docs/implementation-backlog.md': 7927,
+  'docs/implementation-backlog.md': 7996,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
