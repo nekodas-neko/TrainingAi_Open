@@ -1,5 +1,15 @@
 # Review — are the memos actually memoising?
 
+> **Corrected 2026-08-18 while shipping Q-490.** Two of this audit's findings did not survive being
+> acted on. (1) It names `target` as the fresh object; **`actual` is fresh at three of the four sites
+> too** — `sumMacroTotals(...)` and `sumIngredients(...)` both build a new object in the render body —
+> so fixing `target` alone would have left three of four memos still defeated. (2) *"No inline arrows
+> exist anywhere"* is wrong: running the same rule as a script found **four**, on four different
+> memoised components (`MealPlanReviewCard`, `MealPlanSection`, `SavedMealCard`, `LogConsole`), one of
+> them inside a `.map()`. They are baselined by `scripts/check-memo-prop-stability.js` and filed as
+> Q-357. The audit's headline — that the great majority of the 66 memos hold — stands; the two
+> specifics above do not.
+
 **Date:** 2026-08-18 · **Agent:** Review · **Lens:** render discipline
 **Findings filed:** Q-490 · **Clean results recorded:** two
 

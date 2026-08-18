@@ -772,7 +772,10 @@ const BASELINE = {
   // Ratchets DOWN 2026-08-18 (Lane B, Q-478 shipped). The entry was removed and
   // Q-477's pointer to it rewritten. Shrink-only means locking the lower number in, so the space
   // an implemented item vacates cannot quietly refill.
-  'docs/implementation-backlog.md': 9907,
+  // Ratchets DOWN 2026-08-18 (Lane B, Q-490 shipped): 9907 -> 9900. Q-490's entry out, Q-357's in,
+  // net seven fewer. Q-357 is the four call sites Q-490's review said did not exist ("no inline
+  // arrows exist anywhere"); they are frozen by the new check rather than left to be rediscovered.
+  'docs/implementation-backlog.md': 9900,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
