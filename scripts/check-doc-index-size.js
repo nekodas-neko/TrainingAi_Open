@@ -554,7 +554,7 @@ const BASELINE = {
 
 
   'projectOverview.md': 7122,
-  'docs/implementation-backlog.md': 9005,
+  'docs/implementation-backlog.md': 8846,
   'CLAUDE.md': 1075,
 
 };
