@@ -328,8 +328,8 @@ const BASELINE = {
   // caveat that keeps the 136 MB honest (measured index size, not a reclaim that has happened). On
   // the backlog, finding 4 is struck in place with the three consequences the entry did not
   // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
-  'projectOverview.md': 6871,
-  'docs/implementation-backlog.md': 7207,
+  'projectOverview.md': 6910,
+  'docs/implementation-backlog.md': 7277,
   'CLAUDE.md': 1044,
 
 };

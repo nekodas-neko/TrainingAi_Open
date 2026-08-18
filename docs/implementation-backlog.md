@@ -285,6 +285,76 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/entries/2026-08-16-health-stale-goal.md).
 
 
+### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
+
+- **Branch:** `feat/coach-undo-control`
+- **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
+  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
+- **Placement:** upper-mid. An AI-initiated write to the data that decides what the user is told to
+  lift, with no in-app way back.
+- **A complete undo subsystem exists and has no caller.** All of this is built:
+  `POST /api/coach/apply/[id]/undo` (auth-gated, rate-limited, ownership-scoped, with a well-reasoned
+  "until the next workout started after the change" window); `undoCoachChange()` with a double-undo
+  guard; an `undo()` handler in **all five** domains; `captureBefore()` in each, existing solely for
+  it; the `coach_changes.undone_at` column; and `components/coach/coach-history.tsx` already styling
+  undone changes with strikethrough, muted colour and a "· undone" suffix.
+- **Nothing calls it.** Every client fetch to a Coach endpoint, enumerated across `app/`,
+  `components/` and `lib/`:
+  ```
+  /api/coach   /api/coach/threads   /api/coach/preview   /api/coach/apply   /api/coach/options
+  ```
+  `/api/coach/apply/[id]/undo` appears in **no** client file, and `coach-history.tsx` renders the
+  list read-only — no Undo button anywhere.
+- **⚠️ This is NOT the known "no user-facing entry point" note** (this file, in the Coach phase-1
+  entry). That note is about phase 1 shipping the **apply** path without an entry point; phases 2–3
+  then wired apply — `change-preview.tsx`, `number-dial.tsx`, `confirm-content.tsx` and
+  `lib/coach/pending-change.ts` all POST to it and it works. **Undo was never wired with it.** The
+  asymmetry is the finding; do not close this as already-known.
+- **Why this severity:** the user approves changes per row, which implies reversibility, and the
+  history screen then styles for an undo that cannot be reached. The only way back is to ask the Coach
+  to change it again — a *new* change against current state, not a restore, and for `early_deload` or
+  `program_phase` possibly not expressible at all.
+- **Fix shape:** an Undo control in `coach-history.tsx` for changes that are not `undoneAt` and still
+  inside the window, treating the route's 409 ("you've trained since") as a first-class state rather
+  than an error. **Lane B** — the route already exists.
+- **⛔ Do Q-468 first, or in the same change.** Wiring the button onto today's undo would ship the
+  defect below.
+
+### [workouts][platform] Q-468 — `undo` restores its captured state without checking the target still holds what the change set
+
+- **Branch:** `fix/coach-undo-drift-check`
+- **Added:** 2026-08-18 · review sweep (the Coach write path) ·
+  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
+- **Placement:** directly with Q-467. **Latent today** (nothing can call undo) and **exactly what
+  Q-467 would expose** the moment a button is wired.
+- **The asymmetry.** `applyCoachPatch` refuses to write over a moved target — every domain runs
+  `driftAgainst(...)` and returns `stale` → 409 with a per-field drift report. `undoCoachChange` has
+  no equivalent: it reads `beforeState` and writes it back. The route's guard asks *"have you trained
+  since?"*, not *"has this row changed since?"*.
+- **Measured live, entirely within the Coach's own flow — no external edit needed:**
+
+  | Step | Action | `session_exercises.exercise_name` |
+  |---|---|---|
+  | 0 | initial | `Barbell Bench Press` |
+  | 1 | Coach change **A**: Barbell → Dumbbell | `Dumbbell Bench Press` |
+  | 2 | Coach change **B**: Dumbbell → Incline | `Incline Bench Press` |
+  | 3 | **Undo A** → `200` | **`Barbell Bench Press`** |
+  | 4 | **Undo B** → `200` | **`Dumbbell Bench Press`** |
+
+- **Two things are wrong.** After step 3 `coach_changes` shows A struck through and B as `NOT UNDONE`
+  — the history claims "Swapped Dumbbell → Incline" is in effect while the row says `Barbell Bench
+  Press`, so the screen that exists to report what the Coach did is wrong. And after step 4 — undoing
+  **everything** — the exercise is `Dumbbell Bench Press` when it started as `Barbell Bench Press`:
+  undoing every Coach change does not return the programme to where it began, and leaves it holding a
+  value the user never chose.
+- **All five domains share the gap.** No `undo()` in any handler checks current state; only
+  `session-exercise` re-verifies ownership on the way back. (The lone `drift` string in `goals.ts` is
+  a comment about a drifting local-storage copy, not a check.)
+- **Fix shape:** run `driftAgainst` on the way back too — compare the target's current values against
+  what the change **set** (`to`) and refuse with 409 + drift when they disagree, exactly as apply
+  does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
+  alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
+
 ### [platform] Q-356 — `periodization-soft-delete.test.ts` fails every day between 14:00 and 16:00 UTC, for every branch
 
 - **Branch:** `fix/periodization-soft-delete-local-midnight`
