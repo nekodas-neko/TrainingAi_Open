@@ -8,10 +8,14 @@ import { ReviewStep, type EditableNutrition } from './review-step'
 import { AssignStep } from './assign-step'
 import { SavedMealsSheet } from './saved-meals-sheet'
 import { FoodLibrarySheet } from './food-library-sheet'
-import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
+import type { NutritionScanResult, NutritionIngredient, FoodItem, FoodLogWithItem, SavedMeal, MealType } from '@trainingai/shared/types/nutrition'
 import { todayInTz } from '@trainingai/shared/date-utils'
+import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
+import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { logFoodEntries, ingredientsToEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
 import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
+import { readCacheSync } from '@/lib/sqlite/cache'
+import { getLocalStore } from '@/lib/local-store'
 import { hapticLight } from '@/lib/haptics'
 import { toast } from 'sonner'
 
@@ -174,6 +178,54 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
     }
   }
 
+  /**
+   * A scanned saved-meal label (Q-389).
+   *
+   * Resolves LOCAL-FIRST because a label is scanned in a kitchen, which is exactly where the network
+   * is not — and `logMealItems` is offline-first on the other side, so a server-only lookup here
+   * would be the one link that breaks it.
+   *
+   * `logMealItems` iterates `oneServingItems`, so this logs **one serving**, never the whole batch.
+   * That is the contract the printed label depends on: the owner removed the per-serving line, so
+   * the label cannot say which basis its figures are on and the app has to settle it instead.
+   */
+  async function handleScannedSavedMeal(mealId: string) {
+    try {
+      const store = userId ? getLocalStore(userId) : null
+      let meal = store ? (await store.getSavedMeals()).find(m => m.id === mealId) ?? null : null
+      if (!meal) {
+        const res = await fetch('/api/nutrition/saved-meals')
+        if (res.ok) {
+          const list = (await res.json()) as SavedMeal[]
+          meal = list.find(m => m.id === mealId) ?? null
+        }
+      }
+      // A physical label outlives the row behind it. Say so, rather than falling through to a
+      // barcode "not found" that names the wrong thing.
+      if (!meal) { toast.error('That saved meal no longer exists'); return }
+
+      // The same cache key the nutrition screens fill (TTL_LONG), so this is warm offline. The
+      // local store's own getMealTypes returns a narrower row type than mealTypeForHour wants.
+      let mealTypes = readCacheSync<MealType[]>('nutrition-meal-types') ?? []
+      if (mealTypes.length === 0) {
+        const r = await fetch('/api/nutrition/meal-types')
+        if (r.ok) mealTypes = (await r.json()) as MealType[]
+      }
+      const bucket = preselectedMealTypeId ?? mealTypeForHour(mealTypes, new Date().getHours())
+      if (!bucket) { toast.error('No meal type available'); return }
+
+      const logs = await logMealItems(meal, logDate ?? todayInTz(), bucket, userId)
+      hapticLight()
+      toast.success(`${meal.name} logged`)
+      reset()
+      onClose()
+      for (const log of logs) onLogged(log)
+    } catch (err) {
+      console.error('Scanned meal log failed:', err)
+      toast.error('Failed to log that meal')
+    }
+  }
+
   return (
     <>
       <Sheet open={open} onOpenChange={o => !o && handleClose()}>
@@ -210,6 +262,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
                 preselectedMealTypeId={preselectedMealTypeId}
                 onLibrarySelect={handleLibrarySelect}
                 userId={userId}
+                onScannedSavedMeal={handleScannedSavedMeal}
               />
             )}
             {step === 'review' && (
