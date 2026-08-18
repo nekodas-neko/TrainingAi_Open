@@ -4,15 +4,21 @@
 > successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-17 · **By:** the first session to run as Lane A · **Q band:** 314–349 (next free: **315** — Q-314 taken for the ring-clock reset-detection defect)
-**Migrations:** 189 and 190 taken (Q-536); next free is **191**. Local SQLite unchanged at v22.
+**Migrations:** 189–192 taken; next free is **193**. Local SQLite unchanged at v22.
 
 ## Now
-Nothing in flight. Shipped this session: **Q-310**, **Q-536** (closed, confirmed on device),
-**Q-539**, **Q-351**. **Q-314** filed.
+**Owner decisions received 2026-08-17** — all four recorded here so they are not re-asked:
+1. **Q-314** → *declare a re-key explicitly*. Approved, not yet built.
+2. **Q-537** → *reveal + copy, and warn on clearKey*. Approved, not yet built. Device-only verify.
+3. **Q-540 vs Q-541** → my call: **take Q-541, skip Q-540's `bytea` half** (the packed blob *is*
+   bytea — doing both rewrites 1.1 M rows twice). Q-540's `event_name` half is superseded too, since
+   packed rows do not store it.
+4. **Q-534** → the 5 GB volume is temporary and must be **deprecated by end of this week**. *All work
+   aims at returning to the stock 500 MB.* This is the standing priority.
 
-**Q-314 is the live one** and is owner-gated — the re-drain-as-reset misdetection behind Q-536.
-Every ring re-pair reopens it. The recommendation put to the owner is to make a re-key *explicit*
-rather than inferred from counter shape.
+**Q-541 Tasks 0–2 shipped** (v1.318.11, migrations 191 + 192, `lib/oura-ble/frame-pack.ts`) —
+additive only, nothing reads or writes the new table and no row has moved. **Tasks 3–7 are next and
+are the actual size win.**
 
 ## Next
 Queue is re-read as of the end of this session. Q-450/451 have shipped (Lane B); Q-536 and Q-539 are
