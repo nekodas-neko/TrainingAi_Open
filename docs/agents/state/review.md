@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** eleven sweeps (2026-08-17 ×2, 2026-08-18 ×9) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **479**)
+**Updated:** 2026-08-18 · **By:** twelve sweeps (2026-08-17 ×2, 2026-08-18 ×10) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **480**)
 
 ## Now
 
-Eleven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twelve sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,33 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 12 — does revoking access actually revoke it? (2026-08-18)
+
+**The first sweep to test privilege *revocation* rather than cross-user data isolation.** Write-up:
+[`docs/reviews/2026-08-18-auth-session-boundaries.md`](../../reviews/2026-08-18-auth-session-boundaries.md).
+
+**Filed Q-479 (mid).** `lib/admin.ts` holds two admin checks that disagree: `requireAdmin` ignores the
+passed flag and reads the row (**61 routes**, revocation immediate); `isAdminUser` returns the flag
+when given one. Seven of its ten call sites pass the JWT claim — six are page guards (UI, correct),
+the seventh is **`app/api/exercises/route.ts:38`**, an API write into the shared `exercise_library`.
+The claim refreshes only once per 24 h (`ISACTIVE_RECHECK_MS`), and the module's docstring asserts it
+*"governs the UI only"* — which is false, and is why this was easy to miss.
+
+**Measured with a control:** admin revoked in the DB, no re-login → `POST /api/exercises` **201**
+(row created) while `GET /api/admin/errors` **403**, same cookie, same instant.
+
+**Five clean results**, including the one worth reusing: `/api/health-connect/ingest` is the
+**reference fail-closed implementation** — 401 with the secret unset *and* on an empty secret, IP
+limiter before the constant-time compare, identical 401 body on trip.
+
+**⚠️ The method note is worth more than the finding, and belongs in every future harness:** the first
+run reported revocation **working** and was wrong. `curl -b` without `-c` discards the rotated
+cookie, so every request re-sent a token with no `isActiveCheckedAt`, the throttle never engaged, and
+the DB was re-read every time. **A session-staleness test is meaningless unless the client persists
+cookie rotation** — use `-b` and `-c` on the same file. This is the third harness artifact this run
+(after the backgrounded-`sleep` false stall and the wrong-column false negative in sweep 9); the
+pattern is that a *clean* result deserves as much suspicion as a dirty one.
 
 ### Fix verification — Q-473 confirmed fixed by re-running the reproduction (2026-08-18)
 

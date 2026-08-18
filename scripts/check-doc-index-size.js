@@ -18,6 +18,15 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, auth/session-boundaries sweep, Q-479): backlog 8846 -> 8894,
+// projectOverview 7122 -> 7157. One queue entry and its Known-Issues row. Both carry the measured
+// A/B inline (POST /api/exercises 201 against GET /api/admin/errors 403, same cookie, same instant)
+// because a privilege-persistence claim without its control is not a finding, and both carry the
+// harness warning that produced a false clean on the first run — a session-staleness test needs a
+// cookie jar that is written back. The sweep's prose is in
+// docs/reviews/2026-08-18-auth-session-boundaries.md, which this ratchet does not govern.
+
+//
 // Raised 2026-08-18 (Review, non-default-timezone sweep, Q-477/Q-478): backlog 8908 -> 9005,
 // projectOverview 7068 -> 7122 (the last 8 record that #112 fixed Q-473 and that Review re-ran the
 // original reproduction against the merged code — 'shipped' and 'fixed' are different claims and
@@ -553,8 +562,8 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7122,
-  'docs/implementation-backlog.md': 8846,
+  'projectOverview.md': 7157,
+  'docs/implementation-backlog.md': 8894,
   'CLAUDE.md': 1075,
 
 };
