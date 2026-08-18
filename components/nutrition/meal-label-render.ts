@@ -1,5 +1,5 @@
 import QRCode from 'qrcode'
-import { encodeMealLabelToken, type MealLabelFigures } from '@trainingai/shared/nutrition/label-payload'
+import { encodeMealLabelToken, fitIngredientLines, type MealLabelFigures } from '@trainingai/shared/nutrition/label-payload'
 
 /**
  * Draws a saved meal's printable 50 × 50 mm label (Q-389).
@@ -21,7 +21,7 @@ const SHEET = 189
 const USABLE_W = 130
 const USABLE_H = 137
 
-export type MealLabelStyle = 'band' | 'editorial' | 'ticket' | 'plaque' | 'square'
+export type MealLabelStyle = 'band' | 'editorial' | 'ticket' | 'plaque' | 'square' | 'squareCentred'
 
 export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: string; squareOnly?: boolean }[] = [
   { value: 'band', label: 'Black band', note: 'Reversed header. The default — and the tightest code.' },
@@ -30,7 +30,8 @@ export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: st
   { value: 'plaque', label: 'Plaque', note: 'Double ring, no write-on line — the largest code.' },
   // Q-393. Square-only, and the picker says so: this artwork uses the corners, so a round die crops
   // the ingredient list. That is the trade the owner accepted to get the breakdown printed.
-  { value: 'square', label: 'Square · ingredients', note: 'Full ingredient list. SQUARE dies only — a round die crops it. Largest, most scannable code.', squareOnly: true },
+  { value: 'squareCentred', label: 'Square · centred', note: 'Name, calories, macros, ingredients, then the code — all on the centre line. SQUARE dies only.', squareOnly: true },
+  { value: 'square', label: 'Square · big code', note: 'Same list, but the code sits beside the calories, which makes it the largest and most scannable code of any style. SQUARE dies only.', squareOnly: true },
 ]
 
 export const DEFAULT_MEAL_LABEL_STYLE: MealLabelStyle = 'band'
@@ -57,6 +58,16 @@ interface StyleSpec {
   squareOnly?: boolean
   /** Print the per-serving ingredient breakdown (Q-393). Needs the corners; square only. */
   ingredients?: boolean
+  /**
+   * How the square layouts arrange themselves.
+   *
+   * `beside` puts the code next to the calories, which is what buys it the biggest code in the
+   * feature (0.561 mm per module). `stack` is the owner's requested reading order — name, calories,
+   * macros, ingredients, code — every element on the centre line. Stacking spends height on text
+   * that `beside` spends on the code, so its code is smaller; it is still larger than every round
+   * style. Both ship because the trade is a matter of taste on paper, not of correctness.
+   */
+  layout?: 'beside' | 'stack'
 }
 
 const SPECS: Record<MealLabelStyle, StyleSpec> = {
@@ -87,7 +98,15 @@ const SPECS: Record<MealLabelStyle, StyleSpec> = {
   square: {
     fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 70, writeOnLine: true,
     reversedHeader: true, rule: 'solid', nameSize: 12, caloriesSize: 24, macroSize: 8,
-    nameTracking: 0.04, uppercaseName: true, squareOnly: true, ingredients: true,
+    nameTracking: 0.04, uppercaseName: true, squareOnly: true, ingredients: true, layout: 'beside',
+  },
+  // 58 units is what the stack can spare once name, calories, macros and five ingredient lines have
+  // taken their height: (58/189)*50 / 33 = 0.465 mm per module. Smaller than `square`'s 0.561, and
+  // still larger than every round style — the cost of reading top-to-bottom down the centre line.
+  squareCentred: {
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 58, writeOnLine: true,
+    reversedHeader: false, rule: 'solid', nameSize: 12, caloriesSize: 22, macroSize: 8,
+    nameTracking: 0.02, uppercaseName: false, squareOnly: true, ingredients: true, layout: 'stack',
   },
 }
 
@@ -249,6 +268,140 @@ function drawSquareLabel(
   return { ingredientLines: shown.length, ingredientOverflow: Math.max(0, ingredients.length - MAX_LINES) }
 }
 
+
+/**
+ * The centred square layout (Q-393, owner-specified reading order):
+ *
+ * ```
+ *   Beef Pasta Bake
+ *   512 KCAL
+ *   P 38  C 46  F 18
+ *   (ingredients)
+ *   [ QR ]
+ * ```
+ *
+ * Every element sits on the centre line, top to bottom, which is the order the owner asked to read
+ * it in. It is the sibling of `drawSquareLabel`, not a replacement: stacking spends on height what
+ * the beside layout spends on the code, so this one's code is 58 units against 70. Both ship.
+ */
+function drawSquareCentredLabel(
+  ctx: CanvasRenderingContext2D,
+  { spec, family, figures, ingredients, qr, INK, PAPER }: {
+    spec: StyleSpec
+    family: string
+    figures: MealLabelFigures
+    ingredients: { name: string; weightG: number }[]
+    qr: { modules: { size: number; data: ArrayLike<number> } }
+    INK: string
+    PAPER: string
+  },
+): { ingredientLines: number; ingredientOverflow: number } {
+  const L = SQUARE_MARGIN
+  const cx = SHEET / 2
+  const bottom = SHEET - SQUARE_MARGIN
+  ctx.textAlign = 'center'
+  ctx.fillStyle = INK
+
+  let y = L + 4
+
+  // --- name -------------------------------------------------------------------------------------
+  const name = spec.uppercaseName ? figures.name.toUpperCase() : figures.name
+  const nameSize = fitText(ctx, name, family, '700', spec.nameSize, SQUARE_W)
+  ctx.font = `700 ${nameSize}px ${family}`
+  ctx.letterSpacing = `${spec.nameTracking}em`
+  y += nameSize
+  ctx.fillText(name, cx, y)
+  ctx.letterSpacing = '0em'
+  y += 7
+
+  // --- calories, with KCAL on the same line so the number reads as one figure -------------------
+  y += spec.caloriesSize
+  ctx.font = `700 ${spec.caloriesSize}px ${family}`
+  const kcalNum = String(figures.calories)
+  const numW = ctx.measureText(kcalNum).width
+  ctx.font = `500 ${spec.macroSize}px ${family}`
+  ctx.letterSpacing = '0.12em'
+  const unitW = ctx.measureText('KCAL').width
+  const startX = cx - (numW + 3 + unitW) / 2
+  ctx.letterSpacing = '0em'
+  ctx.textAlign = 'left'
+  ctx.font = `700 ${spec.caloriesSize}px ${family}`
+  ctx.fillText(kcalNum, startX, y)
+  ctx.font = `500 ${spec.macroSize}px ${family}`
+  ctx.letterSpacing = '0.12em'
+  ctx.fillText('KCAL', startX + numW + 3, y)
+  ctx.letterSpacing = '0em'
+  ctx.textAlign = 'center'
+  y += 6
+
+  // --- macros -----------------------------------------------------------------------------------
+  y += spec.macroSize
+  ctx.font = `500 ${spec.macroSize}px ${family}`
+  ctx.letterSpacing = '0.06em'
+  ctx.fillText(`P ${figures.proteinG}   C ${figures.carbsG}   F ${figures.fatG}`, cx, y)
+  ctx.letterSpacing = '0em'
+  y += 5
+
+  // --- rule + ingredients -----------------------------------------------------------------------
+  ctx.strokeStyle = INK
+  ctx.lineWidth = 0.5
+  ctx.beginPath()
+  ctx.moveTo(cx - SQUARE_W / 2 + 14, y)
+  ctx.lineTo(cx + SQUARE_W / 2 - 14, y)
+  ctx.stroke()
+  y += 8
+
+  // How many lines fit is DERIVED, not assumed. The code is bottom-anchored, so the list has exactly
+  // the gap between the macros and the code to work with — and a hardcoded five overlapped it (the
+  // first draft ran the list from y=81 into a code starting at y=113). Deriving it means the layout
+  // cannot collide no matter how the type sizes above are retuned, and a meal with more ingredients
+  // than fit is summarised rather than drawn over the code.
+  const lineH = 8.5
+  const code = spec.codeUnits
+  const codeTop = bottom - (spec.writeOnLine ? 9 : 0) - code
+  const room = Math.max(0, codeTop - y - 2)
+  // The arithmetic lives in `fitIngredientLines` and is property-tested there, because this failure
+  // is invisible end-to-end: `drawCode` paints a white quiet-zone box before its modules, so a list
+  // that overruns is drawn OVER rather than colliding — the code still decodes and the label just
+  // shows fewer ingredients than it claims. The test found a real overrun in the first draft.
+  const fit = fitIngredientLines({ room, lineHeight: lineH, count: ingredients.length })
+  const shown = ingredients.slice(0, fit.shown)
+  const overflow = fit.overflow
+  for (const ing of shown) {
+    const text = `${Math.round(ing.weightG)}g ${ing.name}`
+    const size = fitText(ctx, text, family, '400', 7.5, SQUARE_W)
+    ctx.font = `400 ${size}px ${family}`
+    ctx.fillText(text, cx, y)
+    y += lineH
+  }
+  if (overflow > 0) {
+    ctx.font = `400 7px ${family}`
+    ctx.fillText(`+${overflow} more — scan for the full list`, cx, y)
+    y += lineH
+  }
+  if (ingredients.length === 0) {
+    ctx.font = `400 7px ${family}`
+    ctx.fillText('Scan for the ingredient breakdown', cx, y)
+  }
+
+  // --- code, bottom-anchored above the write-on rule ---------------------------------------------
+  // Anchored from the BOTTOM rather than flowed from `y`: a meal with two ingredients and one with
+  // six must put the code in the same place, or every label in a batch sits differently.
+  drawCode(ctx, qr, cx - code / 2, codeTop, code, INK, PAPER)
+
+  if (spec.writeOnLine) {
+    const lineY = bottom - 2
+    ctx.strokeStyle = INK
+    ctx.lineWidth = 0.5
+    ctx.beginPath()
+    ctx.moveTo(cx - SQUARE_W / 2 + 20, lineY)
+    ctx.lineTo(cx + SQUARE_W / 2 - 20, lineY)
+    ctx.stroke()
+  }
+
+  return { ingredientLines: shown.length, ingredientOverflow: overflow }
+}
+
 export interface RenderMealLabelOptions {
   mealId: string
   figures: MealLabelFigures
@@ -307,7 +460,8 @@ export async function renderMealLabel(
 
   if (spec.ingredients) {
     const codeMm = (spec.codeUnits / SHEET) * 50
-    const drawn = drawSquareLabel(ctx, { spec, family, figures, ingredients: ingredients ?? [], qr, INK, PAPER })
+    const args = { spec, family, figures, ingredients: ingredients ?? [], qr, INK, PAPER }
+    const drawn = spec.layout === 'stack' ? drawSquareCentredLabel(ctx, args) : drawSquareLabel(ctx, args)
     return { moduleCount, codeMm, ...drawn }
   }
 

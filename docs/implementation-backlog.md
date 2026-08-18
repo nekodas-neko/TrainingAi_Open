@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **552** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -284,6 +284,241 @@ below threshold and left in place for next time.
 > whole fix/revert/restore cycle was re-run against the final code.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
+
+### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
+
+- **Branch:** `fix/db-query-403-masks-outage`
+- **Added:** 2026-08-18 · **Lane A** (`app/api/admin/db-query/route.ts`). Tiny, and it cost a real
+  diagnosis today.
+- **What happened.** During the 2026-08-18 volume incident `prod_DB` went offline. Every
+  `/api/admin/db-query` call returned **`{"error":"Forbidden"}`**, which reads as "your credential was
+  revoked" — so the first several minutes went into checking env vars and the admin flag instead of
+  looking at the database. The Railway dashboard said "Service is offline" in one glance.
+- **Mechanism.** `authorize()` calls `requireAdmin(exportUserId)` inside a **bare `try/catch`**
+  (route.ts ~51-53). `requireAdmin` does a DB round-trip (`repo.getUserById`) and throws `AdminError`
+  when the user is missing or not admin — but **any other throw, including a connection failure, lands
+  in the same catch** and becomes 403. "Not authorised" and "could not check" are indistinguishable.
+- **Why it matters beyond this incident.** 403 is the one status a caller will not retry and will not
+  escalate; it actively points the investigation away from infrastructure. `/api/version` does **not**
+  touch the DB, so it returned 200 throughout and offered no contradiction.
+- **Fix shape:** catch `AdminError` specifically and return 403; let anything else surface as **503**
+  (or 500) so an outage looks like an outage. Same pattern applies to the session branch below it, and
+  to any other route wrapping `requireAdmin` in a bare catch — **grep for the shape, don't fix one site.**
+
+### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1
+- **Branch:** `perf/postgres-memory-footprint`
+- **Added:** 2026-08-18 · **Lane A.** Largest single line item on the bill and near-zero risk.
+- **Measured (Railway, ~19.6 days to 2026-08-18):** `prod_DB` averages **0.79 GB RAM** and **0.002
+  vCPU** — **$7.87/month of memory for a database that does essentially no work**, against 171 MB of
+  data. Its own CPU graph is flat at 0.0 across a 3-hour window.
+- **Candidates:** `shared_buffers` sized for the container rather than the data; the app pool is
+  `max: 10` and the rollup worker carries its own `PG_POOL_MAX=2`, so up to 12 backend processes each
+  with their own memory. `work_mem` is already 4 MB (noted on Q-534) and is not the problem.
+- **Careful with the "it's only 200 MB now" reading.** The 3-hour graph taken 2026-08-18 shows ~200 MB
+  **climbing** — the service had just restarted during the volume incident and Postgres memory grows as
+  caches warm. **0.79 GB is the warmed steady state and will return.** Measure over a full day, not
+  after a restart.
+- **Load-bearing constraint (`CLAUDE.md`):** total connections = `max` x replicas must stay under the
+  Railway connection limit, and the pool's error handler and timeouts must survive any change here.
+
+### [devices][platform] Q-550 — `oura_heartrate`: 27 MB of indexes on 6.8 MB of heap
+
+- **Branch:** `perf/oura-heartrate-index-audit`
+- **Added:** 2026-08-18 · **Lane A.** Small; the same shape as Q-534 at one-tenth the size.
+- **Measured 2026-08-18:** 34 MB total, 65,160 rows — **6.8 MB heap, 27 MB indexes**. Now the
+  third-largest table after the packing work, and indexes are 4x the data.
+- **`oura_heartrate_pkey` had zero lifetime scans** on a table that already carries a
+  `(user_id, timestamp)` unique constraint. **Re-measure before acting** — the counters reset at the
+  2026-08-17 crash, so a fresh zero means "not since recovery", not "never".
+- **Keep `oura_heartrate_user_updated` despite its zero.** Migration 130 added it for Track-B sync,
+  which is not wired yet, so its zero is expected and correct.
+
+### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 8
+- **Added:** 2026-08-18 · BLOCKED: owner, and deliberately **after** Q-545.
+- **The owner's stated goal:** *"The Goal was to move off railway if there were enough benefits"*, with
+  a target of **under $5/month** against today's ~$18.63.
+- **Do not decide this yet.** Q-545 moves the compute to the phone and shrinks the server to a thin
+  store, which changes the comparison materially — and Q-547 found that **a large share of the current
+  bill is deploy churn from two lanes shipping**, not steady-state cost. Deciding on today's numbers
+  would be deciding on an inflated, pre-fix baseline.
+- **What each side looks like, to be re-costed when the time comes.** *Stay:* realistic floor ~$8/month
+  after Q-545 + Q-549; keeps managed deploys, backups and the git-push workflow. *Leave:* a small VPS
+  (Hetzner CX22 class, ~4 EUR/month, 2 vCPU / 4 GB / 40 GB) runs both services with far more headroom
+  and lands near the target — at the cost of owning backups, TLS, deploys and the Postgres that is
+  currently managed. **Weigh that against 2026-08-18**, when a staged volume change took `prod_DB`
+  offline and Railway's own tooling recovered it.
+- **One hard input either way:** Railway **cannot shrink a volume** and bills on storage *used*, so the
+  5 GB provisioning is free and is not a reason to move.
+
+### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
+- **Branch:** `feat/device-rollup-port`
+- **Added:** 2026-08-18. **Owner-directed: "do the D-track first, that should have a lot of focus."**
+- **Lane A.** `lib/oura-ble/**`, `lib/data/**`, `lib/local-store/**`. JS/server + client; no Kotlin.
+- **The gap, in the owner's words:** *"I assumed all the ring data would go directly to the phone and
+  once it's aggregated and calculated it sends to DB."* That is the D-track north star verbatim. Today
+  it is inverted — the phone ships raw frames up and **Railway** decodes them and runs SleepNet.
+- **Why it is a port, not a rewrite — measured 2026-08-18:** `aggregateOuraRawSamples` is
+  `adapter.ts:4958-6067`, **1,110 lines, of which only 17 touch `this.db`/`.select(`/an `oura.*` slice
+  helper.** The rest is computation over already-shared helpers (`sleepNet`, `computeDailySummaries`,
+  `computeSleepScore`, `computeResilienceForDay`, `computeStepsByDay`, `resolveDsToMs`,
+  `decodeEventBody`). Extract it behind a small `RollupIO` port with two implementations — Postgres and
+  local SQLite. **Do not hand-write a second device rollup**; that is the duplicate-implementation bug
+  `CLAUDE.md`'s One Formula, One Place rule exists to prevent.
+- **Half the device side already exists and is inert.** D2 Task 1 shipped
+  `upsertOuraDailySummary`/`upsertOuraBucket`/`upsertOuraHeartrate` to `LocalStore`; Tasks 2-3 shipped
+  the native store and the `getUnrolledRaw`/`markRolledUp` bridge, **device-verified**. A repo-wide grep
+  finds **no caller** for either bridge method. The device drains and stores correctly, then nothing
+  consumes it.
+- **It closes Q-538 as a side effect.** Measured on device 2026-08-18: 209,326 rows, **0 rolled up**,
+  31.2 MB. `pruneRaw` needs `rolled_up = 1`, and `markRolledUp` is what this task finally calls.
+- **Safety, non-negotiable:** never `markRolledUp` before the derived forms are durably written locally.
+  Marking a frame consumed while its output is unstored frees the pruner to delete raw that produced
+  nothing. And **do not touch the ingest writer or the history cursor** — device-verified, and a botched
+  change there loses drained spans forever (ops-doc I18/I21).
+- **Extraction gate:** the server rollup must produce identical `sleep_sessions`/`body_metrics` output
+  over a sample of historical days before and after. The extraction ships **no** behaviour change.
+
+### [platform][devices] Q-546 — WASM cannot instantiate in production: `script-src` has no `wasm-unsafe-eval`
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 4
+- **Branch:** `fix/csp-wasm-unsafe-eval`
+- **Added:** 2026-08-18 · **Lane A** (`next.config.ts`). Independent of everything else — do it early.
+- **Verified today.** `next.config.ts:10` sets `script-src 'self' 'unsafe-inline'` (plus `'unsafe-eval'`
+  in dev only) `https://accounts.google.com`. There is no `wasm-unsafe-eval`, so **no WASM session can
+  start in production**, and every on-device neural plan (D2 Task 6 — SleepNet + step_counter) is
+  blocked behind it.
+- **The trap is the one the master plan predicted:** *"the parity test runs under Node (no CSP) and
+  would false-green."* `lib/oura-models/__tests__/wasm-parity.test.ts` passes under vitest and proves
+  nothing about the device. It is a genuine parity proof against the TorchScript golden and a **useless
+  CSP proof**.
+- **Fix:** add `wasm-unsafe-eval` to the production `script-src`, then **assert on the S25 that a real
+  WASM session instantiates under the deployed header** — a green test is not the gate here, a device is.
+- **Security note:** `wasm-unsafe-eval` is narrower than `unsafe-eval` (it permits WASM compilation
+  only). State that in the PR rather than letting it read as a blanket eval relaxation.
+
+### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
+
+- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
+- **Branch:** *(none — an owner measurement, then a finding)*
+- **Added:** 2026-08-18 · **Answered the same day.** No longer blocking. Remaining work is the quiet-window baseline named below.
+- **The number.** Railway, ~19.6 days to 2026-08-18: the app averages **0.22 vCPU** and **0.61 GB**
+  (**$4.42 + $6.07/month**), against `prod_DB` at 0.002 vCPU. **The app is computing, not waiting on
+  queries.** Storage, by contrast, is **$0.12/month, 0.6 percent of the bill** — so the entire
+  805 MB to 171 MB exercise moved it by about nine cents.
+- **Three hypotheses tested and refuted — do not re-file them:** (a) a server cron — there is none,
+  every `setInterval` in the repo is client-side; (b) the rollup re-decoding the 35-day window —
+  **Q-213 already fixed it**, a persisted watermark narrows the window to the touched span (see the
+  comment at `adapter.ts:4981`); (c) an epoch-mismatched watermark forcing the full window — anchors,
+  frames and watermark all read **epoch 0**.
+- **What is left.** Drains land ~19x/day for 1-6 active minutes — a ~3 percent duty cycle that **cannot**
+  produce 0.22 vCPU sustained. So there is a baseline consumer between drains that source-reading has
+  not found in three attempts.
+- **MEASURED 2026-08-18 — ANSWERED. It is spiky, so Q-545 is the right fix.** Owner pulled the 3-hour
+  graphs. `TrainingAI` CPU sits near **0.0 vCPU between events** and spikes to **1.0-1.2 vCPU** (once
+  2.0). Memory tracks it exactly: **~400 MB baseline, spiking to 800 MB-1.2 GB** on the same events —
+  the allocation signature of decoding frames and running SleepNet. `prod_DB` CPU is **flat at 0.0**,
+  confirming the app computes while the database only holds memory. **Request-driven, not a leak.**
+- **A second finding the measurement surfaced, and it may matter more than the first.** The TrainingAI
+  charts carry **~12-15 dashed vertical markers in three hours**, each paired with a ~10 MB network
+  ingress spike — apparently **deploys**, at roughly 5/hour. Both Implementation lanes have been
+  merging continuously and each merge restarts the service (cold start + `instrumentation.ts` schema
+  warm-up). **A large share of the measured CPU/RAM is development churn, not steady-state app cost**,
+  which means the $18.63/month projection is inflated by an atypical period. **Confirm those markers
+  are deploys before trusting any before/after comparison** — and take a baseline during a quiet window,
+  not a shipping day.
+- **Third correction: `prod_DB` reads ~200 MB and climbing on the 3-hour graph, not 0.79 GB.** It
+  restarted during the volume incident and Postgres memory grows as caches warm, so the billed 0.79 GB
+  is its warmed steady state and will return. Tuning `shared_buffers` still caps it; the cold reading
+  is not evidence the problem went away.
+- **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
+  baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
+  cutting deploy frequency, not more tuning.
+### [platform][nutrition] Q-471 — the double-trip metric counts deliberate rerolls as redundant, and that is the AI-usage screen's top row
+
+- **Branch:** `fix/ai-fingerprint-granularity`
+- **Added:** 2026-08-18 · review sweep from **owner-supplied production screenshots** of More →
+  Developer → AI usage · [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** above Q-470/Q-469, because it decides how those are read. A misleading diagnostic
+  sends implementers at the wrong row.
+- **What the screen shows (30d):** 268 calls, 89 of them "redundant" (33%), topped by
+  `meal-plan-generate-meal` at **32 redundant · 4 distinct**.
+- **Why the top row is an artefact.** Redundancy is `(user_id, section, fingerprint)` repeating within
+  120 s (`lib/data/postgres/adapter.ts:4489`). Three sections fingerprint on a calorie target alone:
+  ```
+  meal-plan-generate-meal   String(Math.round(input.targetCalories))
+  meal-plan-top-up          String(Math.round(targets.calories))
+  meal-plan-generate        `${mealCount}:${dayTypes.join('/')}`
+  ```
+  Rerolling a meal is the feature working — tap reroll, dislike it, tap again — and every such call
+  carries the same rounded calorie target, so **every deliberate reroll after the first counts as
+  redundant**. "32 · 4" most plausibly reads as four meal slots rerolled ~8 times each.
+- **⚠️ The reroll path is already correctly guarded — do not "fix" it.** `meal-plan-review-step.tsx`
+  sets `rerolling` before the fetch and every control carries `disabled={rerolling != null}` (reroll
+  icon, instruction submit, both reorder arrows). There is no tap-spam here. This entry exists partly
+  to stop someone being sent to that file by the screen.
+- **So 44 of the 89 redundant calls (32 + 9 + 3) are artefact; the other 45 are real** (Q-470, Q-469).
+- **Fix shape:** fingerprint on what actually distinguishes one request from another — for
+  `generate-meal` at least the meal `position` plus `avoidNames` (which already changes on every
+  successful reroll); for `meal-plan-generate`, excluded foods and stores. The instrument's rule
+  ("ids/dates/keys only, never raw prompt text or health data") still holds — these are ids and keys.
+  Alternatively mark user-initiated repeats at the call site, which is the distinction the screen is
+  actually trying to draw. **Lane A.**
+
+### [workouts][platform] Q-470 — the background prescription regeneration has a rate limit but no in-flight guard, so a second page-load fires it again
+
+- **Branch:** `fix/prescription-regen-in-flight-guard`
+- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** mid. A real duplicate LLM generation for the same session-day, on the path that
+  decides prescribed load.
+- **This one is genuine, unlike Q-471's rows.** `prescription` fingerprints on
+  `{ programSessionId, today }` (`packages/shared/src/ai-periodization/generate-prescription.ts:295`)
+  — stable for one session on one day. **14 redundant across 8 distinct** is therefore the same
+  logical prescription generated twice within 120 s.
+- **Cause.** `regeneratePrescriptionInBackground` (`app/api/workout-data/route.ts:50-59`) is
+  fire-and-forget and called from **two** sites in the same `GET` handler — `:541` when
+  `reevalResult.needsRegenerate`, `:561` when `aiPrescriptionPending && !isPoll`. It carries
+  `rateLimit('prescribe:${userId}', 20, 60*60*1000)`, which caps a runaway loop but **does not
+  dedupe**:
+  - `/api/workout-data` is fetched via `cachedFetch`, which paints from cache and **then always
+    revalidates over the network** — so every open of the workout screen issues a real GET;
+  - until the first background generation lands, `needsRegenerate` / `aiPrescriptionPending` are still
+    true, so the second GET starts a second generation for the same session-day.
+- **The rate limit is not the bug and should stay** — its comment says it exists to stop "an unattended
+  poll loop" minting unlimited Gemini calls, and it does that. It was never an idempotency mechanism.
+  Note `:561` already excludes polls via `!isPoll`; `:541` has no such guard.
+- **Fix shape:** an in-flight marker keyed on `(userId, programSessionId, today)` — the same key the
+  fingerprint already uses — checked before spawning and cleared when the generation settles. A
+  process-local `Set` covers the common case; a short-lived DB marker survives multiple replicas,
+  which matters because Railway can run more than one. **Lane A.**
+
+### [cardio][platform] Q-469 — `running-plan-explain` re-asks the model for the same sentence on every card mount
+
+- **Branch:** `fix/running-plan-explain-cache`
+- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** low-mid. The most redundant *genuine* section, on a call that is explicitly not
+  load-bearing.
+- **Genuine, like Q-470.** Fingerprint is `{ type, durationMin }` — stable for a given day's
+  prescribed run. **31 redundant across 9 distinct**: the same run explained ~7 times on average.
+- **Cause.** `components/running/prescribed-run-card.tsx:41-53` fires it from a bare `useEffect` with
+  no cache. The author already handled the re-render risk — the comment says `gateReasons` is joined
+  into a stable string *"so a new array ref each render doesn't re-fire the fetch"* — but **mount is
+  the remaining trigger**: every navigation back to the running screen, and every remount from a
+  parent, re-asks for the same sentence.
+- **Why not higher:** the call is explicitly *"never load-bearing"* — the deterministic `rationale`
+  renders immediately and the AI copy only swaps in if it arrives — and the section is cheap (62 calls,
+  6,864 tokens total). **The reason to fix it is content consistency:** the wording changes between
+  mounts, so the same prescribed run is described differently each time the user opens the screen.
+- **Fix shape:** cache on the fingerprint inputs (`type`, `durationMin`, `rationale`, `gateKey`); the
+  app already has a client cache layer and the instant-paint rule points the same way. A day-scoped
+  key is enough — the prescription does not change within a day. **Lane B.**
 
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
@@ -690,6 +925,91 @@ and "· per portion" on `servings !== 1`, so the first card in the owner's scree
 lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
 redesign should either reserve the slot or move it into the expanded view.
 
+
+**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
+before code, so both screens were recreated at true S25 size from the real tokens and reviewed
+against the `ui-ux-pro-max` rule set. **Canvas:**
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
+today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
+theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
+
+**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
+44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
+the smallest targets on either screen); quantity steppers, row delete and all four card actions
+**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
+`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
+(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
+(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
+
+**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
+exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
+pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
+Whichever option below wins, the control that survives comes from the primitive.
+
+**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
+the row already prints both ways: `ingredient-row.tsx:100-107` always renders
+`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
+so two rows can sit in different modes at once and `1.2` beside `60` means different things.
+- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
+  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
+  the freed width is what pays for 48 px steppers.
+- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
+  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
+- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
+  tallest of the three, which works against the density complaint that started this.
+
+**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
+string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
+The selection-state literals and the macro palette are the same eight characters and must not share
+a fate — finding 1 is the former only.
+
+
+**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
+MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
+true S25 size in our own tokens — **canvas page "Reworked screens"**,
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
+meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
+none of the chrome, colour or type is copied.
+
+**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
+srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
+row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
+quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
+button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
+ingredients fill the S25 screen; the drawn version fits five with room left over.
+**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
+sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
+
+**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
+search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
+use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
+column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
+screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
+and this is the sixth.
+
+**14 — The other structural changes, in the order they pay off.**
+- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
+  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
+- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
+  space the day screen currently spends on nothing.
+- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
+  sheets, so a repeat log is one tap from the top of the list.
+- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
+  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
+- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
+  swipe on a saved meal, not beside the button pressed daily.
+
+- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
+  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
+  then convert screens one at a time behind the existing behaviour. **Do not start by editing
+  `nutrition-content.tsx`** — one added line fails Custom Rules.
+- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
+  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
+  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
+  anyway.
+- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
+  sync-payload change (Lane A) while everything above is Lane B.
+
 **What NOT to change — all three exist because a CLAUDE.md rule required them:**
 - `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
   correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
@@ -698,9 +1018,10 @@ redesign should either reserve the slot or move it into the expanded view.
   colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
 - No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
 
-- **Suggested first step.** The owner responded well to drawn options on Q-393; findings 4–5 are the
-  same kind of question. A short design pass covering the ingredient row and the saved-meal card,
-  in both dark **and** light, would settle them before any code is written.
+- **First step is done — the drawings exist** (finding 6). What is still open is the owner's pick
+  between srv/g options A, B and C, and whether the collapse-when-not-editing row in the proposed
+  Edit Meal artboard is wanted. Do not start coding the ingredient row before that answer; findings
+  1, 2, 3, 7 and 8 do not depend on it and can go first.
 - **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
   nothing here touches an engine path.
 - **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
@@ -710,6 +1031,54 @@ redesign should either reserve the slot or move it into the expanded view.
   `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
+
+### [nutrition][platform] Q-396 — a photo per saved meal, and the size cap is the whole design
+
+- **Branch:** `feat/saved-meal-thumbnail`
+- **Added:** 2026-08-18 · owner: *"can we have base64 saved images of meals? small icons?"*, while
+  reviewing the Q-395 rework — a meal you built weeks ago is hard to recognise from its name alone.
+- **Lane A.** Needs a Postgres migration, a local SQLite column and a sync-payload change. The Q-395
+  rework it serves is Lane B; the two can land independently because the UI degrades to no image.
+
+**The precedent exists and does not transfer.** `users.avatar` stores a **full `data:` URI in a text
+column**, validated by MIME whitelist and capped at **5 MB**
+(`app/api/user/avatar/route.ts:34-45`). That works because an avatar is **one row per user and is
+never in the sync delta**. A meal thumbnail is one per saved meal, and saved meals sync — so every
+image rides the outbox push, the pull delta, and the on-device SQLite mirror, on a phone, forever.
+Copying the 5 MB cap here would be the largest single regression the sync engine has ever taken.
+
+**Recommendation — a hard-capped thumbnail, stored as a data URI.**
+- **128 × 128 WebP, target ~6 KB, reject over 16 KB.** Downscale on-device with a canvas *before it
+  leaves the client*, and re-validate server-side — a client-side cap alone is not a cap. At 6 KB,
+  100 saved meals is ~600 KB across the whole sync surface, which is the same order as the text
+  already moving.
+- **Why base64 in a text column and not object storage:** the app is offline-first and has no blob
+  host. A URL renders nothing in airplane mode, which breaks the standing rule that *a local table
+  must hold everything needed to render the row offline*. A capped data URI is the only shape that
+  survives the canonical runtime. This is the rare case where the "obviously wrong" storage choice
+  is the right one, and the cap is what makes it so — **do not relax it later without re-reading
+  this paragraph**.
+- **What it costs if the cap slips:** nothing fails loudly. The outbox gets slower, the local DB
+  grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
+  named constant next to the column, not inline in the route.
+
+**The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
+on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
+weight, no upload path — and it already carries most of the recognition benefit in the drawings,
+where every thumbnail is exactly that placeholder. If the photo work is deferred, ship this and the
+Q-395 rows still look finished.
+
+**The full chain this has to touch, per the offline-sync rule — all in one PR:**
+`saved_meals` column → the web route's Zod schema → the `pushMutations` branch → `getSyncDelta`
+output → `pullDelta` mapping → `applyDelta` upsert columns → the local SQLite migration → **and its
+row in `RECONCILE_TABLES`/`RECONCILE_COLUMNS`**, which is the one most often missed and the one that
+silently breaks upgraded devices while every test and fresh install passes.
+
+- **Verification.** Not "it saved" — prove a non-null value **round-trips to the device and renders
+  with the network off**, which is the only test that distinguishes this from a URL. Then check the
+  outbox still drains on a throttled connection with a dozen meals carrying images.
+- **Not in scope:** photos on individual food items or on logged entries. One image per *saved
+  meal*, which is the surface the owner asked about and the only one where the row is durable.
 
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
@@ -926,6 +1295,19 @@ redesign should either reserve the slot or move it into the expanded view.
   3. **`work_mem` is 4 MB** and the failing query sorts 1.1M rows. Raising it for that path, or
      giving the query an index that avoids the sort, removes the temp-disk dependency that turned a
      full volume into a user-visible error.
+> **⚠️ The 500 MB target is withdrawn — 2026-08-18, and this is settled rather than deferred.**
+> Railway **cannot shrink a volume**: *"Down-sizing a volume is not currently supported, but
+> increasing size is supported."* And it does not need to, because Railway bills *"only … the amount
+> of storage used by your volumes,"* not the provisioned size — so the 5 GB volume costs exactly what
+> a 500 MB one would at the same usage. Reverting would mean a dump/restore onto a fresh volume,
+> i.e. real downtime and risk on the database holding the ring archive, to save nothing. **Do not
+> attempt it.** Treat every "return to stock 500 MB" line below as historical context for why the
+> work was prioritised, not as an outstanding action.
+>
+> What was genuinely lost is the tripwire: 500 MB is what made the bloat scream rather than creep, and
+> 5 GB is ~30 years of headroom at the post-packing rate. Replace it deliberately — a database-size
+> line in the session-start orientation read, beside the existing `error_events` check.
+
 - **The target is concrete:** the owner raised the volume 500 MB → 5 GB as a temporary mitigation
   and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
   estimating, and say whether 500 MB is reachable without touching retention.
@@ -1002,6 +1384,32 @@ redesign should either reserve the slot or move it into the expanded view.
   [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
 
 
+### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
+
+- **Branch:** `fix/admin-db-maintenance-off-native-gate`
+- **Added:** 2026-08-18, found while reclaiming 513 MB during the `disk_full` recovery.
+- **Lane B.** `components/oura-ble/**` + `app/admin/oura-ble/**`. No server change.
+- **What happens.** `components/oura-ble/oura-ble-debug.tsx:391` early-returns a "Native OuraBle
+  plugin unavailable" banner when the Capacitor plugin is absent. `<DbFootprintCard />` is rendered at
+  line 555 — *after* that return. So on any desktop browser the VACUUM FULL button, the Lever 1b
+  backfill button and the footprint readout do not render at all.
+- **Why that is wrong.** None of those three touch the plugin. `POST /api/oura-ble/samples/vacuum` is
+  a plain server-side call behind `auth()` + `requireAdmin`; it has nothing to do with BLE. It is
+  gated only by being rendered inside a component that gates on something else.
+- **Why it matters more than it looks.** Reclaiming disk becomes possible only from the phone — and
+  **`VACUUM FULL` takes an `ACCESS EXCLUSIVE` lock**, so the APK is the one client blocked while it
+  runs, with a WebView timeout free to swallow the response. Worse, if the APK is broken, uninstalled
+  or mid-rebuild, the disk cannot be reclaimed *at all* — which is exactly the situation where a full
+  volume is most likely. On 2026-08-18 the workaround was a `fetch()` from a desktop console.
+- **Fix shape:** move `DbFootprintCard` (and any other server-only card) above the availability
+  early-return. The genuinely native panels — `RawStoreStatusConsole`'s `rawStats()`, the SleepNet
+  dump, the sensor probe — correctly stay behind it.
+- **Second half: the pack backfill has no button at all.** `POST /api/oura-ble/samples/pack` shipped
+  with Q-541 Task 4 and its own comment says *"the button sends none"*, but nothing in `app/` or
+  `components/` references it. The 2026-08-18 run — 764 buckets, 941,233 frames — was five hand-typed
+  `fetch()` calls. It needs the same GET-preview + press-until-`remaining: 0` treatment the other
+  levers have, beside them in the footprint card.
+
 ### [devices][platform] Q-538 — `oura_raw.db` grows without bound on the phone: `pruneRaw` has no caller, and `rolled_up` is never set
 
 - **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §3
@@ -1022,10 +1430,31 @@ redesign should either reserve the slot or move it into the expanded view.
 - **Consequence:** the store has accumulated everything drained since 2026-07-27 at ~2–3 MB/day, with
   no bound and no visible failure state — exactly what the retention decision warned about (*"a rollup
   that silently falls behind turns Tier 1 into unbounded growth"*).
-- **Do first, it is cheap and unblocks measurement:** build the missing `rawStats()` panel in
-  `app/admin/oura-ble/` (already a known gap — `rawStoreOpen`/`lowDisk`/`totalRows`/`unrolledRows` are
-  wired in the plugin and rendered nowhere). **Nobody has ever observed the real size of this file.**
-  Then the bound + failure state; the full prune needs D2 Task 5.
+- ✅ **MEASURED ON DEVICE 2026-08-18 — the panel exists now and the owner read it.** First-ever
+  observation of this store, and it confirms the static analysis exactly:
+
+  | | |
+  |---|---:|
+  | total rows | **209,326** |
+  | **rolled up** | **0** |
+  | unrolled | 209,326 |
+  | on disk | **31.2 MB** |
+  | low disk | no |
+
+  **Zero rows are marked rolled up**, so `pruneRaw`'s `rolled_up = 1 AND synced = 1` predicate matches
+  nothing and the documented 14-day window cannot delete a single row. Both causes are now confirmed
+  from the device, not inferred.
+- **31.2 MB is a floor, not an accumulation.** The store was wiped by the 2026-08-17 reinstall and
+  rebuilt to 209,326 rows in ~1.5 days — that is the Full re-sync re-draining the ring's whole buffer
+  into a fresh cursor-0 store. Forward growth is ~23,000 rows/day at ~149 bytes/row ≈ **3.4 MB/day**,
+  matching the ~3.2 MB/day in `CLAUDE.md` and the ~1.2 GB/year the 2026-08-02 retention decision
+  predicted for an unpruned tier.
+- **It already exceeds Android Auto Backup's 25 MB per-app quota**, so the phone-side backup covers
+  none of it — see the `allowBackup` note below. That was a projection when this entry was filed; at
+  31.2 MB it is now a measurement.
+- **What is left here:** the bound and the visible failure state. The real prune still needs D2 Task 5
+  (the WebView rollup consumer) to set `rolled_up`, which is what this entry has always said and what
+  the device reading now proves.
 - **Also record:** `AndroidManifest.xml:14` sets `allowBackup="true"` with no `dataExtractionRules`.
   Android Auto Backup's cloud quota is 25 MB/app and `oura_raw.db` passed that within two weeks, so
   **the device raw store has no working backup.** That is load-bearing for the D4 decision (Q-542).

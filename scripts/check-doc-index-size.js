@@ -179,6 +179,16 @@ const root = path.join(__dirname, '..');
 // to the top of the queue and approved every drawn variant as a shippable style, so the entry gains
 // the priority marker and the note that this is no longer a pick-one decision — only the default is
 // still open, and that is a stored preference belonging to Q-392.
+//
+// Raised 2026-08-18 (session wrap-up, Q-548..Q-551): four entries the session measured but had not
+// filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
+// oura_heartrate index ratio, and the owner decision on leaving Railway (deliberately deferred behind
+// Q-545 so it is not decided on a pre-fix, deploy-inflated baseline).
+//
+// Raised 2026-08-18 (session wrap-up, Q-548..Q-551): four entries the session measured but had not
+// filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
+// oura_heartrate index ratio, and the owner decision on leaving Railway (deferred behind Q-545 so it
+// is not decided on a pre-fix, deploy-inflated baseline).
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -425,7 +435,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6910,
+  'projectOverview.md': 6957,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -439,7 +449,20 @@ const BASELINE = {
   // earlier figure in Q-389/Q-393 divided by the module count and not by the module count plus the
   // quiet zone the renderer draws inside the code box, so all of them read ~24% large. That table is
   // what stops the next session sizing a label against a number the printer will not honour.
-  'docs/implementation-backlog.md': 7828,
+  // Raised 2026-08-18 (Q-395 round 2, BugFix intake). The owner asked for mockups and a UI
+  // review of the nutrition screens before any code. Four findings came back that the entry
+  // did not have: every control is 44 px against this repo's own 48 dp rule, the srv/g toggle
+  // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
+  // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
+  // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
+  // Raised 2026-08-18 (Q-395 round 3 + Q-396, BugFix intake). The owner sent MyFitnessPal
+  // screenshots and asked for a rework rather than a repaint, so Q-395 now carries the settled
+  // direction: the root cause is a list row carrying an editor, which supersedes the three
+  // srv/g options as a fork, plus the one-row-component decision and the sequencing warning
+  // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
+  // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
+  // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+  'docs/implementation-backlog.md': 8257,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -447,7 +470,7 @@ const BASELINE = {
   // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
   // must do: construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock. Recomputed from the merged file on each merge this branch took.
-  'CLAUDE.md': 1056,
+  'CLAUDE.md': 1075,
 
 };
 

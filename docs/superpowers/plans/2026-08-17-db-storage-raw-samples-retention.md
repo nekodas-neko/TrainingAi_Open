@@ -21,8 +21,12 @@ recovered. Every other option on the table gets most of the space back and gives
 **Production hit `[pg 53100] disk_full`.** The volume was 500 MB — not the 1 GB the code comment
 claimed, which this document had already flagged as unverified. At the 464 MB measured in §1 the
 database was therefore already at **93% of its volume**, and the runway was hours, not 60 days. The
-volume has been raised 500 MB → 5 GB as a temporary mitigation; **the target is to return to the
-stock 500 MB.**
+volume has been raised 500 MB → 5 GB. **That was recorded as temporary with a target of returning to
+the stock 500 MB; the target is WITHDRAWN as of 2026-08-18 and the raise is permanent.** Railway
+cannot shrink a volume, and bills on storage *used* rather than provisioned — so 5 GB costs what
+500 MB would, and reverting would mean a dump/restore onto a fresh volume for no saving. Every
+"against the 500 MB target" figure below still stands as the sizing goal that drove the work; only
+the act of reverting the volume is off the table.
 
 **The cause is not growth.** Re-measured at 08:04 UTC, ~22 minutes after crash recovery:
 

@@ -6,6 +6,7 @@ import {
   mealLabelFiguresFromItems,
   MEAL_LABEL_TOKEN_LENGTH,
   QR_V2_M_BYTE_CAPACITY,
+  fitIngredientLines,
 } from '../label-payload'
 import type { SavedMeal, FoodItem } from '../../types/nutrition'
 
@@ -131,5 +132,47 @@ describe('mealLabelFigures', () => {
 
   it('carries the meal name through unchanged', () => {
     expect(mealLabelFigures(meal(2)).name).toBe('Ninja Creami')
+  })
+})
+
+describe('fitIngredientLines', () => {
+  const lineHeight = 8.5
+
+  it('shows every ingredient when they all fit', () => {
+    expect(fitIngredientLines({ room: 60, lineHeight, count: 4 })).toEqual({ shown: 4, overflow: 0 })
+  })
+
+  /**
+   * The invariant the whole helper exists for, and it is NOT reachable end-to-end: the code paints a
+   * white quiet-zone box before its modules, so an overrunning list is drawn over rather than
+   * colliding visibly — the code still decodes, and the label just silently shows fewer ingredients
+   * than it says it printed. Verified by reverting the derivation to a hardcoded five and watching
+   * the full E2E suite, QR decode included, stay green.
+   */
+  it('never needs more lines than the room allows, including the "+N more" line', () => {
+    for (const room of [10, 17, 25, 30, 42, 60]) {
+      for (const count of [1, 2, 3, 5, 8, 20]) {
+        const { shown, overflow } = fitIngredientLines({ room, lineHeight, count })
+        const linesDrawn = shown + (overflow > 0 ? 1 : 0)
+        expect(linesDrawn * lineHeight, `room ${room}, count ${count}`).toBeLessThanOrEqual(room)
+        expect(shown + overflow, 'every ingredient is either shown or counted').toBe(count)
+      }
+    }
+  })
+
+  // Room for one line and more than one ingredient: the line goes to the summary, not to a single
+  // ingredient plus a summary that will not fit. This is the case the property test caught.
+  it('gives a one-line gap to the summary rather than overrunning it', () => {
+    expect(fitIngredientLines({ room: 10, lineHeight, count: 2 })).toEqual({ shown: 0, overflow: 2 })
+  })
+
+  it('summarises rather than dropping — nothing vanishes silently', () => {
+    const { shown, overflow } = fitIngredientLines({ room: 30, lineHeight, count: 8 })
+    expect(shown + overflow).toBe(8)
+    expect(overflow).toBeGreaterThan(0)
+  })
+
+  it('reports nothing to draw for a meal with no ingredients', () => {
+    expect(fitIngredientLines({ room: 30, lineHeight, count: 0 })).toEqual({ shown: 0, overflow: 0 })
   })
 })

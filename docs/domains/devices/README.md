@@ -83,6 +83,15 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
   remains as a net for an undeclared re-key, validated only against the two re-drains it must not
   fire on, because there is no observed true reset in the data. No button yet — Q-317, Lane B.
 
+- [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](../../superpowers/plans/2026-08-18-device-primary-compute.md)
+  — **closing D2 Task 5/6 and D3 (2026-08-18, owner-directed focus).** The phone drains, stores and
+  cursors correctly and then **nothing consumes it** — a repo-wide grep finds no caller for
+  `getUnrolledRaw` or `markRolledUp`. Measured: `aggregateOuraRawSamples` is 1,110 lines with only **17
+  DB-coupled lines**, so the device rollup is a port behind a `RollupIO` interface, not a rewrite.
+  Two blockers verified today: production `script-src` has **no `wasm-unsafe-eval`**, so WASM cannot
+  instantiate on the device at all; and the app's 0.22 vCPU is **unexplained** after three refuted
+  hypotheses. Backlog Q-545 / Q-546 / Q-547.
+
 - [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](../../superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
   — **Q-541 implementation plan (2026-08-17).** Two tiers: `oura_raw_samples` stays exactly as it is
   for a 7-day hot window, a new `oura_raw_packed` holds everything older as sealed `bytea` blobs keyed
@@ -157,6 +166,12 @@ Live at the time of writing (2026-07-30):
   `getChestStrapLinkStatus()`, 1 Hz poll) — not yet confirmed on-device.
 
 ## History
+
+- [`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`](../../handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md)
+  — **the storage decision, the `disk_full` recovery (805 MB → 171 MB), and the D-track pivot.** Filed
+  under `platform` because it spans the bill and the pipeline, so the `devices` glob below misses it.
+  Carries the three refuted CPU hypotheses and the measured portability of the rollup (1,110 lines,
+  17 DB-coupled) — both expensive to re-derive.
 
 - Handoffs: `ls docs/handoff-*-devices-*.md` — plus
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)

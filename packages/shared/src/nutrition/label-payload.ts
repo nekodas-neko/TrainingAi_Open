@@ -125,3 +125,28 @@ export function mealLabelFiguresFromItems(meal: SavedMeal): Omit<MealLabelFigure
     fatG: Math.round(fatG),
   }
 }
+
+/**
+ * How many ingredient lines fit above a bottom-anchored code, and how many are left over.
+ *
+ * Pure, and tested, because the failure it prevents is invisible: the code paints a white quiet-zone
+ * box before its modules, so a list that overruns is **drawn over** rather than colliding visibly.
+ * The code still scans and still decodes to the right meal — an end-to-end check cannot see it at
+ * all. What breaks is the label silently claiming to list five ingredients while showing two.
+ *
+ * `overflow > 0` costs a line of its own for the "+N more" summary, which has to come out of the
+ * same room rather than being added after it.
+ */
+export function fitIngredientLines(
+  { room, lineHeight, count }: { room: number; lineHeight: number; count: number },
+): { shown: number; overflow: number } {
+  if (count <= 0) return { shown: 0, overflow: 0 }
+  const capacity = Math.max(0, Math.floor(room / lineHeight))
+  if (count <= capacity) return { shown: count, overflow: 0 }
+  // When the room holds a single line and there is more than one ingredient, that line goes to the
+  // summary and NOTHING is listed. Flooring `shown` at 1 instead — the first draft did — draws an
+  // ingredient *and* a summary into a one-line gap, which is the overrun this function exists to
+  // prevent. Caught by the property test, not by eye.
+  const shown = Math.max(0, capacity - 1)
+  return { shown, overflow: count - shown }
+}
