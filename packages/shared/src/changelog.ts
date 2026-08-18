@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.9",
+    date: "2026-08-18",
+    changes: [
+      "Typing in the meal plan editor no longer redraws every meal's macro bars on each keystroke. The bars were built to skip redrawing when nothing about them had changed, and that had never actually worked \u2014 so renaming a meal or writing an instruction re-rendered the whole list letter by letter.",
+    ],
+  },
+  {
     version: "1.324.8",
     date: "2026-08-18",
     changes: [
