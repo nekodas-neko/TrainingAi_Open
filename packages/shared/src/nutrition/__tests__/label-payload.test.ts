@@ -7,6 +7,7 @@ import {
   MEAL_LABEL_TOKEN_LENGTH,
   QR_V2_M_BYTE_CAPACITY,
   fitIngredientLines,
+  wrapIngredientRun,
 } from '../label-payload'
 import type { SavedMeal, FoodItem } from '../../types/nutrition'
 
@@ -174,5 +175,59 @@ describe('fitIngredientLines', () => {
 
   it('reports nothing to draw for a meal with no ingredients', () => {
     expect(fitIngredientLines({ room: 30, lineHeight, count: 0 })).toEqual({ shown: 0, overflow: 0 })
+  })
+})
+
+describe('wrapIngredientRun', () => {
+  const items = [
+    { name: 'Beef mince', weightG: 200 },
+    { name: 'pasta', weightG: 150 },
+    { name: 'passata', weightG: 100 },
+    { name: 'cheddar', weightG: 40 },
+    { name: 'onion', weightG: 80 },
+  ]
+
+  it('runs the ingredients inline, comma separated', () => {
+    const { lines, overflow } = wrapIngredientRun({ items, charsPerLine: 200, maxLines: 3 })
+    expect(overflow).toBe(0)
+    expect(lines.join(' ')).toBe('200g Beef mince, 150g pasta, 100g passata, 40g cheddar, 80g onion')
+  })
+
+  /**
+   * The property Q-397's whole design rests on: inline wrapping fits the COMPLETE list in far fewer
+   * lines than one-per-ingredient, which is what hands the height back to the code. Five stacked
+   * ingredients are five lines; here they are three.
+   */
+  it('fits all five ingredients in three lines at the real column width', () => {
+    const { lines, shown, overflow } = wrapIngredientRun({ items, charsPerLine: 31, maxLines: 3 })
+    expect(shown).toBe(5)
+    expect(overflow).toBe(0)
+    expect(lines.length).toBeLessThanOrEqual(3)
+  })
+
+  it('never exceeds its line budget, at any width, for any list', () => {
+    for (const charsPerLine of [12, 20, 31, 44]) {
+      for (const maxLines of [1, 2, 3]) {
+        const { lines, shown, overflow } = wrapIngredientRun({ items, charsPerLine, maxLines })
+        expect(lines.length, `${charsPerLine}ch x ${maxLines}`).toBeLessThanOrEqual(maxLines)
+        expect(shown + overflow, 'nothing is silently dropped').toBe(items.length)
+      }
+    }
+  })
+
+  it('summarises the tail as "+N more" rather than truncating a name', () => {
+    const { lines, shown, overflow } = wrapIngredientRun({ items, charsPerLine: 24, maxLines: 1 })
+    expect(shown + overflow).toBe(5)
+    if (overflow > 0) expect(lines.join(' ')).toContain(`+${overflow} more`)
+  })
+
+  it('says how many there are when not even one fits, rather than printing half a name', () => {
+    const { lines, shown } = wrapIngredientRun({ items, charsPerLine: 6, maxLines: 1 })
+    expect(shown).toBe(0)
+    expect(lines[0]).toBe('5 ingredients — scan')
+  })
+
+  it('returns nothing to draw for a meal with no ingredients', () => {
+    expect(wrapIngredientRun({ items: [], charsPerLine: 31, maxLines: 3 }).lines).toEqual([])
   })
 })

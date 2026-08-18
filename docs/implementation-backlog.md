@@ -621,15 +621,60 @@ moving *beside* the calories rather than under them.
   pitch is **0.353 mm** — below every shipped style, not merely below the "0.487 floor" this entry
   names. It buys three of five ingredient lines at 6.5 px in exchange for the least reliable code in
   the set. Recommendation: do not build it; the square die is the answer to wanting the list on paper.
-- **Still open:** option 2 above, and **the stored default**, which stays blocked on **Q-392** exactly
+- **✅ SUPERSEDED AND CLOSED by Q-397, shipped 2026-08-18 (v1.324.0).** This entry's central
+  premise — that the list "does not fit on a round one" — was true only for a **stacked** list. The
+  owner's actual suggestion was an **inline wrapping run**, which spends width instead of height:
+  five ingredients become three wrapped lines rather than five, and the height handed back goes to
+  the code. The complete list now fits a **round** label with a code larger than the old default's.
+  **B2 — round-safe, inline, centred, complete list — is the new `DEFAULT_MEAL_LABEL_STYLE`**, at
+  0.529 mm per module against the old default's 0.369, both now asserted in
+  `components/nutrition/__tests__/meal-label-code-size.test.ts` per Q-397's verification note.
+  Option 2 as costed here is moot; the stacked square style stays in the picker.
+- **Still open:** **the stored default**, which stays blocked on **Q-392** exactly
   as this entry says — the style remains picked-at-print-time and nothing was persisted.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
-  whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
-  without an explicit owner decision recorded here; and if a square-only variant ships, the app makes
+  whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
+  decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
+  now 0.529 and the old one measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
   clear which labels are square-only rather than letting a round die silently crop the list.
 - **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
+
+### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
+
+- **Branch:** `docs/coach-write-usage-decision`
+- **Added:** 2026-08-18 · review sweep (this run's findings checked against production) ·
+  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md)
+- **Placement:** low as work — **this is not a defect**. Filed because it re-prices Q-467/Q-468 (both
+  amended) and because "is this earning its complexity?" is an owner question a reviewer should not
+  answer alone.
+- **Measured.** `claude_ro.coach_changes` is **empty**: `total 0, ever_undone 0, first null, last null`.
+  Not "no undos" — **no applied changes at all, ever.**
+- **The Coach is not unused.** 5 threads / 16 messages (8 user, 8 assistant), latest 2026-08-13; the
+  AI-usage screen shows 17 Coach calls in 30 days. The widget vocabulary is rendering:
+
+  | | count |
+  |---|---|
+  | assistant messages | 8 |
+  | carrying any tool call | **8 of 8** |
+  | carrying a `choice_list` | 5 |
+  | carrying a **`change_preview`** | **1** |
+  | **changes applied** | **0** |
+
+  Across five conversations the model proposed a change **once**, and it was not accepted.
+- **What this does NOT mean.** Apply is **not** broken — the previous sweep applied a patch through the
+  real route successfully, and all four client call sites are wired. Whether the zero is because the
+  model rarely proposes (1 preview in 8 assistant messages) or because the single proposal was simply
+  declined is **not determinable from this data**, and the entry deliberately does not guess.
+- **Scope caveat that governs the whole entry:** `claude_ro` is **row-scoped to one user**. Zero means
+  *the owner* has never applied a Coach change; other accounts are structurally invisible here. Do not
+  restate this as "no user has ever used it".
+- **What would answer it:** a wider window, a second account, or instrumenting how often the model
+  emits a `change_preview` at all. None available from this endpoint.
+- **The decision this is really asking for:** five domain handlers, apply, preview, undo,
+  `coach_changes` and ~1,100 lines under `lib/coach/domains/` currently produce no writes. Keep and
+  drive adoption, or narrow? **Owner's call, not Lane A's.**
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
@@ -665,6 +710,13 @@ moving *beside* the calories rather than under them.
   than an error. **Lane B** — the route already exists.
 - **⛔ Do Q-468 first, or in the same change.** Wiring the button onto today's undo would ship the
   defect below.
+- **🔎 AMENDED 2026-08-18 from production — re-scoped, not closed.** `claude_ro.coach_changes` is
+  **empty**: no Coach change has ever been applied by this account, so **there has never been anything
+  to undo** and the harm this entry describes has not yet happened. The code path is still wrong and
+  the first real use will meet it — but the "upper-mid" placement was priced on an exposure that does
+  not exist yet. See **Q-472** and
+  [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
+  (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
 ### [workouts][platform] Q-468 — `undo` restores its captured state without checking the target still holds what the change set
 
@@ -700,6 +752,10 @@ moving *beside* the calories rather than under them.
   what the change **set** (`to`) and refuse with 409 + drift when they disagree, exactly as apply
   does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
   alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
+- **🔎 AMENDED 2026-08-18 from production — zero live instances.** Production has **not one
+  `target_id` with more than one change** (`coach_changes` is empty entirely), so the stacked-change
+  scenario that triggers this has never occurred. The defect reproduces locally and is real; its
+  exposure today is nil. Re-priced alongside Q-467 and Q-472.
 
 ### [readiness][platform] ✅ Q-394 — RESOLVED: `anchor-source.test.ts` was red on `main`, fixed by Q-356's fixture change
 
@@ -1009,6 +1065,47 @@ and this is the sixth.
   anyway.
 - **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
   sync-payload change (Lane A) while everything above is Lane B.
+
+
+**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
+- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
+  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
+  second ring component.
+- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
+  search across everything · tabs **Recent · Frequent · Saved meals** · a bottom row of
+  **Barcode · Photo · Describe**. Photo is kept because it exists today and the owner did not ask
+  to remove it.
+- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
+  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
+- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
+  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
+- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
+  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
+- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
+  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
+  unrelated screen.
+
+**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
+page/section to what's in prod right now — we don't want to silently lose any sections."* The first
+draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
+(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
+MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
+**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
+**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
+and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
+quietly loses a section is the failure mode this entry exists to prevent.
+
+**17 — A section that has nowhere to go under the new tabs: `My Foods`.** The shipped capture step
+offers it (`onMyFoods` → `FoodLibrarySheet`) and the three agreed tabs are Recent, Frequent and
+Saved meals. Recommendation: make it a **fourth tab**, not a button — it is a list of foods like the
+other three, and a tab is where someone will look for it. Flagged rather than decided.
+
+**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
+assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
+`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
+`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
+delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
+whether or not anyone draws them first.
 
 **What NOT to change — all three exist because a CLAUDE.md rule required them:**
 - `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
@@ -1676,6 +1773,11 @@ silently breaks upgraded devices while every test and fresh install passes.
   rows means "already set". The question to ask of each is whether zero rows is an expected idempotent
   outcome or an error.
 - **NOT device-verified** — reproduced on the web build; the outbox half is read from source, not run.
+- **🔎 CHECKED 2026-08-18 against production — it cannot adjudicate this, do not cite it either way.**
+  Of the owner's **77 completed sessions, 57 (74.0%) carry no `session_rpe`**. That looks supportive
+  and is **not evidence**: the mechanism this entry describes leaves the value in the *local* store,
+  which `claude_ro` cannot see, so a dropped write and a user who skipped the optional prompt produce
+  an identical server row. Separating them needs the device.
 
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 
@@ -1946,6 +2048,13 @@ ehr     0     0     0     0   648   208   128   556     0
   *"the user told us they feel neutral"* must not collapse to the same value.
 - **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
   body carries no answers. **Lane A.**
+- **🔎 AMENDED 2026-08-18 from production — REFUTED in practice; drop the priority.** Across all 50 of
+  the owner's check-in rows, checked against **every** answer column (including the six morning ones:
+  `wake_mood`, `perceived_recovery`, `motivation`, `sleep_quality_feel`, `resting_soreness`,
+  `illness_context`), **zero are truly empty** — 45 morning and 5 evening, all carrying answers. The
+  route will write a hollow row if handed `{}`, but nothing in real use has done so.
+  ⚠️ **A first version of that query said "45 of 50 entirely empty" and was WRONG** — it tested only
+  the evening columns. Recorded so the false number is not picked up from anywhere it leaked.
 
 ### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
 
@@ -3886,6 +3995,213 @@ session working from a temporarily restored copy.
   started each of those days at a fixed midpoint regardless of recovery. Last occurrence was over a
   month ago, so it reads as a post-re-key coverage gap that closed on its own. *Something that stopped
   is not something that was fixed* — noted as unexplained rather than closed.
+
+### [workouts] Q-512 — `health-insight`'s ACWR is structurally null on every day (110/110)
+
+- **Branch:** `fix/health-insight-acwr-window`
+- **Plan:** none — a one-line fix either way. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §2
+- **Mechanism.** `app/api/ai/health-insight/route.ts` calls `computeVolumeAcwr` with
+  `getWorkoutSessionsFrom(userId, subDays(new Date(), 7))` — a **7-day** list. The helper gates on
+  `spanDays >= minSpanDays` (**21**), and `spanDays` is measured from the earliest session *in the list
+  passed to it*. **A 7-day list can never span 21 days**, so the gate can never pass.
+- **Confirmed by replay over 110 days: 0 non-null.** Not a coverage problem more history would fix —
+  structural. The route computes the load object and reads `.acwr` from it every time, always `null`.
+- **First action:** either widen the fetch to **28 days** to match `signals.ts` (if the insight is meant
+  to mention training load), or drop the `computeVolumeAcwr` call and the `.acwr` read (if it is not).
+- **Do NOT lower `minSpanDays`** to rescue this caller — that degrades *every* caller's ACWR to fix one
+  that is mis-wired.
+
+### [workouts][platform] Q-513 — the score-audit panel and the next-session engine disagree on the ACWR band on 38% of days
+
+- **Branch:** `fix/build-day-audit-acwr-window`
+- **Plan:** none — a window change. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-acwr-calibration.md`](reviews/2026-08-18-acwr-calibration.md) §3
+- **Three callers, three windows**, all feeding one `computeVolumeAcwr` and all banded with the same
+  `ACWR_THRESHOLDS`: `signals.ts` **28 days** (the intended 7:28, drives the engine),
+  `health-insight` **7 days** (always null, Q-512), `score-audit/build-day-audit.ts` **all history**
+  (chronic becomes the **lifetime** weekly average).
+- **Measured** over the same days:
+
+  | | 28-day (engine) | all-history (audit panel) |
+  |---|---|---|
+  | mean | 0.99 | **1.07** |
+  | `optimal` share | **69.3%** | 49.4% |
+  | `high` share | 12.5% | **29.2%** |
+  | `very_high` share | 0% | **3.4%** |
+  | days > 1.5 (emergency-deload line) | **0** | **3** |
+
+  Mean |difference| **0.150**, max **0.395**, **different band on 33 of 88 days (38%)**.
+- **Mechanism, and it worsens over time.** The lifetime weekly average is *lower* than the recent
+  baseline — 20,572 kg/wk lifetime vs 23,239 kg/wk over the last 28 days (**1.13×**) — so the smaller
+  denominator inflates the ratio (observed inflation 1.08). **Any sustained volume increase widens the
+  gap indefinitely**; it is not a fixed offset that could be tolerated.
+- **Why it matters.** `build-day-audit` *is* the score-audit panel, whose whole contract is to show a
+  score beside **the inputs that produced it**. On 38% of days it shows a training-load band the engine
+  never saw, and on three days it shows `very_high`/past the emergency-deload line while the engine saw
+  at most `high`.
+- **First action:** pass a **28-day** window in `build-day-audit`, matching `signals.ts`. If a lifetime
+  view is independently wanted it needs a different name — it is not ACWR. Then re-measure.
+- **Upper bound caveat:** `build-day-audit`'s `programTooNew` gate can null its ACWR independently, so
+  38% bounds the days the panel actually renders a band.
+
+### [workouts] Q-514 — 64% of the engine's back-off load cuts are an expected-RPE clamp artefact
+
+- **Branch:** `fix/expected-rpe-clamp-exclusion`
+- **Plan:** none — a predicate plus a filter. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](reviews/2026-08-18-rpe-autoregulation-calibration.md)
+- **`RPE_DEAD_BAND = 1.5` is correctly placed — do NOT move it.** Sensitivity over 377 per-exercise
+  windows: 0.5 → 48.3%, 1.0 → 29.4%, 1.25 → 20.7%, **1.5 → 17.5%**, 2.0 → 14.9%. It sits on a flat part
+  of the curve and the delta distribution is centred (mean −0.05). **The input is what is biased.**
+- **The floor clamp splits the data in two.** `expectedRpe` clamps to the 5–10 slider range. The
+  **ceiling never binds** (raw expected tops out at exactly 10.0, 0 sets clamped); the **floor binds on
+  37 of 570 sets (6.5%)**, hiding raw values as low as **−10.4**. Those are not warm-ups —
+  `intensity_pct` **49.6–66.7** (median 54.3) at **7–13 reps** (median 10), ordinary accessory work. At
+  54.3% reps-to-failure is ~19, so a 10-rep set has ~9 RIR and a "true" expected RPE near 0.6; the model
+  can only say **5**, and the owner reports **6.9**.
+
+  | population | n | mean delta |
+  |---|---|---|
+  | floor-clamped | 37 | **+1.89** |
+  | everything else | 533 | **−0.34** |
+
+  A **2.2-point systematic offset**, in the direction the back-off arm reads as "RPE ran high".
+- **Cost, replaying the shipped grouping** (per exercise, trailing 3 sessions, ≥3 sets, threshold 1.5):
+
+  | | shipped | excluding floor-clamped |
+  |---|---|---|
+  | back-off (≥ +1.5) | **39 (10.3%)** | **14 (4.1%)** |
+  | push (≤ −1.5) | 27 (7.2%) | **27 (7.9%)** |
+  | sd of delta | 1.16 | 0.96 |
+
+  **25 of 39 back-off triggers vanish — 64%** — while the push arm is *untouched*. That asymmetry is
+  what makes it a bias fix rather than a de-sensitisation. 64% of back-off windows contain ≥1
+  floor-clamped set. Each trigger is a **5–10% load cut**.
+- **First action:** exclude sets whose **raw (pre-clamp)** expected RPE falls outside the slider range
+  from the autoregulation delta. They carry no information — the model cannot state its expectation, so
+  the gap to the reported value measures nothing. Matches the codebase's existing principle of passing
+  `null` rather than fabricating a neutral (`computeResilienceForDay`). Contained: one predicate beside
+  `expectedRpe`, plus a filter in `signals.ts`'s `perExRpeDelta` loop (~line 293). **No curve change.**
+- **Corroborated by the app's own other model.** `ACCESSORY_SPEC` (`goal-ranges.ts`) prescribes
+  accessory work to **RPE 7.5–8.5** (*"ALL genuinely challenging (>= RPE 7.5)"*). The floor-clamped sets
+  report a mean actual RPE of **6.89** — below every target in that table and below the dataset mean of
+  7.49. **By the app's other model these sets are easy**, while the autoregulation delta reads them at
+  +1.89 and cuts load. Two models in one codebase disagreeing in *sign* about the same sets.
+  (A stronger version — attributing the clamped sets to the `accessory` role — was **abandoned as
+  unsound**: exercise names map to more than one role across programs, so a name-based join fans out.)
+- **Do NOT widen the clamp** to allow expected RPE below 5 — an expectation of 0.6 against an owner who
+  never reports below 6 gives a delta of **+6.3**, worse. The set is unrepresentable either way.
+- **Re-measure after.** Back-off 4.1% vs push 7.9% is asymmetric the other way; whether that is right is
+  the next question, and it must be asked against unbiased input.
+- **Caveat that bounds the counts — read this with the 64%.** The back-off arm needs a second signal
+  (`rm1Trend === 'down'` OR `repCompletionRate < 0.95`), which the replay does **not** model. Measured:
+  the owner is short of the prescribed reps on only **14 of 196 sets (7.1%)**, exact on 75%, over on
+  17.9%, mean completion **1.046** — so `missedReps` is rarely the corroborator and most back-offs must
+  come via a falling 1RM. **The number of cuts actually issued is well below 39, and the number the fix
+  prevents is well below 25.** The defect is real and one-directional, but "64% of back-off *triggers*"
+  is not "64% of load cuts on your training". The ratio is the finding; sizing the absolute impact needs
+  `rm1Trend` modelled, which this review does not do. Only sets carrying
+  both `rpe` and `intensity_pct` are visible (570 of 1,029 set logs).
+- **Related, recorded not filed:** `calcAmrap1RM` / `amrapScaleFactor` (the 1.0/0.97/0.93/0.88/0.82
+  rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls
+  would be wasted; removing it is a Review-lane call.
+
+### [heart-rate][body] Q-515 — the rest/active boundary shrank 3× because the owner got fitter
+
+- **Branch:** `fix/hr-rest-threshold-anchor`
+- **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
+- **Blast radius.** `HR_REST_THRESHOLD = 0.05` is the single rest/active boundary shared by **Body
+  Battery's charge/drain** and the **Activity Score's "moved this hour"** signal — it propagates into
+  two pillars.
+- **Measured** over 12,471 BLE ring samples, waking hours (07:00–21:59), joined per day to that day's
+  own stored profile:
+
+  | month | resting HR | hr_max | boundary | median % of waking samples below it |
+  |---|---|---|---|---|
+  | 2026-07 | 62.9 | 187.0 | **69.1 bpm** | **26.5%** |
+  | 2026-08 | 54.4 | 171.2 | **60.2 bpm** | **8.2%** |
+
+  **A 3.2× collapse in one month at identical sample density (184/day).**
+- **Every input behaved correctly.** Resting HR 62.9 → 54.4 is a genuine fitness gain; `hr_max`
+  187 → 168 is the profile maturing from the age formula to a corroborated observed ceiling (the chest
+  strap's max is 166 over 40,230 samples) — `resolveHrProfile` working as designed. Waking HR also fell,
+  77.5 → 73.3.
+- **The trap is a RATE difference.** Resting HR fell **8.5 bpm**; waking HR fell only **4.2**. Resting
+  HR is the more responsive fitness marker, so a boundary pinned to it moves ~2× as fast as the
+  distribution it classifies. Decomposed: resting HR explains ~8.1 of the 8.9 bpm boundary drop, the
+  `hr_max` maturation ~0.9. **The owner got fitter and was rewarded with less recovery credit.**
+- **No fraction fixes it** — sweeping the constant, July vs August medians: 0.05 → 26.5/8.2 (3.2×),
+  0.08 → 38.5/22.7, 0.10 → 47.8/29.8, 0.12 → 59.6/35.2, 0.15 → 72.8/50.6 (1.4×). The gap narrows but
+  never closes. **Tuning this constant is not the fix** — fourth instance of that pattern today
+  (Q-506, Q-512, Q-514, Q-515).
+- **Two separable questions; only one is answered here.** *(a) Is it stable?* No — a defect regardless
+  of taste. *(b) Is 8.2% the right level?* **Unknown** — ~1.2 h of a 15 h day is not obviously wrong,
+  and whether Body Battery should charge more in daylight is an owner question. **Fix (a) alone**; if
+  the fraction is raised at the same time the two effects become inseparable and neither is verifiable.
+- **First action — recommendation:** anchor the boundary to a **slow-moving** resting baseline (90-day
+  trailing, or a fixed offset re-derived quarterly) so a month of fitness improvement cannot move the
+  classifier under its own data. Keeps personalisation, removes the month-scale feedback. Reversal cost
+  is low and the effect is observable within a week of BLE data.
+- **Rejected alternative:** a percentile of the owner's own recent *waking* HR (trailing-28-day p25).
+  Stable by construction — which is the objection: Body Battery charge would go near-constant and a
+  genuinely restful day could not read as one. The codebase already names this "the treadmill" and
+  removed it from the activity-goal volume lane (Q-190). **Self-referential boundaries are fine for a
+  pure classifier and wrong for anything feeding a score — this one feeds two.**
+- **Re-measure both consumers afterwards**: Body Battery's charge/drain balance (currently mean charged
+  23.1 vs drained 36.0) and the Activity Score's movement signal.
+- **On Q-272:** its "median 6.7% of waking samples" could not be reproduced — the same statistic on
+  current data gives **15.0%** pooled over 42 days. **Not filed as an error there**; the month split
+  (26.5% / 8.2%) suggests it was measured on recent data alone, and the drift documented here explains
+  the difference.
+- **Still unreviewed in this pillar:** `PEAK_BANDS` (its "stable per-bucket sample sizes" justification
+  is an empirical claim nobody has measured) and the Karvonen zone boundaries (0.6/0.7/0.8/0.9).
+
+### [heart-rate] Q-516 — `PEAK_BANDS` is calibrated for a heart-rate range strength training never reaches
+
+- **Branch:** `fix/hr-recovery-peak-bands`
+- **Plan:** none yet — re-banding is cheap; **the honesty change in "first action" is the real work.**
+  Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md) Part 2
+- **The claim under test.** `hr-recovery-profile.ts` justifies its bands as *"Bands, not exact bpm, for
+  stable per-bucket sample sizes (spec §3)."* That is empirical, and it is **false** for this athlete.
+- **Observed range**, 208 episodes with `coverage_ok` (2026-05-27 → 08-17): min 59, p25 93.8,
+  **median 102**, p75 110, p95 121, **max 132**.
+
+  | band | episodes | share | mean `drop_60s` |
+  |---|---|---|---|
+  | **`<110`** (spec: *low-signal, de-emphasise*) | **149** | **71.6%** | **3.0** |
+  | `110–129` | 57 | 27.4% | **14.9** |
+  | `130–149` | **2** | 1.0% | 13.5 |
+  | `150–169` | **0** | 0% | — |
+  | `170+` | **0** | 0% | — |
+
+  The highest set-peak ever recorded is **132**, so the top two bands are **structurally unreachable**,
+  not merely sparse. `LOW_SIGNAL_BAND_LABEL = '<110'` sits at the **p75**, so the profile de-emphasises
+  three quarters of its own data. **One usable bucket** (`110–129`, n = 57).
+- **The de-emphasis is CORRECT, which makes it worse.** Mean `drop_60s` is **3.0** below 110 against
+  **14.9** above it — the spec's "near-meaningless … mostly measurement noise" is **supported**. So
+  re-banding does not recover hidden signal: **peak HR during a lifting set mostly does not reach the
+  range where HR recovery is informative.** These bands read as designed for cardio/interval work.
+- **Also:** `coverage_ok` is true on only **212 of 691** rows (31%) — two thirds of set-HR rows are
+  discarded before banding. Not investigated; recorded so 208 is not mistaken for the full sample.
+- **First action:** (1) re-band to the observed range (e.g. `<90 · 90–104 · 105–119 · 120+`) so four
+  buckets populate and the 110–129 signal is not diluted; **(2) — the important one — state plainly in
+  the feature and the docs that HR recovery is informative for roughly the 28% of sets peaking above
+  110.** A re-banded profile that averages noise into four buckets is **worse** than one honest bucket,
+  because it looks like it is working. **Do not ship (1) without (2).**
+- **Owner-facing question behind it:** if HR recovery is meant to track conditioning, the range exists
+  in cardio and chest-strap data (max 166 over 40,230 samples), not strength sets. Whether the feature
+  is targeted correctly is a product decision, not a constant.
+- **Caveat:** nothing about the recovery *math* (`drop_30s`…`drop_120s`, `sec_to_hrr50`) was checked —
+  only the banding and its populations. Cardio/chest-strap **episodes** were not examined; the claim
+  that the range exists there comes from raw `oura_heartrate`, since `set_hr_stats` is strength-derived
+  by construction.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

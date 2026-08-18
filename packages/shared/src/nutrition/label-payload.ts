@@ -150,3 +150,57 @@ export function fitIngredientLines(
   const shown = Math.max(0, capacity - 1)
   return { shown, overflow: count - shown }
 }
+
+/**
+ * The ingredient run as wrapped lines — `200g Beef mince, 150g pasta, 100g passata` — with `+N more`
+ * when it will not fit (Q-397).
+ *
+ * **Inline, not one line per ingredient, and that is the whole design.** A stacked list spends
+ * *height*, which on a 50 mm label is the one thing the code also needs; a wrapping run spends
+ * *width*, which is otherwise wasted. Five ingredients become two or three wrapped lines rather than
+ * five stacked ones, and the height handed back goes to the code — which is how the complete list
+ * fits a **round** label with a bigger code than the stacked version could manage.
+ *
+ * Measuring by character count rather than by `ctx.measureText` keeps this pure and testable. The
+ * caller passes the characters that fit its column at its type size; the renderer is the only place
+ * that knows the font.
+ */
+export function wrapIngredientRun(
+  { items, charsPerLine, maxLines }: {
+    items: { name: string; weightG: number }[]
+    charsPerLine: number
+    maxLines: number
+  },
+): { lines: string[]; shown: number; overflow: number } {
+  if (items.length === 0 || maxLines <= 0 || charsPerLine <= 0) {
+    return { lines: [], shown: 0, overflow: items.length }
+  }
+  const label = (i: { name: string; weightG: number }) => `${Math.round(i.weightG)}g ${i.name}`
+
+  // Try the whole list first, then give back one ingredient at a time until what is left — plus its
+  // "+N more" tail — fits the line budget. Dropping from the end keeps the order the meal was built
+  // in, which is the order the owner reads it in.
+  for (let take = items.length; take >= 1; take--) {
+    const rest = items.length - take
+    const text = items.slice(0, take).map(label).join(', ') + (rest > 0 ? `, +${rest} more` : '')
+    const lines = wrapByChars(text, charsPerLine)
+    if (lines.length <= maxLines) return { lines, shown: take, overflow: rest }
+  }
+  // Not even one ingredient fits: say how many there are rather than printing a partial name.
+  return { lines: [`${items.length} ingredients — scan`], shown: 0, overflow: items.length }
+}
+
+/** Greedy word wrap on a character budget. */
+function wrapByChars(text: string, charsPerLine: number): string[] {
+  const words = text.split(' ')
+  const lines: string[] = []
+  let line = ''
+  for (const w of words) {
+    const next = line ? `${line} ${w}` : w
+    if (next.length <= charsPerLine) { line = next; continue }
+    if (line) lines.push(line)
+    line = w
+  }
+  if (line) lines.push(line)
+  return lines
+}

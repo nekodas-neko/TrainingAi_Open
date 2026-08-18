@@ -154,7 +154,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // one whose code is tightest, so a regression there matters most. "Square" is Q-393's ingredient
   // layout, which takes a different draw path entirely — it would be the easiest one to break
   // silently, since it is the only style that renders from a second data source.
-  for (const style of ['Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Square · centred', 'Square · big code']) {
+  for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Square · big code']) {
     await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
     await expect
       .poll(inkFraction, { message: `${style} should paint ink onto the canvas`, timeout: 20_000 })
@@ -168,7 +168,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // layout. It matters most for the two square styles, whose ingredient list is drawn directly above
   // the code — an earlier version of the centred layout ran the list into it, and a covered code
   // still looks like a code.
-  for (const style of ['Black band', 'Plaque', 'Square · centred', 'Square · big code']) {
+  for (const style of ['Ingredients · centred', 'Black band', 'Plaque', 'Square · big code']) {
     await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
     await expect.poll(inkFraction, { timeout: 20_000 }).toBeGreaterThan(0.01)
 
