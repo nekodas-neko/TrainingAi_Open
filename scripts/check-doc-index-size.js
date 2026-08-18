@@ -329,7 +329,11 @@ const BASELINE = {
   // the backlog, finding 4 is struck in place with the three consequences the entry did not
   // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
   'projectOverview.md': 6871,
-  'docs/implementation-backlog.md': 7207,
+  // Raised 2026-08-18 (Tuning): 7207 -> 7221. Live evidence added to Q-501 — after both
+  // recalibrations deployed, 0 of 96 derived rows carry a readiness model version and a bulk job had
+  // bumped updated_at on all of them without rewriting a score. The measurement belongs in the entry
+  // because it is what stops the next person auditing the ship by timestamp and getting it wrong.
+  'docs/implementation-backlog.md': 7221,
   'CLAUDE.md': 1044,
 
 };

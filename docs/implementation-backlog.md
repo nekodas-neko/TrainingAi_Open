@@ -2857,6 +2857,20 @@ session working from a temporarily restored copy.
 - **Plan:** none yet
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
+- **⚠️ SECOND live demonstration, 2026-08-18, and it is the more damaging one.** After the Sleep
+  (v1.319.0) and Readiness (v1.321.0) recalibrations deployed (production reports **1.321.1**), a
+  bulk job at **03:55:01** bumped `updated_at` on essentially every `oura_daily_derived` row **without
+  rewriting any score**. Result, measured: **0 of 96 rows carry a `readiness` model version**, and
+  every stored sleep/readiness score is still pre-recalibration (2026-08-17 stores **78** for a
+  7.58 h / 90% / 0.75 h-deep night — an old-model value). Every one of those rows was *created*
+  before the deploy.
+  **So `updated_at` is not evidence of which model wrote a row** — it moves for reasons unrelated to
+  the score. Anyone auditing "did the recalibration land?" by timestamp gets the wrong answer, and
+  this is exactly why the `model_version` stamp matters more than it looks.
+- **Consequence worth knowing:** stored scores are only rewritten when the readiness route recomputes,
+  which happens on app open. Placeholder rows already exist through **2026-08-22** with null scores,
+  so the first row to carry new-model values *and* the `v3:ri5:2026-08-18` stamp will be the next day
+  actually scored — that is where the trend step falls, and the stamp is what will mark it.
 - **Demonstrated live 2026-08-17:** the 08-13 summary was re-rolled mid-session (hours 1.20 → 5.78,
   a Q-274 fragment night resolving itself) and the derived readiness row did not follow — that day's
   persisted score is now **7 points** off a fresh recompute at the unchanged anchor.
