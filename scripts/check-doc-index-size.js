@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, local-first write coverage): backlog 9387 -> 9393, projectOverview
+// 7501 -> 7523. No new entry — the sweep BOUNDS Q-488 (it is one handler, not a class), which is the
+// question an implementer has to answer before budgeting the work, so it rides on that entry. The
+// row also carries two things a later audit would otherwise get wrong: the file-level version of
+// this check is unsound (it clears the very file Q-488 is in), and "no pull mapping" is not evidence
+// of a gap, because saved_meals is push-only and kept fresh by hydrate-on-read by design.
+
+//
 // Raised 2026-08-18 (Review, server-only writes to local-first domains, Q-488): backlog 9384 -> 9387,
 // projectOverview 7468 -> 7501. One queue entry and its row. Both carry three lines that decide how
 // it gets triaged and fixed: it SELF-HEALS via the tombstone (visible inconsistency, not data loss);
@@ -651,7 +659,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7501,
+  'projectOverview.md': 7523,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -662,7 +670,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9387,
+  'docs/implementation-backlog.md': 9393,
   'CLAUDE.md': 1075,
 
 };
