@@ -103,6 +103,38 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform][body][nutrition] 🟡 The create routes nobody gave a schema — a 10 MB note is accepted where the edit path caps it at 1,000 (Q-484, 2026-08-18)
+
+- **`CLAUDE.md` says oversized input is "a rejection, not a skip". Nothing had tested it.**
+  [`docs/reviews/2026-08-18-unvalidated-create-bodies.md`](docs/reviews/2026-08-18-unvalidated-create-bodies.md).
+- **Measured:** `POST /api/injuries` with a 200 kB `muscleName` + 500 kB `notes` → **201**, both stored
+  in full; `POST /api/supplements` with a 300 kB `name` → **201**; and a **10 MB** `notes` → **201**,
+  10,000,000 characters stored. No ceiling found below 10 MB.
+- **⚠️ Do not quote 10 MB as a storage figure.** `pg_column_size` read ~120 kB because the payload was
+  one repeated character and TOAST compressed it; real text would not. What is defensible: the
+  transfer and parse cost is unbounded, and stored size is bounded only by what the content compresses
+  to.
+- **The asymmetry is the finding.** For the same table and fields, `PATCH /api/injuries/[id]` runs
+  `InjuryPatchSchema` (`muscleName max(100)`, `notes max(1000)`, `startedDate` regex) while
+  `POST /api/injuries` does `const body = await req.json()` and destructures. **`CLAUDE.md` names
+  `updateInjury` as the reference for whitelisting a PATCH body** — it is a good reference, and the
+  create path beside it has no schema at all, which is probably why nobody looked.
+- **The unvalidated `startedDate` also 500s** — `{"startedDate":"not-a-date"}` → 500,
+  `{"startedDate":"0001-01-01"}` → 201 accepted. Same class as Q-482, same root cause, fixed by the
+  same change.
+- **Scope, read carefully: 33 body-bearing routes call `req.json()` with no schema parse — a
+  *candidate* count, not a defect count.** Several do hand-rolled checks, several are admin-gated.
+  **Two** were confirmed by probe; the other 31 are unaudited and should be treated as neither broken
+  nor fine.
+- **Severity low today and the reason to fix is not attack** — this app's users are its own account
+  holders. It is filed because the session-start **database-size ritual** and the 2026-08-17
+  `disk_full` outage exist precisely for unbounded growth, because the stated direction is multi-user
+  and a Play Store listing, and because `InjuryPatchSchema` already encodes the intended bounds so the
+  fix is a few lines.
+- **Two clean results:** the PATCH/PUT edit paths are properly bounded wherever checked; and the
+  163-vs-31 `z.string()`-with-`.max()` ratio is **not** a finding and must not be quoted — most
+  unbounded `z.string()` under `app/api` are **AI output schemas**, not request bodies.
+
 ### [platform] 🟠 A route id that is not a UUID reaches Postgres — and three routes reply with the SQL (Q-482, Q-483, 2026-08-18)
 
 - **The third case, after "another user's id" (protection holds) and "valid but missing" (Q-463):**
