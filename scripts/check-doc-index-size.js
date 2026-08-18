@@ -445,7 +445,14 @@ const BASELINE = {
   // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
   // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
   // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
-  'docs/implementation-backlog.md': 7948,
+  // Raised 2026-08-18 (Q-395 round 3 + Q-396, BugFix intake). The owner sent MyFitnessPal
+  // screenshots and asked for a rework rather than a repaint, so Q-395 now carries the settled
+  // direction: the root cause is a list row carrying an editor, which supersedes the three
+  // srv/g options as a fork, plus the one-row-component decision and the sequencing warning
+  // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
+  // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
+  // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+  'docs/implementation-backlog.md': 8043,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

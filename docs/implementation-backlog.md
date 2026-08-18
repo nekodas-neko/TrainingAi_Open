@@ -809,6 +809,53 @@ string onto `var(--brand)` would repaint the protein macro with whatever accent 
 The selection-state literals and the macro palette are the same eight characters and must not share
 a fate — finding 1 is the former only.
 
+
+**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
+MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
+true S25 size in our own tokens — **canvas page "Reworked screens"**,
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
+meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
+none of the chrome, colour or type is copied.
+
+**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
+srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
+row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
+quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
+button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
+ingredients fill the S25 screen; the drawn version fits five with room left over.
+**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
+sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
+
+**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
+search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
+use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
+column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
+screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
+and this is the sixth.
+
+**14 — The other structural changes, in the order they pay off.**
+- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
+  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
+- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
+  space the day screen currently spends on nothing.
+- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
+  sheets, so a repeat log is one tap from the top of the list.
+- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
+  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
+- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
+  swipe on a saved meal, not beside the button pressed daily.
+
+- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
+  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
+  then convert screens one at a time behind the existing behaviour. **Do not start by editing
+  `nutrition-content.tsx`** — one added line fails Custom Rules.
+- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
+  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
+  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
+  anyway.
+- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
+  sync-payload change (Lane A) while everything above is Lane B.
+
 **What NOT to change — all three exist because a CLAUDE.md rule required them:**
 - `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
   correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
@@ -830,6 +877,54 @@ a fate — finding 1 is the former only.
   `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
+
+### [nutrition][platform] Q-396 — a photo per saved meal, and the size cap is the whole design
+
+- **Branch:** `feat/saved-meal-thumbnail`
+- **Added:** 2026-08-18 · owner: *"can we have base64 saved images of meals? small icons?"*, while
+  reviewing the Q-395 rework — a meal you built weeks ago is hard to recognise from its name alone.
+- **Lane A.** Needs a Postgres migration, a local SQLite column and a sync-payload change. The Q-395
+  rework it serves is Lane B; the two can land independently because the UI degrades to no image.
+
+**The precedent exists and does not transfer.** `users.avatar` stores a **full `data:` URI in a text
+column**, validated by MIME whitelist and capped at **5 MB**
+(`app/api/user/avatar/route.ts:34-45`). That works because an avatar is **one row per user and is
+never in the sync delta**. A meal thumbnail is one per saved meal, and saved meals sync — so every
+image rides the outbox push, the pull delta, and the on-device SQLite mirror, on a phone, forever.
+Copying the 5 MB cap here would be the largest single regression the sync engine has ever taken.
+
+**Recommendation — a hard-capped thumbnail, stored as a data URI.**
+- **128 × 128 WebP, target ~6 KB, reject over 16 KB.** Downscale on-device with a canvas *before it
+  leaves the client*, and re-validate server-side — a client-side cap alone is not a cap. At 6 KB,
+  100 saved meals is ~600 KB across the whole sync surface, which is the same order as the text
+  already moving.
+- **Why base64 in a text column and not object storage:** the app is offline-first and has no blob
+  host. A URL renders nothing in airplane mode, which breaks the standing rule that *a local table
+  must hold everything needed to render the row offline*. A capped data URI is the only shape that
+  survives the canonical runtime. This is the rare case where the "obviously wrong" storage choice
+  is the right one, and the cap is what makes it so — **do not relax it later without re-reading
+  this paragraph**.
+- **What it costs if the cap slips:** nothing fails loudly. The outbox gets slower, the local DB
+  grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
+  named constant next to the column, not inline in the route.
+
+**The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
+on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
+weight, no upload path — and it already carries most of the recognition benefit in the drawings,
+where every thumbnail is exactly that placeholder. If the photo work is deferred, ship this and the
+Q-395 rows still look finished.
+
+**The full chain this has to touch, per the offline-sync rule — all in one PR:**
+`saved_meals` column → the web route's Zod schema → the `pushMutations` branch → `getSyncDelta`
+output → `pullDelta` mapping → `applyDelta` upsert columns → the local SQLite migration → **and its
+row in `RECONCILE_TABLES`/`RECONCILE_COLUMNS`**, which is the one most often missed and the one that
+silently breaks upgraded devices while every test and fresh install passes.
+
+- **Verification.** Not "it saved" — prove a non-null value **round-trips to the device and renders
+  with the network off**, which is the only test that distinguishes this from a URL. Then check the
+  outbox still drains on a throttled connection with a dozen meals carrying images.
+- **Not in scope:** photos on individual food items or on logged entries. One image per *saved
+  meal*, which is the surface the owner asked about and the only one where the row is durable.
 
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
