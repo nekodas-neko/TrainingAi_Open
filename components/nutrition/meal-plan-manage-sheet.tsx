@@ -170,7 +170,7 @@ export function MealPlanManageSheet({ plan, onOpenChange, onChanged, onRebuild, 
                     className={cn(
                       'min-h-[44px] min-w-[44px] rounded-xl border text-sm font-semibold transition-colors',
                       n === mealsPerDay
-                        ? 'border-[#22c55e]/50 bg-[#22c55e]/15 text-[#22c55e]'
+                        ? 'border-brand/50 bg-brand/15 text-brand'
                         : 'border-border bg-background/50 active:bg-muted/30',
                     )}
                   >
@@ -245,7 +245,7 @@ export function MealPlanManageSheet({ plan, onOpenChange, onChanged, onRebuild, 
           </Button>
 
           {confirmDelete ? (
-            <div className="rounded-xl border border-[#ef4444]/40 bg-[#ef4444]/5 p-3 space-y-2">
+            <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3 space-y-2">
               <p className="text-sm font-medium">Delete “{plan.name}”?</p>
               <p className="text-[11px] leading-snug text-muted-foreground">
                 This removes it from every device. Meals you saved to your library stay.
@@ -260,7 +260,7 @@ export function MealPlanManageSheet({ plan, onOpenChange, onChanged, onRebuild, 
               </div>
             </div>
           ) : (
-            <Button variant="ghost" className="w-full text-[#ef4444]" onClick={() => setConfirmDelete(true)} disabled={busy}>
+            <Button variant="ghost" className="w-full text-destructive" onClick={() => setConfirmDelete(true)} disabled={busy}>
               Delete plan
             </Button>
           )}

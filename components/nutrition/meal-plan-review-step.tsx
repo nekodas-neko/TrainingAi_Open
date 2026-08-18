@@ -90,8 +90,8 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
   return (
     <div className="space-y-4">
       {draft.allergies.length > 0 && (
-        <div className="rounded-xl border border-[#ef4444]/40 bg-[#ef4444]/5 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-widest text-[#ef4444]">
+        <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-3">
+          <p className="text-[10px] font-semibold uppercase tracking-widest text-destructive">
             Must not contain
           </p>
           <p className="mt-1 text-sm font-medium">{draft.allergies.join(', ')}</p>
@@ -111,7 +111,7 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
               className={cn(
                 'min-h-[36px] flex-1 rounded-xl border px-3 text-xs font-semibold capitalize transition-colors',
                 i === variantIdx
-                  ? 'border-[#22c55e]/50 bg-[#22c55e]/15 text-[#22c55e]'
+                  ? 'border-brand/50 bg-brand/15 text-brand'
                   : 'border-border bg-muted/50',
               )}
             >
@@ -155,7 +155,7 @@ export function MealPlanReviewStep({ draft, onDraftChange, saveToLibrary, onTogg
                 {/* Without this a kept meal is indistinguishable from a suggestion, and the reroll
                     button sits on it identically — you would replace your own food by accident. */}
                 {m.savedMealId != null && (
-                  <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-[#22c55e]">
+                  <p className="mt-0.5 inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-brand">
                     <BookOpen className="w-3 h-3" /> Yours — kept
                   </p>
                 )}
