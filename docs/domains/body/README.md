@@ -36,6 +36,8 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 - [`docs/reviews/2026-08-18-battery-anchor-discontinuity.md`](../../reviews/2026-08-18-battery-anchor-discontinuity.md) — **the Body Battery anchor flip measured, and a constraint to protect, 2026-08-18** (Q-511 — the anchor takes the sleep score **raw**, and its sleep→readiness upgrade was worth **−17.7 points** on average, sd 10.2, worst −51: the owner's 2026-08-02 "the number visibly jumped" report, quantified. The sleep recalibration cut ~82% of that systematic offset as a side effect, so **the sleep and readiness scales being comparable is now load-bearing here** — lifting sleep back toward its old mean re-opens the bug. The per-day sd of 10.2 remains, so the freeze-once rule stays load-bearing too. Flip *frequency* is unobservable: `body_battery_daily` has never persisted `anchor_source = 'sleep'`).
 
+- [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](../../reviews/2026-08-18-hr-rest-threshold-calibration.md) — **first calibration review of this pillar, 2026-08-18** (Q-515 — `HR_REST_THRESHOLD` is the rest/active boundary shared by Body Battery and the Activity Score, and its charge window collapsed **26.5% → 8.2%** of waking samples in one month. **Every input was correct**: a genuine fitness gain plus `resolveHrProfile` maturing `hr_max` from the age formula to an observed ceiling. The trap is a rate difference — resting HR fell 8.5 bpm while waking HR fell 4.2 — so a boundary pinned to resting moves twice as fast as the distribution it classifies. Sweeping the constant narrows the gap 3.2× → 1.4× but never closes it: **the anchoring is the defect, not the number**).
+
 ## Open issues
 
 ```bash

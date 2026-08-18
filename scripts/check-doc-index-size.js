@@ -473,7 +473,10 @@ const BASELINE = {
   // conclusion is counterintuitive: the ACWR thresholds and RPE_DEAD_BAND are RIGHT and must not move,
   // while the call sites and the clamped input feeding them are wrong. Strip the tables and the next
   // reader tunes a constant instead of fixing the input — three times over.
-  'docs/implementation-backlog.md': 8540,
+  // Raised 2026-08-18 (Tuning): -> 8592. Q-515 — first calibration of the heart-rate pillar. The tables
+  // are the entry: the July/August collapse and the fraction sweep together show that tuning the
+  // constant cannot fix it, which is the opposite of what the entry title suggests on its own.
+  'docs/implementation-backlog.md': 8634,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
