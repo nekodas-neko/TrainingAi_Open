@@ -190,11 +190,32 @@ trusting the caller, because an unsorted list would otherwise encode a negative 
 different data instead of failing; and a **zero delta is legal** — two frames may share a `ds`, since
 the dedup key includes `body_hex`.
 
-**Task 3 — the two-tier reader.** Every read in §8 becomes "cold blobs ∪ hot rows for this ds range".
-The read shapes are already uniform — nearly all of them are
-`WHERE user_id = ? AND tag IN (…) AND ring_timestamp_ds BETWEEN ? AND ? ORDER BY ring_timestamp_ds` —
-so this is one helper, not a rewrite per call site. Put it beside the existing rollup reader so both
-tiers are always read together and no call site can forget one.
+**Task 3 — ✅ SHIPPED** as `lib/data/postgres/slices/oura-raw-frames.ts`. Two functions, not one:
+`readRawFrames` (ds range + tags, ascending) covers the rollup, both step-feature reads, the
+temp/MET and battery range reads and the two tag-census diagnostics; `readRecentRawFrames`
+(newest-first, limited) covers the admin tester's raw dump and the summary's `recent()`. Both return
+**exactly the shape of the `select` they replace**, so a call site changed which function it calls
+and nothing else — which is what made the equivalence testable rather than argued. Eleven read sites
+converted; `getOuraRawSamplesForTags` is left alone deliberately, it is Task 7.
+
+Three things the work established that the plan had not:
+
+- **An aggregate cannot use the reader's dedupe, and silently double-counted.** The summary's
+  per-tag counts summed the two tiers directly; measured on the dev server, 80 frames read as
+  **120** while a bucket sat in both tiers — the packer's own mid-write state, and its permanent
+  state if it is interrupted between write and delete. The counts now anti-join on
+  `(epoch, tag, ds_bucket)`, which is exact because the packer's unit is a whole bucket.
+- **`event_name` had to become derived, not read.** A packed frame carries no name, and grouping the
+  summary on a column one tier lacks splits a single tag into two rows. `eventName(tag)` is now the
+  only source — which also drops a stale stored name that `refreshRawSampleEventNames` exists to
+  repair. One test fixture pinned the old stale value and was updated to pin the consequence.
+- **A dormant tag needed a cold fallback in three places** (the field inspector, the raw dump, the
+  oldest-frame span). Hot-only, a tag that stopped streaming before the hot window opened reads as
+  never having produced data rather than as stale.
+
+Verified end to end on `pnpm dev` by rehearsing the packer by hand over four seeded ring-days: the
+summary, per-tag counts, raw dump and ds span are **byte-identical across all three states** —
+all-hot, both-tiers, and hot-rows-deleted — with half the frames readable only from a blob.
 
 **Task 4 — the packer**, per §6. Admin-triggered first (a button beside Redecode/VACUUM), bounded per
 call, idempotent, resumable. **Not automatic on deploy**, same posture as Lever 1b/1c.

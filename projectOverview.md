@@ -266,6 +266,15 @@ differ — vacuum alone re-crosses it in ~5 days, with the index+row work ~7 wee
 under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
 **do not run another Full re-sync until this is resolved**; that is what triggered it.
 
+**Progress, 2026-08-18.** Q-541 Tasks 0–3 have shipped (v1.318.11–12) — the `oura_raw_packed` table,
+the codec, and the two-tier reader every raw-frame read now goes through. **⚠️ None of it has moved a
+row**: nothing writes a blob yet, so the database has not shrunk by a byte and the size numbers above
+still stand. Re-measured that morning it is **819 MB**, up from 786 the day before, with
+`oura_raw_samples` at 699 MB (255 MB heap, **443 MB indexes**). Tasks 4–7 — packer, backfill, prune,
+`measured_at` sweep — are what reclaim the space. One cheap win was found and filed rather than
+taken: **Q-315**, `error_events` holding 4 live rows in 49 MB, reclaimable by a single `VACUUM FULL`
+with nothing at risk.
+
 ### [devices][platform] 🔴 An app uninstall destroys the Oura ring key, and nothing warned about it (2026-08-17)
 
 The 32-hex ring key lives **only** in Android SharedPreferences. `OuraBlePlugin.kt` says so in its
