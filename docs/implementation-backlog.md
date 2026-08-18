@@ -962,8 +962,11 @@ which also makes it testable and works offline.
     it uses — the candidates are Google Fonts (Geist, Archivo, Instrument Serif) and none can be
     assumed present wherever the PNG/PDF is generated. A silently-substituted fallback changes the
     metrics and the layout is tight enough that it will reflow.
-  - **The made-on date is a blank ruled line the owner writes on**, not a rendered date. This
-    removes a whole question: the label no longer has to know when it was printed.
+  - **The made-on date is a bare ruled line the owner writes on** — a rule and nothing else, with
+    **no "MADE" label beside it** (owner, 2026-08-17; deli ticket already did it this way and the
+    other styles now match). Not a rendered date, which removes a whole question: the label never
+    has to know when it was printed. Plaque carries no line at all, which is what buys it the
+    largest code.
   - **No per-serving line** — the owner removed it (2026-08-17). The label shows calories and macros
     as bare figures.
     **⚠ This un-resolves the per-serving-vs-batch ambiguity flagged above, by choice.** On a recipe
@@ -976,10 +979,39 @@ which also makes it testable and works offline.
     recipe.** A renderer reading `totals` prints 624 kcal on a tub whose QR logs 312 — the two halves
     disagreeing silently on real food, with the per-serving line now removed. **Render
     `totals / servings`**, and assert both halves against each other in one test.
-- **Mockups exist** — four centred, circle-safe 50 × 50 mm treatments at true scale (editorial ·
-  black band · deli ticket · plaque), each annotated with its tradeoff and its code's physical size.
-  They live in a design canvas, **not in this repo**; ask the owner for the link, or redraw from this
-  spec, which carries everything they encode. No aesthetic has been picked yet.
+- **✅ ALL FOUR STYLES SHIP, and the user cycles between them** (owner, 2026-08-17). This is a
+  different build from "pick one aesthetic", and it is cheap designed-in / expensive retrofitted:
+  **the renderer takes a style name and looks up a template**, rather than one layout with the style
+  baked in. Build it that way from the first commit. The four are *black band* (Archivo, reversed
+  header — **the owner's chosen DEFAULT**, 2026-08-17), *editorial* (Geist, quietest), *deli ticket*
+  (mono, dashed rules) and *plaque* (Instrument Serif, double ring).
+  - **Where the style choice lives is undecided, and one option costs a migration.** Per saved meal
+    is the nicest and needs a new `saved_meals` column — **that is Lane A's to claim, not intake's**.
+    A global user setting avoids the schema change. Picked-at-print-time and not stored is cheapest
+    of all. Decide before building; the renderer's shape is the same either way.
+  - **Four styles currently need four font families** — Geist, Geist Mono, Archivo, Instrument Serif
+    — and every one must be embedded (see the typeface rule above). Worth consolidating, but not for
+    free: dropping Archivo or Instrument Serif changes what the band and plaque styles *are*.
+  - **The smallest style sets the standard for the whole set**, and black band is now both the
+    default and the smallest at 12.2 mm. A style whose code will not scan is not a style choice, it
+    is a broken label, so **test-print black band first** — if it scans, the others do. ⚠ Read the
+    module-pitch correction below before trusting that: at 25×25 the pitch is finer than the figures
+    the mockups were drawn to, and 12.2 mm may not survive it.
+- **Mockups exist** — the four circle-safe 50 × 50 mm treatments at true scale, each annotated with
+  its tradeoff and its code's physical size, plus a working style-cycler that mounts the same four
+  files so the demo cannot drift from the designs. They live in a design canvas, **not in this
+  repo**; ask the owner for the link, or redraw from this spec, which carries everything they encode.
+  **Default is black band** (owner, 2026-08-17). **Redrawn 2026-08-18 with the correct 25×25 code**,
+  so the drawings now match the version the payload actually needs.
+- **⚠ The measured pitch at 25×25, and the fact there is no room to recover it.** Same physical
+  squares, four more modules across: **band 0.487 mm** (the default, and the tightest), editorial
+  0.529, ticket 0.550, plaque 0.635. **The code cannot simply be grown** — the content already fills
+  the circle-safe box, and a taller stack pushes the top and bottom rows into the narrowing part of
+  the circle, where the meal name is the first thing to stop fitting. So the code only grows if
+  something goes. The cheapest version of that is drawn as variant **2b — black band with the
+  write-on rule dropped**: 16.4 mm and **0.656 mm** per module, better than every original style bar
+  plaque, at the cost of the handwritten date. **Test-print black band before the layout is frozen;
+  2b is the fix that keeps the style if it fails.**
 - **⚠ Going circular shrank the code, and this is the live risk.** Square-with-macros allowed
   ~16–17 mm; the circle-safe versions give **12.2–15.9 mm**. **⚠ Corrected 2026-08-17: that is
   0.49–0.64 mm per module, not 0.58–0.76 — a 21×21 code cannot hold a meal id at all** (v1 holds 17
@@ -988,10 +1020,10 @@ which also makes it testable and works offline.
   A modern phone reads that at close range, but the margin is thinner than this entry assumed and **ink spread
   on a home printer merges small modules** — that is the failure mode to expect, and it will look
   like "the scanner doesn't work" rather than like a print problem. Levers, cheapest first: drop the
-  MADE line (worth ~3.7 mm), then drop macros. **Test-print and scan before the layout is frozen.**
+  write-on rule (worth ~3.7 mm — plaque already does, and is the largest code), then drop macros. **Test-print and scan before the layout is frozen.**
 - **One constraint the mockups surface that the spec must not lose:** a QR needs a **quiet zone** —
   clear white margin on all four sides — and the code's physical size sets how much data it can
-  carry legibly. At 50 mm the four layouts give codes of ~16–28 mm. **Settle the payload before
+  carry legibly. At 50 mm the circle-safe layouts give codes of 12.2–15.9 mm. **Settle the payload before
   fixing the size**: a longer payload raises the module count, the same square gets finer, and a
   16 mm code starts to struggle. **Encode the id alone — this is now a requirement, not a
   preference** (see the corrected module maths above: the id alone already needs 25×25).
