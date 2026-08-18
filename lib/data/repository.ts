@@ -920,6 +920,16 @@ export interface WorkoutRepository {
   getPendingRekeyDeclaration(userId: string): Promise<{ id: number; declaredAt: Date } | null>
   consumeRekeyDeclaration(id: number, epoch: number): Promise<void>
   cancelPendingRekeyDeclaration(userId: string): Promise<boolean>
+
+  /** Q-535 — a redecode runs off the request. One in-flight job per user; `startRedecodeJob`
+   *  returns the running one rather than starting a second. */
+  startRedecodeJob(userId: string, opts: Record<string, unknown>): Promise<{ job: import('./postgres/slices/oura').RedecodeJob; alreadyRunning: boolean }>
+  getRedecodeJob(userId: string, id: number): Promise<import('./postgres/slices/oura').RedecodeJob | null>
+  getLatestRedecodeJob(userId: string): Promise<import('./postgres/slices/oura').RedecodeJob | null>
+  finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null): Promise<void>
+  /** Closes a job whose process died mid-run — otherwise the one-at-a-time index blocks every
+   *  future redecode forever. */
+  reapStaleRedecodeJobs(userId: string): Promise<number>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────

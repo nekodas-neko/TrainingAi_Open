@@ -369,7 +369,15 @@ const BASELINE = {
   // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
   // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
   // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7462,
+  //
+  // Raised 2026-08-18 (Q-535 Lane A half, Lane A): 7462 -> 7491. Two things the queue cannot afford
+  // to lose: Q-535 now says the 502 is NOT gone yet and why the default was left alone (both
+  // consoles report completion from the synchronous shape, so flipping it blind would have them
+  // state that started work had finished), and half its own premise expired the same day — the
+  // row-walking phase became a no-op, so the `scanned=1098158` figures it quotes are historical.
+  // Plus the new Q-318 entry carrying the exact response contract, so the other lane does not have
+  // to read the route to build against it.
+  'docs/implementation-backlog.md': 7491,
   'CLAUDE.md': 1044,
 
 };

@@ -1140,6 +1140,20 @@ export const ouraRawPacked = pgTable('oura_raw_packed', {
 // consumes the pending row and opens the epoch it names, instead of the epoch being inferred from a
 // ds regression — which a history re-drain produces too, and which re-timed the whole sleep history
 // twice. At most one may be pending per user (partial unique index).
+// One admin-triggered redecode run (migration 196, Q-535). The route returns this row's id
+// immediately instead of awaiting the work, because awaiting it exceeded the gateway timeout and
+// reported "failed" for a run that had completed — which invited a retry of the heaviest pair of
+// calls in the app. In a table rather than process memory so a restart cannot silently lose a job.
+export const ouraRedecodeJobs = pgTable('oura_redecode_jobs', {
+  id:         bigserial('id', { mode: 'number' }).primaryKey(),
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  startedAt:  timestamp('started_at', { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp('finished_at', { withTimezone: true }),
+  opts:       jsonb('opts').notNull().default({}),
+  result:     jsonb('result'),
+  error:      text('error'),
+})
+
 export const ouraBleRekeyDeclarations = pgTable('oura_ble_rekey_declarations', {
   id:          bigserial('id', { mode: 'number' }).primaryKey(),
   userId:      uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),

@@ -6640,6 +6640,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getPendingRekeyDeclaration(userId: string) { return oura.getPendingRekeyDeclaration(this.db, userId) }
   async consumeRekeyDeclaration(id: number, epoch: number) { return oura.consumeRekeyDeclaration(this.db, id, epoch) }
   async cancelPendingRekeyDeclaration(userId: string) { return oura.cancelPendingRekeyDeclaration(this.db, userId) }
+  async startRedecodeJob(userId: string, opts: Record<string, unknown>) { return oura.startRedecodeJob(this.db, userId, opts) }
+  async getRedecodeJob(userId: string, id: number) { return oura.getRedecodeJob(this.db, userId, id) }
+  async getLatestRedecodeJob(userId: string) { return oura.getLatestRedecodeJob(this.db, userId) }
+  async finishRedecodeJob(id: number, result: Record<string, unknown> | null, error: string | null) { return oura.finishRedecodeJob(this.db, id, result, error) }
+  async reapStaleRedecodeJobs(userId: string) { return oura.reapStaleRedecodeJobs(this.db, userId) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }

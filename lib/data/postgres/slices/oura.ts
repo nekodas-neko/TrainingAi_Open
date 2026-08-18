@@ -172,6 +172,124 @@ export async function getLatestOuraCloudVitals(
 }
 
 /**
+ * Q-535 — a redecode run, tracked so the request does not have to wait for it.
+ *
+ * The route used to await the heaviest pair of calls in the app and exceed the gateway timeout, so
+ * Railway returned 502 and the tester printed "redecode failed" for work that had completed
+ * (measured: `scanned=1098158`, every `sleep_sessions` row stamped *after* the 502). A false failure
+ * invites a retry, and a retry is another full-history pass of the operation whose own comment names
+ * it as the event-loop starvation that took production down.
+ *
+ * One in-flight job per user, enforced by a partial unique index: the 4/min rate limit does not stop
+ * two overlapping runs, and two concurrent full-history re-aggregates are exactly the load this
+ * exists to prevent.
+ */
+export interface RedecodeJob {
+  id: number
+  startedAt: Date
+  finishedAt: Date | null
+  opts: Record<string, unknown>
+  result: Record<string, unknown> | null
+  error: string | null
+}
+
+const REDECODE_JOB_COLS = {
+  id: s.ouraRedecodeJobs.id,
+  startedAt: s.ouraRedecodeJobs.startedAt,
+  finishedAt: s.ouraRedecodeJobs.finishedAt,
+  opts: s.ouraRedecodeJobs.opts,
+  result: s.ouraRedecodeJobs.result,
+  error: s.ouraRedecodeJobs.error,
+}
+
+const asJob = (r: {
+  id: number; startedAt: Date; finishedAt: Date | null; opts: unknown; result: unknown; error: string | null
+}): RedecodeJob => ({
+  id: r.id,
+  startedAt: r.startedAt,
+  finishedAt: r.finishedAt,
+  opts: (r.opts as Record<string, unknown>) ?? {},
+  result: (r.result as Record<string, unknown> | null) ?? null,
+  error: r.error,
+})
+
+/** Returns the existing running job instead of starting a second — see the unique index. */
+export async function startRedecodeJob(
+  db: Db, userId: string, opts: Record<string, unknown>,
+): Promise<{ job: RedecodeJob; alreadyRunning: boolean }> {
+  const running = await getRunningRedecodeJob(db, userId)
+  if (running) return { job: running, alreadyRunning: true }
+  const [row] = await db
+    .insert(s.ouraRedecodeJobs)
+    .values({ userId, opts })
+    .returning(REDECODE_JOB_COLS)
+  return { job: asJob(row), alreadyRunning: false }
+}
+
+export async function getRunningRedecodeJob(db: Db, userId: string): Promise<RedecodeJob | null> {
+  const [row] = await db
+    .select(REDECODE_JOB_COLS)
+    .from(s.ouraRedecodeJobs)
+    .where(and(eq(s.ouraRedecodeJobs.userId, userId), isNull(s.ouraRedecodeJobs.finishedAt)))
+    .limit(1)
+  return row ? asJob(row) : null
+}
+
+/** User-scoped by id AND user: a job id is returned to a client, so it must not be readable across
+ *  accounts just because it was guessed. */
+export async function getRedecodeJob(db: Db, userId: string, id: number): Promise<RedecodeJob | null> {
+  const [row] = await db
+    .select(REDECODE_JOB_COLS)
+    .from(s.ouraRedecodeJobs)
+    .where(and(eq(s.ouraRedecodeJobs.userId, userId), eq(s.ouraRedecodeJobs.id, id)))
+    .limit(1)
+  return row ? asJob(row) : null
+}
+
+export async function getLatestRedecodeJob(db: Db, userId: string): Promise<RedecodeJob | null> {
+  const [row] = await db
+    .select(REDECODE_JOB_COLS)
+    .from(s.ouraRedecodeJobs)
+    .where(eq(s.ouraRedecodeJobs.userId, userId))
+    .orderBy(desc(s.ouraRedecodeJobs.startedAt))
+    .limit(1)
+  return row ? asJob(row) : null
+}
+
+export async function finishRedecodeJob(
+  db: Db, id: number, result: Record<string, unknown> | null, error: string | null,
+): Promise<void> {
+  await db
+    .update(s.ouraRedecodeJobs)
+    .set({ finishedAt: new Date(), result, error })
+    .where(and(eq(s.ouraRedecodeJobs.id, id), isNull(s.ouraRedecodeJobs.finishedAt)))
+}
+
+/**
+ * A job whose process died mid-run would otherwise stay `running` forever — and, because of the
+ * one-at-a-time index, would block every future redecode. Closed on read rather than by a sweeper:
+ * there is no cron layer in this app, and the only reader that matters is the one asking whether it
+ * may start another.
+ */
+export const REDECODE_JOB_STALE_MS = 30 * 60_000
+
+export async function reapStaleRedecodeJobs(db: Db, userId: string, nowMs = Date.now()): Promise<number> {
+  const rows = await db
+    .update(s.ouraRedecodeJobs)
+    .set({
+      finishedAt: new Date(nowMs),
+      error: 'abandoned — no result recorded before the staleness window elapsed (the process most likely restarted mid-run)',
+    })
+    .where(and(
+      eq(s.ouraRedecodeJobs.userId, userId),
+      isNull(s.ouraRedecodeJobs.finishedAt),
+      lt(s.ouraRedecodeJobs.startedAt, new Date(nowMs - REDECODE_JOB_STALE_MS)),
+    ))
+    .returning({ id: s.ouraRedecodeJobs.id })
+  return rows.length
+}
+
+/**
  * Q-314 — the owner's declaration that the ring was deliberately re-keyed.
  *
  * A re-key restarts the ring's own clock, and the app cannot tell that apart from a history
