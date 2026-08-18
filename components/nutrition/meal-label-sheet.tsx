@@ -7,6 +7,7 @@ import { Loader2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
 import { mealLabelFigures } from '@trainingai/shared/nutrition/label-payload'
+import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import {
   renderMealLabel, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, type MealLabelStyle,
@@ -39,14 +40,22 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
   // this: the sheet opened, the canvas was in the accessibility tree, and nothing was ever painted.
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [style, setStyle] = useState<MealLabelStyle>(DEFAULT_MEAL_LABEL_STYLE)
-  const [metrics, setMetrics] = useState<{ moduleCount: number; codeMm: number } | null>(null)
+  const [metrics, setMetrics] = useState<{ moduleCount: number; codeMm: number; ingredientLines: number; ingredientOverflow: number } | null>(null)
   const [busy, setBusy] = useState(false)
   const { groupProps, getRadioProps } = useRovingRadioGroup(true)
 
   useEffect(() => {
     if (!open || !meal || !canvas) return
     let cancelled = false
-    renderMealLabel(canvas, { mealId: meal.id, figures: mealLabelFigures(meal), style })
+    renderMealLabel(canvas, {
+      mealId: meal.id,
+      figures: mealLabelFigures(meal),
+      // Per SERVING, same as the figures — `savedMealToIngredients` goes through `oneServingItems`
+      // too, so "200 g mince" is the amount behind the calories printed next to it. Feeding it the
+      // whole recipe here would put a batch ingredient list beside a per-serving calorie count.
+      ingredients: savedMealToIngredients(meal),
+      style,
+    })
       .then(m => { if (!cancelled) setMetrics(m) })
       .catch(err => {
         console.error('Label render failed:', err)
@@ -117,8 +126,30 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
             <p className="text-center text-[11px] leading-snug text-muted-foreground">
               Code is <span className="font-semibold text-foreground">{metrics.codeMm.toFixed(1)} mm</span> at{' '}
               {metrics.moduleCount}×{metrics.moduleCount} modules
-              {' — '}{((metrics.codeMm / (metrics.moduleCount + 8)) ).toFixed(2)} mm per module.
+              {' — '}
+              <span className="font-semibold text-foreground">
+                {(metrics.codeMm / (metrics.moduleCount + 8)).toFixed(2)} mm per module
+              </span>.
+              {/* Divided by modules + the 8 module-widths of quiet zone, because the renderer draws
+                  the quiet zone INSIDE that box — so this is the pitch actually printed. Dividing by
+                  the module count alone (which the backlog's figures do) overstates it by ~24%. */}
               <span className="block">Test-print and scan before relying on it; ink spread merges fine modules.</span>
+            </p>
+          )}
+
+          {metrics && metrics.ingredientLines > 0 && (
+            <p className="text-center text-[11px] leading-snug text-muted-foreground">
+              Printing <span className="font-semibold text-foreground">{metrics.ingredientLines} ingredient{metrics.ingredientLines === 1 ? '' : 's'}</span>
+              {metrics.ingredientOverflow > 0
+                ? <> — {metrics.ingredientOverflow} more {metrics.ingredientOverflow === 1 ? 'is' : 'are'} summarised on the label as “scan for the full list”.</>
+                : <> — the whole breakdown fits.</>}
+            </p>
+          )}
+
+          {MEAL_LABEL_STYLES.find(s => s.value === style)?.squareOnly && (
+            <p role="status" className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug">
+              <span className="font-semibold">Square dies only.</span> This layout uses the corners to
+              fit the ingredient list — printed on a round die, the list is cropped.
             </p>
           )}
 
@@ -136,7 +167,14 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
                     on ? 'border-[var(--color-brand)] bg-[var(--brand-card-bg)]' : 'border-border bg-muted/30'
                   }`}
                 >
-                  <span className="block text-[12px] font-semibold">{s.label}</span>
+                  <span className="block text-[12px] font-semibold">
+                    {s.label}
+                    {s.squareOnly && (
+                      <span className="ml-1 rounded bg-amber-500/20 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
+                        Square
+                      </span>
+                    )}
+                  </span>
                   <span className="block text-[10px] leading-snug text-muted-foreground">{s.note}</span>
                 </button>
               )

@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.323.0",
+    date: "2026-08-18",
+    changes: [
+      "Meal labels can now print the ingredient breakdown \u2014 \u201c200g Beef mince\u201d, one line each, for a single serving. It is a new \u201cSquare \u00b7 ingredients\u201d style, and it is marked SQUARE because it uses the corners a round die cuts off: there is no room for a list on a round label without shrinking the code, and the code is the part that has to keep working. It also has the largest, most scannable code of any style.",
+      "The label preview now says how many ingredients will actually print, and tells you when some were summarised as \u201cscan for the full list\u201d rather than quietly dropping them.",
+      "Corrected the code size the preview reports. It was dividing by the wrong number and reading about a quarter larger than what is really printed \u2014 worth knowing before a test print, since fine modules are what ink spread destroys.",
+    ],
+  },
+  {
     version: "1.322.2",
     date: "2026-08-18",
     changes: [
