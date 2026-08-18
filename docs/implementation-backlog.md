@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
+| Next free Postgres migration | **199** | `lib/data/postgres/migrations/` (head: `198_drop_duplicate_indexes.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **552** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -821,18 +821,6 @@ below threshold and left in place for next time.
   after a restart.
 - **Load-bearing constraint (`CLAUDE.md`):** total connections = `max` x replicas must stay under the
   Railway connection limit, and the pool's error handler and timeouts must survive any change here.
-
-### [devices][platform] Q-550 — `oura_heartrate`: 27 MB of indexes on 6.8 MB of heap
-
-- **Branch:** `perf/oura-heartrate-index-audit`
-- **Added:** 2026-08-18 · **Lane A.** Small; the same shape as Q-534 at one-tenth the size.
-- **Measured 2026-08-18:** 34 MB total, 65,160 rows — **6.8 MB heap, 27 MB indexes**. Now the
-  third-largest table after the packing work, and indexes are 4x the data.
-- **`oura_heartrate_pkey` had zero lifetime scans** on a table that already carries a
-  `(user_id, timestamp)` unique constraint. **Re-measure before acting** — the counters reset at the
-  2026-08-17 crash, so a fresh zero means "not since recovery", not "never".
-- **Keep `oura_heartrate_user_updated` despite its zero.** Migration 130 added it for Track-B sync,
-  which is not wired yet, so its zero is expected and correct.
 
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
 
