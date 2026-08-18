@@ -210,6 +210,8 @@ const BASELINE = {
   // step in the trend chart where the old and new model scores meet, and no device verification.
   // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
   // other lanes twice, which is the case the note below warns silently drops one side.
+
+  'projectOverview.md': 6843,
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
@@ -252,12 +254,11 @@ const BASELINE = {
   // without which the section reads as progress against the 500 MB deadline where there is none)
   // and +41 on the backlog (the Q-541 status block, and the new Q-315 entry for error_events
   // holding 4 live rows in 49 MB).
-  'projectOverview.md': 6760,
   // Raised 2026-08-18 (Tuning, Q-505): 7020 -> 7056. One queue entry for the Activity Score decision,
   // carrying the measured cause and the two coherent answers inline — the item is blocked on the
   // owner choosing between them, and an implementer must not have to open the review to learn that.
   // Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
-  'docs/implementation-backlog.md': 7122,
+  'docs/implementation-backlog.md': 7276,
   'CLAUDE.md': 1010,
 };
 

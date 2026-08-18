@@ -959,6 +959,160 @@ ehr     0     0     0     0   648   208   128   556     0
   **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
   and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
 
+### [platform][nutrition][workouts][devices] Q-463 — "the row you named does not exist" is answered five different ways, and five routes answer it with a 500
+
+- **Branch:** `fix/not-found-status-across-write-surface`
+- **Added:** 2026-08-18 · review sweep (nutrition/cardio/activity writes + an app-wide not-found probe) ·
+  [`docs/reviews/2026-08-18-write-surface-not-found.md`](reviews/2026-08-18-write-surface-not-found.md)
+- **Placement:** mid. Not a leak and not data loss — but it misclassifies a permanent failure as
+  transient on the sync path, and it degrades `error_events`, which is the one fault signal nobody
+  is watching.
+- **Generalises Q-462.** That entry filed `/api/log-exercise` returning 500 for an ownership refusal.
+  This one is the measurement showing it was not isolated — implement them together.
+- **Measured uniformly.** Every `app/api` route with a dynamic segment and a write method, called as
+  an **authenticated** user with a fabricated UUID (`00000000-0000-4000-8000-0000000fffff`). 33
+  endpoints answered:
+
+  | Answer | Count | Verdict |
+  |---|---|---|
+  | `404` + JSON error | 8 | correct |
+  | `200`/`204` on `DELETE` | 7 | **defensible, do not "fix"** — see below |
+  | `400` from body validation before the id lookup | 12 | not evidence; excluded |
+  | `403` (admin gate first) | 1 | correct |
+  | **`500`** | **5** | the finding |
+
+- **The five:**
+  ```
+  PATCH  /api/injuries/[id]              500  (empty body)
+  PUT    /api/nutrition/meal-types/[id]  500  (empty body)
+  PATCH  /api/supplements/[id]           500  (empty body)
+  POST   /api/supplements/[id]/log       500  (empty body)
+  DELETE /api/phase-sets/[id]            500  {"error":"Phase set not found"}
+  ```
+  Plus `POST /api/log-exercise` (Q-462), which has no dynamic segment so it is not in the 33.
+- **One cause, repeated.** Repository methods throw a bare `Error('… not found')` — **16 such throws**
+  across `lib/data/postgres/` and `packages/shared/src` — and these routes have nothing mapping them
+  to a status, so Next's default handler returns 500. Confirmed live in the dev log:
+  `Error: Supplement not found`, `Error: Food log not found`, `Error: Meal type not found`, each with
+  a full stack trace.
+- **One resource, two wrong answers on two verbs.** `PUT /api/phase-sets/[id]` →
+  `400 {"error":"Phase set not found"}`; `DELETE /api/phase-sets/[id]` →
+  `500 {"error":"Phase set not found"}`. Same resource, same condition, same message. Neither is 404.
+- **Three consequences, each against a rule this repo already wrote:**
+  1. **The sync client retries what can never succeed.** `CLAUDE.md`: *"A 4xx/validation failure is a
+     poison pill: quarantine it, don't retry forever. 5xx/429 = back off and retry."* A permanent
+     "not yours / not there" reported as 5xx is classified as transient.
+  2. **Four of the five return an empty body**, so a client calling `res.json()` on the failure throws
+     a parse exception on top and never renders its error state.
+  3. **It pollutes `error_events`** — *"the only view of faults that never reach a human"*, pruned at
+     30 days and read at every session start. Stack traces from correctly-refused requests make that
+     table worse at its job.
+- **Fix shape:** a typed `NotFoundError` / `NotOwnedError` in the repository layer plus **one** shared
+  mapper at the route boundary — not 16 call sites each remembering. **`/api/nutrition/meal-plans/*`
+  is the in-repo reference:** all five of its write endpoints already return a clean
+  `404 {"error":"Not found"}`. **Lane A** (repository + `app/api`).
+- **Do NOT also change the seven `DELETE`s that return 200/204 for an absent row.** That looks like the
+  same shape and is not: `DELETE` is idempotent by convention, the desired end state (row absent) holds,
+  and the outbox is right to treat it as done. It is recorded as **clean** in the review, with the
+  reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
+  `session_rpe = 7` and it did **not** hold.)
+
+### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
+
+- **Branch:** `fix/strict-request-schemas`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
+  the failure mode is silent data misplacement and this repo has already paid for the class once.
+- **Measured:** of **70** files defining a `z.object(...)` request schema across `app/api` and
+  `packages/shared/src/validation`, only **6** call `.strict()`. Zod's default silently drops unknown keys.
+- **Demonstrated live** on `POST /api/body-metadata`:
+
+  | Sent | Response | Row written |
+  |---|---|---|
+  | `{"date":"2026-08-10","weightKg":81}` | `200 {"success":true,"date":"2026-08-18"}` | weight 81 on **2026-08-18** |
+  | `{"date":"3026-08-18","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+  | `{"date":"not-a-date","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+
+- **Do NOT change the route — it is correct.** `app/api/body-metadata/route.ts:236` reads
+  `body.localDate` and defaults to today in the user's timezone when absent, which is the documented
+  pattern. The defect is that `date` is not in the contract, the schema is not strict, so the key is
+  dropped and the write lands on today with a success response.
+- **Why file it:** the repo has already lost a full release to this exact class — the `ai-chat`
+  `localDate` regex that rejected every real request, documented at length in `CLAUDE.md`. A strict
+  schema turns that mistake into a 400 at the boundary instead of a silent wrong-day write.
+- **Eleven date-bearing write schemas are non-strict**, including `sync/push`, `health-connect/ingest`,
+  `running-plan`, `running-plan/override`, `plan-meal-answers`, and the shared `body-metrics`,
+  `activity-log` and `fitness-test` schemas. `WorkoutEntryPatchSchema` is one of the six that **is**
+  strict — use it as the reference.
+- **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
+  hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
+- **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
+  APK may legitimately carry fields the current schema does not name; making that one strict could
+  reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
+  written reason. **Lane A.**
+
+### [platform] Q-466 — CI re-downloads the Playwright browser on every E2E run, and a slow CDN turns that into an indefinite stall
+
+- **Branch:** `ci/cache-playwright-browsers`
+- **Added:** 2026-08-18 · review sweep (observed while landing the section-coverage PRs) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** low-mid. Costs nothing when the CDN is healthy and blocks a PR entirely when it is not.
+- **What.** `.github/workflows/ci.yml:391-392` runs `npx playwright install --with-deps chromium` on
+  **every** E2E run, with no cache:
+  ```yaml
+  - name: Install Chromium
+    run: npx playwright install --with-deps chromium
+  ```
+  `actions/setup-node`'s `cache: 'pnpm'` (five jobs use it) caches the pnpm store, **not** the
+  Playwright browser binaries, which live in `~/.cache/ms-playwright`. So each run pulls ~150 MB of
+  Chromium plus system packages afresh.
+- **Observed three times on 2026-08-18**, on PR #47 and twice on PR #66, out of roughly 8–10 E2E runs
+  that day — a small sample, so treat the *rate* as indicative rather than measured, but three in one
+  day on one repo is not a coincidence. In both cases the step sat
+  `in_progress` for **6–22 minutes** with every other job already green, and the job had to be
+  cancelled and re-run; the re-run completed the same step in well under a minute. The tell is
+  distinctive and worth knowing: `Install Chromium` `in_progress` while `Run pnpm e2e` is still
+  `pending` means the download, not the specs.
+- **Why it is worth fixing rather than tolerating.** E2E is a **required check**, so this blocks the
+  merge outright rather than degrading it, and the recovery (cancel the run, re-run the workflow,
+  wait again) costs ~20 minutes of wall clock each time. With five concurrent agents landing PRs, that
+  is paid repeatedly.
+- **Fix shape:** add `actions/cache` for `~/.cache/ms-playwright`, keyed on the resolved
+  `@playwright/test` version from `pnpm-lock.yaml` so a version bump invalidates it — the standard
+  pattern from Playwright's own CI docs. Keep the `install` step (it must still run to place the
+  browser and system deps on a cache miss); the cache only removes the download.
+- **Note for the implementer:** `playwright.config.ts` deliberately prefers the sandbox's
+  `/opt/pw-browsers/chromium` when present and falls back to Playwright's managed download elsewhere,
+  which is why CI needs the install at all. That comment explains the design — do not "simplify" it
+  away while adding the cache.
+
+### [readiness] Q-465 — `POST /api/day-checkin` creates a check-in row from a completely empty body
+
+- **Branch:** `fix/day-checkin-requires-an-answer`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** low. **The consequence is unproven and the entry says so** — do not implement this as
+  if a known symptom were being fixed.
+- **Observed.** `POST /api/day-checkin` with a body of exactly `{}` returns **201** and writes a row
+  with every metric null:
+  ```
+  log_date    phase    physical_tiredness  mental_drain  hydration  sore_muscles
+  2026-08-18  evening  (null)              (null)        (null)     {}
+  ```
+  An unknown field is accepted and dropped too (`{"sleepQuality":"banana"}` → 201, nothing stored —
+  `day_checkins` has no such column). That half belongs to Q-464.
+- **Both consumers were checked and neither shows a user-visible bug.**
+  `components/morning-checkin-sheet.tsx:58-70` pre-fills from a saved row but coalesces every field
+  through `?? NEUTRAL_SCALES`, so an all-null row behaves identically to no row.
+  `app/api/workout-data/route.ts:471` feeds the check-in into `reevaluationKey(...)`, where an empty
+  row changes the key and can trigger a re-evaluation carrying no new information.
+- **Why it is still worth closing:** the row is indistinguishable from a real check-in in which the
+  user answered nothing, and readiness is precisely the pillar where *"the user told us nothing"* and
+  *"the user told us they feel neutral"* must not collapse to the same value.
+- **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
+  body carries no answers. **Lane A.**
+
 ### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
 
 - **Branch:** `fix/log-exercise-ownership-error-status`
