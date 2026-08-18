@@ -285,6 +285,98 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
+
+- **Branch:** `fix/exercises-route-admin-db-check`
+- **Added:** 2026-08-18 · review sweep (auth/session boundaries) ·
+  [`docs/reviews/2026-08-18-auth-session-boundaries.md`](reviews/2026-08-18-auth-session-boundaries.md)
+- **Placement:** mid. **Moderate-low impact** — the gain is rows in a catalogue, not user data — but
+  it is privilege persistence with a working proof of concept and the fix is deleting one argument.
+- **Two admin checks in one file disagree.** `lib/admin.ts`: `requireAdmin(userId, _isAdmin?)` accepts
+  the flag for signature compatibility and **refuses to trust it**, reading the row every call (**61
+  API routes**). `isAdminUser(userId, isAdmin?)` **returns the passed flag** when given one.
+- **Ten sites call `isAdminUser`; seven pass `session.user.isAdmin` (the JWT claim).** Six are page
+  guards, which is UI and fine. **The seventh is an API write route** —
+  `app/api/exercises/route.ts:38`, gating `createExercise`, a write into `exercise_library`, the
+  catalogue every user reads.
+- **The claim is refreshed only once a day.** `lib/auth/is-active-refresh.ts` re-reads `isActive`/
+  `isAdmin` inside the jwt callback, throttled by `ISACTIVE_RECHECK_MS = 24h` — a sound decision
+  (unthrottled would be a DB query per request). The problem is what it then claims:
+  > *"This governs the **UI** only: `requireAdmin` reads the row from the database on every call and
+  > never trusts this claim."*
+
+  **That is false**, and it is why this is easy to miss — a reviewer who reads it stops looking.
+- **Measured**, admin granted → fresh login → token warmed → admin revoked in the DB, **no re-login**,
+  cookie rotation persisted as a browser does:
+  ```
+  POST /api/exercises    = 201   ← isAdminUser, JWT claim
+  GET  /api/admin/errors = 403   ← requireAdmin, DB read  (the control)
+  session claim still says: isAdmin = True
+  → row "ZZ Probe Revoked" created in exercise_library
+  ```
+  Same cookie, same instant, one route refusing and the other admitting. **Window: up to 24 h.**
+- **Fix shape:**
+  1. `app/api/exercises/route.ts:38` — drop the second argument, or better, use `requireAdmin` like
+     its 61 siblings so the file stops being the odd one out.
+  2. **Correct the docstring** in `lib/auth/is-active-refresh.ts`; step 1 is what makes "UI only"
+     true. Say outright that an API route must never pass the claim — **the wrong comment is more
+     dangerous than the wrong call, because it scales to the next route someone adds.**
+  3. *Optional ratchet:* fail Custom Rules on `isAdminUser(` with a second argument under
+     `app/api/**`. Cheap, and the shape this repo already uses where prose did not hold.
+- **Lane A owns this** (`app/api/**`, `lib/admin.ts`, `lib/auth/**`).
+- **Do NOT "fix" the six page guards** — they are UI, they match the docstring, and a revoked admin
+  seeing an empty admin shell for ≤24 h while every API behind it 403s is the intended trade.
+- **Not verified on:** the APK (its WebView keeps cookies, so it behaves like the corrected harness)
+  or production. `ISACTIVE_RECHECK_MS` is read from source, not observed over a real 24-hour window.
+- **⚠️ If you re-run this, persist cookie rotation.** My first run reported revocation working and was
+  **wrong**: `curl -b` without `-c` discards the rotated cookie, so every request re-sent a token with
+  no `isActiveCheckedAt`, the throttle never engaged, and the DB was re-read every time. Use `-b` and
+  `-c` on the same file.
+
+### [nutrition][platform] Q-481 — a water quick-add replayed by the outbox triple-counts; it is the one non-idempotent mutation of the nineteen
+
+- **Branch:** `fix/outbox-water-delta-dedupe`
+- **Added:** 2026-08-18 · review sweep (at-least-once delivery) ·
+  [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](reviews/2026-08-18-outbox-replay-idempotency.md)
+- **Placement:** mid. Silent, unrecoverable drift in a tracked metric — but hydration is a soft metric
+  and the blast radius is one column, so it sits below the live sync and auth items.
+- **Measured.** Same mutation id, pushed three times in sequence:
+  ```
+  3 × {"id":"water-fixed-id-001","domain":"body_metrics","date":"…","payload":{"waterMlDelta":250}}
+  → body_metrics.water_ml = 750        (each push: {"processed":1,"errors":[]})
+  ```
+- **Reachable by ordinary means, on the canonical runtime.** `lib/local-store/sync-engine.ts` wraps
+  the push in `try { res = await fetch(…) } catch { break }`. If the request **reaches the server and
+  commits** but the response is lost — signal dropped mid-response, the OS killing a backgrounded app,
+  a timeout — the mutation is still `status='pending'`, nothing marks it in-flight, and the next sync
+  re-pushes it. The server keeps **no record of processed mutation ids**.
+- **The write itself is correct and must not be "fixed".** `incrementWaterLog` (`adapter.ts:2761`)
+  does the addition inside the upsert (`COALESCE(water_ml,0) + ${ml}`) and the push branch routes to
+  it deliberately — *"an increment, not an absolute set … so concurrent adds sum instead of
+  last-writer-wins clobbering each other (SYNC-P7)"*. Atomic-and-additive is right for concurrency and
+  is precisely what makes a **replay** wrong. Swapping to an absolute total reintroduces SYNC-P7.
+- **It is the only one.** All 19 push branches enumerated; every other domain upserts on
+  `(user_id, date)` or on a client-supplied row id. Three replay-tested and clean (see below).
+- **Fix shape:** server-side dedupe on the mutation id **for this branch only** — a small
+  `applied_mutations(user_id, mutation_id, applied_at)` table with a unique constraint, checked before
+  the increment and inserted in the same transaction. No need to cover the other 18 (naturally
+  idempotent), so it stays small and pruning is trivial. **Lane A owns it** — it is a migration.
+  If it is judged not worth a table, the honest alternative is to accept the drift and record it in
+  `CLAUDE.md`'s **Stored Counters** section — whose opening line is *"Every stored counter in this
+  project has drifted"*, and this is one.
+- **Clean results from the same pass, recorded so they are not re-run:**
+  - `complete_workout` replayed 3× → `sessions_in_phase` = **1**. Second independent confirmation of
+    the **Q-473** fix, covering the vector its original comment named (*"re-pushed after its response
+    was lost"*) — sweep 9's re-run covered the concurrent vector, this covers the replay one.
+  - Absolute `body_metrics` (`weightKg`, `steps`) replayed 3× → one row, correct values.
+  - `activity_logs` replayed 3× → **one row**. Note this looks like it contradicts sweep 9, where
+    `POST /api/activity-logs` gave 5 rows for 5 concurrent calls: **different writers**. The web route
+    mints a server-side id; the outbox payload carries a client-generated one and upserts on it.
+    Neither is a defect — know it before reasoning about one from the other.
+- **Not verified on:** the APK. The replay was simulated by re-posting the same envelope (exactly what
+  the client does), but the client-side trigger was read from source, not induced. The other 15
+  branches were read, not individually replay-tested.
+
 ### [app-shell][platform] Q-478 — two cache guards compare a server-stamped date against a client `DEFAULT_TZ` date, so they return false for hours a day for any non-Brisbane user
 
 - **Branch:** `fix/cache-today-guards-take-tz`
@@ -334,6 +426,44 @@ below threshold and left in place for next time.
 - **Lane B owns this** (`lib/sqlite/cache.ts` is shared, but every call site is Lane B surface —
   claim `lib/sqlite/cache.ts` in the baton before starting).
 
+### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
+
+- **Branch:** `docs/claude-md-repo-tz-line`
+- **Added:** 2026-08-18 · review sweep (server-side verification) ·
+  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](reviews/2026-08-18-server-tz-and-rate-limit-verification.md)
+- **Placement:** low. A one-clause documentation correction — but a load-bearing one, because it
+  misdirects anyone picking up **Q-477**.
+- **The line**, in the Date Arithmetic section:
+  > *"Repo day-window helpers currently **hardcode** `DEFAULT_TZ` — thread the session tz through when
+  > touching them, and never re-declare `DEFAULT_TZ` locally."*
+- **They do not hardcode it — they take it as a default parameter, and every caller passes the session
+  timezone:**
+
+  | Helper | Callers | Threads tz? |
+  |---|---|---|
+  | `getCalendarData(…, timezone = DEFAULT_TZ)` | `app/api/calendar-data` | ✅ |
+  | `getRecentTrainedDays(…, timezone = DEFAULT_TZ)` | `app/api/streak-data` | ✅ |
+  | `getNextSession(…, timezone = DEFAULT_TZ)` | 5 sites incl. `lib/ai-chat/tools.ts` | ✅ at all 5 |
+
+  A default every caller overrides is a safety net, not a hardcoded value.
+- **Why the stale line costs something.** It marks `lib/data` as a known-broken area, so an
+  implementer taking Q-477 (the client-side timezone sweep) starts there, finds nothing, and a
+  reviewer treats a repo call site as suspect when it is in fact the pattern to copy.
+- **The other half of the same sentence is holding** — zero local re-declarations of `DEFAULT_TZ`
+  outside `packages/shared/src/date-utils.ts`. Keep that clause verbatim.
+- **Fix:** replace the "currently hardcode" clause with what is true — the helpers *default* to
+  `DEFAULT_TZ` and every current caller threads the session tz; keep the instruction to keep doing so,
+  since the default is what makes forgetting silent.
+- **Filed rather than edited directly** because `CLAUDE.md` is the contract all five agents read, and
+  a Review agent quietly rewriting a rule line is a change the other four should see come through the
+  queue. Any lane can take it.
+- **Verified alongside, and worth keeping in the entry so it is not re-derived:** all 4
+  timezone-sensitive SQL sites in `lib/data` interpolate a parameter (no hardcoded zone string
+  anywhere in the repository layer), and every caller of the shared sleep helpers
+  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend`)
+  passes `tz`. **This bounds Q-477 to the client** — its fix does not need to touch `lib/data` or
+  `packages/shared/src/health`.
+
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
 
 - **Branch:** `fix/client-today-uses-user-timezone`
@@ -381,26 +511,6 @@ below threshold and left in place for next time.
 - **Not verified on:** the APK — and note the 9 `localDateString()` sites read the *phone's* zone
   there, a third value this harness cannot reproduce. Not against production, where every user is
   Brisbane and the symptom does not arise.
-
-### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
-
-- **Branch:** `fix/db-query-403-masks-outage`
-- **Added:** 2026-08-18 · **Lane A** (`app/api/admin/db-query/route.ts`). Tiny, and it cost a real
-  diagnosis today.
-- **What happened.** During the 2026-08-18 volume incident `prod_DB` went offline. Every
-  `/api/admin/db-query` call returned **`{"error":"Forbidden"}`**, which reads as "your credential was
-  revoked" — so the first several minutes went into checking env vars and the admin flag instead of
-  looking at the database. The Railway dashboard said "Service is offline" in one glance.
-- **Mechanism.** `authorize()` calls `requireAdmin(exportUserId)` inside a **bare `try/catch`**
-  (route.ts ~51-53). `requireAdmin` does a DB round-trip (`repo.getUserById`) and throws `AdminError`
-  when the user is missing or not admin — but **any other throw, including a connection failure, lands
-  in the same catch** and becomes 403. "Not authorised" and "could not check" are indistinguishable.
-- **Why it matters beyond this incident.** 403 is the one status a caller will not retry and will not
-  escalate; it actively points the investigation away from infrastructure. `/api/version` does **not**
-  touch the DB, so it returned 200 throughout and offered no contradiction.
-- **Fix shape:** catch `AdminError` specifically and return 403; let anything else surface as **503**
-  (or 500) so an outage looks like an outage. Same pattern applies to the session branch below it, and
-  to any other route wrapping `requireAdmin` in a bare catch — **grep for the shape, don't fix one site.**
 
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
@@ -4437,6 +4547,59 @@ session working from a temporarily restored copy.
 - **Recorded, not filed:** `tdeeAdjustment` (`tdee-adaptation.ts`) is **dead code** — referenced only by
   its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
   `amrapScaleFactor` (Q-514); do not calibrate it.
+
+### [platform][readiness] Q-518 — the readiness model stamp survived 5h40m, then a sibling writer erased it
+
+- **Branch:** `fix/model-versions-jsonb-merge`
+- **Plan:** none — one conflict-arm expression. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-model-version-clobber.md`](reviews/2026-08-18-model-version-clobber.md)
+- **⚠️ This INVALIDATES a claim published today.** PR #85 reported the shared `model_versions` merge
+  *"held in production"*. It held for the readiness write and **does not survive the next
+  body-composition backfill**.
+- **Observed, same row (`oura_daily_derived`, day 2026-08-18), twice in one session:**
+
+  | read at | `model_versions` | `readiness_score` |
+  |---|---|---|
+  | **04:38:27** | `{"bodyComp": "atlas_2_1_0", "readiness": "v3:ri5:2026-08-18"}` | 76 |
+  | **10:18:40** | `{"bodyComp": "atlas_2_1_0"}` | 77 |
+
+  Rows 08-16/17/18 all carry `updated_at = 10:18:40`, so one job rewrote all three. Stamped rows across
+  the table went **1 → 0** (they had gone 0 → 1 earlier the same session, which is how it was noticed).
+- **Mechanism — `COALESCE` does not merge JSON.** `upsertOuraDailyDerived` sets every column as
+  `COALESCE(excluded.col, oura_daily_derived.col)`. Correct for scalars; for a `jsonb` column it picks
+  the first non-null **document whole**, so a non-null incoming value replaces the stored one entirely.
+  The merge is therefore left to each caller, and **only one of two callers does it**:
+
+  | writer | passes | merges? |
+  |---|---|---|
+  | `lib/health/readiness-payload.ts:544` | `{ ...existingVersions, readiness: … }` (reads the row first) | **yes** |
+  | `lib/data/postgres/slices/oura.ts:1664` | `{ bodyComp: BODY_COMP_MODEL_VERSION }` (flat literal) | **no** |
+
+  **The readiness code did nothing wrong** — it is the only participant honouring a convention the
+  shared writer does not enforce.
+- **Cost.** (1) **Q-501's purpose is defeated** — the stamp was the fix for "did this score move because
+  the inputs changed or the model did", and it does not survive a backfill. (2) Readiness was supposed
+  to be the pillar that *had* a stamp where sleep does not; in stored data it now does not either.
+  (3) Every future pillar that stamps has the same exposure — the next agent will copy readiness's
+  correct merge and still be clobbered.
+- **First action: move the merge into `upsertOuraDailyDerived`**, not into the bodyComp caller. For
+  `model_versions` the conflict arm should be
+  `COALESCE(existing.model_versions,'{}'::jsonb) || COALESCE(excluded.model_versions,'{}'::jsonb)` —
+  keeping every existing key and letting an incoming key win on collision, which is what both callers
+  already assume. **This is the pattern the codebase already chose one column over**:
+  `upsertOuraHeartrate`'s comment — *"this makes the guarantee the function's own, so every caller gets
+  it rather than each one remembering"* — and **Q-280 exists because two of its siblings missed it**.
+  Identical shape; fix it the same way.
+- **Do NOT patch the bodyComp caller alone** — that restores today's stamp and leaves the next writer to
+  rediscover the rule, which is how this happened.
+- **Re-verify by observation, not reasoning:** stamp a row via the readiness route, run the
+  body-composition backfill, re-read. Reasoning about this is what produced the wrong claim.
+- **Caveats.** The `||` expression above was **written, not run** — no test, no local DB. **The job that
+  ran at 10:18:40 was not identified directly**: the bodyComp backfill is the only `model_versions`
+  writer passing a flat object and its payload matches the surviving document exactly, but no
+  scheduler/trigger was traced, so **its cadence is unknown** and "short half-life" is an inference from
+  one observation. `readiness_score` also moved 76 → 77 between reads and **that is not explained here**.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

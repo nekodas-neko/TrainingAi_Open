@@ -18,6 +18,39 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, empty/n=1 account sweep): projectOverview 7213 -> 7243. No queue entry
+// — the sweep found nothing to file. The row exists for the method correction inside it: a probe
+// that greps a JSON response for NaN/Infinity detects neither, because JSON.stringify serialises
+// both to null. That check had already produced two clean-looking runs before it was caught, and it
+// is the kind of thing a later sweep repeats unless it is written where orientation reads it.
+
+//
+// Raised 2026-08-18 (Review, outbox-replay-idempotency sweep, Q-481): backlog 9005 -> 9049,
+// projectOverview 7184 -> 7213. One queue entry and its Known-Issues row. Both carry the SYNC-P7
+// caveat inline — the additive write is deliberate and an implementer who "fixes" it to an absolute
+// set reintroduces the clobber it was written to prevent — and both carry the activity_logs result
+// that looks like it contradicts sweep 9 and does not (different writers). Those two are the lines
+// that stop the entry being implemented wrongly, which is the only reason the entry exists.
+
+//
+// Raised 2026-08-18 (Review, server-side verification sweep, Q-480): backlog 8967 -> 9005,
+// projectOverview 7157 -> 7184. One queue entry and one Known-Issues row, both for a sweep that
+// found nothing. The lines are the *inventory of what was checked* — which repository and shared
+// helpers thread the session tz, that all four timezone-sensitive SQL sites are parameterised, that
+// all 104 rate-limit keys are user- or IP-scoped — and that inventory is the entire value: without
+// it the next sweep re-derives it, and Q-477's fix scope stays unbounded. A clean result costs lines
+// exactly once.
+
+//
+// Raised 2026-08-18 (Review, auth/session-boundaries sweep, Q-479): backlog 8846 -> 8894,
+// projectOverview 7122 -> 7157. One queue entry and its Known-Issues row. Both carry the measured
+// A/B inline (POST /api/exercises 201 against GET /api/admin/errors 403, same cookie, same instant)
+// because a privilege-persistence claim without its control is not a finding, and both carry the
+// harness warning that produced a false clean on the first run — a session-staleness test needs a
+// cookie jar that is written back. The sweep's prose is in
+// docs/reviews/2026-08-18-auth-session-boundaries.md, which this ratchet does not govern.
+
+//
 // Raised 2026-08-18 (Review, non-default-timezone sweep, Q-477/Q-478): backlog 8908 -> 9005,
 // projectOverview 7068 -> 7122 (the last 8 record that #112 fixed Q-473 and that Review re-ran the
 // original reproduction against the merged code — 'shipped' and 'fixed' are different claims and
@@ -553,8 +586,12 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7122,
-  'docs/implementation-backlog.md': 8846,
+  'projectOverview.md': 7243,
+  // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
+  // writer within hours. The two timestamped readings are the entry: without them this reads as a
+  // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
+  // invalidates PR #85's claim.
+  'docs/implementation-backlog.md': 9049,
   'CLAUDE.md': 1075,
 
 };

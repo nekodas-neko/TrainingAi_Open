@@ -103,6 +103,127 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] 🟠 A revoked admin keeps one write for up to 24 hours, and the module docstring says it cannot (Q-479, 2026-08-18)
+
+- **The first sweep to test privilege *revocation* rather than cross-user data isolation.**
+  [`docs/reviews/2026-08-18-auth-session-boundaries.md`](docs/reviews/2026-08-18-auth-session-boundaries.md).
+- **`lib/admin.ts` holds two admin checks that disagree.** `requireAdmin` takes an `_isAdmin`
+  argument and deliberately **ignores** it, reading the row every call — **61 API routes** use it, and
+  revocation is immediate on all of them. `isAdminUser` **returns the passed flag** when given one.
+  Seven of its ten call sites pass the JWT claim; six are page guards (UI, correct), and the seventh
+  is **`app/api/exercises/route.ts:38`**, an API write into `exercise_library` — the catalogue every
+  user reads.
+- **The claim refreshes once a day.** `ISACTIVE_RECHECK_MS = 24h` in `lib/auth/is-active-refresh.ts`,
+  a sound throttle. What is not sound is its docstring: *"This governs the **UI** only: `requireAdmin`
+  … never trusts this claim."* That is false, and it is why this was easy to miss — a reviewer who
+  reads it stops looking. **The wrong comment is more dangerous than the wrong call, because it
+  scales to the next admin route someone adds.**
+- **Measured with a control**, admin revoked in the DB with no re-login and cookie rotation persisted
+  as a browser does: `POST /api/exercises` → **201** (row created) while `GET /api/admin/errors` →
+  **403**, same cookie, same instant. Session claim still read `isAdmin: True`.
+- **Severity moderate-low and stated as such:** what a revoked admin gains is rows in a catalogue —
+  no health data, no other user's rows, no credentials. It is filed because it is privilege
+  persistence with a working proof of concept and the fix is deleting one argument.
+- **Five clean results recorded:** all 61 `requireAdmin` routes DB-check; the six page guards are
+  genuinely UI and should NOT be "fixed"; `/api/health-connect/ingest` fails closed with its secret
+  unset *and* on an empty secret, with an IP limiter before a constant-time compare and an identical
+  401 body — the reference implementation for the fail-closed rule; both bearer paths
+  (`day-review`, `db-query`) fail closed on partial config; and the claim-refresh module itself is
+  careful (a missing row is not deactivation, a failed lookup does not advance the timestamp, a DB
+  blip cannot sign everyone out).
+- **⚠️ Method note worth more than the finding.** The first run of this test reported revocation
+  **working** and was wrong: `curl -b` without `-c` discards the rotated cookie, so every request
+  re-sent a token with no `isActiveCheckedAt`, the throttle never engaged, and the DB was re-read
+  every time. **A session-staleness test is meaningless unless the client persists cookie rotation.**
+- **Not verified on:** the APK or production; `ISACTIVE_RECHECK_MS` is read from source, not observed
+  over a real 24-hour window.
+
+### [platform] ✅ The empty account and the n=1 account are clean — and the probe that said so was invalid until it was fixed (2026-08-18)
+
+- **All 126 static GET routes driven twice** — once as an account with zero rows in every domain, once
+  after giving it exactly one `body_metrics` row and one `sleep_sessions` row.
+  [`docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md`](docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md).
+- **The method correction is the point of the entry.** The probe grepped response bodies for `NaN`
+  and `Infinity`, came back clean twice, and **could not have detected either**:
+  `JSON.stringify({x: NaN})` → `{"x":null}`, and the same for `±Infinity`. Both serialise to `null`,
+  indistinguishable from a legitimate no-data null. **A numeric-corruption check must never be run
+  against a serialised JSON body** — audit the divisions, or use a differential (numeric at n=many,
+  `null` at n=1 while its input exists), never a string match on the response.
+- **By the correct method — auditing every mean-style division across `app/api`,
+  `packages/shared/src` and `lib/health` — there is no unguarded division.** The four that looked
+  unguarded from a grep each carry an explicit early return immediately above
+  (`health-trends:111`, `cardio-week:24`, `oura/hr-window:61`, `admin/program-export:51`); the rest
+  are ternary-guarded at the expression.
+- **No route changed behaviour between zero data and one data point** — the useful half of the sweep.
+  Status distribution identical across both runs: 76–77 × 200, 33 × 403 (admin-gated), 11 × 400
+  (missing required param), 2 × 404, 3 × 5xx.
+- **All three 5xx are environmental and unchanged between runs:** `/api/download-apk` 502 (GitHub not
+  reachable from the sandbox), `/api/push/subscribe` 503 (VAPID unset), and
+  `/api/oura-ble/decoder-constants` 500 with an empty body (the vendored constants are deliberately
+  absent from the public repo). The last was **deliberately not filed**: the client's
+  `isUsable()` exists precisely to reject an error-shaped payload, and the decoder throws on an absent
+  table rather than producing plausible wrong numbers.
+- **`onRequestError` verified working.** It caught the bodiless 500 and wrote an `error_events` row
+  with the exact message — checked by querying the table after the run. The hook does what its comment
+  claims for the ~80 route files with no `catch`.
+- **Not verified:** the APK, production, or the dynamic-segment (`[id]`) routes, which were excluded.
+
+### [nutrition][platform] 🟠 A water quick-add replayed by the outbox triple-counts — the one non-idempotent mutation of nineteen (Q-481, 2026-08-18)
+
+- **The gap between sweeps 9 and 10**: concurrent writes were measured, and the outbox under failure
+  was measured, but not the same mutation arriving **twice in sequence** — which is what at-least-once
+  delivery guarantees will eventually happen.
+  [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](docs/reviews/2026-08-18-outbox-replay-idempotency.md).
+- **Measured:** one mutation id pushed three times → `water_ml = 750` for 250 ml logged, every push
+  answering `{"processed":1,"errors":[]}`. The server keeps **no record of processed mutation ids**.
+- **Reachable by ordinary means on the canonical runtime.** The client wraps its push in
+  `try { await fetch(…) } catch { break }`, so a request that **reaches the server and commits** but
+  whose response is lost — signal drop, OS killing a backgrounded app, timeout — leaves the mutation
+  `pending` with nothing marking it in-flight. The next sync re-pushes it. On a phone on mobile data
+  that is routine.
+- **The write is correct and must not be "fixed".** `incrementWaterLog` adds inside the upsert and the
+  push branch routes to it deliberately (SYNC-P7: *"an increment, not an absolute set … so concurrent
+  adds sum instead of last-writer-wins clobbering"*). Atomic-and-additive is right for concurrency and
+  is exactly what makes a replay wrong; an absolute total reintroduces the clobber it was written to
+  prevent. The fix is **mutation-id dedupe for this one branch**, not a change of semantics.
+- **Bounded:** all 19 push branches enumerated, and this is the only non-idempotent one — every other
+  domain upserts on `(user_id, date)` or a client-supplied row id.
+- **Three clean results, one of them load-bearing:** `complete_workout` replayed 3× → counter = 1,
+  which is the **second independent confirmation of the Q-473 fix** and covers the vector its original
+  comment named (an outbox mutation re-pushed after its response was lost); absolute `body_metrics`
+  is idempotent; and `activity_logs` replayed 3× gives **one** row — which looks like it contradicts
+  sweep 9's "5 concurrent → 5 rows" and does not: **different writers**, the web route minting a
+  server-side id and the outbox carrying a client-generated one.
+- **Not verified on:** the APK. The replay was simulated by re-posting the same envelope (what the
+  client does); the client-side trigger was read from source, not induced.
+
+### [platform] ✅ The server side of the timezone problem does not exist — verified at every layer below the routes (Q-480, 2026-08-18)
+
+- **A verification sweep, written up because a clean result is a result.**
+  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md).
+  Sweep 11 concluded "the server is correct" by counting `todayInTz()` **inside route files**, which
+  is not the whole server — a blameless route can still get a Brisbane answer if the repository
+  function it calls defaults the timezone. This sweep went looking for that half. **It is not there.**
+- **Checked and clean:** every caller of the three tz-defaulting repository helpers
+  (`getCalendarData`, `getRecentTrainedDays`, `getNextSession`) passes the session timezone; all
+  **four** timezone-sensitive SQL sites in `lib/data` interpolate a parameter, with **no hardcoded
+  zone string anywhere in the repository layer**; and every call site of the shared sleep helpers
+  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend` —
+  the ones that decide which calendar day a night belongs to) passes `tz`. Zero local re-declarations
+  of `DEFAULT_TZ`.
+- **This bounds Q-477.** The wrong-timezone problem is **exclusively client-side**; its fix does not
+  need to touch `lib/data` or `packages/shared/src/health`.
+- **Q-480 is the one finding, and it is a documentation correction.** `CLAUDE.md` says *"Repo
+  day-window helpers currently **hardcode** `DEFAULT_TZ`"*. They do not — they take it as a default
+  parameter that every caller overrides. The stale line marks the repository layer as known-broken, so
+  an implementer taking Q-477 would start there and find nothing. Filed rather than edited directly,
+  because `CLAUDE.md` is the contract all five agents read.
+- **Rate limiting swept in the same pass, also clean:** all **13** routes calling
+  `generateObject`/`generateText`/`streamText` are rate-limited, and **all 104 `rateLimit` keys are
+  user- or IP-scoped** — zero global keys, so no route where one user's traffic can throttle another's.
+- **Not covered:** whether any limit is set at the right *number*, the client half of rate limiting,
+  the APK, or production.
+
 ### [app-shell][platform] 🟠 The app run as a user who is not in Brisbane: the server follows their timezone, 100 of 125 client call sites do not (Q-477, Q-478, 2026-08-18)
 
 - **The blind spot `CLAUDE.md` names, entered for the first time.** All 30 user rows in the local DB

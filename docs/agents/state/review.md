@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** eleven sweeps (2026-08-17 ×2, 2026-08-18 ×9) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **479**)
+**Updated:** 2026-08-18 · **By:** fifteen sweeps (2026-08-17 ×2, 2026-08-18 ×13) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **482**)
 
 ## Now
 
-Eleven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Fifteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,110 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 15 — the empty account, the n=1 account, and a probe that could not have worked (2026-08-18)
+
+**Filed nothing.** All **126** static GET routes driven twice — zero rows in every domain, then
+exactly one `body_metrics` and one `sleep_sessions` row. Write-up:
+[`docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md`](../../reviews/2026-08-18-empty-and-single-datapoint-accounts.md).
+
+**⚠️ The method correction is the deliverable, and it is the most reusable thing this run produced.**
+The probe grepped response bodies for `NaN`/`Infinity`, came back clean **twice**, and could not have
+detected either: `JSON.stringify({x: NaN})` → `{"x":null}`, same for `±Infinity`. Both serialise to
+`null`, indistinguishable from a legitimate no-data null. **Never run a numeric-corruption check
+against a serialised JSON body** — audit the divisions, or use a differential (numeric at n=many,
+`null` at n=1 while its input exists).
+
+**By the correct method: no unguarded division** anywhere in `app/api`, `packages/shared/src` or
+`lib/health`. The four that look unguarded from a grep each carry an explicit early return
+immediately above. **No route changed behaviour between zero data and one data point.**
+
+**Three 5xx, all environmental, none filed** — `download-apk` (no GitHub from the sandbox),
+`push/subscribe` (VAPID unset), and `oura-ble/decoder-constants` (bodiless 500; the vendored constants
+are deliberately out of the public repo). The last is not filed on purpose: the client's `isUsable()`
+exists to reject an error-shaped payload and the decoder throws on an absent table, so the failure is
+loud where it matters. **`onRequestError` verified working** — it wrote the `error_events` row for
+that bodiless 500, confirmed by querying the table.
+
+**Three harness artifacts caught in this run now** (backgrounded-`sleep` false stall, wrong-column
+false negative, discarded cookie, and this). Every one produced a *clean-looking* result. The habit
+that catches them: before recording a clean result, ask what the probe would have done if the bug
+were present.
+
+### Sweep 14 — the same mutation pushed twice (2026-08-18)
+
+**The gap between sweeps 9 and 10** — concurrent writes measured, outbox-under-failure measured, but
+never the same mutation arriving **twice in sequence**, which at-least-once delivery guarantees.
+Write-up: [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](../../reviews/2026-08-18-outbox-replay-idempotency.md).
+
+**Filed Q-481 (mid).** Same mutation id ×3 → `water_ml = 750` for 250 logged, every push answering
+`{"processed":1,"errors":[]}`. The server keeps **no record of processed mutation ids**, and the
+client's `try { await fetch(…) } catch { break }` leaves a committed-but-unacknowledged mutation
+`pending` with nothing marking it in-flight. **`waterMlDelta` is the only non-idempotent branch of the
+19** — every other domain upserts on `(user_id, date)` or a client-supplied row id.
+
+**The entry leads with what NOT to do:** the additive write is deliberate (SYNC-P7 — concurrent adds
+must sum, not clobber), so the fix is mutation-id dedupe for that one branch, never an absolute total.
+That is the way this gets implemented wrongly.
+
+**Three clean results**, one load-bearing: `complete_workout` replayed 3× → counter = **1**, a second
+independent confirmation of the **Q-473** fix covering the *replay* vector its comment named (sweep 9
+covered the concurrent one). And `activity_logs` replayed 3× gives **one** row — which looks like it
+contradicts sweep 9's "5 concurrent → 5 rows" and does not: **different writers**, web route vs
+outbox. Worth remembering before reasoning about one path from the other.
+
+### Sweep 13 — verifying the server side; a clean sweep, written up as one (2026-08-18)
+
+**Went looking for the server half of Q-477 and it is not there.** Write-up:
+[`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](../../reviews/2026-08-18-server-tz-and-rate-limit-verification.md).
+
+Sweep 11 based "the server is correct" on counting `todayInTz()` **inside route files** — not the
+whole server, since a blameless route still gets Brisbane if the repo function it calls defaults the
+tz. Checked and clean: every caller of the tz-defaulting repository helpers threads the session tz;
+all **4** timezone-sensitive SQL sites in `lib/data` are parameterised (no hardcoded zone string
+anywhere in the repository layer); every call site of the shared sleep helpers (`nightSessions`,
+`sleepScoreBaselines`, …) passes `tz`; zero local `DEFAULT_TZ` re-declarations. **This bounds Q-477 to
+the client.**
+
+Rate limiting swept in the same pass: all **13** AI routes limited, all **104** `rateLimit` keys
+user- or IP-scoped, **zero global keys**.
+
+**Filed Q-480 (low) — a documentation correction.** `CLAUDE.md` calls the repo day-window helpers
+timezone-*hardcoded*; they take a **default parameter** every caller overrides. The stale line marks
+`lib/data` as known-broken, so whoever takes Q-477 starts there and finds nothing. **Filed rather than
+edited directly** — `CLAUDE.md` is the contract all five agents read, and a Review agent quietly
+rewriting a rule line is a change the other four should see come through the queue.
+
+**Worth carrying: a clean sweep is a result.** It is written up at length on purpose — the inventory
+of what was checked is the deliverable, so sweep 14 does not re-derive it. Do not manufacture a
+finding to justify a sweep; do record what was ruled out.
+
+### Sweep 12 — does revoking access actually revoke it? (2026-08-18)
+
+**The first sweep to test privilege *revocation* rather than cross-user data isolation.** Write-up:
+[`docs/reviews/2026-08-18-auth-session-boundaries.md`](../../reviews/2026-08-18-auth-session-boundaries.md).
+
+**Filed Q-479 (mid).** `lib/admin.ts` holds two admin checks that disagree: `requireAdmin` ignores the
+passed flag and reads the row (**61 routes**, revocation immediate); `isAdminUser` returns the flag
+when given one. Seven of its ten call sites pass the JWT claim — six are page guards (UI, correct),
+the seventh is **`app/api/exercises/route.ts:38`**, an API write into the shared `exercise_library`.
+The claim refreshes only once per 24 h (`ISACTIVE_RECHECK_MS`), and the module's docstring asserts it
+*"governs the UI only"* — which is false, and is why this was easy to miss.
+
+**Measured with a control:** admin revoked in the DB, no re-login → `POST /api/exercises` **201**
+(row created) while `GET /api/admin/errors` **403**, same cookie, same instant.
+
+**Five clean results**, including the one worth reusing: `/api/health-connect/ingest` is the
+**reference fail-closed implementation** — 401 with the secret unset *and* on an empty secret, IP
+limiter before the constant-time compare, identical 401 body on trip.
+
+**⚠️ The method note is worth more than the finding, and belongs in every future harness:** the first
+run reported revocation **working** and was wrong. `curl -b` without `-c` discards the rotated
+cookie, so every request re-sent a token with no `isActiveCheckedAt`, the throttle never engaged, and
+the DB was re-read every time. **A session-staleness test is meaningless unless the client persists
+cookie rotation** — use `-b` and `-c` on the same file. This is the third harness artifact this run
+(after the backgrounded-`sleep` false stall and the wrong-column false negative in sweep 9); the
+pattern is that a *clean* result deserves as much suspicion as a dirty one.
 
 ### Fix verification — Q-473 confirmed fixed by re-running the reproduction (2026-08-18)
 
