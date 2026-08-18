@@ -103,13 +103,19 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
-### [platform] 🔴 Production says the sync-push blind spot is real: pull has recorded 69 faults, push has recorded zero, ever (2026-08-18)
+### [platform] 🟠 Q-475 shipped mid-sweep; the production evidence is about the half its fix did not cover (Q-487, 2026-08-18)
 
 - **This run's fourteen findings checked against production**, the same exercise that corrected four
   findings in sweep 8.
   [`docs/reviews/2026-08-18-production-verification-round-2.md`](docs/reviews/2026-08-18-production-verification-round-2.md).
   Nothing new filed; **six entries amended**.
-- **Q-475 upgraded from "measured locally" to "the precondition has occurred, repeatedly."**
+- **⚠️ Q-475 was implemented while this sweep ran** — `#115` classifies the cause server-side
+  (`isRetryableWriteError`), stops the client counting a retryable failure against
+  `MAX_MUTATION_ATTEMPTS`, and engages the whole-queue backoff. **The dead-lettering and missing
+  backoff are genuinely fixed.** What the evidence below is about is **not**: `reportServerError` is
+  called only in the route's *outer* catch, which `pushMutations` never reaches, so a push failure
+  still never reaches `error_events`. **Filed as Q-487**, scoped to the observability half.
+- **The production shape, and it is an absence:**
 
   | Route | Faults in `error_events` | Span |
   |---|---|---|
@@ -7363,7 +7369,6 @@ append-only session journal and the batched archives live under `docs/`:
 | `docs/overview/entries/` | **Recent journal (uncompacted)** — one file per PR/session (`YYYY-MM-DD-<slug>.md`); read these + the newest history file for "what happened lately". Folded into the batched history by the compaction sweep — see the README there. **Corrected 2026-07-30:** this line said "near-empty (compacted 2026-07-20)" but the directory holds ~179 files from 07-20→07-29 — the compaction sweep is overdue; a future session should run it. |
 | [`docs/agents/README.md`](docs/agents/README.md) | **The standing agents** — the four roles, their authority, the two-lane file-ownership contract, the Q-number bands, and the handoff protocol. Cold-start prompts in `docs/agents/prompts/`, live batons in `docs/agents/state/` |
 | `docs/overview/status-archive.md` | The 157 dated status notes that had accumulated in this file's Current Status section, archived 2026-08-17. Superseded by the journal; do not add to it |
-| `docs/overview/history-2026-08-18.md` | **Completed journal (batched)** — 19 entries folded by the 2026-08-18 compaction sweep. Only entries **no durable doc linked to** were folded; each keeps a `<!-- folded from … -->` marker. A new file rather than an append, because `history-2026-08-15.md` was already at 218 KB |
 | `docs/overview/history-2026-08-15.md` … `history-2026-07-17.md` | **Completed journal (batched)** — nine files covering 2026-07-17 → 2026-08-15, folded from 498 loose entries by the 2026-08-17 compaction sweep, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from |
 | `docs/overview/history-2026-07-20.md` | **Completed journal (batched)** — the 2026-07-17 → 2026-07-20 loose entries, compacted 2026-07-20, newest at top |
 | `docs/overview/history-2026-07-16.md` | **Completed journal (batched)** — sessions 2026-07-16 → 2026-07-17, newest at top |

@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
+| Next free Postgres migration | **199** | `lib/data/postgres/migrations/` (head: `198_drop_duplicate_indexes.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **552** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -285,71 +285,45 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
-### [platform][devices] Q-475 — a database outage reaches the client as HTTP 200, so the backoff written for it never fires and ~43 minutes of downtime dead-letters the whole outbox
+### [platform][devices] Q-487 — a sync-push failure still cannot reach `error_events`, and production shows the shape as a zero
 
-- **✅ PRODUCTION-CONFIRMED 2026-08-18 — the precondition has occurred, repeatedly.**
-  `/api/sync/pull` has **69** faults in `error_events` (2026-07-19 → 2026-08-13); `/api/sync/push` has
-  **zero, ever**. Over the same window the database refused connections **125 times across six days**
-  (39 in one day), one pull row reading `[cause: timeout exceeded when trying to connect]`.
-  `components/sync-provider.tsx` runs `await pushMutations(userId)` at :139 and `pullDelta` at :145 —
-  **push first, same cycle** — so the zero is not "push never ran", it is **"push cannot report"**,
-  which is exactly this finding. Raises the priority argument, does not change the fix.
+- **Branch:** `fix/sync-push-reports-to-error-events`
+- **Added:** 2026-08-18 · review sweep (production verification round 2) ·
   [`docs/reviews/2026-08-18-production-verification-round-2.md`](reviews/2026-08-18-production-verification-round-2.md)
-- **Branch:** `fix/sync-push-classify-retryable-errors`
-- **Added:** 2026-08-18 · review sweep (offline-sync failure paths) ·
-  [`docs/reviews/2026-08-18-outbox-under-failure.md`](reviews/2026-08-18-outbox-under-failure.md)
-- **Placement:** high. Measured against a genuinely stopped database, it converts a *transient*
-  server problem into per-user manual repair, and the fix is a classification change rather than a
-  redesign.
-- **Measured.** Local Postgres stopped (`pg_ctl -m fast stop`), then two ordinary valid mutations
-  pushed to `/api/sync/push`:
-  ```
-  HTTP 200
-  {"processed":0,"errors":[{"id":"d1","domain":"body_metrics","date":"2026-08-09",
-    "error":"Error: Failed query: insert into \"body_metrics\" …"}, {"id":"d2", …}]}
-  ```
-  **200, not 500.** `pushMutations` catches per-mutation — which is exactly what makes the poison-pill
-  rule work — so at the wire a dead connection is indistinguishable from a validation rejection.
-- **What the client does with that** (`lib/local-store/sync-engine.ts:798-833`): `res.ok` is true, so
-  `consecutive5xx = 0; push5xxUntil = 0` — the whole-queue backoff is **reset rather than engaged**,
-  and the client keeps pushing at full cadence into a server that cannot write. Every mutation then
-  goes through `recordMutationFailures` → `attempts++` → dead-letters at `MAX_MUTATION_ATTEMPTS = 5`.
-- **The arithmetic.** Per-item backoff is `30_000 * 4 ** (attempts - 1)` — 30 s → 2 m → 8 m → 32 m,
-  fifth attempt dead-letters. **≈ 42.5 minutes of outage dead-letters every queued mutation.** That is
-  an ordinary outage length; this repo has recorded two (the session-165 pool incident and the
-  2026-08-17 `disk_full`).
-- **The client already states the principle it is violating**, three lines below:
-  ```ts
-  // Transport failures (catch/!res.ok above) are
-  // deliberately NOT counted — they say nothing about the mutation itself.
-  ```
-  A dead database says nothing about the mutation either. It is counted only because it does not
-  *look* like a transport failure.
-- **Cost — not data loss, and that matters.** `status='failed'` keeps the row, the More-tab badge
-  reflects it, the four Tier-A domains fire a toast, and `retryFailedMutation` restores it. The cost is
-  that after a ~43-minute outage a user finds **every** pending write dead-lettered, a red badge, a
-  toast claiming a workout failed to sync — and a retry UI that is **per-item only**
-  (`components/more/sync-health-card.tsx:109-123`, no "retry all"), so N stranded mutations mean N
-  taps, each firing its own full `pushMutations`. They are asked to hand-repair a queue that was never
-  broken.
-- **Fix shape — two options, prefer the first:**
-  1. **Classify at the source.** The per-mutation catch already knows a connection error from a
-     validation error and flattens both into `String(err)`. Mark the error retryable (a `retryable`
-     flag or a `code` on the error entry) and have `recordMutationFailures` skip the attempt bump for
-     those — the same treatment transport failures already get by policy.
-  2. **Escalate a whole-batch failure.** If every mutation in a batch failed with the same
-     connection-shaped error, return 500 and let the client's existing 5xx path do the right thing
-     with no client change. Cheaper, but blind to a partial outage.
-  (1) fixes the classification instead of inferring it from a count, and (2) can layer on later.
-- **Same class as Q-548, filed the same day on a different route** — there a DB outage surfaced as
-  `{"error":"Forbidden"}` and burned minutes of a real diagnosis on a credential hunt. Two independent
-  routes now known to misreport a database outage as something else; a third look at how outages
-  surface across `app/api/**` would probably be worth someone's hour, but is not this entry.
-- **Lane split:** the server half is Lane A (`app/api/sync/push`, `lib/data/postgres/adapter.ts`); the
-  client half is Lane A too (`lib/local-store/**`). One lane, one PR.
-- **Not verified on:** Railway (inducing a production DB outage is not on), or the APK. The client half
-  is plain TypeScript in `sync-engine.ts` with no native dependency and the arithmetic above is read
-  straight from it.
+- **Placement:** mid-low. One call, and it closes a structural blind spot in the table the
+  session-start ritual reads.
+- **This is the half of Q-475 that its fix did not cover.** `#115` landed the classification correctly
+  — `isRetryableWriteError` server-side, the client no longer counting a retryable failure against
+  `MAX_MUTATION_ATTEMPTS`, and `serverUnavailable` engaging the whole-queue backoff. **Behaviour is
+  fixed. Reporting is not.**
+- **The gap:** `reportServerError` is called only in the route's **outer** catch
+  (`app/api/sync/push/route.ts:51`), which `pushMutations` never reaches because it catches
+  per-mutation by design. Failures do hit the server log
+  (`console.error('[pushMutations] error', …)`) but **never `error_events`** — the table `CLAUDE.md`
+  calls *"the only view of faults that never reach a human"*, and the one the session-start ritual
+  reads.
+- **Production evidence — the shape is an absence** (owner's rows, retained window):
+
+  | Route | Faults in `error_events` | Span |
+  |---|---|---|
+  | `/api/sync/pull` | **69** | 2026-07-19 → 2026-08-13 |
+  | `/api/sync/push` | **0** | none, ever |
+
+  Over the same window the database refused connections **125 times across six days** (39 on
+  2026-08-12), one pull row reading `[cause: timeout exceeded when trying to connect]`.
+- **Why the zero is evidence and not absent traffic:** `components/sync-provider.tsx` runs
+  `await pushMutations(userId)` at :139 and `pullDelta` at :145 — **push first, same cycle**. Push is
+  not less exposed than pull; it runs before it.
+- **Fix shape:** call `reportServerError` (or an equivalent) for the errors `pushMutations` returns —
+  ideally only for the **retryable** ones, since a validation rejection is not a server fault and
+  would be noise. The classification needed to make that distinction **already exists** as of `#115`,
+  so this is a small addition on top of it rather than new machinery.
+- **Do not "fix" it by removing the per-mutation catch** — that catch is what makes the poison-pill
+  rule work.
+- **Lane A owns this** (`app/api/sync/push`, `lib/data/postgres/adapter.ts`).
+- **⚠️ Re-derive it soon or not at all:** `error_events` prunes at **30 days**, so the pull-69/push-0
+  asymmetry above cannot be reproduced after that window. It is recorded here because it will not be
+  measurable later.
 
 ### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
 
@@ -846,18 +820,6 @@ below threshold and left in place for next time.
   after a restart.
 - **Load-bearing constraint (`CLAUDE.md`):** total connections = `max` x replicas must stay under the
   Railway connection limit, and the pool's error handler and timeouts must survive any change here.
-
-### [devices][platform] Q-550 — `oura_heartrate`: 27 MB of indexes on 6.8 MB of heap
-
-- **Branch:** `perf/oura-heartrate-index-audit`
-- **Added:** 2026-08-18 · **Lane A.** Small; the same shape as Q-534 at one-tenth the size.
-- **Measured 2026-08-18:** 34 MB total, 65,160 rows — **6.8 MB heap, 27 MB indexes**. Now the
-  third-largest table after the packing work, and indexes are 4x the data.
-- **`oura_heartrate_pkey` had zero lifetime scans** on a table that already carries a
-  `(user_id, timestamp)` unique constraint. **Re-measure before acting** — the counters reset at the
-  2026-08-17 crash, so a fresh zero means "not since recovery", not "never".
-- **Keep `oura_heartrate_user_updated` despite its zero.** Migration 130 added it for Track-B sync,
-  which is not wired yet, so its zero is expected and correct.
 
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
 

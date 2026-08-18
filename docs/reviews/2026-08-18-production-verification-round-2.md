@@ -56,8 +56,23 @@ says: `pushMutations` catches per-mutation, returns 200 with the failure inside 
 calls `reportServerError`. The one place designed to catch faults that never reach a human has a
 blind spot exactly where this finding lives.
 
-**This does not change the fix**, but it does change the priority argument: the precondition has
-occurred in production, repeatedly, within the last ten days of data.
+### ⚠️ Q-475 was fixed while this sweep was running — and half of what the evidence shows survives it
+
+`#115` (*"Mark a database-unavailable push failure retryable, and stop counting it"*) landed on `main`
+during this sweep, taking the option this role recommended: `isRetryableWriteError(err)` classifies
+the cause server-side while the chain is intact, the client filters
+`rejected = failed.filter(f => !f.retryable)` so a retryable failure no longer burns
+`MAX_MUTATION_ATTEMPTS`, and `serverUnavailable` now engages the whole-queue backoff exactly as a 5xx
+would. **The dead-lettering and the missing backoff are both genuinely fixed.**
+
+**What the production evidence above is about is not fixed.** `reportServerError` is still called only
+in the route's *outer* catch (`app/api/sync/push/route.ts:51`), which `pushMutations` never reaches
+because it catches per-mutation by design. The failures do reach the server log
+(`console.error('[pushMutations] error', …)`), but **not `error_events`** — which is the table
+`CLAUDE.md` calls *"the only view of faults that never reach a human"* and which the session-start
+ritual reads. So the pull-69 / push-0 asymmetry measured here will still read as zero after the fix.
+
+Filed as **Q-487**, scoped to the observability half only.
 
 ---
 

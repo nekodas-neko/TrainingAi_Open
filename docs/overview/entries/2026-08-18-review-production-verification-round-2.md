@@ -9,7 +9,19 @@ Sweep 8 checked that run's findings against production and corrected four of the
 (Q-473…Q-486) had been filed since, none production-checked. A finding priced on a reachability guess
 is a finding priced wrong.
 
-## Q-475 — the strongest result of the run
+## Q-475 shipped mid-sweep, and the evidence is about the half its fix did not cover
+
+`#115` landed while this sweep was running, taking the option this role recommended:
+`isRetryableWriteError` classifies the cause server-side, the client stops counting a retryable
+failure against `MAX_MUTATION_ATTEMPTS`, and `serverUnavailable` engages the whole-queue backoff.
+**Those are genuinely fixed**, and the Q-475 queue entry was removed.
+
+**`reportServerError` is still only in the route's outer catch** (`app/api/sync/push/route.ts:51`),
+which `pushMutations` never reaches because it catches per-mutation by design. Failures reach the
+server log but **never `error_events`**. Filed as **Q-487**, scoped to that half — and the production
+numbers below are its evidence.
+
+## The production shape is an absence
 
 | Route | Faults in `error_events` | Span |
 |---|---|---|

@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty sweeps (2026-08-17 ×2, 2026-08-18 ×18) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **487**)
+**Updated:** 2026-08-18 · **By:** twenty sweeps (2026-08-17 ×2, 2026-08-18 ×18) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **488**)
 
 ## Now
 
@@ -30,7 +30,14 @@ against a healthy server on a live network), and the secret-gated `health-connec
 accumulated unchecked. Write-up:
 [`docs/reviews/2026-08-18-production-verification-round-2.md`](../../reviews/2026-08-18-production-verification-round-2.md).
 
-**Q-475 upgraded, and it is the strongest result of the run.** `/api/sync/pull` has **69** faults in
+**⚠️ Q-475 shipped mid-sweep (#115) and the fix covers only half of what the evidence shows.** The
+classification (`isRetryableWriteError`), the client no longer counting a retryable failure against
+`MAX_MUTATION_ATTEMPTS`, and the whole-queue backoff are all genuinely fixed. **`reportServerError`
+is still only in the route's outer catch**, which `pushMutations` never reaches — so a push failure
+still never reaches `error_events`. **Filed Q-487** for that half; the Q-475 entry was removed from
+the queue (completed on main).
+
+**The production shape is an absence, and it is the evidence for Q-487.** `/api/sync/pull` has **69** faults in
 `error_events` (2026-07-19 → 2026-08-13); `/api/sync/push` has **zero, ever** — across six days with
 **125** database connection failures (39 in one day). `sync-provider.tsx` runs `await
 pushMutations()` at :139 and `pullDelta` at :145, **push first, same cycle**, so the zero is not
@@ -41,6 +48,14 @@ blind spot exactly where that finding lives.
 **Q-484 latent confirmed** — `injuries` is empty. **Q-481 and Q-485 unprovable from production**, and
 Q-485's obvious query (35/114 rows with steps and no weight) is **the expected shape**, not evidence —
 same trap as Q-460's "74% lack an RPE".
+
+**Two concurrency lessons from this sweep, both cost real work:**
+1. **Check whether a finding shipped before writing about it as open.** Q-475 was implemented while
+   this sweep was measuring it. The measurement was still worth having — it showed the fix's blind
+   spot — but the row had to be rewritten and the queue entry removed.
+2. **Check whether a chore already landed before doing it.** I ran the entries compaction and folded
+   19 unlinked entries; `#130` had folded the same 19 an hour earlier. The whole fold was discarded.
+   `git log origin/main --oneline -- <path>` first.
 
 **Make this a habit, not a one-off.** Two rounds have now run and both changed how findings should be
 read — sweep 8 corrected four, this one upgraded one and stopped four from being over-priced. **Run it
