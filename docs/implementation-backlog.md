@@ -432,6 +432,70 @@ blocker and the intended shape were both already named, so **do not re-derive th
   note says the server half is the correct home, so **route it to Lane A** with the display change
   riding along.
 
+### [platform][app-shell] Q-392 — preferences live only on the device, so a reinstall or a second browser starts from defaults
+
+- **Branch:** `feat/server-backed-user-preferences`
+- **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
+  - when i do a new install or open on computer - it loses all the saved preferences. We need to
+  make it persist across installs/etc."*
+- **Screenshot context** (Home, so it does not need to survive): the customised surface is exactly
+  what resets — the score-ring style behind Readiness / Heart Rate / Sleep / Activity, the three
+  chosen quick-log tiles (kg · Steps · Calories), card colours, and which widgets appear at all.
+
+**Confirmed: these are `localStorage` only, with no server copy.** Inventory as of this trace —
+
+| what | key | lives in |
+|---|---|---|
+| Home widgets / cards | `ta_ss_widgets`, `ta_ss_cards` | `lib/home/home-prefs.ts:29-30` |
+| Pill & card colours | `ta_pill_colors`, `ta_card_colors` | `home-prefs.ts:31,40` |
+| Score-ring style (20 options) | `ta_score_ring_style` | `home-prefs.ts:159` |
+| Weight lookback | `ta_weight_lookback` | `home-prefs.ts:57` |
+| Push / meal / health / day-review / calendar toggles | `ta_pref_*` | five call sites |
+| Rest & run status chips | `ta_pref_rest_chip`, `ta_pref_run_chip` | `lib/native/*-chip.ts` |
+| Background / wallpaper | `ta_background_settings` | `lib/stores/background-settings-store.ts:36` |
+| Food region | `ta_food_region` | four component sites |
+
+- **✅ The pattern to copy already exists and is proven — do not invent one.** **Q-241 (done
+  2026-08-14, v1.307.1)** made goals server-authoritative for exactly this reason, and left the
+  shape behind: the server owns the value, `PATCH /api/user/goals` writes it, and
+  `hydrateGoalSeeds()` (`home-prefs.ts:85`) pushes it into the same `localStorage` keys so first
+  paint stays instant. `app/api/user/` already holds `goals`, `profile`, `avatar`,
+  `equipped-title`, `bedtime-estimate`. **This item is extending that to the rest of the table
+  above**, not designing persistence from scratch.
+- **⚠ One row is already half-built, and is the cheapest possible proof.** `users.food_region`
+  **exists as a column** (`lib/data/postgres/schema.ts:31`, `NOT NULL DEFAULT 'AU'`) and **nothing
+  reads or writes it** — a grep of `app/api/**` and `lib/data/**` finds only the definition. The
+  region the app actually uses comes from `localStorage.getItem('ta_food_region') ?? 'AU'` at
+  `components/nutrition/capture-step.tsx:130,138`, `review-step.tsx:124`, and is set at
+  `components/profile/edit-profile-sheet.tsx:238`. So the column is dead, the setting is
+  device-only, and the landing spot is already in the schema. Wire this one first — it validates
+  the whole approach against a real preference for almost no work.
+- **Decisions the spec has to make:**
+  1. **A column per preference, or one JSONB blob?** Columns match `users.*` as it stands and keep
+     things queryable; a blob avoids a migration per new preference, which matters given how many
+     are listed above. **Either way the migration is Lane A's to claim, not intake's.**
+  2. **Conflict rule when two devices disagree.** Q-241 settled it for goals — server wins, local is
+     a seed — and the same rule should hold here rather than a second, different one.
+  3. **What deliberately stays device-local.** Not everything above should sync: `ta_pref_rest_chip`
+     and `ta_pref_run_chip` drive Android status-bar chips that mean nothing in a desktop browser,
+     and push-notification enablement is per-install by nature. Decide the list rather than syncing
+     the lot; a desktop browser inheriting a phone's notification state is its own bug.
+- **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
+  — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
+  destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
+  re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
+  This report establishes that reinstalls are part of the owner's normal routine, which changes
+  Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
+- **What would count as done:** sign in on a fresh install or a different browser and the chosen
+  ring style, widgets, colours, weight lookback and food region are already applied — no
+  re-configuration; changing one on either device and reopening the other shows the new value; and
+  the preferences that are deliberately per-install are documented as such rather than silently
+  not syncing.
+- **Surface:** browser-reproducible end to end (two profiles, or one profile and a private window)
+  against the seeded DB — no device needed to prove the sync. Only the native chip toggles need the
+  APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
+  the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
@@ -618,6 +682,19 @@ blocker and the intended shape were both already named, so **do not re-derive th
   3. **`work_mem` is 4 MB** and the failing query sorts 1.1M rows. Raising it for that path, or
      giving the query an index that avoids the sort, removes the temp-disk dependency that turned a
      full volume into a user-visible error.
+> **⚠️ The 500 MB target is withdrawn — 2026-08-18, and this is settled rather than deferred.**
+> Railway **cannot shrink a volume**: *"Down-sizing a volume is not currently supported, but
+> increasing size is supported."* And it does not need to, because Railway bills *"only … the amount
+> of storage used by your volumes,"* not the provisioned size — so the 5 GB volume costs exactly what
+> a 500 MB one would at the same usage. Reverting would mean a dump/restore onto a fresh volume,
+> i.e. real downtime and risk on the database holding the ring archive, to save nothing. **Do not
+> attempt it.** Treat every "return to stock 500 MB" line below as historical context for why the
+> work was prioritised, not as an outstanding action.
+>
+> What was genuinely lost is the tripwire: 500 MB is what made the bloat scream rather than creep, and
+> 5 GB is ~30 years of headroom at the post-packing rate. Replace it deliberately — a database-size
+> line in the session-start orientation read, beside the existing `error_events` check.
+
 - **The target is concrete:** the owner raised the volume 500 MB → 5 GB as a temporary mitigation
   and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
   estimating, and say whether 500 MB is reachable without touching retention.

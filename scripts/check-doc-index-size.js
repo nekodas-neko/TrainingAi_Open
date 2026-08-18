@@ -161,6 +161,13 @@ const root = path.join(__dirname, '..');
 // wrong: the existing workoutKcal is a DAY total already rendering in the same screen's Energy
 // section, and the estimate is duration-only, so sitting it beside measured volume implies a
 // derivation that does not exist.
+//
+// Raised 2026-08-18 (BugFix intake, Q-392): +64 for one owner-reported queue entry — preferences are
+// localStorage-only, so a reinstall or a second browser starts from defaults. Most of the length is
+// the inventory table of which preference lives in which key and file, which is the work an
+// implementer would otherwise repeat. Also records that the pattern already exists (Q-241 made goals
+// server-authoritative and left hydrateGoalSeeds behind), and that users.food_region is a dead
+// column whose setting is device-only — the cheapest possible proof of the approach.
 // Raised 2026-08-18 (disk_full recovery): the first on-device rawStats reading (209,326 rows, 0
 // rolled up, 31.2 MB) replaces "never measured" on Q-538 and its Known-Issues row, and Q-544 files
 // the console gate that made a desktop VACUUM impossible. A measurement replacing a projection, and
@@ -346,7 +353,7 @@ const BASELINE = {
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
 
-  'projectOverview.md': 6876,
+  'projectOverview.md': 6882,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -356,7 +363,8 @@ const BASELINE = {
   // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
   // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
   // fourth time. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7283,
+  'docs/implementation-backlog.md': 7360,
+  'docs/implementation-backlog.md': 7360,
   'CLAUDE.md': 1044,
 
 };

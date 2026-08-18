@@ -315,8 +315,14 @@ routes failed with **`[pg 53100]`** — PostgreSQL's `disk_full`. Both failing q
 | `last_autovacuum` / `last_analyze` | **never** — `n_live_tup` reads 0 |
 
 **Three things stack, and only one of them is the archival data.**
-1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation; **the stated target
-   is to return to the stock 500 MB** once the bulk is dealt with.
+1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation. **That raise is now
+   permanent and correct — the "return to stock 500 MB" target is WITHDRAWN (2026-08-18).** Railway
+   cannot shrink a volume (*"Down-sizing a volume is not currently supported"*), and bills *"only …
+   the amount of storage used,"* not the provisioned size — so 5 GB costs what 500 MB would. Reverting
+   would mean a dump/restore onto a fresh volume: real downtime and risk on the database holding the
+   ring archive, to save nothing. **Do not attempt it.** What is genuinely lost is the tripwire — 500 MB
+   is what made this bloat scream rather than creep — so add a DB-size line to the session-start
+   orientation read beside the `error_events` check.
 2. **Indexes exceed the table.** The dedup index covers
    `(user_id, ring_timestamp_ds, tag, body_hex)` — it indexes the raw payload itself, so it grows
    faster than the rows do. **291 MB of the 466 MB is index, not data.**
