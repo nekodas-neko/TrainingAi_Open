@@ -103,6 +103,35 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] ✅ Both halves of the staleness test now audited — case (b) clean, and the mechanical test for it does not work (2026-08-18)
+
+- **Completes the lens.** Sweep 21 audited case (a) (`freshWithinTtl`); this audits case (b),
+  **seed-only read paths** — the worse half, because a seed-only key never revalidates at all.
+  [`docs/reviews/2026-08-18-seed-only-read-paths.md`](docs/reviews/2026-08-18-seed-only-read-paths.md).
+- **The naive test over-reports and must not be used.** Differencing `readCacheSync` keys against
+  `cachedFetch` keys (51 vs 66) yields five seed-only candidates — `achievements:<userId>`,
+  `ai-health-insight:<section>:<date>`, `mood:<date>`, and two `workout-card:*`. **All five
+  revalidate. None is seed-only.**
+- **Because revalidation happens three ways and `cachedFetch` is only one:** (1) `cachedFetch`;
+  (2) a raw `fetch(...)` then `setCached(...)` — `ai-insight-card.tsx`, `workout-screen.tsx`;
+  (3) a **local-store read** then `setCached(...)` — `session-select-content.tsx`'s `mood:` path.
+  **The third matters most:** for an offline-first domain the local store *is* the source of truth, so
+  "revalidate" correctly means reading SQLite, not the network. A test that looks for a network call
+  marks the app's most authoritative paths as stale.
+- **So the test for seed-only cannot be "`readCacheSync` without `cachedFetch`"** — it is "no
+  write-back to the key from any source after the seed", which is not greppable in one pass. Five
+  candidates had to be read individually.
+- **⚠️ Second time this run a `Q-NNN:` comment read as an open bug and was the fix.**
+  `workout-screen.tsx:272` (Q-126, lifetime XP reported as one session's gain) is the fix's rationale,
+  not a live defect — as was `session-select-content.tsx:896` (Q-117) last sweep. **In this codebase a
+  comment naming a Q number is usually why the code is shaped that way.** Worth knowing before
+  grepping `never invalidated` or a Q number and reaching for the alarm.
+- **Result: both halves of Q-262's test are audited and clean.** The most repeated bug class in this
+  project currently has no live instance that either half of the documented test can find.
+- **Not verified:** static audit and source reading; not on the APK or production. A stale-value bug
+  arising some *other* way — a write that updates the DB without touching the local store — is outside
+  what this test catches and was not looked for.
+
 ### [platform] ✅ Every load-bearing cache invalidation audited — no gap, closing an audit `CLAUDE.md` names as never done (2026-08-18)
 
 - **The most repeated bug class in this project (12+ incidents), audited against Q-262's own test.**
