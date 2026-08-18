@@ -924,6 +924,17 @@ predate that correction and should have been rewritten; they were not.
    options". The registry (`MEAL_LABEL_STYLES`) already supports this; the default is a stored
    preference and routes through Q-392.
 
+**✅ THE DEFAULT IS DECIDED — B2, owner, 2026-08-18** (*"Yes have B2 as the default"*): round-safe,
+inline-wrapped, the **complete** ingredient list, centred as name / calories / macros / ingredients /
+code. Measured **0.529 mm per module**, against the **0.487** that `DEFAULT_MEAL_LABEL_STYLE = 'band'`
+ships today — so the new default prints a *more* forgiving code than the current one **and** carries
+the breakdown, on either die. Change that constant in the same PR; do not leave B2 as an opt-in
+style the owner has to go and find.
+
+**Do not read this as "ship B2 only."** The other four stay in the picker — that is what "keep them
+all as options" asked for, and the shipped square style is the right pick for anyone who prefers the
+stacked alignment and is using square stock.
+
 - **Verification.** Recompute mm/module per style and assert it in the existing unit test — the
   preview's own size figure was wrong once already (fixed in v1.323.0), so a number nobody asserts
   is a number that drifts. Then a physical test print, which is the only real check.

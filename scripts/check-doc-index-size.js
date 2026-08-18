@@ -474,7 +474,7 @@ const BASELINE = {
   // and drawn, and never written back into the entry. The new entry carries the measured table
   // so the numbers cannot be re-litigated, and the process note that a correction made mid-
   // conversation has to be written into the queue in the same session.
-  'docs/implementation-backlog.md': 8358,
+  'docs/implementation-backlog.md': 8369,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
