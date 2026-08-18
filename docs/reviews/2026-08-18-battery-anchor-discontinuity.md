@@ -114,6 +114,35 @@ defect. Recorded rather than filed, per *"something that stopped is not somethin
 
 ---
 
+## 2.6 The symmetric audit: thresholds on the READINESS scale
+
+Q-500 moved the readiness scale too (+1 on two-thirds of days), and its review enumerated six
+thresholds and measured the crossings. Re-running that enumeration found it listed **six of eight**:
+
+| threshold | site | in Q-500's table? |
+|---|---|---|
+| `< 45` (+ ACWR > 1.2) → early deload | `readiness-payload.ts` | yes |
+| `50` → band Low/Moderate | `scoreBand()` | yes |
+| `< 60` → AI `lowReadiness` branch | `ai-dynamic.ts:231` | yes |
+| `< 60` → rest-day guidance | `rest-day-guidance.ts` | yes |
+| `70` → band Moderate/High | `scoreBand()` | yes |
+| `>= 75` → rest-day guidance "train hard" | `rest-day-guidance.ts` | yes |
+| `< 60` → lowers the high-OTS threshold ×0.9 | `lib/oura-models/inference/ots.ts:151` | **no** |
+| `< 40` → LLM `rest_day_recommended` instruction | `ai-periodization/prompt.ts:168` | **no** |
+
+**The conclusion is unaffected, and that was checked rather than assumed.** `ots.ts` sits on the
+**same 60 line** the review already measured as uncrossed. The prompt's 40 is a line the review never
+measured — `external_readiness` is our own score (`liveReadinessForDay`) — but the only readiness
+values anywhere in 35–48 across all of production are **37, 48 and 48**, so a uniform +1 shift moves
+nothing across 40 (or 45). Q-500's table was incomplete; its answer was right.
+
+Q-500's review has been amended in place with both rows and a note, rather than leaving an incomplete
+enumeration for the next person to inherit. **A threshold living inside an LLM prompt string is the
+one this class of audit will keep missing** — it is invisible to a grep for numeric comparisons
+against a score variable.
+
+---
+
 ## 3. Proposal
 
 1. **Change nothing in the scoring.** The audit's finding is that the re-anchoring was complete and a

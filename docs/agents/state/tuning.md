@@ -13,8 +13,10 @@ Since then, working only scores no other lane holds:
   re-anchored in the recalibration PR, so nothing was missed. The audit did find that Body Battery's
   anchor takes the sleep score **raw**, and its sleep→readiness flip was worth **−17.7 points** (sd
   10.2, worst −51) — the owner's 2026-08-02 "the number visibly jumped" report, quantified. The
-  recalibration cut ~82% of that systematic offset as a **side effect**.
-  [`review`](../../reviews/2026-08-18-battery-anchor-discontinuity.md).
+  recalibration cut ~82% of that systematic offset as a **side effect**. The symmetric readiness-scale
+  audit found Q-500's threshold table listed **six of eight** — `ots.ts:151` and a `< 40` line inside
+  an **LLM prompt string** were missing; the conclusion holds (checked, not assumed) and that review is
+  amended in place. [`review`](../../reviews/2026-08-18-battery-anchor-discontinuity.md).
 - **BLE-era input drift — MEASURED, propose-only** (Q-509, Q-510). The Recovery Index refit on 42
   BLE nights lands at **3.31 h** against the shipped anchor of 5 — and **the anchor must not move**:
   the refit anchor and the input distribution shrank by the *same* factor (0.715× vs 0.72–0.74×), which
@@ -125,6 +127,11 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **A scale-consumer audit misses thresholds inside LLM prompt strings.** Grepping for numeric
+  comparisons against a score variable will never find `external_readiness < 40` written as prose in
+  `ai-periodization/prompt.ts` — yet it is a real threshold on our own score
+  (`externalReadiness = liveReadinessForDay(...)`). When auditing a scale, grep the prompt builders
+  too. This is how Q-500's table came to list six of eight.
 - **⚠️ DO NOT lift the sleep scale back toward its old mean.** It will look tempting — the new
   distribution reads harsh. But the sleep and readiness scales being within a few points of each other
   is now **load-bearing for Body Battery**: its anchor takes the sleep score raw, and the
