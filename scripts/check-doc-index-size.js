@@ -374,7 +374,12 @@ const BASELINE = {
   // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
   // "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
   // against.
-  'docs/implementation-backlog.md': 7596,
+  // Raised 2026-08-18 (Tuning): 7596 -> 7636. Q-511 — the audit of "did the sleep recalibration miss
+  // a consumer of the sleep scale?" (it did not) turned up that the Body Battery anchor flip was worth
+  // 17.7 points and the recalibration removed 82% of it. The entry is long because most of it is a
+  // PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
+  // owner-reported bug in another pillar, and that only lands with the numbers attached.
+  'docs/implementation-backlog.md': 7636,
   'CLAUDE.md': 1044,
 
 };
