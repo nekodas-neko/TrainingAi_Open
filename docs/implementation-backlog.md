@@ -2142,6 +2142,52 @@ to apply only when calibrated.
   as well (Nutrition 0/1900 and Energy Balance 1,626), so a fix on Nutrition alone leaves Home
   contradicting it. **Sibling sweep: both surfaces in the same PR.**
 
+
+**ROOT CAUSE FOUND, and it is not staleness — it is two TDEE models. (2026-08-18)**
+The owner asked whether both numbers were not already AI-derived. They were. They come from the same
+BMR and disagree by exactly the activity level the goal wizard was told about:
+
+| | formula | value |
+|---|---|---|
+| BMR implied by the shipped maintenance | 1,826 ÷ 1.2 | **1,522** |
+| Goal wizard, `calculateBaseline` | BMR × **1.375** (light) − 200 | **1,892** ≈ the stored **1,900** |
+| Energy balance, `buildEnergyBalance` | BMR × **1.2** (sedentary) − 200 | **1,626** |
+
+**Gap = BMR × (1.375 − 1.2) = 266 kcal.** Observed on device: **274**. The 8 kcal is rounding and
+weight drift since the goal was set. That is the entire discrepancy accounted for.
+
+**Neither is wrong; they are different contracts.**
+`goal-recommendation.ts:5` bakes a **self-reported** activity multiplier into the target, so the
+number already assumes your training and never moves. `daily-energy.ts:20` uses
+`SEDENTARY_MULTIPLIER = 1.2` **deliberately**, and its comment says why: *"measured movement is added
+explicitly, so a higher activity multiplier here would double-count it."* One assumes activity, the
+other measures it. Run both and you get two budgets — which is what the screen shows.
+
+**✅ OWNER DECISION, 2026-08-18: one number, and it rises with activity.** *"if its saying its
+1800-200; then that should be the calorie goal? and it can increase with activity?... can we look at
+having them all the same?"*
+
+**Recommendation: adopt the measured model everywhere.** It is the only one that can be right on both
+a rest day and a training day — an assumed multiplier is wrong on every day that is not average, and
+the app already measures the real thing. Concretely:
+1. **Today's goal = sedentary base + today's measured activity + goal delta.** The stored
+   `nutrition_targets.calories` becomes the **rest-day floor**, not the truth, and the day's figure is
+   derived from it.
+2. **The goal wizard must switch to the sedentary multiplier** when it feeds this. Leaving it at
+   `light`/`moderate` while activity is also added measured is a double-count — the exact thing
+   `daily-energy.ts` warns about, and the reason the two numbers drifted apart in the first place.
+   **This is the load-bearing change; the merge in this entry is cosmetic without it.**
+3. **Macros have to follow, and not uniformly.** Protein is dosed per kg of bodyweight
+   (`PROTEIN_G_PER_KG_BY_GOAL`), so it must **not** scale with activity; the earned calories belong to
+   carbs. Scale all three and the ring and the bars disagree again in a new way.
+4. **Say where the extra came from.** A budget that grows during the day is confusing unless it is
+   labelled — *"1,626 + 312 earned from training"* rather than a number that silently changes.
+
+**⚠ What this costs, stated plainly:** the goal stops being a fixed number you can memorise, and it is
+at its lowest in the morning before you have trained. That is the honest trade for a number that is
+right on both kinds of day. **One formula, one place** — after this there must be exactly one TDEE
+implementation, and `calculateBaseline`'s multiplier table stops being a second one.
+
 ### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
 
 - **Branch:** `fix/inline-centred-line-budget`

@@ -768,7 +768,7 @@ const BASELINE = {
   // with what you burn. Both correct. The entry carries the trace for each and the finding that
   // matters most — the card explaining the gap is gated on a calibrated maintenance, so it is
   // suppressed in exactly the window where the two numbers disagree.
-  'docs/implementation-backlog.md': 10008,
+  'docs/implementation-backlog.md': 10054,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
