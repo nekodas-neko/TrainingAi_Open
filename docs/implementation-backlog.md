@@ -2912,6 +2912,20 @@ session working from a temporarily restored copy.
 - **Plan:** none yet
 - **Added:** 2026-08-17 · Tuning agent · found while measuring Q-500 ·
   [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md) §6
+- **⚠️ SECOND live demonstration, 2026-08-18, and it is the more damaging one.** After the Sleep
+  (v1.319.0) and Readiness (v1.321.0) recalibrations deployed (production reports **1.321.1**), a
+  bulk job at **03:55:01** bumped `updated_at` on essentially every `oura_daily_derived` row **without
+  rewriting any score**. Result, measured: **0 of 96 rows carry a `readiness` model version**, and
+  every stored sleep/readiness score is still pre-recalibration (2026-08-17 stores **78** for a
+  7.58 h / 90% / 0.75 h-deep night — an old-model value). Every one of those rows was *created*
+  before the deploy.
+  **So `updated_at` is not evidence of which model wrote a row** — it moves for reasons unrelated to
+  the score. Anyone auditing "did the recalibration land?" by timestamp gets the wrong answer, and
+  this is exactly why the `model_version` stamp matters more than it looks.
+- **Consequence worth knowing:** stored scores are only rewritten when the readiness route recomputes,
+  which happens on app open. Placeholder rows already exist through **2026-08-22** with null scores,
+  so the first row to carry new-model values *and* the `v3:ri5:2026-08-18` stamp will be the next day
+  actually scored — that is where the trend step falls, and the stamp is what will mark it.
 - **Demonstrated live 2026-08-17:** the 08-13 summary was re-rolled mid-session (hours 1.20 → 5.78,
   a Q-274 fragment night resolving itself) and the derived readiness row did not follow — that day's
   persisted score is now **7 points** off a fresh recompute at the unchanged anchor.
@@ -2929,6 +2943,58 @@ session working from a temporarily restored copy.
 - **First action:** decide whether derived rows get recomputed with their summary, or store the input
   values they actually used. The second is cheaper and self-describing; the first re-scores days
   silently and needs Q-273's version stamp first either way.
+
+### [devices][readiness] Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
+
+- **Branch:** `fix/temperature-baseline-cold-start`
+- **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a baseline/data fix, not
+  a scoring-constant change.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-illness-radar-calibration.md`](reviews/2026-08-18-illness-radar-calibration.md)
+- **Measured** over `claude_ro.oura_daily_derived`, n = 46 days with an illness score: range **0–38**,
+  median 7.5, sd 7.17. Flags: `normal` 33, `learning` 13, and **zero** `watch` / `elevated` / `fever`.
+  `ILLNESS_WATCH_SCORE = 40`, so the score has peaked **two points short** of the lowest threshold and
+  never crossed it.
+- **Cause — one biomarker of four is dead, and it carries 40% of the weight.** Observed z ranges:
+
+  | biomarker | weight | z range (n = 31–33) | days z ≥ 1.2 |
+  |---|---|---|---|
+  | **temperature** | **0.40** | **0.07 – 0.47** | **0** |
+  | breathing | 0.25 | −1.37 – 1.88 | 6 |
+  | restingHeartRate | 0.20 | −1.22 – 1.18 | 0 |
+  | hrvBalance | 0.15 | −2.51 – 3.77 | 17 |
+
+  Three look like z-scores. Temperature is one-sided, always positive, and spans 0.4 in total — at its
+  observed maximum it contributes **6** of the 40 points its weight allows. The best day on record
+  (2026-07-26, score 38) had a −2.5σ HRV drop *with* elevated breathing *and* elevated resting HR and
+  still fell short, because the heaviest term was asleep.
+- **The defect is the baseline, not the thresholds.** Stored baseline deviation against the true
+  night-to-night sd of the same rows: temperature **253.7 vs 13.5 = 18.7×**; hrv 0.6×, rhr 1.4×,
+  breath 1.4×. Since `tempZ = (value − mean) / dev`, every temperature z is divided by ~19× too much.
+  It is a **cold start**: the EMA mean began at **1791** centi-°C (17.9 °C) on 2026-07-08 against true
+  values of ~3584, so the first nights produced residuals ~130× the true sd, and the dev term is still
+  carrying them 40 nights later (332 → 196, with an order of magnitude to go). It hit temperature and
+  not the others purely because of scale — centi-°C is ~3,500 where HRV is ~50 ms.
+- **`FEVER_TEMP_Z = 2.5` is unreachable, not merely unused** — against an observed max of 0.47 a fever
+  would need a nightly skin temperature roughly **5 °C** above baseline.
+- **Second consumer.** The same `tempZ` feeds readiness's `temperature` contributor at 10% weight
+  (`closer-better`, `100 − |z| × 66.7`). With |z| pinned near 0.3 it returns ~80 essentially every day
+  — measured mean 70.5, sd 17.3, **0 of 33 days with |z| ≥ 1.2**. A contributor meant to catch fever is
+  close to a constant.
+- **Do NOT lower the thresholds.** `watch = 40`, `elevated = 65` and `FEVER_TEMP_Z = 2.5` are all
+  defensible *given a correct z*; moving them fits the threshold to a broken input — the mistake this
+  session made once on readiness and reverted (Q-504).
+- **First action**, in preference order: (1) re-seed the temperature baseline from the observed
+  distribution (mean 3584, sd 13.5 over 40 nights) rather than waiting out the EMA — cheapest, fixes
+  both consumers; (2) the durable fix — seed a first observation and a sane prior dev instead of zero,
+  or hold the dev term through a warm-up, **because every new user repeats this and the app has other
+  users**; (3) failing both, gate the radar on temperature baseline maturity so it reports `learning`
+  rather than a confident `normal` built on a dead biomarker.
+- **Re-measure the whole biomarker table afterwards** — every z in it moves by ~19×, and it is entirely
+  possible the radar then fires *too* often. That is the next calibration question, not this one.
+- **Worth checking in the same pass:** whether the other baselines cold-start the same way and simply
+  recover faster because their scale is small. The ratios above say they are fine *now*, at 40 nights;
+  they say nothing about night 5.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

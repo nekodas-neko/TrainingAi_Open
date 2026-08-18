@@ -48,6 +48,14 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   proposed as 5 (**Q-500, ⛔ owner sign-off**); and Q-271's headline numbers ("never above 50, ever",
   "2.2 pts/day") are an 8-day artefact — over 41 days it is 12 days above 50 and 0.71 pts/day. Also
   files **Q-501**: persisted readiness rows drift from the summaries they derive from.
+- [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
+  — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
+  at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's
+  stored deviation is **253.7 against a true nightly sd of 13.5 (18.7×)**, a cold start the EMA is
+  still digesting 40 nights on, and temperature carries **40%** of the weight. `FEVER_TEMP_Z = 2.5` is
+  unreachable (it would need ~5 °C above baseline). The same `tempZ` makes **readiness's temperature
+  contributor near-constant** (0 of 33 days with |z| ≥ 1.2). Filed **Q-506**: fix the baseline, do not
+  touch the thresholds.
 - [`docs/body-battery-tuning.md`](../../body-battery-tuning.md) — how the Body Battery model is
   tuned against physiology; the reasoning behind its constants. **Read the v5 section before
   touching any constant**: the v5 values were set by backtesting for distributional plausibility,

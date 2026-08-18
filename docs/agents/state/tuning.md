@@ -3,29 +3,43 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 506)
+**Updated:** 2026-08-18 · **By:** `claude/tuning-agent-role-x9jg4r` · **Q band:** 500–529 (next free: 507)
 
 ## Now
-The owner's three-pillar range pass is complete as far as it can go without them.
+The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
+Since then, working only scores no other lane holds:
+- **Illness radar — MEASURED, propose-only** (Q-506). It has never produced an action-bearing flag in
+  46 days, and the cause is a **cold-start-poisoned temperature baseline** (stored dev 253.7 vs a true
+  nightly sd of 13.5 — **18.7×**) on the biomarker carrying **40%** of the weight. Same `tempZ` also
+  makes readiness's temperature contributor near-constant.
+  **Fix the baseline, not the thresholds** — Lane A implements.
+  [`review`](../../reviews/2026-08-18-illness-radar-calibration.md).
 - **Sleep — SHIPPED** (v1.319.0, Q-503): mean 84.1 → 69.5, sd 15.9 → 16.6, range 32–99, every band
   populated. [`review`](../../reviews/2026-08-18-sleep-score-range-recalibration.md).
-- **Readiness — Q-504 REFUTED** (2026-08-18): the calibration was implemented and is *wrong* here.
-  It breaks three real invariants (contributions no longer sum to the score, all-neutral stops giving
-  50, no-check-in can reach 100) and the z-slope lever fails too — those contributors already
-  saturate. Readiness is in fact the healthiest pillar; its ceiling is the issue, and the fix is
-  **Q-500**. [`review`](../../reviews/2026-08-18-readiness-range-refuted.md).
-- **Activity — BLOCKED ON THE OWNER** (Q-505): needs a decision about what the score means, not a
-  number. [`review`](../../reviews/2026-08-18-activity-score-calibration.md).
+- **Readiness — SHIPPED** (v1.321.0, Q-500): Recovery Index anchor 6 h → 5 h, fitted against Oura's
+  own contributor. `READINESS_MODEL_VERSION` now stamped (`v3:ri5:2026-08-18`).
+  **Q-504 (a range calibration) was REFUTED** — implemented, then reverted: it breaks three
+  invariants the composite holds, and the z-slope lever fails because those contributors already
+  saturate. [`review`](../../reviews/2026-08-18-readiness-range-refuted.md).
+- **Activity — SPECIFIED, not built** (Q-505). All three decisions resolved; ready for Lane A.
+  [`plan`](../../superpowers/plans/2026-08-18-activity-score-redesign.md) ·
+  [`review`](../../reviews/2026-08-18-activity-score-calibration.md).
 
 ## Next
-1. **Q-505 — build the Activity redesign** (Lane A). All three decisions are resolved in
-   [`the plan`](../../superpowers/plans/2026-08-18-activity-score-redesign.md); sequencing is in its §4.
-2. **Re-derive Q-500's anchor on ~15 BLE-era nights.** The shipped fit is Cloud-era and BLE overnight
+1. **Q-505 — build the Activity redesign** (Lane A). Decisions and sequencing are in the plan's §4.
+2. **Verify the two shipped recalibrations against production.** Checked 2026-08-18 and **nothing has
+   landed yet**: production runs 1.321.1, but **0 of 96 `oura_daily_derived` rows carry a `readiness`
+   model version** and every stored score is still pre-recalibration. Stored scores are only rewritten
+   when the route recomputes (on app open), and every existing row predates the deploy. Re-check after
+   the owner next opens the app; the first stamped row is where the trend step falls.
+3. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z in that
+   review's §2 table moves by ~19×, so the radar may then fire *too* often. That is a calibration
+   question and it is Tuning's, unlike the fix itself.
+4. **Daytime stress (22/40 days) and resilience (13/40) have never been calibration-reviewed**, and
+   nothing is queued on either by any lane. They are the remaining un-tuned scores.
+5. **Re-derive Q-500's anchor on ~15 BLE-era nights.** The shipped fit is Cloud-era and BLE overnight
    HR is ~2× noisier, so 5 h is conservative for current data rather than wrong.
-2. **Q-505 — Activity Score.** Analysed; waiting on the owner to choose between "score today"
-   (re-weight toward the same-day lane) and "score recent training" (keep weights, fix the daily
-   framing). Q-277 is the older discrimination finding this supersedes.
-3. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
+6. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
 
@@ -79,6 +93,14 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **A threshold is not the lever when the input feeding it is broken.** The illness radar peaks at 38
+  against a `watch` threshold of 40, which is exactly the shape that tempts a two-point threshold
+  nudge. The z it is built on is divided by ~19× too much. Lowering the threshold would have hidden a
+  dead biomarker behind a firing radar — the Q-504 mistake in a new costume. Check the input's
+  distribution against the thing it summarises **before** touching a constant.
+- **The other lanes' territory is off-limits by the owner's instruction (2026-08-18):** *"Only pick up
+  new tuning opportunities that the other lanes don't have."* Q-502 (Body Battery), Q-505 (Activity)
+  and Q-501 are Lane A's to build. Check all four batons before picking a score to measure.
 - Q numbers come from the band above, not the backlog's next-free pointer. No migration numbers.
 
 ## Gotchas that cost time
@@ -87,6 +109,10 @@ for this work:
   7/10) and the honest outcome was a partial document. For sleep, the design harness was validated
   to mean-abs-error 4.3 first, and the final distribution was re-run through the **shipped
   TypeScript**, not the harness.
+- **`updated_at` does NOT tell you which model wrote a row.** On 2026-08-18 a bulk job bumped
+  `updated_at` on ~every `oura_daily_derived` row at 03:55:01 without rewriting a single score. Auditing
+  "did the recalibration land?" by timestamp gives the wrong answer — check the `model_version` stamp,
+  or recompute from inputs.
 - **Production data moves under you mid-session.** 2026-08-13's summary was re-rolled while a review
   was being written (`recovery_index_hours` 1.20 → 5.78, a Q-274 fragment night self-healing).
   Re-pull before quoting, and record the pull time.
