@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// 2026-08-18 (Review sweep 39, Q-556 cross-user isolation): backlog -> 9953, projectOverview -> 7876.
+// Rebuilt from origin/main after a parallel compaction sweep landed the same history file --
+// splicing the conflict hunks would have produced two baselines for one number.
+//
 // Keeps the orientation documents readable. Same ratchet shape as check-component-size.js.
 //
 // These files are what every session reads before it can start, and they are the ones that rot,
@@ -741,7 +745,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7852,
+  'projectOverview.md': 7876,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -758,7 +762,7 @@ const BASELINE = {
   // type-checks, lints clean and does nothing. Those nineteen lines are the column-list evidence and
   // the re-tag to Lane A. A one-line "re-tagged to Lane A" would send the next session down the
   // same dead end, because the dead end reads as correct in every check the sandbox can run.
-  'docs/implementation-backlog.md': 9924,
+  'docs/implementation-backlog.md': 9953,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

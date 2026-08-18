@@ -87,22 +87,34 @@ arithmetic — limit 60, floor 41, so the whole directory has **19 files of head
 out at roughly twenty minutes on the busiest stretch of the day and about half a day at the average
 rate.
 
-**Why sweeping harder could not fix that.** Those 41 are linked by a durable doc and must not be
-folded (rule 1 above). They are a floor, not growth. The guard was counting them, so it fired on a
-condition its own prescribed remedy is forbidden to touch — which is not a guard, it is a periodic
-outage, and it lands on every lane at once because a journal entry rides in *every* feature PR.
+**Why the floor held, measured on that same third sweep — and the lever it gives you.** The eleven
+entries added between the second sweep and the third were all **Review** sweeps, and Review links its
+**`docs/reviews/…` write-up** from the domain indexes while leaving the **journal entry itself
+unlinked**. So the linked floor tracks *durable-doc citations*, not entry count: a session that cites
+its review or handoff document costs the floor nothing, while one that cites its loose journal entry
+raises it permanently.
 
-**The change.** `scripts/check-doc-index-size.js` now applies the 60 limit to the **unlinked** count,
-which is exactly what a sweep clears. It still catches what the guard was written for: if nobody
-sweeps, unlinked entries pile up and it fires (verified by simulating 61 against the real 41-entry
-floor). A separate ceiling of **250 total** keeps the original 509-file readability failure caught,
-and its message says plainly that a sweep alone will not fix that one.
+**That makes the fix cheaper than either option in the tension below:** when a durable doc needs to
+cite a session, **cite the review/handoff document, not the loose journal entry**. No sweep rewriting,
+no re-pointing of existing citations — just a habit that stops the floor growing from here.
 
-**The standing tension is unchanged and still undecided.** A fold-everything sweep and durable docs
-linking entries are incompatible; the docs win, so the floor stays. Resolving it means either the
-sweep rewriting citations to the history file it folded into (with an anchor), or durable docs citing
-the batched history rather than a loose entry. What changed today is only that the floor no longer
-blocks everyone's CI while that decision waits.
+**Why sweeping harder could not fix it in the meantime.** The linked entries are a floor, not
+growth, and the guard was counting them — so it fired on a condition its own prescribed remedy is
+forbidden to touch. That is not a guard, it is a periodic outage, and it lands on every lane at once
+because a journal entry rides in *every* feature PR. It did exactly that twice in one day.
+
+**So the guard changed too, and the two fixes are complementary.**
+`scripts/check-doc-index-size.js` now applies the 60 limit to the **unlinked** count — exactly what a
+sweep clears. The citation habit above stops the floor rising; this stops the existing floor blocking
+CI while that habit takes effect. It still catches what the guard was written for: if nobody sweeps,
+unlinked entries pile up and it fires (verified by simulating 61 against the real floor). A separate
+ceiling of **250 total** keeps the original 509-file readability failure caught, and its message says
+plainly that a sweep alone will not fix that one.
+
+**The older framing, kept for the record:** this used to be described as an undecided choice between
+the sweep rewriting citations into the history file, or durable docs citing the batched history. The
+citation habit above is cheaper than either and needs no retrofit, so that is the answer unless the
+floor starts rising again from a source other than journal citations.
 
 This is a standing chore in the same spirit as Dependabot remediation: it lives here permanently and
 is worked on a threshold, not every session. Below threshold, leave the entries; above it, compact.
