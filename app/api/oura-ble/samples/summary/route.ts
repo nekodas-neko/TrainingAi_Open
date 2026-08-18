@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 
 // What's been recorded from the ring so far — feeds the /admin/oura-ble tester UI.
@@ -10,8 +10,8 @@ export async function GET() {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const repo = await getRepositoryAsync()

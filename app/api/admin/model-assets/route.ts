@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import path from 'node:path'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { reportModelBucketAssets, reportConstantsBucketAssets } from '@/lib/oura-models/bucket-report'
 import { verifyModelAssets, REQUIRED_MODEL_FILES } from '@/lib/oura-models/required-models'
 import modelFiles from '@/lib/oura-models/model-files.json'
@@ -20,8 +20,8 @@ export async function GET() {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const [bucket, disk, constantsBucket] = await Promise.all([
