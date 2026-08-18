@@ -18,6 +18,129 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// 2026-08-18 (Review, Q-554 orientation-index paths): backlog -> 9876, projectOverview -> 7806.
+// One queue entry and its row. Both keep the module-map specifics (row 232, decodeStepsPacket, zero
+// references) because "a doc named a path that does not exist" is forgettable while "the map read to
+// avoid re-implementing things listed something never built" is the reason the check exists.
+//
+// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
+// projectOverview SHRANK by ~70 lines here even after adding an entry: Q-139's stale 69-line
+// "OPEN" body was replaced with a compact device-check row, and Q-81's duplicate archive copy was
+// cut. Baselines are shrink-only, so this ratchets down and the space cannot be reclaimed silently.
+//
+// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
+// projectOverview RATCHETS DOWN here (7805 -> 7785) even though an entry was added: Q-139's stale
+// 69-line "OPEN" body became a compact device-check row and Q-81's duplicate archive copy was cut.
+// The baseline is shrink-only, so locking the lower number in is the point -- reclaimed space
+// cannot quietly refill.
+//
+// Raised 2026-08-18 (Review, Q-499 reproduced + Q-552 ledger): backlog -> 9809, projectOverview -> 7805.
+// Q-499's entry grew rather than a new one being added: it was filed on static reading and is now
+// reproduced, and the before/after (1 node -> 0, control at 1) is what makes it actionable. Plus one
+// new entry for the Q-block ledger near-miss.
+//
+// Raised 2026-08-18 (Review, silent card failures, Q-499): backlog -> 9762, projectOverview -> 7773.
+// One queue entry and its row. Both keep the 78/18 and 12-candidates/2-confirmed splits, because the
+// honest scope IS the finding here -- a row that said "12 cards vanish" would be a defect count this
+// sweep did not earn, and the next reader would inherit it as fact.
+//
+// Raised 2026-08-18 (Review, unbounded request bodies, Q-498): backlog 9690 -> 9727,
+// projectOverview 7722 -> 7747. One queue entry and its row. Both keep the 113/7/93/3
+// coverage split and the line numbers showing the ingest route parses at 40 and checks the secret
+// at 58 -- the ordering is the finding, and a summary that drops it reads as "add a size cap",
+// which is the smaller half of the fix.
+//
+// Raised 2026-08-18 (Review, admin range-loop termination, Q-497): backlog 9652 -> 9690,
+// projectOverview 7693 -> 7722. One queue entry and its row. The entry keeps the measured loop
+// trace (iter 32 = 10000-01-01, still looping at 5000) because the defect is invisible from the
+// source -- every guard on the route reads correct, and only the trace shows the exit condition
+// inverting. It also names the second site, which writes.
+//
+// Raised 2026-08-18 (Review, health-connect ingest, Q-493..Q-496): backlog 9557 -> 9652,
+// projectOverview 7655 -> 7693. Four queue entries and one row, for four findings on one route.
+// The rows carry the measured before/after pairs (81 kg -> 499 kg; 1 limiter key at 20 vs 30 at 1)
+// because both findings are counter-intuitive from the source alone -- the limiter returns an
+// identical 401 either way, so without the numbers the next reader re-runs the experiment.
+//
+// Raised 2026-08-18 (Review, CLAUDE.md prose counts, Q-492): backlog 9520 -> 9557,
+// projectOverview 7631 -> 7655. One queue entry and its row. The measurement they carry is the
+// count-by-count table, which is the whole finding — a summary of it would leave the next reader
+// re-deriving nine numbers to know which are trustworthy.
+//
+// Raised 2026-08-18 (Review, aria-expanded collapsibles, Q-491): backlog 9477 -> 9520,
+// projectOverview 7603 -> 7631. One queue entry and its row. The lines that earn their place are the
+// MEMBERSHIP diff, not the count: CLAUDE.md's nine and today's nine are different sets (one fixed,
+// one never listed, two moved), so citing the count alone would hide that the list is what drifted.
+// Both also carry the meta-pattern — three hand-maintained counts in CLAUDE.md found stale this run
+// (Q-480, Q-490, Q-491) while every ratcheted count is current — which is the argument for fixing
+// this with a script rather than a sweep.
+
+//
+// Raised 2026-08-18 (Review, render rules part 2): projectOverview 7576 -> 7603. No queue entry —
+// all four rules held. The row is worth its lines because it records the three raw counts that look
+// like findings and are not (85 index keys, all on static lists; a 62-field useShallow pick holding
+// actions rather than hot-path values; 25 bare readCacheSync hits, three of them false positives in
+// the orchestrator and one of those the COMMENT stating the rule). Without it the next sweep
+// re-derives all three and may file them.
+
+//
+// Raised 2026-08-18 (Review, memo-stability audit, Q-490): backlog 9439 -> 9477, projectOverview
+// 7551 -> 7576. One queue entry and its row. Both lead with the CLEAN number (64 of 66 memos hold,
+// no inline arrows anywhere) because without it the entry reads as though memoisation is broken
+// here, and both carry the fix caveat that the per-meal site wants SCALARS rather than a useMemo —
+// a useMemo there needs one memo per row, which is worse than the bug. Both also flag that no render
+// counts were measured; the claim is from object identity, not a profiler.
+
+//
+// Raised 2026-08-18 (Review, ms-offset → calendar day, Q-489): backlog 9393 -> 9439, projectOverview
+// 7523 -> 7551. One queue entry and its row, and the lines that earn their place are the NEGATIVE
+// ones: most instances of the banned ms-offset pattern are CORRECT (rolling instant windows feeding
+// hours-based consumers like computeMuscleRecovery), so an implementer who greps the pattern and
+// "fixes" all twelve would break muscle recovery. Both also carry the measured DST table, which
+// cannot be re-derived without re-running the transition arithmetic.
+
+//
+// Raised 2026-08-18 (Review, local-first write coverage): backlog 9387 -> 9393, projectOverview
+// 7501 -> 7523. No new entry — the sweep BOUNDS Q-488 (it is one handler, not a class), which is the
+// question an implementer has to answer before budgeting the work, so it rides on that entry. The
+// row also carries two things a later audit would otherwise get wrong: the file-level version of
+// this check is unsound (it clears the very file Q-488 is in), and "no pull mapping" is not evidence
+// of a gap, because saved_meals is push-only and kept fresh by hydrate-on-read by design.
+
+//
+// Raised 2026-08-18 (Review, server-only writes to local-first domains, Q-488): backlog 9384 -> 9387,
+// projectOverview 7468 -> 7501. One queue entry and its row. Both carry three lines that decide how
+// it gets triaged and fixed: it SELF-HEALS via the tombstone (visible inconsistency, not data loss);
+// the originating screen is CORRECT because it reads the server-side day-log aggregate, which is why
+// nothing on that screen could reveal it; and making the delete work offline is a separate, larger
+// question that must not be folded into the one-call fix.
+
+//
+// Raised 2026-08-18 (Review, seed-only read paths — case (b)): projectOverview 7439 -> 7468. No
+// queue entry; the audit found no gap. The row is worth its lines for two things that are otherwise
+// rediscovered by running a bad test: the mechanical seed-only check (readCacheSync minus
+// cachedFetch) OVER-REPORTS, because revalidation also happens via a raw fetch+setCached and via a
+// local-store read+setCached — and the third is the app's most authoritative path, so a
+// network-shaped test marks it stale. Plus: a `Q-NNN:` comment here is usually a fix's rationale,
+// not an open defect. That misread cost a false alarm twice in this run (Q-117, Q-126).
+
+//
+// Raised 2026-08-18 (Review, load-bearing cache audit): projectOverview 7411 -> 7439. No queue entry
+// — the audit found no gap. The row is the *result table* plus two things that would otherwise be
+// rediscovered the hard way: session-select-content.tsx:896's "never invalidated" comment is the
+// comment on the Q-117 FIX, not a live defect (it reads exactly like one), and case (b) of Q-262's
+// test — seed-only read paths — remains unaudited and is the likelier source of a stale-value report.
+
+//
+// Raised 2026-08-18 (Review, production verification round 2): backlog 9359 -> 9384,
+// projectOverview 7369 -> 7406. No new queue entries — six existing ones amended in place with what
+// production says, which is the cheapest possible place to carry it. The backlog growth is those
+// amendments; the projectOverview row carries the pull-69 / push-0 table because that asymmetry is
+// the evidence for Q-475 and cannot be re-derived after error_events prunes at 30 days. It also
+// carries the two queries that look like evidence and are NOT (water is too sparse; null-weight-with-
+// steps is the expected shape), so the next reader does not pick them up.
+
+//
 // Raised 2026-08-18 (Review, Tier-A enqueue silence, Q-486): backlog 9312 -> 9359,
 // projectOverview 7339 -> 7369. One queue entry and its row. The lines that earn their place are the
 // three "do not": do not undo the layering (local write, then a direct POST as primary, then the
@@ -618,7 +741,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7369,
+  'projectOverview.md': 7852,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -629,7 +752,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9359,
+  'docs/implementation-backlog.md': 9905,
   'CLAUDE.md': 1075,
 
 };

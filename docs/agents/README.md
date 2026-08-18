@@ -175,13 +175,29 @@ So numbers are **not** taken one at a time from the pointer. Each agent owns a b
 | Implementation Lane A | **314 – 349** |
 | Implementation Lane B | **350 – 386** |
 | BugFix | **387 – 449** |
-| Review | **450 – 499** |
+| Review | **450 – 499** (exhausted 2026-08-18) → **552 – 601** |
 | Tuning | **500 – 529** |
 | *(one-off planning sessions)* | no standing band — take a block from the pointer |
 
+**Review's band 450–499 was exhausted on 2026-08-18** (Q-499 was the last) and the role has claimed
+**552–601** as its second band, per the "next block of 50" instruction below.
+
+**⚠️ The block ledger below was incomplete, which is the same failure it exists to prevent.** It
+recorded 530–537, 538–542 and 543, but **544–551 were also in use** — across
+`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
+`docs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
+`docs/domains/devices/README.md` and the backlog — and appeared nowhere here. A Review session
+following this file's own instruction literally ("claim the next block of 50 above 529") would have
+taken 530–579 and collided with fourteen live numbers. That is precisely the renumbering incident
+recorded below, repeating. **Reading the instruction is not enough: grep the tree for the highest
+`Q-` in use before claiming, and add your block here in the same PR.**
+
 Blocks taken this way so far: **530–537** (2026-08-17), **538–542** (2026-08-17, DB storage /
 raw-sample retention) and **543** (2026-08-18, owner-directed session — the decision-brief rule
-in `CLAUDE.md`; one number, not a block of fifty, because the session filed one finding). The second of those was **renumbered from 530–536 on merge** — it had taken
+in `CLAUDE.md`; one number, not a block of fifty, because the session filed one finding),
+**544–551** (2026-08-18, DB storage / device-primary compute and database reclaim — in use since
+2026-08-18 but recorded here only on 2026-08-18 by Review, see the warning above) and
+**552–601** (2026-08-18, **Review's second standing band** after 450–499 was exhausted). The second of those was **renumbered from 530–536 on merge** — it had taken
 its block from a pointer reading 530 while a concurrent planning session held the same numbers
 unmerged, which is the exact failure the standing bands exist to prevent and which the pointer
 cannot prevent, because it cannot see an unmerged PR. **If you are a one-off session, take your

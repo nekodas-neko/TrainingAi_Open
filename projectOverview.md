@@ -69,6 +69,267 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][platform] 🟢 Offline read surfaces work; a tab tap is a silent no-op only before the SW claims (Q-555, 2026-08-18)
+
+- **The offline paths were driven for real for the first time** — this role's baton had listed them as
+  structurally untested since sweep 1, and `context.setOffline(true)` turned out to be the whole
+  barrier. [`docs/reviews/2026-08-18-offline-read-surfaces.md`](docs/reviews/2026-08-18-offline-read-surfaces.md).
+- **✅ Both paths deliver once the worker controls the page.** A full reload offline serves the
+  precached `/offline` page verbatim (and the precache works under `next dev`). An offline tab tap
+  navigates and paints **2515 chars against 2486 online — ~101%** — no offline page, no skeleton, no
+  blank. **This is the strongest positive result of the run; the offline story is not aspirational.**
+- **🟢 Q-555 — the narrow gap.** In the **uncontrolled** state the same tap is a **silent no-op**: URL
+  unchanged, no navigation, no offline page, no feedback. That state **is the first-ever page load** —
+  the worker registers during it and claims only afterwards. Filed because the symptom is
+  indistinguishable from a frozen app, and on the APK the worker **is** the offline cold-start
+  mechanism, so install day is when a new user is most likely to be changing networks.
+- **⚠️ Three of five probe iterations produced plausible, specific, wrong answers** — all retracted
+  before filing. The keeper: a "38% retained" figure and a marker match **agreed with each other and
+  both failed for the same reason** (the home page renders widgets labelled Readiness/Sleep/Activity).
+  Only the URL settled it. **Corroboration between two weak signals is not evidence when they can fail
+  the same way.**
+- **Not exercised — load-bearing:** web only. On web `cachedFetch` falls back to `localStorage`, so the
+  **seed** path was verified, **not** the native SQLite store that is the APK's real source of truth.
+
+
+### [platform] 🟢 The module map's `path → symbol` claims all hold — 110 of 110, now ratcheted (2026-08-18)
+
+- **A clean sweep, recorded because a null result is easy to under-report.**
+  [`docs/reviews/2026-08-18-module-map-symbol-claims.md`](docs/reviews/2026-08-18-module-map-symbol-claims.md).
+- **Took Q-554's stated limit as the lens.** That check proves a path *resolves*, never that the prose
+  beside it is true. The mechanically checkable part of the prose is the `→ symbolName` claim — the
+  part a reader acts on. **All 110 name a symbol that exists in the file they attribute it to.**
+- **This bounds the Q-554 worry rather than leaving it open.** Row 232 (a map row for a module never
+  built) was **not** the tip of a pattern of sloppy attribution — it was one row, and its path was
+  wrong too, which is why the cheaper check caught it. The map's attribution is in good shape.
+- **⚠️ A correction inside the measurement.** The first probe reported 72 of 110 rows resolvable —
+  implying 38 broken paths, flatly contradicting the check shipped an hour earlier. The **probe** was
+  wrong: it omitted the `lib/…` → `packages/shared/src/…` remap (Q-153). **A new measurement that
+  contradicts an existing green check is a bug in the measurement until proven otherwise.**
+- **Ratcheted:** `scripts/check-module-map-symbols.js`, step **43 of 43**. A presence check, not a
+  resolver — the failure worth catching (a symbol that moved, leaving the map pointing at its old
+  home) shows up as absence. It earns its place at zero violations because *"One Formula, One Place"*
+  names this map as how you find the existing implementation, so a row pointing at the wrong file is
+  how the second copy gets written — **by someone who checked first, as instructed.**
+- **Not exercised:** a row naming a real file and a real function while describing behaviour neither
+  has still passes. That half remains unmeasured.
+
+
+### [platform] 🟢 The orientation indexes named paths that do not exist, one of them never built (Q-554, 2026-08-18)
+
+- **Filed and fixed in the same PR**, kept as the record of the class.
+  [`docs/reviews/2026-08-18-orientation-index-paths.md`](docs/reviews/2026-08-18-orientation-index-paths.md).
+- **`CLAUDE.md` has had a path check since Q-153; `docs/module-map.md` and the eleven domain indexes
+  had none** — though sessions are told to read them before building a helper or working in a pillar.
+- **⚠️ `module-map.md:232` described a module that has never existed** — `lib/oura-ble/steps-motion-decoder.ts`
+  → `decodeStepsPacket`, **zero references tree-wide**. The real port is the row below
+  (`lib/oura-models/…`), itself flagged there as **"NOT yet wired"**. So the map presented *planned
+  wiring* as existing infrastructure, in the table read specifically **to avoid re-implementing what
+  already exists**. Marked `⚠️ NOT BUILT`.
+- **Three stale rows fixed** — `app/history/` (workouts), `docs/oura-models/` (devices), `app/overview/`
+  (app-shell); none exist. **Plus 49 malformed display paths** (`docs/../overview/…`) across all eleven
+  indexes: link targets were correct, the visible labels were not.
+- **Now enforced:** `scripts/check-index-doc-paths.js`, step **42 of 42**, covering **748 paths across 12
+  docs**. Its first pass reported 59 of 787 — nearly all noise — and the fixes then re-triggered it,
+  since naming a path as *absent* still names it; four `DELIBERATE` entries carry their reasons.
+- **Not exercised:** existence only. It does **not** check that the description beside a path is true —
+  a row naming a real file while describing behaviour it lacks still passes.
+
+
+### [platform] 🟢 A Known Issue was in both the live list and the resolved archive; nothing checked (Q-553, 2026-08-18)
+
+- **Filed and fixed in the same PR**, kept as the record of the class.
+  [`docs/reviews/2026-08-18-known-issue-duplication.md`](docs/reviews/2026-08-18-known-issue-duplication.md).
+- **Q-139 read `🔴 OPEN` here and `✅ fixed` in the archive, for ten days** — 69 lines describing a bug
+  fixed 2026-08-08 in v1.270.25. **Every session's mandated orientation read showed a red,
+  highest-severity open issue for a ten-day-old fix.** Both halves verified fixed **in source**
+  (`packages/shared/src/health/step-estimate.ts:176`), not taken on the archive's word. **Q-81** was a
+  byte-identical 31-line entry in both files.
+- **⚠️ Both were also archived early.** The rule allows a move only when nothing is owed, *including a
+  pending device check* — and both entries name one. So: **copied rather than moved, and moved before
+  it was allowed.** Resolution: cut the premature archive copies, keep the live entries (where an owed
+  check belongs), fold in anything unique first.
+- **Now enforced:** `scripts/check-known-issue-duplication.js`, step **41 of 41** in Custom Rules. Its
+  first version reported 4 of which 2 were real, so it skips **range** headings and identifies an entry
+  by its **first** Q number — both narrowings documented in the script itself.
+- **Not exercised:** static reconciliation. Q-139 still owes an on-device check after the next history
+  drain; Q-81 owes a production check. Neither is possible in this harness.
+
+
+### [platform] 🟢 Two sources of truth for the next Q band; the prose one was wrong (Q-552, 2026-08-18)
+
+- **Review's band 450–499 was exhausted by Q-499.** `docs/agents/README.md` says *"claim the next block
+  of 50 above 529"* — which literally gives **530–579** and collides with **fourteen numbers already
+  in use**. The predecessor baton had already written 530–579 into the handover.
+- **The ledger recorded 530–537, 538–542 and 543; `544–551` were also live** across two platform
+  handoffs, `docs/overview/history-2026-08-15.md`, the devices domain index and the backlog, and
+  appeared nowhere in it.
+- **⚠️ Correcting this row's first draft: the ledger is NOT the only defence, and the truth is more
+  interesting.** Two sources exist for the same fact — the backlog's *Live pointers* row said
+  **552** and is **CI-enforced** (`scripts/check-backlog-pointers.js`); the README's prose ledger and
+  its *"next block of 50 above 529"* said **530** and was stale. **The machine-checked pointer was
+  right the whole time**, and the collision was reachable only by following the prose instruction —
+  which is what the README tells you to do, and what the Review baton had copied.
+- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
+  in this very PR (*"a band was used without being recorded"*).
+- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
+  count in a script is a fact* — and the first where the checked copy was silently right while the
+  prose copy was silently wrong.
+- **Fixed in the same PR:** claimed **552–601**, recorded 544–551, bumped the pointer to **602**, and
+  pointed the instruction at the checked source. Kept as the record of why the procedure changed.
+
+
+### [app-shell][health] 🟢 Three lenses — two clean, and cards that cannot tell "no data" from "the fetch failed" (Q-499, 2026-08-18)
+
+- **Two lenses came up clean and are recorded so nobody re-runs them.**
+  [`docs/reviews/2026-08-18-silent-card-failures.md`](docs/reviews/2026-08-18-silent-card-failures.md).
+  **(1) Internal error text in responses** — 7 route files return `err.message`, every one admin- or
+  session-gated, two apparent hits are logs not responses, and `admin/db-query` returning the raw SQL
+  error is **correct by design**. **(2) AI rate-limit coverage** — 7 routes looked unlimited; all seven
+  make **zero LLM calls** and matched on the `ai` path segment alone. **Every route that actually
+  calls an LLM has a rate limit.** Sixth consecutive sweep where the mechanical check over-reported.
+- **🟢 Q-499 — and a correction to the rule that names it.** `CLAUDE.md` says `cachedFetch` *"swallows
+  `!res.ok`"*; it does **not** unconditionally — `cachedFetchCore` takes an `onError` callback and
+  swallows only when the caller declines it. So this is **coverage with an existing mechanism**, not a
+  missing capability, and the rule's wording should say so.
+- **78 components call `cachedFetch`; 18 reference `onError`** (an upper bound — some are unrelated
+  matches). **Two verified by hand**, both conflating failure with emptiness:
+  `health/hr-recovery-profile-card.tsx` (`return null` while `profile` stays null on failure) and
+  `health/strength-progress-card.tsx` (`.catch(() => {})` then `return null`).
+- **Scoped honestly:** 12 candidates from a crude filter, **2 confirmed** — the other ten are a
+  worklist, not a defect count.
+- **Why it matters more than it looks:** `cachedFetch` treats any `!res.ok` alike, **including a 429
+  from the app's own limiter** — a rate-limited user watches health cards vanish rather than seeing
+  "try again in a minute", and the same silence covers a 500.
+- **✅ REPRODUCED 2026-08-18 (sweep 34)** —
+  [`docs/reviews/2026-08-18-card-429-reproduction.md`](docs/reviews/2026-08-18-card-429-reproduction.md).
+  `/api/weights-summary` forced to 429 by route interception at the S25 viewport: **`Estimated 1RM`
+  went 1 node → 0, with no error wording anywhere on the page.** **Control holds** — blocking a
+  different endpoint left it at 1. (`Ring Status` inconclusive: absent at baseline too.)
+- **⚠️ Invisible on a warm cache, visible on a cold one.** A repeat visit paints the seed and the
+  failed refresh is silent. So the user most likely to hit it is opening fresh, and least likely to
+  reproduce it a minute later — *"the card is gone"* reads as **intermittent**, inviting the
+  "can't reproduce" dismissal the report-invalidation rule exists to prevent.
+- **Still not exercised:** on device and offline (where `cachedFetch` cannot revalidate at all). **One**
+  card proven; the other eleven remain a worklist.
+
+
+### [platform] 🟡 Three unauthenticated routes buffer an unbounded request body; one parses it before any check (Q-498, 2026-08-18)
+
+- **Lens taken from sweep 31's method note** — *find bounds declared one way and enforced another*.
+  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](docs/reviews/2026-08-18-unbounded-request-bodies.md).
+- **The shared guard is correct and is not the defect.** `readJsonLimited` uses `Content-Length` only
+  as a fast path and streams with a real byte counter. Measured: 20 MB to `/api/client-error` (16 KB
+  cap) was **cut off at 2,949,120 bytes**.
+- **Coverage:** 113 routes take a body, **7** are guarded, **93** are not — and of those 93 exactly
+  **3** are reachable without a session: `auth/register`, `auth/exchange-mobile-token`,
+  `health-connect/ingest`. **The seven guarded routes are all *less* exposed than these three.**
+  Measured: the two tested each accepted the **full 20,000,048 bytes**, then returned 400.
+- **⚠️ Ordering separates them.** `auth/register` and `exchange-mobile-token` rate-limit **before**
+  parsing, so the rate is bounded. **`health-connect/ingest` reads at line 35 and Zod-parses at 40 but
+  rate-limits at 53 and checks the secret at 58** — a caller **holding no secret** makes the server
+  buffer and fully parse an arbitrary body, unthrottleable because the limiter runs after.
+- **Compounds with Q-493:** all three limiters key on the spoofable `x-forwarded-for` leftmost hop, so
+  the ordering that protects the two auth routes is itself bypassable. Two independent defects that
+  remove each other's mitigation.
+- **Fix:** route the three through `readJsonLimited`, **and** move the limiter + secret check above the
+  body read on the ingest route — the second is the larger win and is independent of the first.
+- **Not exercised:** the actual ceiling was **not** probed (20 MB proved there is no cap; going further
+  risked destabilising the server for no extra information). Railway's edge may impose its own limit —
+  not checked. No device, no production.
+
+
+### [platform] 🟡 A 31-day range that passes every guard makes two admin routes loop forever (Q-497, 2026-08-18)
+
+- **Applied sweep 30's lesson to the *other* secret-gated route.** `admin/day-review` is gated by
+  `ADMIN_EXPORT_SECRET`; sweep 30 had just shown that "needs configuration" was never a real barrier.
+  [`docs/reviews/2026-08-18-admin-range-loop-termination.md`](docs/reviews/2026-08-18-admin-range-loop-termination.md).
+- **All three of `CLAUDE.md`'s claims about the route hold** — GET-only, fail-closed on either unset
+  var, and `requireAdmin` on the token path so the token widens *transport* not authority. Checked,
+  not assumed.
+- **🟡 Q-497 — the day loop compares strings, and `shiftDateStr` does not pad the year.** One day after
+  `9999-12-31` is `10000-01-01`, and `'10000-01-01' <= '9999-12-31'` is **true** (`'1' < '9'`).
+  `from=9999-12-01&to=9999-12-31` passes `normalizeDateParamIso`, passes `end < start`, and spans
+  **exactly 31 = `MAX_RANGE_DAYS`** — then runs forever. Measured: still looping at iteration 5000, at
+  year 10013; the control range terminates at 31. Each iteration is a `buildDayAudit` (~12 queries)
+  against a `max: 10` pool.
+- **The comment directly above the loop** explains the days run sequentially rather than concurrently
+  because fanning out *"would starve the rest of the app (the failure mode that took production down
+  in session 165)"*. The sequential loop avoids that — and then never stops.
+- **Two sites; the second writes.** `admin/backfill-derived-scores:80` has the identical loop and
+  identical guards, and `dryRun=false` commits — unbounded writes, not just a hang.
+  `energy-balance-service.ts:152` is safe (start derived by shifting back from today).
+- **Severity: medium — admin-only.** Weigh it as *"one mistyped year takes the app down"*, not an
+  attack. **Fix:** pad the year in `shiftDateStr`, the single place producing the malformed value.
+- **Also corroborates Q-496 directly:** `2026-13-45` / `2026-02-31` / `0000-00-00` return **400** here
+  via `normalizeDateParamIso` and **500** on `health-connect/ingest` via its raw regex. Same inputs,
+  opposite outcomes, one directory apart — the correct behaviour is already demonstrated next door.
+- **Not exercised:** the loop was reproduced verbatim in isolation, not by hitting the route — driving
+  it against a running server *is* the hang. No device, no production.
+
+
+### [devices][platform][body] 🔴 The Health Connect ingest route, driven for real — the brute-force gate is bypassable and a far-future date poisons "latest" permanently (Q-493…Q-496, 2026-08-18)
+
+- **The only unauthenticated write into `body_metrics`, exercised for the first time.** It has sat on
+  the Review baton as untested since sweep 1 because it needs `HEALTH_CONNECT_INGEST_SECRET` set. All
+  four findings are **reproduced against a running server**:
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](docs/reviews/2026-08-18-health-connect-ingest.md).
+- **🔴 Q-493 — the SEC-I3 brute-force gate is bypassed by rotating one request header.** The limiter
+  keys on `x-forwarded-for`'s **leftmost** hop, which is the value the *client* supplies. Measured, 30
+  wrong-secret attempts each way: **fixed** header → 1 key at count 20, gate engaged; **rotating** →
+  **30 keys at count 1, all 30 reached the secret compare.** **Seven sites** share the pattern,
+  including `admin/day-review` (bearer path to the owner's full health history). Nothing in the docs
+  records it, and the R1 security-hardening plan *propagated* it as "the existing pattern".
+  **⚠️ Unverified: whether Railway's proxy sanitises the header** — not determinable from the sandbox,
+  and production's limiter was not probed. The fix does not depend on the answer.
+- **🔴 Q-494 — one far-future date permanently captures every `ORDER BY date DESC LIMIT 1` read.**
+  `POST {"date":"9999/12/30","weightKg":499}` took `getMostRecentConfirmedWeightKg` from **81 kg to
+  499 kg**, and no later write can outrank it. Feeds the BLE-scale confirmation path and
+  `deriveActivityKcal`. **The ranked source merge is orthogonal to this, not weak against it** —
+  ranking is per column *per date*, and a row on a date nothing else writes has no competitor.
+  **⚠️ And it is not a novel class:** `packages/shared/src/validation/ingest-clock.ts` exists for
+  exactly this and guards `scale-ble/samples`; `oura-ble/samples` is guarded downstream; the workout
+  path got `resolveCompletedAt` at **Q-24 §7**, whose comment uses the same phrase — *"accepted
+  unbounded and uncompared"*. **`health-connect/ingest` is the only health-write ingest path with no
+  clock bound anywhere in its chain** — the sibling-surface rule missed twice. The fix is to route the
+  date through `ingest-clock`, not to add a bespoke range check.
+- **🟡 Q-496** — `2026-13-45` / `2026-02-31` / `0000-00-00` pass the shape regex and return **HTTP 500**
+  plus an `error_events` row each. The class `normalizeDateParam` exists to prevent; this route never
+  got the guard. **🟢 Q-495** — `z.coerce.number()` turns `[]`→0, `true`→1, `""`→0 kg; the route's own
+  comment names two garbage inputs and both are correctly rejected, these three are not named.
+- **What the route gets right, stated because three findings are refinements of it:** the gate runs
+  *before* the compare and returns an identical 401 on trip; `safeCompare` is constant-time and
+  length-safe; the date regex accepts both separators (the Q-130 lesson); both garbage examples its
+  comment names are rejected.
+- **Not exercised:** local dev server, seeded DB. Not on device, not against production, not against
+  Railway's real proxy — the one unknown Q-493 turns on. All test rows, `error_events` and
+  `rate_limits` rows were deleted and the 81 kg reading verified restored.
+
+
+### [platform] 🟡 Seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current (Q-492, 2026-08-18)
+
+- **The lens was the file every session must read first.** Three sweeps this week each found a stale
+  `CLAUDE.md` number by accident (Q-480, Q-490, Q-491). This one enumerated **every** checkable count
+  and re-derived it against `main` at `63fb89c`:
+  [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](docs/reviews/2026-08-18-claude-md-prose-counts.md).
+- **Script-backed: 3 of 3 current.** Sparkline (3 inline / 6 exempt), `Ran 40 of 40` custom rules, the
+  rollup vitest glob. **Prose: 7 of 9 stale** — hex literals **471 → 428**; the >800-line hotspot list
+  still names `more/profile-tab.tsx` (**476 lines**); "22 of 33" → **29 of 40**; `READINESS_SCORE_TTL`
+  "four sites" → **6**; suite "448 files" → **504**; plus the two already filed. **Two prose counts are
+  right** (score-band 17, "11 inline grep rules") — the correlation is strong, not absolute.
+- **Two items are more than drift.** `more/profile-tab.tsx` **should already have been struck** — the
+  same paragraph mandates it and cites `health-sections.tsx` as the precedent. And the rollup-glob
+  maintenance command at `CLAUDE.md:976` is scoped to the directory the glob covers, so it **can only
+  confirm the glob against itself** — a rollup test written elsewhere is invisible to the check that
+  exists to find it. **Both defects are latent:** no test outside the glob calls the rollup today.
+- **One ratchet with slack.** `check-component-size.js` is shrink-only; `components/workout-screen.tsx`
+  is pinned at **1850** against an actual **1831** — 19 lines of regrowth that would pass silently.
+- **The fix is not correcting seven numbers** — that buys a week. Cite the command, or delete the
+  number and keep the rule. The file already contains the model in its own sparkline paragraph.
+  *A count in prose is a claim with a decay date; a count in a script is a fact.*
+- **Not exercised:** static verification only — no runtime, no device.
+
+
 ### [platform][app-shell][readiness] 🟢 This run's own findings checked against production — one refuted, two re-scoped, one new (Q-472, 2026-08-18)
 
 - **The lens was to measure my own claims.** Seven sweeps filed 22 findings (Q-450…Q-471), almost all
@@ -102,6 +363,268 @@ order.
 - **The constraint governing every number above:** `claude_ro` is **row-scoped to one user** and
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
+
+### [app-shell] 🟡 Nine collapsibles still ship no `aria-expanded` — and it is the third hand-maintained count in `CLAUDE.md` found stale this run (Q-491, 2026-08-18)
+
+- **A named list with a date is checkable, which is the reason to write one.** `CLAUDE.md` names nine
+  chevron toggles lacking `aria-expanded`, re-counted 2026-08-09. Re-checked:
+  [`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](docs/reviews/2026-08-18-aria-expanded-collapsibles.md).
+- **Still 9, but not the same 9.** `more/profile-tab.tsx` is **fixed** (0 chevrons remain);
+  `components/weights-summary.tsx` has the defect and **was never on the list**; `deload-explanation`
+  and `signal-sections` have **moved**, so the paths in the rule are stale. The other six are unchanged.
+- **One partially compensates:** `weights-summary.tsx` carries `aria-label={collapsed ? "Expand" :
+  "Collapse"}`, so state does reach a screen reader — just not through the attribute that also
+  expresses the control→region relationship.
+- **Severity low and the reason is honest:** no known screen-reader user. Filed because the stated
+  direction is a **Play Store listing**, where accessibility is a review surface, and because the
+  recommended fix removes a maintenance burden rather than adding one.
+- **Prefer the ratchet over the sweep.** Nine attributes are easy to add and will drift again.
+  `CLAUDE.md`'s own rule says to prefer Radix `Collapsible`, **which supplies both attributes for
+  free**; then a shrink-only Custom Rules count so the list stops needing a human.
+- **⚠️ The pattern is worth more than the finding — third stale hand-maintained count this run:**
+  Q-480 (repo helpers described as hardcoding a timezone they take as a parameter), Q-490 (*"both
+  long-standing memos"* — there are **66**), and this one. **Every ratcheted count is current** — hex
+  literals, TTL divergence, component size, doc-index size, backlog pointers. This file already drew
+  that lesson for hex literals (*"recorded here as improving and it was not … because this line was
+  prose and nothing measured it"*); it applies to its own prose. **A count in prose is a claim with a
+  decay date; a count in a script is a fact.**
+- **Not verified: no screen-reader testing** — the claim is that the attribute is absent, not that an
+  announcement is wrong. Not on the APK, where TalkBack is the relevant reader. `coach-content.tsx`
+  was examined and **excluded** (its chevron is a back button).
+
+### [app-shell] ✅ The other four render rules audited — all held, and every mechanical check over-reported (2026-08-18)
+
+- **Completes the render lens** that sweep 26 opened.
+  [`docs/reviews/2026-08-18-render-hot-paths.md`](docs/reviews/2026-08-18-render-hot-paths.md). Filed
+  nothing; Q-490 remains the only open item in this area.
+- **`key={index}` in editable lists — held.** 85 occurrences exist, but filtering to lists that are
+  **both editable and deletable** gives **zero**, and the known editable lists key on stable ids
+  (`meal.id`, `item.id`, `style.id`, `program.id`). **Reporting the 85 would have been wrong** — index
+  keys on a static list are correct React.
+- **A 1 Hz timer in the orchestrator — held.** `workout-screen.tsx:797` does hold a `setInterval`, and
+  it writes `recordTraceSample(...)` to a module singleton with **no `setState`** — which is the
+  pattern the rule wants, and its comment says so.
+- **Zustand selector breadth — held.** The orchestrator's `useShallow` pick is **62 fields**, which
+  looks alarming and is not: the hot-path *values* (`perSetWeights`, `rpeValues`) are **absent**; only
+  their *actions* are picked, and action references are stable. The leaves read the values via their
+  own narrow selectors (`active-set-card.tsx:40,44`). **Counting fields in a pick is not the test —
+  actions vs values is.**
+- **`readCacheSync` in a render body — held, and the grep flagged the rule itself.** 25 hits outside an
+  effect/callback; the three in the orchestrator are all false positives, and the first
+  (`workout-screen.tsx:264`) is **the comment stating the rule** — *"readCacheSync must never live in
+  that path"* — reported as a breach of that rule.
+- **The standing lesson, now six sweeps running:** every mechanical check here over-reported. The raw
+  counts — 85 index keys, 62 picked fields, 25 bare cache reads — are all defensible, and a review
+  that filed them would have produced three wrong entries and one absurd one. **The grep finds
+  candidates; the handler decides.**
+- **Not verified:** static analysis, no profiler, not on the APK.
+
+### [nutrition][app-shell] 🟡 64 of 66 memos hold; the two that do not re-render every meal row on every keystroke (Q-490, 2026-08-18)
+
+- **`CLAUDE.md` warns that an inline object or arrow "defeats the memo silently" — a defeated memo
+  looks optimised and does nothing.** Nobody had checked whether the current ones hold.
+  [`docs/reviews/2026-08-18-memo-stability-audit.md`](docs/reviews/2026-08-18-memo-stability-audit.md).
+- **The headline is the clean part: 64 of 66 hold, and there are no inline arrows anywhere** in a
+  memoised component's props. The discipline the rule asks for is being kept almost everywhere.
+- **The two exceptions are one module and one prop.** `MealMacroBars` and `DayMacroTotals`
+  (`meal-macro-bars.tsx:58,83`) are called with `target={{ … }}` — a fresh object identity per render —
+  from `meal-plan-review-step.tsx` and `meal-plan-edit-sheet.tsx`, in both cases **inside
+  `variant.meals.map(...)`**.
+- **Why it bites:** the edit sheet holds **9 `useState` hooks** including per-keystroke handlers
+  (`setInstruction`, `setRenameText`), so **every keystroke re-renders every meal row's macro bars** —
+  exactly what the memo was added to prevent. **Performance, not correctness**, and bounded by the
+  handful of meals in a day.
+- **Fix:** `useMemo` the object, or better, pass four scalars — for the per-meal site a `useMemo` would
+  need one memo per row, so scalars are the cleaner choice.
+- **A stale clause worth correcting alongside:** the rule says *"both long-standing memos in the
+  codebase were defeated exactly this way"*. There are now **66** memoised components, not two. The
+  rule is right; the count is from an earlier era and reads as though memoisation is rare here. Same
+  class as Q-480.
+- **Not verified: no render counts were measured** — the claim follows from object identity and
+  React's shallow compare, not a profiler run. The call-site scan can miss a memoised component
+  invoked with deeply nested children in its props; the 66 declarations are exhaustive.
+
+### [platform][readiness] 🟡 Five sites turn an ms offset into a calendar day; in a DST zone three compute "today" for "yesterday" (Q-489, 2026-08-18)
+
+- **`CLAUDE.md` bans this shape and records six copies shipping in one file.** `lib/ai-chat/tools.ts`
+  is clean now, but 12 instances remain elsewhere and nobody had sorted the ones that matter from the
+  ones that do not. [`docs/reviews/2026-08-18-ms-offset-to-calendar-day.md`](docs/reviews/2026-08-18-ms-offset-to-calendar-day.md).
+- **⚠️ Most of the 12 are CORRECT and filing them would be wrong.** The rule's harm is *"ms-offset
+  windows straddle two AEST days and merge them"* — that is about **day-bucketed** aggregation.
+  `muscle-recovery`, `workout-load-history` and `friends/feed` use a **rolling instant** filter feeding
+  consumers that work in hours (`computeMuscleRecovery` reads `ws.startedAt.getTime()`), which for a
+  physiological window is *more* correct than a calendar day.
+- **Five sites do produce a calendar day, and the failure is measured** in `America/New_York`:
+  ```
+  ** MISMATCH **  local 2026-11-01 23:30   now-24h → 2026-11-01   true yesterday 2026-10-31
+  ```
+  On the **25-hour fall-back day**, in its last hour, `now − 24h` lands on **today**. Three of the five
+  are computing "yesterday" that way — the `getOuraDailyDerived` range start (an AI-dynamic
+  prescription input), the achievements streak comparison, and the periodization signal chain.
+- **Severity stated plainly: unreachable today** — every user is `Australia/Brisbane`, no DST — and
+  **one hour per year per DST-zone user** when reachable. Filed because it is measured, it is exactly
+  the hand-rolled date arithmetic this file bans, and **`shiftDateStr` already exists and is already
+  used in this shape** at `slices/oura.ts:1182`. One-line swaps.
+- **Q-477 is what makes it reachable at all** — the Profile timezone setting and its auto-detect
+  button. Same family; neither urgent.
+- **Two clean results:** `lib/ai-chat/tools.ts` carries none of the banned pattern (the 2026-07-06 fix
+  held), and the rolling-window uses must not be "fixed".
+- **Not verified:** measured with `date-fns-tz` directly, not by driving the app with a DST-zone user
+  at that hour — the app cannot be time-travelled here.
+
+### [platform] ✅ Q-488 is the only one — every other write to a local-first domain updates the store (2026-08-18)
+
+- **Answers the question an implementer taking Q-488 has to ask:** is this a handler or a class?
+  [`docs/reviews/2026-08-18-local-first-write-coverage.md`](docs/reviews/2026-08-18-local-first-write-coverage.md).
+  **It is one handler.** Every mutating write to a local-first domain was audited for a local-store
+  call **inside the handler** — `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE),
+  `quick-edit-log-sheet` (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet`
+  (DELETE+PATCH), `done-activity-screen` (PATCH). **All eight write locally.** Only Q-488's does not.
+- **⚠️ The obvious check is unsound, and its own output proves it.** Asking whether the *file* touches
+  the local store reports `health-content.tsx` — the Q-488 file — as fine, because it uses the store
+  elsewhere and just not in the delete handler. **File-level coverage says nothing about a handler.**
+- **Two server-only writers, both clean, one for a reason worth keeping.** The Health Connect metrics
+  PATCH arrives via the pull (chain verified in sweep 23). And
+  `meal-plan-setup-sheet.tsx:387` creates saved meals server-only — fine, because `saved_meals` is
+  **push-only** in the outbox and kept current by **hydrate-on-read** instead
+  (`saved-meals-sheet.tsx:111` hydrates from the API; `food-logger-sheet.tsx:196` falls back to it).
+  **So "no pull mapping" is not evidence of a gap** — a future audit testing pull coverage alone would
+  file that one wrongly.
+- **Not verified:** static audit and source reading, not on the APK. The handler-window heuristic reads
+  a fixed span around each call site, so a local write further away would be missed — for the eight
+  above the call is within a few lines.
+
+### [activity][app-shell] 🟠 Deleting an activity leaves it in the local store, so three other screens keep showing it (Q-488, 2026-08-18)
+
+- **The successor sweep 22 named for itself:** a stale value arising *outside* Q-262's test — a write
+  that updates the server without touching the local store.
+  [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md).
+- **What.** `health-content.tsx:684-700` deletes via `fetch("/api/activity-logs", {method:"DELETE"})`,
+  toasts *"Deleted"*, invalidates caches — **and never touches the local store**.
+- **The originating screen is correct, which is why this survived.** `refreshDayOverlay` reads
+  `cachedFetch('day-log:<date>')`, a **server-read** cross-domain aggregate (the sanctioned
+  exception), so the activity vanishes there at once. Nothing on that screen could reveal the problem.
+- **The local row is untouched**, and three surfaces read it local-first — session-select's week
+  activity, nutrition's calories-burned total, and the activity-history card. `pullDelta` is throttled
+  to **5 minutes** un-forced and nothing in the delete path forces one, so the floor is that window
+  and the real duration is "until the next natural sync".
+- **It self-heals and is not data loss.** The server delete is a **soft** delete with a
+  `user_id`-scoped tombstone, and `applyDelta` applies it under the correct `sync_status='synced'`
+  guard. Something wrong is shown for a while; nothing is lost.
+- **Fix is one call** — delete the local row alongside the API call, as `done-activity-screen.tsx`,
+  `exercise-review-sheet.tsx` and `walk-summary.tsx` all already do. Making the delete work *offline*
+  is a separate, larger question and should not be folded in silently.
+- **The rule it breaks is not written down.** `CLAUDE.md` states the forward direction (*"if a domain
+  WRITES to the local store, its UI MUST READ from the local store"*). The inverse is what bites:
+  **a domain the UI reads local-first must have every write update the local store — including
+  deletes, and including writes made from a screen that itself reads server-side.** Worth adding
+  alongside the fix.
+- **Three clean results:** the Health Connect metrics PATCH is server-only but its full chain checks
+  out (all four fields in the pull mapping *and* `RECONCILE_COLUMNS`); that route is one of the only
+  two dynamic routes that validate their UUID (consistent with Q-482); and the delete/tombstone
+  mechanism itself is present and correct.
+- **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
+  readers fall through to their API fallbacks and the inconsistency cannot appear there. On-device is
+  the only real verification.
+
+### [platform] ✅ Both halves of the staleness test now audited — case (b) clean, and the mechanical test for it does not work (2026-08-18)
+
+- **Completes the lens.** Sweep 21 audited case (a) (`freshWithinTtl`); this audits case (b),
+  **seed-only read paths** — the worse half, because a seed-only key never revalidates at all.
+  [`docs/reviews/2026-08-18-seed-only-read-paths.md`](docs/reviews/2026-08-18-seed-only-read-paths.md).
+- **The naive test over-reports and must not be used.** Differencing `readCacheSync` keys against
+  `cachedFetch` keys (51 vs 66) yields five seed-only candidates — `achievements:<userId>`,
+  `ai-health-insight:<section>:<date>`, `mood:<date>`, and two `workout-card:*`. **All five
+  revalidate. None is seed-only.**
+- **Because revalidation happens three ways and `cachedFetch` is only one:** (1) `cachedFetch`;
+  (2) a raw `fetch(...)` then `setCached(...)` — `ai-insight-card.tsx`, `workout-screen.tsx`;
+  (3) a **local-store read** then `setCached(...)` — `session-select-content.tsx`'s `mood:` path.
+  **The third matters most:** for an offline-first domain the local store *is* the source of truth, so
+  "revalidate" correctly means reading SQLite, not the network. A test that looks for a network call
+  marks the app's most authoritative paths as stale.
+- **So the test for seed-only cannot be "`readCacheSync` without `cachedFetch`"** — it is "no
+  write-back to the key from any source after the seed", which is not greppable in one pass. Five
+  candidates had to be read individually.
+- **⚠️ Second time this run a `Q-NNN:` comment read as an open bug and was the fix.**
+  `workout-screen.tsx:272` (Q-126, lifetime XP reported as one session's gain) is the fix's rationale,
+  not a live defect — as was `session-select-content.tsx:896` (Q-117) last sweep. **In this codebase a
+  comment naming a Q number is usually why the code is shaped that way.** Worth knowing before
+  grepping `never invalidated` or a Q number and reaching for the alarm.
+- **Result: both halves of Q-262's test are audited and clean.** The most repeated bug class in this
+  project currently has no live instance that either half of the documented test can find.
+- **Not verified:** static audit and source reading; not on the APK or production. A stale-value bug
+  arising some *other* way — a write that updates the DB without touching the local store — is outside
+  what this test catches and was not looked for.
+
+### [platform] ✅ Every load-bearing cache invalidation audited — no gap, closing an audit `CLAUDE.md` names as never done (2026-08-18)
+
+- **The most repeated bug class in this project (12+ incidents), audited against Q-262's own test.**
+  [`docs/reviews/2026-08-18-load-bearing-cache-audit.md`](docs/reviews/2026-08-18-load-bearing-cache-audit.md).
+  Q-262 established that a stale entry only survives as a *settled* value when a call site passes
+  **`freshWithinTtl: true`** or a read path is **seed-only** — and this file recorded that only
+  `invalidateGoalRecommendations` had ever been checked, *"the other groups are not audited."*
+- **Case (a) is now audited and clean.** Sixteen `freshWithinTtl: true` sites resolve to **seven keys**,
+  all `TTL_LONG` (6 h): `exercise-library`, `activity-types`, `progression-styles`,
+  `workout-templates`, `progress-summary`, `workout-data:all`/`workout-card:<id>`. **Every one is in an
+  invalidation group, and every client writer of the endpoint behind it calls that group.** No gap.
+- **One thing that reads as a live defect and is not.** `session-select-content.tsx:896` says the
+  `workout-data` caches are *"never invalidated … for up to 6 hours"* — that is the **comment on the
+  Q-117 fix**, and `invalidatePrescriptionChanged()` is the line below it. Recorded so the next person
+  to grep `never invalidated` does not reach for the alarm, as I did.
+- **A design property, deliberately not filed:** these invalidations are **device-local** —
+  `cache-groups.ts` clears the writing client's cache and cannot reach another device. `exercise_library`
+  and `activity_types` are **shared** tables, so a change on one device leaves other clients serving the
+  old list as a settled value for up to 6 h. Not filed because `TTL_LONG` is documented as *"slow-changing
+  config"* and the current user base has no second writer. **Worth knowing when multi-user lands** — the
+  answer then is a version/etag or a shorter TTL for shared config, not more invalidation call sites,
+  which cannot help across devices.
+- **Case (b) is still unaudited** — seed-only read paths (a screen that `readCacheSync`s a key and never
+  fetches it, the Q-260 shape). That half leaves no revalidation at all and is the likelier source of a
+  stale-value report. Named as the obvious next sweep in this lens.
+- **Not verified:** static audit plus local dev; not on the APK. Cross-device staleness was reasoned
+  about, not reproduced — this harness has one client.
+
+### [platform] 🟠 Q-475 shipped mid-sweep; the production evidence is about the half its fix did not cover (Q-487, 2026-08-18)
+
+- **This run's fourteen findings checked against production**, the same exercise that corrected four
+  findings in sweep 8.
+  [`docs/reviews/2026-08-18-production-verification-round-2.md`](docs/reviews/2026-08-18-production-verification-round-2.md).
+  Nothing new filed; **six entries amended**.
+- **⚠️ Q-475 was implemented while this sweep ran** — `#115` classifies the cause server-side
+  (`isRetryableWriteError`), stops the client counting a retryable failure against
+  `MAX_MUTATION_ATTEMPTS`, and engages the whole-queue backoff. **The dead-lettering and missing
+  backoff are genuinely fixed.** What the evidence below is about is **not**: `reportServerError` is
+  called only in the route's *outer* catch, which `pushMutations` never reaches, so a push failure
+  still never reaches `error_events`. **Filed as Q-487**, scoped to the observability half.
+- **The production shape, and it is an absence:**
+
+  | Route | Faults in `error_events` | Span |
+  |---|---|---|
+  | `/api/sync/pull` | **69** | 2026-07-19 → 2026-08-13 |
+  | `/api/sync/push` | **0** | none, ever |
+
+  Over the same window the database refused connections **125 times across six days** (39 on
+  2026-08-12), with one pull row reading `[cause: timeout exceeded when trying to connect]`.
+- **The zero is evidence, not absent traffic.** `components/sync-provider.tsx` runs
+  `await pushMutations(userId)` at :139 and `pullDelta` at :145 — **push first, same cycle**. Push is
+  not less exposed than pull; it runs before it. So the zero means **"push cannot report"**, which is
+  precisely what Q-475 describes: `pushMutations` catches per-mutation, returns 200 with the failure
+  in the body, and never calls `reportServerError`. **The one table designed to catch faults that
+  never reach a human has a blind spot exactly where that finding lives.**
+- **Q-482 and Q-483 confirmed never triggered** — zero `22P02` rows ever, so a malformed route id has
+  not reached production and the SQL-leaking 500 has never been served. Both were filed low; **do not
+  re-price them upward from the local 500s alone.**
+- **Q-484 latent confirmed** — `claude_ro.injuries` is **empty**; the route that accepts a 10 MB note
+  has stored nothing at all.
+- **Q-481 and Q-485 cannot be adjudicated from production, and one of them has a trap.** Water: 4 days
+  logged, max 1000 ml — too thin for a double-count to show, so read it as the feature being unused,
+  not as the replay not happening. Weight: 35 of 114 rows have steps and a NULL weight, which is **the
+  expected shape** (steps daily from the ring, weight only on scale use) and **must not be cited** as
+  coerced-away weights — the same trap as Q-460's "74% lack an RPE".
+- **The standing constraint:** `claude_ro` is row-scoped to one user and `error_events` prunes at 30
+  days. Every count is *the owner's, recently* — a zero means the owner never hit it, never that no
+  user did. Push *traffic volume* could not be measured directly; the argument that push runs is from
+  the call site, not a counter.
 
 ### [workouts][devices] 🟠 The outbox enqueue for a workout is the only write in the app that fails silently — and it is the last line of defence (Q-486, 2026-08-18)
 
@@ -2870,75 +3393,35 @@ Design galleries: `docs/design/2026-08-07-score-row-mockups*.html`.
 Secondary, non-blocking: the picker is now a flat list of nineteen radio options, which wants
 grouping or thumbnails rather than a longer list. Not scoped.
 
-### [activity][devices][platform] 🔴 Q-139 — `resolveDsToMs` compresses ring time by up to 18× during a backlog drain (found 2026-08-07, OPEN)
+### [activity][devices][platform] ⚠️ Q-139 — ring-clock compression FIXED (v1.270.25), **not verified on device**
 
-Found investigating an owner report that app steps read higher than the Samsung Health phone count
-(app 4,176 vs phone 3,376 at 21:49 on 2026-08-07). The step gap turned out **not** to be the bug —
-see the closing note below — but the investigation surfaced a real one on the shared ring clock.
+**Fixed 2026-08-08 in v1.270.25.** Owner decision: **fix forward, no backfill.** Kept here rather
+than archived because the device check is still owed, which is what this section is for. Full
+investigation, including the measurement traps that make it expensive to re-derive:
+[`docs/handoff-2026-08-07-activity-ring-clock-compression.md`](docs/handoff-2026-08-07-activity-ring-clock-compression.md);
+session journal `docs/overview/entries/2026-08-08-ring-clock-compression.md`.
 
-**What is wrong.** A clock anchor is `(batch max ds, server receive time)`, so its *lag*
-(`anchorUtcMs − anchorDs × 100`) is however long that batch took to reach the server. That lag is
-not constant: over 2026-08-07's ds range (n=99 anchors) it spans **56.2 minutes**, with a sharp
-lower edge (p0→p10 is 1.4 min) and a long upper tail — the signature of true time plus a variable
-receive latency. `resolveDsToMs` interpolates linearly between the two anchors bracketing a ds, so
-the local time-scale it applies is `Δutc / Δds`. When the ring drains buffered history, ds advances
-far faster than the wall clock and that ratio collapses.
+**The slope was never the unknown** — the ring's counter ticks at exactly 100 ms/ds by construction,
+only the offset is unobserved. `resolveDsToMs` now applies that fixed slope with one offset per
+epoch, estimated as the **p10 of anchor lag**: an event cannot be received before it happened, so the
+floor of the lag distribution is the honest offset and the tail is receive latency (p0→p10 spans
+1.4 min against a 56.2 min full spread). That also makes the mapping monotonic in `ds`, which
+interpolation could not promise.
 
-Measured on real production frames: ds `28297856`→`28314950` is Δds 17,094 = **28.5 minutes of ring
-time**, and it resolves into `12:47:19`→`12:48:54` — **95 seconds**, an ~18× compression. This is not
-one bad moment; at the 30 s frame cadence a 60 s block should hold 2 paired windows, and
-2026-08-07's blocks hold 79 (11:42), 70 (10:41), 66 (14:01) and 60 (17:11).
+- **Both halves shipped.** `resolveDsToMs` now applies the fixed 100 ms/ds slope with one offset per
+  epoch (p10 of anchor lag), which is also monotonic in `ds`. And the sibling gap is closed —
+  `mergeStepCounterWithLive` gates **model** windows through `isPlausibleStepWindow`, not just live
+  ones (verified in `packages/shared/src/health/step-estimate.ts:176`, whose comment names Q-139).
+- **⚠️ What is still owed: the on-device check only.** The consequence shows after the next real
+  history drain. Nothing else is outstanding — no code work, no owner decision.
+- **Stored history was deliberately not rewritten**, so ~35 days before the deploy read
+  inconsistently with everything after. Blast radius is steps + the admin console; sleep and HR use a
+  different converter (`measuredAtMs`) and are untouched.
 
-**Why it shows up in steps.** `resampleSteps` folds per-sample steps into fixed 60 s wall-clock
-blocks, so every window squeezed into one block sums there. 2026-08-07 produced 60 s windows of
-**1,555**, 664 and 268 steps — the top one is 26 steps *per second*.
-
-**It distorts placement far more than totals.** Re-running the real rollup over the same frames with
-a physically-correct clock (ds ticks at exactly 100 ms; offset = the minimum observed lag) gives
-**zero** implausible windows, and moves the day total from 4,178 to 4,652 — and 2026-08-06 from 1,232
-to 1,245. So the totals were roughly right and the *timeline* was wrong.
-
-**Blast radius is steps only.** `resolveDsToMs` is used by `step-day-buckets.ts` (the steps rollup
-write and `previewStepsBackfill`) and the admin step-counter console — nothing else. Sleep
-boundaries, HR bins and temperature go through `measuredAtMs`, a **fixed** 100 ms/ds slope from one
-anchor, which carries Q-71's offset error but structurally cannot compress. An earlier draft of this
-row said a fix would move sleep boundaries; it will not.
-
-**This is an input to [Q-71](docs/implementation-backlog.md), and partly contradicts it.** Q-71
-proposes moving the sleep/HR/temperature paths onto `resolveDsToMs` on the grounds that
-interpolation is "the more accurate one". It is more accurate than unbounded newest-anchor
-extrapolation, and it still carries this defect — so implementing Q-71 as written would trade an
-offset error for a compression error on sleep and HR. Fix Q-139 first; its fix (a robust
-non-interpolating offset) is also the right fix for Q-71's paths, letting one converter serve both.
-
-**Watch the monotonic guard.** The rollup recomputes a 35-day window but can only ever *raise* a
-stored total (`mergedSteps > existingSteps`), so a clock fix is not "future days only" — recent days
-would drift upward wherever the corrected number is higher, while days that should come *down* stay
-inflated without an owner-gated `allowStepsDecrease` backfill. Both measured days moved up.
-
-**Second, smaller gap on the same path:** `mergeStepCounterWithLive`
-(`packages/shared/src/health/step-estimate.ts`) applies `isPlausibleStepWindow` to **live** windows
-only — model windows go through unfiltered. That asymmetry is what let the three impossible windows
-above reach the daily total. Worth closing as a backstop, though under a correct clock it would not
-have fired on 2026-08-07.
-
-**Reproduction is exact**, so nothing here is inferred: replaying production's own
-`computeStepsByDay` over the same anchors and frames returns 4,178 against the stored 4,176.
-Full investigation, including the measurement traps that make this expensive to re-derive:
-[`docs/handoff-2026-08-07-activity-ring-clock-compression.md`](docs/handoff-2026-08-07-activity-ring-clock-compression.md).
-
-**On the original step question — no tuning is warranted.** 2026-08-07's steps are 100 %
-`step_counter` over ring frames: `body_metrics.source_map->>'steps'` is `oura_ble`, and
-`step_live_windows` has held no row since 2026-07-28, so no phone or Health Connect value is in the
-mix. Correcting the clock moves the ring *further* from the phone (4,652 vs 3,376), which is the
-expected direction — a finger-worn sensor counts movement a pocketed phone misses. Applying a scale
-factor to close that gap would be fitting a fudge to one day of paired data. Note also that the
-rollup's same-day guard is monotonic (`mergedSteps > existingSteps` in `adapter.ts`), so an
-over-count from a distorted clock can never self-correct downward.
-
-**Not found by the same-day full-app deep review** (below) — that sweep covered routes and pages;
-this sits under the ring rollup's clock conversion.
-
+*Rewritten 2026-08-18 (Q-553): this row previously read `🔴 … (found 2026-08-07, OPEN)` and carried
+69 lines describing the bug as unfixed, while an `✅ fixed` entry for the same issue already sat in
+the resolved archive. Every session's orientation read had shown a red open issue for a bug fixed ten
+days earlier.*
 ### [platform][app-shell] Full-app deep review, 2026-08-07 — 53 findings, ALL QUEUED (nothing fixed)
 
 A whole-app review of saving, caching, performance and domain logic across all **201 API routes** and

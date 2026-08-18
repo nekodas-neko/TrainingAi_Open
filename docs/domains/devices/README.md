@@ -14,7 +14,7 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
 | Area | Where |
 |---|---|
 | Oura direct BLE | `lib/oura-ble/` — `plugin.ts`, `sync.ts`, `decode.ts`, `clock.ts`, `raw-storage.ts`, `continuous-capture.ts`, `battery-soak.ts` |
-| On-device models | `lib/oura-models/`, `docs/oura-models/` |
+| On-device models | `lib/oura-models/` — there is no `docs/oura-models/` directory (the row named one until 2026-08-18); the operational reference is [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) |
 | Oura Cloud | **Removed 2026-08-13 (Q-224).** `lib/oura/` is local-only now: `ble-freshness.ts`, `cloud-freshness.ts` (the re-key constant), `contributors.ts`, `types.ts` |
 | Chest strap | `lib/polar-ble/` |
 | Scale | `lib/scale-ble/` |
@@ -39,7 +39,7 @@ documentation cluster in the repo (~45 known issues, ~38 plans, 300+ model files
    `scripts/private-paths.json`)
 6. [`docs/device-agnostic-source-architecture.md`](../../device-agnostic-source-architecture.md) —
    the raw-capable vs computed source tiers, and
-   [`docs/../overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)
+   [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)
    for what tiers 1-2 actually landed as (Q-43): sleep has one write path with a required `source`,
    Health Connect stage intervals become a `sleep_phase_5_min` hypnogram, and the readiness
    composite runs without a ring. **Nothing in it has run against a real Health Connect provider.**
@@ -117,10 +117,12 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
   plus an amendment to Q-534 — these were renumbered from Q-530…Q-536 on merge, after a concurrent
   planning session turned out to hold the same block unmerged.
 
+- [`docs/reviews/2026-08-18-orientation-index-paths.md`](../../reviews/2026-08-18-orientation-index-paths.md) — **the orientation indexes named paths that do not exist, 2026-08-18** (Q-554 — `module-map.md:232` carried a row for `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket`, **neither of which has ever existed**; the real port is the row below and is itself flagged "NOT yet wired", so the map presented planned work as existing infrastructure. Plus three stale domain rows — `app/history/`, `docs/oura-models/`, `app/overview/` — and 49 malformed history display labels (a stray `../` made them resolve to a non-existent root `overview/`).) Now enforced by `scripts/check-index-doc-paths.js`, step 42 of 42, over **748 paths**.
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-455 — a bodiless 500 from `/api/oura-ble/decoder-constants` when the constants read throws). Findings Q-450…Q-455; four areas recorded **clean**.
 
 - [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-459 — the rolling `apk-latest` release is delete-then-recreate, so the advertised APK download URL 404s during every native merge). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
 
+- [`docs/reviews/2026-08-18-health-connect-ingest.md`](../../reviews/2026-08-18-health-connect-ingest.md) — **the secret-gated Health Connect ingest route, driven for real, 2026-08-18** (Q-493 — the SEC-I3 brute-force gate keys on `x-forwarded-for`'s **leftmost, client-supplied** hop, so rotating one header bypassed it: fixed header → 1 limiter key at count 20, rotating → **30 keys at count 1, all reaching the secret compare**; 7 sites share the pattern. Q-494 — `{"date":"9999/12/30","weightKg":499}` took `getMostRecentConfirmedWeightKg` from **81 kg to 499 kg permanently**, and the ranked source merge is orthogonal to it because ranking is per column *per date*. Q-495/Q-496 — coercion laundering and a 500-on-invalid-date). **What the route gets right is stated first** — the gate precedes the compare, `safeCompare` is length-safe, the date regex takes both separators.
 - [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — `DELETE /api/phase-sets/[id]` answers a missing row with a 500 while `PUT` on the same resource answers 400). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (the scale/ring ingest routes reject malformed frames and take no `userId` from the body; two sit behind `requireAdmin`). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
@@ -153,14 +155,14 @@ Live at the time of writing (2026-07-30):
   an unreachable strap by design and nothing re-armed them, so a strap put on after launch needed
   an app restart. Fixed via `retryAmbient()` + a foreground tick; the BLE half cannot be exercised
   in the sandbox. See
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - 🟠 **Sleep/HRV/breathing metrics changed scale at the BLE re-key** with no conversion — open.
 - 🟢 **Clock anchors are stamped at server batch-receive time, not ring-capture time (Q-71,
   unblocked 2026-08-12)** — traced to `insertOuraRawSamples`'s `anchorUtc = new Date()`; the
   already-shipped `resolveDsToMs` robust-offset fix (Q-139) tests clean against real sleep history
   (uniform −3min) and just needs wiring to the sleep/HR/temperature converter. See
   [`docs/oura-ble-operations.md`](../../oura-ble-operations.md) I25 and
-  [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md).
+  [`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md).
 - 🟡 **Eight device-owned `oura_daily_derived` columns have no producer** (Q-7b) — open.
 - ⏳ **Ring clock anchors are append-only observations** — phase 1 of 2, currently inert.
 - The D1/D2 on-device restore and raw-store tracks are largely **shipped server-side but

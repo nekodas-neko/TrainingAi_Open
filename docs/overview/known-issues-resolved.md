@@ -224,31 +224,6 @@ fault readable; there has not been one.
 
 Session journal: `docs/overview/entries/2026-08-08-production-counter-audit.md`.
 
-### [activity][devices][platform] ✅ Ring time no longer compresses during a history drain (Q-139, fixed 2026-08-08, v1.270.25)
-
-Owner decision: **fix forward, no backfill.** A clock anchor is `(batch max ds, server receive time)`,
-so its lag is however long that batch took to arrive — and `resolveDsToMs` interpolated between
-anchors, making the local time-scale `Δutc / Δds`. While the ring drains buffered history ds advances
-far faster than the wall clock, so that ratio collapses: measured on production frames, **Δds 17,094
-(28.5 min of ring time) mapped onto 95 s of wall clock, ~18×**. `resampleSteps` then folds everything
-squeezed into a block into the same 60 s bucket, which produced windows of **1,555 · 664 · 268
-steps** — the top one 26 steps per second.
-
-**The slope was never the unknown** — the ring's counter ticks at exactly 100 ms/ds by construction,
-only the offset is unobserved. It now applies the fixed slope with one offset per epoch, estimated as
-the **p10 of anchor lag** (an event cannot be received before it happened, so the floor of the lag
-distribution is the honest offset and the tail is receive latency; p0→p10 spans 1.4 min against a
-56.2 min full spread). Also makes the mapping monotonic in `ds`, which interpolation could not
-promise. Shipped with the sibling gap the entry named: `mergeStepCounterWithLive` now gates **model**
-windows through `isPlausibleStepWindow`, not just live ones.
-
-⚠️ **Stored history was deliberately not rewritten**, so the last ~35 days read inconsistently with
-everything after this deploy — the accepted cost of fix-forward. Blast radius is steps + the admin
-console only; sleep and HR use a different converter (`measuredAtMs`) and are untouched. **Not
-verified on device** — the on-device consequence only shows after the next real drain.
-
-Session journal: `docs/overview/entries/2026-08-08-ring-clock-compression.md`.
-
 ### [workouts][platform] ✅ The Year Review read a deload as a lift dropping to zero (found + fixed 2026-08-08, v1.270.24)
 
 Found while running Q-52's outstanding "re-measure once blocks cycle" audit: four exercises in the
@@ -555,37 +530,6 @@ explains as a claim about the *view* until proven otherwise.
 Regenerating also picked up **`prescribed_runs.segments` and `exercise_library.merged_into`** —
 columns added by migrations 163–166 without re-running the generator, and therefore unreadable under
 the default-deny schema. Four migrations had missed that step.
-
-### [readiness][devices] ✅ Q-81 — a query filtered on a column nothing has ever written (2026-08-05, v1.259.1)
-
-The sweep guessed the daytime-HRV model was failing downstream, in the extractor or the fit.
-**Wrong — execution never got there.** `getOuraRawSamplesForTags` filtered on `decoded IS NOT NULL`,
-and that column is NULL on **all 812,816 rows across all 30 tags**. `body_hex` is the archival
-source of truth and every other consumer decodes on the fly; this function was the odd one out, so
-it returned an empty array to every caller, always.
-
-**Two victims, one already on the record:** `oura_daytime_hrv_model` empty since the feature shipped
-(Body Battery's D5 input permanently absent), and `/api/oura-ble/device-metrics` returning
-`{"days": []}` — which the 2026-08-05 navigation entry had recorded as unexplained. Same cause.
-
-Fixed by decoding from `body_hex`, matching the three existing sites in the same file. **Two further
-finds while fixing it:** the caller asked for a 60-day window and was being silently clamped to 31
-(now an exported constant, so the lie is gone), and the refit's throttle only applied *once a model
-existed* — so with an empty table it ran on every rollup, which was free at zero rows and would have
-become a ~43k-row / 503 KB read on **every ingest drain** after this fix. Now throttled on attempt.
-That was a regression this fix would have introduced, caught by asking what the change costs on the
-path it runs on. Both silent bails now report into `stepErrors`.
-
-**Verified:** a DB-backed test drives real production hex through the real repository function to a
-model that actually fits (60 rows → 150 samples → finite coefficients); reverting the one-line
-filter reproduces the production numbers exactly (0 rows, 0 samples).
-
-**⚠️ Not verified — whether it fits on the owner's real data.** The test proves the chain, not that
-31 days of the owner's nights clear `MIN_TRAINING_SAMPLES = 50` with enough variance for a
-non-singular system. The refit runs inside the ingest rollup, so this resolves on the next drain.
-**Worth re-checking after a day:** `oura_daytime_hrv_model` should have a row, and device-metrics
-should stop returning `{"days": []}`. If it still refuses, the new `stepErrors` message names which
-reason — which it never did before.
 
 ### [platform] ✅ Data-collection gap sweep — every table counted and dated (2026-08-05)
 
