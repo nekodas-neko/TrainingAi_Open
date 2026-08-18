@@ -1211,6 +1211,102 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
+### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
+
+- **Branch:** `fix/inline-centred-line-budget`
+- **Added:** 2026-08-18 · owner, on v1.324.6 with the style selected: *"I dont see the B2 default we
+  wanted... where is my b2 default? should of shipped?"* It **did** ship (Q-397, #105) and is
+  correctly the default and correctly selected. It just draws no ingredients.
+- **Lane B.** One constant in `components/nutrition/meal-label-render.ts`. No schema, no route.
+
+**Proven arithmetic, not a data problem.** `drawSquareCentredLabel` walks the column top-down and
+then asks how many 8-unit lines fit above the code:
+
+```
+L = (189 − 137) / 2 = 26        bottom = 189 − 26 = 163
+y  = 30 (L+4)
+  + nameSize(12) + 7            →  49
+  + caloriesSize(21) + 6        →  76
+  + macroSize(7.5) + 5          →  88.5
+  + rule gap(8)                 →  96.5
+codeTop  = 163 − 0 − codeUnits(66) = 97
+maxLines = floor((97 − 96.5 − 2) / 8) = floor(−0.19) → clamped to 0
+```
+
+**Zero lines, and it is not marginal — it is negative.** `fitText` shrinking a long name does not
+rescue it: at nameSize 12/10/8/6/**4** the answer is 0 every time, because the name contributes at
+most 12 of the 66.5 units consumed. For **one** line the code box must be **≤ 56.5 units**; it ships
+at **66**.
+
+**The tell was in the spec's own comment.** It reasons *"58 units is what the stack can spare once
+name, calories, macros and five ingredient lines have taken their height"* — and the value shipped is
+66. But 58 does not fit either (it yields 0 lines as well); the budget was computed against a
+different set of gaps than the ones drawn. **Do not simply set it to 58.**
+
+**Confirming symptom, visible in the owner's screenshot:** the sheet's *"Printing N ingredients"* line
+is absent. That copy is gated on `metrics.ingredientLines > 0`, so the renderer is already reporting
+0 — the plumbing works and is telling the truth. `savedMealToIngredients` is **not** the fault; the
+local store joins `food_items` and populates `foodItem`, and the per-portion calories on the label
+(208 kcal, P 32 C 8 F 5) prove the items resolved.
+
+**What to fix, in order of preference.**
+1. **Recompute the budget from the drawn gaps rather than guessing a constant.** Derive `codeUnits`
+   from the space actually left (`bottom − y − reserved lines × 8`) so the code takes what remains
+   after N lines, instead of a hardcoded box the layout cannot honour.
+2. If a fixed constant is kept, it must be **≤ 56.5 for one line, ≤ 40.5 for three** — and three is
+   what the style promises. 40.5 units is a 10.7 mm box, symbol ~8.1 mm, **~0.32 mm per module**,
+   which is *below* the 0.487 that `band` shipped with. **That is the real finding:** the centred
+   stack cannot carry the full list *and* a better code than the old default, so one of the two has
+   to give. The mockup that promised both was drawn at tighter type (6.5 px list, smaller headline,
+   smaller gaps) than the spec that shipped.
+3. **Whatever is chosen, the picker copy must match it.** "The full ingredient list" is currently
+   false, and a style that quietly prints fewer lines than it claims is how this was missed.
+
+- **Regression test, and it is cheap:** `meal-label-code-size.test.ts` already exists. Add a case
+  asserting `ingredientLines >= 1` for a two-ingredient meal in every style whose spec sets
+  `ingredients: true`. A style that claims a list and draws none should fail CI, not a test print.
+- **Verification:** the preview must show the ingredient run **and** the "Printing N ingredients"
+  line, then a physical print at 50 mm.
+
+### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
+
+- **Branch:** `fix/label-save-to-gallery`
+- **Added:** 2026-08-18 · owner, on v1.324.6: *"the share button doesnt do anything - it should give
+  a download to gallery/images when clicking it."*
+- **Lane A** if it needs a Capacitor plugin or a Kotlin bridge (it does — see below), which also
+  means **a new APK**. State that in the PR: this half does not reach the device through a Railway
+  deploy.
+
+**Why it does nothing.** `meal-label-sheet.tsx` has two paths and both miss on the canonical runtime:
+1. `navigator.canShare?.({ files: [file] })` — share-*with-files* is narrower than share-with-text
+   and is not reliably available in the Samsung WebView, so the guard correctly returns false and
+   falls through. The guard is right; there is just nothing behind it.
+2. The fallback is `<a download>` on a blob URL — and **the code's own comment says this is
+   unreliable inside the WebView**, which is why it was written as the fallback. It is a silent
+   no-op there: no error, no file, no toast. Exactly what the owner reports.
+
+So the feature has only ever worked in `pnpm dev`. This is the failure class CLAUDE.md names
+directly — green on web, dead on the device, because the failing path is unreachable in the sandbox.
+
+**What to build.** A native save, not a better guess at a web API.
+- Write the PNG with **`@capacitor/filesystem`**, then make it visible to the gallery. On Android a
+  file written to app storage is invisible to the Photos app until it is registered with
+  **MediaStore** — writing to `Directory.Documents` and hoping is the trap here. Either use a
+  community MediaStore plugin or add a small Kotlin bridge beside `OuraBlePlugin`.
+- Keep the **share sheet** as a second, explicitly-labelled action: saving to the gallery and handing
+  the PNG to a label-printer app are different intents, and the owner asked for the first. One button
+  doing whichever happens to be available is what produced this bug.
+- **Fail loudly.** Every branch ends in a toast — saved, shared, or failed. A silent path is what made
+  this invisible for a release.
+
+- **⚠ Do not "fix" this by removing the `canShare` guard.** Calling `navigator.share` with files where
+  it is unsupported rejects, and the existing catch swallows `AbortError` — which would turn a dead
+  button into a dead button that also lies in the log.
+- **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
+  Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
+- **Related:** the label this saves is currently missing its ingredient list — **Q-399**. Fix that
+  first or the first file that lands in the gallery is the wrong artwork.
+
 ### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 
 - **Branch:** `feat/meal-plan-to-saved-meals`
