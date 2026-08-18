@@ -133,7 +133,15 @@ isBodyMetadataFresh   : False
 ### What that costs, per call site
 
 - **`app/session-select/session-select-content.tsx:514`** — `if (!isBodyMetadataFresh(data)) return;`
-  is an **early return**, and `setMetaLoading(false)` sits below it. The loading state never clears.
+  is an **early return**, and one `setMetaLoading(false)` sits below it.
+
+  > **Corrected 2026-08-18 while fixing Q-478.** This said *"the loading state never clears"*. It
+  > does — `fetchMeta` has a **second**, unconditional `setMetaLoading(false)` after the `await
+  > cachedFetch(...)` (`session-select-content.tsx:522`), so the skeleton clears when the network
+  > round trip lands. What the early return actually costs is the *instant* clear on the cache hit,
+  > so the skeleton lingers for a round trip instead of not at all. Still a real regression against
+  > the instant-paint rule, and still fixed by passing `tz`; but it is a slow paint, not a stuck one,
+  > and the stronger claim would have had the next reader looking for a hang that is not there.
 - **`app/health/health-content.tsx:194`** — today's metrics and active energy are set inside the
   guard, so they are never set: the Health screen's today values stay blank while the data sits in
   the response.

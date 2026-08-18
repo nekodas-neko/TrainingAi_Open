@@ -21,7 +21,14 @@ const BASELINE = {
   'components/workout-screen.tsx': 1850,
   'app/session-select/session-select-content.tsx': 1457,
   'components/config-screen.tsx': 997,
-  'app/health/health-content.tsx': 911,
+  // Raised 2026-08-18 (Lane B, Q-478): 911 -> 912. Net +1 after paying for what could be paid
+  // for — the file's two `@/app/api/body-metadata/route` type imports were merged, reclaiming a
+  // line against the two this needed (`useUserTimezone` + `const tz`). The remaining line buys
+  // the screen the user's actual timezone: without it `isBodyMetadataFresh` compares a
+  // server-stamped date to Brisbane's, and today's metrics and active energy stay blank for
+  // 14 hours a day for a New York user. There is no smaller shape — a hook cannot be called
+  // from inside the callback that needs its value.
+  'app/health/health-content.tsx': 912,
   'components/config/program-editor-sheet.tsx': 963,
 };
 

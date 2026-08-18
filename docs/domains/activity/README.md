@@ -19,6 +19,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-18-cross-user-isolation.md`](../../reviews/2026-08-18-cross-user-isolation.md) — **cross-user isolation, driven with two real accounts, 2026-08-18** (**10 of 11 probes rejected by the route's own ownership check**, including logging a set into another user's session and completing their workout; **the enumeration control passed** — a nonexistent id and another user's id return byte-identical responses. Q-556 — `DELETE /api/activity-logs` returns `200 {"success":true}` for a row it did not delete; **verified not a leak**, the row is intact, but it is inconsistent with every sibling and a false 2xx confirms an outbox mutation away). **The first run reported eleven clean results and proved almost nothing** — six hit routes that do not exist, and an HTML 404 reads exactly like an access-control pass.
 - [`docs/reviews/2026-08-18-known-issue-duplication.md`](../../reviews/2026-08-18-known-issue-duplication.md) — **a Known Issue in two lists at once, 2026-08-18** (Q-553 — **Q-139 read `🔴 OPEN` in `projectOverview.md` and `✅ fixed` in the resolved archive for ten days**, 69 lines describing a bug fixed 2026-08-08; **Q-81** was a byte-identical 31-line entry in both. Both were also **archived early** — the rule forbids moving while a device check is owed, and both name one. Fixed here, and now enforced by `scripts/check-known-issue-duplication.js`, step 41 of 41.)
 - [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](../../reviews/2026-08-18-server-only-writes-to-local-first-domains.md) — **the activity delete audited end to end, 2026-08-18** (Q-488 — it updates the server and the caches but never the local store, so session-select, nutrition and the activity-history card keep showing the deleted activity until the next pull; self-heals via the tombstone). The Health Connect metrics PATCH is also server-only but its full pull chain checks out.
 - [`docs/reviews/2026-08-15-comprehensive-app-review.md`](../../reviews/2026-08-15-comprehensive-app-review.md)
@@ -52,6 +53,15 @@ grep -n '\[activity\]' docs/implementation-backlog.md   # no queue items today
 ```
 
 Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
+
+- ⛔ **Q-488 — the activity delete never updates the local store, and the obvious fix is a no-op.**
+  Re-scoped 2026-08-18 and handed to Lane A: `lib/local-store` has no `deleteActivityLog`, and
+  `upsertActivityLog` omits `deleted_at` from both its INSERT list and its `ON CONFLICT DO UPDATE
+  SET`, so stamping `deletedAt` on a read-merged record type-checks and changes nothing. The fix
+  needs a local-store method first, then four lines in `app/health/health-content.tsx`. Evidence and
+  the reverted dead end:
+  [`the journal entry`](../../overview/entries/2026-08-18-local-first-write-rule-and-journal-sweep.md).
+  The rule it broke is now in `CLAUDE.md`'s Offline-First section.
 
 - ✅ **The activity detail sheet's HR chart, zone breakdown and HR-coloured route line had never
   rendered** for any activity (found + fixed 2026-08-09, v1.276.1) — a validation-gate mismatch on

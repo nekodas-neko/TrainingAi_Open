@@ -28,7 +28,7 @@ function getLastTrainedLabel(session: ProgramSession, tz: string): string {
     if (!data) return "";
     const exercises: Array<{ lastDate: string | null; loggedTodayInSession?: boolean }> = data.exercises ?? [];
     if (exercises.length === 0) return "";
-    if (isWorkoutDataToday(data) && exercises.some((e) => e.loggedTodayInSession)) return "Trained today";
+    if (isWorkoutDataToday(data, tz) && exercises.some((e) => e.loggedTodayInSession)) return "Trained today";
     const todayKey = dayKeyInTz(tz, 0);
     const dates = exercises
       .map((e) => e.lastDate)

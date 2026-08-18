@@ -78,17 +78,43 @@ different ways. Both are mechanical; neither is obvious until it happens.
    link inside the entry loses a level when it moves. Missing this left 6 broken links pointing one
    directory too high.
 
-**The floor is measurably rising — second sweep, 2026-08-18 (same day).** 62 entries, of which
-**41 were linked** by a durable doc and only 21 were foldable, so the sweep went 62 → 41 where the
-first went 61 → 32. Nine days' worth of new entries arrived and the *linked* count grew by nine.
-The runaway limit is 60, so on this trend the next sweep clears fewer than it needs to and the one
-after that clears nothing. This is now a dated problem, not a theoretical one.
+### The limit now counts foldable entries, not all of them (changed 2026-08-18)
 
-**The standing tension worth naming:** a fold-everything sweep and durable docs linking entries are
-incompatible, and today the docs win — which means the loose directory has a floor that grows.
-Resolving it properly means either the sweep rewriting citations to the history file it folded into
-(with an anchor), or durable docs citing the batched history rather than a loose entry. Not decided;
-recorded so the next sweep does not rediscover it from a red CI run.
+**Third and fourth sweeps, 2026-08-18 (same day again).** Another lane swept 61 → 41 concurrently
+with this one: 20 of 61 unlinked, and **the floor held at 41** across both, so the rise predicted
+above did not continue on those runs and the trend is not a straight line. What did not change is the
+arithmetic — limit 60, floor 41, so the whole directory has **19 files of headroom**, which measured
+out at roughly twenty minutes on the busiest stretch of the day and about half a day at the average
+rate.
+
+**Why the floor held, measured on that same third sweep — and the lever it gives you.** The eleven
+entries added between the second sweep and the third were all **Review** sweeps, and Review links its
+**`docs/reviews/…` write-up** from the domain indexes while leaving the **journal entry itself
+unlinked**. So the linked floor tracks *durable-doc citations*, not entry count: a session that cites
+its review or handoff document costs the floor nothing, while one that cites its loose journal entry
+raises it permanently.
+
+**That makes the fix cheaper than either option in the tension below:** when a durable doc needs to
+cite a session, **cite the review/handoff document, not the loose journal entry**. No sweep rewriting,
+no re-pointing of existing citations — just a habit that stops the floor growing from here.
+
+**Why sweeping harder could not fix it in the meantime.** The linked entries are a floor, not
+growth, and the guard was counting them — so it fired on a condition its own prescribed remedy is
+forbidden to touch. That is not a guard, it is a periodic outage, and it lands on every lane at once
+because a journal entry rides in *every* feature PR. It did exactly that twice in one day.
+
+**So the guard changed too, and the two fixes are complementary.**
+`scripts/check-doc-index-size.js` now applies the 60 limit to the **unlinked** count — exactly what a
+sweep clears. The citation habit above stops the floor rising; this stops the existing floor blocking
+CI while that habit takes effect. It still catches what the guard was written for: if nobody sweeps,
+unlinked entries pile up and it fires (verified by simulating 61 against the real floor). A separate
+ceiling of **250 total** keeps the original 509-file readability failure caught, and its message says
+plainly that a sweep alone will not fix that one.
+
+**The older framing, kept for the record:** this used to be described as an undecided choice between
+the sweep rewriting citations into the history file, or durable docs citing the batched history. The
+citation habit above is cheaper than either and needs no retrofit, so that is the answer unless the
+floor starts rising again from a source other than journal citations.
 
 This is a standing chore in the same spirit as Dependabot remediation: it lives here permanently and
 is worked on a threshold, not every session. Below threshold, leave the entries; above it, compact.

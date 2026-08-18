@@ -107,7 +107,7 @@ export function GoalsSection({ user, onUserSaved }: GoalsSectionProps) {
         recent?: { date: string; weightKg: number | null; bodyFat: number | null }[]
         weekToDate?: { steps: number; calories: number; waterMl: number } | null
       } | null) => {
-        if (isBodyMetadataFresh(d)) {
+        if (isBodyMetadataFresh(d, user?.timezone)) {
           if (d?.today) setTodayMeta({ steps: d.today.steps ?? null, waterMl: d.today.waterMl ?? null, calories: d.today.calories ?? null })
           setWeekToDate(d?.weekToDate ?? null)
         }

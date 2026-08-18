@@ -294,6 +294,9 @@ jobs:
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 
+      - name: Cache today-guards take the user's timezone
+        run: node scripts/check-tz-aware-cache-guards.js
+
       - name: Non-strict request schemas do not increase
         run: node scripts/check-strict-request-schemas.js
 

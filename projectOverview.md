@@ -69,6 +69,30 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [activity][platform] 🟢 Cross-user isolation holds; one route reports a success it did not perform (Q-556, 2026-08-18)
+
+- **The last reachable "structurally untested" item — a second account — driven for real.** The local
+  harness already had a zero-data account with a saved session, so it needed no new infrastructure.
+  **Third time this run an "unreachable" surface was not.**
+  [`docs/reviews/2026-08-18-cross-user-isolation.md`](docs/reviews/2026-08-18-cross-user-isolation.md).
+- **✅ 10 of 11 probes rejected by the route's own ownership check** — reading A's recap/energy/timing,
+  deleting A's workout, **logging a set into A's session**, completing A's workout. **And the
+  enumeration control passed:** a nonexistent id and A's id return byte-identical responses, so no
+  route confirms which ids exist.
+- **🟢 Q-556 — `DELETE /api/activity-logs` returns `200 {"success":true}` for another user's row.**
+  **Not a leak, and that was checked:** the DB immediately after shows the row intact, `deleted_at`
+  NULL, still A's. The repo method returns `void`, so the handler cannot know and answers success
+  unconditionally. Filed because it is **inconsistent with every sibling** (house posture is 404 for
+  both cases) and because **offline-first makes a false success expensive** — a 2xx confirms and drops
+  an outbox mutation. That second path was **not demonstrated**.
+- **⚠️ The first run of this sweep reported eleven clean results and proved almost nothing** — six hit
+  routes that do not exist (HTML 404s, which read exactly like an access-control pass) and one failed
+  schema validation first. **A 404 from an unmatched route is not evidence of access control**, and the
+  tell was in the body, not the status.
+- **Not exercised:** one probe (`PATCH …/metrics`) still failed validation, so that check is unverified.
+  Local DB + web build; not production, not device; two accounts only.
+
+
 ### [app-shell][platform] 🟢 Offline read surfaces work; a tab tap is a silent no-op only before the SW claims (Q-555, 2026-08-18)
 
 - **The offline paths were driven for real for the first time** — this role's baton had listed them as
@@ -894,13 +918,18 @@ order.
   highlights **Tue**, on a day that was Wednesday the 19th for that user. Source is
   `calendar-widget.tsx:110`, `localDateString()` — the **device's** zone, a *third* answer following
   neither the setting nor the server. `CLAUDE.md` warns of two client "today" sources; there are three.
-- **Q-478 is the sharp, cheap half — do it first.** `isWorkoutDataToday` and `isBodyMetadataFresh`
-  (`lib/sqlite/cache.ts:361,369`) compare a **server-stamped** date to a **client `DEFAULT_TZ`** date,
-  so they return false for |Δoffset| hours a day — **14 hours a day for a New York user**. Confirmed
-  false against a live response with a real row planted on the user's true today. Consequences:
-  session-select's early return leaves `setMetaLoading(false)` unrun (**loading state never clears**),
-  Health's today values never set, the workout screen strips `loggedTodayInSession` from every
-  exercise, and the "Trained today" badge never appears.
+- **✅ Q-478 SHIPPED 2026-08-18 (v1.324.8) — the sharp, cheap half is done.** `isWorkoutDataToday` and
+  `isBodyMetadataFresh` compared a **server-stamped** date to a **client `DEFAULT_TZ`** date, so they
+  returned false for |Δoffset| hours a day — **14 hours a day for a New York user** — leaving Health's
+  today values unset, the workout screen stripping `loggedTodayInSession` from every exercise, and the
+  "Trained today" badge absent. Both now take a `tz`, all nine call sites pass one, and
+  `scripts/check-tz-aware-cache-guards.js` fails Custom Rules on a call that does not.
+  [`Journal`](docs/overview/entries/2026-08-18-tz-aware-cache-guards.md). Two corrections to the
+  original finding, both made in place: session-select's skeleton **does** clear — a second
+  unconditional `setMetaLoading(false)` runs after the await, so the cost is a round-trip-long skeleton,
+  not a stuck one; and `unwrapToday`/`cachedFetchToday` were deliberately left alone (client-written,
+  client-read, self-consistent). **The rest of this row — Q-477 — is still open**, including its
+  ratchet on bare `todayInTz()` across client code, which this narrower check does not provide.
 - **Nothing is missing except the argument.** `useUserTimezone()` is a context available tree-wide and
   `goals-section.tsx:114` already uses it correctly. In `workout-select-content.tsx`, lines 31 and 32
   sit inside a function that *takes* `tz`: line 32 uses it, line 31 cannot, because the helper has no
@@ -7810,7 +7839,7 @@ append-only session journal and the batched archives live under `docs/`:
 | `docs/overview/entries/` | **Recent journal (uncompacted)** — one file per PR/session (`YYYY-MM-DD-<slug>.md`); read these + the newest history file for "what happened lately". Folded into the batched history by the compaction sweep — see the README there. **Corrected 2026-07-30:** this line said "near-empty (compacted 2026-07-20)" but the directory holds ~179 files from 07-20→07-29 — the compaction sweep is overdue; a future session should run it. |
 | [`docs/agents/README.md`](docs/agents/README.md) | **The standing agents** — the four roles, their authority, the two-lane file-ownership contract, the Q-number bands, and the handoff protocol. Cold-start prompts in `docs/agents/prompts/`, live batons in `docs/agents/state/` |
 | `docs/overview/status-archive.md` | The 157 dated status notes that had accumulated in this file's Current Status section, archived 2026-08-17. Superseded by the journal; do not add to it |
-| `docs/overview/history-2026-08-15.md` … `history-2026-07-17.md` | **Completed journal (batched)** — nine files covering 2026-07-17 → 2026-08-15, folded from 498 loose entries by the 2026-08-17 compaction sweep, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from |
+| [`docs/overview/history-2026-08-18.md`](docs/overview/history-2026-08-18.md) … `history-2026-07-17.md` | **Completed journal (batched)** — ten files covering 2026-07-17 → 2026-08-18, folded from 498 + 41 loose entries by the 2026-08-17 and 2026-08-18 compaction sweeps, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from. `history-2026-08-18.md` was started because `history-2026-08-15.md` had passed the ~250 KB rule at 300 KB |
 | `docs/overview/history-2026-07-20.md` | **Completed journal (batched)** — the 2026-07-17 → 2026-07-20 loose entries, compacted 2026-07-20, newest at top |
 | `docs/overview/history-2026-07-16.md` | **Completed journal (batched)** — sessions 2026-07-16 → 2026-07-17, newest at top |
 | `docs/overview/history-current.md` | Sessions ~287 → 2026-07-16 (closed batch) |
