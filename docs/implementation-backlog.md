@@ -687,6 +687,76 @@ below threshold and left in place for next time.
   cannot be edited by accident — is best solved as part of this, not separately.
 - **Verification:** device-only. None of it is checkable from the sandbox.
 
+### [workouts][platform] Q-460 — the session-RPE route reports success for a write that matched nothing, and the sync path then discards the mutation
+
+- **Branch:** `fix/session-rpe-affected-row-check`
+- **Added:** 2026-08-18 · review sweep (workout write path, **measured against a second live account**) ·
+  [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)
+- **Placement:** upper-mid. A silently dropped write on the canonical runtime, with no error surface
+  and nothing left to retry.
+- **Measured three ways, live.** `POST /api/workout-sessions/rpe`:
+
+  | Call | Result | Row after |
+  |---|---|---|
+  | user B → user A's real session | `200 {"success":true}` | A's `session_rpe` **still NULL** |
+  | fabricated UUID (`…0000deadbeef`) | `200 {"success":true}` | no such row |
+  | A → A's own session (control) | `200` | written |
+
+- **The security half is CORRECT — do not file this as a leak.** `setSessionRpe`
+  (`lib/data/postgres/adapter.ts:814`) scopes the UPDATE with
+  `and(eq(id, …), eq(userId, …))`, so the cross-user call matched zero rows and changed nothing.
+- **What is missing is `CLAUDE.md` rule (a):** the affected-row count is never checked.
+  `app/api/workout-sessions/rpe/route.ts` ends:
+  ```ts
+  await repo.setSessionRpe(userId, parsed.data.workoutSessionId, parsed.data.sessionRpe)
+  return NextResponse.json({ success: true })
+  ```
+- **On device it is worse than a wrong status code.** `components/workout/done-screen.tsx:160-167`
+  writes locally and queues a `session_rpe` outbox mutation; `pushMutations`
+  (`adapter.ts:4105-4112`) does `await this.setSessionRpe(...)` then **`processed++` unconditionally**.
+  A mutation whose session row is absent server-side — not yet synced, deleted from another device, or
+  an id that drifted — is **counted as processed and removed from the outbox**. Local keeps the RPE,
+  the server never gets it, nothing retries. Permanent divergence, no error surface.
+- **Fix shape:** return the affected-row count from `setSessionRpe` and act on it in both callers —
+  the route with a 404, the push branch by pushing to `errors` so the client's bounded-retry /
+  dead-letter path can see it. **Lane A** (adapter + route).
+- **Do NOT "fix" its neighbour by copying this.** `setWorkoutSessionWarmupEnd` (`adapter.ts:820`) also
+  matches zero rows sometimes and that is **correct** — it carries `isNull(warmupEndedAt)`, so zero
+  rows means "already set". The question to ask of each is whether zero rows is an expected idempotent
+  outcome or an error.
+- **NOT device-verified** — reproduced on the web build; the outbox half is read from source, not run.
+
+### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
+
+- **Branch:** `fix/start-set-bounce-blocks-automation`
+- **Added:** 2026-08-18 · review sweep (workout write path) ·
+  [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)
+- **Placement:** mid. **This is a testability finding, not a user-facing defect** — a human tapping a
+  bouncing button is entirely unaffected, and the entry must not be implemented as if the animation
+  were broken.
+- **Observed.** Driving a real workout in Playwright at 412×915, every step worked — select,
+  pre-workout, warm-up, Begin Exercises, Start Set 1, Log Set 1 — then `Start Set 2` **hung to the
+  300 s test timeout**. The locator resolved; the click never completed. Proven:
+  ```
+  ##CLASS  … transition hover:opacity-90 active:scale-95 animate-bounce
+  ##ANIM   bounce | infinite
+  ##NORMAL BLOCKED: TimeoutError: locator.click: Timeout 8000ms exceeded
+  ##FORCED CLICKED     → screen advanced to "2 … ▶ active"
+  ```
+- **Cause.** Playwright's actionability check needs a stable bounding box for two consecutive frames;
+  an infinite CSS animation never gives one. This is the W1 bounce `CLAUDE.md` documents by design
+  (*"Start button `animate-bounce` when `workoutPhase === 'rest'`"*).
+- **Why it matters anyway.** The repo has just built an E2E harness to catch regressions (Q-249,
+  extended by Q-352's zero-data account), and **the app's core write path cannot be driven by it past
+  the first set.** The two worst findings of the preceding week — Q-450's silently discarded activity
+  and Q-451's dead first-run button — were both exactly the shape an E2E spec catches.
+- **`force: true` is not the fix.** It bypasses *all* actionability checks including "is this covered
+  by an overlay", so a spec written that way would keep passing straight through a real regression.
+- **Fix shape (Lane B):** gate the animation on something a test can turn off — honour
+  `prefers-reduced-motion` (Playwright sets it via `contextOptions`), or suppress the bounce when a
+  test hook is present. Keep the affordance on device; make the control automatable. A spec covering
+  log-set → complete-workout is the follow-on this unblocks.
+
 ### [platform] Q-353 — the health-insight prompt says "no data" where it means "absent", and the model reads it as zero
 
 - **Branch:** `fix/ai-insight-prompt-absent-vs-zero`
@@ -792,6 +862,30 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Surface: device required.** Every claim here is code-traced or from ingested-event counts;
   **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
   and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
+
+### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
+
+- **Branch:** `fix/log-exercise-ownership-error-status`
+- **Added:** 2026-08-18 · review sweep (workout write path) ·
+  [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)
+- **Placement:** low. **The block is correct; only the reporting is wrong.**
+- **Observed.** `POST /api/log-exercise` as user B carrying user A's `workoutSessionId` returns
+  `500 {"error":"Failed to log exercise"}`. **Nothing was written** — A's session kept exactly its
+  original exercise log and B gained no session — because the guard fires:
+  ```
+  [log-exercise] logExerciseFromPayload threw Error: ensureWorkoutSession:
+    session 3fbf3d8a-… is not owned by user 1d7059d1-…
+      at PostgresWorkoutRepository.ensureWorkoutSession (adapter.ts:794)
+  ```
+- **So rule (c) is honoured.** The defect is that a permanent, correctly-refused condition is reported
+  as a **transient server error** and logged with a full stack trace as though the server faulted.
+- **Two mitigations keep this low — both checked, not assumed.** It is **unreachable through the UI**
+  (the client only ever sends a session id it created), and the sync path does **not** retry it
+  forever: `pushMutations` wraps each mutation in its own `try/catch` (`adapter.ts:4333-4338`) that
+  records to `errors` and continues, so the queue cannot wedge and `MAX_MUTATION_ATTEMPTS`
+  dead-letters it.
+- **Fix shape:** give `ensureWorkoutSession` a typed ownership error and map it to 403/404 at the
+  route, leaving 500 for genuine faults. **Lane A.**
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
@@ -2472,6 +2566,38 @@ session working from a temporarily restored copy.
 - **Follow-up:** re-derive the anchor on ~15 BLE-era nights. The fit is Cloud-era, and BLE overnight HR
   is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
+
+### [readiness][workouts] Q-504 — recalibrate the Readiness range, and re-anchor the five thresholds that ride on it
+
+- **Branch:** `fix/readiness-range-calibration` · **Lane:** A
+- **Added:** 2026-08-18 · Tuning · owner-directed range work ·
+  [`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](reviews/2026-08-18-sleep-score-range-recalibration.md) §6
+- **Not blocked on the owner** — they directed the range work explicitly. It is held only because of
+  blast radius, and the analysis is already done.
+- **Measured.** Even with v1.319.0's new Sleep Score feeding its `previousNight` term, readiness is
+  mean 68.9, sd 11.6, **IQR 64.4–75.7 (11 points)**, nothing above 87, nothing in the 30s or 40s.
+  Same structural cause as Sleep: a blend of nine contributors shrinks spread by ~1/sqrt(9).
+- **The fix is known and measured.** A `SCORE_CALIBRATION`-style transform on the composite, anchored
+  on its own percentiles (p2/p10/p25/p50/p75/p90/p98 -> 25/42/55/68/81/91/97), gives **mean 66.8,
+  sd 19.3, range 15–99, 4 days >= 90 and 6 below 50** — the owner's stated acceptance test.
+- **Why it is not shipped: five action thresholds ride on the readiness scale**, and the change moves
+  **12 of 26 days across at least one.** Days below each, now -> after: early-deload `<45` **1 -> 4**;
+  band `50` 1 -> 6; AI low-readiness `<60` 4 -> 8; band `70` 12 -> 15; rest-day "train hard" `>=75`
+  19 -> 17.
+  - The **band** moves (50, 70) are the intended outcome — more days reading "Low" is what a working
+    range looks like. Leave them.
+  - The **action** thresholds are not. Shipping as-is quadruples early-deload firing, which the owner
+    did not ask for. Re-anchor each to preserve its firing RATE, exactly as `LOW_SLEEP_SCORE`
+    60 -> 42 was handled in v1.319.0 (that PR's §5 is the worked example).
+- **Files:** `packages/shared/src/health/readiness-composite.ts` (the calibration),
+  `lib/health/readiness-payload.ts:47` (`EARLY_DELOAD_SCORE_MAX`),
+  `packages/shared/src/ai-periodization/ai-dynamic.ts:231`,
+  `packages/shared/src/health/rest-day-guidance.ts:36,46`, `lib/oura-models/inference/ots.ts:151`.
+- **Sequencing:** **Q-273 (model versioning) first, or stamp a readiness version in the same PR.**
+  Sleep shipped without one and its trend chart now has an unmarked step at the changeover — do not
+  repeat that on readiness. **Q-500 (Recovery Index anchor 6 -> 5) becomes lower priority** once this
+  lands: it was a 1-point correction aimed at the same range problem this fixes wholesale, and it
+  should be re-measured *after* this rather than stacked with it.
 
 ### [readiness][body] Q-502 — Body Battery's tuning substrate is a biased sample of each day
 

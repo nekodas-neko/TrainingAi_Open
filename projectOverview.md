@@ -69,6 +69,52 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [workouts][platform] 🟠 The workout write path probed cross-user for the first time — protection holds; a silent dropped write and an un-automatable core flow (Q-460…Q-462, 2026-08-18)
+
+- **The lens.** Every prior sweep of this pillar read the model (1RM, RPE, autoregulation, deload) or
+  swept `GET`. Nothing had probed the **mutations** — and `exercise_logs` and `set_logs` have **no
+  `user_id` column**, so every write that touches them depends on someone remembering to join up to
+  `workout_sessions`. Method, limits and the full tables:
+  [`docs/reviews/2026-08-18-workout-write-path.md`](docs/reviews/2026-08-18-workout-write-path.md).
+- **✅ The headline is the clean one: cross-user write protection holds.** A second live account
+  called every workout mutation against the owner's real row ids, and the owner's rows were re-read
+  from Postgres afterwards: `PATCH`/`DELETE /api/workout-entry` → **404**, `DELETE
+  /api/workout-sessions` → **404**, `/api/log-exercise` → **refused**, `ai-periodization/prescribe` →
+  **404**. Nothing crossed accounts. `workout-entry`'s `assertOwnership` is the documented
+  join-to-`workout_sessions` pattern done right. **A control was run for every probe** — the same call
+  by the owner on their own row returned 200 and actually changed the weights — because a 4xx proves
+  nothing if the body was malformed. That control caught one of my own probes being wrong mid-sweep.
+- **🟠 Q-460 — the session-RPE route reports success for a write that matched nothing.** A fabricated
+  session UUID returns `{"success":true}`. The security half is correct (the UPDATE is user-scoped and
+  matched zero rows); the missing piece is the affected-row check. **On device this is worse than a
+  wrong status code:** `pushMutations` does `setSessionRpe(...)` then `processed++` unconditionally, so
+  an RPE whose session row is absent server-side is **counted as processed and removed from the
+  outbox** — local keeps it, the server never gets it, nothing retries.
+- **🟠 Q-461 — the workout flow cannot be automated past set 1.** `Start Set 2` carries an infinite
+  `animate-bounce`, so Playwright's stability check never passes and the click hangs to the test
+  timeout (`animationIterationCount: infinite`; normal click blocked at 8 s; `force: true` clicks and
+  advances). **Not a user-facing defect** — a human taps a bouncing button fine. It matters because the
+  harness built to catch regressions (Q-249/Q-352) therefore cannot cover the app's core write path,
+  and the week's two worst findings (Q-450, Q-451) were exactly the shape an E2E spec catches.
+- **🟡 Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500.** `ensureWorkoutSession`
+  correctly refuses the write; the defect is reporting a permanent refusal as a transient fault, with a
+  stack trace. Kept low because it is unreachable through the UI **and** the outbox catches per
+  mutation rather than retrying forever — both checked, not assumed.
+- **Also clean:** the outbox cannot be wedged by one bad workout mutation (per-mutation `try/catch`,
+  the `CLAUDE.md` poison-pill rule implemented); and the flow itself runs end to end on the web build —
+  select → pre-workout → warm-up → active → set logging, correct rest countdown, RPE capture, live 1RM
+  and plate maths, with **zero uncaught page errors and zero failing `/api/` responses**.
+- **Two near-misses checked and cleared,** recorded so a later sweep does not re-raise them: the live
+  1RM's "▲ +2.00 kg" against a header reading 97.5 is **exact** (the stored PR is 98; the 97.5 is the
+  previous session's estimate), and the warm-up ramp labelling 70 kg as "92%" is a fixed target
+  percentage with the weight rounded to the loadable plate step, by design.
+- **NOT device-verified.** Web build only — `getLocalStore()` returns null, so the device's
+  local-write-plus-outbox path was never exercised and the Q-460 outbox half is read from source, not
+  run. Fresh local seed, so nothing here speaks to prod drift. Workout mutations only; the
+  program/phase-set/template routes were listed and **not** called, and rule (b) (raw bodies into
+  `.set()`) was **not** systematically audited.
+- **Nothing was fixed.** All three are queued.
+
 ### [app-shell][readiness] 🟢 Score presentation audited (Q-281) — the colour-only-state fix is NOT device-verified (2026-08-17)
 
 - **⚠️ Owed: open Home with the "Accent ring" style selected on the S25 and confirm the band word
@@ -806,6 +852,22 @@ not executed at all** — no failure was induced, and its table is reasoning fro
 finding is **one lifter's 569 sets**. Only 8 of 117 AI insights were read closely. The Play Store
 requirements in Q-287/Q-288 are asserted from knowledge and should be re-checked against Google's
 current policy before building.
+
+### [sleep] ⚠️ Sleep Score recalibrated to use its range — the trend chart has an unmarked step (Q-503, v1.319.0, 2026-08-18)
+
+Sleep averaged **87.4 with 27 of 35 days ≥ 85** and no night between 40 and 69. Recalibrated
+(nine curves re-anchored + a `SCORE_CALIBRATION` on the blend): over the same 65 nights it now reads
+**mean 69.5, sd 16.6, range 32–99**, every band populated. Two real defects fixed — scoring your own
+HRV/HR baseline returned 90/86, and the REM ceiling sat below the owner's median. `LOW_SLEEP_SCORE`
+re-anchored 60 → 42 so the rest-day hint fires at its old rate (6%) rather than 26%. Evidence:
+[`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](docs/reviews/2026-08-18-sleep-score-range-recalibration.md).
+
+**Still owed, which is why this is ⚠️ and not ✅:** historical `oura_daily_derived.sleep_score` rows
+keep their old values until each day is re-read, so the trend chart shows a **step at the changeover
+with older days ~15 points higher for model reasons, not physiological ones** — and sleep stamps **no
+`model_version`** (Q-273), so nothing in the data marks where it is. Also **not device-verified**, and
+the calibration is fitted to one sleeper's distribution (a per-user rolling calibration is the real
+fix). **Readiness has the identical problem and is NOT yet fixed — Q-504.**
 
 ### [readiness][sleep][activity][body] 🔴 The five scoring pillars, measured together against production for the first time — 14 findings (Q-271…Q-284, 2026-08-15)
 

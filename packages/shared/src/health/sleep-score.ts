@@ -58,27 +58,27 @@ function interp(x: number, pts: readonly (readonly [number, number])[]): number 
 // night lands in the 80s. Contributor *shapes* (isotonic durations, latency U-curve, circadian timing)
 // are unchanged. See docs/superpowers/plans/2026-07-22-core-score-cards-and-activity-overhaul.md (W-C).
 // Total sleep duration (hours) → sub-score. 100 at ~9h; 8h is excellent (~92); 7.6h normal-good (~86).
-const TOTAL_SLEEP = [[0, 0], [3, 10], [4, 22], [5, 42], [6, 60], [7, 76], [7.5, 84], [8, 92], [8.5, 97], [9, 100], [10, 99]] as const
+const TOTAL_SLEEP = [[0, 0], [3, 8], [4, 18], [5, 30], [6, 46], [6.5, 54], [7, 62], [7.5, 70], [8, 77], [8.5, 84], [9, 92], [9.5, 97], [10, 100]] as const
 // Sleep efficiency (%) → sub-score. 90% good (~82); 96%+ near-perfect.
-const EFFICIENCY = [[60, 8], [70, 26], [80, 52], [85, 66], [88, 76], [90, 82], [92, 90], [94, 96], [96, 100]] as const
+const EFFICIENCY = [[60, 5], [70, 20], [80, 38], [85, 50], [88, 60], [90, 68], [92, 76], [94, 85], [96, 93], [98, 100]] as const
 // REM / Deep duration (hours) → sub-score. 100 at realistic excellent stage hours (~1.8h REM, ~1.7h deep).
-const REM = [[0, 0], [0.4, 24], [0.75, 50], [1.1, 72], [1.5, 90], [1.8, 97], [2.2, 100]] as const
-const DEEP = [[0, 0], [0.4, 34], [0.75, 62], [1.1, 84], [1.4, 96], [1.7, 100]] as const
+const REM = [[0, 0], [0.4, 15], [0.8, 35], [1.1, 50], [1.4, 62], [1.7, 72], [2.0, 82], [2.3, 91], [2.6, 97], [3.0, 100]] as const
+const DEEP = [[0, 0], [0.3, 15], [0.5, 32], [0.7, 50], [0.9, 64], [1.1, 77], [1.3, 86], [1.5, 93], [1.8, 98], [2.0, 100]] as const
 // Sleep-onset latency (minutes) → sub-score. Non-monotone U-curve peaking at a TRUE 100 (~12 min):
 // both instant sleep (a sign of sleep debt) and a long time to fall asleep are penalised.
-const LATENCY = [[0, 78], [5, 92], [12, 100], [18, 97], [25, 86], [35, 70], [50, 50], [70, 30], [100, 12]] as const
+const LATENCY = [[0, 50], [5, 72], [10, 85], [14, 90], [20, 78], [28, 62], [40, 42], [55, 25], [80, 8], [100, 4]] as const
 // Sleep-timing: circular distance (hours) of the sleep midpoint from ~03:00 → sub-score. Peaks at a
 // TRUE 100 at a 03:00 midpoint (open_health's circadian finding, corr +0.91 with that ideal).
-const TIMING = [[0, 100], [0.75, 93], [1.5, 80], [2.5, 60], [3.5, 40], [5, 20]] as const
+const TIMING = [[0, 95], [0.5, 88], [1.0, 78], [1.5, 66], [2.5, 45], [3.5, 28], [5, 10]] as const
 // Overnight HRV (rMSSD ms) as a ratio to the personal baseline → sub-score. At/above your own norm
 // scores high (100 at ≥1.1×); a depressed night scores low. Opt-in: only added when a baseline is
 // supplied (see `opts.hrvBaselineMs`), so nights/callers without a baseline renormalise as before.
-const HRV_RATIO = [[0.6, 30], [0.75, 50], [0.85, 66], [1.0, 90], [1.1, 100], [1.4, 100]] as const
+const HRV_RATIO = [[0.6, 8], [0.75, 25], [0.85, 42], [0.95, 60], [1.0, 70], [1.1, 84], [1.2, 93], [1.35, 100]] as const
 // Overnight average HR as a ratio to the personal baseline → sub-score. LOWER is better (the mirror of
 // HRV_RATIO): a night spent at or below your own norm scores 100, an elevated night falls away fast.
 // This is the axis the 2026-07-25 night failed on (+10bpm against a 65.8bpm baseline) and that nothing
 // scored before. Opt-in via `opts.hrBaselineBpm`, same as `hrv`.
-const HR_RATIO = [[0.90, 100], [0.96, 100], [1.0, 86], [1.04, 68], [1.08, 50], [1.15, 26], [1.30, 6]] as const
+const HR_RATIO = [[0.85, 100], [0.90, 92], [0.95, 82], [1.0, 70], [1.04, 55], [1.08, 40], [1.15, 20], [1.30, 4]] as const
 // Schedule deviation (hours) from the sleeper's habitual bed/wake times → sub-score.
 //
 // Two deliberate choices, both visible in the 2026-07-25 night:
@@ -90,7 +90,7 @@ const HR_RATIO = [[0.90, 100], [0.96, 100], [1.0, 86], [1.04, 68], [1.08, 50], [
 //    behaviour), and whatever it costs is already priced by `totalSleep` and `timing`. Scoring it
 //    symmetrically marked 2026-07-27 down from 94 to 89 for the crime of an early night after a bad
 //    one, which is the opposite of the intended signal.
-const SCHEDULE_DEV = [[0, 100], [0.5, 97], [1.0, 88], [1.5, 74], [2.5, 50], [4, 22]] as const
+const SCHEDULE_DEV = [[0, 100], [0.4, 92], [0.8, 82], [1.2, 70], [1.8, 55], [2.5, 40], [4, 15]] as const
 // `restlessPeriods` is deliberately NOT scored (audit finding Q-3). The column holds two
 // incommensurable quantities: Cloud-era nights carry Oura's own restlessness measure (138–330 in
 // this history) and BLE nights carry `model.awakenings` (0–5). One curve cannot serve both, and the
@@ -125,6 +125,34 @@ const AWAKE_PENALTY = [[0, 0], [0.05, 4], [0.1, 10], [0.2, 22], [0.35, 38]] as c
 // standard deviations from the sleeper's own trailing mean so it self-calibrates per person
 // rather than assuming a fixed fraction is universally abnormal.
 const AWAKE_FRAGMENTATION_CAP = [[0, 100], [1, 100], [1.5, 88], [2, 72], [2.5, 52], [3, 32], [4, 15]] as const
+
+// Final calibration — maps the weighted blend onto the usable 0–100 range (2026-08-17, owner-directed).
+//
+// The contributor curves decide the RANKING of nights; this decides the RANGE. They are separate
+// problems and the curves alone cannot fix the range, for a structural reason: the blend averages
+// ten contributors, so its spread shrinks by roughly 1/sqrt(10) against theirs. Measured over the
+// owner's 65 main sleeps, the pre-calibration blend put its **interquartile range inside 6 points**
+// (86–92 on the old curves, 74–81 after recalibrating them) — half of all nights landing in a band
+// six points wide, which is why every night read "high" and nothing discriminated. Re-shaping the
+// contributor curves moved the mean down and left the spread almost unchanged (sd 15.9 -> 14.9);
+// only a transform on the blend itself widens it.
+//
+// Anchored on the owner's own measured blend percentiles (p2/p10/p25/p50/p75/p90/p98), mapped onto
+// 33/48/58/70/82/91/97. Result over the same 65 nights: mean 69.5, sd 16.7, range 33–99, with
+// 7 nights >= 90 and 9 below 50 — a night in every band instead of 51 of 67 above 85.
+//
+// TWO PROPERTIES TO KNOW BEFORE TOUCHING THIS:
+//  - It is fitted to ONE sleeper's distribution. Another user inherits this person's percentiles,
+//    which is wrong for them in proportion to how differently they sleep. A per-user rolling
+//    calibration is the real fix; this is the owner-only step toward it (canonical runtime is the
+//    owner's device). Refit, don't nudge, if the owner's sleep pattern genuinely shifts.
+//  - It AMPLIFIES noise in the steep middle: around the median, ~4 points of blend become ~12 points
+//    of displayed score. That is the deliberate cost of range — two similar nights now read
+//    differently. If that reads as jitter rather than signal, flatten the 74–85 segment first.
+// The 93 anchor keeps a genuinely perfect night able to reach a true 100 (the session-245 intent,
+// guarded by tests). The owner's best real night blends to 91, so 100 stays reserved rather than
+// reachable by a merely-excellent one.
+const SCORE_CALIBRATION = [[0, 0], [20, 18], [34.6, 33], [50, 41], [65.4, 48], [74, 58], [78, 70], [81, 82], [85.6, 91], [88.7, 97], [91, 99], [93, 100]] as const
 
 const clamp100 = (n: number) => Math.max(0, Math.min(100, n))
 
@@ -204,6 +232,7 @@ export const SLEEP_MODEL = {
     scheduleWorstEndpointDeviationHours: SCHEDULE_DEV,
     awakeFractionPenalty: AWAKE_PENALTY,
     awakeFractionFragmentationCapByPersonalSd: AWAKE_FRAGMENTATION_CAP,
+    scoreCalibration: SCORE_CALIBRATION,
   },
   hrBaselineMinNights: SLEEP_HR_BASELINE_MIN_NIGHTS,
   scheduleMinNights: SLEEP_SCHEDULE_MIN_NIGHTS,
@@ -423,7 +452,10 @@ export function computeSleepScore(
   }
 
   const totalWeight = parts.reduce((s, p) => s + p.weight, 0)
-  const preCapScore = clamp100(Math.round(parts.reduce((s, p) => s + p.weight * p.sub, 0) / totalWeight))
+  const blend = parts.reduce((s, p) => s + p.weight * p.sub, 0) / totalWeight
+  // Calibration runs BEFORE the fragmentation cap: that cap's anchors (100/88/72/52/32/15) are
+  // written on the displayed 0–100 scale, so it has to compare against a calibrated value.
+  const preCapScore = clamp100(Math.round(interp(blend, SCORE_CALIBRATION)))
 
   const components: Record<string, number> = {}
   for (const p of parts) components[p.key] = Math.round(p.sub)
