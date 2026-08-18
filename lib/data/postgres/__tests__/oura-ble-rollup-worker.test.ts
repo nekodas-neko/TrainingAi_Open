@@ -150,8 +150,12 @@ describe.skipIf(!canRun)('BLE rollup worker (Q-213 Stage 2)', () => {
     expect(phases.aggregateError).toBeNull()
     expect(phases.redecoded).not.toBeNull()
     expect(phases.aggregated).not.toBeNull()
-    // It really walked the rows rather than returning an empty shell.
-    expect(phases.redecoded!.scanned).toBeGreaterThan(0)
+    // `scanned` is 0 by design since Q-541 Task 7: the redecode's row-walking phase re-stamped
+    // `measured_at` and `event_name`, both of which are now derived at read time, so it has nothing
+    // to walk. It is kept as a reported no-op rather than deleted, and this pins that shape — a
+    // MISSING `redecoded` (asserted above) still means the phase failed, which is the distinction
+    // the route's contract actually rests on.
+    expect(phases.redecoded).toEqual({ scanned: 0, updated: 0, restamped: 0 })
 
     const viaWorker = await snapshot(pool)
     await resetDerived(pool)

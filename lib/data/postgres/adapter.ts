@@ -15,7 +15,7 @@ import { measuredAtMs, dsFromMeasuredAtMs, cadenceSecFromDs, decodeEventBody, he
  *  (812k rows). Exported so callers size their own lookback against it rather than asking for more
  *  and being silently clamped, which is what `maybeRefitDaytimeHrvModel` was doing at 60 days. */
 export const MAX_RAW_SAMPLE_WINDOW_DAYS = 31
-import { isClockEpochReset, resolveDsToMs, currentEpoch, type ClockAnchor } from '@/lib/oura-ble/clock'
+import { isClockEpochReset, resolveDsToMs, resolveMsToDs, currentEpoch, type ClockAnchor } from '@/lib/oura-ble/clock'
 import { spo2PctFromR } from '@/lib/oura-ble/spo2'
 import { STEP_FEATURE_TAGS, STEP_MOTION_TAG } from '@/lib/oura-ble/rollup-consumed-tags'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
@@ -4874,68 +4874,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return inserted.length
   }
 
-  /** Re-stamp measured_at and refresh event_name over stored rows. Under Lever 1 the
-   *  `decoded` JSONB is no longer persisted (the rollup decodes from body_hex live), so
-   *  a fixed/new decoder applies automatically at the next rollup — there is nothing to
-   *  backfill on the row itself. This pass now only corrects the two persisted metadata
-   *  columns that a re-anchor or a renamed tag can leave stale. body_hex stays untouched. */
-  async redecodeOuraRawSamples(userId: string): Promise<{ scanned: number; updated: number; restamped: number }> {
-    // Re-stamp measured_at from the CURRENT anchor as we page. At ingest, rows are
-    // stamped with the anchor as it stood mid-drain — during a catch-up drain that
-    // anchor pairs an old ring timestamp with "now", so a whole night of history
-    // lands stamped at drain time (seen in prod: 6,038 sleep events collapsed into
-    // the 09:00 drain hour). The ring clock is monotonic within an epoch, so once
-    // the anchor is accurate the linear mapping re-derives each row's real time.
-    // Done per page (bounded to ≤500 rows/statement) so it can never exceed the
-    // pool's 15 s statement_timeout on a large table — a whole-table UPDATE could.
-    const anchor = await this.getOuraClockAnchor(userId)
-    const anchorUtcIso = anchor?.anchorUtc.toISOString() ?? null
-
-    let scanned = 0
-    let updated = 0
-    let restamped = 0
-    let cursor = 0
-    for (;;) {
-      const page = await this.db
-        .select({ id: s.ouraRawSamples.id, tag: s.ouraRawSamples.tag, eventName: s.ouraRawSamples.eventName })
-        .from(s.ouraRawSamples)
-        .where(and(eq(s.ouraRawSamples.userId, userId), gt(s.ouraRawSamples.id, cursor)))
-        .orderBy(asc(s.ouraRawSamples.id))
-        .limit(500)
-      if (page.length === 0) break
-      const pageFirstId = page[0].id
-      const pageLastId = page[page.length - 1].id
-      for (const row of page) {
-        scanned++
-        const name = eventName(row.tag)
-        if (name !== row.eventName) {
-          await this.db.update(s.ouraRawSamples)
-            .set({ eventName: name })
-            .where(eq(s.ouraRawSamples.id, row.id))
-          updated++
-        }
-        cursor = row.id
-      }
-      if (anchor && anchorUtcIso) {
-        // IS DISTINCT FROM is load-bearing, not a micro-optimisation. `measured_at` is indexed
-        // (idx_oura_raw_samples_user_measured), so an UPDATE that writes back the value already
-        // there still cannot be a HOT update — it rewrites an entry in ALL FOUR of this table's
-        // indexes. Unguarded, every redecode pass re-stamped every row: production reached
-        // 1,324,792 updates against 740,966 rows with 19 HOT, and ~130 MB of the table's 306 MB
-        // of indexes is bloat from it (measured 2026-08-02, Q-46).
-        const res = await this.db.execute(sql`
-          UPDATE oura_raw_samples
-          SET measured_at = ${anchorUtcIso}::timestamptz
-            + (ring_timestamp_ds - ${anchor.anchorDs}) * interval '100 milliseconds'
-          WHERE user_id = ${userId} AND id >= ${pageFirstId} AND id <= ${pageLastId}
-            AND measured_at IS DISTINCT FROM ${anchorUtcIso}::timestamptz
-              + (ring_timestamp_ds - ${anchor.anchorDs}) * interval '100 milliseconds'
-        `)
-        restamped += res.rowCount ?? 0
-      }
-    }
-
-    return { scanned, updated, restamped }
+  /**
+   * Formerly: re-stamp `measured_at` and refresh `event_name` over every stored row.
+   *
+   * **Both columns are dead as of Q-541 Task 7, so this pass has nothing to correct.** Every reader
+   * now derives the event name from `tag` and the wall-clock time from the clock anchors, and a
+   * packed frame carries neither column at all — so re-stamping wrote values nothing reads.
+   *
+   * That it is now a no-op is not a tidy-up. **This loop caused the 2026-08-17 `disk_full`
+   * outage**: `measured_at` was indexed, so writing back a changed value could never be a HOT
+   * update and rewrote an entry in all four of the table's indexes. Production reached 1,324,792
+   * updates against 740,966 rows with **19** HOT, and a single full re-stamp rewrote 681,005 rows
+   * without adding one frame. Q-46's `IS DISTINCT FROM` guard bounded the damage but could not
+   * remove it — the Q-71/Q-536 clock fixes changed every row's derived value, so every row was
+   * genuinely distinct. Deriving at read time is what removes the operation, and with it the reason
+   * the documented remedy for five failure modes (ops-doc I12, I14, I19, I20, I25) was a disk-fill
+   * hazard.
+   *
+   * Kept as a no-op rather than deleted because `/api/oura-ble/samples/redecode` still exists and
+   * still does the part that matters — re-aggregating from `body_hex`, which is untouched. The
+   * counters are reported as 0 rather than removed so the admin readout keeps its shape; the route
+   * now reports `restamped: 0` because there is nothing to re-stamp, not because it failed.
+   */
+  async redecodeOuraRawSamples(_userId: string): Promise<{ scanned: number; updated: number; restamped: number }> {
+    return { scanned: 0, updated: 0, restamped: 0 }
   }
 
   /** D5 — own daytime-HRV: throttled per-user refit (fittedAt-gated, not an in-memory timer, so it
@@ -6263,24 +6225,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // DISTINCT ON (tag) keeps the highest ring clock per tag — cheap (~1 row/tag). Hot-tier only,
     // then a per-tag cold lookup for any tag that has gone quiet for longer than the hot window —
     // without which a dormant tag reads as having no data rather than as stale.
-    const hotLatest = await this.db
+    const summaryAnchors = await this.getOuraClockAnchors(userId)
+    const derivedMeasuredAt = (ds: number): Date | null => {
+      const ms = resolveDsToMs(ds, summaryAnchors)
+      return ms != null ? new Date(ms) : null
+    }
+    const hotLatest = (await this.db
       .selectDistinctOn([s.ouraRawSamples.tag], {
         tag: s.ouraRawSamples.tag,
-        eventName: s.ouraRawSamples.eventName,
-        measuredAt: s.ouraRawSamples.measuredAt,
+        ds: s.ouraRawSamples.ringTimestampDs,
         decoded: s.ouraRawSamples.decoded,
         bodyHex: s.ouraRawSamples.bodyHex,
       })
       .from(s.ouraRawSamples)
       .where(where)
-      .orderBy(s.ouraRawSamples.tag, desc(s.ouraRawSamples.ringTimestampDs))
+      .orderBy(s.ouraRawSamples.tag, desc(s.ouraRawSamples.ringTimestampDs)))
+      // Both metadata columns are derived rather than read (Q-541 Task 7). `measured_at` was the
+      // last projection of a column that is now dead, and a packed frame carries neither — leaving
+      // one branch reading and the other deriving is how a field starts disagreeing with itself.
+      .map(r => ({ tag: r.tag, eventName: eventName(r.tag), measuredAt: derivedMeasuredAt(Number(r.ds)), decoded: r.decoded, bodyHex: r.bodyHex }))
     const hotLatestTags = new Set(hotLatest.map(r => r.tag))
     const dormantTags = [...countsByTag.keys()].filter(t => !hotLatestTags.has(t))
     const coldLatest = dormantTags.length === 0 ? [] : (await Promise.all(
       dormantTags.map(async tag => {
         const [newest] = await readRecentRawFrames(this.db, userId, [tag], 1)
         return newest
-          ? { tag, eventName: eventName(tag), measuredAt: null, decoded: newest.decoded, bodyHex: newest.bodyHex }
+          ? { tag, eventName: eventName(tag), measuredAt: derivedMeasuredAt(newest.ds), decoded: newest.decoded, bodyHex: newest.bodyHex }
           : null
       }),
     )).filter((r): r is NonNullable<typeof r> => r != null)
@@ -6430,32 +6400,34 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getOuraRawSamplesForTags(userId: string, tags: number[], days: number): Promise<OuraRawSampleRow[]> {
     if (tags.length === 0) return []
     const windowDays = Math.min(Math.max(Math.floor(days), 1), MAX_RAW_SAMPLE_WINDOW_DAYS)
-    const rows = await this.db
-      .select({
-        ds: s.ouraRawSamples.ringTimestampDs,
-        tag: s.ouraRawSamples.tag,
-        eventName: s.ouraRawSamples.eventName,
-        measuredAt: s.ouraRawSamples.measuredAt,
-        decoded: s.ouraRawSamples.decoded,
-        bodyHex: s.ouraRawSamples.bodyHex,
-      })
-      .from(s.ouraRawSamples)
-      .where(and(
-        eq(s.ouraRawSamples.userId, userId),
-        inArray(s.ouraRawSamples.tag, tags),
-        isNotNull(s.ouraRawSamples.measuredAt),
-        gte(s.ouraRawSamples.measuredAt, sql`now() - make_interval(days => ${windowDays})`),
-      ))
-      .orderBy(asc(s.ouraRawSamples.measuredAt))
+
+    // Q-541 Task 7 / Q-534: the window is converted to a RING ds range and the read is ds-keyed,
+    // rather than filtering on the stored `measured_at` column.
+    //
+    // Three things that buys, in order of how much they matter:
+    //   1. It removes the last read of `idx_oura_raw_samples_user_measured` — 136 MB, and the reason
+    //      a `measured_at` re-stamp rewrote 681,005 rows with zero HOT updates and filled the disk.
+    //   2. It reads BOTH tiers. A packed frame has no `measured_at` column at all, so a filter on
+    //      one would have silently returned only the hot window.
+    //   3. `measured_at` is a stored derivation and goes stale whenever the clock model changes —
+    //      which it did, twice (Q-71, Q-536). Deriving it per read cannot go stale.
+    const anchors = await this.getOuraClockAnchors(userId)
+    if (anchors.length === 0) return []
+    const startDs = resolveMsToDs(Date.now() - windowDays * 86_400_000, anchors)
+    if (startDs == null) return []
+
+    const rows = await readRawFrames(this.db, userId, { tags, startDs: Math.floor(startDs) })
     return rows.map((r): OuraRawSampleRow => ({
       ringTimestampDs: Number(r.ds),
       tag: r.tag,
-      eventName: r.eventName,
-      measuredAt: r.measuredAt ? new Date(r.measuredAt).toISOString() : null,
+      eventName: eventName(r.tag),
+      measuredAt: (() => {
+        const ms = resolveDsToMs(r.ds, anchors)
+        return ms != null ? new Date(ms).toISOString() : null
+      })(),
       // Infallible by contract: decodeEventBody returns null on an unknown or malformed body rather
       // than throwing, and consumers already treat a null decode as "skip this row".
-      decoded: (r.decoded as Record<string, unknown> | null)
-        ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null),
+      decoded: r.decoded ?? (r.bodyHex ? decodeEventBody(r.tag, hexToBytes(r.bodyHex)) : null),
       bodyHex: r.bodyHex,
     }))
   }
@@ -6647,6 +6619,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async getDerivedScoresForDay(userId: string, day: string) { return oura.getDerivedScoresForDay(this.db, userId, day) }
   async getLatestOuraCloudVitals(userId: string) { return oura.getLatestOuraCloudVitals(this.db, userId) }
   async getLatestOuraBleMeasuredAt(userId: string) { return oura.getLatestOuraBleMeasuredAt(this.db, userId) }
+  async hasOuraBleSamples(userId: string) { return oura.hasOuraBleSamples(this.db, userId) }
   async listOuraTags(userId: string, startDay: string, endDay: string) { return oura.listOuraTags(this.db, userId, startDay, endDay) }
   async upsertBodyBatteryDaily(userId: string, row: import('../repository').BodyBatteryDailyRow) { return bodyBattery.upsertBodyBatteryDaily(this.db, userId, row) }
   async getBodyBatteryHistory(userId: string, startDate: string, endDate: string) { return bodyBattery.getBodyBatteryHistory(this.db, userId, startDate, endDate) }

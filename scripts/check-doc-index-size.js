@@ -211,7 +211,14 @@ const BASELINE = {
   // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
   // other lanes twice, which is the case the note below warns silently drops one side.
 
-  'projectOverview.md': 6843,
+  //
+  // Raised 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A): 6843 -> 6853. Ten lines on the
+  // disk-full item, and they carry the one distinction that item most needs: the outage's MECHANISM
+  // is gone, not merely mitigated — with every reader deriving the timestamp, the re-stamp that
+  // rewrote 681,005 rows is a no-op. Plus the caveat that keeps the number honest: 136 MB is the
+  // measured index size, not a reclaim that has happened, since the drop runs on the next deploy and
+  // the space only returns to the file after a VACUUM FULL.
+  'projectOverview.md': 6853,
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all

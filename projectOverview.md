@@ -349,6 +349,16 @@ differ — vacuum alone re-crosses it in ~5 days, with the index+row work ~7 wee
 under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
 **do not run another Full re-sync until this is resolved**; that is what triggered it.
 
+**Progress, 2026-08-18 — part 2.** Q-534's **finding 4 is done**: both readers of the stored
+`measured_at` were rewritten to convert their window through the clock anchors and read ds-keyed, and
+migration **193** drops `idx_oura_raw_samples_user_measured` — **136 MB**, the single largest
+reclaim available without moving a row. It also **removes the outage's mechanism rather than
+mitigating it**: with every reader deriving the time, the stored column is dead, so the redecode's
+re-stamp — the non-HOT full-table rewrite that filled the disk — is now a no-op. Findings 1–3 of
+Q-534 (payload-in-index, autovacuum never having run, `work_mem`) are still open. ⚠️ The 136 MB is
+the measured size in production, **not a reclaim that has happened** — the drop runs on the next
+deploy's `ensureSchema`, and the space returns to the file only after a `VACUUM FULL`.
+
 **Progress, 2026-08-18.** Q-541 Tasks 0–3 have shipped (v1.318.11–12) — the `oura_raw_packed` table,
 the codec, and the two-tier reader every raw-frame read now goes through. **⚠️ None of it has moved a
 row**: nothing writes a blob yet, so the database has not shrunk by a byte and the size numbers above

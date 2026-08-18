@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **193** | `lib/data/postgres/migrations/` (head: `192_claude_ro_views_oura_raw_packed.sql`) |
+| Next free Postgres migration | **194** | `lib/data/postgres/migrations/` (head: `193_drop_oura_raw_samples_measured_index.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -570,6 +570,20 @@ below threshold and left in place for next time.
   clock anchors at both call sites, and `getOuraRawSamplesForTags` is on a read path. So the order is
   **rewrite both call sites to be ds-keyed, prove equivalence, then drop the index** — three steps,
   not one. Do not drop it first and measure afterwards.
+- ✅ **Finding 4 is DONE, 2026-08-18 (Lane A), in that order.** Both consumers now convert their
+  wall-clock window through the anchors and read ds-keyed and two-tier; migration **193** drops the
+  index (**136 MB** by then, on a 699 MB table whose indexes were 443 MB). Three consequences the
+  entry did not anticipate, recorded so they are not re-derived:
+  (a) **the stored `measured_at` and `event_name` columns are now dead**, so the redecode's re-stamp
+  loop — *the mechanism of the outage* — was writing values nothing reads, and is a documented no-op;
+  the pre-flight free-space guard this entry asks for is therefore moot, because the operation it
+  guards no longer exists;
+  (b) **`/api/oura/stats` read `connected` off "we can name a last-measured time"**, which stopped
+  being the same question once the time became derived — split into `hasOuraBleSamples`, or a ring
+  with frames but no resolvable anchor would have silently taken the Health tab's whole Ring section;
+  (c) **dropping the now-dead columns is NOT done** — that is a data-dropping migration and
+  owner-gated, whereas the index drop is reversible with one `CREATE INDEX`. Findings 1–3
+  (payload-in-index, autovacuum, `work_mem`) are untouched and still open.
 - **The redecode's own cost, since this entry gates it.** `POST /api/oura-ble/samples/redecode`
   re-stamps `measured_at` over every row (its own opening comment says so), which is exactly the
   non-HOT full-table rewrite that produced the ~306 MB of bloat. Measured 2026-08-17 **after** the

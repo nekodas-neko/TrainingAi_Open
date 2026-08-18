@@ -6,6 +6,23 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.320.1",
+    date: "2026-08-18",
+    changes: [
+      "The times on your ring's raw events are now worked out fresh from the ring's clock every time they are read, instead of being written onto each event once and left there. The stored copy went stale twice this year when the clock maths was corrected, and rewriting a million of them is what filled the disk last week \u2014 that rewrite no longer happens at all, and Redecode no longer performs it.",
+      "Freed 136 MB by removing an index that only existed to support the old stored timestamps.",
+      "Fixed: the Health tab's Ring section decided whether your ring was connected by asking whether it could name a last-reading time. Those are different questions, and the section would have vanished silently for a ring that had reported but whose clock could not be pinned down. It now asks whether the ring has reported at all.",
+    ],
+  },
+  {
+    version: "1.320.0",
+    date: "2026-08-18",
+    changes: [
+      "Saved meals can now print a food label. Open a saved meal and tap the code icon to get a 50 \u00d7 50 mm label with the meal name, its calories and macros, a blank line to write the date on, and a scannable code \u2014 in four styles you can switch between. Scanning that code with the food scanner logs the meal straight away.",
+      "The figures on the label are for one serving, and so is what scanning it logs. On a batch recipe that makes two, the label shows what one portion is rather than the whole tub.",
+    ],
+  },
+  {
     version: "1.319.1",
     date: "2026-08-18",
     changes: [

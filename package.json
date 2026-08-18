@@ -1,6 +1,6 @@
 {
   "name": "trainingai",
-  "version": "1.319.1",
+  "version": "1.320.1",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "pnpm": {

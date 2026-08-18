@@ -37,6 +37,24 @@ describe.skipIf(!canRun)('getOuraRawSamplesForTags decodes body_hex', () => {
       [TEST_USER_ID, `rawdecode-${TEST_USER_ID}@example.com`],
     )
     await pool.query(`DELETE FROM oura_raw_samples WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM oura_ble_clock_anchors WHERE user_id = $1`, [TEST_USER_ID])
+
+    // A clock anchor, because `getOuraRawSamplesForTags` now derives wall-clock time from the
+    // anchors rather than reading the stored `measured_at` column (Q-541 Task 7 / Q-534, which drops
+    // the index that column had). This fixture used to stamp `measured_at` by hand and supply no
+    // anchor at all — a state production cannot be in, since anchors are append-only and every
+    // stamped row was stamped FROM one. Supplying it is what makes the fixture model production.
+    //
+    // The ds values are now consistent with the wall-clock times too: 5 minutes is 3,000
+    // deciseconds. Before, ds advanced 0.2 s per frame while `measured_at` advanced 5 minutes, so
+    // the two columns described different histories — invisible while nothing derived one from the
+    // other.
+    const ANCHOR_DS = 1_000_000
+    await pool.query(
+      `INSERT INTO oura_ble_clock_anchors (user_id, anchor_ds, anchor_utc, epoch, observed_source)
+       VALUES ($1, $2, $3, 0, 'test')`,
+      [TEST_USER_ID, ANCHOR_DS, sleepStart],
+    )
 
     // 30 hrv frames + 30 temp frames spread across the sleep window. `decoded` deliberately left
     // NULL — that is exactly the production shape this regression is about.
@@ -46,7 +64,7 @@ describe.skipIf(!canRun)('getOuraRawSamplesForTags decodes body_hex', () => {
         `INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex, measured_at)
          VALUES ($1,$2,93,'hrv_event',$3,$4), ($1,$5,70,'temp_event',$6,$4)
          ON CONFLICT DO NOTHING`,
-        [TEST_USER_ID, 1_000_000 + i * 2, HRV_HEX, at, 1_000_001 + i * 2, TEMP_HEXES[i % TEMP_HEXES.length]],
+        [TEST_USER_ID, ANCHOR_DS + i * 3_000, HRV_HEX, at, ANCHOR_DS + i * 3_000 + 1, TEMP_HEXES[i % TEMP_HEXES.length]],
       )
     }
   })
@@ -54,6 +72,7 @@ describe.skipIf(!canRun)('getOuraRawSamplesForTags decodes body_hex', () => {
   afterAll(async () => {
     if (!canRun) return
     await pool.query(`DELETE FROM oura_raw_samples WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM oura_ble_clock_anchors WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
   })
 

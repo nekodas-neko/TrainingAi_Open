@@ -32,9 +32,13 @@ export async function GET() {
 
   const repo = await getRepositoryAsync()
 
-  const bleMeasuredAt = await repo.getLatestOuraBleMeasuredAt(userId)
+  // Existence, not freshness. `connected` used to be read off "we can name a last-measured time",
+  // and those stopped being the same question when that time became derived from the clock anchors
+  // (Q-541 Task 7): a user with frames but no resolvable anchor has a ring, and a false here takes
+  // the Health tab's whole Ring section with it silently (`oura-section.tsx` returns null).
+  const hasBleSamples = await repo.hasOuraBleSamples(userId)
 
-  if (!bleMeasuredAt) {
+  if (!hasBleSamples) {
     return NextResponse.json(
       { connected: false, daily: null } satisfies OuraStatsResponse,
       { headers: { "Cache-Control": "private, no-store" } },
