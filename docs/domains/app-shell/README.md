@@ -58,6 +58,8 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-461 — the infinite `animate-bounce` on Start Set blocks Playwright's stability check, so no E2E spec can drive a workout past set 1). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
 
+- [`docs/reviews/2026-08-17-score-presentation-audit.md`](../../reviews/2026-08-17-score-presentation-audit.md) — **every surface rendering a pillar score, audited (Q-281), 2026-08-17.** Fourteen surfaces scored for contributors / trend / action: **nine render a score with no contributors and no trend**, and exactly one has all three. One real colour-only-state violation found and fixed (Home "accentring" band dot); `FactorBar` inspected and deliberately left alone. Also carries three corrections to **Q-278**'s premises — `score-audit/` has zero user-facing consumers, `scoreAvailability` has one, and daytime stress + resilience have no score surface at all.
+
 ## Open issues
 
 ```bash

@@ -123,8 +123,12 @@ const root = path.join(__dirname, '..');
 // from the square to the inscribed circle, and removed the per-serving line. Both are spec changes
 // an implementer would otherwise build against wrongly, plus the measured consequence: circle-safe
 // composition shrinks the code to 12.2-15.9mm and print ink-spread is the failure mode to expect.
+// Raised 2026-08-17 (Q-530 secret settled): backlog 6770 -> 6781. Q-530's step-3 gate flipped from
+// "blocked on the owner" to the settled decision, plus the two operational notes that stop the next
+// session misreading it — a stale container reading the variable as absent, and the fact that
+// nothing can verify either copy until the route exists.
 //
-// Raised 2026-08-18 (Review, Q-460…Q-462): projectOverview 6679 -> 6725, backlog 6735 -> 6829.
+// Raised 2026-08-18 (Review, Q-460…Q-462): projectOverview 6689 -> 6735, backlog 6781 -> 6885.
 // Three queue entries from the workout write-path sweep plus the Known-Issues row indexing them.
 // Entries and open-issue content, which is what these files are for; the sweep's prose lives in
 // docs/reviews/2026-08-18-workout-write-path.md, outside this ratchet.
@@ -147,10 +151,36 @@ const BASELINE = {
   // cut from 12 lines to 7). The two it is over are the two the original entry had no reason to
   // carry: that the fix is **observed but not guarded**, and the Q-352 pointer to why. A struck item
   // that can silently regress is exactly what a session must not have to discover for itself.
-  'projectOverview.md': 6725,
-  'docs/implementation-backlog.md': 6829,
+  //
+  // Raised 2026-08-17 (Q-281, Lane B): projectOverview 6679 -> 6689, backlog 6735 -> 6770. Same
+  // shape as the two raises above and the same reason: a shipped fix owing a device check cannot go
+  // to the resolved archive. The ratchet was right to catch the first draft at 20 over — the audit's
+  // findings, the FactorBar judgement call and the Q-278 corrections all moved to
+  // docs/reviews/2026-08-17-score-presentation-audit.md, which this file does not govern. What is
+  // left is the owed check (a 7.5px band word, verified only in a browser harness, on a style the
+  // owner selects) and the one pointer that stops Q-278 being planned on premises this audit
+  // refuted. Two stale lines were corrected in the same pass: the version, four minors out of date,
+  // and an open-PR snapshot naming three PRs of which two had long since closed. The backlog half is
+  // Q-281's audit result folded into its entry plus the two refuted premises annotated onto Q-278 —
+  // a correction to an existing entry, which is cheaper here than an implementer discovering it.
+  //
+  // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
+  // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
+  // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
+  // Raised 2026-08-17 (Q-389 planning, Lane B): backlog 6781 -> 6791. Recomputed from the merged
+  // file — this collided with a concurrent raise to 6781, exactly the same-day collision this file
+  // keeps warning about, and splicing would have silently un-done that side. Three corrections folded into
+  // the existing Q-389 entry rather than filed separately, per the "a wrong correction is more
+  // expensive than a long one" precedent above: its QR module maths was ~16% optimistic (a 21x21
+  // code cannot hold a UUID at all — v1 holds 17 bytes, so the floor is v2 25x25 and the pitch is
+  // 0.49-0.64mm, on a margin the entry already calls thin); its per-serving worry is already
+  // satisfied by oneServingItems; and that in turn exposes the real bug, that SavedMeal.totals is
+  // the whole recipe, so a naive renderer prints double what scanning the label logs. Each is
+  // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
+  // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
+  'projectOverview.md': 6735,
+  'docs/implementation-backlog.md': 6885,
   'CLAUDE.md': 1010,
-
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;

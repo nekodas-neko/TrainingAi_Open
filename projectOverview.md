@@ -24,7 +24,7 @@
 
 ## 🔖 Current Status
 
-**Version:** v1.317.3 · **Branch:** `main` · Railway auto-deploys on push to `main`.
+**Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-17.
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
@@ -42,9 +42,9 @@ than picking an item straight off the queue.
 clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short daytime
 fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
 
-**Open at the time of writing:** PR #4 (APK release read without a token), PR #6 (session notes the
-public cut did not carry), PR #9 (the first write-path E2E spec). Check
-`list_pull_requests` rather than trusting this line — it is a snapshot, not a live view.
+**Open at the time of writing:** PR #6 (session notes the public cut did not carry), PR #10 (the
+public-repo migration handoff). Check `list_pull_requests` rather than trusting this line — it is a
+snapshot, not a live view, and it was already three PRs out of date once.
 
 **What shipped recently is in the journal, not here.** Read `docs/overview/entries/` for the current
 window, then the newest `history-*.md`. The 157 dated status notes this section used to carry were
@@ -114,6 +114,16 @@ order.
   program/phase-set/template routes were listed and **not** called, and rule (b) (raw bodies into
   `.set()`) was **not** systematically audited.
 - **Nothing was fixed.** All three are queued.
+
+### [app-shell][readiness] 🟢 Score presentation audited (Q-281) — the colour-only-state fix is NOT device-verified (2026-08-17)
+
+- **⚠️ Owed: open Home with the "Accent ring" style selected on the S25 and confirm the band word
+  reads.** v1.318.10 adds it beside that style's band dot at **7.5 px** — legible in the Playwright
+  harness at 412×915, but small type on the real panel is a different question. Contrast unmeasured
+  on both themes (Q-282's gap); the word inherits the dot's colour, so it is as contrasty as the dot.
+- **Audit:** [`docs/reviews/2026-08-17-score-presentation-audit.md`](docs/reviews/2026-08-17-score-presentation-audit.md)
+  — 14 surfaces, **9 render a score with no contributors and no trend**. **Read it before Q-278**: it
+  refutes two of that entry's premises with measurement.
 
 ### [platform] 🟠 The repo migration reviewed as an architecture change — no credentials leaked, CI posture correct, four leftovers filed (Q-456…Q-459, 2026-08-17)
 
