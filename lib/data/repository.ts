@@ -356,7 +356,13 @@ export interface IncomingMutation {
 
 export interface PushResult {
   processed: number;
-  errors:    Array<{ id?: string; domain: string; date: string; error: string }>;
+  /**
+   * Q-475 — `retryable: true` means the *server* could not write (database down, out of disk,
+   * connection killed), not that anything is wrong with the mutation. The client must not count
+   * those against MAX_MUTATION_ATTEMPTS, exactly as it already declines to count transport
+   * failures. Absent/false is the safe default: bounded retry, then dead-letter.
+   */
+  errors:    Array<{ id?: string; domain: string; date: string; error: string; retryable?: boolean }>;
 }
 
 export interface UserGoals {

@@ -21,7 +21,7 @@ const { fakeStore } = vi.hoisted(() => ({
 
 vi.mock('@/lib/local-store/index', () => ({ getLocalStore: () => fakeStore }))
 
-import { pushMutations, pullDelta, restoreFromCloud, _resetSyncBackoff } from '../sync-engine'
+import { pushMutations, pullDelta, restoreFromCloud, _resetSyncBackoff, isSyncBackedOff } from '../sync-engine'
 
 // A fully-empty SyncDelta — every domain array present (unguarded mappers call .map on
 // them directly) plus the cursor + hasMore the restore driver reads.
@@ -63,6 +63,80 @@ describe('pushMutations', () => {
     expect(fakeStore.recordMutationFailures).toHaveBeenCalledWith([
       { id: 'ob-2', error: 'FK ownership check failed' },
     ])
+  })
+
+  // ── Q-475: a database that cannot write arrives as HTTP 200 with per-item errors ──────────
+  describe('a per-item error the server marked retryable', () => {
+    const dbDown = (ids: string[]) => ({
+      ok: true, status: 200,
+      json: () => Promise.resolve({ processed: 0, errors: ids.map(id => ({
+        id, domain: 'food_logs', date: '2026-07-01',
+        error: 'Error: Failed query: insert into "food_logs" …', retryable: true,
+      })) }),
+    })
+
+    it('does not count towards MAX_MUTATION_ATTEMPTS — the row stays queued, untouched', async () => {
+      fakeStore.getPendingMutations.mockResolvedValue([
+        mut('ob-1', 'food_logs', '2026-07-01'),
+        mut('ob-2', 'food_logs', '2026-07-01'),
+      ])
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(dbDown(['ob-1', 'ob-2'])))
+
+      await pushMutations('u1')
+
+      // The whole point: no attempts bump, so ~43 minutes of outage cannot dead-letter the queue.
+      expect(fakeStore.recordMutationFailures).not.toHaveBeenCalled()
+      expect(fakeStore.deleteMutations).not.toHaveBeenCalled()
+    })
+
+    it('engages the whole-queue backoff instead of resetting it', async () => {
+      fakeStore.getPendingMutations.mockResolvedValue([mut('ob-1', 'food_logs', '2026-07-01')])
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(dbDown(['ob-1'])))
+
+      expect(isSyncBackedOff()).toBe(false)
+      await pushMutations('u1')
+      expect(isSyncBackedOff()).toBe(true)
+    })
+
+    it('still records the non-retryable siblings in the same response', async () => {
+      fakeStore.getPendingMutations.mockResolvedValue([
+        mut('ob-1', 'food_logs', '2026-07-01'),
+        mut('ob-2', 'food_logs', '2026-07-01'),
+        mut('ob-3', 'food_logs', '2026-07-01'),
+      ])
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, status: 200,
+        json: () => Promise.resolve({ processed: 1, errors: [
+          { id: 'ob-2', domain: 'food_logs', date: '2026-07-01', error: 'FK ownership check failed' },
+          { id: 'ob-3', domain: 'food_logs', date: '2026-07-01', error: 'db down', retryable: true },
+        ] }),
+      }))
+
+      await pushMutations('u1')
+
+      expect(fakeStore.recordMutationFailures).toHaveBeenCalledWith([
+        { id: 'ob-2', error: 'FK ownership check failed' },
+      ])
+      // ob-1 succeeded and is confirmed even though the batch ended in a backoff.
+      expect(fakeStore.deleteMutations).toHaveBeenCalledWith(['ob-1'])
+    })
+
+    it('an older server that sends no flag keeps the previous bounded-retry behaviour', async () => {
+      fakeStore.getPendingMutations.mockResolvedValue([mut('ob-1', 'food_logs', '2026-07-01')])
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
+        ok: true, status: 200,
+        json: () => Promise.resolve({ processed: 0, errors: [
+          { id: 'ob-1', domain: 'food_logs', date: '2026-07-01', error: 'Error: Failed query: …' },
+        ] }),
+      }))
+
+      await pushMutations('u1')
+
+      expect(fakeStore.recordMutationFailures).toHaveBeenCalledWith([
+        { id: 'ob-1', error: 'Error: Failed query: …' },
+      ])
+      expect(isSyncBackedOff()).toBe(false)
+    })
   })
 
   it('runs the stranded-food-item heal before draining the outbox', async () => {
