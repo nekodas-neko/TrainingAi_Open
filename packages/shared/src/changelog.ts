@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.322.0",
+    date: "2026-08-18",
+    changes: [
+      "Re-pairing the ring no longer shifts the timestamps on your whole sleep history. When the ring re-sends buffered history after a re-pair, the app used to read that as the ring's clock having been reset and re-dated everything against it \u2014 which is what moved months of nights by twelve to fourteen hours, twice. A replay of history the ring already sent is now recognised as exactly that.",
+      "A genuine ring re-key is something you now tell the app about, rather than something it tries to work out from the data. It still notices one you forgot to mention, if the ring's counter really did restart.",
+    ],
+  },
+  {
     version: "1.321.2",
     date: "2026-08-18",
     changes: [

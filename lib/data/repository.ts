@@ -914,6 +914,12 @@ export interface WorkoutRepository {
   /** Has the ring ever reported? Answers "is it connected" without needing a resolvable clock
    *  anchor — see the note on the implementation for why those are different questions. */
   hasOuraBleSamples(userId: string): Promise<boolean>
+  /** Q-314 — the owner declares a deliberate ring re-key; the next ingest batch opens the epoch.
+   *  Idempotent: declaring twice returns the pending one rather than queueing a second. */
+  declareOuraRekey(userId: string, note: string | null): Promise<{ id: number; declaredAt: Date; alreadyPending: boolean }>
+  getPendingRekeyDeclaration(userId: string): Promise<{ id: number; declaredAt: Date } | null>
+  consumeRekeyDeclaration(id: number, epoch: number): Promise<void>
+  cancelPendingRekeyDeclaration(userId: string): Promise<boolean>
   listOuraTags(userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]>
 
   // ── Body Battery (daily snapshots for model tuning) ──────────────────────────

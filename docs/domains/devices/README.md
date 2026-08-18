@@ -76,6 +76,13 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md`](../../overview/entries/2026-08-18-ble-rekey-declared-not-inferred.md)
+  — **Q-314, shipped 2026-08-18.** A ring re-key is now **declared** (`POST /api/oura-ble/rekey`),
+  not inferred from a ds regression — a history re-drain produces the same shape, and reading it as a
+  reset re-timed the whole sleep history twice (+12.17 h, +14.16 h). `EPOCH_RESTART_RATIO = 0.05`
+  remains as a net for an undeclared re-key, validated only against the two re-drains it must not
+  fire on, because there is no observed true reset in the data. No button yet — Q-317, Lane B.
+
 - [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](../../superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
   — **Q-541 implementation plan (2026-08-17).** Two tiers: `oura_raw_samples` stays exactly as it is
   for a 7-day hot window, a new `oura_raw_packed` holds everything older as sealed `bytea` blobs keyed

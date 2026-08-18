@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **194** | `lib/data/postgres/migrations/` (head: `193_drop_oura_raw_samples_measured_index.sql`) |
+| Next free Postgres migration | **196** | `lib/data/postgres/migrations/` (head: `195_claude_ro_views_rekey_declarations.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -526,45 +526,27 @@ blocker and the intended shape were both already named, so **do not re-derive th
 - **Verification:** the affordance must be shown to work while the key is present, and the warning
   shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
 
-### [devices][platform] Q-314 — a history re-drain is detected as a ring-clock reset, and every re-pair reopens Q-536
+### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
-- **Branch:** `fix/ble-clock-reset-vs-redrain`
-- **Lane: A** — `lib/oura-ble/clock.ts`, `lib/data/postgres/adapter.ts` (the ingest anchor path
-  around `isClockEpochReset`).
-- **Added:** 2026-08-17, from the Q-536 diagnosis. **Q-536 is now shipped and confirmed on the
-  owner's device** (v1.318.2 + the 10:47 redecode: the midday cluster went 43 nights → 4, and the
-  survivors are short daytime fragments, not bedtimes). This entry is the mechanism that caused it,
-  it is **still live**, and it will do the same thing again on the next re-pair.
-- **What happens.** `isClockEpochReset(batchMaxDs, epochMaxDs)` (`clock.ts`) opens a new clock epoch
-  whenever a batch's max `ds` regresses more than `EPOCH_REGRESSION_TOLERANCE_DS` (36,000 ds = 1 h)
-  below the epoch's high-water mark. After a re-pair the app holds no sync cursor, so the ring
-  replays days of buffered history — a regression of **4.75 days** on 2026-08-17 — and that reads as
-  a reset. It is not: the counter is continuous across the boundary (epoch 3's first sample above
-  epoch 2's ceiling is ds 37,112,507 against 37,112,321, a gap of **18.6 s**), and the minimum
-  anchor lag agrees across all four epochs to within **50 s**.
-- **Why it is expensive.** A spurious epoch becomes `currentEpoch(anchors)`, and its offset is
-  estimated from a burst in which >90% of anchors carry re-drain backlog — so it lands ~14 h wrong.
-  `aggregateOuraRawSamples` resolves every ds against `currentEpoch`, so **one re-pair re-times the
-  entire sleep history**. It has now happened twice (2026-07-30 → epoch 1, +12.17 h; 2026-08-17 →
-  epoch 3, +14.16 h); the first self-healed within 7 minutes when epoch 2 opened, the second did not.
-- **The open design question — this is why it is filed rather than fixed.** How do you tell a
-  re-drain from a genuine re-key? Candidates, none yet chosen:
-  - **Absolute floor.** `clock.ts`'s own comment says a real reset "drops the counter to near zero",
-    so require `batchMaxDs` below some absolute threshold rather than merely below the high-water
-    mark. Clean against both observed events (17.4 M and 33.0 M ds, neither near zero) — but the
-    threshold is a guess, and a re-key not synced for longer than it would be missed.
-  - **Overlap test.** A re-drain replays ds values already stored; a reset produces genuinely new
-    low ones. Checkable against `oura_raw_samples`, at the cost of a query on the biggest table in
-    the DB in the ingest path.
-  - **Make it explicit.** A re-key is a deliberate act (`clearKey` / re-pair). Have that path
-    declare the new epoch instead of inferring it from counter shape.
-  - ⚠️ **There is no observed true reset in the data** — both epoch openings were re-drains — so any
-    threshold chosen here is unvalidated against the case it exists for. Getting this wrong in the
-    other direction (missing a real re-key) is worse and quieter than the current failure.
-- **Do not fix by lowering `robustOffsetMs`'s percentile.** Measured on the drained epochs: p1 is
-  already +1.28 h contaminated and only the two smallest anchors are clean. See Q-536.
-- **Verification:** unit tests over both measured re-drain events and a synthetic true reset; the
-  re-pair path can only really be exercised on device.
+- **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
+  Lane A's and already shipped (Q-314).
+- **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Why it matters more than a convenience.** The whole point of Q-314 is that a re-key is
+  **declared** rather than inferred, because inferring it from counter shape re-timed the owner's
+  entire sleep history twice. A declaration nobody can make in the app is a declaration that will be
+  forgotten at exactly the moment it is needed — right after a re-key, on a laptop, mid-`open_oura`.
+- **What exists:** `GET /api/oura-ble/rekey` → `{ pending: { id, declaredAt } | null }`;
+  `POST` (optional `{note}`, idempotent — declaring twice returns the pending one and says so);
+  `DELETE` cancels an un-consumed one. Admin-gated, POST rate-limited 5/min.
+- **Shape:** a control in the BLE admin console. It must say plainly that **nothing happens until the
+  ring next reports** — the effect is deferred because the new ds is not knowable at declaration
+  time, and a button that looks like it acted immediately would invite a second press or a "did it
+  work?" Show `pending` from the `GET` so the waiting state is visible, and offer cancel while it is
+  pending.
+- ⚠️ **Do not offer cancel once it is consumed.** The API refuses, correctly: the epoch it opened
+  already exists and every timestamp derived from it depends on that row as the audit trail.
+- **Verification:** the route is already proven end to end on `pnpm dev` (all four verbs, including
+  idempotency and the 401). This item is the affordance only.
 
 ### [platform][devices] Q-535 — Redecode reports "failed: 502" for work that succeeded
 
