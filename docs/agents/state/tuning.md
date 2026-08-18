@@ -107,11 +107,22 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
 | app-shell, platform | n/a — no scoring surface |
 
-**Next unblocked work, in order:** finish workouts (1RM/RPE/progression), then the **nutrition TDEE
-outcome check** (does the recommended calorie target track the owner's actual weight trend?), then
-heart-rate (`HR_REST_THRESHOLD 0.05` has a documented rationale but was never validated against the
-owner's HR; `PEAK_BANDS` claim "stable per-bucket sample sizes" — an empirical claim never measured). Data exists for all three (77 sessions, 1,029 set logs, 3.5 months; body
-metrics and food logs; BLE HR since the re-key).
+**Next unblocked MEASUREMENT work: none.** Workouts, heart-rate and the nutrition TDEE check — the
+three this line used to point at — were all completed 2026-08-18. Every pillar with a scoring surface
+is measured except **cardio**, which is deliberately skipped for lack of data (~13 run/treadmill
+sessions, newest 2026-07-24), not for lack of time.
+
+**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Fifteen findings are open —
+Q-506…Q-520 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
+1. **Q-518** — the model-version stamp is erased within hours, which blocks the measurement
+   infrastructure the rest depend on. One conflict-arm expression.
+2. **Q-517** — a maintenance below the owner's own BMR is one tap from becoming their calorie goal.
+3. **Q-514** — ~64% of the engine's back-off load cuts are a clamp artefact.
+4. **Q-506** — the illness radar has never been able to fire.
+5. **Q-515** — the rest/active boundary shrinks as the owner gets fitter.
+
+**So a successor should not go looking for a pillar to measure.** The useful Tuning work now is
+re-measuring *after* Lane A lands one of the above — each fix has a stated pass test in its entry.
 
 ## Blocked
 - **Nothing is blocked on the owner.** They delegated all open decisions on 2026-08-18
