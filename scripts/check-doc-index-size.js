@@ -168,6 +168,12 @@ const root = path.join(__dirname, '..');
 // implementer would otherwise repeat. Also records that the pattern already exists (Q-241 made goals
 // server-authoritative and left hydrateGoalSeeds behind), and that users.food_region is a dead
 // column whose setting is device-only — the cheapest possible proof of the approach.
+//
+// Raised 2026-08-18 (BugFix intake, Q-393): +55 for one owner-reported queue entry — an ingredient
+// breakdown on the printed meal label, a follow-up to the Q-389 renderer that shipped the same day.
+// The length is mostly the measurement that decides it: a round 50mm label has 7px left after the
+// shipped content, i.e. zero ingredient lines, while a square one has 1.64x the area. Also records
+// that the QR is not an escape hatch — the payload budget is 26 bytes with a CI test asserting it.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -399,7 +405,7 @@ const BASELINE = {
   // Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
-  'docs/implementation-backlog.md': 7683,
+  'docs/implementation-backlog.md': 7738,
   'CLAUDE.md': 1044,
 
 };
