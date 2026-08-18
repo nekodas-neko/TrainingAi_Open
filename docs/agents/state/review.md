@@ -3,24 +3,48 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** six sweeps (2026-08-17 ×2, 2026-08-18 ×4) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **469**)
+**Updated:** 2026-08-18 · **By:** seven sweeps (2026-08-17 ×2, 2026-08-18 ×5) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **472**)
 
 ## Now
 
-Six sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Seven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
 |---|---|---|
-| `workouts` | write path cross-user + live drive | Q-460…Q-462 |
+| `workouts` | write path cross-user + live drive, **AI double-trips** | Q-460…Q-462, Q-470 |
 | `nutrition` · `cardio` · `activity` | writes cross-user + app-wide not-found probe | Q-463 |
 | `sleep` · `readiness` · `heart-rate` · `body` · `devices` | ingest auth, value validation, schema strictness | Q-464, Q-465 |
 | `app-shell` · `platform` | failure cells, repo-migration architecture, **the Coach write path** | Q-450…Q-459, Q-467, Q-468 |
 
 **Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
-left the web build — every offline-first domain took its web fallback), **production data**
-(`claude_ro` was never queried in any of the six), the **offline and error paths** (everything ran
+left the web build — every offline-first domain took its web fallback), **production data** (the owner's AI-usage
+screenshots drove sweep 7, but `claude_ro` has still never been queried directly), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 7 — the AI-usage screen's double-trips, from owner screenshots (2026-08-18)
+
+**The first production-data finding of this run.** The owner supplied three screenshots of More →
+Developer → AI usage. Write-up:
+[`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md).
+
+**Filed — Q-469, Q-470, Q-471** (Q-471 placed above the other two, because it decides how they read).
+
+**The lesson worth carrying: check what a metric fingerprints on before believing it.** The screen
+showed 89/268 calls (33%) redundant, topped by `meal-plan-generate-meal` at 32·4. Redundancy is
+`(user_id, section, fingerprint)` within 120 s — and three sections fingerprint on a **calorie target
+alone**, so every deliberate meal reroll counts as redundant. **44 of the 89 are artefact.** The reroll
+path is already correctly guarded; an implementer sent there by the screen would find nothing.
+
+The two real ones: `prescription` (14·8) fingerprints on `{programSessionId, today}` and double-fires
+because `regeneratePrescriptionInBackground` is fire-and-forget from two sites in `GET
+/api/workout-data` with a rate limit but no in-flight guard, while `cachedFetch` always revalidates;
+and `running-plan-explain` (31·9) re-asks on every card mount with no cache.
+
+**✅ Corroborations — production confirms two prior entries.** **Q-295 holds exactly** (Coach 6.3% of
+calls, 50.7% of tokens). **Q-170's latency fix is holding** — the 30-day Coach average of 5,840 ms
+looks like a regression but the 7-day reads **2,307 ms**; **do not reopen Q-170 on the 30-day number**.
+Cost is $0.09/30d, so the don't-optimise-spend decision stands.
 
 ### Sweep 6 — the AI Coach's write path (2026-08-18) — the first review ever to cover it
 

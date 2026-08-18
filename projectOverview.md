@@ -69,6 +69,42 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][workouts][cardio][nutrition] 🟠 The AI-usage screen's double-trips traced to cause — the top row is an artefact, two rows are real (Q-469…Q-471, 2026-08-18)
+
+- **First production-data finding of this review run.** The owner supplied three screenshots of
+  **More → Developer → AI usage**: 30 days, 268 calls, 651,639 tokens, **$0.09**, 2 failures, and
+  **89 redundant calls (33%)** across five sections. Traced through
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](docs/reviews/2026-08-18-ai-double-trips.md).
+- **Cost is irrelevant here and should stay that way.** $0.09 per 30 days — eliminating every
+  redundant call saves a fraction of a cent, and `CLAUDE.md` already records the decision not to
+  optimise AI spend. These are filed for **latency and content consistency**, and three of the five
+  sections are *generative*, so a repeat returns different content rather than the same answer twice.
+- **🟠 Q-471 — the screen's most alarming row is a measurement artefact.** Redundancy is
+  `(user_id, section, fingerprint)` repeating within 120 s, and three sections fingerprint on a
+  **calorie target alone**. Rerolling a meal is the feature working, and every reroll carries the same
+  rounded target — so `meal-plan-generate-meal`'s "32 redundant · 4 distinct" most plausibly reads as
+  four slots rerolled ~8 times each. **The reroll path is already correctly guarded**
+  (`disabled={rerolling != null}` on every control), so an implementer sent there by the screen would
+  find nothing to fix. **44 of the 89 are artefact; 45 are real.**
+- **🟠 Q-470 — the prescription regeneration double-fires for real.** It fingerprints on
+  `{ programSessionId, today }`, so 14 redundant / 8 distinct is the same logical prescription
+  generated twice. `regeneratePrescriptionInBackground` is fire-and-forget from two sites in
+  `GET /api/workout-data`, with a rate limit but **no in-flight guard** — and `cachedFetch` always
+  revalidates over the network, so every screen open issues a real GET while the triggering condition
+  is still true. The rate limit is not the bug and should stay.
+- **🟡 Q-469 — `running-plan-explain` re-asks on every card mount.** 31 redundant / 9 distinct, from a
+  bare `useEffect` with no cache. The author had already fixed the re-render case (the `gateKey` join);
+  mount is the remaining trigger. Not load-bearing — the deterministic rationale renders immediately —
+  but the **wording changes between mounts**, so the same run reads differently each visit.
+- **✅ Two prior findings corroborated by production, and one reaffirmed.** **Q-295 holds exactly** —
+  Coach is 17 of 268 calls (6.3%) and 330,221 of 651,639 tokens (50.7%), ~19,400 tokens/call.
+  **Q-170's latency fix is holding** — the 30-day Coach average of 5,840 ms looks like a regression but
+  the 7-day window reads **2,307 ms**, better than the 3.5 s the fix claimed; **do not reopen Q-170 on
+  the 30-day number**. And the error rate is 2/268 (0.7%), unremarkable on this evidence.
+- **Limits:** one user's account over the window shown, and the call sites were read rather than driven
+  — nothing here was reproduced locally.
+- **Nothing was fixed.** All three are queued.
+
 ### [app-shell][workouts][platform] 🟠 The AI Coach's write path reviewed for the first time — apply is exemplary, undo is unreachable and wrong (Q-467, Q-468, 2026-08-18)
 
 - **Never reviewed before.** The Coach appears in eight prior review docs and five backlog entries —
@@ -354,8 +390,14 @@ routes failed with **`[pg 53100]`** — PostgreSQL's `disk_full`. Both failing q
 | `last_autovacuum` / `last_analyze` | **never** — `n_live_tup` reads 0 |
 
 **Three things stack, and only one of them is the archival data.**
-1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation; **the stated target
-   is to return to the stock 500 MB** once the bulk is dealt with.
+1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation. **That raise is now
+   permanent and correct — the "return to stock 500 MB" target is WITHDRAWN (2026-08-18).** Railway
+   cannot shrink a volume (*"Down-sizing a volume is not currently supported"*), and bills *"only …
+   the amount of storage used,"* not the provisioned size — so 5 GB costs what 500 MB would. Reverting
+   would mean a dump/restore onto a fresh volume: real downtime and risk on the database holding the
+   ring archive, to save nothing. **Do not attempt it.** What is genuinely lost is the tripwire — 500 MB
+   is what made this bloat scream rather than creep — so add a DB-size line to the session-start
+   orientation read beside the `error_events` check.
 2. **Indexes exceed the table.** The dedup index covers
    `(user_id, ring_timestamp_ds, tag, body_hex)` — it indexes the raw payload itself, so it grows
    faster than the rows do. **291 MB of the 466 MB is index, not data.**
@@ -670,7 +712,7 @@ the next device change.
 - Detail: [`docs/overview/history-2026-08-15.md`](docs/overview/history-2026-08-15.md).
 
 
-### [devices][platform] 🟠 `oura_raw.db` is growing without bound on the phone, and nobody has ever seen how big it is (Q-538, 2026-08-17)
+### [devices][platform] 🟠 `oura_raw.db` grows without bound on the phone — now measured: 209,326 rows, **0 rolled up**, 31.2 MB (Q-538, 2026-08-17 · measured 2026-08-18)
 
 The documented "14-day rolling buffer" for on-device raw frames (owner retention decision,
 2026-08-02) **has not shipped**. `OuraRawDb.kt` implements `pruneRaw`/`markRolledUp`/`getUnrolledRaw`/
@@ -682,12 +724,17 @@ any of them**. Two independent causes, and fixing the first does not fix the sec
 The store has therefore accumulated everything drained since 2026-07-27 at roughly 2–3 MB/day. This
 can wedge the drain: ops-doc **I21** holds the cursor on `SQLITE_FULL`.
 
-- **Not measured, and cannot be from here:** the actual size of the file on the owner's S25. The admin
-  console has no `rawStats()` panel — the fields are wired in `lib/oura-ble/plugin.ts` and rendered
-  nowhere. Building that panel is the first step of Q-530 and the only way to see this.
+- ✅ **Measured on device 2026-08-18** — the panel exists and the owner read it: **209,326 total rows,
+  `rolled up` = 0, 31.2 MB on disk, `low disk` no.** Zero rolled-up rows means `pruneRaw`'s predicate
+  matches nothing, so both causes above are confirmed from the device rather than inferred.
+- **31.2 MB is a floor.** The store was wiped by the 2026-08-17 reinstall and rebuilt in ~1.5 days by
+  the Full re-sync re-draining the ring's buffer at cursor 0. Forward growth ≈ **3.4 MB/day**
+  (~149 bytes/row), matching the ~3.2 MB/day this repo already recorded and the ~1.2 GB/year the
+  2026-08-02 retention decision predicted for an unpruned tier.
 - **Related, and load-bearing for the D4 decision:** `AndroidManifest.xml:14` sets
   `allowBackup="true"` with no `dataExtractionRules`. Android Auto Backup's cloud quota is 25 MB/app
-  and this file passed it within two weeks, so **the device raw store has no working backup.**
+  and the file now measures **31.2 MB**, so **the device raw store has no working backup** — that was a
+  projection when this row was filed and is now a measurement.
 - Detail and the five costed options:
   [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md).
 

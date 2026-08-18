@@ -179,6 +179,16 @@ const root = path.join(__dirname, '..');
 // to the top of the queue and approved every drawn variant as a shippable style, so the entry gains
 // the priority marker and the note that this is no longer a pick-one decision — only the default is
 // still open, and that is a stored preference belonging to Q-392.
+//
+// Raised 2026-08-18 (session wrap-up, Q-548..Q-551): four entries the session measured but had not
+// filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
+// oura_heartrate index ratio, and the owner decision on leaving Railway (deliberately deferred behind
+// Q-545 so it is not decided on a pre-fix, deploy-inflated baseline).
+//
+// Raised 2026-08-18 (session wrap-up, Q-548..Q-551): four entries the session measured but had not
+// filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
+// oura_heartrate index ratio, and the owner decision on leaving Railway (deferred behind Q-545 so it
+// is not decided on a pre-fix, deploy-inflated baseline).
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -425,7 +435,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6910,
+  'projectOverview.md': 6957,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -445,12 +455,19 @@ const BASELINE = {
   // rebuilds a primitive that already exists, the toggle chooses an INPUT mode for a value the
   // row prints both ways (with three drawn ways out and a recommendation), and #22c55e is also
   // MACRO_COLORS.protein, so the obvious sweep would repaint the protein macro.
-  // Raised 2026-08-18 (Tuning): -> 7918. Q-512/Q-513 — the FIRST calibration review of the workouts
-  // pillar. Both entries carry their measured tables because the conclusion is counterintuitive: the
-  // ACWR thresholds are RIGHT and must not be touched (the >1.5 emergency deload has never fired, and
-  // that is correct), while two of the three call sites computing ACWR are wrong. Strip the tables and
-  // the next reader tunes the thresholds instead of fixing the windows.
-  'docs/implementation-backlog.md': 7918,
+  // Raised 2026-08-18 (Q-395 round 3 + Q-396, BugFix intake). The owner sent MyFitnessPal
+  // screenshots and asked for a rework rather than a repaint, so Q-395 now carries the settled
+  // direction: the root cause is a list row carrying an editor, which supersedes the three
+  // srv/g options as a fork, plus the one-row-component decision and the sequencing warning
+  // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
+  // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
+  // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+  // Raised 2026-08-18 (Tuning): -> 8308, recomputed from the MERGED file. Q-512/Q-513 — the FIRST
+  // calibration review of the workouts pillar. Both entries carry their measured tables because the
+  // conclusion is counterintuitive: the ACWR thresholds are RIGHT and must not be touched (the >1.5
+  // emergency deload has never fired, and that is correct), while two of the three call sites
+  // computing ACWR are wrong. Strip the tables and the next reader tunes the thresholds instead.
+  'docs/implementation-backlog.md': 8308,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -458,7 +475,7 @@ const BASELINE = {
   // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
   // must do: construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock. Recomputed from the merged file on each merge this branch took.
-  'CLAUDE.md': 1056,
+  'CLAUDE.md': 1075,
 
 };
 
