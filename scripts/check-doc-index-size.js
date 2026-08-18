@@ -432,7 +432,14 @@ const BASELINE = {
   // CI check (hex literals vs the runtime-themeable --brand, the shrink-only ratchet already
   // aimed at them, and both landing files sitting ON the 800-line limit so line one fails),
   // kept separate from the two that need mockups first.
-  'docs/implementation-backlog.md': 7800,
+  // Raised 2026-08-18 (Q-393, Lane B): backlog 7800 -> 7828. Note `main` was ALREADY over this
+  // baseline by 28 when measured here, so this raise unblocks every branch, not just this one — a
+  // baseline that main itself exceeds fails the Custom Rules job on unrelated PRs. The lines are
+  // Q-393's shipped/not-shipped annotation, which carries the measured module-pitch table: every
+  // earlier figure in Q-389/Q-393 divided by the module count and not by the module count plus the
+  // quiet zone the renderer draws inside the code box, so all of them read ~24% large. That table is
+  // what stops the next session sizing a label against a number the printer will not honour.
+  'docs/implementation-backlog.md': 7828,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
