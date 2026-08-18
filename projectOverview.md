@@ -69,6 +69,30 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟡 Seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current (Q-492, 2026-08-18)
+
+- **The lens was the file every session must read first.** Three sweeps this week each found a stale
+  `CLAUDE.md` number by accident (Q-480, Q-490, Q-491). This one enumerated **every** checkable count
+  and re-derived it against `main` at `63fb89c`:
+  [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](docs/reviews/2026-08-18-claude-md-prose-counts.md).
+- **Script-backed: 3 of 3 current.** Sparkline (3 inline / 6 exempt), `Ran 40 of 40` custom rules, the
+  rollup vitest glob. **Prose: 7 of 9 stale** — hex literals **471 → 428**; the >800-line hotspot list
+  still names `more/profile-tab.tsx` (**476 lines**); "22 of 33" → **29 of 40**; `READINESS_SCORE_TTL`
+  "four sites" → **6**; suite "448 files" → **504**; plus the two already filed. **Two prose counts are
+  right** (score-band 17, "11 inline grep rules") — the correlation is strong, not absolute.
+- **Two items are more than drift.** `more/profile-tab.tsx` **should already have been struck** — the
+  same paragraph mandates it and cites `health-sections.tsx` as the precedent. And the rollup-glob
+  maintenance command at `CLAUDE.md:976` is scoped to the directory the glob covers, so it **can only
+  confirm the glob against itself** — a rollup test written elsewhere is invisible to the check that
+  exists to find it. **Both defects are latent:** no test outside the glob calls the rollup today.
+- **One ratchet with slack.** `check-component-size.js` is shrink-only; `components/workout-screen.tsx`
+  is pinned at **1850** against an actual **1831** — 19 lines of regrowth that would pass silently.
+- **The fix is not correcting seven numbers** — that buys a week. Cite the command, or delete the
+  number and keep the rule. The file already contains the model in its own sparkline paragraph.
+  *A count in prose is a claim with a decay date; a count in a script is a fact.*
+- **Not exercised:** static verification only — no runtime, no device.
+
+
 ### [platform][app-shell][readiness] 🟢 This run's own findings checked against production — one refuted, two re-scoped, one new (Q-472, 2026-08-18)
 
 - **The lens was to measure my own claims.** Seven sweeps filed 22 findings (Q-450…Q-471), almost all

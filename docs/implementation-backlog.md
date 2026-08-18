@@ -848,6 +848,43 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [platform] Q-492 — seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current
+
+- **Branch:** `docs/claude-md-counts-cite-the-command`
+- **Added:** 2026-08-18 · review sweep (documentation self-maintenance) ·
+  [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](reviews/2026-08-18-claude-md-prose-counts.md)
+- **Placement:** medium. Docs-only and cheap, but `CLAUDE.md` is the file every session reads before
+  it may start, so a wrong number there is read by five concurrent agents before any code is touched.
+- **The measurement.** Every checkable count in the file, re-derived against `main` at `63fb89c`:
+  - **Script-backed: 3 of 3 current** — sparkline (3 inline / 6 exempt), `Ran 40 of 40` custom rules,
+    the rollup vitest glob.
+  - **Prose: 7 of 9 stale** — hex literals **471 → 428**; the >800-line hotspot list still names
+    `more/profile-tab.tsx` (**476 lines**); `health-sections.tsx` 795 → **777**; the script glob
+    "22 of 33" → **29 of 40**; `READINESS_SCORE_TTL` "four sites" → **6**; suite "448 files" →
+    **504**; the nine chevron paths (already Q-491). Two prose counts *are* right (score-band 17,
+    "11 inline grep rules") — the correlation is strong, not absolute, and is recorded that way.
+- **Two items that are more than drift:**
+  - `more/profile-tab.tsx` **should already have been struck** — the same paragraph mandates removing
+    a hotspot that drops under the line, and cites `health-sections.tsx` being removed on 2026-08-09
+    for exactly that. The procedure was followed once, then not again.
+  - **The rollup-glob maintenance command cannot detect what it is for.** `CLAUDE.md:976` says keep
+    the glob in step with `grep -rl aggregateOuraRawSamples lib/data/postgres/__tests__/`, to catch
+    "a new rollup test outside it". But it is scoped to the directory the glob covers, so it can only
+    confirm the glob against itself; and `grep -l` matches comments (it reports two files that never
+    call the function). **Both defects are latent** — no test outside the glob actually calls the
+    rollup today. Nothing is mis-timed; the procedure just would not fire when needed.
+- **One ratchet with slack.** `check-component-size.js` is shrink-only; four baselines are exact,
+  `components/workout-screen.tsx` is pinned at **1850** against an actual **1831** — 19 lines of
+  regrowth that would pass silently.
+- **The fix is not "correct the seven numbers"** — that resets the decay clock for about a week. For
+  each count, **cite the command or delete the number and keep the rule**. The file already contains
+  the model, in its own sparkline paragraph: *"Don't hand-count from `grep -rn '<polyline'`; run
+  `node scripts/check-sparkline-primitive.js`, which is the maintained list."* `check-hex-literals.js`
+  and `check-component-size.js` both already print their own totals.
+- **Scope:** `CLAUDE.md` (rewrite each count as a command citation); optionally lower the
+  `workout-screen.tsx` baseline to 1831 and broaden the rollup grep to repo-wide + call-site-aware.
+- **Not exercised:** static verification only, no runtime or device.
+
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
 - **Branch:** `fix/aria-expanded-collapsibles-ratchet`

@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-eight sweeps (2026-08-17 ×2, 2026-08-18 ×26) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **492**)
+**Updated:** 2026-08-18 · **By:** twenty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×27) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **493**)
 
 ## Now
 
-Twenty-eight sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-nine sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,39 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 29 — every count in `CLAUDE.md`, verified mechanically (2026-08-18)
+
+**Filed Q-492 (medium).** Write-up:
+[`docs/reviews/2026-08-18-claude-md-prose-counts.md`](../../reviews/2026-08-18-claude-md-prose-counts.md).
+
+**Took sweep 28's own standing suggestion, and it held.** Enumerated every checkable count in
+`CLAUDE.md` and re-derived it against `main` at `63fb89c`:
+
+- **Script-backed: 3 of 3 current** — sparkline (3 inline / 6 exempt), `Ran 40 of 40`, the rollup glob.
+- **Hand-typed prose: 7 of 9 stale** — hex literals **471 → 428**, the >800-line hotspot list still
+  names a **476-line** file, `health-sections` 795 → **777**, "22 of 33" → **29 of 40**,
+  `READINESS_SCORE_TTL` "four sites" → **6**, suite "448 files" → **504**, plus Q-491's nine paths.
+
+**Two prose counts are right** — score-band's 17, and "the 11 inline grep rules". The correlation is
+strong, **not absolute**, and the write-up says so instead of rounding it up. What *is* absolute in
+this sample: no script-backed count was stale.
+
+**Two findings are more than drift.** (1) `more/profile-tab.tsx` **should already have been struck** —
+the same paragraph mandates it and cites `health-sections.tsx` as the 2026-08-09 precedent; the
+procedure was followed once, then not again. (2) **The rollup-glob maintenance command cannot detect
+what it is for** — `CLAUDE.md:976` scopes it to `lib/data/postgres/__tests__/`, the very directory the
+glob covers, so it can only confirm the glob against itself, while the warning it serves is about a
+rollup test written *outside* it. **Both latent** — repo-wide, no test outside the glob calls
+`aggregateOuraRawSamples`. Recorded as "would not fire when needed", not as a present failure.
+
+**Also:** `check-component-size.js` is shrink-only and four of five baselines are exact, but
+`workout-screen.tsx` is pinned at **1850** against an actual **1831** — 19 lines of silent regrowth
+headroom. Worth checking the other ratchets for the same slack.
+
+**The recommendation is deliberately not "fix the seven numbers"** — that buys a week. Cite the
+command, or delete the number and keep the rule. `check-hex-literals.js` and
+`check-component-size.js` already print their own totals; the sparkline paragraph is the in-file model.
 
 ### Sweep 28 — the `aria-expanded` list, re-checked (2026-08-18)
 
@@ -40,9 +73,7 @@ is current**: hex literals, TTL divergence, component size, doc-index size, back
 `CLAUDE.md` drew this lesson for hex literals and it applies to its own prose. **A count in prose is a
 claim with a decay date; a count in a script is a fact.**
 
-**A standing suggestion for a successor:** sweep `CLAUDE.md` for remaining prose counts and propose
-replacing each with a script citation. Three were wrong out of three checked. That is a docs-only PR
-with a high hit rate and it makes the file self-maintaining where it currently is not.
+**This suggestion was taken as sweep 29 — see immediately above. It held: 7 of 9 stale.**
 
 ### Sweep 27 — the other four render rules; all held (2026-08-18)
 
