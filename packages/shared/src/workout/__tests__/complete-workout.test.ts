@@ -1,7 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 const getWorkoutSessionById         = vi.fn()
-const completeWorkoutSession        = vi.fn(async () => {})
+// Q-473: the real implementation returns whether *this* call stamped `completed_at` — the guarded
+// UPDATE's affected-row count. The mock must honour that, because it is now what decides
+// idempotence; a mock returning undefined would make every completion look like a replay.
+const completeWorkoutSession        = vi.fn<(id: string, userId: string, at: Date) => Promise<boolean>>(async () => true)
 const getWorkoutSessionProgramSessionId = vi.fn()
 const updatePrescriptionStatus      = vi.fn(async () => {})
 const incrementSessionsInPhase      = vi.fn(async () => {})
@@ -24,7 +27,7 @@ import { completeWorkoutFromPayload, resolveCompletedAt } from '../complete-work
 
 beforeEach(() => {
   getWorkoutSessionById.mockReset()
-  completeWorkoutSession.mockClear()
+  completeWorkoutSession.mockReset().mockResolvedValue(true)
   getWorkoutSessionProgramSessionId.mockReset()
   updatePrescriptionStatus.mockClear()
   incrementSessionsInPhase.mockClear()
@@ -47,6 +50,8 @@ describe('completeWorkoutFromPayload', () => {
 
   it('is idempotent on replay: never double-consumes the prescription or double-increments the phase counter', async () => {
     getWorkoutSessionById.mockResolvedValue({ id: 'ws-1', startedAt: new Date(), completedAt: new Date() })
+    // The row is already stamped, so the guarded UPDATE matches nothing.
+    completeWorkoutSession.mockResolvedValue(false)
     getWorkoutSessionProgramSessionId.mockResolvedValue('ps-1')
 
     const result = await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })
@@ -57,6 +62,22 @@ describe('completeWorkoutFromPayload', () => {
     // ...but the one-shot side effects must not re-fire on a replay.
     expect(updatePrescriptionStatus).not.toHaveBeenCalled()
     expect(incrementSessionsInPhase).not.toHaveBeenCalled()
+  })
+
+  it('Q-473: a loser of a concurrent completion does not increment, even though its own read saw completedAt: null', async () => {
+    // This is the shape that was measured: four simultaneous POSTs for one session, all four
+    // reading before any of them wrote, giving sessions_in_phase = 3 for one workout. The read
+    // below is the pre-write one every racer sees; the UPDATE's `isNull(completed_at)` guard is
+    // what separates them, and returning false is how the database says "you were not first".
+    getWorkoutSessionById.mockResolvedValue({ id: 'ws-1', startedAt: new Date(), completedAt: null })
+    completeWorkoutSession.mockResolvedValue(false)
+    getWorkoutSessionProgramSessionId.mockResolvedValue('ps-1')
+
+    const result = await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })
+
+    expect(result).toEqual({ alreadyCompleted: true, programSessionId: 'ps-1' })
+    expect(incrementSessionsInPhase).not.toHaveBeenCalled()
+    expect(updatePrescriptionStatus).not.toHaveBeenCalled()
   })
 
   it('skips the phase-counter side effects for a session with no linked program session (AI-dynamic/freeform)', async () => {
@@ -163,6 +184,7 @@ describe('completeWorkoutFromPayload', () => {
 
     it('does not record on a replayed (already-completed) session', async () => {
       getWorkoutSessionById.mockResolvedValue({ id: 'ws-1', startedAt: new Date(), completedAt: new Date() })
+      completeWorkoutSession.mockResolvedValue(false)
       getWorkoutSessionProgramSessionId.mockResolvedValue('ps-1')
 
       await completeWorkoutFromPayload('u1', { workoutSessionId: 'ws-1' })

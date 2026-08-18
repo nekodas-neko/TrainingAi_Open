@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { NotFoundError } from '@trainingai/shared/errors'
 import { eq, and, inArray, gte, lt, asc, desc, sql, isNull } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -180,7 +181,7 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
       // 0 rows means the id is not this user's. It already failed closed — `pRow.id` below throws
       // inside the transaction — but by accident rather than by design, and with an opaque
       // TypeError instead of a reason (Q-129).
-      if (!r) throw new Error('Program not found')
+      if (!r) throw new NotFoundError('Program')
       pRow = r
     } else {
       const [r] = await tx.insert(s.programs)
@@ -510,7 +511,7 @@ export async function updatePhaseSet(
     .from(s.phaseSets)
     .where(and(eq(s.phaseSets.id, phaseSetId), eq(s.phaseSets.userId, userId)))
     .limit(1)
-  if (!existing) throw new Error('Phase set not found')
+  if (!existing) throw new NotFoundError('Phase set')
   if (existing.isDefault) throw new Error('Default phase set cannot be modified')
 
   return db.transaction(async tx => {
@@ -536,7 +537,7 @@ export async function deletePhaseSet(db: Db, phaseSetId: string, userId: string)
     .from(s.phaseSets)
     .where(and(eq(s.phaseSets.id, phaseSetId), eq(s.phaseSets.userId, userId)))
     .limit(1)
-  if (!existing) throw new Error('Phase set not found')
+  if (!existing) throw new NotFoundError('Phase set')
   if (existing.isDefault) throw new Error('Cannot delete the default phase set')
 
   // Scoped to the caller: an unscoped probe both blocked this user's delete on a stranger's
@@ -733,7 +734,7 @@ export async function saveProgressionStyle(db: Db, userId: string, style: Progre
         .set({ name: style.name, updatedAt: new Date() })
         .where(and(eq(s.progressionStyles.id, style.id), eq(s.progressionStyles.userId, userId)))
         .returning({ id: s.progressionStyles.id })
-      if (updated.length === 0) throw new Error('Progression style not found')
+      if (updated.length === 0) throw new NotFoundError('Progression style')
       styleId = updated[0].id
     } else {
       const [sRow] = await tx.insert(s.progressionStyles)

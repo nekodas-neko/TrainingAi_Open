@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isNotFoundError } from '@trainingai/shared/errors';
+import { routeErrorResponse } from '@/lib/api/route-errors';
 import { auth } from "@/auth";
 import { rateLimit } from "@/lib/rate-limit";
 import { LogExercisePayloadSchema, logExerciseFromPayload } from "@trainingai/shared/workout/log-exercise";
@@ -42,6 +44,17 @@ export async function POST(req: NextRequest) {
       isPR:             result.isPR,
     });
   } catch (err) {
+    // Q-462: an ownership refusal is not a server fault. Checked first, so it neither reports 500 to
+    // the sync path (which reads 5xx as "retry later" and 4xx as a poison pill to quarantine) nor
+    // writes a stack trace into `error_events` — the one fault signal nobody is watching.
+    if (isNotFoundError(err)) {
+      // Logged, but as a one-line warning rather than a `reportServerError` stack trace: a cross-user
+      // attempt is worth seeing in the server log, and is exactly the kind of correctly-refused
+      // request that should NOT be filling `error_events`. Dropping the log entirely would trade one
+      // problem for a blind spot.
+      console.warn(`[log-exercise] refused: ${err.message} (user ${userId}, session ${parsed.data.workoutSessionId})`);
+      return routeErrorResponse(err);
+    }
     console.error("[log-exercise] logExerciseFromPayload threw", err);
     reportServerError(err, { userId, url: req.nextUrl.pathname });
     return NextResponse.json({ error: "Failed to log exercise" }, { status: 500 });

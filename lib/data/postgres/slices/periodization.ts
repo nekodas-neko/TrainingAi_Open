@@ -1,4 +1,5 @@
 import { eq, and, inArray, asc, desc, sql, isNull, gte } from 'drizzle-orm'
+import { NotFoundError } from '@trainingai/shared/errors'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import { shiftDateStr, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
@@ -285,7 +286,7 @@ export async function replaceVolumeTargets(db: Db, userId: string, programId: st
     const owned = await tx.select({ id: s.programs.id }).from(s.programs)
       .where(and(eq(s.programs.id, programId), eq(s.programs.userId, userId)))
       .limit(1)
-    if (owned.length === 0) throw new Error('Program not found')
+    if (owned.length === 0) throw new NotFoundError('Program')
 
     await tx.delete(s.programVolumeTargets).where(eq(s.programVolumeTargets.programId, programId))
     if (targets.length > 0) {

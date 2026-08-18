@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { withRouteErrors } from '@/lib/api/route-errors'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -23,8 +24,11 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const parsed = InjuryPatchSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const repo = await getRepository()
-  const injury = await repo.updateInjury(id, session.user.id, parsed.data)
-  return NextResponse.json(injury)
+  // Q-463: an id that is not yours (or does not exist) answered 500 with an empty body.
+  return withRouteErrors(async () => {
+    const injury = await repo.updateInjury(id, session.user!.id!, parsed.data)
+    return NextResponse.json(injury)
+  })
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -33,6 +37,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params
   const repo = await getRepository()
-  await repo.deleteInjury(id, session.user.id)
-  return NextResponse.json({ ok: true })
+  return withRouteErrors(async () => {
+    await repo.deleteInjury(id, session.user!.id!)
+    return NextResponse.json({ ok: true })
+  })
 }
