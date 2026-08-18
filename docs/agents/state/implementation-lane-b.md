@@ -3,11 +3,40 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **357**)
+**Updated:** 2026-08-18 · **By:** the sixth Lane B run · **Q band:** 350–386 (next free: **357**)
 
 ## Now
 Nothing in flight. **The meal-label (food sticker) work is the live thread** — Q-389 built it, Q-393
 added the ingredient breakdown, and what remains on it is two owner decisions and a print test.
+
+### This run (2026-08-18, sixth)
+
+- **Q-478 SHIPPED** (v1.324.8, PR #154) — `isBodyMetadataFresh`/`isWorkoutDataToday` compared a
+  **server-stamped** date to a bare `todayInTz()`, i.e. Brisbane, so both returned false for |Δ|
+  hours a day — 14 in New York — on current data. Both take a `tz` now; all nine call sites pass one;
+  `scripts/check-tz-aware-cache-guards.js` (Custom Rules) fails any call that does not.
+  [Journal](../../overview/entries/2026-08-18-tz-aware-cache-guards.md).
+  **Two corrections to the review, made in place:** session-select's loading state **does** clear (a
+  second unconditional `setMetaLoading(false)` runs after the await, so the cost is a round-trip-long
+  skeleton, not a hang — the review said "never clears"); and `unwrapToday`/`cachedFetchToday` were
+  deliberately left alone, being client-written and client-read.
+  **Q-477 is still open**, including its ratchet on bare `todayInTz()` across client code — this
+  check guards two named helpers, not the general case.
+
+- **Q-488 RE-TAGGED TO LANE A, not built** (PR #152) — and the reason is worth carrying. The entry
+  said "one call in one Lane B handler". There is no such call: `lib/local-store` has **no**
+  `deleteActivityLog` (every hit for that name is the *server* repository), and `upsertActivityLog`
+  omits `deleted_at` from **both** its INSERT column list and its `ON CONFLICT DO UPDATE SET`. A
+  read-merge upsert stamping `deletedAt: now` compiles, type-checks, lints clean, and is a **no-op** —
+  `getActivityLogs` filters on a column the write never touches. It was written here and reverted.
+  **Nothing in this sandbox could have caught it** (`getLocalStore` returns null in the web runtime),
+  so it would have merged green as a fix. The backlog entry now carries the column evidence.
+  The inverse offline-first rule it asked for **did** land, in `CLAUDE.md`'s Offline-First section.
+
+- **Journal compaction sweep, third of the day** — 61 loose entries, 20 unlinked, into a new
+  `docs/overview/history-2026-08-18.md`. `main` was already **over** the 60-file runaway limit, so
+  Custom Rules was red on every open branch. The linked floor held at 41 rather than rising as the
+  README's forecast said; the README now records that.
 
 - **Q-393 SHIPPED** (v1.323.0, PR #94) — the per-serving ingredient breakdown, as a **square-only**
   style. A round 50 mm label has **7 units of slack once the default's content is on it — zero
@@ -141,6 +170,9 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
 **Q-353** (the health-insight prompt's "no data") and **Q-356** (the daily CI failure below).
 
 ## ⚠️ Blocking everyone, not just this lane
+- **Q-356 is FIXED** (Lane A) — the backlog now carries `✅ Q-394 — RESOLVED: anchor-source.test.ts
+  was red on main, fixed by Q-356's fixture change`. Left below because the *shape* recurs and
+  CLAUDE.md's Date Arithmetic section now names it. Original report:
 - **Q-356** — `lib/data/postgres/__tests__/periodization-soft-delete.test.ts` fails **14:00–16:00 UTC
   every day, on any branch**: it inserts a session at `now() - 1 hour` (UTC) and queries a
   Brisbane-local day window, so just after Brisbane midnight the fixture lands on the previous local
@@ -187,6 +219,14 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
   taken for Q-457 with Lane A's baton showing no claims. Release the claim when convenient.
 - **`scripts/check-doc-index-size.js`** — not a lane path, but every Lane B PR touches its baseline.
   Both lanes raise it on the same days; **recompute from the merged file, never splice the hunk.**
+  (Hit again on 2026-08-18: main's numbers moved under an in-flight PR and the conflict was inside
+  the baseline block. Recomputing from the merged files is a ten-second fix; splicing is not.)
+- **`lib/sqlite/cache.ts`** — **this is Lane A's directory** and was touched for Q-478, as that
+  entry explicitly instructed. Additive only: an optional `tz` on two exported guards, no call-site
+  contract broken. Lane A's baton read *None held* and its queue was entirely Oura/DB work.
+  Release the claim when convenient.
+- **`scripts/check-component-size.js`** — not a lane path; its `health-content.tsx` baseline was
+  raised by one for Q-478.
 
 Otherwise the lane list in [`docs/agents/README.md`](../README.md) §3.
 
@@ -252,4 +292,12 @@ Otherwise the lane list in [`docs/agents/README.md`](../README.md) §3.
 - **The remote branch ref goes stale after every squash-merge**, and push is rejected as "behind".
   Force-push is not permitted here — `git fetch origin <branch> && git merge FETCH_HEAD` is a content
   no-op that clears it. Verify with `git diff HEAD origin/main --stat` before pushing.
-- **`pnpm check:rules` ran 38 of 38 on 2026-08-17.** Quote the count, never "pass" — it moves.
+- **`pnpm check:rules` ran 44 of 44 on 2026-08-18** (38 on 08-17, 43 earlier the same day). Quote
+  the count, never "pass" — it moves, sometimes twice in a session.
+- **The 800-line component ratchet will block a two-line addition to a hotspot**, and the sanctioned
+  way through is in the script's own header: reclaim what you can, then raise the baseline with the
+  reason in the same PR. Merging duplicate imports from the same module is the cheapest honest
+  reclaim — `nutrition-content.tsx` funded both its new lines that way and stayed at exactly 800.
+- **`get_check_runs` lags.** On 2026-08-18 it read three of six checks `in_progress` for ~10 minutes
+  after they had finished; `merge_pull_request` succeeded immediately. Try the merge rather than
+  polling — branch protection refuses a genuinely pending check.
