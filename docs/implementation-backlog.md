@@ -285,6 +285,751 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+<!-- NUTRITION FOCUS BLOCK — the owner asked on 2026-08-18 to concentrate on nutrition. The eight
+     entries below are ordered by dependency, not by Q number. Do not re-sort them into numeric
+     order; the sequence is the point. -->
+
+## Nutrition focus — the owner's priority, 2026-08-18
+
+*"lets focus on the nutrition changes now. id like to get this perfected today"*
+
+The next eight entries are the nutrition cluster, **ordered by dependency rather than Q number**.
+Do not re-sort them numerically; the sequence is the point, and two of them block others.
+
+**Realistically today, and this is the honest split:**
+- **Achievable** — Q-399, Q-402 and Q-401 are small, self-contained and independent of the rework.
+  Together they fix the label, stop the Home widget freezing, and unify the two calorie budgets.
+  Q-387's wiring is a shared-module change and can run in parallel in the other lane.
+- **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
+  `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
+  first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
+  whatever else happens.
+
+**Parallel-safe:** Q-399, Q-402 and the Lane B half of Q-401 touch different files and can land in any
+order. Everything else is sequential.
+
+### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
+
+- **Branch:** `fix/inline-centred-line-budget`
+- **Added:** 2026-08-18 · owner, on v1.324.6 with the style selected: *"I dont see the B2 default we
+  wanted... where is my b2 default? should of shipped?"* It **did** ship (Q-397, #105) and is
+  correctly the default and correctly selected. It just draws no ingredients.
+- **Lane B.** One constant in `components/nutrition/meal-label-render.ts`. No schema, no route.
+
+**Proven arithmetic, not a data problem.** `drawSquareCentredLabel` walks the column top-down and
+then asks how many 8-unit lines fit above the code:
+
+```
+L = (189 − 137) / 2 = 26        bottom = 189 − 26 = 163
+y  = 30 (L+4)
+  + nameSize(12) + 7            →  49
+  + caloriesSize(21) + 6        →  76
+  + macroSize(7.5) + 5          →  88.5
+  + rule gap(8)                 →  96.5
+codeTop  = 163 − 0 − codeUnits(66) = 97
+maxLines = floor((97 − 96.5 − 2) / 8) = floor(−0.19) → clamped to 0
+```
+
+**Zero lines, and it is not marginal — it is negative.** `fitText` shrinking a long name does not
+rescue it: at nameSize 12/10/8/6/**4** the answer is 0 every time, because the name contributes at
+most 12 of the 66.5 units consumed. For **one** line the code box must be **≤ 56.5 units**; it ships
+at **66**.
+
+**The tell was in the spec's own comment.** It reasons *"58 units is what the stack can spare once
+name, calories, macros and five ingredient lines have taken their height"* — and the value shipped is
+66. But 58 does not fit either (it yields 0 lines as well); the budget was computed against a
+different set of gaps than the ones drawn. **Do not simply set it to 58.**
+
+**Confirming symptom, visible in the owner's screenshot:** the sheet's *"Printing N ingredients"* line
+is absent. That copy is gated on `metrics.ingredientLines > 0`, so the renderer is already reporting
+0 — the plumbing works and is telling the truth. `savedMealToIngredients` is **not** the fault; the
+local store joins `food_items` and populates `foodItem`, and the per-portion calories on the label
+(208 kcal, P 32 C 8 F 5) prove the items resolved.
+
+**What to fix, in order of preference.**
+1. **Recompute the budget from the drawn gaps rather than guessing a constant.** Derive `codeUnits`
+   from the space actually left (`bottom − y − reserved lines × 8`) so the code takes what remains
+   after N lines, instead of a hardcoded box the layout cannot honour.
+2. If a fixed constant is kept, it must be **≤ 56.5 for one line, ≤ 40.5 for three** — and three is
+   what the style promises. 40.5 units is a 10.7 mm box, symbol ~8.1 mm, **~0.32 mm per module**,
+   which is *below* the 0.487 that `band` shipped with. **That is the real finding:** the centred
+   stack cannot carry the full list *and* a better code than the old default, so one of the two has
+   to give. The mockup that promised both was drawn at tighter type (6.5 px list, smaller headline,
+   smaller gaps) than the spec that shipped.
+3. **Whatever is chosen, the picker copy must match it.** "The full ingredient list" is currently
+   false, and a style that quietly prints fewer lines than it claims is how this was missed.
+
+- **Regression test, and it is cheap:** `meal-label-code-size.test.ts` already exists. Add a case
+  asserting `ingredientLines >= 1` for a two-ingredient meal in every style whose spec sets
+  `ingredients: true`. A style that claims a list and draws none should fail CI, not a test print.
+- **Verification:** the preview must show the ingredient run **and** the "Printing N ingredients"
+  line, then a physical print at 50 mm.
+
+### [nutrition][app-shell] Q-402 — Home's energy-balance widget never refetches; only an app restart updates it
+
+- **Branch:** `fix/energy-balance-widget-refetch`
+- **Added:** 2026-08-18 · owner: *"noting the widget energy bar doesnt update natively; requires a
+  restart of the app."*
+- **Lane B.** One hook, `app/health/hooks/use-health-calcs.ts`. No schema, no route.
+
+**Confirmed cause — the hook fetches once and has nothing to make it fetch again.**
+`useEnergyBalanceToday()` seeds from cache in one effect and then:
+
+```ts
+useEffect(() => {
+  const today = todayInTz()
+  cachedFetch<EnergyBalanceResponse>(`energy-balance:${today}`, …, ENERGY_BALANCE_TTL, d => setData(d ?? null))
+}, [])          // ← empty deps: once per mount, never again
+```
+
+`HomeEnergyBalanceCard` lives in the persistent tab shell, so it does **not** unmount when you switch
+tabs — the effect never re-runs and `data` keeps whatever the first fetch returned. Killing the app is
+the only thing that remounts it. That is precisely the reported behaviour.
+
+**The invalidation is NOT the missing piece — that part already works.** `lib/cache-groups.ts` clears
+`energy-balance:` from **six** write groups. The entry is correctly evicted; nothing asks the hook to
+go and get a new one. This is the *other half* of the standing cache rule: invalidating a key and
+re-rendering the component that reads it are two different things, and the repo has no
+subscribe-to-invalidation mechanism at all (checked — no cache event, no listener; `TAB_NAV_EVENT`
+exists but is navigation only).
+
+**Why Nutrition looks fine and Home does not.** The Nutrition tab does not use this hook —
+`nutrition-content.tsx` fetches the payload itself and re-fetches on its own date and logging changes,
+then passes it down to `CalorieBalanceBar`. So the same number is live on one surface and frozen on
+the other, which is also why this reads as "the widget" rather than "energy balance".
+
+**What to fix.** Give the hook a reason to re-run, and prefer a mechanism the whole app can use over a
+one-off:
+1. **Preferred — a cache-invalidation signal.** Have `invalidateCache()` emit, and let a small
+   `useCachedValue(key, url, ttl)` hook resubscribe. This is the general fix; **every other
+   seed-and-fetch-once hook in the app has the same latent bug**, and finding them one owner report at
+   a time is the expensive path.
+2. **Minimum viable** — refetch on tab focus / on the shell's navigation event, plus after any local
+   write that queues a `body_metrics` or `food_logs` mutation.
+- **⚠ Do not "fix" this by lowering `ENERGY_BALANCE_TTL`.** A shorter TTL does not help: the effect
+  never runs again, so the TTL is never consulted. It would only add load and hide the real defect.
+- **Verification:** log food from Home without leaving the tab and watch the bar move. Then repeat on
+  the **APK**, since the persistent shell is what makes this reproduce and a browser reload masks it.
+- **Related:** **Q-401** replaces this widget's progress bar with the energy zone bar, which makes the
+  staleness more visible, not less — do this one first or alongside it.
+
+### [nutrition][app-shell] Q-401 — two calorie budgets on one screen, 274 apart, and the card that explains it is suppressed
+
+- **Branch:** `feat/combine-energy-and-macro-widgets`
+- **Added:** 2026-08-18 · owner, on the Nutrition tab: *"why are these values different? should it not
+  match the nutrition goal? I was hopping we could combine these 2 widgets/displays"*
+- **⚠ SPLIT ACROSS LANES — check before starting.** The bar swap and the suppression rule in
+  finding 3 are **Lane B** (components only). Retiring `ACTIVITY_MULTIPLIERS` as a second TDEE
+  model touches `packages/shared/src/nutrition/goal-recommendation.ts`, which is **Lane A's**
+  under §3 — a Lane B session must hand that half over rather than reach into it. The two halves
+  are independent: the swap can land first, and the formula change does not need the UI.
+  No schema, no route, no migration either way.
+
+**Both numbers are correct and they measure different things.** Traced, not guessed
+(`lib/health/energy-balance-service.ts:180-181`):
+- **Ring — "1900 left"** = `nutrition_targets.calories` (1,900) − eaten. A **fixed** goal you set
+  once. It does not move when you train.
+- **Energy Balance — "1,626 kcal left today"** = maintenance (1,826) + `CALORIE_ADJUSTMENT_BY_GOAL`
+  (**recomp = −200**, `goal-recommendation.ts:19`) − eaten. A **dynamic** budget that rises with what
+  you actually burn.
+
+1,826 − 200 = **1,626** against a set **1,900**: a **274 kcal** gap, both labelled "left", stacked one
+above the other with nothing reconciling them.
+
+**Finding 1 — the app already knows.** `driftsFromRecommendation` is
+`|currentKcal − recommendedKcal| > 100` → |1,900 − 1,626| = 274 → **true**, today, on the owner's
+device.
+
+**Finding 2 — and it is arguably telling the owner something real.** For a *recomp* goal the
+recommendation sits 200 **under** maintenance; the stored goal is 74 **over** it. Whatever the merge
+looks like, that is a fact the screen should be able to say out loud.
+
+**Finding 3 — ⚠ the only surface that explains it is gated shut exactly when it is needed.**
+`tdee-adaptation-card.tsx:44-48` requires `maintenance.source === "calibrated"`. The owner's card
+reads *"Log food on 4 more days to calibrate"*, i.e. `source === 'formula'` — so the Calorie Nudge is
+correctly hidden, and the two numbers sit there unexplained. **The gate is right for the *action* and
+wrong for the *explanation*.** Suggesting a new target off a formula-derived maintenance would move
+the user sideways with false authority — that comment is correct and should stay. Saying *why the two
+numbers differ* costs nothing and needs no calibration. **Split the condition:** explain always, offer
+to apply only when calibrated.
+
+**The merge, and the one decision inside it.**
+- **One card.** Ring and macro bars on top; energy balance as a strip beneath; the reconciliation in
+  a sentence rather than as two numbers to subtract.
+- **The ring keeps the SET goal (1,900), not the recommendation.** This is the load-bearing choice:
+  the macro grams under it (0/150 P, 0/190 C, 0/60 F) are derived from that same `nutrition_targets`
+  row. Point the ring at 1,626 while the bars still read 1,900-derived grams and the card contradicts
+  itself internally — a worse bug than the one being fixed.
+- **Energy balance keeps its zone bar**, which is the part the ring cannot express: it is the only
+  thing on the screen that accounts for what you burned.
+- **Related:** the calibration this is waiting on is what **Q-387** unblocks — until completed days
+  can be identified, `source` stays `formula` and this explanation is the only thing the user gets.
+
+- **Not in scope:** changing anyone's targets, or auto-applying the recommendation. This entry makes
+  the disagreement legible; **Q-302**'s nudge already owns the applying.
+- **Verification:** with a formula-derived maintenance and a drifting goal, the merged card must state
+  the gap and the reason. Then check the **Home** widget renders the same two figures — it shows both
+  as well (Nutrition 0/1900 and Energy Balance 1,626), so a fix on Nutrition alone leaves Home
+  contradicting it. **Sibling sweep: both surfaces in the same PR.**
+
+
+**ROOT CAUSE FOUND, and it is not staleness — it is two TDEE models. (2026-08-18)**
+The owner asked whether both numbers were not already AI-derived. They were. They come from the same
+BMR and disagree by exactly the activity level the goal wizard was told about:
+
+| | formula | value |
+|---|---|---|
+| BMR implied by the shipped maintenance | 1,826 ÷ 1.2 | **1,522** |
+| Goal wizard, `calculateBaseline` | BMR × **1.375** (light) − 200 | **1,892** ≈ the stored **1,900** |
+| Energy balance, `buildEnergyBalance` | BMR × **1.2** (sedentary) − 200 | **1,626** |
+
+**Gap = BMR × (1.375 − 1.2) = 266 kcal.** Observed on device: **274**. The 8 kcal is rounding and
+weight drift since the goal was set. That is the entire discrepancy accounted for.
+
+**Neither is wrong; they are different contracts.**
+`goal-recommendation.ts:5` bakes a **self-reported** activity multiplier into the target, so the
+number already assumes your training and never moves. `daily-energy.ts:20` uses
+`SEDENTARY_MULTIPLIER = 1.2` **deliberately**, and its comment says why: *"measured movement is added
+explicitly, so a higher activity multiplier here would double-count it."* One assumes activity, the
+other measures it. Run both and you get two budgets — which is what the screen shows.
+
+**✅ OWNER DECISION, 2026-08-18: one number, and it rises with activity.** *"if its saying its
+1800-200; then that should be the calorie goal? and it can increase with activity?... can we look at
+having them all the same?"*
+
+**Recommendation: adopt the measured model everywhere.** It is the only one that can be right on both
+a rest day and a training day — an assumed multiplier is wrong on every day that is not average, and
+the app already measures the real thing. Concretely:
+1. **Today's goal = sedentary base + today's measured activity + goal delta.** The stored
+   `nutrition_targets.calories` becomes the **rest-day floor**, not the truth, and the day's figure is
+   derived from it.
+2. **The goal wizard must switch to the sedentary multiplier** when it feeds this. Leaving it at
+   `light`/`moderate` while activity is also added measured is a double-count — the exact thing
+   `daily-energy.ts` warns about, and the reason the two numbers drifted apart in the first place.
+   **This is the load-bearing change; the merge in this entry is cosmetic without it.**
+3. **Macros have to follow, and not uniformly.** Protein is dosed per kg of bodyweight
+   (`PROTEIN_G_PER_KG_BY_GOAL`), so it must **not** scale with activity; the earned calories belong to
+   carbs. Scale all three and the ring and the bars disagree again in a new way.
+4. **Say where the extra came from.** A budget that grows during the day is confusing unless it is
+   labelled — *"1,626 + 312 earned from training"* rather than a number that silently changes.
+
+**⚠ What this costs, stated plainly:** the goal stops being a fixed number you can memorise, and it is
+at its lowest in the morning before you have trained. That is the honest trade for a number that is
+right on both kinds of day. **One formula, one place** — after this there must be exactly one TDEE
+implementation, and `calculateBaseline`'s multiplier table stops being a second one.
+
+
+**✅ OWNER CONFIRMED THE MODEL AND NARROWED THE MERGE, 2026-08-18.** *"i want the lowest number that
+assumes no exercise/movement - and only has BMR essentially. then we adjust/increase that number
+activity. can you make it consistent throughout the whole app that distinction."* Plus: *"id rather
+keep the regular nutrition one; and just add the bar from the energy balance to it to replace the
+current nutrition progress bar."*
+
+**1 — The baseline is BMR × sedentary, everywhere, and activity is only ever ADDED.** That is the
+contract. `SEDENTARY_MULTIPLIER = 1.2` (`daily-energy.ts:20`) is the one baseline; anything that also
+adds measured movement must start from it. **`ACTIVITY_MULTIPLIERS` in `goal-recommendation.ts:5`
+stops being a second TDEE model** — the wizard keeps asking the activity question if it is useful for
+step goals and water, but it must not fold that multiplier into the calorie target.
+
+**2 — Sweep it, do not patch one caller.** Grep every use of `ACTIVITY_MULTIPLIERS`, `calculateBaseline`
+and any local `bmr *` before deciding the change is done. The rule this falls under is **One Formula,
+One Place**: after this PR there is exactly one place that turns a BMR into a daily target, and
+exactly one place that adds today's movement to it. A second copy is what produced Q-401 in the first
+place.
+
+**3 — The merge is now a one-line swap, not a new card.** Keep `MacroRing` and Home's nutrition widget
+as they are — ring, macro rows, everything. **Replace only the calorie progress bar** with the energy
+zone bar (`barBands`/`barPosition` from `packages/shared/src/nutrition/calorie-balance.ts`, already
+shared and already used by three surfaces). The progress fill answers *"how full is the tank"*; the
+zone answers *"am I on target"*, which is the question a budget that moves with activity actually has.
+Home's bar is the gradient fill in `home-card-widget.tsx` (`goalPct`, `scaleX`).
+
+**4 — Say where the budget came from, in one line under the bar:** *"1,626 base + 274 earned from
+training"*. Without it a number that changes during the day looks like a bug — which is exactly how
+this entry started.
+
+**5 — Both surfaces in the same PR.** Home and Nutrition, per the sibling-surface rule. And note
+**Q-402**: Home's energy card never refetches, so it will show a stale zone bar until that is fixed —
+swapping the bar in without it makes the staleness *more* visible.
+
+### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
+
+- **Branch:** `fix/tdee-partial-day-completeness`
+- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
+  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
+  the rest? does it assume thats all I had for the day and tune around that? Need some control
+  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
+  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
+  that the owner's suspicion is correct.
+- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
+  There is no completeness concept anywhere in the path.
+
+**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
+"logged day" is with a bare non-zero test:
+
+```ts
+const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
+```
+
+A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
+*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
+(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
+`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
+
+**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
+miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
+in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
+comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
+in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
+the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
+abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
+fixed the version that self-corrects by evening, and left the version that never does.
+
+**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
+eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
+1400, dinner never logged):
+
+```
+partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
+0            14          2600        2600         medium      null
+6            14          2086        2086         medium      null
+14           14          1400        1400         medium      null
+```
+
+Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
+`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
+as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
+"plausible" 1400.
+
+**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
+`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
+inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
+under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
+module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
+too, so the Balance card's "burned" figure is dragged down in step.
+
+- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
+  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
+  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
+  presents protections (1) and (2) as the complete story — the claim this corrects.
+- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
+  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
+  this question is about: logs consistently enough to switch tuning on.
+- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
+  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
+  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
+  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
+
+**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
+
+1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
+   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
+   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
+   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
+   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
+   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
+2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
+   "expected" is the calorie target, derived *from* maintenance, which is the number being
+   estimated, so a low estimate lowers the threshold and admits more partial days next window.
+   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
+   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
+   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
+3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
+   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
+   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
+   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
+   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
+
+- **What would count as fixed:** a day the user did not finish logging can no longer enter
+  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
+  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
+  rather than toward a confident wrong number. Whichever mechanism is chosen,
+  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
+  module is well-tested for empty days and has never been tested for half-full ones.
+- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
+  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
+  control, if option 1 is chosen, would need a device check.
+
+
+**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
+meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
+one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
+option 3 (silent inference) cannot be corrected by the person who knows the answer.
+
+**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
+— not in the header, not beside the ring. It is a statement about a day that has finished, and its
+position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
+is everything you ate. Only completed days are used to work out your maintenance calories."*
+Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
+must be reversible, since the whole point is that a wrong day poisons the estimate.
+
+**Ship the counter with it, not after it.** The button feeds something invisible today, and that
+invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
+had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
+for, so the two land together rather than one inventing a second version of the other.
+
+**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
+`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
+assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
+quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
+honest one, so the estimate starts from days marked after this ships and the counter shows that
+plainly.
+
+### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
+
+- **Branch:** `feat/nutrition-visual-uplift`
+- **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
+  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
+- **What this entry is for.** A taste request cannot be implemented from as written, so this
+  separates the part that is objectively wrong (findings 1–3, each with a CI check that already
+  measures it) from the part that is genuinely a design decision (findings 4–5, which need
+  mockups before code). Do the first half regardless of what is decided about the second.
+- **Scope.** `app/nutrition/nutrition-content.tsx` and `components/nutrition/**` — the Nutrition
+  tab, the Saved Meals sheet, the Edit Meal builder, and the meal-plan sheets that share their
+  visual language. Nothing server-side: no route, no schema, no migration.
+
+**1 — 48 hardcoded hex literals, and `#22c55e` is the one that actually breaks.**
+`--brand` is **user-selectable at runtime**: `components/theme-color-picker.tsx:38` writes
+`--brand`/`--color-brand` from a hue the user picks, and `app/globals.css:59-65` *darkens* the
+light-mode value on purpose (the comment there says why — the vivid dark-mode green is unreadable
+as light-mode text). Every `#22c55e` in nutrition opts out of both. Change the accent to blue and
+nutrition's selected chips and checkboxes stay green; switch to light mode and they stay at the
+value the CSS deliberately avoids. Sites: `saved-meal-card.tsx:75,97` · `my-meals-picker.tsx:226,270,276` ·
+`restrictions-picker.tsx:183` · `meal-plan-edit-sheet.tsx:220` · `meal-plan-manage-sheet.tsx:173` ·
+`meal-plan-setup-sheet.tsx:206,433` · `meal-plan-review-step.tsx:114,158` · `meal-plan-section.tsx:30`.
+Same story for `#ef4444` where `text-destructive` already exists — `ingredient-row.tsx:52` uses the
+token correctly, `saved-meal-card.tsx` and `meal-plan-manage-sheet.tsx:248,263` use the literal.
+
+**2 — CI is already pointed at this, which is what makes it cheap.**
+`scripts/check-hex-literals.js:91-103` carries **14 nutrition files** as shrink-only baselines
+totalling 48 literals. Lowering those numbers *is* the deliverable for finding 1, the check proves
+it, and the ratchet means a redesign structurally cannot make it worse. Do not sweep the whole repo
+(471 literals) — that is a separate, much larger job.
+
+**3 — ⚠ Both landing files are at the 800-line ceiling, and this bites on line one.**
+`app/nutrition/nutrition-content.tsx` is **exactly 800** and `components/nutrition/saved-meals-sheet.tsx`
+is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both are held to
+`LIMIT = 800` hard — verified by the script's own counting, not `wc`. **Adding a single line to
+`nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
+the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
+files to it to buy room.
+
+- **✅ FINDINGS 1 AND 2 SHIPPED 2026-08-18 (v1.324.4, Lane B).** Every `#22c55e` and `#ef4444` in
+  the nutrition surface is now `brand` / `destructive`, so selected chips, checkboxes and the plan
+  card follow the user's chosen accent and light mode's deliberately-darkened value. **Repo total
+  471 → 428**, and **eight nutrition files came off the hex baseline entirely**, which holds them at
+  zero from here — the ratchet now makes this class structurally unable to come back in those files.
+  One site needed more than a swap: `meal-plan-section.tsx` passed its literal to `accentCardStyle()`,
+  which needs real colour channels and **returns an accent-less card for anything that is not a hex**,
+  so handing it a `var()` would have silently dropped the tint. Its gradient is now built locally with
+  `color-mix` on `var(--color-brand)`, mirroring that helper's output including the `willChange` layer
+  promotion.
+- **Finding 3 did not bite and is still true.** Replacing literals with tokens is line-for-line, so
+  nothing was added to either 800-line file — but `nutrition-content.tsx` is still exactly at the
+  limit, so **the extraction is still the first commit of any change that adds a line.**
+
+**4 — Edit Meal is three times taller than it needs to be (the design half).**
+Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro
+line, a 44 px delete button, a 44 px −/qty/+ stepper row, and a serving-conversion hint. Two
+ingredients fill the S25 screen — which is exactly what the owner's screenshot shows, with the
+whole-batch total already off-screen. A five-ingredient recipe is a blind scroll. **This needs a
+decision, not a fix.** Two shapes worth drawing: a compact row that reveals its stepper on tap, or
+the stepper inline with the name. Do not pick one in code first.
+
+**5 — Card metadata has an uneven rhythm.** `saved-meal-card.tsx:102,118` gate "Makes N portions"
+and "· per portion" on `servings !== 1`, so the first card in the owner's screenshot carries two
+lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
+redesign should either reserve the slot or move it into the expanded view.
+
+
+**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
+before code, so both screens were recreated at true S25 size from the real tokens and reviewed
+against the `ui-ux-pro-max` rule set. **Canvas:**
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
+today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
+theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
+
+**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
+44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
+the smallest targets on either screen); quantity steppers, row delete and all four card actions
+**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
+`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
+(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
+(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
+
+**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
+exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
+pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
+Whichever option below wins, the control that survives comes from the primitive.
+
+**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
+the row already prints both ways: `ingredient-row.tsx:100-107` always renders
+`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
+so two rows can sit in different modes at once and `1.2` beside `60` means different things.
+- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
+  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
+  the freed width is what pays for 48 px steppers.
+- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
+  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
+- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
+  tallest of the three, which works against the density complaint that started this.
+
+**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
+string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
+The selection-state literals and the macro palette are the same eight characters and must not share
+a fate — finding 1 is the former only.
+
+
+**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
+- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
+  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
+- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
+  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
+  weight, and moving them is churn — but editing them two tabs from where they are judged is the
+  friction the shortcut removes.
+- **"Complete Today's Logging" is a button at the foot of the day's log** — see **Q-387**, where the
+  decision and its wiring live.
+- **The meal plan becomes a generator of saved meals** — see **Q-398**.
+
+**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
+MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
+true S25 size in our own tokens — **canvas page "Reworked screens"**,
+<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
+meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
+none of the chrome, colour or type is copied.
+
+**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
+srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
+row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
+quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
+button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
+ingredients fill the S25 screen; the drawn version fits five with room left over.
+**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
+sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
+
+**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
+search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
+use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
+column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
+screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
+and this is the sixth.
+
+**14 — The other structural changes, in the order they pay off.**
+- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
+  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
+- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
+  space the day screen currently spends on nothing.
+- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
+  sheets, so a repeat log is one tap from the top of the list.
+- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
+  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
+- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
+  swipe on a saved meal, not beside the button pressed daily.
+
+- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
+  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
+  then convert screens one at a time behind the existing behaviour. **Do not start by editing
+  `nutrition-content.tsx`** — one added line fails Custom Rules.
+- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
+  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
+  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
+  anyway.
+- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
+  sync-payload change (Lane A) while everything above is Lane B.
+
+
+**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
+- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
+  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
+  second ring component.
+- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
+  search across everything · tabs **Recent · Frequent · Saved meals** · a bottom row of
+  **Barcode · Photo · Describe**. Photo is kept because it exists today and the owner did not ask
+  to remove it.
+- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
+  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
+- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
+  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
+- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
+  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
+- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
+  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
+  unrelated screen.
+
+**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
+page/section to what's in prod right now — we don't want to silently lose any sections."* The first
+draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
+(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
+MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
+**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
+**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
+and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
+quietly loses a section is the failure mode this entry exists to prevent.
+
+**17 — A section that has nowhere to go under the new tabs: `My Foods`.** The shipped capture step
+offers it (`onMyFoods` → `FoodLibrarySheet`) and the three agreed tabs are Recent, Frequent and
+Saved meals. Recommendation: make it a **fourth tab**, not a button — it is a list of foods like the
+other three, and a tab is where someone will look for it. Flagged rather than decided.
+
+**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
+assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
+`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
+`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
+delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
+whether or not anyone draws them first.
+
+**What NOT to change — all three exist because a CLAUDE.md rule required them:**
+- `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
+  correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
+- `saved-meal-card.tsx` is well built: `role="button"` + `aria-expanded` (`:80-82`) for the
+  nested-control WebView rule, macro colour always paired with its P/C/F label (`:130-142`) for the
+  colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
+- No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
+
+- **First step is done — the drawings exist** (finding 6). What is still open is the owner's pick
+  between srv/g options A, B and C, and whether the collapse-when-not-editing row in the proposed
+  Edit Meal artboard is wanted. Do not start coding the ingredient row before that answer; findings
+  1, 2, 3, 7 and 8 do not depend on it and can go first.
+- **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
+  nothing here touches an engine path.
+- **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
+  `ui-ux-pro-max` skill — it is this repo's own design system and the authority for this item.
+- **Verification.** `node scripts/check-hex-literals.js` must report a **lower** number for every
+  file touched; `node scripts/check-component-size.js` clean without new BASELINE rows;
+  `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
+  in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
+  fallback if no device is available.
+
+### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
+
+- **Branch:** `feat/meal-plan-to-saved-meals`
+- **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
+  used too much; it will be created - then likely not used again. It would be good if each item from
+  the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
+  sections."*
+- **Lane B** for the UI. **Lane A** if the plan→meal copy needs a column or a sync change — check
+  before starting, and hand that half over rather than taking a migration number.
+
+**What this replaces.** The meal plan is five surfaces — `meal-plan-section`, `meal-plan-review-card`,
+`meal-plan-setup-sheet`, `meal-plan-edit-sheet`, `meal-plan-manage-sheet` — plus its own row shape,
+its own staleness banner and its own editing model. All of it exists to maintain a thing the owner
+builds once and then stops opening. That is a lot of surface earning very little.
+
+**The reframe, and it is the owner's:** a plan is not somewhere you live, it is a **batch generator**.
+Each meal it produces gets a **Save** action; saved, it becomes an ordinary `saved_meals` row and
+inherits everything that already works — the detail screen, the macro split, the printable label and
+its QR, logging in one tap. The plan can then be discarded without losing anything worth keeping.
+
+**What to build.**
+1. **A `Save` action per plan meal, and a `Save all N`.** Saving writes `saved_meals` +
+   `saved_meal_items` from the plan's own items — the same rows the meal builder writes, so there is
+   exactly one representation of a meal in the app. A saved row shows its QR affordance in place of
+   the Save button, which is also how you see at a glance what you have already kept.
+2. **A `plan` tag on the resulting My Meals row**, so provenance is visible and nothing else about
+   the row is special.
+3. **Then delete surface, do not add it.** Once meals live in My Meals, `meal-plan-section` on the
+   day screen and `meal-plan-review-card`'s staleness nag have no job — the plan is not a live thing
+   to keep fresh any more. **Confirm that with the owner before removing anything**; this entry
+   proposes the reduction, it does not authorise it.
+
+- **⚠ Do not merge the two data models.** `saved_meals` is the destination, the plan stays its own
+  tables. Copy on save; never make a plan row and a meal row the same record. A plan is a schedule of
+  suggestions and a saved meal is a recipe you own — collapsing them means editing a saved meal
+  silently rewrites a plan, or deleting a plan takes your meals with it.
+- **Idempotence matters more than it looks.** "Save all" pressed twice must not produce nine
+  duplicates. Key the copy on `(plan id, plan item id)` and make a repeat save a no-op that reports
+  what already existed.
+- **Verification:** save one plan meal, then prove the resulting row logs, prints a label, and that
+  the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
+  indistinguishable from a hand-built one, so the label path is the test that proves it.
+
+### [nutrition][platform] Q-396 — a photo per saved meal, and the size cap is the whole design
+
+- **Branch:** `feat/saved-meal-thumbnail`
+- **Added:** 2026-08-18 · owner: *"can we have base64 saved images of meals? small icons?"*, while
+  reviewing the Q-395 rework — a meal you built weeks ago is hard to recognise from its name alone.
+- **Lane A.** Needs a Postgres migration, a local SQLite column and a sync-payload change. The Q-395
+  rework it serves is Lane B; the two can land independently because the UI degrades to no image.
+
+**The precedent exists and does not transfer.** `users.avatar` stores a **full `data:` URI in a text
+column**, validated by MIME whitelist and capped at **5 MB**
+(`app/api/user/avatar/route.ts:34-45`). That works because an avatar is **one row per user and is
+never in the sync delta**. A meal thumbnail is one per saved meal, and saved meals sync — so every
+image rides the outbox push, the pull delta, and the on-device SQLite mirror, on a phone, forever.
+Copying the 5 MB cap here would be the largest single regression the sync engine has ever taken.
+
+**Recommendation — a hard-capped thumbnail, stored as a data URI.**
+- **128 × 128 WebP, target ~6 KB, reject over 16 KB.** Downscale on-device with a canvas *before it
+  leaves the client*, and re-validate server-side — a client-side cap alone is not a cap. At 6 KB,
+  100 saved meals is ~600 KB across the whole sync surface, which is the same order as the text
+  already moving.
+- **Why base64 in a text column and not object storage:** the app is offline-first and has no blob
+  host. A URL renders nothing in airplane mode, which breaks the standing rule that *a local table
+  must hold everything needed to render the row offline*. A capped data URI is the only shape that
+  survives the canonical runtime. This is the rare case where the "obviously wrong" storage choice
+  is the right one, and the cap is what makes it so — **do not relax it later without re-reading
+  this paragraph**.
+- **What it costs if the cap slips:** nothing fails loudly. The outbox gets slower, the local DB
+  grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
+  named constant next to the column, not inline in the route.
+
+**The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
+on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
+weight, no upload path — and it already carries most of the recognition benefit in the drawings,
+where every thumbnail is exactly that placeholder. If the photo work is deferred, ship this and the
+Q-395 rows still look finished.
+
+**The full chain this has to touch, per the offline-sync rule — all in one PR:**
+`saved_meals` column → the web route's Zod schema → the `pushMutations` branch → `getSyncDelta`
+output → `pullDelta` mapping → `applyDelta` upsert columns → the local SQLite migration → **and its
+row in `RECONCILE_TABLES`/`RECONCILE_COLUMNS`**, which is the one most often missed and the one that
+silently breaks upgraded devices while every test and fresh install passes.
+
+- **Verification.** Not "it saved" — prove a non-null value **round-trips to the device and renders
+  with the network off**, which is the only test that distinguishes this from a URL. Then check the
+  outbox still drains on a throttled connection with a dozen meals carrying images.
+- **Not in scope:** photos on individual food items or on logged entries. One image per *saved
+  meal*, which is the surface the owner asked about and the only one where the row is durable.
+
+### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
+
+- **Branch:** `fix/label-save-to-gallery`
+- **Added:** 2026-08-18 · owner, on v1.324.6: *"the share button doesnt do anything - it should give
+  a download to gallery/images when clicking it."*
+- **Lane A** if it needs a Capacitor plugin or a Kotlin bridge (it does — see below), which also
+  means **a new APK**. State that in the PR: this half does not reach the device through a Railway
+  deploy.
+
+**Why it does nothing.** `meal-label-sheet.tsx` has two paths and both miss on the canonical runtime:
+1. `navigator.canShare?.({ files: [file] })` — share-*with-files* is narrower than share-with-text
+   and is not reliably available in the Samsung WebView, so the guard correctly returns false and
+   falls through. The guard is right; there is just nothing behind it.
+2. The fallback is `<a download>` on a blob URL — and **the code's own comment says this is
+   unreliable inside the WebView**, which is why it was written as the fallback. It is a silent
+   no-op there: no error, no file, no toast. Exactly what the owner reports.
+
+So the feature has only ever worked in `pnpm dev`. This is the failure class CLAUDE.md names
+directly — green on web, dead on the device, because the failing path is unreachable in the sandbox.
+
+**What to build.** A native save, not a better guess at a web API.
+- Write the PNG with **`@capacitor/filesystem`**, then make it visible to the gallery. On Android a
+  file written to app storage is invisible to the Photos app until it is registered with
+  **MediaStore** — writing to `Directory.Documents` and hoping is the trap here. Either use a
+  community MediaStore plugin or add a small Kotlin bridge beside `OuraBlePlugin`.
+- Keep the **share sheet** as a second, explicitly-labelled action: saving to the gallery and handing
+  the PNG to a label-printer app are different intents, and the owner asked for the first. One button
+  doing whichever happens to be available is what produced this bug.
+- **Fail loudly.** Every branch ends in a toast — saved, shared, or failed. A silent path is what made
+  this invisible for a release.
+
+- **⚠ Do not "fix" this by removing the `canShare` guard.** Calling `navigator.share` with files where
+  it is unsupported rejects, and the existing catch swallows `AbortError` — which would turn a dead
+  button into a dead button that also lies in the log.
+- **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
+  Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
+- **Related:** the label this saves is currently missing its ingredient list — **Q-399**. Fix that
+  first or the first file that lands in the gallery is the wrong artwork.
+
 ### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
 
 - **⛔ RE-TAGGED TO LANE A 2026-08-18 — the "one call in one Lane B handler" shape below is not
@@ -1932,518 +2677,47 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
-### [nutrition][app-shell] Q-401 — two calorie budgets on one screen, 274 apart, and the card that explains it is suppressed
-
-- **Branch:** `feat/combine-energy-and-macro-widgets`
-- **Added:** 2026-08-18 · owner, on the Nutrition tab: *"why are these values different? should it not
-  match the nutrition goal? I was hopping we could combine these 2 widgets/displays"*
-- **Lane B** for the merge. The suppression rule in finding 3 is also Lane B (one condition in a
-  component). No schema, no route, no migration.
-
-**Both numbers are correct and they measure different things.** Traced, not guessed
-(`lib/health/energy-balance-service.ts:180-181`):
-- **Ring — "1900 left"** = `nutrition_targets.calories` (1,900) − eaten. A **fixed** goal you set
-  once. It does not move when you train.
-- **Energy Balance — "1,626 kcal left today"** = maintenance (1,826) + `CALORIE_ADJUSTMENT_BY_GOAL`
-  (**recomp = −200**, `goal-recommendation.ts:19`) − eaten. A **dynamic** budget that rises with what
-  you actually burn.
-
-1,826 − 200 = **1,626** against a set **1,900**: a **274 kcal** gap, both labelled "left", stacked one
-above the other with nothing reconciling them.
-
-**Finding 1 — the app already knows.** `driftsFromRecommendation` is
-`|currentKcal − recommendedKcal| > 100` → |1,900 − 1,626| = 274 → **true**, today, on the owner's
-device.
-
-**Finding 2 — and it is arguably telling the owner something real.** For a *recomp* goal the
-recommendation sits 200 **under** maintenance; the stored goal is 74 **over** it. Whatever the merge
-looks like, that is a fact the screen should be able to say out loud.
-
-**Finding 3 — ⚠ the only surface that explains it is gated shut exactly when it is needed.**
-`tdee-adaptation-card.tsx:44-48` requires `maintenance.source === "calibrated"`. The owner's card
-reads *"Log food on 4 more days to calibrate"*, i.e. `source === 'formula'` — so the Calorie Nudge is
-correctly hidden, and the two numbers sit there unexplained. **The gate is right for the *action* and
-wrong for the *explanation*.** Suggesting a new target off a formula-derived maintenance would move
-the user sideways with false authority — that comment is correct and should stay. Saying *why the two
-numbers differ* costs nothing and needs no calibration. **Split the condition:** explain always, offer
-to apply only when calibrated.
-
-**The merge, and the one decision inside it.**
-- **One card.** Ring and macro bars on top; energy balance as a strip beneath; the reconciliation in
-  a sentence rather than as two numbers to subtract.
-- **The ring keeps the SET goal (1,900), not the recommendation.** This is the load-bearing choice:
-  the macro grams under it (0/150 P, 0/190 C, 0/60 F) are derived from that same `nutrition_targets`
-  row. Point the ring at 1,626 while the bars still read 1,900-derived grams and the card contradicts
-  itself internally — a worse bug than the one being fixed.
-- **Energy balance keeps its zone bar**, which is the part the ring cannot express: it is the only
-  thing on the screen that accounts for what you burned.
-- **Related:** the calibration this is waiting on is what **Q-387** unblocks — until completed days
-  can be identified, `source` stays `formula` and this explanation is the only thing the user gets.
-
-- **Not in scope:** changing anyone's targets, or auto-applying the recommendation. This entry makes
-  the disagreement legible; **Q-302**'s nudge already owns the applying.
-- **Verification:** with a formula-derived maintenance and a drifting goal, the merged card must state
-  the gap and the reason. Then check the **Home** widget renders the same two figures — it shows both
-  as well (Nutrition 0/1900 and Energy Balance 1,626), so a fix on Nutrition alone leaves Home
-  contradicting it. **Sibling sweep: both surfaces in the same PR.**
-
-
-**ROOT CAUSE FOUND, and it is not staleness — it is two TDEE models. (2026-08-18)**
-The owner asked whether both numbers were not already AI-derived. They were. They come from the same
-BMR and disagree by exactly the activity level the goal wizard was told about:
-
-| | formula | value |
-|---|---|---|
-| BMR implied by the shipped maintenance | 1,826 ÷ 1.2 | **1,522** |
-| Goal wizard, `calculateBaseline` | BMR × **1.375** (light) − 200 | **1,892** ≈ the stored **1,900** |
-| Energy balance, `buildEnergyBalance` | BMR × **1.2** (sedentary) − 200 | **1,626** |
-
-**Gap = BMR × (1.375 − 1.2) = 266 kcal.** Observed on device: **274**. The 8 kcal is rounding and
-weight drift since the goal was set. That is the entire discrepancy accounted for.
-
-**Neither is wrong; they are different contracts.**
-`goal-recommendation.ts:5` bakes a **self-reported** activity multiplier into the target, so the
-number already assumes your training and never moves. `daily-energy.ts:20` uses
-`SEDENTARY_MULTIPLIER = 1.2` **deliberately**, and its comment says why: *"measured movement is added
-explicitly, so a higher activity multiplier here would double-count it."* One assumes activity, the
-other measures it. Run both and you get two budgets — which is what the screen shows.
-
-**✅ OWNER DECISION, 2026-08-18: one number, and it rises with activity.** *"if its saying its
-1800-200; then that should be the calorie goal? and it can increase with activity?... can we look at
-having them all the same?"*
-
-**Recommendation: adopt the measured model everywhere.** It is the only one that can be right on both
-a rest day and a training day — an assumed multiplier is wrong on every day that is not average, and
-the app already measures the real thing. Concretely:
-1. **Today's goal = sedentary base + today's measured activity + goal delta.** The stored
-   `nutrition_targets.calories` becomes the **rest-day floor**, not the truth, and the day's figure is
-   derived from it.
-2. **The goal wizard must switch to the sedentary multiplier** when it feeds this. Leaving it at
-   `light`/`moderate` while activity is also added measured is a double-count — the exact thing
-   `daily-energy.ts` warns about, and the reason the two numbers drifted apart in the first place.
-   **This is the load-bearing change; the merge in this entry is cosmetic without it.**
-3. **Macros have to follow, and not uniformly.** Protein is dosed per kg of bodyweight
-   (`PROTEIN_G_PER_KG_BY_GOAL`), so it must **not** scale with activity; the earned calories belong to
-   carbs. Scale all three and the ring and the bars disagree again in a new way.
-4. **Say where the extra came from.** A budget that grows during the day is confusing unless it is
-   labelled — *"1,626 + 312 earned from training"* rather than a number that silently changes.
-
-**⚠ What this costs, stated plainly:** the goal stops being a fixed number you can memorise, and it is
-at its lowest in the morning before you have trained. That is the honest trade for a number that is
-right on both kinds of day. **One formula, one place** — after this there must be exactly one TDEE
-implementation, and `calculateBaseline`'s multiplier table stops being a second one.
-
-### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
-
-- **Branch:** `fix/inline-centred-line-budget`
-- **Added:** 2026-08-18 · owner, on v1.324.6 with the style selected: *"I dont see the B2 default we
-  wanted... where is my b2 default? should of shipped?"* It **did** ship (Q-397, #105) and is
-  correctly the default and correctly selected. It just draws no ingredients.
-- **Lane B.** One constant in `components/nutrition/meal-label-render.ts`. No schema, no route.
-
-**Proven arithmetic, not a data problem.** `drawSquareCentredLabel` walks the column top-down and
-then asks how many 8-unit lines fit above the code:
-
-```
-L = (189 − 137) / 2 = 26        bottom = 189 − 26 = 163
-y  = 30 (L+4)
-  + nameSize(12) + 7            →  49
-  + caloriesSize(21) + 6        →  76
-  + macroSize(7.5) + 5          →  88.5
-  + rule gap(8)                 →  96.5
-codeTop  = 163 − 0 − codeUnits(66) = 97
-maxLines = floor((97 − 96.5 − 2) / 8) = floor(−0.19) → clamped to 0
-```
-
-**Zero lines, and it is not marginal — it is negative.** `fitText` shrinking a long name does not
-rescue it: at nameSize 12/10/8/6/**4** the answer is 0 every time, because the name contributes at
-most 12 of the 66.5 units consumed. For **one** line the code box must be **≤ 56.5 units**; it ships
-at **66**.
-
-**The tell was in the spec's own comment.** It reasons *"58 units is what the stack can spare once
-name, calories, macros and five ingredient lines have taken their height"* — and the value shipped is
-66. But 58 does not fit either (it yields 0 lines as well); the budget was computed against a
-different set of gaps than the ones drawn. **Do not simply set it to 58.**
-
-**Confirming symptom, visible in the owner's screenshot:** the sheet's *"Printing N ingredients"* line
-is absent. That copy is gated on `metrics.ingredientLines > 0`, so the renderer is already reporting
-0 — the plumbing works and is telling the truth. `savedMealToIngredients` is **not** the fault; the
-local store joins `food_items` and populates `foodItem`, and the per-portion calories on the label
-(208 kcal, P 32 C 8 F 5) prove the items resolved.
-
-**What to fix, in order of preference.**
-1. **Recompute the budget from the drawn gaps rather than guessing a constant.** Derive `codeUnits`
-   from the space actually left (`bottom − y − reserved lines × 8`) so the code takes what remains
-   after N lines, instead of a hardcoded box the layout cannot honour.
-2. If a fixed constant is kept, it must be **≤ 56.5 for one line, ≤ 40.5 for three** — and three is
-   what the style promises. 40.5 units is a 10.7 mm box, symbol ~8.1 mm, **~0.32 mm per module**,
-   which is *below* the 0.487 that `band` shipped with. **That is the real finding:** the centred
-   stack cannot carry the full list *and* a better code than the old default, so one of the two has
-   to give. The mockup that promised both was drawn at tighter type (6.5 px list, smaller headline,
-   smaller gaps) than the spec that shipped.
-3. **Whatever is chosen, the picker copy must match it.** "The full ingredient list" is currently
-   false, and a style that quietly prints fewer lines than it claims is how this was missed.
-
-- **Regression test, and it is cheap:** `meal-label-code-size.test.ts` already exists. Add a case
-  asserting `ingredientLines >= 1` for a two-ingredient meal in every style whose spec sets
-  `ingredients: true`. A style that claims a list and draws none should fail CI, not a test print.
-- **Verification:** the preview must show the ingredient run **and** the "Printing N ingredients"
-  line, then a physical print at 50 mm.
-
-### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
-
-- **Branch:** `fix/label-save-to-gallery`
-- **Added:** 2026-08-18 · owner, on v1.324.6: *"the share button doesnt do anything - it should give
-  a download to gallery/images when clicking it."*
-- **Lane A** if it needs a Capacitor plugin or a Kotlin bridge (it does — see below), which also
-  means **a new APK**. State that in the PR: this half does not reach the device through a Railway
-  deploy.
-
-**Why it does nothing.** `meal-label-sheet.tsx` has two paths and both miss on the canonical runtime:
-1. `navigator.canShare?.({ files: [file] })` — share-*with-files* is narrower than share-with-text
-   and is not reliably available in the Samsung WebView, so the guard correctly returns false and
-   falls through. The guard is right; there is just nothing behind it.
-2. The fallback is `<a download>` on a blob URL — and **the code's own comment says this is
-   unreliable inside the WebView**, which is why it was written as the fallback. It is a silent
-   no-op there: no error, no file, no toast. Exactly what the owner reports.
-
-So the feature has only ever worked in `pnpm dev`. This is the failure class CLAUDE.md names
-directly — green on web, dead on the device, because the failing path is unreachable in the sandbox.
-
-**What to build.** A native save, not a better guess at a web API.
-- Write the PNG with **`@capacitor/filesystem`**, then make it visible to the gallery. On Android a
-  file written to app storage is invisible to the Photos app until it is registered with
-  **MediaStore** — writing to `Directory.Documents` and hoping is the trap here. Either use a
-  community MediaStore plugin or add a small Kotlin bridge beside `OuraBlePlugin`.
-- Keep the **share sheet** as a second, explicitly-labelled action: saving to the gallery and handing
-  the PNG to a label-printer app are different intents, and the owner asked for the first. One button
-  doing whichever happens to be available is what produced this bug.
-- **Fail loudly.** Every branch ends in a toast — saved, shared, or failed. A silent path is what made
-  this invisible for a release.
-
-- **⚠ Do not "fix" this by removing the `canShare` guard.** Calling `navigator.share` with files where
-  it is unsupported rejects, and the existing catch swallows `AbortError` — which would turn a dead
-  button into a dead button that also lies in the log.
-- **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
-  Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
-- **Related:** the label this saves is currently missing its ingredient list — **Q-399**. Fix that
-  first or the first file that lands in the gallery is the wrong artwork.
-
-### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
-
-- **Branch:** `feat/meal-plan-to-saved-meals`
-- **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
-  used too much; it will be created - then likely not used again. It would be good if each item from
-  the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
-  sections."*
-- **Lane B** for the UI. **Lane A** if the plan→meal copy needs a column or a sync change — check
-  before starting, and hand that half over rather than taking a migration number.
-
-**What this replaces.** The meal plan is five surfaces — `meal-plan-section`, `meal-plan-review-card`,
-`meal-plan-setup-sheet`, `meal-plan-edit-sheet`, `meal-plan-manage-sheet` — plus its own row shape,
-its own staleness banner and its own editing model. All of it exists to maintain a thing the owner
-builds once and then stops opening. That is a lot of surface earning very little.
-
-**The reframe, and it is the owner's:** a plan is not somewhere you live, it is a **batch generator**.
-Each meal it produces gets a **Save** action; saved, it becomes an ordinary `saved_meals` row and
-inherits everything that already works — the detail screen, the macro split, the printable label and
-its QR, logging in one tap. The plan can then be discarded without losing anything worth keeping.
-
-**What to build.**
-1. **A `Save` action per plan meal, and a `Save all N`.** Saving writes `saved_meals` +
-   `saved_meal_items` from the plan's own items — the same rows the meal builder writes, so there is
-   exactly one representation of a meal in the app. A saved row shows its QR affordance in place of
-   the Save button, which is also how you see at a glance what you have already kept.
-2. **A `plan` tag on the resulting My Meals row**, so provenance is visible and nothing else about
-   the row is special.
-3. **Then delete surface, do not add it.** Once meals live in My Meals, `meal-plan-section` on the
-   day screen and `meal-plan-review-card`'s staleness nag have no job — the plan is not a live thing
-   to keep fresh any more. **Confirm that with the owner before removing anything**; this entry
-   proposes the reduction, it does not authorise it.
-
-- **⚠ Do not merge the two data models.** `saved_meals` is the destination, the plan stays its own
-  tables. Copy on save; never make a plan row and a meal row the same record. A plan is a schedule of
-  suggestions and a saved meal is a recipe you own — collapsing them means editing a saved meal
-  silently rewrites a plan, or deleting a plan takes your meals with it.
-- **Idempotence matters more than it looks.** "Save all" pressed twice must not produce nine
-  duplicates. Key the copy on `(plan id, plan item id)` and make a repeat save a no-op that reports
-  what already existed.
-- **Verification:** save one plan meal, then prove the resulting row logs, prints a label, and that
-  the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
-  indistinguishable from a hand-built one, so the label path is the test that proves it.
-
-### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
-
-- **Branch:** `feat/nutrition-visual-uplift`
-- **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
-  could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
-- **What this entry is for.** A taste request cannot be implemented from as written, so this
-  separates the part that is objectively wrong (findings 1–3, each with a CI check that already
-  measures it) from the part that is genuinely a design decision (findings 4–5, which need
-  mockups before code). Do the first half regardless of what is decided about the second.
-- **Scope.** `app/nutrition/nutrition-content.tsx` and `components/nutrition/**` — the Nutrition
-  tab, the Saved Meals sheet, the Edit Meal builder, and the meal-plan sheets that share their
-  visual language. Nothing server-side: no route, no schema, no migration.
-
-**1 — 48 hardcoded hex literals, and `#22c55e` is the one that actually breaks.**
-`--brand` is **user-selectable at runtime**: `components/theme-color-picker.tsx:38` writes
-`--brand`/`--color-brand` from a hue the user picks, and `app/globals.css:59-65` *darkens* the
-light-mode value on purpose (the comment there says why — the vivid dark-mode green is unreadable
-as light-mode text). Every `#22c55e` in nutrition opts out of both. Change the accent to blue and
-nutrition's selected chips and checkboxes stay green; switch to light mode and they stay at the
-value the CSS deliberately avoids. Sites: `saved-meal-card.tsx:75,97` · `my-meals-picker.tsx:226,270,276` ·
-`restrictions-picker.tsx:183` · `meal-plan-edit-sheet.tsx:220` · `meal-plan-manage-sheet.tsx:173` ·
-`meal-plan-setup-sheet.tsx:206,433` · `meal-plan-review-step.tsx:114,158` · `meal-plan-section.tsx:30`.
-Same story for `#ef4444` where `text-destructive` already exists — `ingredient-row.tsx:52` uses the
-token correctly, `saved-meal-card.tsx` and `meal-plan-manage-sheet.tsx:248,263` use the literal.
-
-**2 — CI is already pointed at this, which is what makes it cheap.**
-`scripts/check-hex-literals.js:91-103` carries **14 nutrition files** as shrink-only baselines
-totalling 48 literals. Lowering those numbers *is* the deliverable for finding 1, the check proves
-it, and the ratchet means a redesign structurally cannot make it worse. Do not sweep the whole repo
-(471 literals) — that is a separate, much larger job.
-
-**3 — ⚠ Both landing files are at the 800-line ceiling, and this bites on line one.**
-`app/nutrition/nutrition-content.tsx` is **exactly 800** and `components/nutrition/saved-meals-sheet.tsx`
-is **793**. Neither is in `scripts/check-component-size.js`'s BASELINE, so both are held to
-`LIMIT = 800` hard — verified by the script's own counting, not `wc`. **Adding a single line to
-`nutrition-content.tsx` fails Custom Rules.** Extraction into `components/nutrition/` children is
-the first commit, not the cleanup at the end. Note the BASELINE is shrink-only: do not add these
-files to it to buy room.
-
-- **✅ FINDINGS 1 AND 2 SHIPPED 2026-08-18 (v1.324.4, Lane B).** Every `#22c55e` and `#ef4444` in
-  the nutrition surface is now `brand` / `destructive`, so selected chips, checkboxes and the plan
-  card follow the user's chosen accent and light mode's deliberately-darkened value. **Repo total
-  471 → 428**, and **eight nutrition files came off the hex baseline entirely**, which holds them at
-  zero from here — the ratchet now makes this class structurally unable to come back in those files.
-  One site needed more than a swap: `meal-plan-section.tsx` passed its literal to `accentCardStyle()`,
-  which needs real colour channels and **returns an accent-less card for anything that is not a hex**,
-  so handing it a `var()` would have silently dropped the tint. Its gradient is now built locally with
-  `color-mix` on `var(--color-brand)`, mirroring that helper's output including the `willChange` layer
-  promotion.
-- **Finding 3 did not bite and is still true.** Replacing literals with tokens is line-for-line, so
-  nothing was added to either 800-line file — but `nutrition-content.tsx` is still exactly at the
-  limit, so **the extraction is still the first commit of any change that adds a line.**
-
-**4 — Edit Meal is three times taller than it needs to be (the design half).**
-Each `IngredientRow` (`components/nutrition/ingredient-row.tsx`) stacks four bands: name + macro
-line, a 44 px delete button, a 44 px −/qty/+ stepper row, and a serving-conversion hint. Two
-ingredients fill the S25 screen — which is exactly what the owner's screenshot shows, with the
-whole-batch total already off-screen. A five-ingredient recipe is a blind scroll. **This needs a
-decision, not a fix.** Two shapes worth drawing: a compact row that reveals its stepper on tap, or
-the stepper inline with the name. Do not pick one in code first.
-
-**5 — Card metadata has an uneven rhythm.** `saved-meal-card.tsx:102,118` gate "Makes N portions"
-and "· per portion" on `servings !== 1`, so the first card in the owner's screenshot carries two
-lines the other two do not. The behaviour is right; the ragged card heights are the cost. A
-redesign should either reserve the slot or move it into the expanded view.
-
-
-**6 — MOCKUPS AND A DESIGN-SYSTEM REVIEW EXIST (2026-08-18).** The owner asked for drawn options
-before code, so both screens were recreated at true S25 size from the real tokens and reviewed
-against the `ui-ux-pro-max` rule set. **Canvas:**
-<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b> — nine artboards: Edit Meal
-today vs proposed, Saved Meals today vs proposed, three srv/g options, a tap-target audit and the
-theme finding drawn out. The three findings below came out of that review and are additional to 1–5.
-
-**7 — Every control on both screens is 44 px. Rule 15 says 48 dp with 8 dp between.**
-44 is the iOS floor, not this repo's. Measured: srv/g segments **40 px** (`ingredient-row.tsx:86`,
-the smallest targets on either screen); quantity steppers, row delete and all four card actions
-**44 px** (`ingredient-row.tsx:50,59,75` · `saved-meal-card.tsx:194-217` ·
-`saved-meals-sheet.tsx:628,650`); stepper gap **6 px** against the 8 dp minimum
-(`ingredient-row.tsx:55`). The only compliant control on either screen is `Update Meal`
-(`saved-meals-sheet.tsx:774`, `h-12`). Treat this as **one systemic change**, not eight fixes.
-
-**8 — The srv/g toggle is a hand-rolled segmented control, and `components/ui/segmented-tabs`
-exists (rule 24).** `ingredient-row.tsx:81-95` rebuilds the pill-tab markup inline — the exact
-pattern that was copy-pasted ~17× with drifting font sizes before the primitive was extracted.
-Whichever option below wins, the control that survives comes from the primitive.
-
-**9 — What the toggle actually is, and the three ways out.** It selects an *input mode* for a value
-the row already prints both ways: `ingredient-row.tsx:100-107` always renders
-`1 serving of X = 250 g · using 300 g`. It is also per-row (`unitById` in `saved-meals-sheet.tsx`),
-so two rows can sit in different modes at once and `1.2` beside `60` means different things.
-- **A — the unit rides on the number** (`[−] [ 60 g ▾ ] [+]`), one tap inside the field swaps it.
-  **Recommended.** It removes a control rather than relocating one, the number is never bare, and
-  the freed width is what pays for 48 px steppers.
-- **B — grams only**, the stepper stepping by one serving. No mode at all, but you can no longer
-  *type* "2 scoops" — the exact case `ingredient-row.tsx`'s own comment says both units exist for.
-- **C — the toggle moves below the value row** at full size. No behaviour change, safest, and the
-  tallest of the three, which works against the density complaint that started this.
-
-**10 — ⚠ `#22c55e` is ALSO the literal value of `MACRO_COLORS.protein`.** A find-and-replace of that
-string onto `var(--brand)` would repaint the protein macro with whatever accent the user picked.
-The selection-state literals and the macro palette are the same eight characters and must not share
-a fate — finding 1 is the former only.
-
-
-**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
-- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
-  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
-- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
-  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
-  weight, and moving them is churn — but editing them two tabs from where they are judged is the
-  friction the shortcut removes.
-- **"Complete Today's Logging" is a button at the foot of the day's log** — see **Q-387**, where the
-  decision and its wiring live.
-- **The meal plan becomes a generator of saved meals** — see **Q-398**.
-
-**11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
-MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
-true S25 size in our own tokens — **canvas page "Reworked screens"**,
-<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>: the day, add food, my meals,
-meal detail, edit meal, and the quantity sheet. What was borrowed is **structural, not visual** —
-none of the chrome, colour or type is copied.
-
-**12 — The root cause of "bulky" is that a list row carries an editor.** Findings 7–9 treated the
-srv/g control as the problem; it is a symptom. Mainstream food loggers put **no controls on a list
-row at all** — row is name, a grey line of what and how much, calories right-aligned — and every
-quantity edit happens on a separate surface. Our `IngredientRow` instead replicates a delete
-button, a stepper, a value field, a unit toggle and a conversion hint onto *every* ingredient. Two
-ingredients fill the S25 screen; the drawn version fits five with room left over.
-**This supersedes srv/g options A, B and C** as a fork: the toggle now appears once, in the quantity
-sheet, at 56 px. Option A's shape (unit chip on the number) is what that sheet uses.
-
-**13 — One row component, six call sites.** Today a food reads one way in the diary, another in
-search, another in a saved meal, another in the builder — four shapes for one thing. The drawings
-use exactly one: optional thumbnail · name · grey secondary line · calories right-aligned in a fixed
-column · optional chevron. Build it as `components/nutrition/food-row.tsx` and use it on all six
-screens; per the repo's own reuse rule a pattern at ≥2 sites gets extracted before the third copy,
-and this is the sixth.
-
-**14 — The other structural changes, in the order they pay off.**
-- **The macro summary becomes a donut with each macro as a share of calories**, next to grams.
-  `components/nutrition/macro-ring.tsx` already exists — extend it rather than adding a second one.
-- **Grouped sections with full-bleed dividers** replace gapped cards, which is most of the vertical
-  space the day screen currently spends on nothing.
-- **Source tabs on the food picker** (Recent · Frequent · My meals · Recipes) replace separate
-  sheets, so a repeat log is one tap from the top of the list.
-- **The meal name becomes the screen title**, not a labelled input box, and the three-line batch
-  explainer becomes a subtitle: *"Makes 2 portions · 278 kcal each"*.
-- **Destructive actions leave the summary row** — delete lives in the quantity sheet and behind a
-  swipe on a saved meal, not beside the button pressed daily.
-
-- **⚠ Sequencing.** This is a rework, not a repaint, and it lands in the two files that are already
-  at the 800-line ceiling (finding 3). Order: extract `food-row.tsx` first, then the quantity sheet,
-  then convert screens one at a time behind the existing behaviour. **Do not start by editing
-  `nutrition-content.tsx`** — one added line fails Custom Rules.
-- **The known cost, stated so it is not discovered late:** changing a quantity now takes a tap. For
-  a saved meal built once and logged for months that is cheap; for someone tweaking amounts while
-  assembling, inline steppers were faster. The owner has seen this trade drawn and chose the rework
-  anyway.
-- **Related:** meal thumbnails are **Q-396**, filed separately because they need a migration and a
-  sync-payload change (Lane A) while everything above is Lane B.
-
-
-**15 — OWNER REVIEW OF THE MOCKUPS, 2026-08-18. Six notes, all folded in; one caught a real gap.**
-- **Ring:** use the shipped `MacroRing` (96 px masked conic + value/target bars), not a new donut —
-  with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
-  second ring component.
-- **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
-  search across everything · tabs **Recent · Frequent · Saved meals** · a bottom row of
-  **Barcode · Photo · Describe**. Photo is kept because it exists today and the owner did not ask
-  to remove it.
-- **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
-  box and type them yourself. The fields are always visible, so neither path is a hidden mode.
-- **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
-  chosen from. The label/QR and the full breakdown stay **inside** the meal on the detail screen.
-- **Edit Meal keeps a real servings control** — "This recipe makes [− 2 portions +]" at 48 px, in a
-  band that also states the per-portion cost. It had been demoted to a subtitle; that was wrong.
-- **The quantity sheet must show where it came from:** the tapped ingredient row stays lit under the
-  scrim and the sheet is headed "Ingredient 1 of 5 · <meal>". Without that the sheet reads as an
-  unrelated screen.
-
-**16 — ⚠ THE COVERAGE AUDIT THE OWNER ASKED FOR, AND WHAT IT FOUND.** *"Make sure you compare each
-page/section to what's in prod right now — we don't want to silently lose any sections."* The first
-draw showed **3 of the 11 sections** the Nutrition tab actually renders. In shipped order
-(`app/nutrition/nutrition-content.tsx`): ScreenHeader + date nav · **CalorieBalanceBar** ·
-MacroRing · **NutritionActionRow (three buttons — Saved Meals had been dropped)** ·
-**MealPlanReviewCard** · **MealPlanSection** · **TdeeAdaptationCard** · MealCard × meal types ·
-**End of Day** · **WeeklyNutritionChart** · **SupplementsSection**. The eight in bold were missing
-and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
-quietly loses a section is the failure mode this entry exists to prevent.
-
-**17 — A section that has nowhere to go under the new tabs: `My Foods`.** The shipped capture step
-offers it (`onMyFoods` → `FoodLibrarySheet`) and the three agreed tabs are Recent, Frequent and
-Saved meals. Recommendation: make it a **fourth tab**, not a button — it is a list of foods like the
-other three, and a tab is where someone will look for it. Flagged rather than decided.
-
-**18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
-assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
-`MealTypeManager` and the Nutrition Settings sheet · `MealPlanSetupSheet`/`EditSheet`/`ManageSheet` ·
-`ManageSupplementsSheet` · `EndOfDayReview` and its seven children · the barcode overlay · the
-delete-log dialog. Roughly eleven more surfaces. They inherit the row language and the 48 dp floor
-whether or not anyone draws them first.
-
-**What NOT to change — all three exist because a CLAUDE.md rule required them:**
-- `MACRO_COLORS` (`@trainingai/shared/nutrition/macro-colors`) is the shared semantic palette,
-  correctly imported at every site. It is **not** finding 1 and must not be tokenised away.
-- `saved-meal-card.tsx` is well built: `role="button"` + `aria-expanded` (`:80-82`) for the
-  nested-control WebView rule, macro colour always paired with its P/C/F label (`:130-142`) for the
-  colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
-- No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
-
-- **First step is done — the drawings exist** (finding 6). What is still open is the owner's pick
-  between srv/g options A, B and C, and whether the collapse-when-not-editing row in the proposed
-  Edit Meal artboard is wanted. Do not start coding the ingredient row before that answer; findings
-  1, 2, 3, 7 and 8 do not depend on it and can go first.
-- **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
-  nothing here touches an engine path.
-- **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
-  `ui-ux-pro-max` skill — it is this repo's own design system and the authority for this item.
-- **Verification.** `node scripts/check-hex-literals.js` must report a **lower** number for every
-  file touched; `node scripts/check-component-size.js` clean without new BASELINE rows;
-  `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
-  in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
-  fallback if no device is available.
-
-### [nutrition][platform] Q-396 — a photo per saved meal, and the size cap is the whole design
-
-- **Branch:** `feat/saved-meal-thumbnail`
-- **Added:** 2026-08-18 · owner: *"can we have base64 saved images of meals? small icons?"*, while
-  reviewing the Q-395 rework — a meal you built weeks ago is hard to recognise from its name alone.
-- **Lane A.** Needs a Postgres migration, a local SQLite column and a sync-payload change. The Q-395
-  rework it serves is Lane B; the two can land independently because the UI degrades to no image.
-
-**The precedent exists and does not transfer.** `users.avatar` stores a **full `data:` URI in a text
-column**, validated by MIME whitelist and capped at **5 MB**
-(`app/api/user/avatar/route.ts:34-45`). That works because an avatar is **one row per user and is
-never in the sync delta**. A meal thumbnail is one per saved meal, and saved meals sync — so every
-image rides the outbox push, the pull delta, and the on-device SQLite mirror, on a phone, forever.
-Copying the 5 MB cap here would be the largest single regression the sync engine has ever taken.
-
-**Recommendation — a hard-capped thumbnail, stored as a data URI.**
-- **128 × 128 WebP, target ~6 KB, reject over 16 KB.** Downscale on-device with a canvas *before it
-  leaves the client*, and re-validate server-side — a client-side cap alone is not a cap. At 6 KB,
-  100 saved meals is ~600 KB across the whole sync surface, which is the same order as the text
-  already moving.
-- **Why base64 in a text column and not object storage:** the app is offline-first and has no blob
-  host. A URL renders nothing in airplane mode, which breaks the standing rule that *a local table
-  must hold everything needed to render the row offline*. A capped data URI is the only shape that
-  survives the canonical runtime. This is the rare case where the "obviously wrong" storage choice
-  is the right one, and the cap is what makes it so — **do not relax it later without re-reading
-  this paragraph**.
-- **What it costs if the cap slips:** nothing fails loudly. The outbox gets slower, the local DB
-  grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
-  named constant next to the column, not inline in the route.
-
-**The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
-on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
-weight, no upload path — and it already carries most of the recognition benefit in the drawings,
-where every thumbnail is exactly that placeholder. If the photo work is deferred, ship this and the
-Q-395 rows still look finished.
-
-**The full chain this has to touch, per the offline-sync rule — all in one PR:**
-`saved_meals` column → the web route's Zod schema → the `pushMutations` branch → `getSyncDelta`
-output → `pullDelta` mapping → `applyDelta` upsert columns → the local SQLite migration → **and its
-row in `RECONCILE_TABLES`/`RECONCILE_COLUMNS`**, which is the one most often missed and the one that
-silently breaks upgraded devices while every test and fresh install passes.
-
-- **Verification.** Not "it saved" — prove a non-null value **round-trips to the device and renders
-  with the network off**, which is the only test that distinguishes this from a URL. Then check the
-  outbox still drains on a throttled connection with a dozen meals carrying images.
-- **Not in scope:** photos on individual food items or on logged entries. One image per *saved
-  meal*, which is the surface the owner asked about and the only one where the row is durable.
+### [workouts][platform] Q-403 — the Coach calls an already-applied swap a "proposal", and says it after the fact
+
+- **Branch:** `fix/coach-applied-change-copy`
+- **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
+  is the sentence around it.
+- **Lane B** if the fix is the system prompt in `app/api/coach/route.ts` (it is). No schema, no route
+  logic.
+
+**What the screen showed, in this order:**
+1. Green result card — *"Swapped Barbell Romanian Deadlift → Barbell Jefferson Curl in Legs"*
+2. Then the assistant's line — *"Here is the proposal to swap Barbell Romanian Deadlift for Barbell
+   Jefferson Curl."*
+3. Then the owner, unprompted — ***"Is this complete?"***
+
+That third line is the finding. The user could not tell from the screen whether anything had happened,
+on a change that had already been written.
+
+**Two defects, both against rules the prompt already states.**
+- **"Proposal" is the wrong word for this domain.** `program_phase` is **the only tier-3 domain**
+  (`lib/coach/domains/program-phase.ts:8`) — the only one that routes through a confirmation screen.
+  A `session_exercise` swap applies immediately, which is why the card is past tense. Calling it a
+  proposal asserts something is pending that has already happened.
+- **The sentence rendered after the widget.** The prompt is explicit: *"Write your one sentence
+  BEFORE calling a widget tool, never after"* (`app/api/coach/route.ts:91`). Two candidate causes and
+  the fix differs — **the model wrote it after the tool call**, or **the UI renders tool results
+  ahead of streamed text**. Check the transcript order before changing the prompt; changing the wrong
+  one leaves it broken.
+- It also **restates what the card already shows**, which the same prompt calls noise.
+
+**What to do.** For domains that apply immediately, the sentence is past tense and adds something the
+card cannot — *"Swapped. Jefferson Curl keeps the hamstring work but drops the loading, so expect the
+session to feel easier."* — **or it is omitted entirely**, because the card is already a complete
+statement. Reserve "proposal", and the future tense, for tier 3.
+
+- **Cheap guard worth having:** the tier is known server-side when the sentence is generated. Feed it
+  into the prompt so "proposal" is only ever available for tier 3, rather than relying on the model to
+  remember which domain it is in.
+- **Verification:** run a swap and confirm the reply reads as a completed action, in an order where
+  the text is not explaining something the user has already seen. Owner screenshots are the fixture.
+- **Not a bug in the swap.** The write path works on device and that is now recorded in
+  `projectOverview.md` — do not "fix" the apply logic.
 
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
@@ -3274,129 +3548,6 @@ ehr     0     0     0     0   648   208   128   556     0
   route will write a hollow row if handed `{}`, but nothing in real use has done so.
   ⚠️ **A first version of that query said "45 of 50 entirely empty" and was WRONG** — it tested only
   the evening columns. Recorded so the false number is not picked up from anywhere it leaked.
-
-### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
-
-- **Branch:** `fix/tdee-partial-day-completeness`
-- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
-  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
-  the rest? does it assume thats all I had for the day and tune around that? Need some control
-  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
-  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
-  that the owner's suspicion is correct.
-- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
-  There is no completeness concept anywhere in the path.
-
-**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
-"logged day" is with a bare non-zero test:
-
-```ts
-const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
-```
-
-A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
-*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
-(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
-`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
-
-**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
-miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
-in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
-comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
-in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
-the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
-abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
-fixed the version that self-corrects by evening, and left the version that never does.
-
-**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
-eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
-1400, dinner never logged):
-
-```
-partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
-0            14          2600        2600         medium      null
-6            14          2086        2086         medium      null
-14           14          1400        1400         medium      null
-```
-
-Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
-`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
-as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
-"plausible" 1400.
-
-**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
-`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
-inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
-under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
-module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
-too, so the Balance card's "burned" figure is dragged down in step.
-
-- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
-  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
-  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
-  presents protections (1) and (2) as the complete story — the claim this corrects.
-- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
-  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
-  this question is about: logs consistently enough to switch tuning on.
-- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
-  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
-  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
-  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
-
-**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
-
-1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
-   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
-   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
-   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
-   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
-   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
-2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
-   "expected" is the calorie target, derived *from* maintenance, which is the number being
-   estimated, so a low estimate lowers the threshold and admits more partial days next window.
-   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
-   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
-   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
-3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
-   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
-   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
-   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
-   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
-
-- **What would count as fixed:** a day the user did not finish logging can no longer enter
-  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
-  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
-  rather than toward a confident wrong number. Whichever mechanism is chosen,
-  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
-  module is well-tested for empty days and has never been tested for half-full ones.
-- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
-  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
-  control, if option 1 is chosen, would need a device check.
-
-
-**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
-meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
-one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
-option 3 (silent inference) cannot be corrected by the person who knows the answer.
-
-**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
-— not in the header, not beside the ring. It is a statement about a day that has finished, and its
-position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
-is everything you ate. Only completed days are used to work out your maintenance calories."*
-Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
-must be reversible, since the whole point is that a wrong day poisons the estimate.
-
-**Ship the counter with it, not after it.** The button feeds something invisible today, and that
-invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
-had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
-for, so the two land together rather than one inventing a second version of the other.
-
-**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
-`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
-assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
-quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
-honest one, so the estimate starts from days marked after this ships and the counter shows that
-plainly.
 
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
@@ -5528,6 +5679,65 @@ session working from a temporarily restored copy.
   writer passing a flat object and its payload matches the surviving document exactly, but no
   scheduler/trigger was traced, so **its cadence is unknown** and "short half-life" is an inference from
   one observation. `readiness_score` also moved 76 → 77 between reads and **that is not explained here**.
+
+### [sleep] Q-519 — manual bedtime entry for a night the ring missed, writing exactly one column
+
+- **Branch:** `feat/manual-bedtime-entry`
+- **Plan:** none needed — contained, and it reuses the existing per-field merge.
+- **Added:** 2026-08-19 · Tuning agent, from an **owner report** ·
+  [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](reviews/2026-08-19-partial-night-manual-bedtime.md)
+- **The report.** The owner forgot to put the ring on before bed and fitted it at ~4 am. The session
+  reads **4:23–8:03 am, 3h 5m, 84% efficiency, 30m latency** against trailing averages of 8h and 92%.
+  Their stated concern: *"I don't want it to change estimated bed time values."*
+- **Quantified.** `GET /api/user/bedtime-estimate` averages sleep starts over **14 days**.
+  `minutesFromNoon(04:23)` = **983** vs ~**660** for an 11 pm bedtime, so one such night moves the mean
+  to 683 — **the estimated bedtime reads ~23 minutes later for two weeks**. `nightSessions()` cannot
+  help: it reassembles a night split by a wake-up (Q-76) and needs an earlier fragment, which does not
+  exist when the ring was off.
+- **The design (owner's proposal, and better than a flag alone).** `lib/data/health-source.ts` merges
+  **per field, not per row** — its own comment: *"a manual weight must not stop the ring's HRV … from"*
+  being kept. `manual` is rank 5, `oura_ble` rank 3. So writing **only `sleep_start`** at `manual`:
+
+  | column | source after | value |
+  |---|---|---|
+  | `sleep_start` | **manual (5)** | the real bedtime |
+  | `duration_hours`, `efficiency`, `average_hrv_ms`, `lowest_heart_rate`, `respiratory_rate` | oura_ble (3) — **untouched** | as measured |
+
+  **No new schema, no new merge logic.**
+- **⚠️ THE INVARIANT THIS RESTS ON.** `duration_hours`, `time_in_bed_hours` and `efficiency` are
+  **stored columns, not derived from `sleep_end − sleep_start`.** That is the *only* reason this is
+  safe. **If anyone later recomputes duration or efficiency from the span, this silently produces a
+  9-hour night at 34% efficiency.** Say so in a comment beside the write.
+- **Manual bedtime writes `sleep_start` and NOTHING else** — not duration, not efficiency, not a
+  synthesised `sleep_end`.
+- **What it does not fix:** the 3h 5m still reaches the sleep score, readiness's `previousNight`
+  contributor, resilience's `sr`, and the Body Battery anchor. That is Q-520, deliberately separate.
+- **Before relying on it, prove the merge with a test** — that writing `sleep_start` at `manual` leaves
+  `average_hrv_ms` at `oura_ble`. This review read that behaviour from the source and its comments and
+  **did not demonstrate it**. Also **audit whether any consumer recomputes duration/efficiency from the
+  span**; that audit is part of this item, not a finding of the review.
+- **Reversal cost:** low — it is one column written by one new path.
+
+### [sleep] Q-520 — a partial-night flag, so an unworn night stops distorting the scores
+
+- **Branch:** `feat/partial-night-flag`
+- **Plan:** none yet. **Do Q-519 first** — it removes the timing noise, and whether this is worth
+  building is easier to judge afterwards.
+- **Added:** 2026-08-19 · Tuning agent ·
+  [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](reviews/2026-08-19-partial-night-manual-bedtime.md) §4
+- **The problem Q-519 leaves behind.** A genuinely-measured-but-incomplete night reads as a bad night
+  to the **sleep score**, **readiness's `previousNight`**, **resilience**, the **Body Battery anchor**,
+  and the trailing "vs recent nights" baselines.
+- **Shape:** a nullable marker on the session excluding the **duration-derived** metrics (time asleep,
+  efficiency, latency, restless periods) from the score and the baselines, while the **physiological**
+  columns keep flowing — HRV, HR, breathing are real measurements of real sleep in the observed window,
+  and the EMA baselines need them (Q-506 showed how fragile those already are).
+- **Make it MANUAL, not auto-detected.** An automatic "looks partial" rule would eventually suppress a
+  genuinely bad short night — exactly what the recalibrated sleep score (Q-503) exists to surface. The
+  cost of wrongly hiding a real bad night exceeds the cost of a tap.
+- **Do not implement this as "delete the night".** That discards valid physiology; on the reported night
+  HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
+- **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
