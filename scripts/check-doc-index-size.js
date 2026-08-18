@@ -174,7 +174,16 @@ const BASELINE = {
   // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
   // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
   'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6791,
+  //
+  // Raised 2026-08-17 (Q-51 re-verification, Lane B): backlog 6791 -> 6811. A correction to an
+  // existing entry whose Task 3 reads as closing it and does not: Task 3 measured HOME cold start
+  // (FCP 472ms, 439 of it the document fetch), while the entry's own callout is about first mount of
+  // /WORKOUT (1086-1348ms, rscCount 0, entirely client-side). Different screen, different number,
+  // still unmeasured. Also re-measures the two file sizes the premise rests on — both have grown
+  // since the entry was written, and the entry states one of them three different ways. Left in the
+  // entry rather than a review doc because the next session to take this item reads the entry, sees
+  // a green Task 3, and would close it.
+  'docs/implementation-backlog.md': 6811,
   'CLAUDE.md': 1010,
 
 };

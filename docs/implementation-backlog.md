@@ -5317,6 +5317,26 @@ aimed somewhere other than the owner's complaint, and the roadmap says so in its
 that is a result worth having *before* committing to Stage 5/6, and it is exactly the measurement
 the goal layout's §7 off-ramp says is missing.
 
+- **⚠️ Task 3 does NOT close this entry, and it reads as if it does. Re-checked 2026-08-17 (Lane B).**
+  Task 3 measured **home cold start** — FCP 472 ms, of which 439 ms is the document round trip and
+  ~15 ms is JavaScript. That is a sound result *about home*. The callout at the top of this entry is
+  about a **different screen and a different number**: first mount of `/workout`, measured warm at
+  **1086 ms and 1348.7 ms with `rscCount: 0`**, i.e. entirely client-side. Nothing has measured that
+  one. "There is no JavaScript problem to solve on this screen" is true of the screen Task 3 looked
+  at and unproven of the screen the callout implicates.
+- **The file sizes are still the premise, and they have grown**, re-measured 2026-08-17 on `main`:
+  `components/workout-screen.tsx` **1,831** (entry says 1,815) and
+  `app/session-select/session-select-content.tsx` **1,457** (entry says 1,453/1,414/1,417 in three
+  places). Both remain the two largest `.tsx` in the app; the next three are `config-screen.tsx`
+  (997), `config/program-editor-sheet.tsx` (963) and `health/health-content.tsx` (911).
+- **What is actually left here is a large refactor with a contested justification, and it should be
+  scoped before it is started.** Splitting the workout orchestrator touches the app's core flow, has
+  **no automated component-test route** (both vitest projects are node-only) and is **device-only to
+  verify**. Task 1 already found that extraction moves *zero* bytes (a static child shares its
+  parent's chunk), so the readability case is the honest one and the perf case needs the /workout
+  first-mount measurement above before anyone commits. **Do the measurement first** — the same
+  mistake this entry made once already is assuming which cost is where.
+
 ### [platform] Q-311 — the E2E CI job puts a credential-shaped literal in a file that is about to be public (Q-49 blocker-adjacent)
 
 - **Branch:** `chore/e2e-auth-secret-before-public-cut`
