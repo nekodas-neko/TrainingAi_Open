@@ -174,6 +174,11 @@ const root = path.join(__dirname, '..');
 // sweep that entry called for is still open, which is the part worth keeping. Q-393 gained the two
 // answers checked against shipped code: the QR encoder is real (qrcode@1.5.4 at EC M) and save/share
 // already exists, so the only open question there is the physical print.
+//
+// Raised 2026-08-18 (BugFix intake, Q-393 prioritised): +7. The owner moved the label-breakdown entry
+// to the top of the queue and approved every drawn variant as a shippable style, so the entry gains
+// the priority marker and the note that this is no longer a pick-one decision — only the default is
+// still open, and that is a stored preference belonging to Q-392.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -421,7 +426,7 @@ const BASELINE = {
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
   'projectOverview.md': 6910,
-  'docs/implementation-backlog.md': 7775,
+  'docs/implementation-backlog.md': 7782,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

@@ -285,6 +285,89 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
+
+- **Branch:** `feat/meal-label-ingredient-breakdown`
+- **⬆ MOVED TO THE TOP OF THE QUEUE by the owner, 2026-08-18** — *"can this be added to the top
+  of the lanes queue - I will test and get back"*. Take this before the numbered items below it.
+- **✅ The owner has approved ALL the drawn variants as shippable styles** (*"I like all of these
+  ones… lets keep them all as options to cycle through and choose a default"*), so this is no
+  longer a pick-one decision — every layout below becomes an entry in the style registry the
+  renderer already reads. **The default is the open question, and it is a stored preference:**
+  see the Q-392 note further down before choosing where to keep it.
+- **Added:** 2026-08-18 · owner: *"could we have a small font showing the break down of the meal i.e
+  Pasta / [macros] / (100g pasta, 200g mince, etc etc) so its the full summary of the meal."*
+- **Follow-up to Q-389, which shipped 2026-08-18 (v1.320.0)** — the label renderer exists
+  (`components/nutrition/meal-label-render.ts`, canvas, four styles, style passed as a parameter),
+  so this is a new layout variant inside a working system, not new machinery.
+
+**The measurement first, because it decides the shape.** On a **round** 50 × 50 mm label the usable
+area is a centred **130 × 137 px** box, and the shipped default already spends all of it:
+
+```
+band header 34 + calories 22 + macros 12 + code 46 + gaps 16  =  130 px
+                                                     leaving  =    7 px
+```
+
+**That is zero ingredient lines.** A list cannot be added to the round label without removing
+something already on it. A **square** label gets the corners back — 171 × 171 usable, **1.64× the
+area and 34 px more height** — and a full five-ingredient list fits there comfortably, with the code
+moving *beside* the calories rather than under them.
+
+- **⚠ It cannot go in the QR instead.** `packages/shared/src/nutrition/label-payload.ts:22-23` sets
+  `QR_V2_M_BYTE_CAPACITY = 26`; the shipped payload is the bare 22-char id, leaving four bytes.
+  Q-389's journal records that **a unit test asserts the length against that budget precisely so a
+  later "let's also put the name in" fails in CI rather than on paper.** An ingredient list is
+  hundreds of bytes. It goes on the paper or it does not go.
+- **Data is available and needs no new shape.** `NutritionIngredient`
+  (`packages/shared/src/types/nutrition.ts:91-97`) already carries `name` and `weightG`, which is
+  exactly "200g Beef mince". For a saved meal it comes from `saved_meal_items` →
+  `food_items`; the plumbing to get it as far as the label sheet is the only new work on the data
+  side.
+- **Three options drawn at true size in the design canvas** (ask the owner for the link):
+  1. **Square, full list** — all five ingredients, code beside the calories at 62 px / **0.656 mm per
+     module**, the roomiest code of anything drawn for this feature, because the corners paid for it.
+     Cost: the artwork does **not** survive a round die, which reverses Q-389's settled
+     "one artwork serves both".
+  2. **Round, trimmed** — three ingredients then "+2 more — scan", calories and macros merged onto
+     one line. **⚠ Forces the code down to 44 px = 0.465 mm per module, below the 0.487 that was
+     already the tightest in the set** — so it trades scan reliability for a partial list, and a
+     partial list is what the request was trying to avoid.
+  3. **Round, scan only** — no list; the code already resolves to the full breakdown in the app.
+     Keeps the code and the name at full size.
+- **The honest framing for the decision:** the printed list is only worth its cost when reading a
+  tub **without** a phone. With a phone in hand, option 3 gives the *whole* breakdown where option 2
+  gives three of five lines at 6.5 px. So the real question is not "can we fit it" but "is this label
+  read away from a phone" — and if the answer is yes, the round die is what has to give, not the code.
+- **✅ Answered 2026-08-18 — two of the owner's follow-up questions, checked against shipped code:**
+  1. **"Will the QR work?"** The shipped renderer uses a **real encoder** — `qrcode@1.5.4`,
+     `QRCode.create(encodeMealLabelToken(mealId), { errorCorrectionLevel: 'M' })`
+     (`components/nutrition/meal-label-render.ts:125`), and its own comment already reasons about
+     exactly this: *"the code is 12.2–16.4 mm on these layouts, so ink spread on a home printer is
+     the expected failure and M is the level that survives it."* EC level M tolerates ~15% damage,
+     which is the margin that absorbs spread. **What is still unproven is the print**, and nobody has
+     run one — it is one of the two physical checks Q-389 already owes. **The mockup codes are
+     placeholder patterns and will not scan; do not test with those.**
+  2. **"Can the image be saved for a label-printer app?"** **Already shipped.**
+     `meal-label-sheet.tsx` does `canvas.toBlob(…, 'image/png')` → `navigator.share({ files })`
+     behind a "Share or save" button, with `<a download>` as the browser fallback. On Android the
+     share sheet is where a label-printer app appears, which is why it was built that way rather than
+     as a Capacitor plugin. **No work needed here.**
+- **⚠ "Cycle through them and choose a default" is two requests, and the second one is new.**
+  Cycling is nearly free — the renderer already takes the style as a parameter and four styles ship,
+  so the breakdown variants are more entries in the same registry. But **Q-389 deliberately ships the
+  style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
+  straight on **Q-392** (preferences live only on the device). If a label default is written to
+  `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
+  **Build the default on whatever Q-392 settles**, not beside it.
+- **What would count as done:** a saved meal's label can render its ingredient list with weights;
+  whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
+  without an explicit owner decision recorded here; and if a square-only variant ships, the app makes
+  clear which labels are square-only rather than letting a round die silently crop the list.
+- **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
+  layout and overflow need no device. **The two checks that matter are still physical** — print it and
+  scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
+
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
 
 - **Branch:** `feat/coach-undo-control`
