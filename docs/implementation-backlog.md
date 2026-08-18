@@ -391,6 +391,50 @@ below threshold and left in place for next time.
   no `isActiveCheckedAt`, the throttle never engaged, and the DB was re-read every time. Use `-b` and
   `-c` on the same file.
 
+### [nutrition][platform] Q-481 — a water quick-add replayed by the outbox triple-counts; it is the one non-idempotent mutation of the nineteen
+
+- **Branch:** `fix/outbox-water-delta-dedupe`
+- **Added:** 2026-08-18 · review sweep (at-least-once delivery) ·
+  [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](reviews/2026-08-18-outbox-replay-idempotency.md)
+- **Placement:** mid. Silent, unrecoverable drift in a tracked metric — but hydration is a soft metric
+  and the blast radius is one column, so it sits below the live sync and auth items.
+- **Measured.** Same mutation id, pushed three times in sequence:
+  ```
+  3 × {"id":"water-fixed-id-001","domain":"body_metrics","date":"…","payload":{"waterMlDelta":250}}
+  → body_metrics.water_ml = 750        (each push: {"processed":1,"errors":[]})
+  ```
+- **Reachable by ordinary means, on the canonical runtime.** `lib/local-store/sync-engine.ts` wraps
+  the push in `try { res = await fetch(…) } catch { break }`. If the request **reaches the server and
+  commits** but the response is lost — signal dropped mid-response, the OS killing a backgrounded app,
+  a timeout — the mutation is still `status='pending'`, nothing marks it in-flight, and the next sync
+  re-pushes it. The server keeps **no record of processed mutation ids**.
+- **The write itself is correct and must not be "fixed".** `incrementWaterLog` (`adapter.ts:2761`)
+  does the addition inside the upsert (`COALESCE(water_ml,0) + ${ml}`) and the push branch routes to
+  it deliberately — *"an increment, not an absolute set … so concurrent adds sum instead of
+  last-writer-wins clobbering each other (SYNC-P7)"*. Atomic-and-additive is right for concurrency and
+  is precisely what makes a **replay** wrong. Swapping to an absolute total reintroduces SYNC-P7.
+- **It is the only one.** All 19 push branches enumerated; every other domain upserts on
+  `(user_id, date)` or on a client-supplied row id. Three replay-tested and clean (see below).
+- **Fix shape:** server-side dedupe on the mutation id **for this branch only** — a small
+  `applied_mutations(user_id, mutation_id, applied_at)` table with a unique constraint, checked before
+  the increment and inserted in the same transaction. No need to cover the other 18 (naturally
+  idempotent), so it stays small and pruning is trivial. **Lane A owns it** — it is a migration.
+  If it is judged not worth a table, the honest alternative is to accept the drift and record it in
+  `CLAUDE.md`'s **Stored Counters** section — whose opening line is *"Every stored counter in this
+  project has drifted"*, and this is one.
+- **Clean results from the same pass, recorded so they are not re-run:**
+  - `complete_workout` replayed 3× → `sessions_in_phase` = **1**. Second independent confirmation of
+    the **Q-473** fix, covering the vector its original comment named (*"re-pushed after its response
+    was lost"*) — sweep 9's re-run covered the concurrent vector, this covers the replay one.
+  - Absolute `body_metrics` (`weightKg`, `steps`) replayed 3× → one row, correct values.
+  - `activity_logs` replayed 3× → **one row**. Note this looks like it contradicts sweep 9, where
+    `POST /api/activity-logs` gave 5 rows for 5 concurrent calls: **different writers**. The web route
+    mints a server-side id; the outbox payload carries a client-generated one and upserts on it.
+    Neither is a defect — know it before reasoning about one from the other.
+- **Not verified on:** the APK. The replay was simulated by re-posting the same envelope (exactly what
+  the client does), but the client-side trigger was read from source, not induced. The other 15
+  branches were read, not individually replay-tested.
+
 ### [app-shell][platform] Q-478 — two cache guards compare a server-stamped date against a client `DEFAULT_TZ` date, so they return false for hours a day for any non-Brisbane user
 
 - **Branch:** `fix/cache-today-guards-take-tz`

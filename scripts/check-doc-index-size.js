@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, outbox-replay-idempotency sweep, Q-481): backlog 9005 -> 9049,
+// projectOverview 7184 -> 7213. One queue entry and its Known-Issues row. Both carry the SYNC-P7
+// caveat inline — the additive write is deliberate and an implementer who "fixes" it to an absolute
+// set reintroduces the clobber it was written to prevent — and both carry the activity_logs result
+// that looks like it contradicts sweep 9 and does not (different writers). Those two are the lines
+// that stop the entry being implemented wrongly, which is the only reason the entry exists.
+
+//
 // Raised 2026-08-18 (Review, server-side verification sweep, Q-480): backlog 8967 -> 9005,
 // projectOverview 7157 -> 7184. One queue entry and one Known-Issues row, both for a sweep that
 // found nothing. The lines are the *inventory of what was checked* — which repository and shared
@@ -571,12 +579,12 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7184,
+  'projectOverview.md': 7213,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
   // invalidates PR #85's claim.
-  'docs/implementation-backlog.md': 9005,
+  'docs/implementation-backlog.md': 9049,
   'CLAUDE.md': 1075,
 
 };
