@@ -16,6 +16,7 @@ import { computeActivityScore } from '@trainingai/shared/health/activity-score'
 import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { metric, splitMeasured, buildPrompt, type MetricLine } from './prompt'
 
 const bodySchema = z.object({
   section: z.enum(['readiness', 'sleep', 'heart-rate', 'activity']),
@@ -27,13 +28,6 @@ const bodySchema = z.object({
 
 function bandLabel(score: number | null): string {
   return score == null ? 'unknown' : scoreBand(score).label.toLowerCase()
-}
-
-function buildPrompt(section: string, dataLines: string[]): string {
-  return `You are a concise health coach. Write a single insight (2-3 sentences, no markdown) for the user's ${section} data. Be specific to the numbers. End with one actionable tip.
-
-Data:
-${dataLines.join('\n')}`
 }
 
 export async function POST(req: Request) {
@@ -84,7 +78,7 @@ export async function POST(req: Request) {
     ? `NOTE: Oura daily fields below are from ${todayOura.date} (latest available — ring Cloud data is frozen since the 2026-07-07 re-key).`
     : null
 
-  let dataLines: string[]
+  let entries: (MetricLine | string)[]
   if (section === 'readiness') {
     const latestIllness = latestIllnessFromDerived(derivedRows)
     // Readiness is the own BLE-derived composite (contributors still come from the derived row),
@@ -92,17 +86,15 @@ export async function POST(req: Request) {
     const readinessMap = liveReadinessByDay(derivedRows, ouraRows)
     const todayReadiness = readinessMap.get(date) ?? (todayOura ? readinessMap.get(todayOura.date) ?? null : null)
     const todayDerived = derivedRows.find(r => r.day === date) ?? derivedRows[derivedRows.length - 1] ?? null
-    dataLines = [
-      `Readiness score: ${todayReadiness ?? 'unknown'}/100 (${bandLabel(todayReadiness)})`,
+    entries = [
+      metric('Readiness score', todayReadiness != null ? `${todayReadiness}/100 (${bandLabel(todayReadiness)})` : null),
       `Contributors: ${formatContributors((todayDerived?.readinessContributors ?? todayOura?.readinessContributors) as Record<string, number | null> | null | undefined)}`,
       latestSummary?.tempDevC != null
-        ? `Body temp deviation (vs personal ring baseline): ${latestSummary.tempDevC > 0 ? '+' : ''}${latestSummary.tempDevC.toFixed(1)}°C`
-        : todayOura?.temperatureDeviation != null
-          ? `Body temp deviation: ${todayOura.temperatureDeviation > 0 ? '+' : ''}${todayOura.temperatureDeviation.toFixed(1)}°C (pre-re-key Cloud value — not current)`
-          : 'Body temp deviation: no data',
-      latestIllness
-        ? `Illness radar (vs personal baseline): ${latestIllness.flag} (score ${latestIllness.score}/100)`
-        : 'Illness radar: no data',
+        ? metric('Body temp deviation (vs personal ring baseline)', `${latestSummary.tempDevC > 0 ? '+' : ''}${latestSummary.tempDevC.toFixed(1)}°C`)
+        : metric('Body temp deviation', todayOura?.temperatureDeviation != null
+          ? `${todayOura.temperatureDeviation > 0 ? '+' : ''}${todayOura.temperatureDeviation.toFixed(1)}°C (pre-re-key Cloud value — not current)`
+          : null),
+      metric('Illness radar', latestIllness ? `${latestIllness.flag} (score ${latestIllness.score}/100, vs personal baseline)` : null),
       `Past week scores: ${ouraRows.map(r => `${r.date} ${readinessMap.get(r.date) ?? '—'}`).join(', ')}`,
     ]
   } else if (section === 'sleep') {
@@ -111,20 +103,21 @@ export async function POST(req: Request) {
     // last row has the same exposure.
     const nights = nightSessions(sleepRows, tz)
     const todaySleep = nights.find(r => r.date === date) ?? nights.at(-1) ?? null
-    dataLines = [
-      `Sleep score: ${todayOura?.sleepScore ?? 'unknown'}/100`,
-      todaySleep?.durationHours != null ? `Duration: ${Math.round(todaySleep.durationHours * 60)} min` : 'Duration: no data',
-      todaySleep?.efficiency != null ? `Efficiency: ${todaySleep.efficiency}%` : 'Efficiency: no data',
-      todaySleep?.averageHrvMs != null ? `Overnight HRV: ${Math.round(todaySleep.averageHrvMs)} ms` : 'Overnight HRV: no data',
-      todaySleep?.avgHeartRate != null ? `Avg sleeping HR: ${Math.round(todaySleep.avgHeartRate)} bpm` : 'Avg sleeping HR: no data',
+    entries = [
+      metric('Sleep score', todayOura?.sleepScore != null ? `${todayOura.sleepScore}/100` : null),
+      metric('Duration', todaySleep?.durationHours != null ? `${Math.round(todaySleep.durationHours * 60)} min` : null),
+      metric('Efficiency', todaySleep?.efficiency != null ? `${todaySleep.efficiency}%` : null),
+      metric('Overnight HRV', todaySleep?.averageHrvMs != null ? `${Math.round(todaySleep.averageHrvMs)} ms` : null),
+      metric('Avg sleeping HR', todaySleep?.avgHeartRate != null ? `${Math.round(todaySleep.avgHeartRate)} bpm` : null),
       `Contributors: ${formatContributors(todayOura?.sleepContributors)}`,
     ]
   } else if (section === 'heart-rate') {
     const todayBm = bodyMetrics.find(r => r.date === date) ?? bodyMetrics[bodyMetrics.length - 1] ?? null
-    dataLines = [
-      todayBm?.restingHeartRate != null ? `Resting heart rate: ${todayBm.restingHeartRate} bpm` : 'Resting heart rate: no data',
-      todayBm?.hrvMs != null ? `Overnight HRV (daily record, same metric as above): ${todayBm.hrvMs} ms` : 'Overnight HRV (daily record): no data',
-      `7-day RHR readings: ${bodyMetrics.filter(r => r.restingHeartRate).map(r => `${r.restingHeartRate}`).join(', ') || 'none'}`,
+    const rhr7d = bodyMetrics.filter(r => r.restingHeartRate).map(r => `${r.restingHeartRate}`)
+    entries = [
+      metric('Resting heart rate', todayBm?.restingHeartRate != null ? `${todayBm.restingHeartRate} bpm` : null),
+      metric('Overnight HRV (daily record, same metric as above)', todayBm?.hrvMs != null ? `${todayBm.hrvMs} ms` : null),
+      metric('7-day RHR readings', rhr7d.length > 0 ? rhr7d.join(', ') : null),
     ]
   } else {
     // The Oura Cloud activity fields are frozen since the 2026-07-07 re-key (always null), so this
@@ -152,13 +145,30 @@ export async function POST(req: Request) {
       typicalSessionVolumeKg: load.typicalSessionVolumeKg,
       goals,
     })
-    dataLines = [
-      `Activity score: ${activityResult?.score ?? 'unknown'}/100 (${bandLabel(activityResult?.score ?? null)})`,
-      todayBmForActivity?.steps != null ? `Steps: ${todayBmForActivity.steps} (goal ${goals.stepGoal})` : 'Steps: no data',
-      todayBmForActivity?.activeCalories != null ? `Active calories: ${todayBmForActivity.activeCalories} kcal (goal ${goals.activeEnergyGoal} kcal)` : 'Active calories: no data',
+    entries = [
+      metric('Activity score', activityResult?.score != null ? `${activityResult.score}/100 (${bandLabel(activityResult.score)})` : null),
+      metric('Steps', todayBmForActivity?.steps != null ? `${todayBmForActivity.steps} (goal ${goals.stepGoal})` : null),
+      metric('Active calories', todayBmForActivity?.activeCalories != null ? `${todayBmForActivity.activeCalories} kcal (goal ${goals.activeEnergyGoal} kcal)` : null),
+      // Session count is a real count from our own history — zero sessions IS a measurement, not an
+      // absent reading, so it stays a line rather than becoming "not measured".
       `Strength training this week: ${sessions7d} session(s) (goal ${goals.strengthFreqGoal}/week), ${Math.round(volume7dKg)} kg total volume`,
       ...(activityResult?.taperApplied ? ['Note: score is eased back today — recent training load is above the optimal range (over-exertion taper).'] : []),
     ]
+  }
+
+  const { lines: dataLines, absent } = splitMeasured(entries)
+
+  // Nothing was measured at all. Q-452 gates the card on a section having data so this should not be
+  // reachable from the UI, but the route is callable directly and `force` bypasses the cache — and
+  // omitting absent metrics (Q-353) is what makes it reachable at all, since heart-rate no longer
+  // has an unconditional line. Answer deterministically rather than paying for a model call whose
+  // only honest output is "there are no readings", which is the exact prompt shape that produced
+  // the invented-zero sentence in the first place.
+  // Deliberately NOT cached: the cache is keyed by (user, section, date), so persisting this would
+  // still be served after the ring syncs later the same day.
+  if (dataLines.length === 0) {
+    const insight = `No ${section.replace('-', ' ')} readings were recorded for ${date}, so there is nothing to interpret yet.`
+    return NextResponse.json({ insight })
   }
 
   if (staleNote) dataLines.unshift(staleNote)
@@ -171,7 +181,7 @@ export async function POST(req: Request) {
       { section: 'health-insight', userId, fingerprint: { section, date } },
       () => generateText({
         model: aiModel(),
-        prompt: buildPrompt(section, dataLines),
+        prompt: buildPrompt(section, dataLines, absent),
         maxRetries: 0,
       }),
     ))
