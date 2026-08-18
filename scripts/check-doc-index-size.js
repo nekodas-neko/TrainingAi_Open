@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, implausible-value sweep, Q-485): backlog 9264 -> 9312,
+// projectOverview 7309 -> 7339. One queue entry and its row, both carrying the two lines that stop
+// it being implemented wrongly: the shared BOUNDS are correct and must not be touched (One Formula,
+// One Place is holding — only the behaviour differs), and the fix is NOT "throw everywhere", because
+// a throw quarantines the mutation and the poison-pill rule forbids that for a validation failure.
+// An entry missing either line produces a worse app than the bug does.
+
+//
 // Raised 2026-08-18 (Review, unvalidated-create-bodies sweep, Q-484): backlog 9214 -> 9264,
 // projectOverview 7277 -> 7309. One queue entry and its row. Both carry two caveats inline that are
 // the reason the entry is safe to act on: the 10 MB figure is NOT a storage number (TOAST compressed
@@ -602,7 +610,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7309,
+  'projectOverview.md': 7339,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -613,7 +621,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9264,
+  'docs/implementation-backlog.md': 9312,
   'CLAUDE.md': 1075,
 
 };

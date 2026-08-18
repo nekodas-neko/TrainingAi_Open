@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** seventeen sweeps (2026-08-17 ×2, 2026-08-18 ×15) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **485**)
+**Updated:** 2026-08-18 · **By:** eighteen sweeps (2026-08-17 ×2, 2026-08-18 ×16) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **486**)
 
 ## Now
 
-Seventeen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Eighteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,31 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 18 — an implausible value down both write paths (2026-08-18)
+
+**Filed Q-485 (mid-low).** `CLAUDE.md` says sync-push must mirror the web route and the push branch's
+comment claims it does; nobody had sent the same out-of-range value down both. Write-up:
+[`docs/reviews/2026-08-18-implausible-value-silent-drop.md`](../../reviews/2026-08-18-implausible-value-silent-drop.md).
+
+`weightKg: 10000` (bound 500): web → **400** with a clear message; sync push → **200**
+`{"processed":1,"errors":[]}`, row written with `weight_kg` NULL. **Invisible in all three places it
+could be recorded** — `errors: []`, no `console.*`, no `error_events` row (verified by query).
+
+**The bounds are correct and must not be touched** — both paths share one validation module, which is
+`One Formula, One Place` holding. Only the *behaviour* differs, and the same function already has the
+visible version: **12 of 14** value checks coerce silently, **2** throw (`waterMlDelta`,
+`sleep_session`) and reach the dead-letter badge. Weight is in the silent group.
+
+**⚠️ The fix is NOT "throw everywhere"** — a throw quarantines the mutation and the poison-pill rule
+forbids that for a validation failure. Recommended order in the entry: log it server-side (one line),
+then a `warnings[]` channel separate from `errors[]`, then a per-field product call an implementer
+should not make in passing.
+
+**Pattern worth naming for successors:** three of the last four sweeps found the *bounds/logic*
+correct and the *reporting* wrong (Q-475 a DB outage as HTTP 200, Q-476 a schema drop as success,
+Q-485 a coerced field as success). This app validates well and tells you badly. That is a productive
+place to keep looking.
 
 ### Sweep 17 — the create routes nobody gave a schema (2026-08-18)
 
