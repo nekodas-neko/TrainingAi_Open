@@ -92,7 +92,7 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | activity | ✅ specified (Q-505) — build is Lane A's |
 | body | ✅ battery range clean; anchor measured (Q-511) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
-| **workouts** | 🟡 ACWR (Q-512/513) + RPE autoregulation (Q-514) done 2026-08-18. **Still untouched: progression rules, monotony/strain, goal-range bands.** 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
+| **workouts** | 🟡 ACWR (Q-512/513) + RPE autoregulation (Q-514) done 2026-08-18. **Foster monotony measured CLEAN** — mean 1.29, and the 2.0 gate fires on 1 of 102 windows (1.0%), correct for a risk flag; rest days are properly seeded at 0. **Still untouched: progression rules, goal-range/INTENSITY_ZONES bands.** 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
 | **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05` (documented rationale, never validated against the owner's HR), `PEAK_BANDS` (their "stable per-bucket sample sizes" justification is an empirical claim nobody measured), zone boundaries |
 | **nutrition** | 🟡 **movement goals ARE calibrated** — `STRENGTH_FREQ_GOAL 5` (Q-137, 91 days) and `SESSION_VOLUME_GOAL_KG 5200` (Q-190, 40 sessions), see [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md). `STEP_GOAL 8000` / `ZONE_MINUTES 22` / `BMR_FRACTION 0.24` are **deliberate population anchors** (Paluch 2022, WHO 150 min/wk), not unchecked round numbers. **Genuinely uncalibrated: the calorie/macro targets vs the owner's observed weight change** — a TDEE outcome check nobody has run |
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
@@ -155,6 +155,14 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **Foster monotony is clean — do not re-open it.** 7-day monotony over 102 windows: mean 1.29,
+  median 1.34, sd 0.31, range 0.41–2.32; `HIGH_MONOTONY = 2.0` fires on **1 window (1.0%)**, which is
+  right for a risk flag. `assemble-plan-context` seeds all 7 days at 0 so rest days count, which is the
+  correct Foster definition — that detail is what makes the threshold meaningful, so do not "optimise"
+  it to training days only.
+- **Exercise names map to MORE THAN ONE role** (`Barbell Shrug` is accessory *and* secondary, 20+ others
+  too). Any `session_exercises`-by-name join fans out and its per-role aggregates are unsound. Cost me
+  one measurement this session; the finding was re-derived without role attribution.
 - **`RPE_DEAD_BAND = 1.5` is RIGHT — do not tune it** (Q-514). It sits on a flat part of the
   sensitivity curve (1.25→20.7%, 1.5→17.5%, 2.0→14.9%) and the delta distribution is centred. The bias
   is in the input: `expectedRpe`'s **floor** clamp binds on 6.5% of sets (the ceiling never binds),

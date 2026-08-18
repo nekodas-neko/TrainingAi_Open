@@ -3976,6 +3976,13 @@ session working from a temporarily restored copy.
   the gap to the reported value measures nothing. Matches the codebase's existing principle of passing
   `null` rather than fabricating a neutral (`computeResilienceForDay`). Contained: one predicate beside
   `expectedRpe`, plus a filter in `signals.ts`'s `perExRpeDelta` loop (~line 293). **No curve change.**
+- **Corroborated by the app's own other model.** `ACCESSORY_SPEC` (`goal-ranges.ts`) prescribes
+  accessory work to **RPE 7.5–8.5** (*"ALL genuinely challenging (>= RPE 7.5)"*). The floor-clamped sets
+  report a mean actual RPE of **6.89** — below every target in that table and below the dataset mean of
+  7.49. **By the app's other model these sets are easy**, while the autoregulation delta reads them at
+  +1.89 and cuts load. Two models in one codebase disagreeing in *sign* about the same sets.
+  (A stronger version — attributing the clamped sets to the `accessory` role — was **abandoned as
+  unsound**: exercise names map to more than one role across programs, so a name-based join fans out.)
 - **Do NOT widen the clamp** to allow expected RPE below 5 — an expectation of 0.6 against an owner who
   never reports below 6 gives a delta of **+6.3**, worse. The set is unrepresentable either way.
 - **Re-measure after.** Back-off 4.1% vs push 7.9% is asymmetric the other way; whether that is right is

@@ -73,3 +73,22 @@ are visible, 570 of 1,029. Nothing on-device, and no owner-reported symptom prom
 production call site**; they appear only in tests. They were on this review's list as hand-tuned
 constants worth validating, and calibrating a function nothing calls would be wasted. Whether the
 table is correct is unknown and unimportant while it is unreachable.
+
+## Also measured, and clean: Foster monotony
+
+`HIGH_MONOTONY = 2.0` softens a prescribed hard run when the week's load has been too samey. Over 102
+rolling 7-day windows the owner's monotony reads mean **1.29**, median 1.34, sd 0.31, range 0.41–2.32,
+and crosses 2.0 on **one window (1.0%)** — the right rate for a risk flag. Nothing to change.
+
+Worth recording *why* it works: `assemble-plan-context` seeds all seven days at zero before adding
+session volume, so rest days count toward the standard deviation. That is the correct Foster
+definition, and it is what makes the 2.0 threshold meaningful — computing monotony over training days
+only would roughly halve the SD and push most weeks over the line. Do not "optimise" that seeding away.
+
+## A measurement I abandoned
+
+I tried to strengthen the accessory argument by grouping sets on `session_exercises.exercise_role`.
+Exercise names map to **more than one role** across programs — `Barbell Shrug` is both accessory and
+secondary, and twenty-odd others are similarly split — so a name-based join fans out and its per-role
+means are unsound. The 6.89-vs-7.5 comparison in the review needs no role attribution, so it is stated
+without one.

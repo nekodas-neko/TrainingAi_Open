@@ -70,6 +70,25 @@ Each of those triggers is a **5–10% load cut** on that exercise (`BACKOFF_MIN_
 So the engine has been cutting load on accessory work because the model could not express how easy the
 set was *supposed* to feel — and then read the gap as the lifter struggling.
 
+### 3.1 The app's own effort prescription disagrees, in the opposite direction
+
+`ACCESSORY_SPEC` (`goal-ranges.ts`) prescribes accessory work to a **target RPE of 7.5–8.5** depending
+on training goal — *"ALL genuinely challenging (>= RPE 7.5)"*, in its own words.
+
+The floor-clamped sets report a mean actual RPE of **6.89**. That is below **every** accessory target
+in that table, and below the dataset's own mean of 7.49. **By the app's other model of how hard these
+sets should feel, they are easy** — while the autoregulation delta reads them at **+1.89**, "ran high",
+and cuts the load.
+
+Two models in the same codebase, disagreeing in *sign* about the same sets. That is independent
+corroboration that the +1.89 is an artefact rather than a real difficulty signal.
+
+**An attempted stronger version of this was abandoned as unsound**: grouping the sets by
+`session_exercises.exercise_role` to show the clamped sets are specifically accessories. Exercise names
+map to **more than one role** across programs (`Barbell Shrug` is both accessory and secondary, and 20+
+others are similarly split), so a name-based join fans out and its per-role means cannot be trusted.
+The claim above needs no role attribution and is made without it.
+
 ---
 
 ## 4. Why the dead band itself is fine

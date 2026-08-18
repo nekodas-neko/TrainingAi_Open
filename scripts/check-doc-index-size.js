@@ -470,7 +470,7 @@ const BASELINE = {
   // +50 for Q-514 (expected-RPE clamp): its two tables ARE the argument — the +1.89/-0.34 split shows
   // the bias is one-directional, and the 39->14 / 27->27 pair is what distinguishes a bias fix from a
   // de-sensitisation. Without both, the obvious response is to raise RPE_DEAD_BAND, which is wrong.
-  'docs/implementation-backlog.md': 8358,
+  'docs/implementation-backlog.md': 8365,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
