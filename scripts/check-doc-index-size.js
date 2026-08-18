@@ -145,6 +145,13 @@ const root = path.join(__dirname, '..');
 // Three queue entries from the workout write-path sweep plus the Known-Issues row indexing them.
 // Entries and open-issue content, which is what these files are for; the sweep's prose lives in
 // docs/reviews/2026-08-18-workout-write-path.md, outside this ratchet.
+//
+// Raised 2026-08-18 (BugFix intake, Q-390): one owner-reported queue entry. The owner asked for a
+// cosmetic change — render the deload flag as "Mon (D)" rather than on its own line — and the trace
+// found the flag is an extra flex row inside an items-end container, so a flagged day's bar sits
+// ~12px higher than an unflagged one on a chart whose purpose is comparing days. The entry carries
+// the geometry, because that is the part an implementer would otherwise fix cosmetically and leave
+// broken. Rebuilt from origin/main's numbers rather than spliced.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -203,6 +210,7 @@ const BASELINE = {
   // step in the trend chart where the old and new model scores meet, and no device verification.
   // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
   // other lanes twice, which is the case the note below warns silently drops one side.
+
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
@@ -245,7 +253,6 @@ const BASELINE = {
   // without which the section reads as progress against the 500 MB deadline where there is none)
   // and +41 on the backlog (the Q-541 status block, and the new Q-315 entry for error_events
   // holding 4 live rows in 49 MB).
-  'projectOverview.md': 6760,
   //
   // Raised 2026-08-18 (Q-541 task 4, Lane A): 7020 -> 7055. Two things: the Q-541 status block gains
   // the packer's settled decisions, and Q-316 is a NEW entry — the packer has no button because
@@ -253,8 +260,20 @@ const BASELINE = {
   // stop the next lane building the wrong thing: the route contract it should call, and the warning
   // that its confirm copy must not read like the lossless VACUUM beside it, because this is the one
   // control in the app that deletes archival frames.
-  'docs/implementation-backlog.md': 7055,
+  // Raised 2026-08-18 (Tuning, Q-505): 7020 -> 7056. One queue entry for the Activity Score decision,
+  // carrying the measured cause and the two coherent answers inline — the item is blocked on the
+  // owner choosing between them, and an implementer must not have to open the review to learn that.
+  // Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
+  //
+  // Recomputed 2026-08-18 (Q-541 task 4, Lane A) from the MERGED files — all three numbers rebuilt,
+  // not spliced, because both files moved on both sides of this merge. Lane A's own delta was the
+  // Q-541 status block for the packer plus the new Q-316 entry (the packer has no button, because
+  // components/** belongs to the other lane, and the entry carries the warning that its confirm copy
+  // must not read like the lossless VACUUM beside it).
+  'projectOverview.md': 6843,
+  'docs/implementation-backlog.md': 7289,
   'CLAUDE.md': 1010,
+
 };
 
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;

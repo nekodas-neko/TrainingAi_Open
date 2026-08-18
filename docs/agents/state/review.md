@@ -3,11 +3,69 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** three sweeps (2026-08-17 ×2, 2026-08-18) · **Q band:** 450–499 (next free: **463**)
+**Updated:** 2026-08-18 · **By:** five sweeps (2026-08-17 ×2, 2026-08-18 ×3) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **467**)
 
 ## Now
 
-Three sweeps have run under this role. All are **merged** (#16, #38, and the workout write-path PR below).
+Five sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+least once**, at the owner's request to work through the sections:
+
+| Pillar | Lens applied | Findings |
+|---|---|---|
+| `workouts` | write path cross-user + live drive | Q-460…Q-462 |
+| `nutrition` · `cardio` · `activity` | writes cross-user + app-wide not-found probe | Q-463 |
+| `sleep` · `readiness` · `heart-rate` · `body` · `devices` | ingest auth, value validation, schema strictness | Q-464, Q-465 |
+| `app-shell` · `platform` | failure cells, repo-migration architecture | Q-450…Q-459 |
+
+**Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
+left the web build — every offline-first domain took its web fallback), **production data**
+(`claude_ro` was never queried in any of the five), the **offline and error paths** (everything ran
+against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 5 — the ingest surface: sleep, readiness, heart-rate, body, devices (2026-08-18)
+
+Write-up: [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md).
+These five pillars barely expose `[id]` write routes — they are read-and-derive, so the write-surface
+lens does not reach them and this one does.
+
+**Filed — Q-464** (70 schema files, only **6** `.strict()`; demonstrated as a silent wrong-day write on
+`body-metadata` — **but `sync/push` must not be made strict carelessly**, older-APK payloads may carry
+unnamed fields) and **Q-465** (`day-checkin` creates a row from `{}`; **consequence unproven and the
+entry says so**).
+
+**CLEAN, and the more useful half:** **no ingest route accepts a `userId` from the body** (all ten
+session- or secret-gated, two behind `requireAdmin`), and value validation rejected every
+physiologically impossible probe with nothing reaching Postgres — HR `-50`/`99999`, mood `999`/`-5`,
+weight `99999`/`-40`, malformed scale hex. The weight errors even name the bound violated.
+
+**Also filed from this run, not from the probe — Q-466:** CI re-downloads the Playwright browser on
+every E2E run with no cache; observed stalling **three times on 2026-08-18**, each costing a cancel-and-re-run
+on a required check. If E2E sits on `Install Chromium` while `Run pnpm e2e` is still `pending`, that is
+the download, not the specs — cancel and re-run rather than diagnosing the specs.
+
+**Not covered:** `health-connect/ingest` was read but **not called** (secret-gated, no secret here), and
+the Oura BLE sample routes were not exercised with real frames.
+
+### Sweep 4 — nutrition/cardio/activity writes, and the not-found answer app-wide (2026-08-18)
+
+Owner asked for section-by-section coverage. Write-up:
+[`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md).
+
+**Filed — Q-463** (sits directly above Q-462, the instance it generalises): the "row does not exist"
+answer is inconsistent across 33 dynamic write endpoints, and **five return a 500** (four with an
+empty body). One cause — 16 bare `throw new Error('… not found')` in the repository layer with no
+route mapping. Matters because a 5xx makes the sync client retry what can never succeed, and every
+refused request writes a stack trace into `error_events`.
+
+**CLEAN:** cross-user protection holds across nutrition/cardio/activity too (nine probes, owner's rows
+re-read, control for each) — so **all four write pillars are now probed and none leaked**. And the
+seven idempotent `DELETE`s returning 200/204 for an absent row are **defensible, deliberately not
+filed** — the reasoning is in the review so it is not re-litigated.
+
+**Section coverage so far.** The write surface is swept for workouts, nutrition, cardio, activity,
+and (via the app-wide probe) body/devices/platform/app-shell. **`sleep`, `readiness` and `heart-rate`
+barely expose dynamic write routes at all** — they are read-and-derive pillars whose writes arrive
+through ingest and sync, so they need a different lens, not this one. That is the next sweep.
 
 ### Sweep 3 — the workout write path, driven live and probed cross-user (2026-08-18)
 

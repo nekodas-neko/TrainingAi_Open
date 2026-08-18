@@ -320,6 +320,61 @@ below threshold and left in place for next time.
 - **Worth a sweep:** any other test inserting `now() - interval '…'` and querying a user-local day
   window has this exact hole. `grep -rn "now() - interval" lib/data/postgres/__tests__/`.
 
+### [workouts][app-shell] Q-390 — the deload "D" is its own flex row, so it lifts that day's bar out of line with the rest
+
+- **Branch:** `fix/training-load-day-flag-inline`
+- **Added:** 2026-08-18 · owner, with a screenshot of Health → Training: *"look at the format;
+  reccomend doing Mon (D) instead so it fits better."*
+- **What the screenshot shows** (it will not survive into an implementer's session): the TRAINING
+  LOAD card, week Mon–Sun. Mon carries a green striped bar with a small amber **D** on its own line
+  *below* the "Mon" label; Tue carries a solid orange bar with no flag; Wed–Sun are empty grey
+  slivers. **Mon's bar visibly sits higher than Tue's and collides with the "TRAINING LOAD"
+  heading above it**, which is the part the owner did not ask about and is the actual defect.
+- **Confirmed root cause, one line of markup.** `components/stats/weekly-stats-hub.tsx:98-107`
+  renders the flag as a *sibling* of the day label inside a column flex:
+  ```tsx
+  <div className="flex flex-1 flex-col items-center gap-1">   // :77 — the day column
+    <div style={{ height: totalHeight }}>…bars…</div>
+    <span className="text-[9px] …">{day.label}</span>
+    {day.isDeload  && <span className="text-[8px] … text-amber-500">D</span>}
+    {day.isTesting && <span className="text-[8px] … text-purple-500">T</span>}
+  ```
+  so each flag becomes an extra **row**, which is the "D on its own line" the owner sees.
+- **Why that is more than cosmetic.** The row of columns is
+  `<div className="flex items-end gap-1 h-14">` (`:62`) — **`items-end`, fixed 56 px**. The columns
+  are already taller than their container and overflow *upward*; adding a flag row makes that
+  column taller still, so its bar is pushed further up than its neighbours:
+
+  ```
+  column with a flag:  52 bar + 4 + 13.5 label + 4 + 8 flag = 81.5 px   (25.5 px above the container)
+  column with none:    52 bar + 4 + 13.5 label              = 69.5 px   (13.5 px above)
+  difference:                                                  12 px
+  ```
+
+  **The bars are therefore not on a common baseline whenever any day is flagged** — a deload or
+  testing day reads ~12 px taller than an identical unflagged day, on a chart whose whole purpose is
+  comparing days against each other. That is the misreading, and the collision with the heading is
+  the same 25.5 px overflow reaching the `mb-3` gap above.
+- **The owner's fix resolves both**, which is why it is the right one: inline the flag into the
+  label span (`Mon (D)`) and the extra row disappears, every column becomes the same height, and the
+  bars land on one baseline again.
+- **Three things to get right while doing it:**
+  1. **Keep the letter, not just the colour.** `CLAUDE.md`'s colour-only-state rule is currently
+     satisfied because the glyph *is* the non-colour channel. `(D)` keeps that; a coloured dot would
+     not.
+  2. **Both flags can be true at once** — the two `&&` blocks are independent, so a day can render
+     `D` and `T` together. `Mon (D)(T)` is ~10 characters in a column roughly 50 dp wide at the S25
+     viewport, which is where it will wrap or clip. Decide the combined form (`Mon (D·T)`?) rather
+     than discovering it on a testing-week screenshot.
+  3. **Check the container height after the change.** Columns overflow `h-14` by 13.5 px even with
+     no flag, so `h-14` is already too small for its contents; inlining removes the *difference* but
+     not the overflow. Either raise the container or move the labels out of the fixed-height row.
+- **Evidence that would confirm it end-to-end:** seed a week where one day is a deload and another
+  has identical volume without the flag, and check the two bars' top edges land at the same y. Today
+  they will differ by ~12 px.
+- **Surface:** browser-reproducible at the S25 viewport (≤640 px) — no device, no native path, no
+  production data needed. `weekly-stats-hub.tsx` is Lane B's (`components/**`).
+
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
 - **Branch:** `feat/ring-key-export`
@@ -938,6 +993,160 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Surface: device required.** Every claim here is code-traced or from ingested-event counts;
   **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
   and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
+
+### [platform][nutrition][workouts][devices] Q-463 — "the row you named does not exist" is answered five different ways, and five routes answer it with a 500
+
+- **Branch:** `fix/not-found-status-across-write-surface`
+- **Added:** 2026-08-18 · review sweep (nutrition/cardio/activity writes + an app-wide not-found probe) ·
+  [`docs/reviews/2026-08-18-write-surface-not-found.md`](reviews/2026-08-18-write-surface-not-found.md)
+- **Placement:** mid. Not a leak and not data loss — but it misclassifies a permanent failure as
+  transient on the sync path, and it degrades `error_events`, which is the one fault signal nobody
+  is watching.
+- **Generalises Q-462.** That entry filed `/api/log-exercise` returning 500 for an ownership refusal.
+  This one is the measurement showing it was not isolated — implement them together.
+- **Measured uniformly.** Every `app/api` route with a dynamic segment and a write method, called as
+  an **authenticated** user with a fabricated UUID (`00000000-0000-4000-8000-0000000fffff`). 33
+  endpoints answered:
+
+  | Answer | Count | Verdict |
+  |---|---|---|
+  | `404` + JSON error | 8 | correct |
+  | `200`/`204` on `DELETE` | 7 | **defensible, do not "fix"** — see below |
+  | `400` from body validation before the id lookup | 12 | not evidence; excluded |
+  | `403` (admin gate first) | 1 | correct |
+  | **`500`** | **5** | the finding |
+
+- **The five:**
+  ```
+  PATCH  /api/injuries/[id]              500  (empty body)
+  PUT    /api/nutrition/meal-types/[id]  500  (empty body)
+  PATCH  /api/supplements/[id]           500  (empty body)
+  POST   /api/supplements/[id]/log       500  (empty body)
+  DELETE /api/phase-sets/[id]            500  {"error":"Phase set not found"}
+  ```
+  Plus `POST /api/log-exercise` (Q-462), which has no dynamic segment so it is not in the 33.
+- **One cause, repeated.** Repository methods throw a bare `Error('… not found')` — **16 such throws**
+  across `lib/data/postgres/` and `packages/shared/src` — and these routes have nothing mapping them
+  to a status, so Next's default handler returns 500. Confirmed live in the dev log:
+  `Error: Supplement not found`, `Error: Food log not found`, `Error: Meal type not found`, each with
+  a full stack trace.
+- **One resource, two wrong answers on two verbs.** `PUT /api/phase-sets/[id]` →
+  `400 {"error":"Phase set not found"}`; `DELETE /api/phase-sets/[id]` →
+  `500 {"error":"Phase set not found"}`. Same resource, same condition, same message. Neither is 404.
+- **Three consequences, each against a rule this repo already wrote:**
+  1. **The sync client retries what can never succeed.** `CLAUDE.md`: *"A 4xx/validation failure is a
+     poison pill: quarantine it, don't retry forever. 5xx/429 = back off and retry."* A permanent
+     "not yours / not there" reported as 5xx is classified as transient.
+  2. **Four of the five return an empty body**, so a client calling `res.json()` on the failure throws
+     a parse exception on top and never renders its error state.
+  3. **It pollutes `error_events`** — *"the only view of faults that never reach a human"*, pruned at
+     30 days and read at every session start. Stack traces from correctly-refused requests make that
+     table worse at its job.
+- **Fix shape:** a typed `NotFoundError` / `NotOwnedError` in the repository layer plus **one** shared
+  mapper at the route boundary — not 16 call sites each remembering. **`/api/nutrition/meal-plans/*`
+  is the in-repo reference:** all five of its write endpoints already return a clean
+  `404 {"error":"Not found"}`. **Lane A** (repository + `app/api`).
+- **Do NOT also change the seven `DELETE`s that return 200/204 for an absent row.** That looks like the
+  same shape and is not: `DELETE` is idempotent by convention, the desired end state (row absent) holds,
+  and the outbox is right to treat it as done. It is recorded as **clean** in the review, with the
+  reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
+  `session_rpe = 7` and it did **not** hold.)
+
+### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
+
+- **Branch:** `fix/strict-request-schemas`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
+  the failure mode is silent data misplacement and this repo has already paid for the class once.
+- **Measured:** of **70** files defining a `z.object(...)` request schema across `app/api` and
+  `packages/shared/src/validation`, only **6** call `.strict()`. Zod's default silently drops unknown keys.
+- **Demonstrated live** on `POST /api/body-metadata`:
+
+  | Sent | Response | Row written |
+  |---|---|---|
+  | `{"date":"2026-08-10","weightKg":81}` | `200 {"success":true,"date":"2026-08-18"}` | weight 81 on **2026-08-18** |
+  | `{"date":"3026-08-18","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+  | `{"date":"not-a-date","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+
+- **Do NOT change the route — it is correct.** `app/api/body-metadata/route.ts:236` reads
+  `body.localDate` and defaults to today in the user's timezone when absent, which is the documented
+  pattern. The defect is that `date` is not in the contract, the schema is not strict, so the key is
+  dropped and the write lands on today with a success response.
+- **Why file it:** the repo has already lost a full release to this exact class — the `ai-chat`
+  `localDate` regex that rejected every real request, documented at length in `CLAUDE.md`. A strict
+  schema turns that mistake into a 400 at the boundary instead of a silent wrong-day write.
+- **Eleven date-bearing write schemas are non-strict**, including `sync/push`, `health-connect/ingest`,
+  `running-plan`, `running-plan/override`, `plan-meal-answers`, and the shared `body-metrics`,
+  `activity-log` and `fitness-test` schemas. `WorkoutEntryPatchSchema` is one of the six that **is**
+  strict — use it as the reference.
+- **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
+  hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
+- **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
+  APK may legitimately carry fields the current schema does not name; making that one strict could
+  reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
+  written reason. **Lane A.**
+
+### [platform] Q-466 — CI re-downloads the Playwright browser on every E2E run, and a slow CDN turns that into an indefinite stall
+
+- **Branch:** `ci/cache-playwright-browsers`
+- **Added:** 2026-08-18 · review sweep (observed while landing the section-coverage PRs) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** low-mid. Costs nothing when the CDN is healthy and blocks a PR entirely when it is not.
+- **What.** `.github/workflows/ci.yml:391-392` runs `npx playwright install --with-deps chromium` on
+  **every** E2E run, with no cache:
+  ```yaml
+  - name: Install Chromium
+    run: npx playwright install --with-deps chromium
+  ```
+  `actions/setup-node`'s `cache: 'pnpm'` (five jobs use it) caches the pnpm store, **not** the
+  Playwright browser binaries, which live in `~/.cache/ms-playwright`. So each run pulls ~150 MB of
+  Chromium plus system packages afresh.
+- **Observed three times on 2026-08-18**, on PR #47 and twice on PR #66, out of roughly 8–10 E2E runs
+  that day — a small sample, so treat the *rate* as indicative rather than measured, but three in one
+  day on one repo is not a coincidence. In both cases the step sat
+  `in_progress` for **6–22 minutes** with every other job already green, and the job had to be
+  cancelled and re-run; the re-run completed the same step in well under a minute. The tell is
+  distinctive and worth knowing: `Install Chromium` `in_progress` while `Run pnpm e2e` is still
+  `pending` means the download, not the specs.
+- **Why it is worth fixing rather than tolerating.** E2E is a **required check**, so this blocks the
+  merge outright rather than degrading it, and the recovery (cancel the run, re-run the workflow,
+  wait again) costs ~20 minutes of wall clock each time. With five concurrent agents landing PRs, that
+  is paid repeatedly.
+- **Fix shape:** add `actions/cache` for `~/.cache/ms-playwright`, keyed on the resolved
+  `@playwright/test` version from `pnpm-lock.yaml` so a version bump invalidates it — the standard
+  pattern from Playwright's own CI docs. Keep the `install` step (it must still run to place the
+  browser and system deps on a cache miss); the cache only removes the download.
+- **Note for the implementer:** `playwright.config.ts` deliberately prefers the sandbox's
+  `/opt/pw-browsers/chromium` when present and falls back to Playwright's managed download elsewhere,
+  which is why CI needs the install at all. That comment explains the design — do not "simplify" it
+  away while adding the cache.
+
+### [readiness] Q-465 — `POST /api/day-checkin` creates a check-in row from a completely empty body
+
+- **Branch:** `fix/day-checkin-requires-an-answer`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** low. **The consequence is unproven and the entry says so** — do not implement this as
+  if a known symptom were being fixed.
+- **Observed.** `POST /api/day-checkin` with a body of exactly `{}` returns **201** and writes a row
+  with every metric null:
+  ```
+  log_date    phase    physical_tiredness  mental_drain  hydration  sore_muscles
+  2026-08-18  evening  (null)              (null)        (null)     {}
+  ```
+  An unknown field is accepted and dropped too (`{"sleepQuality":"banana"}` → 201, nothing stored —
+  `day_checkins` has no such column). That half belongs to Q-464.
+- **Both consumers were checked and neither shows a user-visible bug.**
+  `components/morning-checkin-sheet.tsx:58-70` pre-fills from a saved row but coalesces every field
+  through `?? NEUTRAL_SCALES`, so an all-null row behaves identically to no row.
+  `app/api/workout-data/route.ts:471` feeds the check-in into `reevaluationKey(...)`, where an empty
+  row changes the key and can trigger a re-evaluation carrying no new information.
+- **Why it is still worth closing:** the row is indistinguishable from a real check-in in which the
+  user answered nothing, and readiness is precisely the pillar where *"the user told us nothing"* and
+  *"the user told us they feel neutral"* must not collapse to the same value.
+- **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
+  body carries no answers. **Lane A.**
 
 ### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
 
@@ -2643,61 +2852,86 @@ session working from a temporarily restored copy.
   is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
   that is a `devices` finding.
 
-### [readiness][workouts] Q-504 — recalibrate the Readiness range, and re-anchor the five thresholds that ride on it
+### [activity] ⛔ Q-505 — Activity Score: redesign as a daily effort meter with a target (2 owner decisions open)
 
-- **Branch:** `fix/readiness-range-calibration` · **Lane:** A
-- **Added:** 2026-08-18 · Tuning · owner-directed range work ·
-  [`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](reviews/2026-08-18-sleep-score-range-recalibration.md) §6
-- **Not blocked on the owner** — they directed the range work explicitly. It is held only because of
-  blast radius, and the analysis is already done.
-- **Measured.** Even with v1.319.0's new Sleep Score feeding its `previousNight` term, readiness is
-  mean 68.9, sd 11.6, **IQR 64.4–75.7 (11 points)**, nothing above 87, nothing in the 30s or 40s.
-  Same structural cause as Sleep: a blend of nine contributors shrinks spread by ~1/sqrt(9).
-- **The fix is known and measured.** A `SCORE_CALIBRATION`-style transform on the composite, anchored
-  on its own percentiles (p2/p10/p25/p50/p75/p90/p98 -> 25/42/55/68/81/91/97), gives **mean 66.8,
-  sd 19.3, range 15–99, 4 days >= 90 and 6 below 50** — the owner's stated acceptance test.
-- **Why it is not shipped: five action thresholds ride on the readiness scale**, and the change moves
-  **12 of 26 days across at least one.** Days below each, now -> after: early-deload `<45` **1 -> 4**;
-  band `50` 1 -> 6; AI low-readiness `<60` 4 -> 8; band `70` 12 -> 15; rest-day "train hard" `>=75`
-  19 -> 17.
-  - The **band** moves (50, 70) are the intended outcome — more days reading "Low" is what a working
-    range looks like. Leave them.
-  - The **action** thresholds are not. Shipping as-is quadruples early-deload firing, which the owner
-    did not ask for. Re-anchor each to preserve its firing RATE, exactly as `LOW_SLEEP_SCORE`
-    60 -> 42 was handled in v1.319.0 (that PR's §5 is the worked example).
-- **Files:** `packages/shared/src/health/readiness-composite.ts` (the calibration),
-  `lib/health/readiness-payload.ts:47` (`EARLY_DELOAD_SCORE_MAX`),
-  `packages/shared/src/ai-periodization/ai-dynamic.ts:231`,
-  `packages/shared/src/health/rest-day-guidance.ts:36,46`, `lib/oura-models/inference/ots.ts:151`.
-- **Sequencing:** **Q-273 (model versioning) first, or stamp a readiness version in the same PR.**
-  Sleep shipped without one and its trend chart now has an unmarked step at the changeover — do not
-  repeat that on readiness. **Q-500 (Recovery Index anchor 6 -> 5) becomes lower priority** once this
-  lands: it was a 1-point correction aimed at the same range problem this fixes wholesale, and it
-  should be re-measured *after* this rather than stacked with it.
+- **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
+- **⛔ blocked: owner decision.** Not sign-off on a number — a decision about what the score means.
+  Both answers below are coherent and they are different products.
+- **Added:** 2026-08-18 · Tuning ·
+  [`docs/reviews/2026-08-18-activity-score-calibration.md`](reviews/2026-08-18-activity-score-calibration.md)
+- **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
+  same-day steps **r = +0.417** — and **2026-08-12 scored 76 on 828 steps while 2026-08-16 scored 64
+  on 8,935**. Steps span 29x across the window; the score moves 25 points.
+- **Why (three measured causes):**
+  1. `strengthFreq` (25) + `strengthVolume` (20) are **45 of 100** and both roll over 7 days. The
+     owner has logged **exactly one session/day for 27 consecutive days**, so `strengthFreq` is
+     near-constant by construction.
+  2. `activeCalories` is non-null on **1 of 47 days** and zone-2+ minutes are **0 on 22 of 27**. Both
+     get excluded and the weights renormalise, leaving roughly **steps 24% · moveHours 16% ·
+     strengthFreq 33% · strengthVolume 27%** — 60% on the near-constant terms.
+  3. `adjustment` is **0 on all 22 days**: `ACWR_TAPER_START = 1.5` has never been reached, so the
+     only place ACWR enters this score is inert.
+- **A range calibration is NOT the fix here, unlike Sleep (Q-503).** Stretching preserves ranking, so
+  it would make the "828 steps beat 8,935 steps" ordering *more* emphatic. Do not copy the Sleep
+  technique onto this pillar.
+- **DECIDED 2026-08-18 — the owner chose (a): it scores TODAY.** Design proposal with the measured
+  input audit:
+  [`docs/superpowers/plans/2026-08-18-activity-score-redesign.md`](superpowers/plans/2026-08-18-activity-score-redesign.md).
+  Brief: steps/day, movement distribution, zone minutes (daily + against a weekly target), exercise
+  minutes, a weekly-to-daily target split; hitting everything = 100; doubles as guidance
+  ("keep it under X today on a deload").
+- **Two owner decisions remain open in that plan** — how hard over-exertion should hit readiness, and
+  what the colour bands mean once a *low* score can be correct on a rest day.
+- **⚠️ A prerequisite bug found while auditing the inputs: `daily_zone_minutes` computes zones against
+  `max_hr = 187` (220 − age) on all 27 days, while Body Battery resolves this owner's MEASURED max at
+  168** (`resolveBatteryHrMax`, Q-57). Every zone boundary sits ~19 bpm too high, which is why zone 2
+  averages **1 min/day** and zone 1 absorbs **554**. Two parts of the app disagree about the same
+  user's max HR — a One-Formula-One-Place violation independent of this work. **Fix it before
+  weighting any zone lane**, or the lane ships dead like `activeCalories` (non-null 1 of 47 days).
+- **"Steps per hour" has no source** — `step_live_windows` holds **11 rows total**. Use the existing
+  HR-derived `moveHours` proxy (`packages/shared/src/health/hourly-movement.ts`), which exists for
+  exactly this reason; do not build hourly step ingest for it.
+- **If (a):** re-weight first, then measure the new distribution, then apply a range calibration only
+  if still compressed — and re-anchor any threshold on the activity scale in the same PR (Q-503's §5
+  is the worked example).
+- **Related, not fixed by this:** Q-278 (the score is absent on more than half of days and the UI does
+  not distinguish that from a real score) and Q-277 (the original discrimination finding). Also worth
+  doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
+  `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
 
-### [readiness][body] Q-502 — Body Battery's tuning substrate is a biased sample of each day
+### [readiness] Q-504 — REFUTED: readiness should NOT get a range calibration; fix Q-500 instead
 
-- **Branch:** `fix/body-battery-end-of-day-snapshot`
-- **Added:** 2026-08-17 · Tuning agent ·
-  [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md) §3
-- **Not blocked on the owner** — this is a data-capture fix, not a scoring change.
-- **Measured.** `GET /api/body-battery` computes on read and writes through, so each
-  `body_battery_daily` row is as of the last time the app was opened that day. Comparing
-  `hr_sample_count` against the samples actually in `oura_heartrate` for the same waking window:
-  2026-08-04 **74 of 3,991 (1.9%)**, 08-16 **64 of 2,656 (2.4%)**, 08-11 125 of 1,451 (8.6%), against
-  08-05 at 88% and 08-14 at 62%. Not `preferStrapBuckets` thinning — that cannot turn 3,991 into 74.
-- **Why it matters.** Draining spreads across the waking day; the charge window is concentrated in
-  genuine rest, which is back-loaded into the evening. A midday snapshot therefore captures more of
-  the day's drain than its charge, so **every charge/drain ratio computed from this table is biased
-  upward by an unknown amount** — including Q-272's headline 5.6×, and including the v1/v4 rows it is
-  compared against. No constant can be fitted against a target that moves with when the app was opened.
-- **The fix is already named** in [`docs/body-battery-tuning.md`](body-battery-tuning.md)'s caveats —
-  a scheduled end-of-day recompute — but recorded there as optional ("if rigour demands it") and
-  scoped only to `end_value`. It applies to `total_charged`/`total_drained` too, and it is a
-  prerequisite for Q-272 rather than a nicety. **Note there is no cron layer** (see
-  [`docs/module-map.md`](module-map.md) §0), so this needs a mechanism decision, not just a job.
-- **Sequencing:** do this **before** Q-272. Tuning constants against a biased substrate produces a
-  constant fitted to the owner's app-opening habits.
+- **Added:** 2026-08-18 · **Resolved the same day, by implementing it and finding it wrong.**
+  [`docs/reviews/2026-08-18-readiness-range-refuted.md`](reviews/2026-08-18-readiness-range-refuted.md)
+- **What this entry used to say:** readiness has Sleep's compression problem and the same
+  `SCORE_CALIBRATION` fix is measured and ready (mean 66.8, sd 19.1, range 15–99), held only on the
+  blast radius of five action thresholds. **Both halves of that are wrong.**
+- **Why the calibration is wrong here, not just risky.** It was implemented and the suite failed on
+  7 tests across 4 files. Three encode invariants the composite genuinely holds, and a post-hoc
+  transform on the blend breaks all three: **contributions no longer sum to the displayed score**
+  (the score-audit panel's whole job), **all-neutral input stops mapping to 50** (it gave 35), and
+  **skipping the check-in can reach 100** (a deliberate cap defeated). The first is disqualifying on
+  its own — readiness drives every training recommendation, and making its explanation panel stop
+  adding up is a worse outcome than a narrow range.
+- **Why the in-model lever fails too.** `Z_POINTS_PER_UNIT` would widen spread while preserving all
+  three invariants (z=0 → 50 at any slope). But the z-based contributors are **already wide and
+  already saturating**: `hrvBalance` sd **27.1** with a median implied |z| of **1.26** against a
+  ceiling at 1.5; `sleepBalance` sd **32.3**, both reaching the 0 and 100 rails. Raising the slope
+  pushes more days onto the rails and compresses the ends.
+- **There is no compression bug.** Contributors carry sd 17–32; the composite carries sd ~11–13.
+  Treating the weighted sds as independent predicts **7.7** — so readiness is already extracting
+  *more* spread than independence would give. Against the owner's test it is the healthiest pillar
+  (range 29–87, sd 13.0, with genuinely low days), unlike Sleep's 27-of-35 above 85.
+- **Its real weakness is the CEILING** — 1 of 34 days reaches 85 — and the term dragging it down is
+  `recoveryIndex`, **mean 35.3**, the lowest of the nine by 20 points. **That is Q-500.** This session
+  had demoted Q-500 to "lower priority since Q-504 fixes the range wholesale"; that is corrected —
+  **Q-500 is the readiness fix.**
+- **Also note:** readiness moves on its own from v1.319.0. `previousNight` is 16% of the weight and
+  the Sleep Score's mean fell ~87 → ~70, so readiness's mean drops roughly **1.8 points** with nothing
+  else changed. Re-measure before drawing conclusions from the new numbers.
+- **Shipped from this entry:** the readiness `model_version` stamp (Q-273's readiness half) — merged
+  into the shared `model_versions` JSONB rather than replacing it, so `bodyBattery`'s stamp survives.
+  Sleep shipped without one and left an unmarked step in its trend chart; readiness will not.
 
 ### [readiness][platform] Q-501 — a stored readiness score cannot be re-derived from the inputs stored beside it
 

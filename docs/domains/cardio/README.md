@@ -42,6 +42,8 @@ prescription coach, the cardio hub/trends/picker surfaces, and guided walk.
 
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-450 — the guided-walk summary's Done button lands on the untyped `/activity` screen). Findings Q-450…Q-455; four areas recorded **clean**.
 
+- [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — the activity/cardio mutations were probed cross-user and hold; `PATCH /api/activity-logs/[id]/metrics` returns a correct 404). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
+
 ## Open issues
 
 ```bash
