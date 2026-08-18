@@ -213,3 +213,37 @@ invisibly-noisy one.
   the raw `oura_heartrate` chest-strap max (166), **not** from any recovery episode built on it —
   `set_hr_stats` is strength-set-derived by construction.
 - 208 episodes is a small sample and all of it is one athlete's strength training.
+
+---
+
+# Part 3 — the Karvonen zone boundaries: checked, deliberately NOT filed
+
+`ZONE_DEFS`' reserve fractions (0.6 / 0.7 / 0.8 / 0.9, with Zone 1 starting at resting HR) were the
+third heart-rate item. **No finding is filed, and the reason is worth recording so the next session
+does not repeat the two dead ends.**
+
+## The wrong denominator, and why it is tempting
+
+Measured across **all** stored HR, Zone 1 holds **99.8%** of BLE samples and **99.1%** of chest-strap
+samples, with Zones 2–5 sharing under 1%. That looks like a damning result and **it is not a fair
+one**: `computeHrZones` / `zoneForBpm` / `HR_ZONE_META` are consumed only on **cardio surfaces** —
+`run-hr-zone-hero`, `exercise-review-sheet`, `zone-stack-chart`, `zone-quota-card`. All-day ring HR is
+not the population these boundaries are asked to classify, and 99% Zone 1 is the expected answer for a
+24-hour denominator regardless of where the boundaries sit.
+
+## The right denominator does not exist yet
+
+`activity_logs` over the whole history: **32 walks, 7 runs, 5 treadmill, 1 cycle** — roughly **13
+run/treadmill sessions**, the most recent **2026-07-24**, nearly a month before this review.
+
+Five boundaries fitted to thirteen sessions would be fitting noise, and it would repeat the mistake
+this review's Part 1 and Part 2 both avoided: **producing a number because a number was asked for.**
+
+## What would make it measurable
+
+Enough cardio volume to populate the upper zones — the same precondition that has kept the whole
+**cardio** pillar deprioritised. Until then the zone boundaries stay on textbook Karvonen, which is a
+defensible default for an athlete with no cardio history to fit against.
+
+**Do not re-open this by measuring all-day HR.** That path yields a 99% Zone 1 figure that reads like
+a finding and is not one.

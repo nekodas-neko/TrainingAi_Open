@@ -93,7 +93,7 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | body | ✅ battery range clean; anchor measured (Q-511) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
 | **workouts** | ✅ **swept 2026-08-18** — ACWR (Q-512/513), RPE autoregulation (Q-514). **Clean:** Foster monotony, and prescription adherence (actual 73.6% vs planned 73.1%, reps +0.25 — so `INTENSITY_ZONES` is realised, and calibrating those zones would be circular since the program was generated from them). Only Q-514 and the two ACWR call sites are open. **Foster monotony CLEAN** — mean 1.29, the 2.0 gate fires on 1 of 102 windows; rest days are properly seeded at 0, which is what makes it meaningful. 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
-| **heart-rate** | 🟡 **swept 2026-08-18** — `HR_REST_THRESHOLD` (**Q-515**: shrank 3× in a month because the owner got fitter; no fraction fixes it, the *anchoring* is the defect) and `PEAK_BANDS` (**Q-516**: observed set-peaks are 59–132, so 2 of 5 bands are **structurally unreachable** and 72% of episodes land in the band the spec de-emphasises — one usable bucket). **Still open: the Karvonen zone boundaries** (0.6/0.7/0.8/0.9) |
+| **heart-rate** | 🟡 **swept 2026-08-18** — `HR_REST_THRESHOLD` (**Q-515**: shrank 3× in a month because the owner got fitter; no fraction fixes it, the *anchoring* is the defect) and `PEAK_BANDS` (**Q-516**: observed set-peaks are 59–132, so 2 of 5 bands are **structurally unreachable** and 72% of episodes land in the band the spec de-emphasises — one usable bucket). **Karvonen zone boundaries checked and deliberately NOT filed** — they are consumed on *cardio* surfaces only, and the history holds ~13 run/treadmill sessions (newest 2026-07-24). Fitting five boundaries to that is fitting noise. **Do not re-open by measuring all-day HR** — that gives a 99% Zone 1 figure that reads like a finding and is the wrong denominator |
 | **nutrition** | 🟡 **movement goals ARE calibrated** — `STRENGTH_FREQ_GOAL 5` (Q-137, 91 days) and `SESSION_VOLUME_GOAL_KG 5200` (Q-190, 40 sessions), see [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md). `STEP_GOAL 8000` / `ZONE_MINUTES 22` / `BMR_FRACTION 0.24` are **deliberate population anchors** (Paluch 2022, WHO 150 min/wk), not unchecked round numbers. **Genuinely uncalibrated: the calorie/macro targets vs the owner's observed weight change** — a TDEE outcome check nobody has run |
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
 | app-shell, platform | n/a — no scoring surface |
@@ -155,6 +155,11 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **Check what population a constant is asked to classify before measuring it.** The Karvonen zone
+  boundaries look catastrophic against all-day HR (99.8% of BLE samples in Zone 1) and that denominator
+  is simply wrong — they are consumed on cardio surfaces only. The fair denominator (~13 run/treadmill
+  sessions, newest 2026-07-24) is too thin to fit five boundaries to, so **nothing was filed**. Two dead
+  ends, both recorded so they are not walked again.
 - **A "for stable bucket sizes" comment is an EMPIRICAL claim — measure it** (Q-516). `PEAK_BANDS`
   says exactly that and is false here: observed set-peaks are 59–132, so the 150–169 and 170+ bands are
   **structurally unreachable**, 130–149 holds 2 episodes, and 72% land in the `<110` band the spec tells

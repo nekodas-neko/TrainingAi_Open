@@ -97,3 +97,19 @@ worse than one honest bucket.
 
 Also recorded: `coverage_ok` passes on only 212 of 691 rows (31%), so two thirds are discarded before
 banding. Not diagnosed.
+
+## Part 3: the zone boundaries, checked and deliberately not filed
+
+Measured against all stored HR, Zone 1 holds 99.8% of BLE samples and 99.1% of chest-strap samples.
+That looks damning and it is the **wrong denominator** — `computeHrZones`/`zoneForBpm` are consumed
+only on cardio surfaces, and 99% Zone 1 is the expected answer for a 24-hour population regardless of
+where the boundaries sit.
+
+The right denominator does not exist yet: `activity_logs` holds 32 walks, 7 runs, 5 treadmill and 1
+cycle over the whole history, newest run 2026-07-24. Fitting five boundaries to ~13 sessions is
+fitting noise, so **nothing was filed** — which is the same reason the cardio pillar stays
+deprioritised.
+
+Both dead ends are recorded in the review and the baton so the next session does not walk them again.
+The all-day measurement in particular is worth flagging, because it produces a number that reads like
+a finding and is not one.
