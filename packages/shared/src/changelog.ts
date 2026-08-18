@@ -6,10 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.322.1",
+    version: "1.322.2",
     date: "2026-08-18",
     changes: [
       "On Health \u2192 Training Load, a deload or testing day is now marked inline next to the day name \u2014 \u201cMon (D)\u201d \u2014 instead of on a line of its own. The flag used to add a whole extra row to that day, which pushed its bar about 12 pixels higher than the others and made it collide with the heading above: two days with the same volume drew at visibly different heights on a chart whose whole job is comparing them.",
+    ],
+  },
+  {
+    version: "1.322.1",
+    date: "2026-08-18",
+    changes: [
+      "Groundwork for the Redecode button reporting honestly. Redecode takes longer than the server is allowed to hold a request open, so it came back as \"failed\" for work that had actually finished \u2014 and a failure that isn't real invites pressing it again, which is the single heaviest thing the app can be asked to do. It can now be started and then checked on separately. The button itself still uses the old path until its side of the change lands, so what you see is unchanged for now.",
     ],
   },
   {

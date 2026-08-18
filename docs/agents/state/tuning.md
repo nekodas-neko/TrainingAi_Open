@@ -3,11 +3,32 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/stress-resilience-calibration` · **Q band:** 500–529 (next free: 509)
+**Updated:** 2026-08-18 · **By:** `tuning/battery-range-clean` · **Q band:** 500–529 (next free: 512)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Body Battery range — CLEAN, nothing filed.** Over 50 days: mean 51.5, **sd 29.2**, full 0–100
+  range, bands Charged 28% / Good 26% / Low 26% / Drained 20%. **It already passes the owner's
+  acceptance test** — the only pillar that did without work. Thresholds 75/50/25 sit right for this
+  distribution. [`entry`](../../overview/entries/2026-08-18-battery-range-clean.md).
+- **Sleep-scale consumer audit — CLEAN, plus one side effect worth protecting** (Q-511). Exactly
+  **one** comparison threshold exists on the sleep scale codebase-wide (`LOW_SLEEP_SCORE`) and it was
+  re-anchored in the recalibration PR, so nothing was missed. The audit did find that Body Battery's
+  anchor takes the sleep score **raw**, and its sleep→readiness flip was worth **−17.7 points** (sd
+  10.2, worst −51) — the owner's 2026-08-02 "the number visibly jumped" report, quantified. The
+  recalibration cut ~82% of that systematic offset as a **side effect**. The symmetric readiness-scale
+  audit found Q-500's threshold table listed **six of eight** — `ots.ts:151` and a `< 40` line inside
+  an **LLM prompt string** were missing; the conclusion holds (checked, not assumed) and that review is
+  amended in place. [`review`](../../reviews/2026-08-18-battery-anchor-discontinuity.md).
+- **BLE-era input drift — MEASURED, propose-only** (Q-509, Q-510). The Recovery Index refit on 42
+  BLE nights lands at **3.31 h** against the shipped anchor of 5 — and **the anchor must not move**:
+  the refit anchor and the input distribution shrank by the *same* factor (0.715× vs 0.72–0.74×), which
+  is a multiplicative bias in the estimator, not a change in the owner. This is the `devices` finding
+  `readiness-composite.ts` pre-registered. Q-510 closes Q-508's open lead: all four `contributorsOk`
+  gates pass 18/18 August days, so resilience is starved by the daytime-stress **coverage** check —
+  which is not persisted anywhere, and `worn_hours_ble` is NULL on all 96 rows.
+  [`review`](../../reviews/2026-08-18-ble-era-input-drift.md).
 - **Daytime stress + resilience — MEASURED, propose-only** (Q-507, Q-508). The last two scores with
   no calibration review, and now none remain. `STRESS_HIGH_DAY_THRESHOLD_MIN = 120` fires at a
   healthy-looking 16% but on the **wrong days** (high-stress minutes correlate **+0.40** with
@@ -35,24 +56,40 @@ Since then, working only scores no other lane holds:
 
 ## Next
 1. **Q-505 — build the Activity redesign** (Lane A). Decisions and sequencing are in the plan's §4.
-2. **Verify the two shipped recalibrations against production.** Checked 2026-08-18 and **nothing has
-   landed yet**: production runs 1.321.1, but **0 of 96 `oura_daily_derived` rows carry a `readiness`
-   model version** and every stored score is still pre-recalibration. Stored scores are only rewritten
-   when the route recomputes (on app open), and every existing row predates the deploy. Re-check after
-   the owner next opens the app; the first stamped row is where the trend step falls.
-3. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z in that
+2. ~~Verify the two shipped recalibrations against production~~ — **DONE 2026-08-18, both are LIVE.**
+   Readiness: 1 of 96 rows stamped `v3:ri5:2026-08-18`, and the shared JSONB **merge held**
+   (`bodyComp` survived). Sleep has no stamp so it was verified by recomputation — 08-17 stores 78
+   against a raw blend of 77.91 (old), 08-18 stores 92 against a calibrated 92 (new).
+   **The trend step falls between 2026-08-17 and 08-18**, and history is not back-filled, so 95 of 96
+   rows stay pre-recalibration. [`review`](../../reviews/2026-08-18-recalibrations-live-verified.md).
+3. **Re-run the Q-509 refit after any HR-smoothing change.** The anchor-vs-input ratio (§1.3 of that
+   review) is the pass test: if it goes to ~1.0 the estimator was fine and the input needed
+   conditioning. Until then, `RECOVERY_INDEX_OPTIMAL_HOURS` stays at 5.
+4. **Once Q-510's coverage is persisted, ask whether `minDaytimeStressHours` is too strict** for this
+   wear pattern. That one *is* Tuning's — but it is unanswerable until the number is visible.
+5. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z in that
    review's §2 table moves by ~19×, so the radar may then fire *too* often. That is a calibration
    question and it is Tuning's, unlike the fix itself.
-4. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). Its call site passes
+6. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). Its call site passes
    **our** sleep score *and* the Recovery Index contributor, so both v1.319.0 and v1.321.0 feed it,
    all 13 existing rows predate both, and the move is *downward* on the term that is saturating.
    **Every score in the app now has a calibration review** — there is no un-reviewed pillar left to
    pick up cold.
-5. **Re-derive Q-500's anchor on ~15 BLE-era nights.** The shipped fit is Cloud-era and BLE overnight
-   HR is ~2× noisier, so 5 h is conservative for current data rather than wrong.
-6. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
+7. ~~Re-derive Q-500's anchor on BLE-era nights~~ — **DONE, and the answer was "do not"** (Q-509).
+8. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
+
+## The lane is drained — everything left is blocked or needs elapsed time
+Every score in the app now has a calibration review, and both recalibrated scales have been audited
+for missed consumers. What remains:
+- **Blocked on Lane A:** Q-506 (temperature baseline), Q-509 (HR smoothing), Q-510 (persist stress
+  coverage), Q-505 (build Activity), Q-502. Each of these must land before the Tuning follow-up on it
+  can be measured.
+- **Needs elapsed time:** watching the new Sleep distribution; re-measuring resilience and the
+  post-recalibration anchor gap once enough new-model rows exist (there is currently **one**).
+Do not manufacture work here. If a successor finds nothing actionable, say so rather than
+re-measuring a settled score — the "do not re-litigate" list below exists to make that cheap.
 
 ## Blocked
 - **Nothing is blocked on the owner.** They delegated all open decisions on 2026-08-18
@@ -105,6 +142,28 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **Body Battery's range is settled and healthy** — sd 29.2 over 50 days, all four bands 20–28%, full
+  0–100. Do not re-open it as a range problem. Its open questions are Q-272 (charge/drain), Q-276
+  (does it agree with readiness at all) and Q-511 (the anchor), none of which are about the spread.
+  Note its stored charge/drain now read 23.1/36.0 where the 2026-08-17 review measured 7/10 — nobody
+  changed the model, so that is an **unexplained** change in the data, not a fix.
+- **A scale-consumer audit misses thresholds inside LLM prompt strings.** Grepping for numeric
+  comparisons against a score variable will never find `external_readiness < 40` written as prose in
+  `ai-periodization/prompt.ts` — yet it is a real threshold on our own score
+  (`externalReadiness = liveReadinessForDay(...)`). When auditing a scale, grep the prompt builders
+  too. This is how Q-500's table came to list six of eight.
+- **⚠️ DO NOT lift the sleep scale back toward its old mean.** It will look tempting — the new
+  distribution reads harsh. But the sleep and readiness scales being within a few points of each other
+  is now **load-bearing for Body Battery**: its anchor takes the sleep score raw, and the
+  sleep→readiness flip was worth −17.7 points before the recalibration and ~−3 after (Q-511). Lifting
+  sleep re-opens an owner-reported bug in a different pillar. Also: the scores agreeing *on average* is
+  not the same as agreeing, so **the anchor's freeze-once rule stays load-bearing** (per-day sd is
+  still 10.2).
+- **When a refit's anchor moves by the same factor its input moved, the input is what changed.** That
+  is the Q-509 test, and it is reusable for any anchored contributor: a real physiological shift moves
+  the data while leaving the correct anchor put. Do not ship a constant that is silently absorbing a
+  measurement bias — and note the readiness code pre-registered this exact conclusion before the data
+  existed, which is why it was easy to honour. Pre-register the interpretation next time too.
 - **A golden vector proves a port computes the same function; it says nothing about scale.** The
   resilience golden's `dailySleepRecoveryList` is 13 *identical* values of 0.6, two orders of magnitude
   below what production produces, so it pins the arithmetic while never exercising the summation that
@@ -121,6 +180,9 @@ for this work:
 - **The other lanes' territory is off-limits by the owner's instruction (2026-08-18):** *"Only pick up
   new tuning opportunities that the other lanes don't have."* Q-502 (Body Battery), Q-505 (Activity)
   and Q-501 are Lane A's to build. Check all four batons before picking a score to measure.
+- **The sleep recalibration's band consequences are settled, not open.** `scoreBand()`'s 50 boundary
+  moved 1 → 6 days and the 70 boundary 12 → 15, measured and deliberately accepted at ship time — more
+  days reading "Low" is the point. Do not re-open it as a finding.
 - Q numbers come from the band above, not the backlog's next-free pointer. No migration numbers.
 
 ## Gotchas that cost time
@@ -129,6 +191,18 @@ for this work:
   7/10) and the honest outcome was a partial document. For sleep, the design harness was validated
   to mean-abs-error 4.3 first, and the final distribution was re-run through the **shipped
   TypeScript**, not the harness.
+- **An unstamped model's LAST stage is still verifiable: is the stored score the plain combination of
+  its own persisted inputs, or the post-processed one?** That is how the sleep recalibration was
+  confirmed live without a stamp (08-17 → raw blend 77.91, 08-18 → calibrated 92, differing by 8 and
+  6 points). **It sees post-processing only, never changes upstream of the persisted intermediate** —
+  persisted contributors are already whatever curves that row's model used. Applying
+  `SCORE_CALIBRATION` to *historical* contributors to ask "what would the new model have scored?"
+  gives a hybrid (new post-processing over old curves) that reads as the recalibration *raising* the
+  mean — backwards. Tried it this session; it is a trap worth naming.
+- **A recalibration is not a uniform reduction.** 2026-08-18's sleep score went *up* under the new
+  model (blend 86.07 → 92) even though the recalibration dropped the mean 84.1 → 69.5 —
+  `SCORE_CALIBRATION` lifts the upper-middle. Checking "did it land?" by looking for a lower number on
+  a good night gives the wrong answer.
 - **`updated_at` does NOT tell you which model wrote a row.** On 2026-08-18 a bulk job bumped
   `updated_at` on ~every `oura_daily_derived` row at 03:55:01 without rewriting a single score. Auditing
   "did the recalibration land?" by timestamp gives the wrong answer — check the `model_version` stamp,
@@ -137,11 +211,12 @@ for this work:
   was being written (`recovery_index_hours` 1.20 → 5.78, a Q-274 fragment night self-healing).
   Re-pull before quoting, and record the pull time.
 - **`/api/admin/db-query` truncates at 1000 rows** (paginate) and can return a spurious 401 under
-  burst (retry with backoff). **A sustained `Forbidden` is different** — on 2026-08-18 it began
-  refusing *every* query including `SELECT count(*)`, and stayed refusing across retries with backoff.
-  That is not the burst 401; budget the queries a session needs rather than iterating against it, and
-  when it locks out, write up what you already measured rather than blocking (Q-508's per-gate
-  coverage was lost this way).
+  burst (retry with backoff). **It can also lock out for minutes at a time** — on 2026-08-18 it
+  refused *every* query including `SELECT count(*)`, survived several retries with backoff, then
+  recovered on its own. (An earlier version of this line called that a distinct, sustained failure;
+  it was not — same transient, longer.) Budget the queries a session needs rather than iterating
+  against it, and when it locks out, write up what you measured and come back — Q-508's per-gate
+  coverage was deferred this way and closed as Q-510 an hour later.
 - **The 30-day prune applies to `error_events`, not to the Oura tables** — check each view's real
   date range rather than assuming.
 - **The 2026-06-23 → 07-07 window is the only place Oura's own contributors sit beside our raw
