@@ -103,6 +103,34 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] ✅ Every load-bearing cache invalidation audited — no gap, closing an audit `CLAUDE.md` names as never done (2026-08-18)
+
+- **The most repeated bug class in this project (12+ incidents), audited against Q-262's own test.**
+  [`docs/reviews/2026-08-18-load-bearing-cache-audit.md`](docs/reviews/2026-08-18-load-bearing-cache-audit.md).
+  Q-262 established that a stale entry only survives as a *settled* value when a call site passes
+  **`freshWithinTtl: true`** or a read path is **seed-only** — and this file recorded that only
+  `invalidateGoalRecommendations` had ever been checked, *"the other groups are not audited."*
+- **Case (a) is now audited and clean.** Sixteen `freshWithinTtl: true` sites resolve to **seven keys**,
+  all `TTL_LONG` (6 h): `exercise-library`, `activity-types`, `progression-styles`,
+  `workout-templates`, `progress-summary`, `workout-data:all`/`workout-card:<id>`. **Every one is in an
+  invalidation group, and every client writer of the endpoint behind it calls that group.** No gap.
+- **One thing that reads as a live defect and is not.** `session-select-content.tsx:896` says the
+  `workout-data` caches are *"never invalidated … for up to 6 hours"* — that is the **comment on the
+  Q-117 fix**, and `invalidatePrescriptionChanged()` is the line below it. Recorded so the next person
+  to grep `never invalidated` does not reach for the alarm, as I did.
+- **A design property, deliberately not filed:** these invalidations are **device-local** —
+  `cache-groups.ts` clears the writing client's cache and cannot reach another device. `exercise_library`
+  and `activity_types` are **shared** tables, so a change on one device leaves other clients serving the
+  old list as a settled value for up to 6 h. Not filed because `TTL_LONG` is documented as *"slow-changing
+  config"* and the current user base has no second writer. **Worth knowing when multi-user lands** — the
+  answer then is a version/etag or a shorter TTL for shared config, not more invalidation call sites,
+  which cannot help across devices.
+- **Case (b) is still unaudited** — seed-only read paths (a screen that `readCacheSync`s a key and never
+  fetches it, the Q-260 shape). That half leaves no revalidation at all and is the likelier source of a
+  stale-value report. Named as the obvious next sweep in this lens.
+- **Not verified:** static audit plus local dev; not on the APK. Cross-device staleness was reasoned
+  about, not reproduced — this harness has one client.
+
 ### [platform] 🟠 Q-475 shipped mid-sweep; the production evidence is about the half its fix did not cover (Q-487, 2026-08-18)
 
 - **This run's fourteen findings checked against production**, the same exercise that corrected four

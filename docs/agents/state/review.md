@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty sweeps (2026-08-17 ×2, 2026-08-18 ×18) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **488**)
+**Updated:** 2026-08-18 · **By:** twenty-one sweeps (2026-08-17 ×2, 2026-08-18 ×19) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **488**)
 
 ## Now
 
-Twenty sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-one sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,29 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 21 — which cache invalidations are actually load-bearing (2026-08-18)
+
+**Filed nothing; closed an audit `CLAUDE.md` names as never done.** Write-up:
+[`docs/reviews/2026-08-18-load-bearing-cache-audit.md`](../../reviews/2026-08-18-load-bearing-cache-audit.md).
+
+Q-262's test: a stale entry survives as a *settled* value only via **(a)** `freshWithinTtl: true` or
+**(b)** a seed-only read path. `CLAUDE.md` recorded that only `invalidateGoalRecommendations` was ever
+checked. **Case (a) is now audited: 16 occurrences → 7 keys, all `TTL_LONG`, all in a group, and every
+client writer calls its group. No gap.**
+
+**Two things worth carrying:**
+1. **`session-select-content.tsx:896`'s "never invalidated … for up to 6 hours" is the comment on the
+   Q-117 FIX**, not a live defect — `invalidatePrescriptionChanged()` is the next line. It reads
+   exactly like an open bug; I reached for the alarm before reading on.
+2. **Case (b) — seed-only read paths — is still unaudited**, and it is the likelier source of a
+   stale-value report because it leaves no revalidation at all. **That is the next sweep in this lens.**
+
+**Recorded, deliberately not filed:** the invalidations are **device-local**, so a shared table
+(`exercise_library`, `activity_types`) stays stale ≤6 h on every *other* client. `TTL_LONG` is
+documented as "slow-changing config" and there is no second writer today — but when multi-user lands
+the answer is a version/etag or a shorter shared-config TTL, **not** more invalidation call sites,
+which cannot cross devices.
 
 ### Sweep 20 — this run's fourteen findings, checked against production (2026-08-18)
 
