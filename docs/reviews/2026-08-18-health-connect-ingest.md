@@ -126,6 +126,48 @@ fault, and it pollutes `error_events` — the table `CLAUDE.md` requires every s
 and which prunes at 30 days. Reaching it needs the secret, so this is not an open spam vector; it is
 a validation gap that makes the fault table less trustworthy.
 
+### Q-494 is not a novel class — it is the one ingest path that never got the fix its siblings have
+
+Followed up after the write-up above. The repo already contains a **shared, purpose-built module for
+exactly this**: `packages/shared/src/validation/ingest-clock.ts`, exporting
+`INGEST_PAST_TOLERANCE_MS` (7 days), `INGEST_FUTURE_TOLERANCE_MS` (60 s) and `resolveMeasuredAt`.
+And the workout path has its own parallel guard, `resolveCompletedAt`, added by **Q-24 §7** — whose
+comment says `completedAtMs` *"was accepted unbounded and uncompared"*, the same sentence that
+describes `date` here.
+
+Coverage across every health-write ingest path:
+
+| Path | Clock bound |
+|---|---|
+| `scale-ble/samples` | ✅ `resolveMeasuredAt` |
+| `oura-ble/samples` | ✅ downstream — `step-day-buckets.ts` applies `INGEST_FUTURE_TOLERANCE_MS`, and says it is making *"the same judgement `resolveMeasuredAt` already makes on the scale ingest path"* |
+| `complete-workout` | ✅ `resolveCompletedAt` (Q-24 §7) |
+| **`health-connect/ingest`** | ❌ **none, anywhere in its chain** |
+
+So this is the **sibling-surface rule** in `CLAUDE.md` — *"when fixing or adding a pattern on one
+surface, grep for every other surface handling the same domain and update them in the same PR"* —
+missed twice: once when `resolveMeasuredAt` was written, once when Q-24 §7 fixed `completedAtMs`.
+
+**This also fixes the shape of the remedy.** Not "add a range check to the regex" but **route the
+ingest date through the existing `ingest-clock` module**, which is the one-formula-one-place answer
+and gives the same reconcile-don't-reject behaviour the other paths already chose. `resolveCompletedAt`'s
+comment argues that case explicitly and it applies here verbatim: a 400 would quarantine the outbox
+mutation and lose a real reading over a bad clock, so an unusable client timestamp should fall back
+to server time rather than fail.
+
+**One caveat for the implementer:** `resolveMeasuredAt` takes an instant and this route takes a
+*calendar date* in the user's timezone, so it is not a drop-in call — the bound belongs on the
+resolved date, compared against the user's today, not on a UTC instant.
+
+### The wider lens, checked
+
+Ten `desc(...).limit(1)` "latest X" readers exist across `lib/` and `app/`. The other eight read
+server-derived or device-monotonic columns (`ouraDaily.date`, `ouraRawSamples.ringTimestampDs`,
+`ouraBleClockAnchors.*`, `ouraRedecodeJobs.startedAt`, `ouraDailySummary.date`,
+`workoutSessions.completedAt`, `exerciseLogs.loggedAt`). `completedAt` is the one that *was* exposed
+and is now guarded. **`bodyMetrics.date` is the only unguarded one** — the lens generalised, and then
+closed on the finding already filed.
+
 ## Priced
 
 | | Severity | Why |

@@ -29,6 +29,20 @@ and the reason is worth keeping: ranking is per column **per date**, so a row on
 ever writes has no competitor and rank 1 wins outright — the protection is orthogonal to this
 attack, not weak against it.
 
+**Followed up, and it sharpened Q-494 considerably.** This is not a novel class — it is the one
+ingest path that never got the fix its siblings have. `packages/shared/src/validation/ingest-clock.ts`
+exists for exactly this and guards `scale-ble/samples`; `oura-ble/samples` is guarded downstream by
+`step-day-buckets.ts`, which says it is making *"the same judgement `resolveMeasuredAt` already makes
+on the scale ingest path"*; and the workout path got `resolveCompletedAt` at **Q-24 §7**, whose
+comment says `completedAtMs` *"was accepted unbounded and uncompared"* — the same sentence that
+describes `date` here. `health-connect/ingest` has no clock bound anywhere in its chain. The
+sibling-surface rule was missed twice. That also fixes the shape of the remedy: route the date
+through the existing module rather than adding a bespoke range check.
+
+**The wider lens closed on the finding already filed.** Ten `desc(...).limit(1)` "latest X" readers
+exist; the other nine read server-derived or device-monotonic columns, and `workoutSessions.completedAt`
+— the one that *was* exposed — is now guarded. `bodyMetrics.date` is the only unguarded one.
+
 **Q-496 (medium)** — `2026-13-45`, `2026-02-31`, `0000-00-00` pass the shape regex and return HTTP
 500 plus an `error_events` row each. That is the class `normalizeDateParam` exists to prevent, and
 this route never got the guard; it makes the fault table every session must read less trustworthy.

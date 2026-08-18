@@ -46,9 +46,24 @@ Probing production's limiter to find out was not done unasked. Recorded in all f
 unverified, with the note that the fix does not depend on it.
 
 **Q-494 — a far-future date permanently captures every `desc(date).limit(1)` read.** 81 kg → **499 kg**,
-unbeatable until the year 9999. **The finding worth carrying forward is the general one:** the ranked
-source merge protects a column *on a given date*; it is structurally silent about a row on a date
-nothing else will ever write. Any "latest X" reader has this shape. Worth a lens of its own.
+unbeatable until the year 9999. The ranked source merge protects a column *on a given date*; it is
+structurally silent about a row on a date nothing else will ever write.
+
+**⚠️ Ran that generalisation as a follow-up lens in the same sweep, and it paid twice.** (1) All ten
+`desc(...).limit(1)` readers were enumerated — the other nine read server-derived or device-monotonic
+columns, and `workoutSessions.completedAt`, the one that *was* exposed, is already guarded. So the
+lens **closed** rather than opening a new front. (2) Far more useful: it surfaced that
+`packages/shared/src/validation/ingest-clock.ts` **already exists for exactly this**, guards
+`scale-ble/samples` and (downstream) `oura-ble/samples`, and that the workout path got its own guard
+at **Q-24 §7** — whose comment says `completedAtMs` *"was accepted unbounded and uncompared"*, the
+same sentence that describes `date` here. **`health-connect/ingest` is the only health-write ingest
+path with no clock bound anywhere in its chain.** Q-494 went from "a range check is missing" to "the
+sibling-surface rule was missed twice, and here is the module to use."
+
+**Generalise every finding once before filing it.** Ten minutes of `grep` turned a bespoke fix into a
+one-formula-one-place fix and told the implementer which helper to call. It also bounded the finding
+— without it, "any latest-X reader has this shape" would have gone in the baton as an open worry, and
+it is not one.
 
 **Method note — the observable was not the status code.** Two of four findings were invisible in the
 HTTP response (the limiter deliberately returns an identical 401; the coercion returns

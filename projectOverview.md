@@ -88,6 +88,12 @@ order.
   499 kg**, and no later write can outrank it. Feeds the BLE-scale confirmation path and
   `deriveActivityKcal`. **The ranked source merge is orthogonal to this, not weak against it** —
   ranking is per column *per date*, and a row on a date nothing else writes has no competitor.
+  **⚠️ And it is not a novel class:** `packages/shared/src/validation/ingest-clock.ts` exists for
+  exactly this and guards `scale-ble/samples`; `oura-ble/samples` is guarded downstream; the workout
+  path got `resolveCompletedAt` at **Q-24 §7**, whose comment uses the same phrase — *"accepted
+  unbounded and uncompared"*. **`health-connect/ingest` is the only health-write ingest path with no
+  clock bound anywhere in its chain** — the sibling-surface rule missed twice. The fix is to route the
+  date through `ingest-clock`, not to add a bespoke range check.
 - **🟡 Q-496** — `2026-13-45` / `2026-02-31` / `0000-00-00` pass the shape regex and return **HTTP 500**
   plus an `error_events` row each. The class `normalizeDateParam` exists to prevent; this route never
   got the guard. **🟢 Q-495** — `z.coerce.number()` turns `[]`→0, `true`→1, `""`→0 kg; the route's own

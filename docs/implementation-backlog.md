@@ -895,8 +895,23 @@ below threshold and left in place for next time.
   per **column, per date** — it stops a worse source overwriting a better one *on the same day*. A row
   on a date nothing else ever writes has no competitor, so rank 1 (`health_connect`, the lowest) wins
   outright. The documented protection is orthogonal to this, not weak against it.
-- **Fix:** bound the accepted date to a sane window (e.g. not more than a day ahead of the user's
-  today, not before the account). Consider whether other `desc(date).limit(1)` readers want the same.
+- **⚠️ This is not a novel class — it is the one ingest path that never got the fix its siblings have.**
+  `packages/shared/src/validation/ingest-clock.ts` already exists for exactly this
+  (`INGEST_PAST_TOLERANCE_MS` 7 d, `INGEST_FUTURE_TOLERANCE_MS` 60 s, `resolveMeasuredAt`), and the
+  workout path has its own parallel guard `resolveCompletedAt` from **Q-24 §7** — whose comment says
+  `completedAtMs` *"was accepted unbounded and uncompared"*, the same sentence that describes `date`
+  here. Coverage: `scale-ble/samples` ✅, `oura-ble/samples` ✅ (downstream, via `step-day-buckets.ts`),
+  `complete-workout` ✅, **`health-connect/ingest` ❌ — none, anywhere in its chain.** The
+  sibling-surface rule was missed twice: once when `resolveMeasuredAt` was written, once at Q-24 §7.
+- **Fix:** route the ingest date through the existing **`ingest-clock`** module rather than adding a
+  bespoke range check — the one-formula-one-place answer, and it inherits the reconcile-don't-reject
+  behaviour the other paths chose (`resolveCompletedAt`'s comment argues that case and it applies
+  verbatim: a 400 would quarantine the outbox mutation and lose a real reading over a bad clock).
+  **Caveat:** `resolveMeasuredAt` takes an *instant*, this route takes a *calendar date* in the user's
+  timezone — the bound belongs on the resolved date against the user's today, not on a UTC instant.
+- **Wider lens, checked:** 10 `desc(...).limit(1)` "latest X" readers exist; the other 9 read
+  server-derived or device-monotonic columns, and `workoutSessions.completedAt` — the one that *was*
+  exposed — is now guarded. **`bodyMetrics.date` is the only unguarded one.**
 
 ### [devices] Q-496 — a regex-passing but invalid ingest date returns 500 and writes an `error_events` row
 
