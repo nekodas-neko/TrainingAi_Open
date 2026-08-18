@@ -2119,64 +2119,6 @@ ehr     0     0     0     0   648   208   128   556     0
   **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
   and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
 
-### [platform][nutrition][workouts][devices] Q-463 — "the row you named does not exist" is answered five different ways, and five routes answer it with a 500
-
-- **Branch:** `fix/not-found-status-across-write-surface`
-- **Added:** 2026-08-18 · review sweep (nutrition/cardio/activity writes + an app-wide not-found probe) ·
-  [`docs/reviews/2026-08-18-write-surface-not-found.md`](reviews/2026-08-18-write-surface-not-found.md)
-- **Placement:** mid. Not a leak and not data loss — but it misclassifies a permanent failure as
-  transient on the sync path, and it degrades `error_events`, which is the one fault signal nobody
-  is watching.
-- **Generalises Q-462.** That entry filed `/api/log-exercise` returning 500 for an ownership refusal.
-  This one is the measurement showing it was not isolated — implement them together.
-- **Measured uniformly.** Every `app/api` route with a dynamic segment and a write method, called as
-  an **authenticated** user with a fabricated UUID (`00000000-0000-4000-8000-0000000fffff`). 33
-  endpoints answered:
-
-  | Answer | Count | Verdict |
-  |---|---|---|
-  | `404` + JSON error | 8 | correct |
-  | `200`/`204` on `DELETE` | 7 | **defensible, do not "fix"** — see below |
-  | `400` from body validation before the id lookup | 12 | not evidence; excluded |
-  | `403` (admin gate first) | 1 | correct |
-  | **`500`** | **5** | the finding |
-
-- **The five:**
-  ```
-  PATCH  /api/injuries/[id]              500  (empty body)
-  PUT    /api/nutrition/meal-types/[id]  500  (empty body)
-  PATCH  /api/supplements/[id]           500  (empty body)
-  POST   /api/supplements/[id]/log       500  (empty body)
-  DELETE /api/phase-sets/[id]            500  {"error":"Phase set not found"}
-  ```
-  Plus `POST /api/log-exercise` (Q-462), which has no dynamic segment so it is not in the 33.
-- **One cause, repeated.** Repository methods throw a bare `Error('… not found')` — **16 such throws**
-  across `lib/data/postgres/` and `packages/shared/src` — and these routes have nothing mapping them
-  to a status, so Next's default handler returns 500. Confirmed live in the dev log:
-  `Error: Supplement not found`, `Error: Food log not found`, `Error: Meal type not found`, each with
-  a full stack trace.
-- **One resource, two wrong answers on two verbs.** `PUT /api/phase-sets/[id]` →
-  `400 {"error":"Phase set not found"}`; `DELETE /api/phase-sets/[id]` →
-  `500 {"error":"Phase set not found"}`. Same resource, same condition, same message. Neither is 404.
-- **Three consequences, each against a rule this repo already wrote:**
-  1. **The sync client retries what can never succeed.** `CLAUDE.md`: *"A 4xx/validation failure is a
-     poison pill: quarantine it, don't retry forever. 5xx/429 = back off and retry."* A permanent
-     "not yours / not there" reported as 5xx is classified as transient.
-  2. **Four of the five return an empty body**, so a client calling `res.json()` on the failure throws
-     a parse exception on top and never renders its error state.
-  3. **It pollutes `error_events`** — *"the only view of faults that never reach a human"*, pruned at
-     30 days and read at every session start. Stack traces from correctly-refused requests make that
-     table worse at its job.
-- **Fix shape:** a typed `NotFoundError` / `NotOwnedError` in the repository layer plus **one** shared
-  mapper at the route boundary — not 16 call sites each remembering. **`/api/nutrition/meal-plans/*`
-  is the in-repo reference:** all five of its write endpoints already return a clean
-  `404 {"error":"Not found"}`. **Lane A** (repository + `app/api`).
-- **Do NOT also change the seven `DELETE`s that return 200/204 for an absent row.** That looks like the
-  same shape and is not: `DELETE` is idempotent by convention, the desired end state (row absent) holds,
-  and the outbox is right to treat it as done. It is recorded as **clean** in the review, with the
-  reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
-  `session_rpe = 7` and it did **not** hold.)
-
 ### [body][app-shell] Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
 
 - **Lane B.** `app/session-select/components/log-value-sheet.tsx` only.
@@ -2332,30 +2274,6 @@ ehr     0     0     0     0   648   208   128   556     0
   route will write a hollow row if handed `{}`, but nothing in real use has done so.
   ⚠️ **A first version of that query said "45 of 50 entirely empty" and was WRONG** — it tested only
   the evening columns. Recorded so the false number is not picked up from anywhere it leaked.
-
-### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
-
-- **Branch:** `fix/log-exercise-ownership-error-status`
-- **Added:** 2026-08-18 · review sweep (workout write path) ·
-  [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)
-- **Placement:** low. **The block is correct; only the reporting is wrong.**
-- **Observed.** `POST /api/log-exercise` as user B carrying user A's `workoutSessionId` returns
-  `500 {"error":"Failed to log exercise"}`. **Nothing was written** — A's session kept exactly its
-  original exercise log and B gained no session — because the guard fires:
-  ```
-  [log-exercise] logExerciseFromPayload threw Error: ensureWorkoutSession:
-    session 3fbf3d8a-… is not owned by user 1d7059d1-…
-      at PostgresWorkoutRepository.ensureWorkoutSession (adapter.ts:794)
-  ```
-- **So rule (c) is honoured.** The defect is that a permanent, correctly-refused condition is reported
-  as a **transient server error** and logged with a full stack trace as though the server faulted.
-- **Two mitigations keep this low — both checked, not assumed.** It is **unreachable through the UI**
-  (the client only ever sends a session id it created), and the sync path does **not** retry it
-  forever: `pushMutations` wraps each mutation in its own `try/catch` (`adapter.ts:4333-4338`) that
-  records to `errors` and continues, so the queue cannot wedge and `MAX_MUTATION_ATTEMPTS`
-  dead-letters it.
-- **Fix shape:** give `ensureWorkoutSession` a typed ownership error and map it to 403/404 at the
-  route, leaving 500 for genuine faults. **Lane A.**
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { withRouteErrors, routeErrorResponse } from '@/lib/api/route-errors'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -23,8 +24,11 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const parsed = MealTypePutSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const repo = await getRepository()
-  const mealType = await repo.updateMealType(id, userId, parsed.data)
-  return NextResponse.json(mealType)
+  // Q-463: an id that is not yours (or does not exist) answered 500 with an empty body.
+  return withRouteErrors(async () => {
+    const mealType = await repo.updateMealType(id, userId, parsed.data)
+    return NextResponse.json(mealType)
+  })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -40,6 +44,7 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
     if (e instanceof Error && e.message === 'MEAL_TYPE_HAS_LOGS') {
       return NextResponse.json({ error: 'Meal type has food log entries — reassign them first' }, { status: 409 })
     }
-    throw e
+    // Q-463: everything else used to rethrow into Next's default handler, which answers 500.
+    return routeErrorResponse(e)
   }
 }
