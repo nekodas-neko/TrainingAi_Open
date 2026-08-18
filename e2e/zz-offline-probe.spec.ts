@@ -1,55 +1,52 @@
 import { test, expect } from '@playwright/test'
 import { STORAGE_STATE } from './fixtures'
 
-// Sweep 38: what does a read surface do with no network? Three states:
-//   A. online, cold cache      -- the reference
-//   B. offline, WARM cache     -- same context after A: seeds should paint
-//   C. offline, COLD cache     -- fresh context, nothing seeded
-const PAGES = ['/health', '/']
-
-test('offline behaviour of the read surfaces', async ({ browser }) => {
+// Sweep 38 diagnostic: distinguish "the SW never controlled the page" (harness artifact) from
+// "the SW controlled it and the offline fallback still failed" (a real finding).
+test('is the service worker controlling, and is /offline precached?', async ({ browser }) => {
   test.setTimeout(300_000)
 
-  const OFFLINE_WORDS = /offline|no connection|no internet|reconnect|you'?re offline|can'?t connect/i
+  const ctx = await browser.newContext({ storageState: STORAGE_STATE })
+  const p = await ctx.newPage()
+  await p.goto('/health', { waitUntil: 'networkidle', timeout: 150_000 })
+  await p.waitForTimeout(3000)
 
-  for (const path of PAGES) {
-    // A + B share one context so the cache warms.
-    const ctx = await browser.newContext({ storageState: STORAGE_STATE })
-    const p = await ctx.newPage()
-    await p.goto(path, { waitUntil: 'networkidle', timeout: 150_000 })
-    await p.waitForTimeout(4000)
-    const onlineText = await p.locator('body').innerText()
-    const onlineLen = onlineText.replace(/\s+/g, ' ').trim().length
+  const before = await p.evaluate(async () => {
+    const regs = await navigator.serviceWorker.getRegistrations()
+    const names = await caches.keys()
+    let offlineCached = false
+    for (const n of names) {
+      const c = await caches.open(n)
+      if (await c.match('/offline')) { offlineCached = true; break }
+    }
+    return {
+      controller: !!navigator.serviceWorker.controller,
+      registrations: regs.length,
+      active: regs.map(r => !!r.active),
+      cacheNames: names,
+      offlineCached,
+    }
+  })
+  console.log('LOAD1 ' + JSON.stringify(before))
 
-    await ctx.setOffline(true)
-    let reloadFailed = false
-    try {
-      await p.reload({ waitUntil: 'domcontentloaded', timeout: 60_000 })
-    } catch { reloadFailed = true }
-    await p.waitForTimeout(4000)
-    const warmText = reloadFailed ? '' : await p.locator('body').innerText()
-    const warmLen = warmText.replace(/\s+/g, ' ').trim().length
+  // A second navigation gives an uncontrolled first load a chance to become controlled.
+  await p.goto('/health', { waitUntil: 'networkidle', timeout: 150_000 })
+  await p.waitForTimeout(2000)
+  const after = await p.evaluate(async () => ({
+    controller: !!navigator.serviceWorker.controller,
+    scriptURL: navigator.serviceWorker.controller?.scriptURL ?? null,
+  }))
+  console.log('LOAD2 ' + JSON.stringify(after))
 
-    console.log(`PAGE ${path}`)
-    console.log(`  A online-cold    chars=${onlineLen}`)
-    console.log(`  B offline-warm   chars=${warmLen}  reloadThrew=${reloadFailed}  offlineWording=${OFFLINE_WORDS.test(warmText)}  retained=${onlineLen ? Math.round(100*warmLen/onlineLen) : 0}%`)
-    await p.screenshot({ path: `zz-offline-warm${path.replace(/\W/g,'_')}.png`, fullPage: true })
-    await ctx.close()
+  await ctx.setOffline(true)
+  let threw = false, text = ''
+  try {
+    await p.reload({ waitUntil: 'domcontentloaded', timeout: 45_000 })
+    text = (await p.locator('body').innerText()).replace(/\s+/g, ' ').trim()
+  } catch (e) { threw = true }
+  console.log(`OFFLINE threw=${threw} chars=${text.length} offlineWording=${/offline/i.test(text)}`)
+  if (text) console.log(`  text: ${JSON.stringify(text.slice(0, 140))}`)
 
-    // C: fresh context, offline from the start.
-    const cold = await browser.newContext({ storageState: STORAGE_STATE })
-    const pc = await cold.newPage()
-    await cold.setOffline(true)
-    let coldFailed = false
-    try {
-      await pc.goto(path, { waitUntil: 'domcontentloaded', timeout: 60_000 })
-    } catch { coldFailed = true }
-    await pc.waitForTimeout(3000)
-    const coldText = coldFailed ? '' : await pc.locator('body').innerText()
-    const coldLen = coldText.replace(/\s+/g, ' ').trim().length
-    console.log(`  C offline-cold   chars=${coldLen}  gotoThrew=${coldFailed}  offlineWording=${OFFLINE_WORDS.test(coldText)}`)
-    if (!coldFailed) console.log(`     first 160 chars: ${JSON.stringify(coldText.replace(/\s+/g,' ').trim().slice(0,160))}`)
-    await cold.close()
-  }
+  await ctx.close()
   expect(true).toBe(true)
 })
