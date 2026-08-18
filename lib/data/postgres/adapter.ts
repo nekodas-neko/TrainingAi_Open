@@ -822,10 +822,26 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       ))
   }
 
-  async setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<void> {
-    await this.db.update(s.workoutSessions)
+  /**
+   * Q-460 — returns whether a row was actually updated.
+   *
+   * The UPDATE is user-scoped, which is correct and is why a cross-account call changes nothing.
+   * What was missing is that **both callers treated "matched nothing" as success**: the route
+   * answered `200 {"success":true}` for a fabricated session id, and `pushMutations` counted the
+   * mutation processed and removed it from the outbox. Local kept the RPE, the server never got it,
+   * and nothing retried.
+   *
+   * Zero rows here is an error, not idempotence. Contrast `setWorkoutSessionWarmupEnd` below, which
+   * carries `isNull(warmupEndedAt)` — zero rows there means "already set" and must stay silent. The
+   * question to ask of any user-scoped UPDATE is which of the two it is; do not copy this shape
+   * without answering it.
+   */
+  async setSessionRpe(userId: string, workoutSessionId: string, rpe: number): Promise<boolean> {
+    const rows = await this.db.update(s.workoutSessions)
       .set({ sessionRpe: rpe, updatedAt: new Date() })
       .where(and(eq(s.workoutSessions.id, workoutSessionId), eq(s.workoutSessions.userId, userId)))
+      .returning({ id: s.workoutSessions.id })
+    return rows.length > 0
   }
 
   async setWorkoutSessionWarmupEnd(userId: string, workoutSessionId: string, warmupEndedAt: Date): Promise<void> {
@@ -4119,7 +4135,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid session_rpe payload' })
             continue
           }
-          await this.setSessionRpe(userId, rpeCheck.data.workoutSessionId, rpeCheck.data.sessionRpe)
+          // Q-460: not `processed++` unconditionally. A session_rpe whose session row is absent
+          // server-side — not yet synced, deleted from another device, or an id that drifted — used
+          // to be counted as processed and dropped from the outbox, leaving the RPE on the device
+          // forever with nothing to retry and no error surface.
+          //
+          // `errors` is the right channel and not a quarantine: the client gives a failed mutation
+          // bounded retries with backoff (30 s → 2 m → 8 m → 32 m, `MAX_MUTATION_ATTEMPTS = 5`) and
+          // then dead-letters it. So the common transient case — the RPE pushed before the session
+          // that carries it — succeeds on a later attempt, and a genuinely orphaned one lands in the
+          // dead-letter queue rather than vanishing.
+          if (!await this.setSessionRpe(userId, rpeCheck.data.workoutSessionId, rpeCheck.data.sessionRpe)) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'No matching workout session for session_rpe' })
+            continue
+          }
           processed++
         } else if (mut.domain === 'complete_workout') {
           const { CompleteWorkoutPayloadSchema, completeWorkoutFromPayload } =

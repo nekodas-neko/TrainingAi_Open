@@ -444,7 +444,6 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 7028,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -501,7 +500,6 @@ const BASELINE = {
   // design questions were answered: the completeness control is an explicit button at the foot of
   // the log (Q-387 options 2 and 3 closed with reasons), the meal plan becomes a generator of
   // saved meals (Q-398), targets stay in Profile with a shortcut, and the pass covers the full journey.
-  'docs/implementation-backlog.md': 8793,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -509,6 +507,13 @@ const BASELINE = {
   // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
   // must do: construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock. Recomputed from the merged file on each merge this branch took.
+
+
+
+
+
+  'projectOverview.md': 7028,
+  'docs/implementation-backlog.md': 8667,
   'CLAUDE.md': 1075,
 
 };
