@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.320.0",
+    date: "2026-08-18",
+    changes: [
+      "Readiness now scores the Recovery Index against a 5-hour target instead of 6. That number used to come from Oura\u2019s public wording; it has now been fitted against Oura\u2019s own version of the same measurement, using the 15 nights before your ring was re-keyed where both exist side by side. Ours tracks theirs closely but was reading about 10 points low every night. Expect readiness to read roughly half a point to one and a half points higher \u2014 no day goes down, and nothing about deload or rest-day advice changes on any day measured.",
+      "Readiness scores now record which version of the model produced them, so a future change to the scoring can be told apart from a change in your actual data. Sleep scores from before yesterday do not have this, which is why the sleep trend has a step in it.",
+    ],
+  },
+  {
     version: "1.319.1",
     date: "2026-08-18",
     changes: [
