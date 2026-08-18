@@ -138,6 +138,36 @@ order.
 - **Not verified on:** the APK or production; `ISACTIVE_RECHECK_MS` is read from source, not observed
   over a real 24-hour window.
 
+### [platform] ✅ The empty account and the n=1 account are clean — and the probe that said so was invalid until it was fixed (2026-08-18)
+
+- **All 126 static GET routes driven twice** — once as an account with zero rows in every domain, once
+  after giving it exactly one `body_metrics` row and one `sleep_sessions` row.
+  [`docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md`](docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md).
+- **The method correction is the point of the entry.** The probe grepped response bodies for `NaN`
+  and `Infinity`, came back clean twice, and **could not have detected either**:
+  `JSON.stringify({x: NaN})` → `{"x":null}`, and the same for `±Infinity`. Both serialise to `null`,
+  indistinguishable from a legitimate no-data null. **A numeric-corruption check must never be run
+  against a serialised JSON body** — audit the divisions, or use a differential (numeric at n=many,
+  `null` at n=1 while its input exists), never a string match on the response.
+- **By the correct method — auditing every mean-style division across `app/api`,
+  `packages/shared/src` and `lib/health` — there is no unguarded division.** The four that looked
+  unguarded from a grep each carry an explicit early return immediately above
+  (`health-trends:111`, `cardio-week:24`, `oura/hr-window:61`, `admin/program-export:51`); the rest
+  are ternary-guarded at the expression.
+- **No route changed behaviour between zero data and one data point** — the useful half of the sweep.
+  Status distribution identical across both runs: 76–77 × 200, 33 × 403 (admin-gated), 11 × 400
+  (missing required param), 2 × 404, 3 × 5xx.
+- **All three 5xx are environmental and unchanged between runs:** `/api/download-apk` 502 (GitHub not
+  reachable from the sandbox), `/api/push/subscribe` 503 (VAPID unset), and
+  `/api/oura-ble/decoder-constants` 500 with an empty body (the vendored constants are deliberately
+  absent from the public repo). The last was **deliberately not filed**: the client's
+  `isUsable()` exists precisely to reject an error-shaped payload, and the decoder throws on an absent
+  table rather than producing plausible wrong numbers.
+- **`onRequestError` verified working.** It caught the bodiless 500 and wrote an `error_events` row
+  with the exact message — checked by querying the table after the run. The hook does what its comment
+  claims for the ~80 route files with no `catch`.
+- **Not verified:** the APK, production, or the dynamic-segment (`[id]`) routes, which were excluded.
+
 ### [nutrition][platform] 🟠 A water quick-add replayed by the outbox triple-counts — the one non-idempotent mutation of nineteen (Q-481, 2026-08-18)
 
 - **The gap between sweeps 9 and 10**: concurrent writes were measured, and the outbox under failure

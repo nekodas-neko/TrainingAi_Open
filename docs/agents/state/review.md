@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** fourteen sweeps (2026-08-17 ×2, 2026-08-18 ×12) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **482**)
+**Updated:** 2026-08-18 · **By:** fifteen sweeps (2026-08-17 ×2, 2026-08-18 ×13) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **482**)
 
 ## Now
 
-Fourteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Fifteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,35 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 15 — the empty account, the n=1 account, and a probe that could not have worked (2026-08-18)
+
+**Filed nothing.** All **126** static GET routes driven twice — zero rows in every domain, then
+exactly one `body_metrics` and one `sleep_sessions` row. Write-up:
+[`docs/reviews/2026-08-18-empty-and-single-datapoint-accounts.md`](../../reviews/2026-08-18-empty-and-single-datapoint-accounts.md).
+
+**⚠️ The method correction is the deliverable, and it is the most reusable thing this run produced.**
+The probe grepped response bodies for `NaN`/`Infinity`, came back clean **twice**, and could not have
+detected either: `JSON.stringify({x: NaN})` → `{"x":null}`, same for `±Infinity`. Both serialise to
+`null`, indistinguishable from a legitimate no-data null. **Never run a numeric-corruption check
+against a serialised JSON body** — audit the divisions, or use a differential (numeric at n=many,
+`null` at n=1 while its input exists).
+
+**By the correct method: no unguarded division** anywhere in `app/api`, `packages/shared/src` or
+`lib/health`. The four that look unguarded from a grep each carry an explicit early return
+immediately above. **No route changed behaviour between zero data and one data point.**
+
+**Three 5xx, all environmental, none filed** — `download-apk` (no GitHub from the sandbox),
+`push/subscribe` (VAPID unset), and `oura-ble/decoder-constants` (bodiless 500; the vendored constants
+are deliberately out of the public repo). The last is not filed on purpose: the client's `isUsable()`
+exists to reject an error-shaped payload and the decoder throws on an absent table, so the failure is
+loud where it matters. **`onRequestError` verified working** — it wrote the `error_events` row for
+that bodiless 500, confirmed by querying the table.
+
+**Three harness artifacts caught in this run now** (backgrounded-`sleep` false stall, wrong-column
+false negative, discarded cookie, and this). Every one produced a *clean-looking* result. The habit
+that catches them: before recording a clean result, ask what the probe would have done if the bug
+were present.
 
 ### Sweep 14 — the same mutation pushed twice (2026-08-18)
 

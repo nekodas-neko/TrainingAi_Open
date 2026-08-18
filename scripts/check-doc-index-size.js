@@ -18,6 +18,13 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, empty/n=1 account sweep): projectOverview 7213 -> 7243. No queue entry
+// — the sweep found nothing to file. The row exists for the method correction inside it: a probe
+// that greps a JSON response for NaN/Infinity detects neither, because JSON.stringify serialises
+// both to null. That check had already produced two clean-looking runs before it was caught, and it
+// is the kind of thing a later sweep repeats unless it is written where orientation reads it.
+
+//
 // Raised 2026-08-18 (Review, outbox-replay-idempotency sweep, Q-481): backlog 9005 -> 9049,
 // projectOverview 7184 -> 7213. One queue entry and its Known-Issues row. Both carry the SYNC-P7
 // caveat inline — the additive write is deliberate and an implementer who "fixes" it to an absolute
@@ -579,7 +586,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7213,
+  'projectOverview.md': 7243,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
