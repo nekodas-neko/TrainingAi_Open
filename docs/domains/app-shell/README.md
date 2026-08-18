@@ -15,7 +15,7 @@ split is "does it feel slow" vs "is it actually slow at the source".
 | Home widgets | `components/home/`, `lib/home/` |
 | Primitives | `components/ui/` — **grep here before writing any tab strip, dialog, empty state, collapsible or sparkline** |
 | Theme & background | `components/dynamic-background/`, `app/globals.css`, `lib/ui/` |
-| Health surfaces | `components/health/`, `app/health/`, `app/overview/` |
+| Health surfaces | `components/health/`, `app/health/` — there is no `app/overview/` route (the row named one until 2026-08-18) |
 
 ## Reference docs
 
@@ -52,10 +52,13 @@ split is "does it feel slow" vs "is it actually slow at the source".
 - Handoff: [`docs/handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md`](../../handoff-2026-08-14-app-shell-ui-flow-ia-review-and-testing-capability.md) — **2026-08-14**, both halves of that session: the IA/caching review and the agent-testing cluster, with the decisions (why Q-232 is an umbrella, why Q-249 sits above it, why the whole cluster precedes Q-49) and the traps.
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/reviews/2026-08-18-offline-read-surfaces.md`](../../reviews/2026-08-18-offline-read-surfaces.md) — **offline read surfaces, driven for real, 2026-08-18** (**both paths work** once the SW controls the page: a reload serves the precached offline document, and an offline tab tap paints **2515 chars vs 2486 online, ~101%**. Q-555 — in the **uncontrolled** state, which is the first-ever load, the same tap is a **silent no-op**: no navigation, no offline page, no feedback). **Web only** — `cachedFetch` falls back to `localStorage` there, so the seed path was verified, not the native SQLite store.
+- [`docs/reviews/2026-08-18-card-429-reproduction.md`](../../reviews/2026-08-18-card-429-reproduction.md) — **Q-499 reproduced in a browser, 2026-08-18** (`/api/weights-summary` forced to 429 by route interception at the S25 viewport: **`Estimated 1RM` went 1 node → 0, no error wording anywhere**; **control holds** — blocking a different endpoint left it at 1). **The vanish is invisible on a warm cache and visible on a cold one**, so it reads as intermittent. Also **Q-552** — the Q-number block ledger omitted 544–551, so the README's own *"next block of 50 above 529"* instruction would have collided with fourteen live numbers; claimed 552–601 and added the missing grep-before-claiming step.
 - [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](../../reviews/2026-08-17-failure-cells-running-the-app.md) — **the failure-cells lens, run against a live app, 2026-08-17** (Q-451 dead first-run CTA, Q-452 AI insight generated over "no data"). Findings Q-450…Q-455; four areas recorded **clean**.
 
 - [`docs/reviews/2026-08-17-repo-migration-architecture.md`](../../reviews/2026-08-17-repo-migration-architecture.md) — **the repo migration reviewed as an architecture change, 2026-08-17** (Q-457 — `lib/github-release.ts` defaults to the archived private repo, so the update card and More → Download APK break silently if the env var is ever unset). Findings Q-456…Q-459; **no credentials leaked and the public-repo CI posture is correct**, plus five more clean results.
 
+- [`docs/reviews/2026-08-18-silent-card-failures.md`](../../reviews/2026-08-18-silent-card-failures.md) — **three lenses: leaked error text, AI rate-limit coverage, and cards that vanish, 2026-08-18** (Q-499 — 78 components call `cachedFetch`, **18** reference its `onError` hook; two verified by hand conflate "fetch failed" with "no data" and simply disappear, including on a **429 from the app's own limiter**. **Corrects `CLAUDE.md`'s premise**: `cachedFetch` does *not* unconditionally swallow `!res.ok` — `cachedFetchCore` takes `onError` and swallows only when the caller declines it.) **Two lenses came up clean:** every route returning `err.message` is admin- or session-gated (and `admin/db-query` doing so is correct by design), and every route that actually calls an LLM has a rate limit — the 7 that looked unlimited make **zero** LLM calls.
 - [`docs/reviews/2026-08-18-workout-write-path.md`](../../reviews/2026-08-18-workout-write-path.md) — **the workout write path, driven live and probed cross-user, 2026-08-18** (Q-461 — the infinite `animate-bounce` on Start Set blocks Playwright's stability check, so no E2E spec can drive a workout past set 1). Findings Q-460…Q-462; **cross-user write protection holds across the whole workout surface** (verified against a second live account, with a control for every probe), plus three more clean results.
 
 - [`docs/overview/entries/2026-08-18-training-load-day-flag-inline.md`](../../overview/entries/2026-08-18-training-load-day-flag-inline.md)
@@ -67,7 +70,11 @@ split is "does it feel slow" vs "is it actually slow at the source".
 
 - [`docs/reviews/2026-08-18-coach-apply-path.md`](../../reviews/2026-08-18-coach-apply-path.md) — **the AI Coach's write path, reviewed for the first time, 2026-08-18** (Q-467 — the Coach's undo subsystem is fully built, `coach-history.tsx` already styles undone changes, and **nothing calls the undo route**). Findings Q-467/Q-468; the **apply** path came back clean and is documented at length as the reference for LLM-initiated writes.
 
-- [`docs/reviews/2026-08-18-timezone-non-default-user.md`](../../reviews/2026-08-18-timezone-non-default-user.md) — **the app driven as a user who is not in Brisbane, for the first time, 2026-08-18** (Q-477 — the Profile "Auto-detect timezone" button is what breaks dates: the server honours the new zone, 100 of 125 client call sites do not, and the Health calendar marks the wrong day as today; Q-478 — `isWorkoutDataToday`/`isBodyMetadataFresh` compare a server-stamped date to a client `DEFAULT_TZ` date, so they are false for up to 14 hours a day and session-select's loading state never clears). **Every API route threads the user's timezone** — all findings are client-side.
+- [`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](../../reviews/2026-08-18-aria-expanded-collapsibles.md) — **the `aria-expanded` list re-checked, 2026-08-18** (Q-491 — still nine, but **not the same nine**: one fixed, one never listed, two moved). Names the broader pattern: three hand-maintained counts in `CLAUDE.md` found stale this run, while every **ratcheted** count is current.
+- [`docs/reviews/2026-08-18-render-hot-paths.md`](../../reviews/2026-08-18-render-hot-paths.md) — **the other four render rules, 2026-08-18**: index keys in editable lists, the orchestrator's timer, Zustand selector breadth, `readCacheSync` in a render body. **All held.** Records that every mechanical check over-reported — 85 index keys are all on static lists, the 62-field `useShallow` pick contains actions not hot-path values, and the cache-read grep flagged the comment that states the rule.
+- [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md) — **are the memos actually memoising? 2026-08-18**. All 66 `memo(...)` declarations collected and every call site scanned: **64 hold**, no inline arrows anywhere. Q-490 — `MealMacroBars`/`DayMacroTotals` are called with an inline `target={{…}}` inside `variant.meals.map(...)`, so every keystroke in the meal-plan edit sheet re-renders every meal row. Also notes the rule's *"both long-standing memos"* count is stale (66, not 2).
+- [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](../../reviews/2026-08-18-server-only-writes-to-local-first-domains.md) — **staleness outside Q-262's test, 2026-08-18** (Q-488 — the activity delete updates the server and the caches but never the local store, so three local-first screens keep showing it until the next pull; self-heals via the tombstone, so a visible inconsistency rather than data loss). Records the unwritten inverse of the offline-first rule.
+- [`docs/reviews/2026-08-18-timezone-non-default-user.md`](../../reviews/2026-08-18-timezone-non-default-user.md) — **the app driven as a user who is not in Brisbane, for the first time, 2026-08-18** (Q-477 — the Profile "Auto-detect timezone" button is what breaks dates: the server honours the new zone, 100 of 125 client call sites do not, and the Health calendar marks the wrong day as today; Q-478 — `isWorkoutDataToday`/`isBodyMetadataFresh` compare a server-stamped date to a client `DEFAULT_TZ` date, so they are false for up to 14 hours a day and session-select's Home skeleton lingers for a network round trip instead of clearing on the cache hit — the review's "never clears" was corrected in place on 2026-08-18; a second unconditional clear runs after the await). **Every API route threads the user's timezone** — all findings are client-side. **Q-478 shipped 2026-08-18** (v1.324.8): both guards take a `tz`, all nine call sites pass one, and `scripts/check-tz-aware-cache-guards.js` keeps it that way — [`the journal entry`](../../overview/entries/2026-08-18-tz-aware-cache-guards.md). Q-477 is still open, including its ratchet on bare `todayInTz()` in client code.
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-472 — `coach_changes` is empty: the Coach's write capability has produced zero writes, which re-prices Q-467/Q-468 to zero production exposure). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
 
@@ -102,7 +109,7 @@ Live at the time of writing (2026-07-30):
   permanently mounted, so mount effects never re-run. More was missed by the original plan and
   never refreshed at all until v1.257.0; use `useRefreshOnTabShow()` or thread `epoch` in any new
   tab-resident card. See
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - **Edge-swipe tab navigation stays live on the four health detail screens** — open.
 - **Screen transition timing + prefetch** (v1.241.1) — not device-verified.
 - **Q-1, the native-feel performance push, is the live owner-directed initiative** — the network
@@ -114,8 +121,8 @@ Live at the time of writing (2026-07-30):
   pre-selects that night in `HealthMetricSheet`'s sleep sheet (not `/health/sleep`, which has no
   date-selection UI). Workout stays non-interactive — no historical HR-chart/exercise-detail screen
   exists yet — tracked as the remainder of backlog item Q-93-followup. See
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
-  and [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md).
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
+  and [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md).
 
 ## History
 
@@ -193,10 +200,10 @@ Live at the time of writing (2026-07-30):
   `cross` because it also covers `platform`-territory items.
 - Handoffs: `ls docs/handoff-*-app-shell-*.md`
 - Journal: `grep -rl 'shell\|transition\|paint\|safe.area' docs/overview/entries/` — including
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-73 — the home header's date string mismatched between server (UTC) and client (Australia/Brisbane)
   for 42% of every day; fixed with a fixed-timezone formatter instead of either side's ambient tz).
-  Also [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
+  Also [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-118 — 6 navless takeover screens used the un-floored `pb-safe-action` instead of
   `pb-safe-action-lg`, the same on-device gesture-bar-overlap class already fixed once for workout
   screens; NOT device-verified).

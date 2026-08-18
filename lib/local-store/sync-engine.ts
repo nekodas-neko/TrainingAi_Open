@@ -811,26 +811,50 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
       ).catch(() => {});
       continue;
     }
-    consecutive5xx = 0;
-    push5xxUntil = 0;
     anyRequestOk = true;
 
     const result = await res.json() as {
       processed: number;
-      errors: Array<{ id?: string; domain: string; date: string; error?: string }>;
+      errors: Array<{ id?: string; domain: string; date: string; error?: string; retryable?: boolean }>;
     };
     // Confirm by outbox id. Failed rows stay queued; resolveFailedOutboxIds
     // degrades to domain:date matching against pre-id servers.
     const failed = resolveFailedOutboxIds(chunk, result.errors);
     confirmed.push(...chunk.filter(m => !failed.has(m.id)));
-    if (failed.size) {
+
+    // Q-475: a database that cannot write reaches us as HTTP 200 with per-item errors, because
+    // pushMutations catches per mutation — which is what makes the poison-pill rule work, and is
+    // also why a dead database used to be indistinguishable from a validation rejection here. The
+    // server now says which it is; these must NOT be counted against MAX_MUTATION_ATTEMPTS, for
+    // the same reason the transport failures below are not. Without this, ~42.5 minutes of outage
+    // (30 s → 2 m → 8 m → 32 m, then dead-letter) strands every queued mutation behind a
+    // per-item-only retry UI.
+    const rejected = [...failed.entries()].filter(([, f]) => !f.retryable);
+    const serverUnavailable = failed.size > rejected.length;
+
+    if (rejected.length) {
       // Per-item server rejections: bump attempts / schedule backoff / dead-letter
       // at MAX_MUTATION_ATTEMPTS. Transport failures (catch/!res.ok above) are
       // deliberately NOT counted — they say nothing about the mutation itself.
       await store.recordMutationFailures(
-        [...failed.entries()].map(([id, error]) => ({ id, error })),
+        rejected.map(([id, f]) => ({ id, error: f.error })),
       ).catch(() => {});
     }
+
+    if (serverUnavailable) {
+      // Same treatment as a 5xx: the rows stay queued, untouched, and the whole queue backs off
+      // rather than pushing at full cadence into a server that cannot write. Breaking also stops
+      // the remaining chunks, which would fail identically.
+      consecutive5xx += 1;
+      push5xxUntil = Date.now() + serverBackoffMs(consecutive5xx);
+      break;
+    }
+
+    // Cleared only once this chunk is known NOT to be a server-unavailable one — a 200 carrying
+    // nothing but "the database is down" must escalate the backoff like a 5xx, not reset it to
+    // 30 s on every attempt.
+    consecutive5xx = 0;
+    push5xxUntil = 0;
   }
 
   // K3: refresh the badge/toast now that this push may have dead-lettered rows.

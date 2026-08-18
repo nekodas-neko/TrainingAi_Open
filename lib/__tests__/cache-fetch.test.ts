@@ -184,6 +184,21 @@ describe('isBodyMetadataFresh', () => {
   it('rejects a today record stamped with a previous day', () => {
     expect(isBodyMetadataFresh({ today: { date: '2026-07-02' } })).toBe(false)
   })
+
+  // Q-478. The date on the payload is stamped by the SERVER in the user's timezone; the
+  // guard computes its own. 12:00 UTC is 22:00 in Brisbane on the 3rd and 08:00 in New
+  // York on the same 3rd — but move two hours later and the two zones are on different
+  // calendar days, which is when the guard used to start rejecting a payload that is in
+  // fact today's. Drop the tz argument from either helper and both cases below fail.
+  it('honours the user timezone rather than Brisbane when the two are on different days', () => {
+    vi.setSystemTime(new Date('2026-07-03T14:30:00Z')) // Brisbane 2026-07-04 00:30, New York 2026-07-03 10:30
+    expect(isBodyMetadataFresh({ today: { date: '2026-07-03' } }, 'America/New_York')).toBe(true)
+    expect(isBodyMetadataFresh({ today: { date: '2026-07-04' } }, 'America/New_York')).toBe(false)
+    // Same instant, same payload, Brisbane user — the opposite answer, and the reason
+    // passing no tz silently gives a New York user the Brisbane one.
+    expect(isBodyMetadataFresh({ today: { date: '2026-07-03' } })).toBe(false)
+    expect(isBodyMetadataFresh({ today: { date: '2026-07-04' } })).toBe(true)
+  })
 })
 
 describe('isWorkoutDataToday', () => {
@@ -209,5 +224,26 @@ describe('isWorkoutDataToday', () => {
     vi.setSystemTime(new Date('2026-07-03T14:01:00Z')) // 2026-07-04 00:01 AEST
     expect(isWorkoutDataToday({ dataDate: '2026-07-03' })).toBe(false)
     expect(isWorkoutDataToday({ dataDate: '2026-07-04' })).toBe(true)
+  })
+
+  // Q-478, and this is the one with a visible consequence: a false here strips
+  // loggedTodayInSession from every exercise, so a New York user's workout screen shows
+  // sets they already logged as not yet done. Drop the tz argument and this fails.
+  it('rolls over on the user\'s midnight, not Brisbane\'s', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-03T14:01:00Z')) // Brisbane 07-04 00:01, New York 07-03 10:01
+    expect(isWorkoutDataToday({ dataDate: '2026-07-03' }, 'America/New_York')).toBe(true)
+    expect(isWorkoutDataToday({ dataDate: '2026-07-04' }, 'America/New_York')).toBe(false)
+  })
+
+  // A Brisbane user must be unaffected by the new parameter — the whole change is a no-op
+  // for the owner, and that is what makes it safe to ship without a device run.
+  it('is unchanged for a Brisbane user whether tz is passed or omitted', () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-07-03T13:59:00Z')) // 2026-07-03 23:59 AEST
+    expect(isWorkoutDataToday({ dataDate: '2026-07-03' }, 'Australia/Brisbane'))
+      .toBe(isWorkoutDataToday({ dataDate: '2026-07-03' }))
+    expect(isBodyMetadataFresh({ today: { date: '2026-07-03' } }, 'Australia/Brisbane'))
+      .toBe(isBodyMetadataFresh({ today: { date: '2026-07-03' } }))
   })
 })

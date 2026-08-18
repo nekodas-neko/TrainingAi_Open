@@ -15,7 +15,31 @@ describe('resolveFailedOutboxIds', () => {
       { id: 'ob-2', domain: 'food_logs', date: '2026-07-01', error: 'FK ownership check failed' },
     ])
     expect([...failed.keys()]).toEqual(['ob-2'])
-    expect(failed.get('ob-2')).toBe('FK ownership check failed')
+    expect(failed.get('ob-2')).toEqual({ error: 'FK ownership check failed', retryable: false })
+  })
+
+  // Q-475: `retryable` marks a server that could not write, not a mutation that must not be.
+  it('carries the server\'s retryable flag through, per row', () => {
+    const failed = resolveFailedOutboxIds(chunk, [
+      { id: 'ob-1', domain: 'food_logs', date: '2026-07-01', error: 'Error: Failed query: insert …', retryable: true },
+      { id: 'ob-2', domain: 'food_logs', date: '2026-07-01', error: 'FK ownership check failed' },
+    ])
+    expect(failed.get('ob-1')?.retryable).toBe(true)
+    expect(failed.get('ob-2')?.retryable).toBe(false)
+  })
+
+  it('defaults retryable to false, so a server that does not send it keeps the old bounded-retry behaviour', () => {
+    const failed = resolveFailedOutboxIds(chunk, [
+      { id: 'ob-2', domain: 'food_logs', date: '2026-07-01', error: 'boom' },
+    ])
+    expect(failed.get('ob-2')?.retryable).toBe(false)
+  })
+
+  it('carries retryable through the legacy domain:date fallback too', () => {
+    const failed = resolveFailedOutboxIds(chunk, [
+      { domain: 'food_logs', date: '2026-07-01', error: 'db down', retryable: true },
+    ])
+    expect([...failed.values()].every(f => f.retryable)).toBe(true)
   })
 
   it('falls back to domain:date for old servers that omit the id', () => {

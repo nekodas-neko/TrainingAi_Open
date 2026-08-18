@@ -297,6 +297,9 @@ jobs:
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 
+      - name: Cache today-guards take the user's timezone
+        run: node scripts/check-tz-aware-cache-guards.js
+
       - name: Non-strict request schemas do not increase
         run: node scripts/check-strict-request-schemas.js
 
@@ -326,6 +329,15 @@ jobs:
 
       - name: Orientation docs stay within their baselines
         run: node scripts/check-doc-index-size.js
+
+      - name: A Known Issue lives in exactly one list
+        run: node scripts/check-known-issue-duplication.js
+
+      - name: Orientation indexes name only paths that exist
+        run: node scripts/check-index-doc-paths.js
+
+      - name: Orientation docs attribute symbols to the right file
+        run: node scripts/check-module-map-symbols.js
 
   migrations:
     name: Migration Check

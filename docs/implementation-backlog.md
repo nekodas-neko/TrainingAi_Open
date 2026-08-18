@@ -15,9 +15,9 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **198** | `lib/data/postgres/migrations/` (head: `197_claude_ro_views_redecode_jobs.sql`) |
+| Next free Postgres migration | **199** | `lib/data/postgres/migrations/` (head: `198_drop_duplicate_indexes.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **552** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -285,66 +285,365 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
-### [platform][devices] Q-475 — a database outage reaches the client as HTTP 200, so the backoff written for it never fires and ~43 minutes of downtime dead-letters the whole outbox
+### [platform][devices] Q-487 — a sync-push failure still cannot reach `error_events`, and production shows the shape as a zero
 
-- **Branch:** `fix/sync-push-classify-retryable-errors`
-- **Added:** 2026-08-18 · review sweep (offline-sync failure paths) ·
-  [`docs/reviews/2026-08-18-outbox-under-failure.md`](reviews/2026-08-18-outbox-under-failure.md)
-- **Placement:** high. Measured against a genuinely stopped database, it converts a *transient*
-  server problem into per-user manual repair, and the fix is a classification change rather than a
-  redesign.
-- **Measured.** Local Postgres stopped (`pg_ctl -m fast stop`), then two ordinary valid mutations
-  pushed to `/api/sync/push`:
+- **Branch:** `fix/sync-push-reports-to-error-events`
+- **Added:** 2026-08-18 · review sweep (production verification round 2) ·
+  [`docs/reviews/2026-08-18-production-verification-round-2.md`](reviews/2026-08-18-production-verification-round-2.md)
+- **Placement:** mid-low. One call, and it closes a structural blind spot in the table the
+  session-start ritual reads.
+- **This is the half of Q-475 that its fix did not cover.** `#115` landed the classification correctly
+  — `isRetryableWriteError` server-side, the client no longer counting a retryable failure against
+  `MAX_MUTATION_ATTEMPTS`, and `serverUnavailable` engaging the whole-queue backoff. **Behaviour is
+  fixed. Reporting is not.**
+- **The gap:** `reportServerError` is called only in the route's **outer** catch
+  (`app/api/sync/push/route.ts:51`), which `pushMutations` never reaches because it catches
+  per-mutation by design. Failures do hit the server log
+  (`console.error('[pushMutations] error', …)`) but **never `error_events`** — the table `CLAUDE.md`
+  calls *"the only view of faults that never reach a human"*, and the one the session-start ritual
+  reads.
+- **Production evidence — the shape is an absence** (owner's rows, retained window):
+
+  | Route | Faults in `error_events` | Span |
+  |---|---|---|
+  | `/api/sync/pull` | **69** | 2026-07-19 → 2026-08-13 |
+  | `/api/sync/push` | **0** | none, ever |
+
+  Over the same window the database refused connections **125 times across six days** (39 on
+  2026-08-12), one pull row reading `[cause: timeout exceeded when trying to connect]`.
+- **Why the zero is evidence and not absent traffic:** `components/sync-provider.tsx` runs
+  `await pushMutations(userId)` at :139 and `pullDelta` at :145 — **push first, same cycle**. Push is
+  not less exposed than pull; it runs before it.
+- **Fix shape:** call `reportServerError` (or an equivalent) for the errors `pushMutations` returns —
+  ideally only for the **retryable** ones, since a validation rejection is not a server fault and
+  would be noise. The classification needed to make that distinction **already exists** as of `#115`,
+  so this is a small addition on top of it rather than new machinery.
+- **Do not "fix" it by removing the per-mutation catch** — that catch is what makes the poison-pill
+  rule work.
+- **Lane A owns this** (`app/api/sync/push`, `lib/data/postgres/adapter.ts`).
+- **⚠️ Re-derive it soon or not at all:** `error_events` prunes at **30 days**, so the pull-69/push-0
+  asymmetry above cannot be reproduced after that window. It is recorded here because it will not be
+  measurable later.
+
+### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
+
+- **⛔ RE-TAGGED TO LANE A 2026-08-18 — the "one call in one Lane B handler" shape below is not
+  buildable, and the obvious version of it is a silent no-op.** `lib/local-store` has **no
+  `deleteActivityLog`**; the `deleteActivityLog` that greps are `repo.deleteActivityLog`
+  (`lib/data/repository.ts:547`, `adapter.ts:2374`) — the *server* repository, which is what the
+  route already calls. The nearest local method is `upsertActivityLog`, and **its INSERT column list
+  and its `ON CONFLICT DO UPDATE SET` both omit `deleted_at` entirely** (27 columns, 27 placeholders,
+  `sqlite-backend.ts:2607`). So a read-merge upsert setting `deletedAt: now` compiles, type-checks,
+  passes lint, and **changes nothing** — `getActivityLogs` filters `deleted_at IS NULL`
+  (`sqlite-backend.ts:824`) against a column the write never touches. That was written and reverted
+  here before it shipped; it is the exact shape a future session will reach for first.
+- **What the fix actually needs:** a `deleteActivityLog(id)` on the local store —
+  `lib/local-store/index.ts` (interface) + `lib/local-store/sqlite-backend.ts` (soft-delete
+  statement, matching `deleteFoodLog`/`deleteInjury`) — **then** the one call in
+  `app/health/health-content.tsx`. Two of those three files are Lane A's by the ownership list, so
+  **Lane A takes the whole item**; splitting it leaves Lane B's call site pointing at a method that
+  does not exist. The Lane B half is four lines and is the last step, not the first.
+- **The `CLAUDE.md` rule this item asked for is already landed** (Lane B, same day) — the inverse of
+  the offline-first rule, in the Offline-First section. Do not re-add it.
+- **✅ SCOPE BOUNDED 2026-08-18 — the *audit* still holds: this is the ONLY instance.**
+  Every mutating write to a local-first domain was audited for a local-store call **inside the
+  handler**: `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE), `quick-edit-log-sheet`
+  (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet` (DELETE+PATCH),
+  `done-activity-screen` (PATCH) — **all eight write locally**. Only this handler does not.
+  [`docs/reviews/2026-08-18-local-first-write-coverage.md`](reviews/2026-08-18-local-first-write-coverage.md)
+- **Branch:** `fix/activity-delete-updates-local-store`
+- **Added:** 2026-08-18 · review sweep (staleness outside Q-262's test) ·
+  [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](reviews/2026-08-18-server-only-writes-to-local-first-domains.md)
+- **Placement:** mid. Visible inconsistency, **not data loss**, and it self-heals — but the fix is one
+  call and the shape is a rule the codebase implies and does not state.
+- **What.** `app/health/health-content.tsx:684-700` deletes via
+  `fetch("/api/activity-logs", { method: "DELETE" })`, toasts *"Deleted"*, calls
+  `invalidateActivityWrites()` and `refreshDayOverlay(...)`. **No `store.deleteActivityLog(...)`, no
+  `queueMutation`.**
+- **The screen the user is on is correct**, which is why this survived: `refreshDayOverlay` →
+  `fetchDayOverlay` reads `cachedFetch('day-log:<date>')`, which is **server-read by design** (a
+  cross-domain aggregate — the sanctioned exception). The activity vanishes there immediately.
+- **The local `activity_logs` row is untouched**, and three surfaces read it local-first:
+  - `app/session-select/session-select-content.tsx:500` — `store.getActivityLogs(weekStart)`
+  - `app/nutrition/nutrition-content.tsx:278` — today's calories burned
+  - `components/health/activity-history-card.tsx:91`
+- **How long:** `pullDelta` is throttled to `MIN_SYNC_INTERVAL_MS` = **5 minutes** unless forced
+  (`sync-engine.ts:77`), and `sync-provider.tsx:145,195` calls it **un-forced**. Nothing in the delete
+  path triggers a pull, so the floor is that window and the real duration is "until the next natural
+  sync".
+- **It self-heals — say so when triaging.** `applyDelta` applies the tombstone
+  (`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, `sqlite-backend.ts:1628`) with
+  the correct pull-clobber guard. The server delete is a **soft** delete with a `user_id`-scoped
+  tombstone (`adapter.ts:2374`). Nothing is lost; something wrong is shown for a while.
+- **Fix shape:** see the re-tag note at the top of this entry. The sibling paths cited here
+  (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`) are **upserts, not
+  deletes** — they are precedent for writing locally, not for a local-delete call that exists.
+  Queuing the delete so it works offline is a **separate, larger** question for this domain — do not
+  fold it in silently.
+- **The rule this breaks is now written down** — `CLAUDE.md`, Offline-First section, immediately
+  above the forward-direction rule it inverts: a domain the UI reads local-first must have *every*
+  write update the local store, deletes included, and including writes made from a screen that
+  itself reads server-side. That last clause is why nothing on the originating screen could reveal
+  it.
+- **Lane A owns this** (`lib/local-store/**` is the load-bearing half; `app/health/**` is four lines
+  at the end). Re-tagged from Lane B — see the top of this entry.
+- **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
+  readers fall through to their API fallbacks and the inconsistency cannot appear there. The 5-minute
+  floor is read from `MIN_SYNC_INTERVAL_MS`, not observed. On-device is the only real verification.
+
+### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
+
+- **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events` (owner's
+  rows, retained window), so the SQL-leaking response has, on this evidence, **never been served to
+  anyone**. Keep the fix — it is three lines and the disclosure is real — but do not re-price this
+  upward from the 500s alone.
+- **Branch:** `fix/no-raw-error-in-response-body`
+- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
+- **Placement:** upper-mid. Three files, a few lines each, and it is the only place in the app that
+  publishes table structure.
+- **Measured:**
   ```
-  HTTP 200
-  {"processed":0,"errors":[{"id":"d1","domain":"body_metrics","date":"2026-08-09",
-    "error":"Error: Failed query: insert into \"body_metrics\" …"}, {"id":"d2", …}]}
+  GET /api/workout-sessions/not-a-uuid/recap  →  500
+  {"error":"[ERROR]: Error: Failed query: select \"id\", \"user_id\", \"session_id\",
+   \"session_name\", \"started_at\", \"completed_at\", \"hr_synced_at\", \"warmup_ended_at\",
+   \"phase_id\", \"phase_type\", \"is_early_deload\", \"was_override\", \"intensity_mode\", …
   ```
-  **200, not 500.** `pushMutations` catches per-mutation — which is exactly what makes the poison-pill
-  rule work — so at the wire a dead connection is indistinguishable from a validation rejection.
-- **What the client does with that** (`lib/local-store/sync-engine.ts:798-833`): `res.ok` is true, so
-  `consecutive5xx = 0; push5xxUntil = 0` — the whole-queue backoff is **reset rather than engaged**,
-  and the client keeps pushing at full cadence into a server that cannot write. Every mutation then
-  goes through `recordMutationFailures` → `attempts++` → dead-letters at `MAX_MUTATION_ATTEMPTS = 5`.
-- **The arithmetic.** Per-item backoff is `30_000 * 4 ** (attempts - 1)` — 30 s → 2 m → 8 m → 32 m,
-  fifth attempt dead-letters. **≈ 42.5 minutes of outage dead-letters every queued mutation.** That is
-  an ordinary outage length; this repo has recorded two (the session-165 pool incident and the
-  2026-08-17 `disk_full`).
-- **The client already states the principle it is violating**, three lines below:
+  The control (a valid-but-missing UUID) returns `{"error":"Not found"}` 404, so this is specific to
+  the malformed id.
+- **It is the route's own catch, not a dev overlay — this ships in production:**
   ```ts
-  // Transport failures (catch/!res.ok above) are
-  // deliberately NOT counted — they say nothing about the mutation itself.
+  const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/recap')
+  return NextResponse.json({ error: errMsg }, { status: 500 })
   ```
-  A dead database says nothing about the mutation either. It is counted only because it does not
-  *look* like a transport failure.
-- **Cost — not data loss, and that matters.** `status='failed'` keeps the row, the More-tab badge
-  reflects it, the four Tier-A domains fire a toast, and `retryFailedMutation` restores it. The cost is
-  that after a ~43-minute outage a user finds **every** pending write dead-lettered, a red badge, a
-  toast claiming a workout failed to sync — and a retry UI that is **per-item only**
-  (`components/more/sync-health-card.tsx:109-123`, no "retry all"), so N stranded mutations mean N
-  taps, each firing its own full `pushMutations`. They are asked to hand-repair a queue that was never
-  broken.
-- **Fix shape — two options, prefer the first:**
-  1. **Classify at the source.** The per-mutation catch already knows a connection error from a
-     validation error and flattens both into `String(err)`. Mark the error retryable (a `retryable`
-     flag or a `code` on the error entry) and have `recordMutationFailures` skip the attempt bump for
-     those — the same treatment transport failures already get by policy.
-  2. **Escalate a whole-batch failure.** If every mutation in a batch failed with the same
-     connection-shaped error, return 500 and let the client's existing 5xx path do the right thing
-     with no client change. Cheaper, but blind to a partial outage.
-  (1) fixes the classification instead of inferring it from a count, and (2) can layer on later.
-- **Same class as Q-548, filed the same day on a different route** — there a DB outage surfaced as
-  `{"error":"Forbidden"}` and burned minutes of a real diagnosis on a credential hunt. Two independent
-  routes now known to misreport a database outage as something else; a third look at how outages
-  surface across `app/api/**` would probably be worth someone's hour, but is not this entry.
-- **Lane split:** the server half is Lane A (`app/api/sync/push`, `lib/data/postgres/adapter.ts`); the
-  client half is Lane A too (`lib/local-store/**`). One lane, one PR.
-- **Not verified on:** Railway (inducing a production DB outage is not on), or the APK. The client half
-  is plain TypeScript in `sync-engine.ts` with no native dependency and the arithmetic above is read
-  straight from it.
+  `errorLog` (`packages/shared/src/logger.ts:1`) builds `` `${logPrefix} ${error}` `` and returns it.
+  **No environment check, no redaction.**
+- **Scope, measured:** four routes use `error: errMsg` / `error: errorLog(...)` as the response body —
+  `workout-sessions/[id]/{recap,energy,timing}` (all three leak) and `session-explain/insight`, which
+  **does not leak today** (a malformed `sessionId` is guarded upstream and returns a clean 404) but
+  carries the same pattern and would leak the moment an error reached its catch. Fix all four.
+- **What it is and is not.** Schema disclosure to an **authenticated** user, and this app's users are
+  its own account holders — not an anonymous-attacker hole. Worth fixing because it publishes table
+  structure nothing else exposes, into a JSON field a client may render, and because the fix costs
+  nothing: `reportServerError(error, …)` is already called on the line above, so redacting the
+  response loses no diagnostic information.
+- **Fix shape:** return a fixed string (`{ error: 'Internal error' }`) and keep `errorLog`'s output in
+  the server log only. Consider making `errorLog`'s return value unusable as a response body — or add
+  a Custom Rules step rejecting `error: errMsg` / `error: errorLog(` inside `NextResponse.json`, which
+  is the shape this repo already uses where prose would not hold.
+- **Lane A owns this** (`app/api/**`, `packages/shared/src/logger.ts`).
+
+### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
+
+- **Branch:** `fix/tier-a-enqueue-visibility`
+- **Added:** 2026-08-18 · review sweep (swallowed failures on write paths) ·
+  [`docs/reviews/2026-08-18-tier-a-enqueue-silence.md`](reviews/2026-08-18-tier-a-enqueue-silence.md)
+- **Placement:** mid. Narrow trigger, but the loss is unrecoverable and un-diagnosable, on the domain
+  the codebase itself calls worst-case. The fix is four lines.
+- **The four sites — the ONLY `queueMutation` calls in the app that swallow, and all Tier-A:**
+  ```
+  components/workout-screen.tsx:1320  queueMutation({domain:'workout_log'}).catch(() => {})
+  components/workout-screen.tsx:1324  queueMutation({domain:'workout_log'}).catch(() => {})
+  components/workout-screen.tsx:1527  queueMutation({domain:'complete_workout'}).catch(() => {})
+  components/workout-screen.tsx:1532  queueMutation({domain:'complete_workout'}).catch(() => {})
+  ```
+  `lib/local-store/dead-letter-signal.ts` defines Tier-A and says why: *"a lost workout is the app's
+  worst-case data loss."*
+- **Read this before judging the size: the surrounding design is GOOD and must not be undone.**
+  `logWorkoutLocally` writes locally first (and logs its own failure); the **primary** send is a direct
+  `POST /api/log-exercise`, deliberately *"independent of the on-device outbox / sync-push path (which
+  can fail silently)"*; the outbox enqueue is only the **fallback**. This is not a write with no outbox
+  — it is a well-layered write whose last layer is silent.
+- **It can throw.** `queueMutation` is a bare `runSQL` INSERT (`sqlite-backend.ts:2669`), so it throws
+  whenever the local DB is unavailable — which `CLAUDE.md` records as having happened **twice** on
+  Android (*"the local DB has been silently dead … every local read returned empty"*), plus the
+  partial-migration and `disk_full` cases.
+- **The sequence that loses a set:** the POST fails (offline — the case this fallback exists for)
+  **and** the local store is broken. Then the set is not sent, not queued, not recoverable; **nothing
+  is logged**; and `hapticLight()` + `setLoggedCount(c => c + 1)` have already told the user it worked.
+- **The inconsistency is the argument.** In the same function, `logWorkoutLocally` failing is
+  `console.warn`ed and `queueMutation` failing is not — the *less* consequential failure is the visible
+  one. The warn above shows the intent; this looks like an oversight, not a decision.
+- **Fix shape (do NOT change control flow):**
+  1. `.catch(err => console.warn('queueMutation failed:', err))` ×4 — matches the line above, makes the
+     condition diagnosable at all.
+  2. Signal the user, since this loss is unrecoverable — a toast, or route it through the existing
+     `lib/local-store/dead-letter-signal.ts` so the More-tab badge lights. The mechanism already exists.
+  - **Do NOT convert these to `await`.** They are fired without blocking on purpose so the UI stays
+    instant (`Saves feel instant`); awaiting puts a SQLite write in front of the haptic.
+- **Lane B owns this** (`components/**`).
+- **NOT reproduced, and cannot be here.** Inducing it needs a broken local SQLite on a device; in the
+  web sandbox `getLocalStore` returns null, so `store_?.` short-circuits and the enqueue never runs.
+  That `queueMutation` throws on a dead local DB is read from source, not observed. **On-device is the
+  only real verification.**
+- **Clean and worth not re-checking:** **26 of ~30** `queueMutation` sites correctly `await`, so a
+  throw reaches a `try` and suppresses the success toast — `components/health/metric-log-sheet.tsx:96`
+  is the reference shape.
+
+### [body][platform][devices] Q-485 — an implausible weight is refused with a message on web and discarded without trace on the device path
+
+- **⚠️ PRODUCTION CANNOT ADJUDICATE THIS, and the obvious query is a trap (checked 2026-08-18).**
+  35 of 114 `body_metrics` rows have steps and a NULL weight — **that is the expected shape**, since
+  steps arrive daily from the ring and weight only when the owner uses a scale. **Do not cite it as
+  evidence of coerced-away weights.** Same trap as Q-460's "74% lack an RPE".
+- **Branch:** `fix/push-coercion-visibility`
+- **Added:** 2026-08-18 · review sweep (numeric bounds across both write paths) ·
+  [`docs/reviews/2026-08-18-implausible-value-silent-drop.md`](reviews/2026-08-18-implausible-value-silent-drop.md)
+- **Placement:** mid-low. Rare trigger, but the failure is designed to be undetectable and step (1) of
+  the fix is one line.
+- **Measured**, same value, same field, same instant (`weightKg: 10000` against a bound of 500):
+  ```
+  POST /api/body-metadata  →  400  {"error":"Too big: expected number to be <=500"}
+  POST /api/sync/push      →  200  {"processed":1,"errors":[]}
+                               → row written: steps 7000, weight_kg NULL
+  ```
+- **The drop is invisible in all three places it could be recorded:** `errors: []` so the client
+  confirms and deletes the mutation; **no** `console.*` in the coercion block; **no** `error_events`
+  row (verified by query). A value the web refuses with a clear message is discarded on the canonical
+  runtime with no trace and no way for the user to know.
+- **The bounds are NOT the problem and must not be "fixed".** Both paths import the same
+  `packages/shared/src/validation/body-metrics.ts`, so they cannot drift — `One Formula, One Place`
+  holding. The push branch's comment claiming it *"matches the web route's numeric bounds"* is
+  accurate about bounds; it just does not describe behaviour.
+- **The same function already has the visible behaviour, applied to 2 of 14 checks:**
+  - **12 coerce silently** — `valid…OrNull(x) ?? undefined` across weight, bodyFat, calories, macros,
+    steps, distance, RHR, HRV, water, measurements.
+  - **2 throw** — `waterMlDelta` and `sleep_session` — which become `errors[]` entries, so the
+    mutation retries, dead-letters, and surfaces on the More-tab badge.
+
+  Both throws are defensible (a dropped *increment* loses the add entirely; a malformed sleep session
+  is meaningless rather than incomplete). The question is why **weight**, the app's headline body
+  metric, sits in the silent group.
+- **⚠️ The fix is NOT "throw everywhere."** A throw quarantines the mutation, and `CLAUDE.md`'s
+  poison-pill rule forbids retrying a validation failure forever. Twelve new dead-letter paths would
+  trade an invisible failure for a queue of red badges over values the user cannot correct from the
+  badge. In rough order of cost:
+  1. **Log the coercion server-side** — one line, makes the drop visible in logs/`error_events`, no
+     client change. Worth doing regardless.
+  2. **Add a `warnings[]` channel** to the push response, separate from `errors[]`, that the client can
+     surface without dead-lettering. This is the version that tells the *user*.
+  3. **Decide per field** which values are "incomplete, keep going" and which are "meaningless,
+     quarantine" — a product decision, **not** one an implementer should make in passing.
+- **Reachability is low and honest:** bounds are generous (weight 20–500 kg) so ordinary UI input never
+  trips them. The path that reaches it is the one the code comment already names — *"a corrupted local
+  payload"* — plus a misreading BLE scale.
+- **Lane A owns this** (`lib/data/postgres/adapter.ts`, `app/api/sync/push`).
+- **Not verified on:** the APK. The client half (`errors: []` → confirm → `deleteMutations`) was read
+  from `sync-engine.ts` rather than induced here. Domain branches outside the `body_metrics` block were
+  not enumerated for the same pattern.
+
+### [platform][body][nutrition] Q-484 — `POST /api/injuries` stores a 10 MB note; its own PATCH sibling caps the same field at 1,000 characters
+
+- **✅ PRODUCTION-CHECKED 2026-08-18 — latent confirmed.** `claude_ro.injuries` is **empty** (0 rows)
+  and `claude_ro.supplements` holds 2 rows with a max name of 9 chars. Nothing oversized exists; the
+  low-severity filing is right.
+- **Branch:** `fix/create-route-body-schemas`
+- **Added:** 2026-08-18 · review sweep (oversized/unvalidated bodies) ·
+  [`docs/reviews/2026-08-18-unvalidated-create-bodies.md`](reviews/2026-08-18-unvalidated-create-bodies.md)
+- **Placement:** mid-low. **Low severity today** and the reason to fix it is not attack — see below.
+  The fix is a few lines because the schema already exists.
+- **Measured:**
+  ```
+  POST /api/injuries     muscleName 200,002 chars + notes 500,000  →  201, both stored in full
+  POST /api/supplements  name 300,002 chars + dose 100,000         →  201, both stored in full
+  POST /api/injuries     notes 10,000,000 chars (a 10 MB body)     →  201, 10,000,000 stored
+  ```
+  No ceiling below 10 MB; the server parsed a 10 MB JSON body into memory and wrote the row.
+- **⚠️ Do NOT quote 10 MB as a storage figure.** `pg_column_size` read ~120 kB for those rows because
+  the payload was one repeated character and TOAST compressed it almost perfectly. Real text would
+  not. The defensible statements: the **transfer and parse** cost is unbounded, and the stored size is
+  bounded only by what the content happens to compress to.
+- **The asymmetry is the finding** — same table, same fields:
+
+  | | `POST /api/injuries` | `PATCH /api/injuries/[id]` |
+  |---|---|---|
+  | Body | `const body = await req.json()` + destructure | `InjuryPatchSchema.safeParse(...)` |
+  | `muscleName` | non-empty check only | `z.string().min(1).max(100)` |
+  | `notes` | none | `z.string().max(1000).nullable()` |
+  | `startedDate` | none — used as-is | `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)` |
+  | `severity` | hand-rolled `includes()` | `z.enum([...])` |
+
+  `CLAUDE.md` names **`updateInjury` as the reference** for Zod-whitelisting a PATCH body. It is a good
+  reference — and the create path beside it has no schema at all, which is probably why: the rule was
+  written about edit paths after an edit-path bug, and create was never revisited.
+- **The unvalidated `startedDate` also 500s** (same class as Q-482, same root cause — no schema):
+  `{"startedDate":"not-a-date"}` → **500**; `{"startedDate":"0001-01-01"}` → **201, accepted**.
+  Fixing this entry fixes that too.
+- **Scope — read carefully:** **33** body-bearing routes call `req.json()` with no `safeParse`/
+  `.parse`. That is a **candidate** count, **not** a defect count: several do hand-rolled checks
+  (injuries validates `severity`) and several are admin-gated, which limits reach without adding
+  validation. **Two** were confirmed by probe; the other 31 are unaudited — do not treat them as
+  broken *or* as fine.
+- **Why it is worth an entry despite low severity.** Not attack: this app's users are its own account
+  holders. But `CLAUDE.md` runs a **session-start database-size ritual** and records a real
+  `disk_full` production outage (2026-08-17), and an unbounded user-writable text column is exactly
+  the shape that ritual exists to catch. The stated direction is multi-user + Play Store, at which
+  point "nobody is attacking it" stops being an argument. And **`InjuryPatchSchema` already encodes
+  the intended bounds** — the create route can reuse it.
+- **Fix shape:** (1) give both POSTs a schema reusing the PATCH bounds; (2) consider a shared
+  body-size guard for `req.json()` so the remaining 31 are bounded before they are individually
+  audited; (3) audit those 31 as a follow-up.
+- **Lane A owns this** (`app/api/**`).
+
+### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
+
+- **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events`. A
+  malformed id has not reached production, which matches how this was filed (*"not a security hole"*).
+- **Branch:** `fix/dynamic-route-uuid-guard`
+- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
+- **Placement:** mid. Not a security hole (see below) — an error-shape and input-validation gap, with
+  a cheap shared fix and an obvious ratchet.
+- **Method.** All 30 dynamic route files, every method, called twice: once with a
+  well-formed-but-nonexistent UUID (**the control**) and once with `not-a-uuid`. 39 pairs. **22
+  returned 5xx**; one of those (`PUT /api/nutrition/meal-types/[id]`) also 500s on the control and is
+  already **Q-463**, leaving **21 new pairs across 14 routes**:
+
+  | Route | Methods 500ing | Control answers |
+  |---|---|---|
+  | `/api/coach/apply/[id]/undo` | POST | 404 |
+  | `/api/friends/[id]` | DELETE | 204 |
+  | `/api/injuries/[id]` | PATCH, DELETE | 404 / 200 |
+  | `/api/nutrition/food-logs/[id]` | DELETE | 200 |
+  | `/api/nutrition/meal-plans/[id]` | GET, PATCH, DELETE | 404 |
+  | `/api/nutrition/meal-plans/[id]/review` | POST | 404 |
+  | `/api/nutrition/meal-plans/[id]/structure` | PATCH | 404 |
+  | `/api/nutrition/meal-plans/meals/[mealId]` | PATCH | 404 |
+  | `/api/nutrition/meal-types/[id]` | DELETE | 200 |
+  | `/api/nutrition/saved-meals/[id]` | DELETE | 200 |
+  | `/api/supplements/[id]` | PATCH, DELETE | 404 / 200 |
+  | `/api/supplements/[id]/log` | POST, DELETE | 404 / 200 |
+  | `/api/workout-review/session/[sessionId]` | POST | 400 |
+  | `/api/workout-sessions/[id]/{energy,recap,timing}` | GET ×3 | 404 |
+
+- **The control is what makes this a finding**: every one of these answers a well-formed missing id
+  correctly. Only the malformed id breaks them, so it is a missing input guard, not a broken route.
+  Postgres rejects the cast with `22P02 invalid_text_representation`.
+- **Only 2 of the 30 dynamic route files validate the id as a UUID at all.** The rest do
+  `const { id } = await params` and pass the string to the repository.
+- **⚠️ Reading the evidence:** a **500 is conclusive** (the request reached the database). A **400 is
+  not** — the probe sent `{}`, so a body-bearing method may have failed its body schema before the id
+  was used. The table above lists only 500s, so every row is conclusive; do **not** read the routes
+  absent from it as verified-correct unless they are GET or DELETE.
+- **Not a security hole.** A malformed id cannot read anyone's data — Postgres refuses the cast before
+  any row is touched and every route is `auth()`-scoped. It becomes a disclosure problem only where it
+  meets **Q-483**, which is why that one is placed above this.
+- **Fix shape:** a shared `parseUuidParam(id)` returning 400 on failure, applied at the top of each
+  dynamic route — the same shape as `normalizeDateParam` for date params, which is this repo's own
+  precedent for exactly this class. Add a Custom Rules step requiring it in any new
+  `app/api/**/[id]` route so the count cannot grow back; `CLAUDE.md` already argues that for date
+  params (*"new routes get the guard at creation"*).
+- **Lane A owns this** (`app/api/**`).
+- **Observability is fine and needs no work:** every one of these reached `error_events` tagged
+  `[pg 22P02]` — the caught ones via `reportServerError`, the bodiless
+  `GET /api/nutrition/meal-plans/[id]` via `onRequestError`.
 
 ### [nutrition][platform] Q-481 — a water quick-add replayed by the outbox triple-counts; it is the one non-idempotent mutation of the nineteen
 
+- **⚠️ PRODUCTION CANNOT ADJUDICATE THIS (checked 2026-08-18).** `body_metrics` has **4 days** with
+  `water_ml`, max **1000 ml**, none over 6 L. No double-count signature — **and not enough water
+  logging for one to appear.** Read this as the feature barely being used, NOT as the replay not
+  happening. The finding stands on its local measurement.
 - **Branch:** `fix/outbox-water-delta-dedupe`
 - **Added:** 2026-08-18 · review sweep (at-least-once delivery) ·
   [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](reviews/2026-08-18-outbox-replay-idempotency.md)
@@ -387,54 +686,546 @@ below threshold and left in place for next time.
   the client does), but the client-side trigger was read from source, not induced. The other 15
   branches were read, not individually replay-tested.
 
-### [app-shell][platform] Q-478 — two cache guards compare a server-stamped date against a client `DEFAULT_TZ` date, so they return false for hours a day for any non-Brisbane user
+### [platform][readiness] Q-489 — five sites turn an ms offset into a calendar day; in a DST zone, three of them compute "today" when they mean "yesterday"
 
-- **Branch:** `fix/cache-today-guards-take-tz`
-- **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
-  [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
-- **Placement:** above Q-477 and **do it first** — it is about a dozen edits, it is the
-  highest-damage consequence of that finding, and it is independently useful.
-- **What.** `lib/sqlite/cache.ts`:
-  ```ts
-  export function isWorkoutDataToday(data)  { return data?.dataDate === todayInTz() }                    // :369
-  export function isBodyMetadataFresh(data) { return data?.today == null || data.today.date === todayInTz() } // :361
+- **Branch:** `fix/ms-offset-calendar-day`
+- **Added:** 2026-08-18 · review sweep (the AI/stats time-window rule) ·
+  [`docs/reviews/2026-08-18-ms-offset-to-calendar-day.md`](reviews/2026-08-18-ms-offset-to-calendar-day.md)
+- **Placement:** low. **Unreachable today** (every user is `Australia/Brisbane`, no DST) and, when
+  reachable, **one hour per year per DST-zone user**. Filed because it is measured, it is the exact
+  hand-rolled date arithmetic `CLAUDE.md` bans, and the fix is a one-line swap to a helper that
+  already exists and is already used elsewhere.
+- **⚠️ Do NOT file the other seven instances of the banned pattern — most are correct.** The rule's
+  harm is *"ms-offset windows straddle two AEST days and merge them"*, which is about **day-bucketed**
+  aggregation. `muscle-recovery`, `workout-load-history` and `friends/feed` use a **rolling instant**
+  filter feeding consumers that work in hours (`computeMuscleRecovery` reads
+  `ws.startedAt.getTime()`), and for a physiological window that is *more* correct than a calendar
+  day. A sweep that greps the pattern and files all 12 files mostly false positives.
+- **The five that produce a calendar day:**
   ```
-  Both compare a **server-stamped** date to a **client `DEFAULT_TZ`** date. Measured: server stamps
-  `dataDate: 2026-08-19` for a `Pacific/Kiritimati` user; the client compares `2026-08-18`; the guard
-  is **false** and stays false while the user's local date differs from Brisbane's.
-- **How much of the day.** Two zones whose offsets differ by Δ hours have different calendar dates for
-  |Δ| hours out of 24. Brisbane is UTC+10 → a New York user (UTC−4 in summer) is Δ=14, so the guards
-  are false **14 hours a day**. Kiritimati is Δ=4.
-- **Confirmed against a live response** with a real `body_metrics` row planted on the user's true today:
+  lib/data/postgres/adapter.ts:1710   toAestDay(new Date(Date.now() - 14 * 86_400_000), timezone)
+  lib/data/postgres/adapter.ts:1722   toAestDay(new Date(Date.now() - 86_400_000), timezone)
+  lib/achievements.ts:50              formatInTimeZone(new Date(Date.now() - 86_400_000), tz, 'yyyy-MM-dd')
+  packages/shared/src/ai-periodization/signals.ts:197
+                                      toAestDay(new Date(Date.now() - 24 * 3_600_000), tz)
+  app/api/progress-summary/route.ts:31
+                                      formatInTimeZone(new Date(Date.now() - 7*24*60*60*1000), tz, 'yyyy-MM-dd')
   ```
-  server today row date : 2026-08-19  (steps 7777)
-  client todayInTz()    : 2026-08-18
-  isBodyMetadataFresh   : False
+- **Measured in `America/New_York` across the 2026 transitions:**
   ```
-- **What each call site then does:**
-  - `app/session-select/session-select-content.tsx:514` — `if (!isBodyMetadataFresh(data)) return;` is
-    an **early return** and `setMetaLoading(false)` is below it, so **the loading state never clears**.
-  - `app/health/health-content.tsx:194` — today's metrics and active energy are set *inside* the
-    guard, so the Health screen's today values stay blank while the data sits in the response.
-  - `components/workout-screen.tsx:324-326` — `freshExercises` rewrites every exercise to
-    `loggedTodayInSession: false`, so the workout screen shows everything as not-yet-logged today.
-  - `app/workout-select/workout-select-content.tsx:31` — the "Trained today" badge never appears.
-- **The clearest illustration in the codebase**, two adjacent lines inside
-  `getLastTrainedLabel(session, tz)`:
-  ```ts
-  if (isWorkoutDataToday(data) && …) return "Trained today";   // :31  DEFAULT_TZ
-  const todayKey = dayKeyInTz(tz, 0);                          // :32  the user's tz
+  ok             local 2026-03-08 00:30   now-24h → 2026-03-07   true yesterday 2026-03-07
+  ok             local 2026-11-01 00:30   now-24h → 2026-10-31   true yesterday 2026-10-31
+  ** MISMATCH ** local 2026-11-01 23:30   now-24h → 2026-11-01   true yesterday 2026-10-31
   ```
-  The user's timezone is already a parameter of that function. One line uses it; the line above cannot,
-  because the helper takes no `tz`.
-- **Fix shape:** give the helpers an optional `tz` and pass `useUserTimezone()` at every call site —
-  about a dozen edits, **no behaviour change for a Brisbane user**, and it removes the whole
-  compare-server-date-to-client-date class. Give `cachedFetchToday`/`unwrapToday` the same treatment
-  for consistency, but note they are **not** broken: their envelope date is client-written and
-  client-read, so they are self-consistent (mislabelled — they hold "Brisbane-today" data). Do not
-  file that as the same defect.
-- **Lane B owns this** (`lib/sqlite/cache.ts` is shared, but every call site is Lane B surface —
-  claim `lib/sqlite/cache.ts` in the baton before starting).
+  On the **25-hour fall-back day**, in its last hour, `now − 24h` lands on **today**.
+- **What the three "yesterday" sites then do:** `adapter.ts:1722` drops yesterday's row from
+  `getOuraDailyDerived`'s range (an AI-dynamic prescription input); `achievements.ts:50` breaks a
+  streak-continuity comparison; `signals.ts:197` feeds the periodization signal chain.
+- **Fix shape:** `shiftDateStr(todayInTz(tz), -1)` for the three, `-14` and `-7` for the other two.
+  `shiftDateStr` (`packages/shared/src/date-utils.ts:154`) does the arithmetic on the date string with
+  `Date.UTC` overflow normalisation — what the rule asks for — and
+  `lib/data/postgres/slices/oura.ts:1182` **already uses exactly this shape**. Nothing new is needed.
+- **Q-477 is what makes this reachable at all** — the Profile timezone setting and its auto-detect
+  button are how a user ends up in a DST zone. Same family; neither is urgent.
+- **Lane A owns this** (`lib/data/**`, `packages/shared/**`, `app/api/**`).
+- **Not verified:** the mismatch was measured with `date-fns-tz` directly, not by driving the app with
+  a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
+  but not Postgres's). The consequence at each call site is read from source.
+
+### [nutrition][app-shell] Q-490 — two memos are pure decoration: every keystroke in the meal-plan sheet re-renders every meal row
+
+- **Branch:** `fix/meal-macro-bars-stable-props`
+- **Added:** 2026-08-18 · review sweep (render discipline) ·
+  [`docs/reviews/2026-08-18-memo-stability-audit.md`](reviews/2026-08-18-memo-stability-audit.md)
+- **Placement:** low-mid. A **performance** issue, not correctness, on one sheet — but it is the exact
+  failure `CLAUDE.md` documents, the memo is currently doing nothing, and the fix is small.
+- **Lead with the good news: 64 of 66 memos hold.** Every `memo(...)` declaration was collected and
+  every JSX call site scanned for an inline arrow/object/array in its props. **No inline arrows exist
+  anywhere.** Only these two are defeated, both from one module, both by the same prop.
+- **What.** `components/nutrition/meal-macro-bars.tsx:58,83` export `MealMacroBars` and
+  `DayMacroTotals` wrapped in `memo(...)`. Every call site passes a **fresh object identity**:
+  ```
+  meal-plan-review-step.tsx:132   <DayMacroTotals target={{ … }} />
+  meal-plan-review-step.tsx:212   <MealMacroBars  target={{ … }} />   ← inside variant.meals.map(...)
+  meal-plan-edit-sheet.tsx:236    <DayMacroTotals target={{ … }} />
+  meal-plan-edit-sheet.tsx        <MealMacroBars  target={{ … }} />   ← inside variant.meals.map(...)
+  ```
+  `memo`'s shallow compare always fails, so both re-render unconditionally.
+- **Why it matters here specifically:** `meal-plan-edit-sheet.tsx` holds **9 `useState` hooks**
+  including per-keystroke handlers (`onChange={e => setInstruction(e.target.value)}`,
+  `setRenameText`), and `MealMacroBars` renders inside `variant.meals.map(...)`. **Every keystroke in
+  the rename or instruction field re-renders every meal row's macro bars** — precisely what the memo
+  was added to prevent.
+- **Fix shape:** hoist the object out of JSX with `useMemo` keyed on the four target values, **or**
+  change the props to four scalars, which removes the class instead of working around it. **Prefer
+  scalars for the per-meal site** — a `useMemo` there would need one memo per row, which is worse than
+  not having the object at all.
+- **Also worth correcting in the same PR:** `CLAUDE.md`'s rule says *"both long-standing memos in the
+  codebase were defeated exactly this way"*. There are now **66** memoised components, not two. The
+  rule is right and stays; the parenthetical is an old count that reads as though memoisation is rare
+  here, which would discourage adding one. Same class as **Q-480**.
+- **Lane B owns this** (`components/nutrition/**`).
+- **Not verified:** static analysis. **No render counts were measured** — the claim follows from object
+  identity and React's shallow compare, not a profiler run. The call-site scan matches JSX elements
+  that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
+  children in its props could be missed; the 66 declarations are exhaustive.
+
+### [activity][platform] Q-556 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
+
+- **Branch:** `fix/activity-log-delete-affected-rows`
+- **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
+  [`docs/reviews/2026-08-18-cross-user-isolation.md`](reviews/2026-08-18-cross-user-isolation.md)
+- **Placement:** low. **Not a leak — verified, not assumed.** As user B, deleting user A's activity
+  log returns `200 {"success":true}`; the database immediately after shows the row **intact**,
+  `deleted_at` NULL, still owned by A, A's count unchanged. The scoping is deliberate and already
+  tested (`repository-ownership-scoping.test.ts:326`).
+- **The route cannot report what happened.** `deleteActivityLog(userId, id): Promise<void>` returns
+  nothing, so the handler `await`s it and answers `{ success: true }` unconditionally.
+- **Why file it anyway:**
+  1. **Inconsistent with every sibling.** The house posture — verified by an enumeration control in
+     the same run — is **404 for both a nonexistent id and someone else's**. This route is **200 for
+     both**. Both are safe against enumeration, but they cannot both be the convention.
+  2. **Offline-first makes a false success expensive.** A queued mutation receiving a 2xx is confirmed
+     and dropped from the outbox, so a delete that matched zero rows *for a different reason* (sync
+     ordering; row not yet on the server) is indistinguishable and gets confirmed away.
+     **⚠️ That path was NOT demonstrated** — it is why the response matters, not an observed bug.
+  3. Same family as the existing rule *"after a user-scoped UPDATE whose row id came from the client,
+     check the affected-row count"*, applied to a DELETE.
+- **Fix:** return the affected-row count from `deleteActivityLog`; answer 404 when zero, matching siblings.
+- **✅ Everything else held.** 10 of 11 probes rejected by the route's own ownership check — A's recap/
+  energy/timing, deleting A's workout, logging a set **into A's session**, completing A's workout.
+  **The enumeration control passed:** nonexistent and A's ids return byte-identical responses.
+- **Not exercised:** `PATCH /api/activity-logs/<id>/metrics` returned `400 Invalid body` (my payload was
+  wrong), so that route's ownership check is **still unverified**. Local DB + web build; not production,
+  not on device; two accounts only — says nothing about admin-vs-user boundaries.
+
+### [app-shell][platform] Q-555 — offline, a tab tap is a silent no-op until the service worker claims the page
+
+- **Branch:** `fix/offline-first-load-navigation`
+- **Added:** 2026-08-18 · review sweep (offline read surfaces, driven for real) ·
+  [`docs/reviews/2026-08-18-offline-read-surfaces.md`](reviews/2026-08-18-offline-read-surfaces.md)
+- **Placement:** low. Narrow by construction — needs a first-ever load (or a cleared worker) plus
+  connection loss inside that window, and it self-heals on the next load.
+- **⚠️ Lead with the good news, because three of four results here are positive.** Both offline paths
+  **work** once the worker is in control: a full reload serves the precached `/offline` page verbatim,
+  and an offline tab tap navigates and paints **2515 chars against 2486 online (~101%)** with no
+  offline page and no skeleton. The offline-first design delivers.
+- **The defect is the uncontrolled window.** Measured:
+  | State | Offline tab tap |
+  |---|---|
+  | `controller: true` | navigates, paints ~101% of cached content |
+  | `controller: false` | **URL unchanged, no navigation, no offline page, no feedback at all** |
+- **The uncontrolled state is the first-ever page load** — the worker registers *during* that
+  navigation and claims only afterwards. So a genuine first session that loses connection inside that
+  window gets a tab bar where taps do nothing and nothing explains why.
+- **Why file something this narrow:** the symptom (*a tap that does nothing, silently*) is
+  indistinguishable from a frozen app, and on the APK the service worker **is** the offline cold-start
+  mechanism — so install day is exactly when a new user is most likely to be moving between networks.
+- **Not diagnosed:** whether the no-op is Next's router aborting a failed RSC fetch or the click
+  handler swallowing it. That needs the router's internals, not another probe.
+- **Not exercised — and this limit is load-bearing:** web build only. On web `cachedFetch` falls back
+  to `localStorage`, so what was verified is the **seed** path, **not** the native SQLite local store
+  that is the real source of truth on the APK. Re-check the first-load window **on device**, where the
+  worker's install timing and the WebView lifecycle differ.
+
+### [platform] Q-554 — the orientation indexes named paths that do not exist, including a module that was never built
+
+- **Status: FILED AND FIXED in the same PR** (docs + a new CI check, Custom Rules now **42 of 42**).
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-orientation-index-paths.md`](reviews/2026-08-18-orientation-index-paths.md)
+- **The gap.** `scripts/check-claude-md-paths.js` guards `CLAUDE.md` for the reason in its header —
+  *"a wrong path in a rulebook is worse than a wrong path in code: nothing compiles it, so it rots
+  silently and is copied confidently"* (Q-153). Sessions are also told to read `docs/module-map.md`
+  before building any shared helper and `docs/domains/<pillar>/README.md` before working in a pillar.
+  **Nothing checked either.**
+- **⚠️ `docs/module-map.md:232` carried a row for a module that has never existed.**
+  `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket(cols27)`: **zero references to either in
+  the whole tree.** What exists is the row twenty lines below — `lib/oura-models/steps-motion-decoder.ts`
+  → `runStepsMotionDecoder(input)`, golden-verified and described there as **"NOT yet wired"** into the
+  BLE decode or the step pipeline. So row 232 described *that wiring*, in the present tense, in a table
+  whose stated purpose is **"what already exists and where … to stop new work re-implementing
+  infrastructure the app already has."** It produced both errors at once: someone looking for the
+  decoder finds nothing, someone checking whether the wiring is done reads that it is.
+- **Three stale domain-index rows:** `workouts` listed a UI route `app/history/` (gone — history renders
+  via `components/exercise-history-sheet.tsx`), `devices` listed `docs/oura-models/` (no such dir; the
+  ops reference is `docs/oura-ble-operations.md`), `app-shell` listed `app/overview/` (no such route).
+- **49 malformed display paths.** Every domain index rendered history links as
+  `` `docs/../overview/history-…md` `` — **link target correct, visible label wrong** (`docs/../overview/`
+  normalises to `overview/`, which does not exist). Fixed across all eleven; link targets untouched.
+- **The check:** `scripts/check-index-doc-paths.js` — **748 paths across 12 docs**. Deliberately
+  narrower than its sibling: root-anchored backticked paths only; globs/ellipses/templates skipped; a
+  path named *while saying it is gone* needs a `DELIBERATE` entry with a reason.
+- **⚠️ Those narrowings were earned, not designed.** The first pass reported **59 of 787**, all but four
+  being relative fragments, globs, or the display-path bug. **And the fixes then re-triggered the
+  check** — writing *"there is no `app/overview/` route"* names the path in backticks just as surely as
+  claiming it exists. Four `DELIBERATE` entries now carry their reason.
+- **Not exercised:** existence only. The check does **not** verify that the description beside a path is
+  accurate — row 232 was caught only because its path was wrong too. A row naming a real file while
+  describing behaviour it does not have still passes.
+
+### [platform] Q-553 — a Known Issue was in both the live list and the resolved archive; nothing checked
+
+- **Status: FILED AND FIXED in the same PR** (docs + a new CI check). Kept as the record of the class.
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-known-issue-duplication.md`](reviews/2026-08-18-known-issue-duplication.md)
+- **The invariant nothing enforced.** `CLAUDE.md`: *"Striking a Known Issue means MOVING it … Cut the
+  entry whole, append it to the archive, **leave nothing behind**."* Two entries were in both lists.
+- **Q-139 — `🔴 OPEN` live and `✅ fixed` archived, for ten days.** `projectOverview.md` carried 69
+  lines describing the bug as unfixed while the archive recorded it fixed 2026-08-08 in v1.270.25.
+  **Every session's mandated orientation read showed a red, highest-severity open issue for a
+  ten-day-old fix.** Both halves verified fixed **in source**, not taken on the archive's word — the
+  backstop the live row called still-open is closed at
+  `packages/shared/src/health/step-estimate.ts:176`, whose comment names Q-139.
+- **Q-81 — a byte-identical 31-line entry in both files.** A pure copy.
+- **⚠️ Both were also archived *early*.** `CLAUDE.md` says only move when nothing is owed, *including a
+  pending device check* — and both entries say one is outstanding (Q-139: not verified on device;
+  Q-81: whether the model fits the owner's real data). So the mistake was two-part: **copied rather
+  than moved, and moved before it was allowed.**
+- **Applied here:** cut the premature archive copies and kept the live entries (the conservative
+  direction — the live list is what everyone reads and where an owed check belongs). Q-81's copy was
+  identical so nothing was lost; Q-139's unique material was folded into the live entry first, and its
+  stale 69-line `🔴 OPEN` body replaced with a compact `⚠️ FIXED, not verified on device` row.
+  `docs/domains/activity/README.md` had the same stale claim (*"needs one owner decision"*, which had
+  been made) — updated.
+- **The check:** `scripts/check-known-issue-duplication.js`, now step **41 of 41** in Custom Rules.
+  **Its first version reported 4 and only 2 were real**, so two narrowings are written into its header:
+  a heading's identity is its **first** Q number (an archive heading may name a second issue in
+  passing), and **range headings are skipped** (a batch row spanning `Q-63…Q-69` overlapping one
+  archived member is a stale range wanting a human, not a red build).
+- **Not exercised:** static reconciliation. Q-139's own outstanding item is an on-device check after the
+  next history drain, and Q-81's needs production — neither possible here.
+
+### [platform] Q-552 — two sources of truth for the next Q band; the prose one was wrong
+
+- **Branch:** `docs/q-block-ledger-procedure` · **(fixed in the same PR that filed it — see below)**
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md)
+- **Placement:** already actioned; kept as the record of *why* the procedure changed.
+- **The near-miss.** Review's band 450–499 was exhausted by Q-499. `docs/agents/README.md` says
+  *"claim the next block of 50 above 529"* — which literally gives **530–579** and collides with
+  **fourteen numbers already in use**. The predecessor baton had already written 530–579 into the
+  handover, so the next session would have taken it.
+- **The ledger recorded 530–537, 538–542 and 543. `544–551` were also live** — across
+  `docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
+  `docs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
+  `docs/domains/devices/README.md` and this backlog — and appeared nowhere in it.
+- **⚠️ Correction to the first draft of this entry, which said the ledger is "the only defence". It is
+  not, and the truth is more interesting — there are TWO sources for the same fact:**
+  | Source | Said | Status |
+  |---|---|---|
+  | this file → *Live pointers* → "Next unallocated Q band" | **552** | ✅ correct, **CI-enforced** by `scripts/check-backlog-pointers.js` |
+  | `docs/agents/README.md` prose ledger + "next block of 50 above 529" | **530** | ❌ stale — omitted 544–551 |
+  The machine-checked pointer was right the whole time. **The collision was reachable only by
+  following the README's prose instruction** — which is what the README tells you to do, and what the
+  Review baton had already copied.
+- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
+  with *"Q-552 is in use but the next unallocated band starts at 552 — a band was used without being
+  recorded."* It caught this in the same PR.
+- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
+  count in a script is a fact* — and the first where the checked copy was silently **right** while the
+  prose copy was silently **wrong**.
+- **Fixed in this PR:** claimed **552–601**, recorded **544–551** retroactively, bumped the pointer to
+  **602**, and pointed the instruction at the checked source — *read the "Next unallocated Q band"
+  pointer, not the prose list; then record your block in both.*
+
+### [app-shell][health] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
+
+- **Branch:** `fix/card-fetch-error-states`
+- **Added:** 2026-08-18 · review sweep (three lenses) ·
+  [`docs/reviews/2026-08-18-silent-card-failures.md`](reviews/2026-08-18-silent-card-failures.md)
+- **Placement:** low-medium. Cosmetic in the common case. The sharp edge is diagnosability: a
+  rate-limited or erroring card is **indistinguishable from an empty one**, which makes an owner
+  report of *"the card is gone"* unanswerable.
+- **⚠️ One correction to `CLAUDE.md`'s premise.** The rule says `cachedFetch` *"swallows `!res.ok`"*.
+  It does **not** unconditionally — `cachedFetchCore` accepts
+  `onError?: (info: CacheFetchErrorInfo) => void`. It swallows *unless the caller opts in*. That makes
+  this a **coverage** problem with an existing mechanism, not a missing capability, and the rule's
+  wording should name `onError` so the next reader knows the hook is there.
+- **Adoption:** 78 components call `cachedFetch`; **18 reference `onError`** — an upper bound, since
+  some are unrelated matches (`components/ai/code-block.tsx`, `components/ai/response.tsx`).
+- **Verified by hand, two instances:**
+  - `components/health/hr-recovery-profile-card.tsx` — `cachedFetch` at :48 with no `onError`, then
+    `:57 if (!profile || profile.bands.length === 0) return null`. `profile` stays `null` on failure,
+    so a failed request and an empty profile render identically.
+  - `components/health/strength-progress-card.tsx` — `:36 ).catch(() => {})` (the smell `CLAUDE.md`
+    names), then `:40 if (withData.length === 0) return null`.
+- **Scoped honestly:** a crude filter produced **12** candidates; **2 were verified**. The other ten
+  are a **worklist, not a defect count** — several `return null` paths there are legitimate empty
+  states, and telling them apart needs per-file judgement.
+- **Why it matters more than it looks:** `cachedFetch` treats **any** `!res.ok` alike, **including a
+  429 from the app's own rate limiter**. A user who trips a limit watches health cards vanish instead
+  of seeing "try again in a minute", and the same silence covers a 500. Offline it is worse —
+  `cachedFetch` cannot revalidate at all.
+- **Fix:** pass `onError` and render a compact error state. In-repo references that already do it:
+  `components/health/observed-hr-card.tsx`, `components/workout/workout-load-error.tsx`. Amend the
+  `CLAUDE.md` wording in the same PR.
+- **✅ REPRODUCED 2026-08-18 (sweep 34) —
+  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md).**
+  Forced `/api/weights-summary` to 429 by Playwright route interception at the S25 viewport:
+  **`Estimated 1RM` went from 1 node at baseline to 0 under the 429, with no error wording anywhere on
+  the page.** **The control holds** — blocking a *different* endpoint (`/api/oura/stats`) in the same
+  harness left it at 1, so the disappearance is caused by blocking that card's own endpoint, not by
+  the interception. (`Ring Status` is **inconclusive**, not clean: absent at baseline too.)
+- **⚠️ The vanish is invisible on a warm cache and appears on a cold one.** A repeat visit paints the
+  seeded value and the failed refresh is silent; a first visit has no seed and the card is gone. So
+  the person most likely to hit it is opening the app fresh, and least likely to reproduce it a minute
+  later — which makes *"the card is gone"* **intermittent-looking**, inviting the "can't reproduce"
+  dismissal that `CLAUDE.md`'s report-invalidation rule exists to prevent.
+- **A paste-ready reproduction spec is in the review doc.** Deliberately not committed as a test: it
+  asserts the *correct* behaviour and is red today, so it belongs in the fix PR, not before it.
+- **Still not exercised:** on device (APK WebView + native local store) and offline, where
+  `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
+  worklist.
+
+### [platform] Q-498 — three unauthenticated routes buffer an unbounded request body; one parses it before any check
+
+- **Branch:** `security/body-size-guard-coverage`
+- **Added:** 2026-08-18 · review sweep (request-body size guards) ·
+  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](reviews/2026-08-18-unbounded-request-bodies.md)
+- **Placement:** medium. No data exposed or corrupted — memory/CPU amplification on unauthenticated
+  endpoints. Ranked above ordinary because the ingest route does the work before *any* check, and
+  because **Q-493 removes the rate bound that would otherwise contain it**.
+- **The shared guard is correct and is not the defect.** `readJsonLimited` treats `Content-Length` as a
+  fast path and streams with a real byte counter, cancelling on overflow. Measured: a 20 MB body to
+  `/api/client-error` (16 KB cap) was **cut off at 2,949,120 bytes**.
+- **Coverage:** 113 route files export `POST`/`PUT`/`PATCH`; **7** use `readJsonLimited`; **93** use bare
+  `req.json()`. Of those 93, **exactly 3 are reachable without a session**: `auth/register`,
+  `auth/exchange-mobile-token`, `health-connect/ingest`. **The seven guarded routes are all *less*
+  exposed than these three.**
+- **Measured**, same 20 MB body: `auth/register` and `health-connect/ingest` each accepted the **full
+  20,000,048 bytes** and then returned 400 — read, buffered and parsed before deciding they did not
+  want it.
+- **⚠️ Ordering separates them, and one is much worse.** `auth/register` (limiter line 9, parse line 13)
+  and `exchange-mobile-token` (8 / 12) rate-limit **before** parsing, so the rate is bounded even with
+  no size cap. **`health-connect/ingest` reads at line 35 and Zod-parses at 40, but rate-limits at 53
+  and checks the secret at 58** — an unauthenticated caller **holding no secret** makes the server
+  buffer and fully parse an arbitrary body, and the limiter cannot throttle it because it runs after.
+- **Fix — two changes, the second matters more:**
+  1. Route the three through `readJsonLimited`. Coverage, not design; the helper exists and 7 routes
+     already use it.
+  2. **On `health-connect/ingest`, move the rate limit and secret compare above the body read.**
+     Independent of the size guard, and the larger win: it converts "anyone can make us parse
+     anything" into "only a caller past the gate can". Needs `secret` moved out of the body (to a
+     header) to do cleanly — a small shape change worth making.
+- **The other 90 all require a session**, which is a real mitigation at this user count and is why the
+  finding is scoped to 3 rather than 93. Recorded because that exposed set grows with the user base if
+  registration ever opens up, not with the code.
+- **Not exercised:** the actual ceiling was **not** probed — 20 MB proved there is no cap and going
+  further risked destabilising the server for no extra information. Railway's edge may impose its own
+  request-size limit, which would reduce practical exposure; not checked.
+
+### [platform] Q-497 — a 31-day range that passes every guard makes two admin routes loop forever
+
+- **Branch:** `fix/shift-date-str-year-padding`
+- **Added:** 2026-08-18 · review sweep (admin date-range routes) ·
+  [`docs/reviews/2026-08-18-admin-range-loop-termination.md`](reviews/2026-08-18-admin-range-loop-termination.md)
+- **Placement:** medium. **Admin-only** — a session cookie or the `ADMIN_EXPORT_SECRET` bearer — so
+  not an unauthenticated vector. Weigh it as *"one mistyped year takes the app down"*, not an attack.
+- **The defect.** `for (let d = start; d <= end; d = shiftDateStr(d, 1))` compares **strings**.
+  `shiftDateStr` builds its year from `getUTCFullYear()` with **no width padding** (month and day both
+  get `padStart(2,'0')`; the year is the one field without it), so one day after `9999-12-31` is
+  `10000-01-01` — and `'10000-01-01' <= '9999-12-31'` is **true**, because `'1' < '9'`.
+- **Every guard passes on the way in** for `from=9999-12-01&to=9999-12-31`: `normalizeDateParamIso`
+  accepts both, `end < start` is false, and the span is **31 — exactly `MAX_RANGE_DAYS`**.
+- **Measured**, replicating the loop verbatim:
+  ```
+  iter 31 d = 9999-12-31
+  iter 32 d = 10000-01-01     <-- should have exited here
+  ...still looping at iteration 5000 d = 10013-08-08
+  CONTROL (2026-08-01..31): 31 iterations — terminates correctly
+  ```
+  It exits only once the year reaches five digits starting with `9` — ~80,000 years, ~29M iterations.
+  Each is a `buildDayAudit`, which the route's own comment puts at **~12 queries**, against a
+  `max: 10` pool.
+- **The irony is the comment directly above the loop:** it explains the days run sequentially rather
+  than concurrently because fanning out *"would starve the rest of the app (the failure mode that took
+  production down in session 165)"*. The sequential loop avoids that — and then never stops.
+- **Two sites, and the second one writes.** Three loops use `shiftDateStr` as the increment:
+  `admin/day-review:118` ❌ (read-only), `admin/backfill-derived-scores:80` ❌ (**identical guards,
+  identical loop, and `dryRun=false` commits** — an unbounded write, not just a hang),
+  `lib/health/energy-balance-service.ts:152` ✅ safe (start is derived by shifting *back* from the
+  user's today, so it cannot reach the boundary).
+- **Fix — not a year bound, that treats the symptom.** Pad the year in `shiftDateStr`
+  (`padStart(4,'0')`), the single place that produces the malformed value: it fixes both call sites at
+  once and is the one-formula-one-place answer. Cheap belt-and-braces: an iteration cap of
+  `MAX_RANGE_DAYS` in both loops, so a future ordering bug degrades to a truncated response, not a hang.
+- **Not exercised:** the loop was reproduced verbatim in isolation rather than by hitting the route —
+  deliberately, since driving it against a running server *is* the hang and the point was proven.
+
+### [devices][platform] Q-493 — the ingest brute-force gate is bypassed by rotating one request header (7 sites)
+
+- **Branch:** `security/client-ip-from-trusted-hop`
+- **Added:** 2026-08-18 · review sweep (secret-gated ingest, driven for real) ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement: high.** It defeats a mitigation (SEC-I3) written specifically to stop this, on the
+  **only unauthenticated write into `body_metrics`**, and the same pattern guards the bearer path to
+  the owner's full health history.
+- **The defect.** Every limiter keys on `x-forwarded-for`'s **leftmost** hop — the value the *client*
+  supplied (a proxy appends its peer to the right). The caller therefore chooses the rate-limit key.
+- **Measured**, 30 wrong-secret attempts each way, limit 20/60 s. Both return 401 throughout (by
+  design), so the observable is `rate_limits`:
+  - **fixed** `X-Forwarded-For` → **1 key, count 20** — gate engaged, 10 attempts blocked.
+  - **rotating** → **30 keys, count 1 each** — **all 30 reached the secret compare.**
+- **Seven sites:** `health-connect/ingest`, `admin/day-review` (bearer → full health history),
+  `admin/db-query` ×2, `auth/register`, `auth/exchange-mobile-token`, `status`.
+- **Nothing in the docs records this, and the R1 security-hardening plan *propagated* it** — the
+  `status` route was added keyed by `x-forwarded-for` *"matching the existing pattern in
+  `auth/register` and `auth/exchange-mobile-token`"*.
+- **⚠️ Not verified:** whether Railway's edge proxy sanitises the header before the app sees it. Not
+  determinable from the sandbox, and probing production's limiter was not done unasked. The
+  code-level bypass is proven; production exploitability turns on that one unknown. **The fix does
+  not depend on it** — the leftmost hop is untrustworthy under the header's own semantics regardless.
+- **Fix:** one shared helper deriving the client IP from the **rightmost** hop or a configured
+  trusted-proxy count — the treatment `safeCompare` already has. Seven call sites should not each
+  re-decide this.
+
+### [devices][body] Q-494 — a far-future ingest date permanently captures every "most recent" read
+
+- **Branch:** `fix/ingest-date-range-bounds`
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement: high.** Single request, permanent, silent, and it corrupts a value feeding the scale
+  pipeline and every activity-calorie estimate.
+- **Measured.** The regex bounds the date's shape, nothing bounds its range:
+  ```
+  before: getMostRecentConfirmedWeightKg -> 2026-08-18, 81 kg
+  POST {"date":"9999/12/30","weightKg":499} -> {"success":true}
+  after:  getMostRecentConfirmedWeightKg -> 9999-12-30, 499 kg
+  ```
+  `ORDER BY date DESC LIMIT 1` answers **499 kg until the year 9999**; no later write can outrank it.
+  Two readers use that shape: `getMostRecentConfirmedWeightKg` (BLE-scale confirmation) and
+  `deriveActivityKcal` (multiplies body weight into activity calories).
+- **The ranked source merge cannot help, and the reason is worth keeping.** `health-source.ts` ranks
+  per **column, per date** — it stops a worse source overwriting a better one *on the same day*. A row
+  on a date nothing else ever writes has no competitor, so rank 1 (`health_connect`, the lowest) wins
+  outright. The documented protection is orthogonal to this, not weak against it.
+- **⚠️ This is not a novel class — it is the one ingest path that never got the fix its siblings have.**
+  `packages/shared/src/validation/ingest-clock.ts` already exists for exactly this
+  (`INGEST_PAST_TOLERANCE_MS` 7 d, `INGEST_FUTURE_TOLERANCE_MS` 60 s, `resolveMeasuredAt`), and the
+  workout path has its own parallel guard `resolveCompletedAt` from **Q-24 §7** — whose comment says
+  `completedAtMs` *"was accepted unbounded and uncompared"*, the same sentence that describes `date`
+  here. Coverage: `scale-ble/samples` ✅, `oura-ble/samples` ✅ (downstream, via `step-day-buckets.ts`),
+  `complete-workout` ✅, **`health-connect/ingest` ❌ — none, anywhere in its chain.** The
+  sibling-surface rule was missed twice: once when `resolveMeasuredAt` was written, once at Q-24 §7.
+- **Fix:** route the ingest date through the existing **`ingest-clock`** module rather than adding a
+  bespoke range check — the one-formula-one-place answer, and it inherits the reconcile-don't-reject
+  behaviour the other paths chose (`resolveCompletedAt`'s comment argues that case and it applies
+  verbatim: a 400 would quarantine the outbox mutation and lose a real reading over a bad clock).
+  **Caveat:** `resolveMeasuredAt` takes an *instant*, this route takes a *calendar date* in the user's
+  timezone — the bound belongs on the resolved date against the user's today, not on a UTC instant.
+- **Wider lens, checked:** 10 `desc(...).limit(1)` "latest X" readers exist; the other 9 read
+  server-derived or device-monotonic columns, and `workoutSessions.completedAt` — the one that *was*
+  exposed — is now guarded. **`bodyMetrics.date` is the only unguarded one.**
+
+### [devices] Q-496 — a regex-passing but invalid ingest date returns 500 and writes an `error_events` row
+
+- **Branch:** `fix/ingest-date-semantic-validation`
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement:** medium. Needs the secret, so not an open spam vector — but it makes the fault table
+  every session is required to read less trustworthy.
+- **Measured:** `2026-13-45`, `2026-02-31`, `0000-00-00` each → **HTTP 500** plus an `error_events`
+  row (`[pg 22008]`). The regex accepts any `\d{4}[-/]\d{2}[-/]\d{2}`, so month 13 and day 45 pass
+  validation and fail at the driver.
+- **This is the class `normalizeDateParam` exists to prevent.** `CLAUDE.md` lists the routes
+  retrofitted with that guard; this one is not among them. A client input error is being recorded as a
+  server fault.
+- **Fix:** route the param through `normalizeDateParam` and return 400. Shares a location with Q-494.
+
+### [devices] Q-495 — `z.coerce.number()` launders `[]`, `true` and `""` into stored readings
+
+- **Branch:** `fix/ingest-no-coercion`
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
+- **Placement:** low. Needs the secret, writes at the lowest rank, and produces implausible rather
+  than dangerous values.
+- **The route's own comment is accurate about what it tested and silent about coercion.** It says the
+  bounds *"reject clearly-garbage values (a stringified `75kg`, a 1e308 double)"* — **both named
+  examples are indeed rejected.** Three unnamed ones are not: `"steps":[]` → **0**, `"steps":true` →
+  **1**, `"weightKg":""` → **0 kg**. Each landed in `body_metrics` stamped `health_connect`; a 0 kg
+  body weight is in range for `.min(0)`.
+- **Fix:** `z.number()` rather than `z.coerce.number()` (Tasker sends real JSON numbers), or reject
+  non-primitive input before the bounds. Give body weight a plausible floor, not zero.
+
+### [platform] Q-492 — seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current
+
+- **Branch:** `docs/claude-md-counts-cite-the-command`
+- **Added:** 2026-08-18 · review sweep (documentation self-maintenance) ·
+  [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](reviews/2026-08-18-claude-md-prose-counts.md)
+- **Placement:** medium. Docs-only and cheap, but `CLAUDE.md` is the file every session reads before
+  it may start, so a wrong number there is read by five concurrent agents before any code is touched.
+- **The measurement.** Every checkable count in the file, re-derived against `main` at `63fb89c`:
+  - **Script-backed: 3 of 3 current** — sparkline (3 inline / 6 exempt), `Ran 40 of 40` custom rules,
+    the rollup vitest glob.
+  - **Prose: 7 of 9 stale** — hex literals **471 → 428**; the >800-line hotspot list still names
+    `more/profile-tab.tsx` (**476 lines**); `health-sections.tsx` 795 → **777**; the script glob
+    "22 of 33" → **29 of 40**; `READINESS_SCORE_TTL` "four sites" → **6**; suite "448 files" →
+    **504**; the nine chevron paths (already Q-491). Two prose counts *are* right (score-band 17,
+    "11 inline grep rules") — the correlation is strong, not absolute, and is recorded that way.
+- **Two items that are more than drift:**
+  - `more/profile-tab.tsx` **should already have been struck** — the same paragraph mandates removing
+    a hotspot that drops under the line, and cites `health-sections.tsx` being removed on 2026-08-09
+    for exactly that. The procedure was followed once, then not again.
+  - **The rollup-glob maintenance command cannot detect what it is for.** `CLAUDE.md:976` says keep
+    the glob in step with `grep -rl aggregateOuraRawSamples lib/data/postgres/__tests__/`, to catch
+    "a new rollup test outside it". But it is scoped to the directory the glob covers, so it can only
+    confirm the glob against itself; and `grep -l` matches comments (it reports two files that never
+    call the function). **Both defects are latent** — no test outside the glob actually calls the
+    rollup today. Nothing is mis-timed; the procedure just would not fire when needed.
+- **One ratchet with slack.** `check-component-size.js` is shrink-only; four baselines are exact,
+  `components/workout-screen.tsx` is pinned at **1850** against an actual **1831** — 19 lines of
+  regrowth that would pass silently.
+- **The fix is not "correct the seven numbers"** — that resets the decay clock for about a week. For
+  each count, **cite the command or delete the number and keep the rule**. The file already contains
+  the model, in its own sparkline paragraph: *"Don't hand-count from `grep -rn '<polyline'`; run
+  `node scripts/check-sparkline-primitive.js`, which is the maintained list."* `check-hex-literals.js`
+  and `check-component-size.js` both already print their own totals.
+- **Scope:** `CLAUDE.md` (rewrite each count as a command citation); optionally lower the
+  `workout-screen.tsx` baseline to 1831 and broaden the rollup grep to repo-wide + call-site-aware.
+- **Not exercised:** static verification only, no runtime or device.
+
+### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
+
+- **Branch:** `fix/aria-expanded-collapsibles-ratchet`
+- **Added:** 2026-08-18 · review sweep (control semantics) ·
+  [`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](reviews/2026-08-18-aria-expanded-collapsibles.md)
+- **Placement:** low. **No known screen-reader user today.** Filed because the stated direction is a
+  **Play Store listing**, where accessibility is a review surface rather than a preference, and
+  because the recommended fix is a ratchet that removes a maintenance burden rather than adding one.
+- **Still 9, but not the same 9.** `CLAUDE.md` names a specific nine (re-counted 2026-08-09). Re-checked:
+  - **`more/profile-tab.tsx` is fixed** — 0 chevrons remain.
+  - **`components/weights-summary.tsx` has the defect and was never on the list.**
+  - `deload-explanation` and `signal-sections` **moved** (`app/session-select/components/`,
+    `app/session-explain/components/`) — the paths in the rule are stale.
+  - The other six are unchanged: `health/day-overlay-sheet`, `workout/active-workout-screen`,
+    `workout/ai-prescription-card`, `workout/added-weight-toggle`, `nutrition/meal-card`,
+    `nutrition/saved-meals-sheet`.
+- **One partially compensates:** `weights-summary.tsx` carries
+  `aria-label={collapsed ? "Expand" : "Collapse"}`, so state does reach a screen reader — just not
+  through the attribute that also expresses the control→region relationship. Better than the other
+  eight; still not the rule.
+- **Fix shape — prefer the ratchet over the sweep.** Adding `aria-expanded={isOpen}` (+ `aria-controls`
+  where the region has an id) to nine sites is easy and will drift again. `CLAUDE.md`'s own rule says
+  to prefer Radix `Collapsible`, **which supplies both attributes for free** — converting the worst
+  offenders is the better trade. Then add a Custom Rules step counting chevron collapsibles without
+  `aria-expanded`, shrink-only, so the list stops needing a human.
+- **⚠️ The pattern is worth more than the finding — third stale hand-maintained count this run:**
+
+  | Rule | Recorded | Actual |
+  |---|---|---|
+  | *"Repo day-window helpers currently hardcode `DEFAULT_TZ`"* (**Q-480**) | broken | a parameter every caller passes |
+  | *"both long-standing memos in the codebase"* (**Q-490**) | 2 | **66** |
+  | *"9 hand-rolled chevron toggles"* (this) | a specific 9 | a **different** 9 |
+
+  Every **ratcheted** count is current — hex literals, TTL divergence, component size, doc-index size,
+  backlog pointers. `CLAUDE.md` already drew this lesson for hex literals (*"recorded here as improving
+  and it was not … because this line was prose and nothing measured it"*); it applies to its own prose.
+  **A count in prose is a claim with a decay date; a count in a script is a fact.** Consider a
+  standing follow-up to replace remaining prose counts with script citations.
+- **Lane B owns this** (`components/**`, `app/**` surfaces); the ratchet script is a `scripts/` addition.
+- **Not verified: no screen-reader testing.** The claim is that the attribute is absent, not that a
+  specific announcement is wrong. Not on the APK, where TalkBack is the relevant reader.
+  `app/coach/coach-content.tsx` was examined and **excluded** — its chevron is a back button.
 
 ### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
 
@@ -512,8 +1303,11 @@ below threshold and left in place for next time.
      a shrink-only per-file baseline — same shape as `check-hex-literals.js` and
      `check-cache-ttl-divergence.js`, both of which exist because prose alone did not hold a count.
      That freezes the number at 100 and puts every future addition in a diff.
-  2. Sweep highest-visibility first: the calendar today-marker, then **Q-478** (small, and the
-     highest-damage consequence — do it before the bulk sweep), then write paths, then display.
+  2. Sweep highest-visibility first: the calendar today-marker, then write paths, then display.
+     **Q-478 is done** (2026-08-18) — the two cache today-guards now take a `tz`, and
+     `scripts/check-tz-aware-cache-guards.js` keeps every call site passing one. Its ratchet is a
+     narrower shape than step 1 asks for: it guards two named helpers, not bare `todayInTz()`.
+     Step 1 is still owed.
   **Do NOT** make `todayInTz`'s default throw or read a global — the function is shared with server
   code that passes `tz` explicitly, and a global reintroduces the ambiguity somewhere harder to see.
 - **Lane B owns the sweep** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`); the CI ratchet is
@@ -539,18 +1333,6 @@ below threshold and left in place for next time.
   after a restart.
 - **Load-bearing constraint (`CLAUDE.md`):** total connections = `max` x replicas must stay under the
   Railway connection limit, and the pool's error handler and timeouts must survive any change here.
-
-### [devices][platform] Q-550 — `oura_heartrate`: 27 MB of indexes on 6.8 MB of heap
-
-- **Branch:** `perf/oura-heartrate-index-audit`
-- **Added:** 2026-08-18 · **Lane A.** Small; the same shape as Q-534 at one-tenth the size.
-- **Measured 2026-08-18:** 34 MB total, 65,160 rows — **6.8 MB heap, 27 MB indexes**. Now the
-  third-largest table after the packing work, and indexes are 4x the data.
-- **`oura_heartrate_pkey` had zero lifetime scans** on a table that already carries a
-  `(user_id, timestamp)` unique constraint. **Re-measure before acting** — the counters reset at the
-  2026-08-17 crash, so a fresh zero means "not since recovery", not "never".
-- **Keep `oura_heartrate_user_updated` despite its zero.** Migration 130 added it for Track-B sync,
-  which is not wired yet, so its zero is expected and correct.
 
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
 
@@ -1210,6 +1992,107 @@ blocker and the intended shape were both already named, so **do not re-derive th
   against the seeded DB — no device needed to prove the sync. Only the native chip toggles need the
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
+
+### [nutrition][app-shell] Q-401 — two calorie budgets on one screen, 274 apart, and the card that explains it is suppressed
+
+- **Branch:** `feat/combine-energy-and-macro-widgets`
+- **Added:** 2026-08-18 · owner, on the Nutrition tab: *"why are these values different? should it not
+  match the nutrition goal? I was hopping we could combine these 2 widgets/displays"*
+- **Lane B** for the merge. The suppression rule in finding 3 is also Lane B (one condition in a
+  component). No schema, no route, no migration.
+
+**Both numbers are correct and they measure different things.** Traced, not guessed
+(`lib/health/energy-balance-service.ts:180-181`):
+- **Ring — "1900 left"** = `nutrition_targets.calories` (1,900) − eaten. A **fixed** goal you set
+  once. It does not move when you train.
+- **Energy Balance — "1,626 kcal left today"** = maintenance (1,826) + `CALORIE_ADJUSTMENT_BY_GOAL`
+  (**recomp = −200**, `goal-recommendation.ts:19`) − eaten. A **dynamic** budget that rises with what
+  you actually burn.
+
+1,826 − 200 = **1,626** against a set **1,900**: a **274 kcal** gap, both labelled "left", stacked one
+above the other with nothing reconciling them.
+
+**Finding 1 — the app already knows.** `driftsFromRecommendation` is
+`|currentKcal − recommendedKcal| > 100` → |1,900 − 1,626| = 274 → **true**, today, on the owner's
+device.
+
+**Finding 2 — and it is arguably telling the owner something real.** For a *recomp* goal the
+recommendation sits 200 **under** maintenance; the stored goal is 74 **over** it. Whatever the merge
+looks like, that is a fact the screen should be able to say out loud.
+
+**Finding 3 — ⚠ the only surface that explains it is gated shut exactly when it is needed.**
+`tdee-adaptation-card.tsx:44-48` requires `maintenance.source === "calibrated"`. The owner's card
+reads *"Log food on 4 more days to calibrate"*, i.e. `source === 'formula'` — so the Calorie Nudge is
+correctly hidden, and the two numbers sit there unexplained. **The gate is right for the *action* and
+wrong for the *explanation*.** Suggesting a new target off a formula-derived maintenance would move
+the user sideways with false authority — that comment is correct and should stay. Saying *why the two
+numbers differ* costs nothing and needs no calibration. **Split the condition:** explain always, offer
+to apply only when calibrated.
+
+**The merge, and the one decision inside it.**
+- **One card.** Ring and macro bars on top; energy balance as a strip beneath; the reconciliation in
+  a sentence rather than as two numbers to subtract.
+- **The ring keeps the SET goal (1,900), not the recommendation.** This is the load-bearing choice:
+  the macro grams under it (0/150 P, 0/190 C, 0/60 F) are derived from that same `nutrition_targets`
+  row. Point the ring at 1,626 while the bars still read 1,900-derived grams and the card contradicts
+  itself internally — a worse bug than the one being fixed.
+- **Energy balance keeps its zone bar**, which is the part the ring cannot express: it is the only
+  thing on the screen that accounts for what you burned.
+- **Related:** the calibration this is waiting on is what **Q-387** unblocks — until completed days
+  can be identified, `source` stays `formula` and this explanation is the only thing the user gets.
+
+- **Not in scope:** changing anyone's targets, or auto-applying the recommendation. This entry makes
+  the disagreement legible; **Q-302**'s nudge already owns the applying.
+- **Verification:** with a formula-derived maintenance and a drifting goal, the merged card must state
+  the gap and the reason. Then check the **Home** widget renders the same two figures — it shows both
+  as well (Nutrition 0/1900 and Energy Balance 1,626), so a fix on Nutrition alone leaves Home
+  contradicting it. **Sibling sweep: both surfaces in the same PR.**
+
+
+**ROOT CAUSE FOUND, and it is not staleness — it is two TDEE models. (2026-08-18)**
+The owner asked whether both numbers were not already AI-derived. They were. They come from the same
+BMR and disagree by exactly the activity level the goal wizard was told about:
+
+| | formula | value |
+|---|---|---|
+| BMR implied by the shipped maintenance | 1,826 ÷ 1.2 | **1,522** |
+| Goal wizard, `calculateBaseline` | BMR × **1.375** (light) − 200 | **1,892** ≈ the stored **1,900** |
+| Energy balance, `buildEnergyBalance` | BMR × **1.2** (sedentary) − 200 | **1,626** |
+
+**Gap = BMR × (1.375 − 1.2) = 266 kcal.** Observed on device: **274**. The 8 kcal is rounding and
+weight drift since the goal was set. That is the entire discrepancy accounted for.
+
+**Neither is wrong; they are different contracts.**
+`goal-recommendation.ts:5` bakes a **self-reported** activity multiplier into the target, so the
+number already assumes your training and never moves. `daily-energy.ts:20` uses
+`SEDENTARY_MULTIPLIER = 1.2` **deliberately**, and its comment says why: *"measured movement is added
+explicitly, so a higher activity multiplier here would double-count it."* One assumes activity, the
+other measures it. Run both and you get two budgets — which is what the screen shows.
+
+**✅ OWNER DECISION, 2026-08-18: one number, and it rises with activity.** *"if its saying its
+1800-200; then that should be the calorie goal? and it can increase with activity?... can we look at
+having them all the same?"*
+
+**Recommendation: adopt the measured model everywhere.** It is the only one that can be right on both
+a rest day and a training day — an assumed multiplier is wrong on every day that is not average, and
+the app already measures the real thing. Concretely:
+1. **Today's goal = sedentary base + today's measured activity + goal delta.** The stored
+   `nutrition_targets.calories` becomes the **rest-day floor**, not the truth, and the day's figure is
+   derived from it.
+2. **The goal wizard must switch to the sedentary multiplier** when it feeds this. Leaving it at
+   `light`/`moderate` while activity is also added measured is a double-count — the exact thing
+   `daily-energy.ts` warns about, and the reason the two numbers drifted apart in the first place.
+   **This is the load-bearing change; the merge in this entry is cosmetic without it.**
+3. **Macros have to follow, and not uniformly.** Protein is dosed per kg of bodyweight
+   (`PROTEIN_G_PER_KG_BY_GOAL`), so it must **not** scale with activity; the earned calories belong to
+   carbs. Scale all three and the ring and the bars disagree again in a new way.
+4. **Say where the extra came from.** A budget that grows during the day is confusing unless it is
+   labelled — *"1,626 + 312 earned from training"* rather than a number that silently changes.
+
+**⚠ What this costs, stated plainly:** the goal stops being a fixed number you can memorise, and it is
+at its lowest in the morning before you have trained. That is the honest trade for a number that is
+right on both kinds of day. **One formula, one place** — after this there must be exactly one TDEE
+implementation, and `calculateBaseline`'s multiplier table stops being a second one.
 
 ### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
 

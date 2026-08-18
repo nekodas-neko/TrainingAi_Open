@@ -1,4 +1,8 @@
 #!/usr/bin/env node
+// 2026-08-18 (Review sweep 39, Q-556 cross-user isolation): backlog -> 9953, projectOverview -> 7876.
+// Rebuilt from origin/main after a parallel compaction sweep landed the same history file --
+// splicing the conflict hunks would have produced two baselines for one number.
+//
 // Keeps the orientation documents readable. Same ratchet shape as check-component-size.js.
 //
 // These files are what every session reads before it can start, and they are the ones that rot,
@@ -17,6 +21,161 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
+//
+// 2026-08-18 (Review, Q-554 orientation-index paths): backlog -> 9876, projectOverview -> 7806.
+// One queue entry and its row. Both keep the module-map specifics (row 232, decodeStepsPacket, zero
+// references) because "a doc named a path that does not exist" is forgettable while "the map read to
+// avoid re-implementing things listed something never built" is the reason the check exists.
+//
+// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
+// projectOverview SHRANK by ~70 lines here even after adding an entry: Q-139's stale 69-line
+// "OPEN" body was replaced with a compact device-check row, and Q-81's duplicate archive copy was
+// cut. Baselines are shrink-only, so this ratchets down and the space cannot be reclaimed silently.
+//
+// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
+// projectOverview RATCHETS DOWN here (7805 -> 7785) even though an entry was added: Q-139's stale
+// 69-line "OPEN" body became a compact device-check row and Q-81's duplicate archive copy was cut.
+// The baseline is shrink-only, so locking the lower number in is the point -- reclaimed space
+// cannot quietly refill.
+//
+// Raised 2026-08-18 (Review, Q-499 reproduced + Q-552 ledger): backlog -> 9809, projectOverview -> 7805.
+// Q-499's entry grew rather than a new one being added: it was filed on static reading and is now
+// reproduced, and the before/after (1 node -> 0, control at 1) is what makes it actionable. Plus one
+// new entry for the Q-block ledger near-miss.
+//
+// Raised 2026-08-18 (Review, silent card failures, Q-499): backlog -> 9762, projectOverview -> 7773.
+// One queue entry and its row. Both keep the 78/18 and 12-candidates/2-confirmed splits, because the
+// honest scope IS the finding here -- a row that said "12 cards vanish" would be a defect count this
+// sweep did not earn, and the next reader would inherit it as fact.
+//
+// Raised 2026-08-18 (Review, unbounded request bodies, Q-498): backlog 9690 -> 9727,
+// projectOverview 7722 -> 7747. One queue entry and its row. Both keep the 113/7/93/3
+// coverage split and the line numbers showing the ingest route parses at 40 and checks the secret
+// at 58 -- the ordering is the finding, and a summary that drops it reads as "add a size cap",
+// which is the smaller half of the fix.
+//
+// Raised 2026-08-18 (Review, admin range-loop termination, Q-497): backlog 9652 -> 9690,
+// projectOverview 7693 -> 7722. One queue entry and its row. The entry keeps the measured loop
+// trace (iter 32 = 10000-01-01, still looping at 5000) because the defect is invisible from the
+// source -- every guard on the route reads correct, and only the trace shows the exit condition
+// inverting. It also names the second site, which writes.
+//
+// Raised 2026-08-18 (Review, health-connect ingest, Q-493..Q-496): backlog 9557 -> 9652,
+// projectOverview 7655 -> 7693. Four queue entries and one row, for four findings on one route.
+// The rows carry the measured before/after pairs (81 kg -> 499 kg; 1 limiter key at 20 vs 30 at 1)
+// because both findings are counter-intuitive from the source alone -- the limiter returns an
+// identical 401 either way, so without the numbers the next reader re-runs the experiment.
+//
+// Raised 2026-08-18 (Review, CLAUDE.md prose counts, Q-492): backlog 9520 -> 9557,
+// projectOverview 7631 -> 7655. One queue entry and its row. The measurement they carry is the
+// count-by-count table, which is the whole finding — a summary of it would leave the next reader
+// re-deriving nine numbers to know which are trustworthy.
+//
+// Raised 2026-08-18 (Review, aria-expanded collapsibles, Q-491): backlog 9477 -> 9520,
+// projectOverview 7603 -> 7631. One queue entry and its row. The lines that earn their place are the
+// MEMBERSHIP diff, not the count: CLAUDE.md's nine and today's nine are different sets (one fixed,
+// one never listed, two moved), so citing the count alone would hide that the list is what drifted.
+// Both also carry the meta-pattern — three hand-maintained counts in CLAUDE.md found stale this run
+// (Q-480, Q-490, Q-491) while every ratcheted count is current — which is the argument for fixing
+// this with a script rather than a sweep.
+
+//
+// Raised 2026-08-18 (Review, render rules part 2): projectOverview 7576 -> 7603. No queue entry —
+// all four rules held. The row is worth its lines because it records the three raw counts that look
+// like findings and are not (85 index keys, all on static lists; a 62-field useShallow pick holding
+// actions rather than hot-path values; 25 bare readCacheSync hits, three of them false positives in
+// the orchestrator and one of those the COMMENT stating the rule). Without it the next sweep
+// re-derives all three and may file them.
+
+//
+// Raised 2026-08-18 (Review, memo-stability audit, Q-490): backlog 9439 -> 9477, projectOverview
+// 7551 -> 7576. One queue entry and its row. Both lead with the CLEAN number (64 of 66 memos hold,
+// no inline arrows anywhere) because without it the entry reads as though memoisation is broken
+// here, and both carry the fix caveat that the per-meal site wants SCALARS rather than a useMemo —
+// a useMemo there needs one memo per row, which is worse than the bug. Both also flag that no render
+// counts were measured; the claim is from object identity, not a profiler.
+
+//
+// Raised 2026-08-18 (Review, ms-offset → calendar day, Q-489): backlog 9393 -> 9439, projectOverview
+// 7523 -> 7551. One queue entry and its row, and the lines that earn their place are the NEGATIVE
+// ones: most instances of the banned ms-offset pattern are CORRECT (rolling instant windows feeding
+// hours-based consumers like computeMuscleRecovery), so an implementer who greps the pattern and
+// "fixes" all twelve would break muscle recovery. Both also carry the measured DST table, which
+// cannot be re-derived without re-running the transition arithmetic.
+
+//
+// Raised 2026-08-18 (Review, local-first write coverage): backlog 9387 -> 9393, projectOverview
+// 7501 -> 7523. No new entry — the sweep BOUNDS Q-488 (it is one handler, not a class), which is the
+// question an implementer has to answer before budgeting the work, so it rides on that entry. The
+// row also carries two things a later audit would otherwise get wrong: the file-level version of
+// this check is unsound (it clears the very file Q-488 is in), and "no pull mapping" is not evidence
+// of a gap, because saved_meals is push-only and kept fresh by hydrate-on-read by design.
+
+//
+// Raised 2026-08-18 (Review, server-only writes to local-first domains, Q-488): backlog 9384 -> 9387,
+// projectOverview 7468 -> 7501. One queue entry and its row. Both carry three lines that decide how
+// it gets triaged and fixed: it SELF-HEALS via the tombstone (visible inconsistency, not data loss);
+// the originating screen is CORRECT because it reads the server-side day-log aggregate, which is why
+// nothing on that screen could reveal it; and making the delete work offline is a separate, larger
+// question that must not be folded into the one-call fix.
+
+//
+// Raised 2026-08-18 (Review, seed-only read paths — case (b)): projectOverview 7439 -> 7468. No
+// queue entry; the audit found no gap. The row is worth its lines for two things that are otherwise
+// rediscovered by running a bad test: the mechanical seed-only check (readCacheSync minus
+// cachedFetch) OVER-REPORTS, because revalidation also happens via a raw fetch+setCached and via a
+// local-store read+setCached — and the third is the app's most authoritative path, so a
+// network-shaped test marks it stale. Plus: a `Q-NNN:` comment here is usually a fix's rationale,
+// not an open defect. That misread cost a false alarm twice in this run (Q-117, Q-126).
+
+//
+// Raised 2026-08-18 (Review, load-bearing cache audit): projectOverview 7411 -> 7439. No queue entry
+// — the audit found no gap. The row is the *result table* plus two things that would otherwise be
+// rediscovered the hard way: session-select-content.tsx:896's "never invalidated" comment is the
+// comment on the Q-117 FIX, not a live defect (it reads exactly like one), and case (b) of Q-262's
+// test — seed-only read paths — remains unaudited and is the likelier source of a stale-value report.
+
+//
+// Raised 2026-08-18 (Review, production verification round 2): backlog 9359 -> 9384,
+// projectOverview 7369 -> 7406. No new queue entries — six existing ones amended in place with what
+// production says, which is the cheapest possible place to carry it. The backlog growth is those
+// amendments; the projectOverview row carries the pull-69 / push-0 table because that asymmetry is
+// the evidence for Q-475 and cannot be re-derived after error_events prunes at 30 days. It also
+// carries the two queries that look like evidence and are NOT (water is too sparse; null-weight-with-
+// steps is the expected shape), so the next reader does not pick them up.
+
+//
+// Raised 2026-08-18 (Review, Tier-A enqueue silence, Q-486): backlog 9312 -> 9359,
+// projectOverview 7339 -> 7369. One queue entry and its row. The lines that earn their place are the
+// three "do not": do not undo the layering (local write, then a direct POST as primary, then the
+// outbox — that ordering is deliberate and documented in the file), do not convert the four calls to
+// `await` (they are fire-and-forget so the UI stays instant), and do not treat this as reproduced —
+// it needs a broken local SQLite on a device and the web sandbox cannot reach the code path at all.
+
+//
+// Raised 2026-08-18 (Review, implausible-value sweep, Q-485): backlog 9264 -> 9312,
+// projectOverview 7309 -> 7339. One queue entry and its row, both carrying the two lines that stop
+// it being implemented wrongly: the shared BOUNDS are correct and must not be touched (One Formula,
+// One Place is holding — only the behaviour differs), and the fix is NOT "throw everywhere", because
+// a throw quarantines the mutation and the poison-pill rule forbids that for a validation failure.
+// An entry missing either line produces a worse app than the bug does.
+
+//
+// Raised 2026-08-18 (Review, unvalidated-create-bodies sweep, Q-484): backlog 9214 -> 9264,
+// projectOverview 7277 -> 7309. One queue entry and its row. Both carry two caveats inline that are
+// the reason the entry is safe to act on: the 10 MB figure is NOT a storage number (TOAST compressed
+// a single repeated character to ~120 kB, real text would not), and the 33 no-schema routes are a
+// CANDIDATE count, not a defect count — 31 are unaudited and are neither broken nor fine. An entry
+// that dropped either caveat would get implemented against numbers that do not mean what they say.
+
+//
+// Raised 2026-08-18 (Review, malformed-route-id sweep, Q-482/Q-483): backlog 9049 -> 9138,
+// projectOverview 7243 -> 7277. Two queue entries and the row indexing them. Q-482 carries its
+// 14-route table inline because the finding IS the list — an implementer needs to know which routes
+// to guard, and re-deriving it means re-running 39 probes. Both carry the evidence-reading caveat
+// (a 500 is conclusive, a 400 is not, because the probe sent an empty body) — without it the routes
+// absent from the table read as verified-correct, which they are not.
+
 //
 // Raised 2026-08-18 (Review, empty/n=1 account sweep): projectOverview 7213 -> 7243. No queue entry
 // — the sweep found nothing to file. The row exists for the method correction inside it: a probe
@@ -586,7 +745,14 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7243,
+  // Raised 2026-08-18 (Lane B, Q-478 shipped). Five lines on an existing row rather
+  // than a new one. Two of them are corrections to the original finding that a striking-through
+  // would have destroyed: the "loading state never clears" consequence was overstated (a second
+  // unconditional clear runs after the await, so it is a round-trip-long skeleton, not a hang) and
+  // the today-envelope helpers were deliberately left alone. The row stays open because Q-477 — the
+  // larger half, including the ratchet on bare todayInTz() — is untouched, and a reader needs to
+  // know which half of a two-Q row shipped.
+  'projectOverview.md': 7881,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -597,8 +763,31 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9145,
-  'CLAUDE.md': 1075,
+  // Raised 2026-08-18 (Lane B, Q-488 re-tag): 9905 -> 9924. The entry said the fix was one call in
+  // one Lane B handler. It is not: the local store has no deleteActivityLog, and upsertActivityLog
+  // omits deleted_at from both its INSERT list and its DO UPDATE SET — so the obvious fix compiles,
+  // type-checks, lints clean and does nothing. Those nineteen lines are the column-list evidence and
+  // the re-tag to Lane A. A one-line "re-tagged to Lane A" would send the next session down the
+  // same dead end, because the dead end reads as correct in every check the sandbox can run.
+  // Ratchets DOWN 2026-08-18 (Lane B, Q-478 shipped). The entry was removed and
+  // Q-477's pointer to it rewritten. Shrink-only means locking the lower number in, so the space
+  // an implemented item vacates cannot quietly refill.
+  // Raised 2026-08-18 (Q-401 — BugFix intake). Recomputed from the MERGED file after taking
+  // main's side; this branch absorbed several same-day raises from other lanes and splicing the
+  // hunks is how one side's raise silently disappears. The Nutrition tab shows two calorie
+  // budgets 274 apart, and the entry proves they are two TDEE models rather than staleness:
+  // BMR x (1.375 - 1.2) = 266 kcal. It also records the owner's decision to adopt one number
+  // that rises with measured activity, and why the wizard's multiplier is the real change.
+  'docs/implementation-backlog.md': 10008,
+  // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
+  // offline-first rule directly above it — a domain read local-first needs EVERY write to update
+  // the local store, deletes included, and including a write made from a screen that itself reads
+  // server-side. Only the written half was here, and the missing half is what shipped the bug:
+  // the delete looked correct from the screen that made it because that screen reads the server
+  // aggregate, while three local-first surfaces kept the row. It belongs beside the rule it
+  // inverts, not in a journal entry, because the next person to write a delete handler reads this
+  // section and not that entry.
+  'CLAUDE.md': 1077,
 
 };
 
@@ -606,9 +795,47 @@ const BASELINE = {
 // that is a chore trigger, not an error, so CI does not fail there — failing at 20 would block
 // unrelated PRs for a tidiness task. This is the runaway guard instead: the directory reached 509
 // before anyone swept it, and at that size it stops being a readable recent-window.
+//
+// **Counted against the limit: entries a sweep can actually remove.** An entry that a durable doc
+// links to (projectOverview.md Known-Issues rows, docs/domains/*/README.md, the agent batons) must
+// NOT be folded — doing so broke 48 links on the first sweep, several inside another lane's baton.
+// Those entries are a floor, not growth, and the floor is now 41 of 60.
+//
+// Counting them made the guard fire on a condition its own remedy cannot fix. Measured 2026-08-18:
+// a sweep took the directory 62 -> 41, and it was back over the limit **twenty minutes later** —
+// at which point every lane's next feature PR failed on a tidiness rule, because a journal entry
+// rides in every feature PR. The second sweep that day cleared 19 and landed on 41 again. Chasing
+// a floor with a sweep that may not touch it is not a guard, it is a periodic outage.
+//
+// So the limit applies to the UNLINKED count, which is exactly what a sweep clears, and still
+// catches the thing this guard was written for: if nobody sweeps, unlinked entries pile up and it
+// fires. A separate, much higher ceiling on the TOTAL keeps the 509-file readability failure
+// caught, since that scenario is real and is not about sweepability.
 const ENTRIES_DIR = 'docs/overview/entries';
 const ENTRIES_CHORE = 20;
 const ENTRIES_LIMIT = 60;
+const ENTRIES_TOTAL_CEILING = 250;
+
+// An entry is "linked" when any .md outside the entries directory mentions its filename. Read once
+// into a single blob rather than grepping per entry — 60 entries x the whole docs tree is the kind
+// of thing that quietly adds a minute to every CI run.
+function linkedEntryNames(root, entriesAbs) {
+  let blob = '';
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name === 'node_modules' || e.name === '.next' || e.name === '.git') continue;
+        if (path.resolve(full) === path.resolve(entriesAbs)) continue;
+        walk(full);
+      } else if (e.name.endsWith('.md')) {
+        blob += fs.readFileSync(full, 'utf8');
+      }
+    }
+  };
+  walk(root);
+  return blob;
+}
 
 const failures = [];
 
@@ -631,20 +858,34 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
 
 const entriesAbs = path.join(root, ENTRIES_DIR);
 if (fs.existsSync(entriesAbs)) {
-  const count = fs
+  const names = fs
     .readdirSync(entriesAbs)
-    .filter((f) => f.endsWith('.md') && f !== 'README.md').length;
-  if (count > ENTRIES_LIMIT) {
+    .filter((f) => f.endsWith('.md') && f !== 'README.md');
+  const count = names.length;
+  const blob = linkedEntryNames(root, entriesAbs);
+  const unlinked = names.filter((f) => !blob.includes(f));
+  const linked = count - unlinked.length;
+
+  if (unlinked.length > ENTRIES_LIMIT) {
     failures.push(
-      `${ENTRIES_DIR}/ holds ${count} loose entries, over the ${ENTRIES_LIMIT} runaway limit.\n` +
-        `      Run the compaction sweep in ${ENTRIES_DIR}/README.md: fold them oldest-first into a\n` +
-        `      batched docs/overview/history-*.md, starting a new one near ~250 KB, then git rm the\n` +
-        `      folded files.`,
+      `${ENTRIES_DIR}/ holds ${unlinked.length} foldable entries, over the ${ENTRIES_LIMIT} runaway limit\n` +
+        `      (${count} total; ${linked} are linked by a durable doc and must NOT be folded).\n` +
+        `      Run the compaction sweep in ${ENTRIES_DIR}/README.md: fold the UNLINKED ones oldest-first\n` +
+        `      into a batched docs/overview/history-*.md, rewriting ](../../ to ](../ in each body, then\n` +
+        `      git rm the folded files.`,
     );
-  } else if (count >= ENTRIES_CHORE) {
+  } else if (count > ENTRIES_TOTAL_CEILING) {
+    failures.push(
+      `${ENTRIES_DIR}/ holds ${count} entries, over the ${ENTRIES_TOTAL_CEILING} total ceiling — it has\n` +
+        `      stopped being a readable recent-window. Only ${unlinked.length} are foldable, so a sweep\n` +
+        `      alone will not fix this: the durable docs citing the other ${linked} need to point at the\n` +
+        `      batched history instead.`,
+    );
+  } else if (unlinked.length >= ENTRIES_CHORE) {
     console.log(
-      `check-doc-index-size: note — ${ENTRIES_DIR}/ holds ${count} entries, at or over the ` +
-        `${ENTRIES_CHORE}-file compaction chore threshold. Not a failure; sweep it when convenient.`,
+      `check-doc-index-size: note — ${ENTRIES_DIR}/ holds ${unlinked.length} foldable entries ` +
+        `(${count} total, ${linked} linked), at or over the ${ENTRIES_CHORE}-file compaction chore ` +
+        `threshold. Not a failure; sweep it when convenient.`,
     );
   }
 }

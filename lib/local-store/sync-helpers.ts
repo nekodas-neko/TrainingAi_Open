@@ -8,21 +8,31 @@ export interface PushErrorRecord {
   domain: string;
   date:   string;
   error?: string;
+  // Q-475: the server could not write (database down/out of disk), so this says nothing about the
+  // mutation. Absent on an older server, which is why every read of it defaults to false.
+  retryable?: boolean;
 }
 
-// Map of failed outbox row id -> error message. Prefers exact id matching
+export interface ResolvedPushFailure {
+  error:     string;
+  retryable: boolean;
+}
+
+// Map of failed outbox row id -> failure. Prefers exact id matching
 // (new servers); falls back to domain:date for error records missing an id
 // (old servers) — which retains every sibling sharing that key, matching the
 // pre-id behaviour, never worse.
 export function resolveFailedOutboxIds(
   chunk: Array<{ id: string; domain: string; date: string }>,
   errors: PushErrorRecord[],
-): Map<string, string> {
-  const failed = new Map<string, string>()
-  const legacyByKey = new Map<string, string>()
+): Map<string, ResolvedPushFailure> {
+  const asFailure = (e: PushErrorRecord): ResolvedPushFailure =>
+    ({ error: e.error ?? 'sync failed', retryable: e.retryable === true })
+  const failed = new Map<string, ResolvedPushFailure>()
+  const legacyByKey = new Map<string, ResolvedPushFailure>()
   for (const e of errors) {
-    if (e.id) failed.set(e.id, e.error ?? 'sync failed')
-    else legacyByKey.set(`${e.domain}:${e.date}`, e.error ?? 'sync failed')
+    if (e.id) failed.set(e.id, asFailure(e))
+    else legacyByKey.set(`${e.domain}:${e.date}`, asFailure(e))
   }
   if (legacyByKey.size) {
     for (const m of chunk) {

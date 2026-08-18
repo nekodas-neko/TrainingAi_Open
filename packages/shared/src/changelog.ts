@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.8",
+    date: "2026-08-18",
+    changes: [
+      "Today's steps, water, active energy and the \u201ctrained today\u201d markers now use your own timezone instead of Brisbane's. If you are far enough from Brisbane that your calendar date differs from its \u2014 fourteen hours a day in New York \u2014 the app treated today's data as if it were yesterday's and hid it: the Health screen's today values stayed blank, the workout screen showed sets you had already logged as not yet done, and the \u201cTrained today\u201d badge never appeared. Nothing changes for a Brisbane user.",
+    ],
+  },
+  {
+    version: "1.324.7",
+    date: "2026-08-18",
+    changes: [
+      "Losing the database connection no longer throws away everything waiting to sync. If the server was unreachable for around 45 minutes \u2014 an ordinary outage \u2014 every pending change on the phone was marked failed and had to be retried one at a time by hand, even though nothing was wrong with any of them. The app now recognises the difference between the server being down and a change being genuinely rejected: it waits and retries on its own, and only real rejections show up as failures.",
+    ],
+  },
+  {
     version: "1.324.6",
     date: "2026-08-18",
     changes: [
