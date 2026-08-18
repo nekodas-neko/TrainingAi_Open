@@ -734,55 +734,6 @@ below threshold and left in place for next time.
   the client does), but the client-side trigger was read from source, not induced. The other 15
   branches were read, not individually replay-tested.
 
-### [app-shell][platform] Q-478 — two cache guards compare a server-stamped date against a client `DEFAULT_TZ` date, so they return false for hours a day for any non-Brisbane user
-
-- **Branch:** `fix/cache-today-guards-take-tz`
-- **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
-  [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
-- **Placement:** above Q-477 and **do it first** — it is about a dozen edits, it is the
-  highest-damage consequence of that finding, and it is independently useful.
-- **What.** `lib/sqlite/cache.ts`:
-  ```ts
-  export function isWorkoutDataToday(data)  { return data?.dataDate === todayInTz() }                    // :369
-  export function isBodyMetadataFresh(data) { return data?.today == null || data.today.date === todayInTz() } // :361
-  ```
-  Both compare a **server-stamped** date to a **client `DEFAULT_TZ`** date. Measured: server stamps
-  `dataDate: 2026-08-19` for a `Pacific/Kiritimati` user; the client compares `2026-08-18`; the guard
-  is **false** and stays false while the user's local date differs from Brisbane's.
-- **How much of the day.** Two zones whose offsets differ by Δ hours have different calendar dates for
-  |Δ| hours out of 24. Brisbane is UTC+10 → a New York user (UTC−4 in summer) is Δ=14, so the guards
-  are false **14 hours a day**. Kiritimati is Δ=4.
-- **Confirmed against a live response** with a real `body_metrics` row planted on the user's true today:
-  ```
-  server today row date : 2026-08-19  (steps 7777)
-  client todayInTz()    : 2026-08-18
-  isBodyMetadataFresh   : False
-  ```
-- **What each call site then does:**
-  - `app/session-select/session-select-content.tsx:514` — `if (!isBodyMetadataFresh(data)) return;` is
-    an **early return** and `setMetaLoading(false)` is below it, so **the loading state never clears**.
-  - `app/health/health-content.tsx:194` — today's metrics and active energy are set *inside* the
-    guard, so the Health screen's today values stay blank while the data sits in the response.
-  - `components/workout-screen.tsx:324-326` — `freshExercises` rewrites every exercise to
-    `loggedTodayInSession: false`, so the workout screen shows everything as not-yet-logged today.
-  - `app/workout-select/workout-select-content.tsx:31` — the "Trained today" badge never appears.
-- **The clearest illustration in the codebase**, two adjacent lines inside
-  `getLastTrainedLabel(session, tz)`:
-  ```ts
-  if (isWorkoutDataToday(data) && …) return "Trained today";   // :31  DEFAULT_TZ
-  const todayKey = dayKeyInTz(tz, 0);                          // :32  the user's tz
-  ```
-  The user's timezone is already a parameter of that function. One line uses it; the line above cannot,
-  because the helper takes no `tz`.
-- **Fix shape:** give the helpers an optional `tz` and pass `useUserTimezone()` at every call site —
-  about a dozen edits, **no behaviour change for a Brisbane user**, and it removes the whole
-  compare-server-date-to-client-date class. Give `cachedFetchToday`/`unwrapToday` the same treatment
-  for consistency, but note they are **not** broken: their envelope date is client-written and
-  client-read, so they are self-consistent (mislabelled — they hold "Brisbane-today" data). Do not
-  file that as the same defect.
-- **Lane B owns this** (`lib/sqlite/cache.ts` is shared, but every call site is Lane B surface —
-  claim `lib/sqlite/cache.ts` in the baton before starting).
-
 ### [platform][readiness] Q-489 — five sites turn an ms offset into a calendar day; in a DST zone, three of them compute "today" when they mean "yesterday"
 
 - **Branch:** `fix/ms-offset-calendar-day`
@@ -1400,8 +1351,11 @@ below threshold and left in place for next time.
      a shrink-only per-file baseline — same shape as `check-hex-literals.js` and
      `check-cache-ttl-divergence.js`, both of which exist because prose alone did not hold a count.
      That freezes the number at 100 and puts every future addition in a diff.
-  2. Sweep highest-visibility first: the calendar today-marker, then **Q-478** (small, and the
-     highest-damage consequence — do it before the bulk sweep), then write paths, then display.
+  2. Sweep highest-visibility first: the calendar today-marker, then write paths, then display.
+     **Q-478 is done** (2026-08-18) — the two cache today-guards now take a `tz`, and
+     `scripts/check-tz-aware-cache-guards.js` keeps every call site passing one. Its ratchet is a
+     narrower shape than step 1 asks for: it guards two named helpers, not bare `todayInTz()`.
+     Step 1 is still owed.
   **Do NOT** make `todayInTz`'s default throw or read a global — the function is shared with server
   code that passes `tz` explicitly, and a global reintroduces the ambiguity somewhere harder to see.
 - **Lane B owns the sweep** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`); the CI ratchet is

@@ -32,6 +32,7 @@ import { todayInTz, toAestDateStr, nowDatetimeInTz } from "@trainingai/shared/da
 import { useWorkoutStore, effectiveRestSec } from "@/lib/stores/workout-store";
 import { useShallow } from "zustand/react/shallow";
 import { cachedFetch, readCacheSync, setCached, isWorkoutDataToday } from "@/lib/sqlite/cache";
+import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { useDeloadChoice } from "@/components/workout/use-deload-choice";
 import { useDurationPreset } from "@/components/workout/use-duration-preset";
 import { WorkoutLoadError } from "@/components/workout/workout-load-error";
@@ -103,6 +104,7 @@ interface WorkoutScreenProps {
 }
 
 export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverride }: WorkoutScreenProps) {
+  const tz = useUserTimezone();
   const { deload, setDeload, recommended: deloadRecommended } = useDeloadChoice(!!aiDeload);
   // Subscribe with a shallow selector picking exactly the members used below, so
   // the orchestrator only re-renders when one of these changes — not on every
@@ -321,7 +323,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     // the single point every downstream consumer (this screen + pre-workout-screen +
     // done-screen, all reading the same `exercises` state) derives from.
     const freshExercises = (data: WorkoutDataSeed): WorkoutExercise[] =>
-      isWorkoutDataToday(data)
+      isWorkoutDataToday(data, tz)
         ? (data.exercises ?? [])
         : (data.exercises ?? []).map(ex => ({ ...ex, loggedTodayInSession: false }));
 
@@ -449,7 +451,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       // handles the normal HTTP/network failure path above.
       if (!synced && !cardSeed && !localSeeded) { setLoadError(true); setLoading(false); }
     }
-  }, [sessionType, deload, userId]);
+  }, [sessionType, deload, userId, tz]);
 
   // Fetch the session's AI-periodization state (drives the AI Prescription card). Callable
   // imperatively so it can re-run the moment a fresh prescription is generated — otherwise the

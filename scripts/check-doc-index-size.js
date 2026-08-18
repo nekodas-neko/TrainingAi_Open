@@ -745,7 +745,14 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7876,
+  // Raised 2026-08-18 (Lane B, Q-478 shipped). Five lines on an existing row rather
+  // than a new one. Two of them are corrections to the original finding that a striking-through
+  // would have destroyed: the "loading state never clears" consequence was overstated (a second
+  // unconditional clear runs after the await, so it is a round-trip-long skeleton, not a hang) and
+  // the today-envelope helpers were deliberately left alone. The row stays open because Q-477 — the
+  // larger half, including the ratchet on bare todayInTz() — is untouched, and a reader needs to
+  // know which half of a two-Q row shipped.
+  'projectOverview.md': 7881,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -762,13 +769,16 @@ const BASELINE = {
   // type-checks, lints clean and does nothing. Those nineteen lines are the column-list evidence and
   // the re-tag to Lane A. A one-line "re-tagged to Lane A" would send the next session down the
   // same dead end, because the dead end reads as correct in every check the sandbox can run.
+  // Ratchets DOWN 2026-08-18 (Lane B, Q-478 shipped). The entry was removed and
+  // Q-477's pointer to it rewritten. Shrink-only means locking the lower number in, so the space
+  // an implemented item vacates cannot quietly refill.
   // Raised 2026-08-18 (Q-401 — BugFix intake). Recomputed from the MERGED file after taking
-  // main's side, not spliced. The Nutrition tab shows two calorie budgets 274 apart, both
-  // labelled "left": a fixed set goal, and maintenance minus the recomp adjustment, which moves
-  // with what you burn. Both correct. The entry carries the trace for each and the finding that
-  // matters most — the card explaining the gap is gated on a calibrated maintenance, so it is
-  // suppressed in exactly the window where the two numbers disagree.
-  'docs/implementation-backlog.md': 10054,
+  // main's side; this branch absorbed several same-day raises from other lanes and splicing the
+  // hunks is how one side's raise silently disappears. The Nutrition tab shows two calorie
+  // budgets 274 apart, and the entry proves they are two TDEE models rather than staleness:
+  // BMR x (1.375 - 1.2) = 266 kcal. It also records the owner's decision to adopt one number
+  // that rises with measured activity, and why the wizard's multiplier is the real change.
+  'docs/implementation-backlog.md': 10008,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

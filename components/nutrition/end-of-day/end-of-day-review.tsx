@@ -11,6 +11,7 @@ import { pushMutations } from '@/lib/local-store/sync-engine'
 import { invalidateHealthTrends } from '@/lib/cache-groups'
 import { usePageGradient, useHeroColorScheme } from '@/components/health/detail-hero'
 import { cachedFetch, readCacheSync, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from '@/lib/sqlite/cache'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { BODY_BATTERY_TTL, TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { prefillEveningScales } from '@trainingai/shared/nutrition/day-checkin-prefill'
 import { buildTodayInsight } from '@trainingai/shared/nutrition/day-insight'
@@ -51,6 +52,7 @@ const DEFAULT_SCALES: Record<EveningScaleKey, number> = {
 }
 
 export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, targets, onLogged }: Props) {
+  const tz = useUserTimezone()
   useSheetBackDismiss(open, onClose)
   const pageGradient = usePageGradient('sleep')
   const isLight = useHeroColorScheme() === 'light'
@@ -78,9 +80,9 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
 
       type BodyMetaToday = { today?: { date: string; steps?: number | null; waterMl?: number | null } | null }
       let meta = readCacheSync<BodyMetaToday | null>('body-metadata')
-      if (meta && !isBodyMetadataFresh(meta)) meta = null
+      if (meta && !isBodyMetadataFresh(meta, tz)) meta = null
       await cachedFetch<BodyMetaToday | null>(
-        'body-metadata', '/api/body-metadata', TTL_MEDIUM, d => { if (isBodyMetadataFresh(d)) meta = d },
+        'body-metadata', '/api/body-metadata', TTL_MEDIUM, d => { if (isBodyMetadataFresh(d, tz)) meta = d },
       ).catch(() => {})
       const steps: number | null = meta?.today?.steps ?? null
       const waterMl: number | null = meta?.today?.waterMl ?? null
@@ -123,7 +125,7 @@ export function EndOfDayReview({ open, onClose, mealTypes, logs, date, userId, t
     return () => {
       cancelled = true
     }
-  }, [open, loaded, userId, date])
+  }, [open, loaded, userId, date, tz])
 
   const totals = logs.reduce(
     (acc, l) => ({
