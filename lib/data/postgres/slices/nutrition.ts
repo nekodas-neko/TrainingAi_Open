@@ -1,4 +1,5 @@
 import { eq, and, inArray, gte, lte, asc, desc, sql, isNull } from 'drizzle-orm'
+import { NotFoundError } from '@trainingai/shared/errors'
 import { randomUUID } from 'node:crypto'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -78,7 +79,7 @@ export async function updateMealType(db: Db, id: string, userId: string, data: P
     .set(data)
     .where(and(eq(s.mealTypes.id, id), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
     .returning()
-  if (!r) throw new Error('Meal type not found')
+  if (!r) throw new NotFoundError('Meal type')
   return rowToMealType(r)
 }
 
@@ -247,7 +248,7 @@ export async function updateFoodLog(db: Db, id: string, userId: string, quantity
     .set({ quantityMultiplier, updatedAt: new Date() })
     .where(and(eq(s.foodLogs.id, id), eq(s.foodLogs.userId, userId)))
     .returning()
-  if (!r) throw new Error('Food log not found')
+  if (!r) throw new NotFoundError('Food log')
   return rowToFoodLog(r)
 }
 
@@ -385,7 +386,7 @@ async function writeSavedMeal(db: Db, userId: string, id: string, name: string, 
       })
       .returning({ id: s.savedMeals.id })
     // A conflict on an id owned by another user updates 0 rows → refuse.
-    if (!meal) throw new Error('Saved meal not found')
+    if (!meal) throw new NotFoundError('Saved meal')
 
     // Ownership-verify every referenced food item belongs to this user before
     // re-inserting — a saved meal must not embed another user's food_items rows.

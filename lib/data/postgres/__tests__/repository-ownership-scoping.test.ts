@@ -574,9 +574,18 @@ describe.skipIf(!canRun)('repository ownership scoping (Q-155)', () => {
       `INSERT INTO workout_sessions (user_id, session_name, started_at)
        VALUES ($1, 'B SECRET WORKOUT', now()) RETURNING id`, [USER_B])
 
+    // Q-462/Q-463: the throw is now a typed NotFoundError, so `/api/log-exercise` can answer 404
+    // instead of 500 — a correctly-refused request is not a server fault, and reporting it as 5xx
+    // told the sync path to retry what can never succeed. Asserting the TYPE rather than the message
+    // is also the stronger check: it cannot pass by coincidence on wording.
+    //
+    // 404 rather than 403 on the wire, deliberately: a session owned by someone else must not be
+    // distinguishable from one that does not exist, or the route becomes a membership oracle. The
+    // identifying detail still reaches the server log as a one-line warning.
+    const { isNotFoundError } = await import('@trainingai/shared/errors')
     await expect(
       repo.ensureWorkoutSession(USER_A, ws.rows[0].id, undefined, 'A HIJACK ATTEMPT', new Date()),
-    ).rejects.toThrow(/not owned by user/)
+    ).rejects.toSatisfy(isNotFoundError)
 
     const { rows } = await pool.query(
       `SELECT user_id, session_name FROM workout_sessions WHERE id = $1`, [ws.rows[0].id])

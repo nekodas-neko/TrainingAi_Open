@@ -6,6 +6,22 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.1",
+    date: "2026-08-18",
+    changes: [
+      "Editing or deleting something that does not exist \u2014 or is not yours \u2014 now says so, instead of reporting a server error. Six write actions answered with a generic failure and, in four cases, an empty response the app could not even read, which also meant the phone treated a permanent refusal as a temporary glitch and kept retrying it.",
+    ],
+  },
+  {
+    version: "1.324.0",
+    date: "2026-08-18",
+    changes: [
+      "The meal label now has the layout you asked for, and it is the new default: name, calories, macros, the ingredients, then the code \u2014 all centred. The ingredients run across the line and wrap, rather than taking a line each.",
+      "That change is what lets a ROUND label carry the whole ingredient list. Running the ingredients across spends width instead of height, and the height it gives back goes to the code \u2014 so the new default prints a code about 40% larger than the old one AND lists the ingredients, on either a round or a square die.",
+      "The stacked square layout stays as an option for anyone who prefers it. Every style is still there to cycle through.",
+    ],
+  },
+  {
     version: "1.323.0",
     date: "2026-08-18",
     changes: [
