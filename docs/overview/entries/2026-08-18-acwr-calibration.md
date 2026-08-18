@@ -4,9 +4,18 @@
 **Type:** docs-only — calibration evidence · **Filed as:** Q-512, Q-513
 
 Prompted by the owner asking whether *all* pillars had been tuned against historical data. They had
-not. The earlier sweep covered the health/recovery **scores**; **workouts, heart-rate, cardio and
-nutrition had zero calibration coverage.** This is the first review of the workouts pillar, starting
-with `ACWR_THRESHOLDS` because it drives deload decisions.
+not. The earlier sweep covered the health/recovery **scores**, and **workouts, heart-rate and cardio
+had zero calibration coverage.** This is the first review of the workouts pillar, starting with
+`ACWR_THRESHOLDS` because it drives deload decisions.
+
+**One correction to that answer, found while acting on it:** I first listed **nutrition** as
+uncalibrated too, citing `DEFAULT_STEP_GOAL 8000` and `SESSION_VOLUME_GOAL_KG 5200` as unchecked round
+numbers. That was wrong. Both the strength-frequency goal (Q-137, 91 days) and the session-volume goal
+(Q-190, 40 sessions) were carefully fitted to the owner's own data on 2026-08-11, with
+[`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md) as the record; the step and
+zone-minute goals are deliberate population anchors (Paluch 2022, WHO 150 min/wk) with their reasoning
+in the source. The genuinely uncalibrated part of nutrition is narrower: **whether the recommended
+calorie target tracks the owner's observed weight change.**
 
 ## The thresholds are right
 

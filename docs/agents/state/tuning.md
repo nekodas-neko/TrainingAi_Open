@@ -93,13 +93,15 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | body | ✅ battery range clean; anchor measured (Q-511) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
 | **workouts** | 🟡 **STARTED 2026-08-18** — ACWR done (Q-512/513). **1RM, expected RPE, progression, monotony/strain still untouched** |
-| **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05`, HR-recovery bands, zone boundaries |
-| **nutrition** | ❌ **none.** `DEFAULT_STEP_GOAL 8000`, `ZONE_MINUTES_GOAL 22`, `SESSION_VOLUME_GOAL_KG 5200`, `ACTIVE_ENERGY_BMR_FRACTION 0.24` — round numbers never checked against what the owner actually does |
+| **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05` (documented rationale, never validated against the owner's HR), `PEAK_BANDS` (their "stable per-bucket sample sizes" justification is an empirical claim nobody measured), zone boundaries |
+| **nutrition** | 🟡 **movement goals ARE calibrated** — `STRENGTH_FREQ_GOAL 5` (Q-137, 91 days) and `SESSION_VOLUME_GOAL_KG 5200` (Q-190, 40 sessions), see [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md). `STEP_GOAL 8000` / `ZONE_MINUTES 22` / `BMR_FRACTION 0.24` are **deliberate population anchors** (Paluch 2022, WHO 150 min/wk), not unchecked round numbers. **Genuinely uncalibrated: the calorie/macro targets vs the owner's observed weight change** — a TDEE outcome check nobody has run |
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
 | app-shell, platform | n/a — no scoring surface |
 
-**Next unblocked work, in order:** finish workouts (1RM/RPE/progression), then nutrition goal
-defaults, then heart-rate. Data exists for all three (77 sessions, 1,029 set logs, 3.5 months; body
+**Next unblocked work, in order:** finish workouts (1RM/RPE/progression), then the **nutrition TDEE
+outcome check** (does the recommended calorie target track the owner's actual weight trend?), then
+heart-rate (`HR_REST_THRESHOLD 0.05` has a documented rationale but was never validated against the
+owner's HR; `PEAK_BANDS` claim "stable per-bucket sample sizes" — an empirical claim never measured). Data exists for all three (77 sessions, 1,029 set logs, 3.5 months; body
 metrics and food logs; BLE HR since the re-key).
 
 ## Blocked
