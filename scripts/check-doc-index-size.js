@@ -191,7 +191,14 @@ const BASELINE = {
   // the whole recipe, so a naive renderer prints double what scanning the label logs. Each is
   // corrected where the wrong claim lives, so an implementer cannot read the stale number and build
   // to it. The plan itself is in docs/superpowers/plans/, which this ratchet does not govern.
-  'projectOverview.md': 6735,
+  //
+  // Raised 2026-08-18 (Q-541 task 3, Lane A): 6735 -> 6744. Nine lines onto the disk-full item, and
+  // eight of them exist to stop a reader drawing the wrong conclusion from the other eight raises:
+  // Tasks 0-3 have shipped and the database has NOT shrunk by a byte, because nothing writes a blob
+  // yet. Without that the section reads as progress against the 500 MB deadline when there is none.
+  // Carries the re-measured 819 MB (up from 786) and the Q-315 pointer. Recomputed from the merged
+  // file.
+  'projectOverview.md': 6744,
   //
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
