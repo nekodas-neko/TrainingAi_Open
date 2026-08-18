@@ -440,6 +440,44 @@ below threshold and left in place for next time.
 - **Lane B owns this** (`lib/sqlite/cache.ts` is shared, but every call site is Lane B surface —
   claim `lib/sqlite/cache.ts` in the baton before starting).
 
+### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
+
+- **Branch:** `docs/claude-md-repo-tz-line`
+- **Added:** 2026-08-18 · review sweep (server-side verification) ·
+  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](reviews/2026-08-18-server-tz-and-rate-limit-verification.md)
+- **Placement:** low. A one-clause documentation correction — but a load-bearing one, because it
+  misdirects anyone picking up **Q-477**.
+- **The line**, in the Date Arithmetic section:
+  > *"Repo day-window helpers currently **hardcode** `DEFAULT_TZ` — thread the session tz through when
+  > touching them, and never re-declare `DEFAULT_TZ` locally."*
+- **They do not hardcode it — they take it as a default parameter, and every caller passes the session
+  timezone:**
+
+  | Helper | Callers | Threads tz? |
+  |---|---|---|
+  | `getCalendarData(…, timezone = DEFAULT_TZ)` | `app/api/calendar-data` | ✅ |
+  | `getRecentTrainedDays(…, timezone = DEFAULT_TZ)` | `app/api/streak-data` | ✅ |
+  | `getNextSession(…, timezone = DEFAULT_TZ)` | 5 sites incl. `lib/ai-chat/tools.ts` | ✅ at all 5 |
+
+  A default every caller overrides is a safety net, not a hardcoded value.
+- **Why the stale line costs something.** It marks `lib/data` as a known-broken area, so an
+  implementer taking Q-477 (the client-side timezone sweep) starts there, finds nothing, and a
+  reviewer treats a repo call site as suspect when it is in fact the pattern to copy.
+- **The other half of the same sentence is holding** — zero local re-declarations of `DEFAULT_TZ`
+  outside `packages/shared/src/date-utils.ts`. Keep that clause verbatim.
+- **Fix:** replace the "currently hardcode" clause with what is true — the helpers *default* to
+  `DEFAULT_TZ` and every current caller threads the session tz; keep the instruction to keep doing so,
+  since the default is what makes forgetting silent.
+- **Filed rather than edited directly** because `CLAUDE.md` is the contract all five agents read, and
+  a Review agent quietly rewriting a rule line is a change the other four should see come through the
+  queue. Any lane can take it.
+- **Verified alongside, and worth keeping in the entry so it is not re-derived:** all 4
+  timezone-sensitive SQL sites in `lib/data` interpolate a parameter (no hardcoded zone string
+  anywhere in the repository layer), and every caller of the shared sleep helpers
+  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend`)
+  passes `tz`. **This bounds Q-477 to the client** — its fix does not need to touch `lib/data` or
+  `packages/shared/src/health`.
+
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
 
 - **Branch:** `fix/client-today-uses-user-timezone`
