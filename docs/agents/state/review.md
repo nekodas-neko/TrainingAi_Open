@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-five sweeps (2026-08-17 ×2, 2026-08-18 ×33) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **554**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
+**Updated:** 2026-08-18 · **By:** thirty-six sweeps (2026-08-17 ×2, 2026-08-18 ×34) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **555**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
 
 ## Now
 
-Thirty-five sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-six sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,39 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 36 — the orientation indexes named paths that do not exist (2026-08-18)
+
+**Filed AND fixed Q-554**, plus a second CI check (Custom Rules **42 of 42**). Write-up:
+[`docs/reviews/2026-08-18-orientation-index-paths.md`](../../reviews/2026-08-18-orientation-index-paths.md).
+
+**Same directive, extended one step:** `CLAUDE.md` has had a path check since Q-153, and its reasoning
+(*"nothing compiles it, so it rots silently and is copied confidently"*) applies verbatim to the other
+documents sessions must read — `module-map.md` and the eleven domain indexes. Neither was checked.
+
+**The find worth remembering: `module-map.md:232` had a row for a module that has NEVER existed** —
+`lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket`, zero references tree-wide. The real port
+is the row twenty lines below, itself flagged **"NOT yet wired"**. So the map presented *planned
+wiring* as existing infrastructure, in the one table read specifically to avoid re-implementing what
+exists. **When a doc's purpose is "what exists", a row describing intent is worse than no row.**
+
+Also: 3 stale domain rows (`app/history/`, `docs/oura-models/`, `app/overview/`) and **49** malformed
+`docs/../overview/…` display labels — link targets correct, visible labels not.
+
+**⚠️ Two method notes, both earned:**
+1. **First pass: 59 of 787 flagged, 4 real.** Relative fragments, globs, and the display bug. Ninth
+   consecutive over-report. **Budget the triage into the sweep — it IS the sweep.**
+2. **The fixes re-triggered my own check — twice, the second time in the sentence describing the
+   trap.** Writing *"there is no `app/overview/` route"* names the path in backticks exactly as
+   claiming it exists does; that is what `DELIBERATE` is for. Then the domain-index link line I wrote
+   to *describe* the 49 malformed labels quoted the malformed path itself, and tripped the check
+   again. **A doc that talks about a bad path contains a bad path.** Either exempt it or phrase it
+   without backticks — the second is usually right, since the reader needs the shape, not the string.
+
+**⚠️ Stated limit, worth a successor's attention:** the check verifies a path **resolves**, never that
+the prose beside it is true. Row 232 was caught only because its path happened to be wrong too. **A
+row naming a real file while describing behaviour it does not have still passes** — and that is the
+larger, unmeasured half of module-map accuracy.
 
 ### Sweep 35 — a Known Issue in two lists at once (2026-08-18)
 

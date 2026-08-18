@@ -18,7 +18,8 @@ the DB id, never the name. See CLAUDE.md, "No Hardcoded Session Names or Trainin
 | Write path (one function per domain) | `lib/workout/log-exercise.ts` — used by both the API route *and* the `pushMutations` branch |
 | Formulas | `lib/1rm.ts`, `lib/health/soreness-volume.ts`, `workout-density.ts`, `workout-energy.ts`, `strength-progress.ts`, `strength-projection.ts`, `workout-activities.ts` |
 | Prescription / AI | `lib/ai-periodization/`, `lib/session-explain/` |
-| UI routes | `app/workout/`, `app/workout-select/`, `app/session-select/`, `app/history/`, `app/config/`, `app/stats/` |
+| UI routes | `app/workout/`, `app/workout-select/`, `app/session-select/`, `app/config/`, `app/stats/` |
+| Past-workout surfaces | No `app/history/` route exists (removed; the row listing it was stale until 2026-08-18). History is rendered in place — `components/exercise-history-sheet.tsx`, opened from `app/session-select/session-select-content.tsx` and `app/stats/`. |
 | Tables | `programs`, `program_sessions`, `session_exercises`, `progression_styles`, `style_sets`, `schedules`, `workout_sessions`, `exercise_logs`, `set_logs`, `personal_records`, `exercise_library` |
 
 Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../CLAUDE.md)
@@ -26,6 +27,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-18-orientation-index-paths.md`](../../reviews/2026-08-18-orientation-index-paths.md) — **the orientation indexes named paths that do not exist, 2026-08-18** (Q-554 — `module-map.md:232` carried a row for `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket`, **neither of which has ever existed**; the real port is the row below and is itself flagged "NOT yet wired", so the map presented planned work as existing infrastructure. Plus three stale domain rows — `app/history/`, `docs/oura-models/`, `app/overview/` — and 49 malformed history display labels (a stray `../` made them resolve to a non-existent root `overview/`).) Now enforced by `scripts/check-index-doc-paths.js`, step 42 of 42, over **748 paths**.
 - [`docs/reviews/2026-08-16-deferred-measurements.md`](../../reviews/2026-08-16-deferred-measurements.md)
   — the measurements four entries deferred. **Rest is NOT the confound behind Q-289** (the error
   survives in all four rest bands), **Q-304's escape hatch did not fire** (28 of 29 high-rep sets
@@ -60,7 +62,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 - Plans: `ls docs/superpowers/plans/*workout*` (7 today) and `*prescription*`.
 - [`docs/superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md`](../../superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md)
   — Workstream D (**shipped**, #995 / v1.250.1, see
-  [`docs/../overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
+  [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
   accepting a phase transition emptied the prescription card permanently, because `advancePhase`
   writes `prescriptionStatus: 'none'` and every recovery path (the "Preparing" placeholder, the
   bounded poll, the client-side regeneration trigger) keys on `'consumed'`. The status a transition
@@ -123,13 +125,13 @@ Live at the time of writing (2026-07-30):
   (Q-87, v1.267.2)** — an "Up Next" card (name + planned starting weight via the shared
   `computeInitialWeights` formula) now renders on the rest countdown, null-safe at the last
   exercise of a session. Outcome:
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - ~~The header refresh button on the pre-workout screen flashed "done" while an AI regeneration
   was still in flight underneath it~~ **fixed 2026-08-06 (Q-86, v1.267.3)** — a decoupled-feedback
   bug, not a caching bug: the button was bound only to its own unrelated re-fetch's loading flag.
   Now bound to `prescriptionPending` too, so it stays disabled/spinning for the whole generation
   window. Outcome:
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md).
 - 🟡 **Q-11 (shared with `heart-rate`)** — the two attribution-timing defects are fixed (v1.257.2,
   v1.266.1); a device-side coverage-quality question remains, to be re-measured now that new
   sessions attribute same-day.
@@ -206,17 +208,17 @@ Live at the time of writing (2026-07-30):
   (Q-63 — skip button needs a confirm; Q-64 — voice logging dead on the APK; Q-65 — PiP missing the
   rest countdown on the exercise-summary screen), same reason.
 - Journal: `grep -rl 'workout\|prescription\|1RM' docs/overview/entries/` — including
-  [`docs/../overview/history-2026-07-28.md`](../../overview/history-2026-07-28.md)
-  and [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
+  [`docs/overview/history-2026-07-28.md`](../../overview/history-2026-07-28.md)
+  and [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-115-followup — the sore-muscle check-in now predicts and warns about a whole-session deload
   escalation instead of always promising a narrow one).
-  Also [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
+  Also [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-109 — Home's manual Deload choice now actually reduces the prescribed load on an AI-dynamic
   session instead of only tagging cosmetic metadata).
-  Also [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
+  Also [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-106 — the home "Recommended Today" card's memo now recomputes once the `workout-data:all`
   batch actually populates its `workout-card:<id>` cache entry, instead of freezing on "Last: —").
-  Also [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
+  Also [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-117 — confirming an early deload and logging an injury both now invalidate the caches that
   hold today's plan, and the injury fingerprint reaches the server-side re-evaluation skip check
   too; previously up to 6 hours stale on both counts).
@@ -250,7 +252,7 @@ Live at the time of writing (2026-07-30):
   exclude its sets unconditionally, which `useFor1rm` alone cannot express — use `estimateOneRm`'s
   explicit `deloaded` option instead (short-circuits to a zero estimate before either formula runs).
   Found because the obvious `useFor1rm: !presc.deloaded` fix silently didn't work (Q-115,
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)).
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)).
 - **A deload signal set on `AiPrescriptionExercise` needs to reach `estimateOneRm`'s `deloaded`
   option at every construction site** — `buildWholeSessionDeloadPrescription` once built exercises
   with no per-exercise `deloaded` flag at all (only a prescription-level boolean nothing downstream
@@ -265,7 +267,7 @@ Live at the time of writing (2026-07-30):
   the toggle on every AI-dynamic session (the normal state for this program). Fixed by reading
   `aiDeload` inside the `aiDrivesLoad` branch and applying `deloadOverrideForGoal()` directly, skipped
   when the exercise is already auto-deloaded (`p.deloaded`) so the two reductions don't compound
-  (Q-109, [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)).
+  (Q-109, [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)).
   Any future manual override of AI-driven behaviour needs the same check: does the flag actually
   reach the branch that's live, or only a parallel mechanism that AI-dynamic mode bypasses?
 - **…and there are TWO deload-confirmation entry points, so fixing one leaves the bug alive.** The
@@ -275,7 +277,7 @@ Live at the time of writing (2026-07-30):
   *week* still produced full-intensity numbers for seven days. `isEarlyDeloadWeek()` now answers the
   window without a phase, both `workout-data` paths surface it, and the builder reads
   `aiDeload || isDeloadActive` (Q-175,
-  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)).
+  [`docs/overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)).
   **Q-185 is closed** (this line previously said "still open"): the un-prescribed branch below the
   `if (aiDrivesLoad)` block reduces an exercise the prescription does not name — every accessory,
   and every session with an expired prescription — verified in source and on the dev server

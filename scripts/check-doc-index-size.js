@@ -18,6 +18,11 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// 2026-08-18 (Review, Q-554 orientation-index paths): backlog -> 9876, projectOverview -> 7806.
+// One queue entry and its row. Both keep the module-map specifics (row 232, decodeStepsPacket, zero
+// references) because "a doc named a path that does not exist" is forgettable while "the map read to
+// avoid re-implementing things listed something never built" is the reason the check exists.
+//
 // 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
 // projectOverview SHRANK by ~70 lines here even after adding an entry: Q-139's stale 69-line
 // "OPEN" body was replaced with a compact device-check row, and Q-81's duplicate archive copy was
@@ -736,7 +741,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7785,
+  'projectOverview.md': 7806,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -747,7 +752,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9841,
+  'docs/implementation-backlog.md': 9876,
   'CLAUDE.md': 1075,
 
 };
