@@ -18,6 +18,15 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, seed-only read paths — case (b)): projectOverview 7439 -> 7468. No
+// queue entry; the audit found no gap. The row is worth its lines for two things that are otherwise
+// rediscovered by running a bad test: the mechanical seed-only check (readCacheSync minus
+// cachedFetch) OVER-REPORTS, because revalidation also happens via a raw fetch+setCached and via a
+// local-store read+setCached — and the third is the app's most authoritative path, so a
+// network-shaped test marks it stale. Plus: a `Q-NNN:` comment here is usually a fix's rationale,
+// not an open defect. That misread cost a false alarm twice in this run (Q-117, Q-126).
+
+//
 // Raised 2026-08-18 (Review, load-bearing cache audit): projectOverview 7411 -> 7439. No queue entry
 // — the audit found no gap. The row is the *result table* plus two things that would otherwise be
 // rediscovered the hard way: session-select-content.tsx:896's "never invalidated" comment is the
@@ -634,7 +643,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7439,
+  'projectOverview.md': 7468,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that

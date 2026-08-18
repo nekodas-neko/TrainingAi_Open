@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-one sweeps (2026-08-17 ×2, 2026-08-18 ×19) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **488**)
+**Updated:** 2026-08-18 · **By:** twenty-two sweeps (2026-08-17 ×2, 2026-08-18 ×20) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **488**)
 
 ## Now
 
-Twenty-one sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-two sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,28 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 22 — case (b), seed-only read paths; the lens is now closed (2026-08-18)
+
+**Filed nothing. Both halves of Q-262's staleness test are now audited and clean.** Write-up:
+[`docs/reviews/2026-08-18-seed-only-read-paths.md`](../../reviews/2026-08-18-seed-only-read-paths.md).
+
+**⚠️ The mechanical test over-reports — do not use it.** `readCacheSync` keys minus `cachedFetch` keys
+(51 vs 66) gives five "seed-only" candidates; **all five revalidate.** Revalidation happens **three**
+ways and `cachedFetch` is only one: (1) `cachedFetch`, (2) a raw `fetch` + `setCached`, (3) a
+**local-store read** + `setCached`. **The third is the trap** — for an offline-first domain the local
+store *is* the source of truth, so a network-shaped test marks the app's most authoritative paths
+stale. The real test is "no write-back to the key from any source after the seed", which is not
+greppable; read each candidate.
+
+**⚠️ A `Q-NNN:` comment in this codebase is usually a fix's rationale, not an open defect.** That cost
+a false alarm **twice** this run — Q-117 (`session-select-content.tsx:896`, "never invalidated … up to
+6 hours") and Q-126 (`workout-screen.tsx:272`, "reported the user's entire lifetime XP"). Both read
+exactly like live bug reports; the fix is the line below. Check before reaching for the alarm.
+
+**Where this lens goes next:** not further into Q-262's test, which is exhausted. A stale-value bug
+arising some *other* way — a write that updates the DB without touching the local store — is outside
+what that test catches and has never been looked for.
 
 ### Sweep 21 — which cache invalidations are actually load-bearing (2026-08-18)
 
