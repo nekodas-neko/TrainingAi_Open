@@ -103,6 +103,42 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] 🔴 Production says the sync-push blind spot is real: pull has recorded 69 faults, push has recorded zero, ever (2026-08-18)
+
+- **This run's fourteen findings checked against production**, the same exercise that corrected four
+  findings in sweep 8.
+  [`docs/reviews/2026-08-18-production-verification-round-2.md`](docs/reviews/2026-08-18-production-verification-round-2.md).
+  Nothing new filed; **six entries amended**.
+- **Q-475 upgraded from "measured locally" to "the precondition has occurred, repeatedly."**
+
+  | Route | Faults in `error_events` | Span |
+  |---|---|---|
+  | `/api/sync/pull` | **69** | 2026-07-19 → 2026-08-13 |
+  | `/api/sync/push` | **0** | none, ever |
+
+  Over the same window the database refused connections **125 times across six days** (39 on
+  2026-08-12), with one pull row reading `[cause: timeout exceeded when trying to connect]`.
+- **The zero is evidence, not absent traffic.** `components/sync-provider.tsx` runs
+  `await pushMutations(userId)` at :139 and `pullDelta` at :145 — **push first, same cycle**. Push is
+  not less exposed than pull; it runs before it. So the zero means **"push cannot report"**, which is
+  precisely what Q-475 describes: `pushMutations` catches per-mutation, returns 200 with the failure
+  in the body, and never calls `reportServerError`. **The one table designed to catch faults that
+  never reach a human has a blind spot exactly where that finding lives.**
+- **Q-482 and Q-483 confirmed never triggered** — zero `22P02` rows ever, so a malformed route id has
+  not reached production and the SQL-leaking 500 has never been served. Both were filed low; **do not
+  re-price them upward from the local 500s alone.**
+- **Q-484 latent confirmed** — `claude_ro.injuries` is **empty**; the route that accepts a 10 MB note
+  has stored nothing at all.
+- **Q-481 and Q-485 cannot be adjudicated from production, and one of them has a trap.** Water: 4 days
+  logged, max 1000 ml — too thin for a double-count to show, so read it as the feature being unused,
+  not as the replay not happening. Weight: 35 of 114 rows have steps and a NULL weight, which is **the
+  expected shape** (steps daily from the ring, weight only on scale use) and **must not be cited** as
+  coerced-away weights — the same trap as Q-460's "74% lack an RPE".
+- **The standing constraint:** `claude_ro` is row-scoped to one user and `error_events` prunes at 30
+  days. Every count is *the owner's, recently* — a zero means the owner never hit it, never that no
+  user did. Push *traffic volume* could not be measured directly; the argument that push runs is from
+  the call site, not a counter.
+
 ### [workouts][devices] 🟠 The outbox enqueue for a workout is the only write in the app that fails silently — and it is the last line of defence (Q-486, 2026-08-18)
 
 - **Following the pattern sweep 18 named** (*this app validates well and tells you badly*) to its most
@@ -7327,6 +7363,7 @@ append-only session journal and the batched archives live under `docs/`:
 | `docs/overview/entries/` | **Recent journal (uncompacted)** — one file per PR/session (`YYYY-MM-DD-<slug>.md`); read these + the newest history file for "what happened lately". Folded into the batched history by the compaction sweep — see the README there. **Corrected 2026-07-30:** this line said "near-empty (compacted 2026-07-20)" but the directory holds ~179 files from 07-20→07-29 — the compaction sweep is overdue; a future session should run it. |
 | [`docs/agents/README.md`](docs/agents/README.md) | **The standing agents** — the four roles, their authority, the two-lane file-ownership contract, the Q-number bands, and the handoff protocol. Cold-start prompts in `docs/agents/prompts/`, live batons in `docs/agents/state/` |
 | `docs/overview/status-archive.md` | The 157 dated status notes that had accumulated in this file's Current Status section, archived 2026-08-17. Superseded by the journal; do not add to it |
+| `docs/overview/history-2026-08-18.md` | **Completed journal (batched)** — 19 entries folded by the 2026-08-18 compaction sweep. Only entries **no durable doc linked to** were folded; each keeps a `<!-- folded from … -->` marker. A new file rather than an append, because `history-2026-08-15.md` was already at 218 KB |
 | `docs/overview/history-2026-08-15.md` … `history-2026-07-17.md` | **Completed journal (batched)** — nine files covering 2026-07-17 → 2026-08-15, folded from 498 loose entries by the 2026-08-17 compaction sweep, oldest-first within each. Every entry keeps a `<!-- from: … -->` marker naming the PR file it came from |
 | `docs/overview/history-2026-07-20.md` | **Completed journal (batched)** — the 2026-07-17 → 2026-07-20 loose entries, compacted 2026-07-20, newest at top |
 | `docs/overview/history-2026-07-16.md` | **Completed journal (batched)** — sessions 2026-07-16 → 2026-07-17, newest at top |

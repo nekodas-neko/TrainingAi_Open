@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** nineteen sweeps (2026-08-17 ×2, 2026-08-18 ×17) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **487**)
+**Updated:** 2026-08-18 · **By:** twenty sweeps (2026-08-17 ×2, 2026-08-18 ×18) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **487**)
 
 ## Now
 
-Nineteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,30 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 20 — this run's fourteen findings, checked against production (2026-08-18)
+
+**Filed nothing; amended six entries.** Sweep 8 did this and corrected four findings; fourteen more had
+accumulated unchecked. Write-up:
+[`docs/reviews/2026-08-18-production-verification-round-2.md`](../../reviews/2026-08-18-production-verification-round-2.md).
+
+**Q-475 upgraded, and it is the strongest result of the run.** `/api/sync/pull` has **69** faults in
+`error_events` (2026-07-19 → 2026-08-13); `/api/sync/push` has **zero, ever** — across six days with
+**125** database connection failures (39 in one day). `sync-provider.tsx` runs `await
+pushMutations()` at :139 and `pullDelta` at :145, **push first, same cycle**, so the zero is not
+absent traffic — it is **push cannot report**. The table designed to catch invisible faults has a
+blind spot exactly where that finding lives.
+
+**Q-482/Q-483 never triggered** (zero `22P02` ever) — filed low, and should stay there.
+**Q-484 latent confirmed** — `injuries` is empty. **Q-481 and Q-485 unprovable from production**, and
+Q-485's obvious query (35/114 rows with steps and no weight) is **the expected shape**, not evidence —
+same trap as Q-460's "74% lack an RPE".
+
+**Make this a habit, not a one-off.** Two rounds have now run and both changed how findings should be
+read — sweep 8 corrected four, this one upgraded one and stopped four from being over-priced. **Run it
+before a run's findings are handed to an implementer, not after.** And write the amendment into the
+entry itself: `error_events` prunes at 30 days, so the pull-69/push-0 asymmetry cannot be re-derived
+later.
 
 ### Sweep 19 — the last line of defence for a workout, failing silently (2026-08-18)
 

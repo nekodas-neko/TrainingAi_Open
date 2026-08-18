@@ -287,6 +287,14 @@ below threshold and left in place for next time.
 
 ### [platform][devices] Q-475 — a database outage reaches the client as HTTP 200, so the backoff written for it never fires and ~43 minutes of downtime dead-letters the whole outbox
 
+- **✅ PRODUCTION-CONFIRMED 2026-08-18 — the precondition has occurred, repeatedly.**
+  `/api/sync/pull` has **69** faults in `error_events` (2026-07-19 → 2026-08-13); `/api/sync/push` has
+  **zero, ever**. Over the same window the database refused connections **125 times across six days**
+  (39 in one day), one pull row reading `[cause: timeout exceeded when trying to connect]`.
+  `components/sync-provider.tsx` runs `await pushMutations(userId)` at :139 and `pullDelta` at :145 —
+  **push first, same cycle** — so the zero is not "push never ran", it is **"push cannot report"**,
+  which is exactly this finding. Raises the priority argument, does not change the fix.
+  [`docs/reviews/2026-08-18-production-verification-round-2.md`](reviews/2026-08-18-production-verification-round-2.md)
 - **Branch:** `fix/sync-push-classify-retryable-errors`
 - **Added:** 2026-08-18 · review sweep (offline-sync failure paths) ·
   [`docs/reviews/2026-08-18-outbox-under-failure.md`](reviews/2026-08-18-outbox-under-failure.md)
@@ -345,6 +353,10 @@ below threshold and left in place for next time.
 
 ### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
 
+- **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events` (owner's
+  rows, retained window), so the SQL-leaking response has, on this evidence, **never been served to
+  anyone**. Keep the fix — it is three lines and the disclosure is real — but do not re-price this
+  upward from the 500s alone.
 - **Branch:** `fix/no-raw-error-in-response-body`
 - **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
   [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
@@ -430,6 +442,10 @@ below threshold and left in place for next time.
 
 ### [body][platform][devices] Q-485 — an implausible weight is refused with a message on web and discarded without trace on the device path
 
+- **⚠️ PRODUCTION CANNOT ADJUDICATE THIS, and the obvious query is a trap (checked 2026-08-18).**
+  35 of 114 `body_metrics` rows have steps and a NULL weight — **that is the expected shape**, since
+  steps arrive daily from the ring and weight only when the owner uses a scale. **Do not cite it as
+  evidence of coerced-away weights.** Same trap as Q-460's "74% lack an RPE".
 - **Branch:** `fix/push-coercion-visibility`
 - **Added:** 2026-08-18 · review sweep (numeric bounds across both write paths) ·
   [`docs/reviews/2026-08-18-implausible-value-silent-drop.md`](reviews/2026-08-18-implausible-value-silent-drop.md)
@@ -478,6 +494,9 @@ below threshold and left in place for next time.
 
 ### [platform][body][nutrition] Q-484 — `POST /api/injuries` stores a 10 MB note; its own PATCH sibling caps the same field at 1,000 characters
 
+- **✅ PRODUCTION-CHECKED 2026-08-18 — latent confirmed.** `claude_ro.injuries` is **empty** (0 rows)
+  and `claude_ro.supplements` holds 2 rows with a max name of 9 chars. Nothing oversized exists; the
+  low-severity filing is right.
 - **Branch:** `fix/create-route-body-schemas`
 - **Added:** 2026-08-18 · review sweep (oversized/unvalidated bodies) ·
   [`docs/reviews/2026-08-18-unvalidated-create-bodies.md`](reviews/2026-08-18-unvalidated-create-bodies.md)
@@ -528,6 +547,8 @@ below threshold and left in place for next time.
 
 ### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
 
+- **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events`. A
+  malformed id has not reached production, which matches how this was filed (*"not a security hole"*).
 - **Branch:** `fix/dynamic-route-uuid-guard`
 - **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
   [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
@@ -627,6 +648,10 @@ below threshold and left in place for next time.
 
 ### [nutrition][platform] Q-481 — a water quick-add replayed by the outbox triple-counts; it is the one non-idempotent mutation of the nineteen
 
+- **⚠️ PRODUCTION CANNOT ADJUDICATE THIS (checked 2026-08-18).** `body_metrics` has **4 days** with
+  `water_ml`, max **1000 ml**, none over 6 L. No double-count signature — **and not enough water
+  logging for one to appear.** Read this as the feature barely being used, NOT as the replay not
+  happening. The finding stands on its local measurement.
 - **Branch:** `fix/outbox-water-delta-dedupe`
 - **Added:** 2026-08-18 · review sweep (at-least-once delivery) ·
   [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](reviews/2026-08-18-outbox-replay-idempotency.md)

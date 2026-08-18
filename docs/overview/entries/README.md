@@ -78,6 +78,14 @@ different ways. Both are mechanical; neither is obvious until it happens.
    link inside the entry loses a level when it moves. Missing this left 6 broken links pointing one
    directory too high.
 
+**Measured again 2026-08-18 (second sweep):** 61 loose entries, of which **41 were cited by a durable
+doc** and only **20 were foldable**; 19 were folded (this run's own in-flight entry was held back) and
+the directory settled at **42** — above the 20-file chore threshold but under the 60-file hard limit
+that blocks CI. So the floor named below is real and it moved: 32 after the first sweep, 42 after this
+one. A third sweep will free fewer still. The two mechanical rules above (fold only unlinked entries;
+rewrite `](../../` → `](../`) both held — `pnpm check:rules` passed 40/40 first try, which is the
+first time this chore has not cost a red CI run.
+
 **The standing tension worth naming:** a fold-everything sweep and durable docs linking entries are
 incompatible, and today the docs win — which means the loose directory has a floor that grows.
 Resolving it properly means either the sweep rewriting citations to the history file it folded into
