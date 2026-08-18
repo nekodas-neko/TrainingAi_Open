@@ -138,6 +138,33 @@ order.
 - **Not verified on:** the APK or production; `ISACTIVE_RECHECK_MS` is read from source, not observed
   over a real 24-hour window.
 
+### [platform] ✅ The server side of the timezone problem does not exist — verified at every layer below the routes (Q-480, 2026-08-18)
+
+- **A verification sweep, written up because a clean result is a result.**
+  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md).
+  Sweep 11 concluded "the server is correct" by counting `todayInTz()` **inside route files**, which
+  is not the whole server — a blameless route can still get a Brisbane answer if the repository
+  function it calls defaults the timezone. This sweep went looking for that half. **It is not there.**
+- **Checked and clean:** every caller of the three tz-defaulting repository helpers
+  (`getCalendarData`, `getRecentTrainedDays`, `getNextSession`) passes the session timezone; all
+  **four** timezone-sensitive SQL sites in `lib/data` interpolate a parameter, with **no hardcoded
+  zone string anywhere in the repository layer**; and every call site of the shared sleep helpers
+  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend` —
+  the ones that decide which calendar day a night belongs to) passes `tz`. Zero local re-declarations
+  of `DEFAULT_TZ`.
+- **This bounds Q-477.** The wrong-timezone problem is **exclusively client-side**; its fix does not
+  need to touch `lib/data` or `packages/shared/src/health`.
+- **Q-480 is the one finding, and it is a documentation correction.** `CLAUDE.md` says *"Repo
+  day-window helpers currently **hardcode** `DEFAULT_TZ`"*. They do not — they take it as a default
+  parameter that every caller overrides. The stale line marks the repository layer as known-broken, so
+  an implementer taking Q-477 would start there and find nothing. Filed rather than edited directly,
+  because `CLAUDE.md` is the contract all five agents read.
+- **Rate limiting swept in the same pass, also clean:** all **13** routes calling
+  `generateObject`/`generateText`/`streamText` are rate-limited, and **all 104 `rateLimit` keys are
+  user- or IP-scoped** — zero global keys, so no route where one user's traffic can throttle another's.
+- **Not covered:** whether any limit is set at the right *number*, the client half of rate limiting,
+  the APK, or production.
+
 ### [app-shell][platform] 🟠 The app run as a user who is not in Brisbane: the server follows their timezone, 100 of 125 client call sites do not (Q-477, Q-478, 2026-08-18)
 
 - **The blind spot `CLAUDE.md` names, entered for the first time.** All 30 user rows in the local DB

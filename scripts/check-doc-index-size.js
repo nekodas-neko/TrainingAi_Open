@@ -18,6 +18,15 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, server-side verification sweep, Q-480): backlog 8967 -> 9005,
+// projectOverview 7157 -> 7184. One queue entry and one Known-Issues row, both for a sweep that
+// found nothing. The lines are the *inventory of what was checked* — which repository and shared
+// helpers thread the session tz, that all four timezone-sensitive SQL sites are parameterised, that
+// all 104 rate-limit keys are user- or IP-scoped — and that inventory is the entire value: without
+// it the next sweep re-derives it, and Q-477's fix scope stays unbounded. A clean result costs lines
+// exactly once.
+
+//
 // Raised 2026-08-18 (Review, auth/session-boundaries sweep, Q-479): backlog 8846 -> 8894,
 // projectOverview 7122 -> 7157. One queue entry and its Known-Issues row. Both carry the measured
 // A/B inline (POST /api/exercises 201 against GET /api/admin/errors 403, same cookie, same instant)
@@ -562,12 +571,12 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7157,
+  'projectOverview.md': 7184,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
   // invalidates PR #85's claim.
-  'docs/implementation-backlog.md': 8967,
+  'docs/implementation-backlog.md': 9005,
   'CLAUDE.md': 1075,
 
 };

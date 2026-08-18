@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twelve sweeps (2026-08-17 ×2, 2026-08-18 ×10) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **480**)
+**Updated:** 2026-08-18 · **By:** thirteen sweeps (2026-08-17 ×2, 2026-08-18 ×11) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **481**)
 
 ## Now
 
-Twelve sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,32 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 13 — verifying the server side; a clean sweep, written up as one (2026-08-18)
+
+**Went looking for the server half of Q-477 and it is not there.** Write-up:
+[`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](../../reviews/2026-08-18-server-tz-and-rate-limit-verification.md).
+
+Sweep 11 based "the server is correct" on counting `todayInTz()` **inside route files** — not the
+whole server, since a blameless route still gets Brisbane if the repo function it calls defaults the
+tz. Checked and clean: every caller of the tz-defaulting repository helpers threads the session tz;
+all **4** timezone-sensitive SQL sites in `lib/data` are parameterised (no hardcoded zone string
+anywhere in the repository layer); every call site of the shared sleep helpers (`nightSessions`,
+`sleepScoreBaselines`, …) passes `tz`; zero local `DEFAULT_TZ` re-declarations. **This bounds Q-477 to
+the client.**
+
+Rate limiting swept in the same pass: all **13** AI routes limited, all **104** `rateLimit` keys
+user- or IP-scoped, **zero global keys**.
+
+**Filed Q-480 (low) — a documentation correction.** `CLAUDE.md` calls the repo day-window helpers
+timezone-*hardcoded*; they take a **default parameter** every caller overrides. The stale line marks
+`lib/data` as known-broken, so whoever takes Q-477 starts there and finds nothing. **Filed rather than
+edited directly** — `CLAUDE.md` is the contract all five agents read, and a Review agent quietly
+rewriting a rule line is a change the other four should see come through the queue.
+
+**Worth carrying: a clean sweep is a result.** It is written up at length on purpose — the inventory
+of what was checked is the deliverable, so sweep 14 does not re-derive it. Do not manufacture a
+finding to justify a sweep; do record what was ruled out.
 
 ### Sweep 12 — does revoking access actually revoke it? (2026-08-18)
 
