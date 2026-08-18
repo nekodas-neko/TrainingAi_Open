@@ -103,6 +103,41 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [platform] 🟠 A revoked admin keeps one write for up to 24 hours, and the module docstring says it cannot (Q-479, 2026-08-18)
+
+- **The first sweep to test privilege *revocation* rather than cross-user data isolation.**
+  [`docs/reviews/2026-08-18-auth-session-boundaries.md`](docs/reviews/2026-08-18-auth-session-boundaries.md).
+- **`lib/admin.ts` holds two admin checks that disagree.** `requireAdmin` takes an `_isAdmin`
+  argument and deliberately **ignores** it, reading the row every call — **61 API routes** use it, and
+  revocation is immediate on all of them. `isAdminUser` **returns the passed flag** when given one.
+  Seven of its ten call sites pass the JWT claim; six are page guards (UI, correct), and the seventh
+  is **`app/api/exercises/route.ts:38`**, an API write into `exercise_library` — the catalogue every
+  user reads.
+- **The claim refreshes once a day.** `ISACTIVE_RECHECK_MS = 24h` in `lib/auth/is-active-refresh.ts`,
+  a sound throttle. What is not sound is its docstring: *"This governs the **UI** only: `requireAdmin`
+  … never trusts this claim."* That is false, and it is why this was easy to miss — a reviewer who
+  reads it stops looking. **The wrong comment is more dangerous than the wrong call, because it
+  scales to the next admin route someone adds.**
+- **Measured with a control**, admin revoked in the DB with no re-login and cookie rotation persisted
+  as a browser does: `POST /api/exercises` → **201** (row created) while `GET /api/admin/errors` →
+  **403**, same cookie, same instant. Session claim still read `isAdmin: True`.
+- **Severity moderate-low and stated as such:** what a revoked admin gains is rows in a catalogue —
+  no health data, no other user's rows, no credentials. It is filed because it is privilege
+  persistence with a working proof of concept and the fix is deleting one argument.
+- **Five clean results recorded:** all 61 `requireAdmin` routes DB-check; the six page guards are
+  genuinely UI and should NOT be "fixed"; `/api/health-connect/ingest` fails closed with its secret
+  unset *and* on an empty secret, with an IP limiter before a constant-time compare and an identical
+  401 body — the reference implementation for the fail-closed rule; both bearer paths
+  (`day-review`, `db-query`) fail closed on partial config; and the claim-refresh module itself is
+  careful (a missing row is not deactivation, a failed lookup does not advance the timestamp, a DB
+  blip cannot sign everyone out).
+- **⚠️ Method note worth more than the finding.** The first run of this test reported revocation
+  **working** and was wrong: `curl -b` without `-c` discards the rotated cookie, so every request
+  re-sent a token with no `isActiveCheckedAt`, the throttle never engaged, and the DB was re-read
+  every time. **A session-staleness test is meaningless unless the client persists cookie rotation.**
+- **Not verified on:** the APK or production; `ISACTIVE_RECHECK_MS` is read from source, not observed
+  over a real 24-hour window.
+
 ### [app-shell][platform] 🟠 The app run as a user who is not in Brisbane: the server follows their timezone, 100 of 125 client call sites do not (Q-477, Q-478, 2026-08-18)
 
 - **The blind spot `CLAUDE.md` names, entered for the first time.** All 30 user rows in the local DB
