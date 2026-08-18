@@ -329,7 +329,13 @@ const BASELINE = {
   // the backlog, finding 4 is struck in place with the three consequences the entry did not
   // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
   'projectOverview.md': 6871,
-  'docs/implementation-backlog.md': 7207,
+  // Raised 2026-08-18 (owner-directed session, Q-543): 7207 -> 7245. One entry for the doc-index
+  // BASELINE object being the repo's most reliable merge conflict — three of the four CI rounds on
+  // #69 were base collisions on THIS object, none on the content being changed. Its 33 lines carry
+  // the measurement, the two candidate shapes, and the warning not to solve it by deleting the
+  // raise-history prose, since at least one note records a near-miss where a splice would have
+  // reverted another lane's raise. Recomputed from the merged file.
+  'docs/implementation-backlog.md': 7245,
   'CLAUDE.md': 1044,
 
 };
