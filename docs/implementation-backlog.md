@@ -676,11 +676,21 @@ moving *beside* the calories rather than under them.
   pitch is **0.353 mm** — below every shipped style, not merely below the "0.487 floor" this entry
   names. It buys three of five ingredient lines at 6.5 px in exchange for the least reliable code in
   the set. Recommendation: do not build it; the square die is the answer to wanting the list on paper.
-- **Still open:** option 2 above, and **the stored default**, which stays blocked on **Q-392** exactly
+- **✅ SUPERSEDED AND CLOSED by Q-397, shipped 2026-08-18 (v1.324.0).** This entry's central
+  premise — that the list "does not fit on a round one" — was true only for a **stacked** list. The
+  owner's actual suggestion was an **inline wrapping run**, which spends width instead of height:
+  five ingredients become three wrapped lines rather than five, and the height handed back goes to
+  the code. The complete list now fits a **round** label with a code larger than the old default's.
+  **B2 — round-safe, inline, centred, complete list — is the new `DEFAULT_MEAL_LABEL_STYLE`**, at
+  0.529 mm per module against the old default's 0.369, both now asserted in
+  `components/nutrition/__tests__/meal-label-code-size.test.ts` per Q-397's verification note.
+  Option 2 as costed here is moot; the stacked square style stays in the picker.
+- **Still open:** **the stored default**, which stays blocked on **Q-392** exactly
   as this entry says — the style remains picked-at-print-time and nothing was persisted.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
-  whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
-  without an explicit owner decision recorded here; and if a square-only variant ships, the app makes
+  whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
+  decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
+  now 0.529 and the old one measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
   clear which labels are square-only rather than letting a round die silently crop the list.
 - **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
@@ -1007,6 +1017,7 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
+<<<<<<< HEAD
 ### [nutrition] Q-397 — the shipped ingredient label is the SUPERSEDED design; inline wrapping is what was agreed
 
 - **Branch:** `fix/meal-label-inline-ingredients`
@@ -1121,6 +1132,8 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
   indistinguishable from a hand-built one, so the label path is the test that proves it.
 
+=======
+>>>>>>> origin/main
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
 - **Branch:** `feat/nutrition-visual-uplift`
@@ -4430,6 +4443,59 @@ session working from a temporarily restored copy.
   only the banding and its populations. Cardio/chest-strap **episodes** were not examined; the claim
   that the range exists there comes from raw `oura_heartrate`, since `set_hr_stats` is strength-derived
   by construction.
+
+### [nutrition] Q-517 — adaptive-TDEE can hand the user a maintenance below their own BMR
+
+- **Branch:** `fix/adaptive-tdee-bmr-floor`
+- **Plan:** none — one constant becomes a computed value. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](reviews/2026-08-18-nutrition-tdee-calibration.md)
+- **`adaptive-tdee.ts` already anticipated this.** Its header warns an ungated estimate *"would tell
+  the user their maintenance is 1200 kcal — actively harmful advice"*. This measures whether the gates
+  hold. **They hold 75% of the time; the lowest value that gets through is 1,052 kcal.**
+- **Input condition (not a defect, nothing filed):** the food log captures **~45%** of actual intake —
+  44 logged days of 110, mean **1,223 kcal**, 43% of logged days under 1,200, 4.8 entries/day. Against
+  75 weigh-ins over 109 days (slope **+8.0 g/day** = **+62 kcal/day** balance) and a Cunningham BMR of
+  **1,698** × 1.55 = predicted TDEE **2,632**, implied actual intake is **~2,694**. Taking the log at
+  face value implies maintenance **1,161 — below BMR**, which is arithmetic proof of under-logging.
+- **Replay of the shipped gates**, every rolling window:
+
+  | outcome | 14-day (97) | 28-day (83) |
+  |---|---|---|
+  | blocked, coverage/span | 72 | 61 |
+  | `implausible_result` | 2 | 0 |
+  | **PASSED** | **23 (24%)** | **22 (27%)** |
+  | passing range | **1,052–2,219** | **1,246–1,889** |
+
+- **`MIN_PLAUSIBLE_MAINTENANCE = 1000` sits just below the artefact** — this owner's lands at **1,052**,
+  clearing it by 52 kcal. The module's own comment predicted the failure at 1,200; the floor was set
+  200 below that prediction and the real value slipped between them.
+- **The values are also unstable** — 1,052–2,219 for the same person within weeks (a 1,167 kcal range).
+- **Why the coverage gates cannot catch it:** `MIN_LOGGED_FRACTION` counts **days carrying a log**, not
+  whether each day's log is **complete**. A day with only breakfast counts as fully logged — exactly
+  this owner's pattern — so a 45%-complete record sails through a 70%-coverage gate. **The gates
+  measure the wrong kind of incompleteness.**
+- **It reaches the user's target.** `TdeeAdaptationCard` writes the accepted value through
+  `PUT /api/nutrition/targets`, which its own docstring calls the source of truth for the daily target,
+  mirroring into `users.calorie_goal`. A 1,052 maintenance is one tap from becoming the calorie goal of
+  someone whose BMR is 1,698.
+- **First action: replace `MIN_PLAUSIBLE_MAINTENANCE` with the user's own BMR.** Maintenance below BMR
+  is impossible *by definition*, not implausible by taste, and `cunninghamBmr` is already imported in
+  the same package. Measured: 14-day passing 23 → **11**, range **1,902–2,219**; 28-day 22 → **10**,
+  range **1,707–1,889**. Every harmful value blocked.
+- **It makes the estimate SAFE, not CORRECT.** Survivors still sit ~500 kcal under the formula's 2,632
+  — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
+- **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of
+  windows and structurally cannot see within-day incompleteness, so raising it drops good windows and
+  keeps bad ones; (2) **do not scale logged intake up** by an under-logging multiplier inferred from
+  the weight trend — that is circular, since maintenance is derived from the same trend, and would
+  reproduce the assumed TDEE as if measured.
+- **Durable fix, larger and separate:** detect within-day incompleteness (expected vs logged meals, or
+  an intake floor relative to BMR) and treat such a day as **unlogged** rather than low. A feature, not
+  a constant.
+- **Recorded, not filed:** `tdeeAdjustment` (`tdee-adaptation.ts`) is **dead code** — referenced only by
+  its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
+  `amrapScaleFactor` (Q-514); do not calibrate it.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
