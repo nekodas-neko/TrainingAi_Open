@@ -368,6 +368,14 @@ const BASELINE = {
   // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
   // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
   // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
+  //
+  // Raised 2026-08-18 (Q-535 Lane A half, Lane A): 7462 -> 7491. Two things the queue cannot afford
+  // to lose: Q-535 now says the 502 is NOT gone yet and why the default was left alone (both
+  // consoles report completion from the synchronous shape, so flipping it blind would have them
+  // state that started work had finished), and half its own premise expired the same day — the
+  // row-walking phase became a no-op, so the `scanned=1098158` figures it quotes are historical.
+  // Plus the new Q-318 entry carrying the exact response contract, so the other lane does not have
+  // to read the route to build against it.
   // Raised 2026-08-18 (Tuning): 7514 -> 7596, recomputed from the MERGED file. Q-509/Q-510 (BLE-era
   // input drift) plus Q-501's "did it land" half marked resolved. Q-509's entry carries the
   // anchor-vs-input ratio table because that ratio IS the finding — strip it and the entry reads as
@@ -381,14 +389,19 @@ const BASELINE = {
   // class must do (construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock). This is the file every session reads before it can start, and the rule it
   // sits beside is the reason this bug was filed rather than repeated.
+
+  //
+  // Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file. Lane A's delta was +29:
+  // Q-535 now states the 502 is NOT gone yet and why the default was left alone, that half its own
+  // premise expired the same day (the row-walking phase became a no-op, so its scanned figures are
+  // historical), and a new Q-318 carrying the exact response contract so the other lane need not
+  // read the route to build against it.
   // Raised 2026-08-18 (Tuning): 7596 -> 7636. Q-511 — the audit of "did the sleep recalibration miss
   // a consumer of the sleep scale?" (it did not) turned up that the Body Battery anchor flip was worth
   // 17.7 points and the recalibration removed 82% of it. The entry is long because most of it is a
   // PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
   // owner-reported bug in another pillar, and that only lands with the numbers attached.
 
-  'projectOverview.md': 6910,
-  'docs/implementation-backlog.md': 7601,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -396,6 +409,20 @@ const BASELINE = {
   // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
   // must do: construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock. Recomputed from the merged file.
+  //
+  // Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
+  // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
+  // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
+
+  'projectOverview.md': 6910,
+  'docs/implementation-backlog.md': 7648,
+  //
+  // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
+  // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
+  // day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
+  // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
+  // must do: construct the failure band rather than wait for it, because faketime cannot move
+  // Postgres's clock. Recomputed from the merged file on each merge this branch took.
   'CLAUDE.md': 1056,
 
 };
