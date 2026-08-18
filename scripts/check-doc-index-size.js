@@ -741,7 +741,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7829,
+  'projectOverview.md': 7852,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -752,7 +752,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9876,
+  'docs/implementation-backlog.md': 9905,
   'CLAUDE.md': 1075,
 
 };

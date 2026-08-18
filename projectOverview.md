@@ -69,6 +69,29 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [app-shell][platform] 🟢 Offline read surfaces work; a tab tap is a silent no-op only before the SW claims (Q-555, 2026-08-18)
+
+- **The offline paths were driven for real for the first time** — this role's baton had listed them as
+  structurally untested since sweep 1, and `context.setOffline(true)` turned out to be the whole
+  barrier. [`docs/reviews/2026-08-18-offline-read-surfaces.md`](docs/reviews/2026-08-18-offline-read-surfaces.md).
+- **✅ Both paths deliver once the worker controls the page.** A full reload offline serves the
+  precached `/offline` page verbatim (and the precache works under `next dev`). An offline tab tap
+  navigates and paints **2515 chars against 2486 online — ~101%** — no offline page, no skeleton, no
+  blank. **This is the strongest positive result of the run; the offline story is not aspirational.**
+- **🟢 Q-555 — the narrow gap.** In the **uncontrolled** state the same tap is a **silent no-op**: URL
+  unchanged, no navigation, no offline page, no feedback. That state **is the first-ever page load** —
+  the worker registers during it and claims only afterwards. Filed because the symptom is
+  indistinguishable from a frozen app, and on the APK the worker **is** the offline cold-start
+  mechanism, so install day is when a new user is most likely to be changing networks.
+- **⚠️ Three of five probe iterations produced plausible, specific, wrong answers** — all retracted
+  before filing. The keeper: a "38% retained" figure and a marker match **agreed with each other and
+  both failed for the same reason** (the home page renders widgets labelled Readiness/Sleep/Activity).
+  Only the URL settled it. **Corroboration between two weak signals is not evidence when they can fail
+  the same way.**
+- **Not exercised — load-bearing:** web only. On web `cachedFetch` falls back to `localStorage`, so the
+  **seed** path was verified, **not** the native SQLite store that is the APK's real source of truth.
+
+
 ### [platform] 🟢 The module map's `path → symbol` claims all hold — 110 of 110, now ratcheted (2026-08-18)
 
 - **A clean sweep, recorded because a null result is easy to under-report.**
