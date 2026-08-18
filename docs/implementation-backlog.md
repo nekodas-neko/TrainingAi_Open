@@ -343,6 +343,103 @@ below threshold and left in place for next time.
   is plain TypeScript in `sync-engine.ts` with no native dependency and the arithmetic above is read
   straight from it.
 
+### [app-shell][platform] Q-478 — two cache guards compare a server-stamped date against a client `DEFAULT_TZ` date, so they return false for hours a day for any non-Brisbane user
+
+- **Branch:** `fix/cache-today-guards-take-tz`
+- **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
+  [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
+- **Placement:** above Q-477 and **do it first** — it is about a dozen edits, it is the
+  highest-damage consequence of that finding, and it is independently useful.
+- **What.** `lib/sqlite/cache.ts`:
+  ```ts
+  export function isWorkoutDataToday(data)  { return data?.dataDate === todayInTz() }                    // :369
+  export function isBodyMetadataFresh(data) { return data?.today == null || data.today.date === todayInTz() } // :361
+  ```
+  Both compare a **server-stamped** date to a **client `DEFAULT_TZ`** date. Measured: server stamps
+  `dataDate: 2026-08-19` for a `Pacific/Kiritimati` user; the client compares `2026-08-18`; the guard
+  is **false** and stays false while the user's local date differs from Brisbane's.
+- **How much of the day.** Two zones whose offsets differ by Δ hours have different calendar dates for
+  |Δ| hours out of 24. Brisbane is UTC+10 → a New York user (UTC−4 in summer) is Δ=14, so the guards
+  are false **14 hours a day**. Kiritimati is Δ=4.
+- **Confirmed against a live response** with a real `body_metrics` row planted on the user's true today:
+  ```
+  server today row date : 2026-08-19  (steps 7777)
+  client todayInTz()    : 2026-08-18
+  isBodyMetadataFresh   : False
+  ```
+- **What each call site then does:**
+  - `app/session-select/session-select-content.tsx:514` — `if (!isBodyMetadataFresh(data)) return;` is
+    an **early return** and `setMetaLoading(false)` is below it, so **the loading state never clears**.
+  - `app/health/health-content.tsx:194` — today's metrics and active energy are set *inside* the
+    guard, so the Health screen's today values stay blank while the data sits in the response.
+  - `components/workout-screen.tsx:324-326` — `freshExercises` rewrites every exercise to
+    `loggedTodayInSession: false`, so the workout screen shows everything as not-yet-logged today.
+  - `app/workout-select/workout-select-content.tsx:31` — the "Trained today" badge never appears.
+- **The clearest illustration in the codebase**, two adjacent lines inside
+  `getLastTrainedLabel(session, tz)`:
+  ```ts
+  if (isWorkoutDataToday(data) && …) return "Trained today";   // :31  DEFAULT_TZ
+  const todayKey = dayKeyInTz(tz, 0);                          // :32  the user's tz
+  ```
+  The user's timezone is already a parameter of that function. One line uses it; the line above cannot,
+  because the helper takes no `tz`.
+- **Fix shape:** give the helpers an optional `tz` and pass `useUserTimezone()` at every call site —
+  about a dozen edits, **no behaviour change for a Brisbane user**, and it removes the whole
+  compare-server-date-to-client-date class. Give `cachedFetchToday`/`unwrapToday` the same treatment
+  for consistency, but note they are **not** broken: their envelope date is client-written and
+  client-read, so they are self-consistent (mislabelled — they hold "Brisbane-today" data). Do not
+  file that as the same defect.
+- **Lane B owns this** (`lib/sqlite/cache.ts` is shared, but every call site is Lane B surface —
+  claim `lib/sqlite/cache.ts` in the baton before starting).
+
+### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
+
+- **Branch:** `fix/client-today-uses-user-timezone`
+- **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
+  [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
+- **Placement:** upper-mid. **Latent today** — every user row is `Australia/Brisbane`, so nothing is
+  broken in production — but the app ships the button that triggers it, and the fix wants a ratchet
+  before the count grows further.
+- **The inversion worth reading first.** While a user is on `Australia/Brisbane`, client and server
+  both compute Brisbane and agree; nothing is wrong. **Setting the timezone is what introduces the
+  bug** — the server moves immediately, the client does not.
+  `components/profile/edit-profile-sheet.tsx:190` exposes an **"Auto-detect timezone"** button, so the
+  intended one-tap action for anyone not in Brisbane is exactly the action that desynchronises them.
+- **Measured** with a user set to `Pacific/Kiritimati` (UTC+14) and re-logged-in so the JWT carried it,
+  at a moment when three calendar dates were live (Midway 08-17, UTC/Brisbane 08-18, Kiritimati 08-19):
+
+  | Layer | Expression | Value | |
+  |---|---|---|---|
+  | Server routes | `todayInTz(tz)` | 2026-08-19 | ✅ |
+  | Client, **25** sites | `todayInTz(tz)` via `useUserTimezone()` | 2026-08-19 | ✅ |
+  | Client, **91** sites | `todayInTz()` → `DEFAULT_TZ` | 2026-08-18 | ❌ |
+  | Client, **9** sites | `localDateString()` → the *device's* zone | 2026-08-18 (here) | ❌ |
+
+  Live: `POST /api/day-checkin` (no date) → `"logDate":"2026-08-19"`; `GET /api/workout-data?tab=<id>`
+  → `"dataDate":"2026-08-19"`.
+- **Observed on screen**, Health → Training as that user: the **Training Calendar highlights 18** and
+  Training Load highlights **"Tue"**, on a day that was Wednesday the 19th for them. Source:
+  `components/calendar-widget.tsx:110`, `const todayStr = localDateString()` — the *device's* zone, a
+  third answer that follows neither the user's setting nor the server. `CLAUDE.md` already warns
+  *"Client code has two 'today' sources … Pick one per feature"*; there are three.
+- **Nothing is missing except the argument.** `useUserTimezone()`
+  (`components/shell/user-timezone-provider.tsx:40`) is a context available anywhere in the tree, and
+  `components/profile/goals-section.tsx:114` already calls `todayInTz(user?.timezone)` correctly.
+- **Fix shape — ratchet first, then sweep by surface:**
+  1. **A Custom Rules step rejecting a bare `todayInTz()` / `localDateString()` in client code**, with
+     a shrink-only per-file baseline — same shape as `check-hex-literals.js` and
+     `check-cache-ttl-divergence.js`, both of which exist because prose alone did not hold a count.
+     That freezes the number at 100 and puts every future addition in a diff.
+  2. Sweep highest-visibility first: the calendar today-marker, then **Q-478** (small, and the
+     highest-damage consequence — do it before the bulk sweep), then write paths, then display.
+  **Do NOT** make `todayInTz`'s default throw or read a global — the function is shared with server
+  code that passes `tz` explicitly, and a global reintroduces the ambiguity somewhere harder to see.
+- **Lane B owns the sweep** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`); the CI ratchet is
+  a `scripts/` addition either lane can carry, but it should land **first** and on its own.
+- **Not verified on:** the APK — and note the 9 `localDateString()` sites read the *phone's* zone
+  there, a third value this harness cannot reproduce. Not against production, where every user is
+  Brisbane and the symptom does not arise.
+
 ### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
 
 - **Branch:** `fix/db-query-403-masks-outage`

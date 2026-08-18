@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** ten sweeps (2026-08-17 ×2, 2026-08-18 ×8) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **477**)
+**Updated:** 2026-08-18 · **By:** eleven sweeps (2026-08-17 ×2, 2026-08-18 ×9) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **479**)
 
 ## Now
 
-Ten sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Eleven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -17,12 +17,60 @@ least once**, at the owner's request to work through the sections:
 | `sleep` · `readiness` · `heart-rate` · `body` · `devices` | ingest auth, value validation, schema strictness | Q-464, Q-465 |
 | `app-shell` · `platform` | failure cells, repo-migration architecture, **the Coach write path** | Q-450…Q-459, Q-467, Q-468 |
 
-**Sweep 10 closed the offline/error-path gap on its server half** — `/api/sync/push` was pushed for real, including with the database stopped. What is still untested there is the **on-device** half (the local SQLite outbox itself, which the web sandbox cannot open).
+**Sweep 11 closed the non-default-timezone gap** — a user was moved to `Pacific/Kiritimati` and the app driven as them. **Sweep 10 closed the offline/error-path gap on its server half** — `/api/sync/push` was pushed for real, including with the database stopped. What is still untested there is the **on-device** half (the local SQLite outbox itself, which the web sandbox cannot open).
 
 **Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Fix verification — Q-473 confirmed fixed by re-running the reproduction (2026-08-18)
+
+**#112 landed the Q-473 fix the same day, taking the option this role recommended** —
+`completeWorkoutSession` returns its affected-row count and the caller decides from the write.
+Review re-ran the original reproduction on the merged code: four fresh trials, four concurrent
+completes each, **`sessions_in_phase` = 1, 1, 1, 1** (was 3, 3, 2, 1). Confirmed fixed; the
+`projectOverview.md` row was amended from 🔴 to 🟠 rather than archived, because **Q-474 is still
+open**.
+
+**Worth making a habit.** Verifying an implementer's fix costs one re-run when the reproduction is
+already written down, and it is the only thing that distinguishes "shipped" from "fixed" — a
+distinction `CLAUDE.md` cares about enough to have a rule for. Keep reproductions in the review doc
+in a form that can be replayed.
+
+### Sweep 11 — the app run as a user who is not in Brisbane (2026-08-18)
+
+**The blind spot `CLAUDE.md` names, entered for the first time** — all 30 local user rows are
+`Australia/Brisbane`, and no sweep had ever left the default zone. Write-up:
+[`docs/reviews/2026-08-18-timezone-non-default-user.md`](../../reviews/2026-08-18-timezone-non-default-user.md).
+
+**Filed Q-477 and Q-478 — both placed BELOW Q-473/Q-475**, deliberately: those two affect the current
+user today, these are latent (no user has a non-Brisbane zone).
+
+- **The server is clean.** Zero argument-less `todayInTz()` in `app/api/**`. Live: `day-checkin` →
+  `logDate: 2026-08-19`, `workout-data` → `dataDate: 2026-08-19`. Both correct. Every finding is
+  client-side.
+- **Q-477 — the setting is what breaks it.** On Brisbane, client and server agree. Setting the zone
+  moves the server and not the client's **91** argument-less `todayInTz()` calls (vs 25 correct, plus
+  **9** `localDateString()` reading the *device's* zone — three answers, not the two `CLAUDE.md`
+  warns of). `edit-profile-sheet.tsx:190` ships an **"Auto-detect timezone"** button, so the intended
+  one-tap action for a non-Brisbane user is the one that desynchronises them. **Seen on screen:** the
+  Health calendar highlighted **18** on a day that was the 19th for that user.
+- **Q-478 — the cheap half, do it first.** `isWorkoutDataToday`/`isBodyMetadataFresh` compare a
+  server-stamped date to a client `DEFAULT_TZ` date → false for |Δoffset| hours a day (**14 h/day for
+  New York**). Real UI states: session-select's early return leaves `setMetaLoading(false)` unrun.
+
+**Method notes that will otherwise cost the next session an hour:**
+1. **Changing `users.timezone` is not enough** — it is stamped into the JWT at login, so re-login
+   before testing. A stale cookie makes the whole thing silently pass.
+2. **Run it only when the zones disagree by a calendar date** — check `TZ=<zone> date +%F` against
+   `TZ=Australia/Brisbane date +%F` first. An hour-only offset hides every symptom.
+3. **`pnpm install` after pulling `main`** before `pnpm dev` — a newly-added dep (`qrcode`) produced a
+   Turbopack "Module not found" that reads like a repo break and is a stale `node_modules`.
+
+**Remaining timezone work this sweep did NOT cover:** the repo-layer day-window helpers that
+`CLAUDE.md` says hardcode `DEFAULT_TZ`, and anything on the APK (the 9 `localDateString()` sites read
+the *phone's* zone there — a third value this harness cannot reproduce).
 
 ### Sweep 10 — the outbox under failure, with the database actually stopped (2026-08-18)
 
