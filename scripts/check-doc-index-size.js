@@ -196,7 +196,16 @@ const BASELINE = {
   // Raised 2026-08-17 (Q-541 tasks 0-2, Lane A): 6791 -> 6801. RECOMPUTED FROM THE MERGED FILE on
   // each of the two merges this branch took, not spliced — the Q-530, Q-389 and Lane A raises all
   // landed the same day and each pass would have silently un-done the other side.
-  'docs/implementation-backlog.md': 6927,
+  //
+  // Raised 2026-08-17 (Q-51 re-verification, Lane B): backlog 6833 -> 6853. A correction to an
+  // existing entry whose Task 3 reads as closing it and does not: Task 3 measured HOME cold start
+  // (FCP 472ms, 439 of it the document fetch), while the entry's own callout is about first mount of
+  // /WORKOUT (1086-1348ms, rscCount 0, entirely client-side). Different screen, different number,
+  // still unmeasured. Also re-measures the two file sizes the premise rests on — both have grown
+  // since the entry was written, and the entry states one of them three different ways. Left in the
+  // entry rather than a review doc because the next session to take this item reads the entry, sees
+  // a green Task 3, and would close it. Recomputed from the merged file, same as the raise above.
+  'docs/implementation-backlog.md': 6947,
   'CLAUDE.md': 1010,
 };
 
