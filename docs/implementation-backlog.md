@@ -285,6 +285,87 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [platform][nutrition] Q-471 — the double-trip metric counts deliberate rerolls as redundant, and that is the AI-usage screen's top row
+
+- **Branch:** `fix/ai-fingerprint-granularity`
+- **Added:** 2026-08-18 · review sweep from **owner-supplied production screenshots** of More →
+  Developer → AI usage · [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** above Q-470/Q-469, because it decides how those are read. A misleading diagnostic
+  sends implementers at the wrong row.
+- **What the screen shows (30d):** 268 calls, 89 of them "redundant" (33%), topped by
+  `meal-plan-generate-meal` at **32 redundant · 4 distinct**.
+- **Why the top row is an artefact.** Redundancy is `(user_id, section, fingerprint)` repeating within
+  120 s (`lib/data/postgres/adapter.ts:4489`). Three sections fingerprint on a calorie target alone:
+  ```
+  meal-plan-generate-meal   String(Math.round(input.targetCalories))
+  meal-plan-top-up          String(Math.round(targets.calories))
+  meal-plan-generate        `${mealCount}:${dayTypes.join('/')}`
+  ```
+  Rerolling a meal is the feature working — tap reroll, dislike it, tap again — and every such call
+  carries the same rounded calorie target, so **every deliberate reroll after the first counts as
+  redundant**. "32 · 4" most plausibly reads as four meal slots rerolled ~8 times each.
+- **⚠️ The reroll path is already correctly guarded — do not "fix" it.** `meal-plan-review-step.tsx`
+  sets `rerolling` before the fetch and every control carries `disabled={rerolling != null}` (reroll
+  icon, instruction submit, both reorder arrows). There is no tap-spam here. This entry exists partly
+  to stop someone being sent to that file by the screen.
+- **So 44 of the 89 redundant calls (32 + 9 + 3) are artefact; the other 45 are real** (Q-470, Q-469).
+- **Fix shape:** fingerprint on what actually distinguishes one request from another — for
+  `generate-meal` at least the meal `position` plus `avoidNames` (which already changes on every
+  successful reroll); for `meal-plan-generate`, excluded foods and stores. The instrument's rule
+  ("ids/dates/keys only, never raw prompt text or health data") still holds — these are ids and keys.
+  Alternatively mark user-initiated repeats at the call site, which is the distinction the screen is
+  actually trying to draw. **Lane A.**
+
+### [workouts][platform] Q-470 — the background prescription regeneration has a rate limit but no in-flight guard, so a second page-load fires it again
+
+- **Branch:** `fix/prescription-regen-in-flight-guard`
+- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** mid. A real duplicate LLM generation for the same session-day, on the path that
+  decides prescribed load.
+- **This one is genuine, unlike Q-471's rows.** `prescription` fingerprints on
+  `{ programSessionId, today }` (`packages/shared/src/ai-periodization/generate-prescription.ts:295`)
+  — stable for one session on one day. **14 redundant across 8 distinct** is therefore the same
+  logical prescription generated twice within 120 s.
+- **Cause.** `regeneratePrescriptionInBackground` (`app/api/workout-data/route.ts:50-59`) is
+  fire-and-forget and called from **two** sites in the same `GET` handler — `:541` when
+  `reevalResult.needsRegenerate`, `:561` when `aiPrescriptionPending && !isPoll`. It carries
+  `rateLimit('prescribe:${userId}', 20, 60*60*1000)`, which caps a runaway loop but **does not
+  dedupe**:
+  - `/api/workout-data` is fetched via `cachedFetch`, which paints from cache and **then always
+    revalidates over the network** — so every open of the workout screen issues a real GET;
+  - until the first background generation lands, `needsRegenerate` / `aiPrescriptionPending` are still
+    true, so the second GET starts a second generation for the same session-day.
+- **The rate limit is not the bug and should stay** — its comment says it exists to stop "an unattended
+  poll loop" minting unlimited Gemini calls, and it does that. It was never an idempotency mechanism.
+  Note `:561` already excludes polls via `!isPoll`; `:541` has no such guard.
+- **Fix shape:** an in-flight marker keyed on `(userId, programSessionId, today)` — the same key the
+  fingerprint already uses — checked before spawning and cleared when the generation settles. A
+  process-local `Set` covers the common case; a short-lived DB marker survives multiple replicas,
+  which matters because Railway can run more than one. **Lane A.**
+
+### [cardio][platform] Q-469 — `running-plan-explain` re-asks the model for the same sentence on every card mount
+
+- **Branch:** `fix/running-plan-explain-cache`
+- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
+  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
+- **Placement:** low-mid. The most redundant *genuine* section, on a call that is explicitly not
+  load-bearing.
+- **Genuine, like Q-470.** Fingerprint is `{ type, durationMin }` — stable for a given day's
+  prescribed run. **31 redundant across 9 distinct**: the same run explained ~7 times on average.
+- **Cause.** `components/running/prescribed-run-card.tsx:41-53` fires it from a bare `useEffect` with
+  no cache. The author already handled the re-render risk — the comment says `gateReasons` is joined
+  into a stable string *"so a new array ref each render doesn't re-fire the fetch"* — but **mount is
+  the remaining trigger**: every navigation back to the running screen, and every remount from a
+  parent, re-asks for the same sentence.
+- **Why not higher:** the call is explicitly *"never load-bearing"* — the deterministic `rationale`
+  renders immediately and the AI copy only swaps in if it arrives — and the section is cheap (62 calls,
+  6,864 tokens total). **The reason to fix it is content consistency:** the wording changes between
+  mounts, so the same prescribed run is described differently each time the user opens the screen.
+- **Fix shape:** cache on the fingerprint inputs (`type`, `durationMin`, `rationale`, `gateKey`); the
+  app already has a client cache layer and the instant-paint rule points the same way. A day-scoped
+  key is enough — the prescription does not change within a day. **Lane B.**
+
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
 - **Branch:** `feat/meal-label-ingredient-breakdown`
