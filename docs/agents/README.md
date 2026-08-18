@@ -179,8 +179,9 @@ So numbers are **not** taken one at a time from the pointer. Each agent owns a b
 | Tuning | **500 – 529** |
 | *(one-off planning sessions)* | no standing band — take a block from the pointer |
 
-Blocks taken this way so far: **530–537** (2026-08-17) and **538–542** (2026-08-17, DB storage /
-raw-sample retention). The second of those was **renumbered from 530–536 on merge** — it had taken
+Blocks taken this way so far: **530–537** (2026-08-17), **538–542** (2026-08-17, DB storage /
+raw-sample retention) and **543** (2026-08-18, owner-directed session — the decision-brief rule
+in `CLAUDE.md`; one number, not a block of fifty, because the session filed one finding). The second of those was **renumbered from 530–536 on merge** — it had taken
 its block from a pointer reading 530 while a concurrent planning session held the same numbers
 unmerged, which is the exact failure the standing bands exist to prevent and which the pointer
 cannot prevent, because it cannot see an unmerged PR. **If you are a one-off session, take your
