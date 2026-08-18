@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { computeExerciseStats, computeEquipmentStats, decomposeSessions } from '@trainingai/shared/workout/time-audit'
 
 export async function GET(req: NextRequest) {
@@ -10,8 +10,8 @@ export async function GET(req: NextRequest) {
 
   try {
     await requireAdmin(session.user.id, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   const daysRaw = Number(req.nextUrl.searchParams.get('days') ?? 90)

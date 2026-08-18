@@ -570,26 +570,6 @@ below threshold and left in place for next time.
   there, a third value this harness cannot reproduce. Not against production, where every user is
   Brisbane and the symptom does not arise.
 
-### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
-
-- **Branch:** `fix/db-query-403-masks-outage`
-- **Added:** 2026-08-18 · **Lane A** (`app/api/admin/db-query/route.ts`). Tiny, and it cost a real
-  diagnosis today.
-- **What happened.** During the 2026-08-18 volume incident `prod_DB` went offline. Every
-  `/api/admin/db-query` call returned **`{"error":"Forbidden"}`**, which reads as "your credential was
-  revoked" — so the first several minutes went into checking env vars and the admin flag instead of
-  looking at the database. The Railway dashboard said "Service is offline" in one glance.
-- **Mechanism.** `authorize()` calls `requireAdmin(exportUserId)` inside a **bare `try/catch`**
-  (route.ts ~51-53). `requireAdmin` does a DB round-trip (`repo.getUserById`) and throws `AdminError`
-  when the user is missing or not admin — but **any other throw, including a connection failure, lands
-  in the same catch** and becomes 403. "Not authorised" and "could not check" are indistinguishable.
-- **Why it matters beyond this incident.** 403 is the one status a caller will not retry and will not
-  escalate; it actively points the investigation away from infrastructure. `/api/version` does **not**
-  touch the DB, so it returned 200 throughout and offered no contradiction.
-- **Fix shape:** catch `AdminError` specifically and return 403; let anything else surface as **503**
-  (or 500) so an outage looks like an outage. Same pattern applies to the session branch below it, and
-  to any other route wrapping `requireAdmin` in a bare catch — **grep for the shape, don't fix one site.**
-
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1

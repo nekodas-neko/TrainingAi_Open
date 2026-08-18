@@ -288,6 +288,9 @@ jobs:
       - name: API responses stay out of the browser HTTP cache
         run: node scripts/check-api-no-store.js
 
+      - name: An admin check that cannot run is not a refusal
+        run: node scripts/check-admin-guard-catch.js
+
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 
