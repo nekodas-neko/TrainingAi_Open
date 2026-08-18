@@ -54,6 +54,15 @@ grep -n '\[activity\]' docs/implementation-backlog.md   # no queue items today
 
 Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
 
+- ⛔ **Q-488 — the activity delete never updates the local store, and the obvious fix is a no-op.**
+  Re-scoped 2026-08-18 and handed to Lane A: `lib/local-store` has no `deleteActivityLog`, and
+  `upsertActivityLog` omits `deleted_at` from both its INSERT list and its `ON CONFLICT DO UPDATE
+  SET`, so stamping `deletedAt` on a read-merged record type-checks and changes nothing. The fix
+  needs a local-store method first, then four lines in `app/health/health-content.tsx`. Evidence and
+  the reverted dead end:
+  [`the journal entry`](../../overview/entries/2026-08-18-local-first-write-rule-and-journal-sweep.md).
+  The rule it broke is now in `CLAUDE.md`'s Offline-First section.
+
 - ✅ **The activity detail sheet's HR chart, zone breakdown and HR-coloured route line had never
   rendered** for any activity (found + fixed 2026-08-09, v1.276.1) — a validation-gate mismatch on
   `/api/oura/hr-window`, not missing data. Both that sheet and the exercise review sheet now
