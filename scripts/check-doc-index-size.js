@@ -18,6 +18,12 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, unbounded request bodies, Q-498): backlog 9690 -> 9727,
+// projectOverview 7722 -> 7747. One queue entry and its row. Both keep the 113/7/93/3
+// coverage split and the line numbers showing the ingest route parses at 40 and checks the secret
+// at 58 -- the ordering is the finding, and a summary that drops it reads as "add a size cap",
+// which is the smaller half of the fix.
+//
 // Raised 2026-08-18 (Review, admin range-loop termination, Q-497): backlog 9652 -> 9690,
 // projectOverview 7693 -> 7722. One queue entry and its row. The entry keeps the measured loop
 // trace (iter 32 = 10000-01-01, still looping at 5000) because the defect is invisible from the
@@ -709,7 +715,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7722,
+  'projectOverview.md': 7747,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -720,7 +726,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9690,
+  'docs/implementation-backlog.md': 9727,
   'CLAUDE.md': 1075,
 
 };

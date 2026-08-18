@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-one sweeps (2026-08-17 ×2, 2026-08-18 ×29) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **498** — ⚠️ **2 left. When it runs out, claim 530–579** and record it in the table in `docs/agents/README.md` §Q-numbers, per its own instruction: "claim the next block of 50 above 529". Tuning holds 500–529.)
+**Updated:** 2026-08-18 · **By:** thirty-two sweeps (2026-08-17 ×2, 2026-08-18 ×30) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **499 — the LAST in band. The sweep after it claims 530–579**, adds that row to the table in `docs/agents/README.md` §Q-numbers, and says so in its PR. That file's own instruction: "claim the next block of 50 above 529". Tuning holds 500–529, so 500–529 is NOT yours.)
 
 ## Now
 
-Thirty-one sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-two sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,37 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 32 — request-body size guards; the guard is right, the coverage is not (2026-08-18)
+
+**Filed Q-498 (medium).** Write-up:
+[`docs/reviews/2026-08-18-unbounded-request-bodies.md`](../../reviews/2026-08-18-unbounded-request-bodies.md).
+
+**Took sweep 31's method note as the lens** — *bounds declared one way and enforced another* — and
+`MAX_BODY_BYTES` was the obvious candidate, since the classic version is trusting `Content-Length`.
+
+**It wasn't that, and the negative result is half the value.** `readJsonLimited` uses `Content-Length`
+as a *fast path* and streams with a real byte counter, cancelling on overflow. Measured: 20 MB to
+`/api/client-error` (16 KB cap) cut off at **2,949,120 bytes**. The hypothesis was wrong and the
+lens still paid, because the same probe answered the coverage question.
+
+**The defect is coverage.** 113 body-taking routes, **7** guarded, **93** bare `req.json()` — and of
+those 93 **exactly 3** are reachable without a session (`auth/register`,
+`auth/exchange-mobile-token`, `health-connect/ingest`). **The 7 guarded routes are all *less* exposed
+than the 3 unguarded ones**, which is the sentence that makes it a finding rather than a statistic.
+
+**⚠️ Ordering is what separates them, and it is the more useful half.** The two auth routes rate-limit
+*before* parsing — correct, and their rate stays bounded without a size cap. `health-connect/ingest`
+reads at 35 and Zod-parses at 40 but rate-limits at **53** and checks the secret at **58**. A caller
+holding **no secret** makes the server buffer and fully parse an arbitrary body.
+
+**Two findings that remove each other's mitigation.** Q-493 (spoofable XFF) defeats the limiter that
+is the *only* bound the two auth routes have. Neither finding is severe alone; together the
+containment is gone. **Check new findings against the open ones for this — the interaction was not
+visible from either sweep on its own.**
+
+**Scoped honestly:** the other 90 need a session, which is real at this user count. Filed as 3, not 93,
+with a note that the exposed set grows with the user base rather than the code.
 
 ### Sweep 31 — the admin date-range routes; a loop that does not terminate (2026-08-18)
 

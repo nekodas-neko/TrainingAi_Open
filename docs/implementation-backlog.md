@@ -848,6 +848,43 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [platform] Q-498 — three unauthenticated routes buffer an unbounded request body; one parses it before any check
+
+- **Branch:** `security/body-size-guard-coverage`
+- **Added:** 2026-08-18 · review sweep (request-body size guards) ·
+  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](reviews/2026-08-18-unbounded-request-bodies.md)
+- **Placement:** medium. No data exposed or corrupted — memory/CPU amplification on unauthenticated
+  endpoints. Ranked above ordinary because the ingest route does the work before *any* check, and
+  because **Q-493 removes the rate bound that would otherwise contain it**.
+- **The shared guard is correct and is not the defect.** `readJsonLimited` treats `Content-Length` as a
+  fast path and streams with a real byte counter, cancelling on overflow. Measured: a 20 MB body to
+  `/api/client-error` (16 KB cap) was **cut off at 2,949,120 bytes**.
+- **Coverage:** 113 route files export `POST`/`PUT`/`PATCH`; **7** use `readJsonLimited`; **93** use bare
+  `req.json()`. Of those 93, **exactly 3 are reachable without a session**: `auth/register`,
+  `auth/exchange-mobile-token`, `health-connect/ingest`. **The seven guarded routes are all *less*
+  exposed than these three.**
+- **Measured**, same 20 MB body: `auth/register` and `health-connect/ingest` each accepted the **full
+  20,000,048 bytes** and then returned 400 — read, buffered and parsed before deciding they did not
+  want it.
+- **⚠️ Ordering separates them, and one is much worse.** `auth/register` (limiter line 9, parse line 13)
+  and `exchange-mobile-token` (8 / 12) rate-limit **before** parsing, so the rate is bounded even with
+  no size cap. **`health-connect/ingest` reads at line 35 and Zod-parses at 40, but rate-limits at 53
+  and checks the secret at 58** — an unauthenticated caller **holding no secret** makes the server
+  buffer and fully parse an arbitrary body, and the limiter cannot throttle it because it runs after.
+- **Fix — two changes, the second matters more:**
+  1. Route the three through `readJsonLimited`. Coverage, not design; the helper exists and 7 routes
+     already use it.
+  2. **On `health-connect/ingest`, move the rate limit and secret compare above the body read.**
+     Independent of the size guard, and the larger win: it converts "anyone can make us parse
+     anything" into "only a caller past the gate can". Needs `secret` moved out of the body (to a
+     header) to do cleanly — a small shape change worth making.
+- **The other 90 all require a session**, which is a real mitigation at this user count and is why the
+  finding is scoped to 3 rather than 93. Recorded because that exposed set grows with the user base if
+  registration ever opens up, not with the code.
+- **Not exercised:** the actual ceiling was **not** probed — 20 MB proved there is no cap and going
+  further risked destabilising the server for no extra information. Railway's edge may impose its own
+  request-size limit, which would reduce practical exposure; not checked.
+
 ### [platform] Q-497 — a 31-day range that passes every guard makes two admin routes loop forever
 
 - **Branch:** `fix/shift-date-str-year-padding`
