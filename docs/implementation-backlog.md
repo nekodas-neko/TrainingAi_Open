@@ -2130,6 +2130,48 @@ one-off:
 - **Related:** **Q-401** replaces this widget's progress bar with the energy zone bar, which makes the
   staleness more visible, not less — do this one first or alongside it.
 
+### [workouts][platform] Q-403 — the Coach calls an already-applied swap a "proposal", and says it after the fact
+
+- **Branch:** `fix/coach-applied-change-copy`
+- **Added:** 2026-08-18, from owner screenshots of a working swap. **The swap itself is fine** — this
+  is the sentence around it.
+- **Lane B** if the fix is the system prompt in `app/api/coach/route.ts` (it is). No schema, no route
+  logic.
+
+**What the screen showed, in this order:**
+1. Green result card — *"Swapped Barbell Romanian Deadlift → Barbell Jefferson Curl in Legs"*
+2. Then the assistant's line — *"Here is the proposal to swap Barbell Romanian Deadlift for Barbell
+   Jefferson Curl."*
+3. Then the owner, unprompted — ***"Is this complete?"***
+
+That third line is the finding. The user could not tell from the screen whether anything had happened,
+on a change that had already been written.
+
+**Two defects, both against rules the prompt already states.**
+- **"Proposal" is the wrong word for this domain.** `program_phase` is **the only tier-3 domain**
+  (`lib/coach/domains/program-phase.ts:8`) — the only one that routes through a confirmation screen.
+  A `session_exercise` swap applies immediately, which is why the card is past tense. Calling it a
+  proposal asserts something is pending that has already happened.
+- **The sentence rendered after the widget.** The prompt is explicit: *"Write your one sentence
+  BEFORE calling a widget tool, never after"* (`app/api/coach/route.ts:91`). Two candidate causes and
+  the fix differs — **the model wrote it after the tool call**, or **the UI renders tool results
+  ahead of streamed text**. Check the transcript order before changing the prompt; changing the wrong
+  one leaves it broken.
+- It also **restates what the card already shows**, which the same prompt calls noise.
+
+**What to do.** For domains that apply immediately, the sentence is past tense and adds something the
+card cannot — *"Swapped. Jefferson Curl keeps the hamstring work but drops the loading, so expect the
+session to feel easier."* — **or it is omitted entirely**, because the card is already a complete
+statement. Reserve "proposal", and the future tense, for tier 3.
+
+- **Cheap guard worth having:** the tier is known server-side when the sentence is generated. Feed it
+  into the prompt so "proposal" is only ever available for tier 3, rather than relying on the model to
+  remember which domain it is in.
+- **Verification:** run a swap and confirm the reply reads as a completed action, in an order where
+  the text is not explaining something the user has already seen. Owner screenshots are the fixture.
+- **Not a bug in the swap.** The write path works on device and that is now recorded in
+  `projectOverview.md` — do not "fix" the apply logic.
+
 ### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
 
 - **Branch:** `fix/inline-centred-line-budget`

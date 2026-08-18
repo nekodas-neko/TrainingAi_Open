@@ -752,7 +752,7 @@ const BASELINE = {
   // the today-envelope helpers were deliberately left alone. The row stays open because Q-477 — the
   // larger half, including the ratchet on bare todayInTz() — is untouched, and a reader needs to
   // know which half of a two-Q row shipped.
-  'projectOverview.md': 7881,
+  'projectOverview.md': 7893,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -783,7 +783,7 @@ const BASELINE = {
   // seven fewer, recomputed from the merged file on top of the raise above. Q-357 is the four
   // defeated memo call sites Q-490's review said did not exist ("no inline arrows exist
   // anywhere"); the new check freezes them rather than leaving them to be rediscovered.
-  'docs/implementation-backlog.md': 10036,
+  'docs/implementation-backlog.md': 10038,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
