@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-six sweeps (2026-08-17 ×2, 2026-08-18 ×34) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **555**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
+**Updated:** 2026-08-18 · **By:** thirty-seven sweeps (2026-08-17 ×2, 2026-08-18 ×35) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **555**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
 
 ## Now
 
-Thirty-six sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-seven sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,34 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 37 — the module map's symbol claims all hold (2026-08-18)
+
+**Filed nothing. Shipped one ratchet** (Custom Rules **43 of 43**). Write-up:
+[`docs/reviews/2026-08-18-module-map-symbol-claims.md`](../../reviews/2026-08-18-module-map-symbol-claims.md).
+
+**Took sweep 36's own stated limit as the lens** — that check proves a path *resolves*, never that the
+prose beside it is true. **Result: 110 of 110 `path → symbol` claims name a symbol that exists in the
+file they attribute it to.**
+
+**This is a null result and it is worth as much as a finding here**, because it **bounds** the worry
+sweep 36 left open: row 232 (a map row for a module never built) was *not* the tip of a pattern. One
+row, and its path was wrong too, which is why the cheap check caught it. **State a clean sweep
+plainly — an unreported null result gets re-investigated.**
+
+**⚠️ The most useful thing in this sweep is a mistake I nearly shipped.** The first probe reported
+**72 of 110** rows resolvable — i.e. 38 broken paths — **flatly contradicting the check I had shipped
+an hour earlier** over the same document. The probe was wrong: it omitted the `lib/…` →
+`packages/shared/src/…` remap (Q-153) that the shipped check already applies. **A new measurement that
+contradicts an existing green check is a bug in the measurement until proven otherwise.** Had I
+reported it, it would have been confident, specific, checkable, and wrong.
+
+**Also: I wrote `113` in the new script's header when the true count was `110`.** Caught before
+commit. **A count in a script's comment is still prose** — Q-492 applies to my own scripts, and the
+number in the header should be the number the script prints.
+
+**Third occurrence in two sweeps of the doc-about-an-absent-path tripping an absent-path checker.**
+Both scripts' headers now say so explicitly.
 
 ### Sweep 36 — the orientation indexes named paths that do not exist (2026-08-18)
 
