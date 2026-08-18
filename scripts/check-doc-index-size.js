@@ -246,7 +246,11 @@ const BASELINE = {
   // and +41 on the backlog (the Q-541 status block, and the new Q-315 entry for error_events
   // holding 4 live rows in 49 MB).
   'projectOverview.md': 6760,
-  'docs/implementation-backlog.md': 7020,
+  // Raised 2026-08-18 (Tuning, Q-505): 7020 -> 7056. One queue entry for the Activity Score decision,
+  // carrying the measured cause and the two coherent answers inline — the item is blocked on the
+  // owner choosing between them, and an implementer must not have to open the review to learn that.
+  // Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
+  'docs/implementation-backlog.md': 7067,
   'CLAUDE.md': 1010,
 };
 
