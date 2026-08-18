@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, server-only writes to local-first domains, Q-488): backlog 9384 -> 9387,
+// projectOverview 7468 -> 7501. One queue entry and its row. Both carry three lines that decide how
+// it gets triaged and fixed: it SELF-HEALS via the tombstone (visible inconsistency, not data loss);
+// the originating screen is CORRECT because it reads the server-side day-log aggregate, which is why
+// nothing on that screen could reveal it; and making the delete work offline is a separate, larger
+// question that must not be folded into the one-call fix.
+
+//
 // Raised 2026-08-18 (Review, seed-only read paths — case (b)): projectOverview 7439 -> 7468. No
 // queue entry; the audit found no gap. The row is worth its lines for two things that are otherwise
 // rediscovered by running a bad test: the mechanical seed-only check (readCacheSync minus
@@ -643,7 +651,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7468,
+  'projectOverview.md': 7501,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -654,7 +662,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9384,
+  'docs/implementation-backlog.md': 9387,
   'CLAUDE.md': 1075,
 
 };

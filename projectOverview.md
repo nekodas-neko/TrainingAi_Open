@@ -103,6 +103,39 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [activity][app-shell] 🟠 Deleting an activity leaves it in the local store, so three other screens keep showing it (Q-488, 2026-08-18)
+
+- **The successor sweep 22 named for itself:** a stale value arising *outside* Q-262's test — a write
+  that updates the server without touching the local store.
+  [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md).
+- **What.** `health-content.tsx:684-700` deletes via `fetch("/api/activity-logs", {method:"DELETE"})`,
+  toasts *"Deleted"*, invalidates caches — **and never touches the local store**.
+- **The originating screen is correct, which is why this survived.** `refreshDayOverlay` reads
+  `cachedFetch('day-log:<date>')`, a **server-read** cross-domain aggregate (the sanctioned
+  exception), so the activity vanishes there at once. Nothing on that screen could reveal the problem.
+- **The local row is untouched**, and three surfaces read it local-first — session-select's week
+  activity, nutrition's calories-burned total, and the activity-history card. `pullDelta` is throttled
+  to **5 minutes** un-forced and nothing in the delete path forces one, so the floor is that window
+  and the real duration is "until the next natural sync".
+- **It self-heals and is not data loss.** The server delete is a **soft** delete with a
+  `user_id`-scoped tombstone, and `applyDelta` applies it under the correct `sync_status='synced'`
+  guard. Something wrong is shown for a while; nothing is lost.
+- **Fix is one call** — delete the local row alongside the API call, as `done-activity-screen.tsx`,
+  `exercise-review-sheet.tsx` and `walk-summary.tsx` all already do. Making the delete work *offline*
+  is a separate, larger question and should not be folded in silently.
+- **The rule it breaks is not written down.** `CLAUDE.md` states the forward direction (*"if a domain
+  WRITES to the local store, its UI MUST READ from the local store"*). The inverse is what bites:
+  **a domain the UI reads local-first must have every write update the local store — including
+  deletes, and including writes made from a screen that itself reads server-side.** Worth adding
+  alongside the fix.
+- **Three clean results:** the Health Connect metrics PATCH is server-only but its full chain checks
+  out (all four fields in the pull mapping *and* `RECONCILE_COLUMNS`); that route is one of the only
+  two dynamic routes that validate their UUID (consistent with Q-482); and the delete/tombstone
+  mechanism itself is present and correct.
+- **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
+  readers fall through to their API fallbacks and the inconsistency cannot appear there. On-device is
+  the only real verification.
+
 ### [platform] ✅ Both halves of the staleness test now audited — case (b) clean, and the mechanical test for it does not work (2026-08-18)
 
 - **Completes the lens.** Sweep 21 audited case (a) (`freshWithinTtl`); this audits case (b),
