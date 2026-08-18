@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.2",
+    date: "2026-08-18",
+    changes: [
+      "Logging a body measurement with a wrong or misspelt field name is now rejected instead of quietly landing on today's date with a success message. Sending a date under the wrong name used to write the value onto today and report success \u2014 measured three ways. Nothing you do in the app sends the wrong names, with one exception now caught: logging water from the metric tile on the web fallback was being discarded entirely, and it now fails visibly rather than silently.",
+    ],
+  },
+  {
     version: "1.324.1",
     date: "2026-08-18",
     changes: [
