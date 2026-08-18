@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 
 // Phase-B feasibility probe (admin): what motion/HR the ring captured during one workout's window.
@@ -12,8 +12,8 @@ export async function GET(req: Request) {
   const userId = session.user.id
   try {
     await requireAdmin(userId, session.user.isAdmin)
-  } catch {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   // No sessionId → probe the most recent completed workout.

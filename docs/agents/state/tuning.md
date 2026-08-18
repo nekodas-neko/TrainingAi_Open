@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/nutrition-tdee-check` · **Q band:** 500–529 (next free: 518)
+**Updated:** 2026-08-18 · **By:** `tuning/model-version-clobber` · **Q band:** 500–529 (next free: 519)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -56,7 +56,10 @@ Since then, working only scores no other lane holds:
 
 ## Next
 1. **Q-505 — build the Activity redesign** (Lane A). Decisions and sequencing are in the plan's §4.
-2. ~~Verify the two shipped recalibrations against production~~ — **DONE 2026-08-18, both are LIVE.**
+2. ~~Verify the two shipped recalibrations against production~~ — **DONE 2026-08-18, both are LIVE**
+   — **but see Q-518: the readiness stamp is erased within hours by the bodyComp backfill**, so the
+   "merge held in production" half of that verification is **retracted**.
+   ~~original note follows~~
    Readiness: 1 of 96 rows stamped `v3:ri5:2026-08-18`, and the shared JSONB **merge held**
    (`bodyComp` survived). Sleep has no stamp so it was verified by recomputation — 08-17 stores 78
    against a raw blend of 77.91 (old), 08-18 stores 92 against a calibrated 92 (new).
@@ -155,6 +158,11 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **A single positive reading of a shared mutable field proves the WRITER, not the invariant** (Q-518).
+  I verified the `model_versions` merge by observing one readiness write and published that it "held in
+  production"; **5h40m later a sibling writer had erased the key**. `COALESCE(excluded, existing)` on a
+  `jsonb` column replaces the document whole, so the merge lives in each caller and only one of two
+  does it. **When checking a shared field, the thing to observe is the NEXT write by someone else.**
 - **A universal plausibility floor cannot protect a per-person quantity** (Q-517).
   `MIN_PLAUSIBLE_MAINTENANCE = 1000` is 52 kcal below where this owner's under-logging artefact lands
   (1,052), and the module's own comment had predicted the failure at 1,200. **Floor it at the user's

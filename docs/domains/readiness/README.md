@@ -72,7 +72,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   superseded** — it pooled four model versions. Split by version, **v5 alone is r = +0.67 (n = 11)**
   for end-of-day battery → next-day readiness (2026-08-15). v5 does carry outcome signal; its
   in-day *shape* is the problem (drains 5× faster than it charges — Q-272).
-- [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
+- [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   — Q-57: the v4 → v5 input fixes, and the two prescriptions backtesting proved wrong.
 - [`docs/reviews/2026-07-27-prod-data-audit-2-derived-metrics.md`](../../reviews/2026-07-27-prod-data-audit-2-derived-metrics.md)
   — which derived columns actually have producers and values in prod.
@@ -80,17 +80,17 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   — Body Battery validated against subjective recovery (r|t = −0.414, p = 0.010, **Q-79 shipped
   2026-08-05, v1.264.0** as an admin calibration panel — note the pairing is **same-date**, since the
   next-morning lag was measured and finds nothing; see
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md));
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md));
   overnight
   HRV predicts same-day training volume, +33 % across the median (**Q-78 shipped 2026-08-05,
   v1.263.0** as the `hrv-volume` trends view — observation only, **not** wired into the prescription
   engine until it is re-measured at n ≥ 60; see
-  [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md));
+  [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md));
   and a re-confirmation that
   seven `oura_daily_derived` columns are still 0/79, with `/api/training-stress` gating itself off
   permanently (Q-7b).
 - [`docs/superpowers/plans/2026-08-02-health-connect-first-class-tier.md`](../../superpowers/plans/2026-08-02-health-connect-first-class-tier.md)
-  + [`docs/../overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)
+  + [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)
   — Q-43: the composite is no longer reachable only through the ring's rollup. Without an
   `oura_daily_summary` row it runs off `body_metrics`/`sleep_sessions` with the same
   `updateBaseline`, persists under `readiness_source: 'generic-derived'`, and the response carries
@@ -99,7 +99,7 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 - Plans: `ls docs/superpowers/plans/*readiness*` (3 today).
 - [`docs/superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md`](../../superpowers/plans/2026-08-02-owner-bug-batch-sync-anchor-prescription-strap.md)
   — Workstream C (**shipped**, #996 / v1.250.2, see
-  [`docs/../overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
+  [`docs/overview/history-2026-07-30.md`](../../overview/history-2026-07-30.md)):
   the Body Battery anchor was re-picked on every read, so it flipped from the sleep score to the
   readiness score part-way through the morning and shifted the whole day's curve. The rule now
   lives in `app/api/body-battery/anchor.ts` — a readiness anchor is frozen for the day, a sleep
@@ -127,6 +127,8 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (Q-465 — `POST /api/day-checkin` creates a check-in row from an empty body, indistinguishable from a check-in where the user answered nothing). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-465 refuted in practice — zero truly-empty check-in rows across all 50, once the six morning columns are included). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+
+- [`docs/reviews/2026-08-18-model-version-clobber.md`](../../reviews/2026-08-18-model-version-clobber.md) — **the readiness model stamp is erased within hours, 2026-08-18** (Q-518 — same row read at 04:38:27 carries `{"bodyComp","readiness"}` and at 10:18:40 carries `{"bodyComp"}` alone; stamped rows table-wide go 1 → 0. `upsertOuraDailyDerived` sets every column with `COALESCE(excluded, existing)`, which for a `jsonb` column replaces the document **whole**, so the merge is left to each caller and only `readiness-payload.ts` does it. **Retracts PR #85's claim that the merge "held in production"** and defeats Q-501's purpose. Fix belongs in the upsert (`existing || excluded`), the same shape as Q-280).
 
 ## Open issues
 
@@ -173,17 +175,17 @@ Live at the time of writing (2026-07-30):
   (Q-39 — the Body Battery anchor flipping source mid-day, **fixed in #996**), filed under `cross`
   because it spans five pillars and so is not matched by the glob above.
 - Journal: `grep -rl 'readiness\|body.battery\|resilience' docs/overview/entries/` — including
-  [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
+  [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-113 — Morning Check-in no longer pre-fills Recovery/Sleep-quality from the very scores they're
   meant to independently validate; Motivation replaced with an illness/context flag feeding the
   shared `selfReportedSick` signal).
-  Also [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
+  Also [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-108 — the Body Battery chart's right-edge label was a hardcoded `"now"` literal, unrelated to
   the real last-sample time; now derived from it).
-  Also [`docs/../overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
+  Also [`docs/overview/history-2026-08-07.md`](../../overview/history-2026-08-07.md)
   (Q-105 — the "Body temp elevated" explainer now shows the real deviation/threshold/baseline-nights
   numbers instead of a fixed qualitative sentence).
-  Also [`docs/../overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
+  Also [`docs/overview/history-2026-08-04.md`](../../overview/history-2026-08-04.md)
   (Q-103 — the "How it moves" panel now reads the real `anchorSource` instead of unconditionally
   claiming Readiness, matching the two sibling lines on the same card that already did).
 

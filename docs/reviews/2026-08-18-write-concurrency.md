@@ -174,3 +174,25 @@ client-side and single-layer, which is acceptable for append data. Recorded, not
 - **Always populate the fixture through the code path's own writer, or verify which column it
   reads.** Hand-writing a plausibly-named column is how the first Q-473 run produced a false negative
   (see Q-474).
+
+---
+
+## Postscript — Q-473 fixed, and re-verified against this document's own reproduction (2026-08-18)
+
+`#112` landed the same day, taking option (1) above: `completeWorkoutSession` now returns its
+affected-row count, and `completeWorkoutFromPayload` derives `alreadyCompleted` from that write
+rather than from a read taken before it.
+
+Review re-ran the reproduction on the merged code, same harness, four fresh trials of four concurrent
+completions of one workout, each spaced past the rate-limit window:
+
+| Trial | Codes | `completed_at` set | `sessions_in_phase` before fix | after fix |
+|---|---|---|---|---|
+| A | 200 ×4 | 1 row | 3 | **1** |
+| B | 200 ×4 | 1 row | 3 | **1** |
+| C | 200 ×4 | 1 row | 2 | **1** |
+| D | 200 ×4 | 1 row | 1 | **1** |
+
+Confirmed fixed. **Q-474 (the dead `program_session_id` column) is untouched and still open** — and
+anyone building a fixture for this area still needs it, because the trap that produced this
+document's one false negative is unchanged.

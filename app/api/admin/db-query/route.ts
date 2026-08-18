@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getPool } from '@/lib/data/postgres/client'
 import { getReadonlyPool, isReadonlyDbConfigured, describeReadonlyConnection } from '@/lib/data/postgres/readonly-client'
-import { requireAdmin } from '@/lib/admin'
+import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
 import { reportServerError } from '@/lib/observability'
@@ -49,8 +49,8 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
     // The token names a caller; it does not confer a role. The user it resolves to must be an admin.
     try {
       await requireAdmin(exportUserId)
-    } catch {
-      return { ok: false, status: 403, error: 'Forbidden' }
+    } catch (err) {
+      return adminFailureOutcome(err)
     }
     return { ok: true, via: 'token' }
   }
@@ -60,8 +60,8 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
   if (!userId) return { ok: false, status: 401, error: 'Unauthorized' }
   try {
     await requireAdmin(userId, session.user?.isAdmin)
-  } catch {
-    return { ok: false, status: 403, error: 'Forbidden' }
+  } catch (err) {
+    return adminFailureOutcome(err)
   }
   return { ok: true, via: 'session' }
 }

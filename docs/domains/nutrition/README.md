@@ -29,14 +29,14 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 - [`docs/superpowers/plans/2026-08-11-meal-plan.md`](../../superpowers/plans/2026-08-11-meal-plan.md)
   — **Meal Plan** (Q-186). Carries six decisions with reasoning; D1 deliberately deviates from the
   owner's ask (chain picker, not geolocation). **Shipped** 2026-08-11 across three releases:
-  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)
+  [`docs/overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)
   (v1.282.0/v1.283.0 — schema, setup flow, restrictions picker, itemised meals, manage sheet) and
-  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)
+  [`docs/overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md)
   (v1.287.0 — portion scaling, per-meal reroll, macro bars, structural edits). Phase 2 prefill is
   Q-187, now unblocked. **Editing a saved plan and building one around meals you already eat**
   (Q-192/Q-193, v1.288.0):
-  [`docs/../overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md).
-- [`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)
+  [`docs/overview/history-2026-08-08.md`](../../overview/history-2026-08-08.md).
+- [`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)
   — **ingredient search reaches Open Food Facts**, gram-level meal editing, and the app-wide
   `SheetHeader` close-button clearance (v1.290.0). Read it before touching `SheetHeader` or the
   external-food path; it carries the tailwind-merge override trap and the OFF serving-size bug.
@@ -44,7 +44,7 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   — **batch servings, plan top-up, reorder and instructed edits** (Q-207…Q-210), from owner testing
   on the S25. Carries the measurement behind Q-210: the plan **scales a saved meal and never adds to
   it**, so a 63P/15C meal in an 83C slot cannot get there at any allowed factor. Slice A shipped as
-  v1.292.0 ([`docs/../overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)).
+  v1.292.0 ([`docs/overview/history-2026-08-12.md`](../../overview/history-2026-08-12.md)).
 - [`docs/superpowers/plans/2026-08-17-saved-meal-printable-label.md`](../../superpowers/plans/2026-08-17-saved-meal-printable-label.md)
   — **Q-389, printable saved-meal labels with a scannable code. ✅ BUILT 2026-08-18 (v1.320.0)** —
   see [the journal entry](../../overview/entries/2026-08-18-saved-meal-printable-label.md); two owed
@@ -73,6 +73,9 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
+- [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md) — **are the memos actually memoising? 2026-08-18**. All 66 `memo(...)` declarations collected and every call site scanned: **64 hold**, no inline arrows anywhere. Q-490 — `MealMacroBars`/`DayMacroTotals` are called with an inline `target={{…}}` inside `variant.meals.map(...)`, so every keystroke in the meal-plan edit sheet re-renders every meal row. Also notes the rule's *"both long-standing memos"* count is stale (66, not 2).
+- [`docs/reviews/2026-08-18-malformed-route-ids.md`](../../reviews/2026-08-18-malformed-route-ids.md) — **every dynamic route called with an id that is not a UUID, 2026-08-18** (Q-483 — three routes reply with the raw driver error including the full `SELECT` and every column name of `workout_sessions`, from their own catch, unredacted in production; Q-482 — 21 route/method pairs across 14 routes 500 on a malformed id while answering a valid-but-missing one correctly, and only 2 of 30 dynamic routes validate the id at all).
+- [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](../../reviews/2026-08-18-outbox-replay-idempotency.md) — **the same mutation pushed twice, 2026-08-18** (Q-481 — a water quick-add replayed by the outbox stores 750 ml for 250 logged; `waterMlDelta` is the only non-idempotent branch of nineteen, and the server keeps no record of processed mutation ids). The additive write is deliberate (SYNC-P7) and must stay — the fix is mutation-id dedupe, not a change of semantics.
 - [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — `PUT /api/nutrition/meal-types/[id]` and both supplement write routes answer a missing row with a bodiless 500). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
 
 - [`docs/reviews/2026-08-18-ai-double-trips.md`](../../reviews/2026-08-18-ai-double-trips.md) — **the AI-usage screen's double-trips traced to cause, 2026-08-18** (Q-471 — the meal-plan reroll path is correctly guarded; its double-trip count is a fingerprint artefact, not tap-spam). Findings Q-469…Q-471; corroborates **Q-295** exactly and confirms **Q-170's latency fix is holding** (7-day Coach average 2,307 ms).
