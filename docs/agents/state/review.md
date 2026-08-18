@@ -3,16 +3,16 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** eight sweeps (2026-08-17 ×2, 2026-08-18 ×6) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **473**)
+**Updated:** 2026-08-18 · **By:** nine sweeps (2026-08-17 ×2, 2026-08-18 ×7) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **475**)
 
 ## Now
 
-Eight sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Nine sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
 |---|---|---|
-| `workouts` | write path cross-user + live drive, **AI double-trips** | Q-460…Q-462, Q-470 |
+| `workouts` | write path cross-user + live drive, **AI double-trips**, **write concurrency** | Q-460…Q-462, Q-470, **Q-473, Q-474** |
 | `nutrition` · `cardio` · `activity` | writes cross-user + app-wide not-found probe | Q-463 |
 | `sleep` · `readiness` · `heart-rate` · `body` · `devices` | ingest auth, value validation, schema strictness | Q-464, Q-465 |
 | `app-shell` · `platform` | failure cells, repo-migration architecture, **the Coach write path** | Q-450…Q-459, Q-467, Q-468 |
@@ -21,6 +21,39 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 9 — write concurrency, fired for the first time (2026-08-18)
+
+**The first sweep in this role to send two writes at once and read the row afterwards.** Write-up:
+[`docs/reviews/2026-08-18-write-concurrency.md`](../../reviews/2026-08-18-write-concurrency.md).
+
+**Filed Q-473 (high) and Q-474 (low).**
+
+- **Q-473 — `sessions_in_phase` over-increments, measured.** Four concurrent
+  `POST /api/complete-workout` for **one** session → four `200`s, `completed_at` on exactly one row,
+  counter at **3, 3, 2, 1** across four trials. Reproduced 4 of 5. Check-then-act: the guarded UPDATE
+  exists and returns `void`, so the idempotency decision comes from a read taken before it. This is
+  the counter `CLAUDE.md` says has drifted three times, in a function whose comment promises it
+  cannot. The outbox replay path calls the same function.
+- **Q-474 — a naming trap, filed because it nearly buried Q-473.** `workout_sessions` carries two FKs
+  to `program_sessions`; `program_session_id` is dead (zero code references, 0 of the owner's 91 prod
+  rows) and owns the name the live `session_id` is used under.
+
+**Four clean results recorded** (`day-checkin` idempotent, `completeWorkoutSession`'s UPDATE guarded,
+`upsertPersonalRecordIfBetter` correctly locked with `FOR UPDATE`, phase-`transition` idempotent) and
+**one deliberately not filed** (`activity-logs` duplicates freely, but every caller holds an in-flight
+guard and server-side dedupe would be wrong).
+
+**Two method notes worth more than either finding:**
+1. **My first Q-473 run was a false negative and I nearly published it.** The fixture populated the
+   dead column, the periodization block silently skipped, and the counter did not move. Rule:
+   **populate a fixture through the code path's own writer, or verify which column it reads.**
+2. **The rate limiter's L1 is in-memory** (`lib/rate-limit.ts`) — `DELETE FROM rate_limits` does not
+   reset it, and six consecutive trials all returned `429`. Space concurrency trials by the full
+   window (65 s for a 60 s limit).
+
+**Concurrency is now a lens with a working method, and it is nowhere near exhausted.** Only five
+routes were probed. Every other non-idempotent write is unmeasured.
 
 ### Sweep 8 — this run's own findings, checked against production (2026-08-18)
 

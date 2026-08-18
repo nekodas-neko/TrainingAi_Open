@@ -285,6 +285,61 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [workouts][platform] Q-473 — completing one workout twice at once counts it twice: `sessions_in_phase` over-increments, in the function whose comment promises it cannot
+
+- **Branch:** `fix/complete-workout-increment-race`
+- **Added:** 2026-08-18 · review sweep (write-concurrency lens) ·
+  [`docs/reviews/2026-08-18-write-concurrency.md`](reviews/2026-08-18-write-concurrency.md)
+- **Placement:** high for a Review finding. It is **measured, reproducible, and silent**, it lands on
+  the one counter `CLAUDE.md` says has already drifted three separate times, and the fix is small.
+- **Measured, not inferred.** Four concurrent `POST /api/complete-workout` for **one** workout
+  session, fresh row, counter reset to 0, trials spaced past the `5 / 60 s` limit:
+
+  | Trial | Codes | `completed_at` set | `sessions_in_phase` after |
+  |---|---|---|---|
+  | A | 200 ×4 | 1 row | **3** |
+  | B | 200 ×4 | 1 row | **3** |
+  | C | 200 ×4 | 1 row | **2** |
+  | D | 200 ×4 | 1 row | 1 |
+
+  A fifth burst that the limiter cut to two survivors gave **2**. Reproduced in **4 of 5**. The
+  workout row is correct every time — only the counter is wrong.
+- **The shape** (`packages/shared/src/workout/complete-workout.ts:56-77`): read `completedAt` →
+  write → `if (programSessionId && !alreadyCompleted) incrementSessionsInPhase(...)`. The idempotency
+  decision comes from the **earlier read**, so every request that read before the winner wrote
+  believes it is the first.
+- **`completeWorkoutSession` is already guarded and that is the whole point** — `adapter.ts:806-814`
+  carries `isNull(completedAt)` in its `WHERE`, so exactly one request stamps the column. It just
+  returns `void`, and the affected-row count that would settle this is thrown away.
+- **The function's own comment claims this is handled:** *"Idempotent: a retried/replayed completion
+  (network retry, or an outbox mutation re-pushed after its response was lost) must not … double-
+  increment the sessions_in_phase stored counter."* Worth fixing the comment's honesty alongside the
+  code.
+- **Two live vectors.** (1) Rapid taps — `CLAUDE.md` records *"5 rapid taps once fired 4
+  `complete-workout` POSTs"*. (2) **Outbox replay** — `pushMutations`' `complete_workout` branch calls
+  the same shared function, so a re-pushed mutation takes the same path. That is the exact case the
+  comment names.
+- **Why it hurts:** `sessions_in_phase` advances the periodization phase (baseline → accumulation →
+  intensification → realisation → deload). Over-counting moves the lifter into the next phase, and
+  into a deload, **early**, off a session that was never trained. Nothing reconciles the counter
+  against `workout_sessions`, so it surfaces only as "my programme advanced too soon".
+- **Fix shape (implementer's call, two options, both already in this codebase):**
+  1. *Cheapest, and it is `CLAUDE.md`'s own write-path rule (a).* Have `completeWorkoutSession`
+     return its affected-row count and derive `alreadyCompleted` from **that** instead of the prior
+     read. The guarded UPDATE exists; only its return value is missing.
+  2. *If a transaction is wanted anyway:* copy `upsertPersonalRecordIfBetter`
+     (`adapter.ts:2987-3004`), which does the same read-then-conditionally-write correctly with
+     `db.transaction` + `SELECT … .for('update')`.
+  Prefer (1) — smaller, no new transaction on a hot path, and it fixes the pattern rather than
+  wrapping it. Whichever lands, `CLAUDE.md`'s **Stored Counters** rule asks for a reconcile-on-read
+  (`reconcileSessionsInPhase` already exists) — check it covers the drift already in the DB.
+- **Lane A owns this** — `packages/shared/**` and `lib/data/**`.
+- **Not verified on:** production (correct — it writes), the APK, or a multi-replica deployment.
+  Local `pnpm dev` is a single node; more replicas widen the window, not narrow it.
+- **Setting up a repro? Read Q-474 first** — populating `workout_sessions.program_session_id` (the
+  obvious-looking column) makes the periodization block silently skip and the race look absent. The
+  live column is `session_id`.
+
 ### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
 
 - **Branch:** `fix/db-query-403-masks-outage`
@@ -630,6 +685,39 @@ moving *beside* the calories rather than under them.
 - **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
+
+### [workouts][platform] Q-474 — `workout_sessions` has two foreign keys to `program_sessions`, and the dead one owns the name the live one is used under
+
+- **Branch:** `chore/workout-sessions-dead-program-session-id`
+- **Added:** 2026-08-18 · review sweep (write-concurrency lens) ·
+  [`docs/reviews/2026-08-18-write-concurrency.md`](reviews/2026-08-18-write-concurrency.md)
+- **Placement:** low. **Nothing is broken today** — nothing uses the dead column. File it as the
+  maintenance hazard it is, not as a bug.
+- **What.** `lib/data/postgres/schema.ts` declares both:
+  ```ts
+  sessionId:        uuid('session_id').references(() => programSessions.id, ...)          // 157 — live
+  programSessionId: uuid('program_session_id').references(() => programSessions.id, ...)  // 168 — dead
+  ```
+  `program_session_id` came from `079_ai_dynamic_periodization.sql:19` ("for prescription trigger
+  linkage"). `grep workoutSessions.programSessionId` across `lib app packages` returns **zero hits** —
+  nothing writes it, nothing reads it.
+- **Confirmed in production:** 0 of the owner's 91 `workout_sessions` rows have `program_session_id`
+  set; 45 have `session_id`. (`claude_ro` is row-scoped to one user, so that is the owner's rows —
+  but a column no code references cannot be populated for anyone else either.)
+- **The trap, which is the actual finding.** The identifier `programSessionId` means the **live**
+  column everywhere in code, while the column actually named `program_session_id` is inert:
+  - `getWorkoutSessionProgramSessionId()` — named for the dead column — selects
+    `s.workoutSessions.sessionId` (`slices/periodization.ts:299-306`).
+  - `ensureWorkoutSession(userId, sessionId, programSessionId, …)` writes its `programSessionId`
+    argument into the `sessionId` field (`adapter.ts:772-780`).
+- **It has already cost a session.** The Q-473 repro fixture populated `program_session_id`, the
+  periodization block took the `null` branch, the counter never moved, and the honest reading of that
+  run was "the race does not exist". It does. The next person to build that fixture hits the same wall.
+- **Fix shape:** rename the reader (and comment the schema) — zero-risk, removes most of the trap on
+  its own. Dropping the column is cleaner but is a **data-losing migration**, so it needs owner
+  confirmation under `CLAUDE.md` and a Lane A migration number; it is not obviously worth that on its
+  own, and would ride better alongside other schema work.
+- **Lane A owns this** — schema and migrations.
 
 ### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
 
@@ -4248,6 +4336,100 @@ session working from a temporarily restored copy.
 - **Related, recorded not filed:** `calcAmrap1RM` / `amrapScaleFactor` (the 1.0/0.97/0.93/0.88/0.82
   rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls
   would be wasted; removing it is a Review-lane call.
+
+### [heart-rate][body] Q-515 — the rest/active boundary shrank 3× because the owner got fitter
+
+- **Branch:** `fix/hr-rest-threshold-anchor`
+- **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
+- **Blast radius.** `HR_REST_THRESHOLD = 0.05` is the single rest/active boundary shared by **Body
+  Battery's charge/drain** and the **Activity Score's "moved this hour"** signal — it propagates into
+  two pillars.
+- **Measured** over 12,471 BLE ring samples, waking hours (07:00–21:59), joined per day to that day's
+  own stored profile:
+
+  | month | resting HR | hr_max | boundary | median % of waking samples below it |
+  |---|---|---|---|---|
+  | 2026-07 | 62.9 | 187.0 | **69.1 bpm** | **26.5%** |
+  | 2026-08 | 54.4 | 171.2 | **60.2 bpm** | **8.2%** |
+
+  **A 3.2× collapse in one month at identical sample density (184/day).**
+- **Every input behaved correctly.** Resting HR 62.9 → 54.4 is a genuine fitness gain; `hr_max`
+  187 → 168 is the profile maturing from the age formula to a corroborated observed ceiling (the chest
+  strap's max is 166 over 40,230 samples) — `resolveHrProfile` working as designed. Waking HR also fell,
+  77.5 → 73.3.
+- **The trap is a RATE difference.** Resting HR fell **8.5 bpm**; waking HR fell only **4.2**. Resting
+  HR is the more responsive fitness marker, so a boundary pinned to it moves ~2× as fast as the
+  distribution it classifies. Decomposed: resting HR explains ~8.1 of the 8.9 bpm boundary drop, the
+  `hr_max` maturation ~0.9. **The owner got fitter and was rewarded with less recovery credit.**
+- **No fraction fixes it** — sweeping the constant, July vs August medians: 0.05 → 26.5/8.2 (3.2×),
+  0.08 → 38.5/22.7, 0.10 → 47.8/29.8, 0.12 → 59.6/35.2, 0.15 → 72.8/50.6 (1.4×). The gap narrows but
+  never closes. **Tuning this constant is not the fix** — fourth instance of that pattern today
+  (Q-506, Q-512, Q-514, Q-515).
+- **Two separable questions; only one is answered here.** *(a) Is it stable?* No — a defect regardless
+  of taste. *(b) Is 8.2% the right level?* **Unknown** — ~1.2 h of a 15 h day is not obviously wrong,
+  and whether Body Battery should charge more in daylight is an owner question. **Fix (a) alone**; if
+  the fraction is raised at the same time the two effects become inseparable and neither is verifiable.
+- **First action — recommendation:** anchor the boundary to a **slow-moving** resting baseline (90-day
+  trailing, or a fixed offset re-derived quarterly) so a month of fitness improvement cannot move the
+  classifier under its own data. Keeps personalisation, removes the month-scale feedback. Reversal cost
+  is low and the effect is observable within a week of BLE data.
+- **Rejected alternative:** a percentile of the owner's own recent *waking* HR (trailing-28-day p25).
+  Stable by construction — which is the objection: Body Battery charge would go near-constant and a
+  genuinely restful day could not read as one. The codebase already names this "the treadmill" and
+  removed it from the activity-goal volume lane (Q-190). **Self-referential boundaries are fine for a
+  pure classifier and wrong for anything feeding a score — this one feeds two.**
+- **Re-measure both consumers afterwards**: Body Battery's charge/drain balance (currently mean charged
+  23.1 vs drained 36.0) and the Activity Score's movement signal.
+- **On Q-272:** its "median 6.7% of waking samples" could not be reproduced — the same statistic on
+  current data gives **15.0%** pooled over 42 days. **Not filed as an error there**; the month split
+  (26.5% / 8.2%) suggests it was measured on recent data alone, and the drift documented here explains
+  the difference.
+- **Still unreviewed in this pillar:** `PEAK_BANDS` (its "stable per-bucket sample sizes" justification
+  is an empirical claim nobody has measured) and the Karvonen zone boundaries (0.6/0.7/0.8/0.9).
+
+### [heart-rate] Q-516 — `PEAK_BANDS` is calibrated for a heart-rate range strength training never reaches
+
+- **Branch:** `fix/hr-recovery-peak-bands`
+- **Plan:** none yet — re-banding is cheap; **the honesty change in "first action" is the real work.**
+  Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md) Part 2
+- **The claim under test.** `hr-recovery-profile.ts` justifies its bands as *"Bands, not exact bpm, for
+  stable per-bucket sample sizes (spec §3)."* That is empirical, and it is **false** for this athlete.
+- **Observed range**, 208 episodes with `coverage_ok` (2026-05-27 → 08-17): min 59, p25 93.8,
+  **median 102**, p75 110, p95 121, **max 132**.
+
+  | band | episodes | share | mean `drop_60s` |
+  |---|---|---|---|
+  | **`<110`** (spec: *low-signal, de-emphasise*) | **149** | **71.6%** | **3.0** |
+  | `110–129` | 57 | 27.4% | **14.9** |
+  | `130–149` | **2** | 1.0% | 13.5 |
+  | `150–169` | **0** | 0% | — |
+  | `170+` | **0** | 0% | — |
+
+  The highest set-peak ever recorded is **132**, so the top two bands are **structurally unreachable**,
+  not merely sparse. `LOW_SIGNAL_BAND_LABEL = '<110'` sits at the **p75**, so the profile de-emphasises
+  three quarters of its own data. **One usable bucket** (`110–129`, n = 57).
+- **The de-emphasis is CORRECT, which makes it worse.** Mean `drop_60s` is **3.0** below 110 against
+  **14.9** above it — the spec's "near-meaningless … mostly measurement noise" is **supported**. So
+  re-banding does not recover hidden signal: **peak HR during a lifting set mostly does not reach the
+  range where HR recovery is informative.** These bands read as designed for cardio/interval work.
+- **Also:** `coverage_ok` is true on only **212 of 691** rows (31%) — two thirds of set-HR rows are
+  discarded before banding. Not investigated; recorded so 208 is not mistaken for the full sample.
+- **First action:** (1) re-band to the observed range (e.g. `<90 · 90–104 · 105–119 · 120+`) so four
+  buckets populate and the 110–129 signal is not diluted; **(2) — the important one — state plainly in
+  the feature and the docs that HR recovery is informative for roughly the 28% of sets peaking above
+  110.** A re-banded profile that averages noise into four buckets is **worse** than one honest bucket,
+  because it looks like it is working. **Do not ship (1) without (2).**
+- **Owner-facing question behind it:** if HR recovery is meant to track conditioning, the range exists
+  in cardio and chest-strap data (max 166 over 40,230 samples), not strength sets. Whether the feature
+  is targeted correctly is a product decision, not a constant.
+- **Caveat:** nothing about the recovery *math* (`drop_30s`…`drop_120s`, `sec_to_hrr50`) was checked —
+  only the banding and its populations. Cardio/chest-strap **episodes** were not examined; the claim
+  that the range exists there comes from raw `oura_heartrate`, since `set_hr_stats` is strength-derived
+  by construction.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
