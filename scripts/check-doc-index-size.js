@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, memo-stability audit, Q-490): backlog 9439 -> 9477, projectOverview
+// 7551 -> 7576. One queue entry and its row. Both lead with the CLEAN number (64 of 66 memos hold,
+// no inline arrows anywhere) because without it the entry reads as though memoisation is broken
+// here, and both carry the fix caveat that the per-meal site wants SCALARS rather than a useMemo —
+// a useMemo there needs one memo per row, which is worse than the bug. Both also flag that no render
+// counts were measured; the claim is from object identity, not a profiler.
+
+//
 // Raised 2026-08-18 (Review, ms-offset → calendar day, Q-489): backlog 9393 -> 9439, projectOverview
 // 7523 -> 7551. One queue entry and its row, and the lines that earn their place are the NEGATIVE
 // ones: most instances of the banned ms-offset pattern are CORRECT (rolling instant windows feeding
@@ -667,7 +675,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7551,
+  'projectOverview.md': 7576,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -678,7 +686,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9439,
+  'docs/implementation-backlog.md': 9477,
   'CLAUDE.md': 1075,
 
 };

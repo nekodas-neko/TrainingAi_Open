@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** twenty-five sweeps (2026-08-17 ×2, 2026-08-18 ×23) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **490**)
+**Updated:** 2026-08-18 · **By:** twenty-six sweeps (2026-08-17 ×2, 2026-08-18 ×24) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **491**)
 
 ## Now
 
-Twenty-five sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Twenty-six sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,31 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 26 — are the memos actually memoising? (2026-08-18)
+
+**Filed Q-490 (low-mid).** A defeated memo looks optimised and does nothing, so nothing surfaces it.
+Write-up: [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md).
+
+**64 of 66 memos hold, and there are no inline arrows anywhere** — lead with that; without it the
+entry reads as though memoisation is broken here. The two exceptions are one module and one prop:
+`MealMacroBars`/`DayMacroTotals` called with `target={{…}}` inside `variant.meals.map(...)`, from a
+sheet with **9 `useState` hooks** and per-keystroke handlers — so every keystroke re-renders every
+meal row. Performance, not correctness.
+
+**The fix wants scalars, not `useMemo`, at the per-meal site** — a `useMemo` there needs one memo per
+row, which is worse than the bug. That is in the entry because it is the obvious wrong fix.
+
+**Second stale-clause find after Q-480:** the rule says *"both long-standing memos in the codebase"* —
+there are now **66**. The rule is right; the count is from an earlier era and reads as though
+memoisation is rare here. Worth a one-line correction alongside the fix.
+
+**⚠️ No render counts were measured** — the claim is from object identity and React's shallow compare,
+not a profiler. Said so everywhere it appears.
+
+**This lens has more in it.** `CLAUDE.md`'s render section also names Zustand selector breadth, timers
+in orchestrators rather than leaves, `readCacheSync` in a component body that renders on a timer, and
+`key={index}` in editable lists. None of those was swept here.
 
 ### Sweep 25 — the banned ms-offset window, sorted (2026-08-18)
 

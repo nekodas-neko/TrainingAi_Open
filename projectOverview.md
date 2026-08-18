@@ -103,6 +103,31 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [nutrition][app-shell] 🟡 64 of 66 memos hold; the two that do not re-render every meal row on every keystroke (Q-490, 2026-08-18)
+
+- **`CLAUDE.md` warns that an inline object or arrow "defeats the memo silently" — a defeated memo
+  looks optimised and does nothing.** Nobody had checked whether the current ones hold.
+  [`docs/reviews/2026-08-18-memo-stability-audit.md`](docs/reviews/2026-08-18-memo-stability-audit.md).
+- **The headline is the clean part: 64 of 66 hold, and there are no inline arrows anywhere** in a
+  memoised component's props. The discipline the rule asks for is being kept almost everywhere.
+- **The two exceptions are one module and one prop.** `MealMacroBars` and `DayMacroTotals`
+  (`meal-macro-bars.tsx:58,83`) are called with `target={{ … }}` — a fresh object identity per render —
+  from `meal-plan-review-step.tsx` and `meal-plan-edit-sheet.tsx`, in both cases **inside
+  `variant.meals.map(...)`**.
+- **Why it bites:** the edit sheet holds **9 `useState` hooks** including per-keystroke handlers
+  (`setInstruction`, `setRenameText`), so **every keystroke re-renders every meal row's macro bars** —
+  exactly what the memo was added to prevent. **Performance, not correctness**, and bounded by the
+  handful of meals in a day.
+- **Fix:** `useMemo` the object, or better, pass four scalars — for the per-meal site a `useMemo` would
+  need one memo per row, so scalars are the cleaner choice.
+- **A stale clause worth correcting alongside:** the rule says *"both long-standing memos in the
+  codebase were defeated exactly this way"*. There are now **66** memoised components, not two. The
+  rule is right; the count is from an earlier era and reads as though memoisation is rare here. Same
+  class as Q-480.
+- **Not verified: no render counts were measured** — the claim follows from object identity and
+  React's shallow compare, not a profiler run. The call-site scan can miss a memoised component
+  invoked with deeply nested children in its props; the 66 declarations are exhaustive.
+
 ### [platform][readiness] 🟡 Five sites turn an ms offset into a calendar day; in a DST zone three compute "today" for "yesterday" (Q-489, 2026-08-18)
 
 - **`CLAUDE.md` bans this shape and records six copies shipping in one file.** `lib/ai-chat/tools.ts`
