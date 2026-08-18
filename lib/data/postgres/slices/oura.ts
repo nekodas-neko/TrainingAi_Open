@@ -9,6 +9,7 @@ import { aestMidnight, todayInTz, DEFAULT_TZ, shiftDateStr } from '@trainingai/s
 import { shouldPrune } from '../retention-throttle'
 import { bodyCompSnapshot } from '@trainingai/shared/health/body-composition'
 import { mergeSet, initialSourceMap, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
+import { resolveDsToMs, type ClockAnchor } from '@/lib/oura-ble/clock'
 
 // Per-field provenance columns (migration 120) for the two multi-source Oura tables.
 const OURA_DAILY_SOURCE_COLS: SourceColumn[] = [
@@ -170,14 +171,70 @@ export async function getLatestOuraCloudVitals(
   return rows[0] ?? null
 }
 
+/**
+ * Has the ring ever reported at all?
+ *
+ * Split out from `getLatestOuraBleMeasuredAt` in Q-541 Task 7, because `/api/oura/stats` was using
+ * "we can name a last-measured time" as a proxy for "the ring is connected", and those stopped being
+ * the same question once the time became derived: a user with frames but no resolvable clock anchor
+ * has a ring, and would have silently lost the Health tab's entire Ring section
+ * (`oura-section.tsx` returns null on `!connected`) with nothing failing anywhere.
+ *
+ * Existence is also the cheaper query — `EXISTS` stops at the first row where the old path took a
+ * `max()` — and it covers both tiers, so a ring whose whole history has been packed still counts.
+ */
+export async function hasOuraBleSamples(db: Db, userId: string): Promise<boolean> {
+  const [[hot], [packed]] = await Promise.all([
+    db.select({ one: sql<number>`1` }).from(s.ouraRawSamples).where(eq(s.ouraRawSamples.userId, userId)).limit(1),
+    db.select({ one: sql<number>`1` }).from(s.ouraRawPacked).where(eq(s.ouraRawPacked.userId, userId)).limit(1),
+  ])
+  return hot != null || packed != null
+}
+
+/**
+ * When the ring last recorded anything, in wall clock.
+ *
+ * Q-541 Task 7 / Q-534: derived from `max(ring_timestamp_ds)` through the clock anchors, not read
+ * from the stored `measured_at` column. This was the second and last reader of
+ * `idx_oura_raw_samples_user_measured` — 136 MB, and the index that made a `measured_at` re-stamp
+ * rewrite 681,005 rows with zero HOT updates and fill the disk.
+ *
+ * It is also the more correct answer twice over. The stored column is a derivation frozen at write
+ * time, so it goes stale whenever the clock model changes — which it has, twice (Q-71, Q-536) — and
+ * a packed frame does not carry the column at all, so a `max(measured_at)` would report the hot
+ * window's edge as the ring's last activity.
+ */
 export async function getLatestOuraBleMeasuredAt(db: Db, userId: string): Promise<Date | null> {
-  const [row] = await db
-    .select({ measuredAt: s.ouraRawSamples.measuredAt })
-    .from(s.ouraRawSamples)
-    .where(and(eq(s.ouraRawSamples.userId, userId), isNotNull(s.ouraRawSamples.measuredAt)))
-    .orderBy(desc(s.ouraRawSamples.measuredAt))
-    .limit(1)
-  return row?.measuredAt ?? null
+  const [[hot], [packed], anchorRows] = await Promise.all([
+    db
+      .select({ maxDs: sql<number | null>`max(${s.ouraRawSamples.ringTimestampDs})::bigint` })
+      .from(s.ouraRawSamples)
+      .where(eq(s.ouraRawSamples.userId, userId)),
+    db
+      .select({ maxDs: sql<number | null>`max(${s.ouraRawPacked.maxDs})::bigint` })
+      .from(s.ouraRawPacked)
+      .where(eq(s.ouraRawPacked.userId, userId)),
+    db
+      .select({
+        epoch: s.ouraBleClockAnchors.epoch,
+        anchorDs: s.ouraBleClockAnchors.anchorDs,
+        anchorUtc: s.ouraBleClockAnchors.anchorUtc,
+      })
+      .from(s.ouraBleClockAnchors)
+      .where(eq(s.ouraBleClockAnchors.userId, userId))
+      .orderBy(asc(s.ouraBleClockAnchors.anchorDs)),
+  ])
+
+  const candidates = [hot?.maxDs, packed?.maxDs]
+    .map(v => (v == null ? null : Number(v)))
+    .filter((v): v is number => v != null)
+  if (candidates.length === 0) return null
+
+  const anchors: ClockAnchor[] = anchorRows.map(r => ({
+    epoch: r.epoch, anchorDs: Number(r.anchorDs), anchorUtcMs: new Date(r.anchorUtc).getTime(),
+  }))
+  const ms = resolveDsToMs(Math.max(...candidates), anchors)
+  return ms != null ? new Date(ms) : null
 }
 
 export async function listOuraTags(db: Db, userId: string, startDay: string, endDay: string): Promise<OuraTagRow[]> {

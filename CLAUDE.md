@@ -22,6 +22,7 @@
 - **At the end of every session, fold the journal/index update into the same PR as the implementation** — don't open a separate follow-up PR for it. Write the session summary as **its own new file** in `docs/overview/entries/` named `YYYY-MM-DD-<branch-slug>.md` (per the convention in [`docs/overview/entries/README.md`](docs/overview/entries/README.md)) — **do NOT prepend to a shared `docs/overview/history-*.md`; that shared-line edit was the most frequent multi-PR merge conflict, and per-entry files take it to zero.** A periodic compaction sweep folds these into the batched history later. Also make the `projectOverview.md` lean-index update (current status, any new known issues, what's planned next) as commits on the *same branch* as the code change, once the diff is final and CI is green — i.e. write it last, right before merging (or before auto-merge lands), not speculatively at the start of the session. Because it rides in the same PR, it only ever lands if that PR actually merges — a PR that gets abandoned, superseded, or reworked never leaves a stale "done" claim behind. Keep shared *pointer* lines out of a feature PR (the backlog serial-track "Next on the track" line and `planned_upgrades.md` tick marks defer to the compaction sweep — see the README); striking the completed item's own backlog **queue entry** stays in the feature PR (non-adjacent, rarely conflicts). If user-visible changes were shipped, bump the version in `package.json` and add an entry to `packages/shared/src/changelog.ts` in that same PR — patch for bug fixes, minor for new features, major for breaking changes or large redesigns. (The version/changelog bump still edits shared lines and can conflict on parallel merges — re-bump on rebase; a future changelog-fragment change could remove that too.)
 - **When the user says the session is wrapping up** — "let's wrap this session", "let's close this session", "we're finishing up", or anything equivalent — that is a request for the three-part wrap-up ritual below (handoff doc → documentation cleanup → next-agent prompt), not just an acknowledgement. See **Session Wrap-Up** immediately after this list.
 - **Tick off roadmap items immediately when pushed to `main`** — as soon as any planned feature or fix lands on `main` (even for testing), mark it as ✅ in `projectOverview.md`. If it still needs testing or has known gaps, add a ⚠️ note inline rather than leaving it unchecked. Never leave a shipped item unchecked because it "isn't fully verified yet".
+- **Decisions come with a recommendation attached, and cheap reversible ones don't come at all.** Recommendation first, why it wins long-term, alternatives and what each is better at, reversal cost, plain English. Full rule: **Decisions That Come Back To Me**, below.
 - **Break things into components** — where possible, split code into smaller components and avoid creating very long files.
 - **Keep plan-generation prompts small.** When turning a design spec into an implementation plan (`docs/superpowers/plans/`), don't hand a sub-agent the entire spec plus the full task breakdown in one massive prompt — it can time out. Investigate the relevant files first (small, scoped Explore calls), then write the plan directly. If a spec covers many independent areas (DB/backend, sync, UI, admin), consider splitting it into multiple smaller plan documents rather than one giant one.
 - **Backlog-driven implementation — plan now, build later, two PRs total.** New features, upgrades, and non-trivial fixes are split across sessions. **PR 1 (docs-only, planning session):** writes the implementation plan to `docs/superpowers/plans/` and inserts an entry into `docs/implementation-backlog.md` at the priority it judges right (queue position = priority) — it does **not** implement. **PR 2 (implementer session, later):** works the queue top-down following the protocol at the top of the backlog file, implements the change, removes the backlog entry, and appends the journal/`projectOverview.md` update — all in that **one** PR (see the end-of-session rule above); a finished item must never linger in the queue, and the notes must never describe work that isn't in that same diff. Exempt: small fixes the user explicitly asks to have done in-session.
@@ -693,6 +694,39 @@ is set permanently via Windows Environment Variables).
 - **A Q number is claimed against the queue file AND every open PR.** Same discipline as migration numbers, and the backlog header says so — but it is easy to grep only `docs/implementation-backlog.md` and miss a number an *unmerged* PR already took. On 2026-08-08 a finding was filed as Q-141 when #1143 already held it; the parallel agent caught the duplicate and refiled it as Q-146. Before taking the next free number, check the open-PR list too.
 - **Resolve `package.json` / `changelog.ts` conflicts by rebuilding from `origin/main`, not by splicing the conflict hunks.** When the conflict falls *inside* an entry's `changes:` array — which it does whenever two PRs bump on the same day — both sides share the `version:`/`date:` header above the marker, so a naive splice produces an entry with no header and silently drops the other PR's version. This corrupted the changelog twice on 2026-08-08 before the approach changed. The reliable shape: take `git show origin/main:packages/shared/src/changelog.ts`, prepend your entry at the next free number, and write the whole file.
 - **In a session that merges several PRs in a row, "freshly fetched" goes stale while you work — re-merge `main` immediately BEFORE opening each PR, not just before creating the branch.** This bit three times in one session on 2026-08-04 (#1052, #1056→#1060 twice) *while the rule above was being followed correctly every time*: the branch was cut from a genuinely current `main`, then an earlier PR of the same session merged, and by the time this one opened its base was behind. You cannot fetch a commit that does not exist yet, so the rule above cannot prevent it. **The tell is distinctive and worth learning: `get_check_runs` returning `total_count: 0` several minutes after opening a PR is a stale base, not slow CI** — real CI reports queued/in-progress checks within about a minute. The fix is `git fetch origin main && git merge origin/main`, resolve, push; checks start immediately. Do not sit waiting on a monitor for checks that will never arrive.
+
+---
+
+## Decisions That Come Back To Me — answer the whole question the first time
+
+**First, don't ask.** A decision is the owner's only if it is **hard to reverse** (migration, auth,
+external contract, public surface), **expensive to reverse** (it seeds a pattern the codebase will
+copy), or a **genuine preference** not derivable from the repo. Everything else — naming, file
+layout, which primitive to reuse, two equivalent implementations — you decide, state in one line what
+you picked and why, and continue. Asking about a cheap reversible choice is not caution; it hands the
+work back.
+
+**When it genuinely is the owner's, never send a bare question.** The owner should not have to reply
+*"give me the options with your recommendation and why, the alternatives and why not, the
+best-practice future-proof answer rather than a quick fix, in plain English"* — that is the default
+shape of every decision you bring, produced unasked:
+
+1. **The recommendation, first line.** One named option, stated as a recommendation — not a menu.
+2. **Why, framed a year out.** What it costs to live with and what it makes easy later, not what is
+   fastest today. Default to the durable option; if you are recommending the quick one, say so
+   outright and name the debt.
+3. **Alternatives, each with the reason it lost** — and what it would genuinely be *better* at. An
+   alternative with no upside is padding, not an option.
+4. **Reversal cost.** If this is wrong in three months, what does undoing it take? Cheap-to-reverse
+   deserves less deliberation, and saying so often unblocks the decision fastest.
+5. **Plain English** — no unexplained jargon or acronyms, no file path standing in for a reason.
+   Assume the reader knows the product cold and the internals not at all.
+
+**Keep it under a minute's reading** (~15 lines). A brief longer than the work has failed. Use
+`AskUserQuestion` for discrete short options, prose when the reasoning is the thing to read. **Never
+manufacture a trade-off** — if one option is genuinely the only sane one, say that and proceed.
+**Override:** "quick fix" / "temporary" / "spike" / "don't over-think it" flips the bias to speed for
+that task, with the durable version noted in one line so the debt is on the record.
 
 ---
 

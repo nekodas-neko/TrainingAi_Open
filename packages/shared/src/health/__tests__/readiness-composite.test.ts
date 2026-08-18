@@ -135,9 +135,13 @@ describe('computeReadinessComposite', () => {
       previousNightScore: null, prevDayActivityScore: null, activityBalanceScore: null,
       nHistory: 0,
     }
-    it('maps hours → 0-100 linearly, 100 at the ≥6h optimal, provisional', () => {
-      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 6 }).contributors.recoveryIndex).toEqual({ score: 100, provisional: true })
-      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 3 }).contributors.recoveryIndex).toEqual({ score: 50, provisional: true })
+    // Anchor moved 6 h → 5 h on 2026-08-18 (Q-500), fitted against Oura's own recovery_index
+    // contributor over the 15 pre-re-key nights where both exist. The property under test is
+    // unchanged — linear, a true 100 at the optimum, 0 at 0 h, clamped above — so only the
+    // anchor-dependent literals move: the midpoint is now 2.5 h rather than 3 h.
+    it('maps hours → 0-100 linearly, 100 at the ≥5h optimal, provisional', () => {
+      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 5 }).contributors.recoveryIndex).toEqual({ score: 100, provisional: true })
+      expect(computeReadinessComposite({ ...base, recoveryIndexHours: 2.5 }).contributors.recoveryIndex).toEqual({ score: 50, provisional: true })
       expect(computeReadinessComposite({ ...base, recoveryIndexHours: 0 }).contributors.recoveryIndex).toEqual({ score: 0, provisional: true })
       expect(computeReadinessComposite({ ...base, recoveryIndexHours: 9 }).contributors.recoveryIndex.score).toBe(100) // clamped
     })
