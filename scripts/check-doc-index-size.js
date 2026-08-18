@@ -495,7 +495,13 @@ const BASELINE = {
   // the user a maintenance below their own BMR. The replay table is the entry: 75% of windows are
   // correctly refused, which is why the obvious response (tighten the coverage gates) is wrong, and
   // the 1,052-vs-1,000 near-miss is only legible with the numbers beside it.
-  'docs/implementation-backlog.md': 8775,
+  // Raised 2026-08-18 (Q-387 decision, Q-398, Q-395 round 5 — BugFix intake). Recomputed from
+  // the MERGED file after taking main's side; this branch took three same-day raises from other
+  // lanes, and splicing conflict hunks is how one side's raise silently disappears. Four blocking
+  // design questions were answered: the completeness control is an explicit button at the foot of
+  // the log (Q-387 options 2 and 3 closed with reasons), the meal plan becomes a generator of
+  // saved meals (Q-398), targets stay in Profile with a shortcut, and the pass covers the full journey.
+  'docs/implementation-backlog.md': 8793,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
