@@ -810,6 +810,44 @@ below threshold and left in place for next time.
   a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
   but not Postgres's). The consequence at each call site is read from source.
 
+### [nutrition][app-shell] Q-490 — two memos are pure decoration: every keystroke in the meal-plan sheet re-renders every meal row
+
+- **Branch:** `fix/meal-macro-bars-stable-props`
+- **Added:** 2026-08-18 · review sweep (render discipline) ·
+  [`docs/reviews/2026-08-18-memo-stability-audit.md`](reviews/2026-08-18-memo-stability-audit.md)
+- **Placement:** low-mid. A **performance** issue, not correctness, on one sheet — but it is the exact
+  failure `CLAUDE.md` documents, the memo is currently doing nothing, and the fix is small.
+- **Lead with the good news: 64 of 66 memos hold.** Every `memo(...)` declaration was collected and
+  every JSX call site scanned for an inline arrow/object/array in its props. **No inline arrows exist
+  anywhere.** Only these two are defeated, both from one module, both by the same prop.
+- **What.** `components/nutrition/meal-macro-bars.tsx:58,83` export `MealMacroBars` and
+  `DayMacroTotals` wrapped in `memo(...)`. Every call site passes a **fresh object identity**:
+  ```
+  meal-plan-review-step.tsx:132   <DayMacroTotals target={{ … }} />
+  meal-plan-review-step.tsx:212   <MealMacroBars  target={{ … }} />   ← inside variant.meals.map(...)
+  meal-plan-edit-sheet.tsx:236    <DayMacroTotals target={{ … }} />
+  meal-plan-edit-sheet.tsx        <MealMacroBars  target={{ … }} />   ← inside variant.meals.map(...)
+  ```
+  `memo`'s shallow compare always fails, so both re-render unconditionally.
+- **Why it matters here specifically:** `meal-plan-edit-sheet.tsx` holds **9 `useState` hooks**
+  including per-keystroke handlers (`onChange={e => setInstruction(e.target.value)}`,
+  `setRenameText`), and `MealMacroBars` renders inside `variant.meals.map(...)`. **Every keystroke in
+  the rename or instruction field re-renders every meal row's macro bars** — precisely what the memo
+  was added to prevent.
+- **Fix shape:** hoist the object out of JSX with `useMemo` keyed on the four target values, **or**
+  change the props to four scalars, which removes the class instead of working around it. **Prefer
+  scalars for the per-meal site** — a `useMemo` there would need one memo per row, which is worse than
+  not having the object at all.
+- **Also worth correcting in the same PR:** `CLAUDE.md`'s rule says *"both long-standing memos in the
+  codebase were defeated exactly this way"*. There are now **66** memoised components, not two. The
+  rule is right and stays; the parenthetical is an old count that reads as though memoisation is rare
+  here, which would discourage adding one. Same class as **Q-480**.
+- **Lane B owns this** (`components/nutrition/**`).
+- **Not verified:** static analysis. **No render counts were measured** — the claim follows from object
+  identity and React's shallow compare, not a profiler run. The call-site scan matches JSX elements
+  that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
+  children in its props could be missed; the 66 declarations are exhaustive.
+
 ### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
 
 - **Branch:** `docs/claude-md-repo-tz-line`
