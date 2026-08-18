@@ -69,6 +69,40 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][app-shell][readiness] 🟢 This run's own findings checked against production — one refuted, two re-scoped, one new (Q-472, 2026-08-18)
+
+- **The lens was to measure my own claims.** Seven sweeps filed 22 findings (Q-450…Q-471), almost all
+  from code-reading and a local seeded database; `claude_ro` had never been queried directly in any of
+  them. More of this write-up is corrections than discoveries, which is the point of running it:
+  [`docs/reviews/2026-08-18-production-verification.md`](docs/reviews/2026-08-18-production-verification.md).
+- **🆕 Q-472 — the Coach's write capability has never once been used.** `coach_changes` is **empty**:
+  no applied change, ever. The Coach is *not* unused (5 threads, 16 messages, 17 calls in 30 days) and
+  the widgets render — 8 of 8 assistant messages carry a tool, 5 a `choice_list`, **1 a
+  `change_preview`** — but **0 changes were applied**. Apply is **not** broken (the previous sweep
+  applied a patch through the real route). Whether the model rarely proposes or the one proposal was
+  declined is **not determinable from this data**. Filed as an owner decision, not a defect.
+- **🔎 Q-467 and Q-468 re-scoped, not closed.** Both are real code defects; both have **zero
+  production exposure**. Nothing has ever been applied, so nothing has ever needed undoing, and no
+  `target_id` carries more than one change. Their top-of-queue placement was priced on exposure that
+  does not exist yet.
+- **🔎 Q-465 refuted in practice — and my first query was wrong.** It reported "45 of 50 check-ins
+  entirely empty"; that query tested only the seven evening columns and ignored six morning ones. Re-run
+  across **every** answer column: **zero truly-empty rows** (45 morning, 5 evening, all with answers).
+  The route will write a hollow row if handed `{}`; nothing in real use has. The false 45/50 is recorded
+  in the entry so it cannot be picked up from anywhere it leaked.
+- **🔎 Q-460 cannot be adjudicated from production.** 57 of 77 completed sessions (74%) carry no
+  `session_rpe` — which looks supportive and **is not evidence**, because a dropped write leaves the
+  value in the local store this endpoint cannot see, making it identical to a skipped optional prompt.
+  **Do not cite the 74% in either direction.**
+- **✅ `error_events` holds nothing new** (the session-start read, done properly). The 30-day table is
+  dominated by **5,771** `[pg 21000]` cardinality violations on `POST /api/hr-ingest` — **already
+  recorded and already fixed**, with the last occurrence (2026-08-13) being the fix landing rather than
+  a fault that stopped unexplained. Everything else is connection-timeout/`aborted` noise mapping to the
+  recorded pool and disk-full incidents. Nothing unrecorded in 7 or 30 days.
+- **The constraint governing every number above:** `claude_ro` is **row-scoped to one user** and
+  `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
+  A zero means the owner has never done the thing; other accounts are structurally invisible here.
+
 ### [platform][workouts][cardio][nutrition] 🟠 The AI-usage screen's double-trips traced to cause — the top row is an artefact, two rows are real (Q-469…Q-471, 2026-08-18)
 
 - **First production-data finding of this review run.** The owner supplied three screenshots of

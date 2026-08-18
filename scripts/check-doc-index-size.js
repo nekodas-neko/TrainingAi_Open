@@ -435,7 +435,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6957,
+  'projectOverview.md': 6991,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -468,7 +468,21 @@ const BASELINE = {
   // merged file: main's content, minus Q-397 (shipped by this PR), plus its closing annotation on
   // Q-393. Recorded rather than nudged, because the second time a shared ratchet is quietly
   // exceeded is the point at which people start assuming it is broken instead of binding.
-  'docs/implementation-backlog.md': 8573,
+  // Raised 2026-08-18 (Q-397 + the Q-395 review fold-in, BugFix intake). Recomputed from the
+  // MERGED file after taking main's side of this baseline, rather than splicing the conflict
+  // hunks — two same-day raises spliced together silently drop one side. Q-397 records that the
+  // shipped ingredient label is the analysis Q-393 was corrected away from, with the measured
+  // mm-per-module table and the owner's choice of B2 as the default; Q-395 gains the six review
+  // notes and the 11-section prod checklist an implementation PR ticks off.
+  // Raised 2026-08-18 (Tuning): -> 8540, recomputed from the MERGED file. Q-512/513/514 — the first
+  // calibration sweep of the workouts pillar. The entries carry their measured tables because every
+  // conclusion is counterintuitive: the ACWR thresholds and RPE_DEAD_BAND are RIGHT and must not move,
+  // while the call sites and the clamped input feeding them are wrong. Strip the tables and the next
+  // reader tunes a constant instead of fixing the input — three times over.
+  // Raised 2026-08-18 (Tuning): -> 8592. Q-515 — first calibration of the heart-rate pillar. The tables
+  // are the entry: the July/August collapse and the fraction sweep together show that tuning the
+  // constant cannot fix it, which is the opposite of what the entry title suggests on its own.
+  'docs/implementation-backlog.md': 8634,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
