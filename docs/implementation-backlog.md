@@ -921,6 +921,67 @@ ehr     0     0     0     0   648   208   128   556     0
   reasoning, so this does not get re-litigated. (Q-460 differs because there the desired end state was
   `session_rpe = 7` and it did **not** hold.)
 
+### [platform][body][nutrition] Q-464 — request schemas are almost never `.strict()`, and on a date-bearing write route that turns a mistyped key into a silent wrong-day write
+
+- **Branch:** `fix/strict-request-schemas`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
+  the failure mode is silent data misplacement and this repo has already paid for the class once.
+- **Measured:** of **70** files defining a `z.object(...)` request schema across `app/api` and
+  `packages/shared/src/validation`, only **6** call `.strict()`. Zod's default silently drops unknown keys.
+- **Demonstrated live** on `POST /api/body-metadata`:
+
+  | Sent | Response | Row written |
+  |---|---|---|
+  | `{"date":"2026-08-10","weightKg":81}` | `200 {"success":true,"date":"2026-08-18"}` | weight 81 on **2026-08-18** |
+  | `{"date":"3026-08-18","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+  | `{"date":"not-a-date","weightKg":81}` | `200 {"success":true,…}` | **2026-08-18** |
+
+- **Do NOT change the route — it is correct.** `app/api/body-metadata/route.ts:236` reads
+  `body.localDate` and defaults to today in the user's timezone when absent, which is the documented
+  pattern. The defect is that `date` is not in the contract, the schema is not strict, so the key is
+  dropped and the write lands on today with a success response.
+- **Why file it:** the repo has already lost a full release to this exact class — the `ai-chat`
+  `localDate` regex that rejected every real request, documented at length in `CLAUDE.md`. A strict
+  schema turns that mistake into a 400 at the boundary instead of a silent wrong-day write.
+- **Eleven date-bearing write schemas are non-strict**, including `sync/push`, `health-connect/ingest`,
+  `running-plan`, `running-plan/override`, `plan-meal-answers`, and the shared `body-metrics`,
+  `activity-log` and `fitness-test` schemas. `WorkoutEntryPatchSchema` is one of the six that **is**
+  strict — use it as the reference.
+- **Fix shape:** add `.strict()`, date-bearing schemas first, then a CI rule — same shape as the
+  hex-literal and TTL-divergence ratchets, which exist because prose alone did not hold the line.
+- **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
+  APK may legitimately carry fields the current schema does not name; making that one strict could
+  reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
+  written reason. **Lane A.**
+
+### [readiness] Q-465 — `POST /api/day-checkin` creates a check-in row from a completely empty body
+
+- **Branch:** `fix/day-checkin-requires-an-answer`
+- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
+- **Placement:** low. **The consequence is unproven and the entry says so** — do not implement this as
+  if a known symptom were being fixed.
+- **Observed.** `POST /api/day-checkin` with a body of exactly `{}` returns **201** and writes a row
+  with every metric null:
+  ```
+  log_date    phase    physical_tiredness  mental_drain  hydration  sore_muscles
+  2026-08-18  evening  (null)              (null)        (null)     {}
+  ```
+  An unknown field is accepted and dropped too (`{"sleepQuality":"banana"}` → 201, nothing stored —
+  `day_checkins` has no such column). That half belongs to Q-464.
+- **Both consumers were checked and neither shows a user-visible bug.**
+  `components/morning-checkin-sheet.tsx:58-70` pre-fills from a saved row but coalesces every field
+  through `?? NEUTRAL_SCALES`, so an all-null row behaves identically to no row.
+  `app/api/workout-data/route.ts:471` feeds the check-in into `reevaluationKey(...)`, where an empty
+  row changes the key and can trigger a re-evaluation carrying no new information.
+- **Why it is still worth closing:** the row is indistinguishable from a real check-in in which the
+  user answered nothing, and readiness is precisely the pillar where *"the user told us nothing"* and
+  *"the user told us they feel neutral"* must not collapse to the same value.
+- **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
+  body carries no answers. **Lane A.**
+
 ### [workouts][platform] Q-462 — an ownership violation on `/api/log-exercise` surfaces as a 500
 
 - **Branch:** `fix/log-exercise-ownership-error-status`

@@ -3,11 +3,43 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** four sweeps (2026-08-17 ×2, 2026-08-18 ×2) · **Q band:** 450–499 (next free: **464**)
+**Updated:** 2026-08-18 · **By:** five sweeps (2026-08-17 ×2, 2026-08-18 ×3) — **all eleven pillars now covered** · **Q band:** 450–499 (next free: **466**)
 
 ## Now
 
-Four sweeps have run under this role — #16 and #38 are merged, and the two 2026-08-18 sweeps below.
+Five sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+least once**, at the owner's request to work through the sections:
+
+| Pillar | Lens applied | Findings |
+|---|---|---|
+| `workouts` | write path cross-user + live drive | Q-460…Q-462 |
+| `nutrition` · `cardio` · `activity` | writes cross-user + app-wide not-found probe | Q-463 |
+| `sleep` · `readiness` · `heart-rate` · `body` · `devices` | ingest auth, value validation, schema strictness | Q-464, Q-465 |
+| `app-shell` · `platform` | failure cells, repo-migration architecture | Q-450…Q-459 |
+
+**Still open by design, and the obvious next lenses:** the **device runtime** (nothing in any sweep
+left the web build — every offline-first domain took its web fallback), **production data**
+(`claude_ro` was never queried in any of the five), the **offline and error paths** (everything ran
+against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 5 — the ingest surface: sleep, readiness, heart-rate, body, devices (2026-08-18)
+
+Write-up: [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md).
+These five pillars barely expose `[id]` write routes — they are read-and-derive, so the write-surface
+lens does not reach them and this one does.
+
+**Filed — Q-464** (70 schema files, only **6** `.strict()`; demonstrated as a silent wrong-day write on
+`body-metadata` — **but `sync/push` must not be made strict carelessly**, older-APK payloads may carry
+unnamed fields) and **Q-465** (`day-checkin` creates a row from `{}`; **consequence unproven and the
+entry says so**).
+
+**CLEAN, and the more useful half:** **no ingest route accepts a `userId` from the body** (all ten
+session- or secret-gated, two behind `requireAdmin`), and value validation rejected every
+physiologically impossible probe with nothing reaching Postgres — HR `-50`/`99999`, mood `999`/`-5`,
+weight `99999`/`-40`, malformed scale hex. The weight errors even name the bound violated.
+
+**Not covered:** `health-connect/ingest` was read but **not called** (secret-gated, no secret here), and
+the Oura BLE sample routes were not exercised with real frames.
 
 ### Sweep 4 — nutrition/cardio/activity writes, and the not-found answer app-wide (2026-08-18)
 

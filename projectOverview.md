@@ -69,6 +69,45 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [readiness][sleep][heart-rate][body][devices] 🟢 The ingest surface reviewed — auth model and value validation both sound; two schema gaps (Q-464, Q-465, 2026-08-18)
+
+- **Why a different lens.** These five pillars barely expose `[id]` write routes — they are
+  read-and-derive, and their writes arrive through **ingest** and **sync**, so the write-surface lens
+  used for workouts and nutrition does not reach them. Full method and limits:
+  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](docs/reviews/2026-08-18-ingest-and-input-validation.md).
+- **✅ No ingest route accepts a `userId` from the request body.** All ten checked derive identity from
+  the session, or — for `health-connect/ingest` — from a shared secret plus `WEBHOOK_USER_ID`; two
+  additionally sit behind `requireAdmin`. **There is no route where a caller can name whose data they
+  are writing.**
+- **✅ Value validation rejects physiologically impossible input and nothing landed in Postgres.**
+  Heart rate `-50` and `99999`, mood `999` and `-5`, body weight `99999` and `-40`, and a malformed
+  scale frame were all `400`. The weight messages name the bound violated (`"Too big: expected number
+  to be <=500"`) rather than saying "invalid". `CLAUDE.md`'s ingest-schema rule is being followed on
+  every route reachable here.
+- **🟡 Q-464 — request schemas are almost never `.strict()`.** Of **70** files defining a `z.object`
+  request schema, only **6** call `.strict()`, so Zod silently drops unknown keys. Demonstrated on
+  `POST /api/body-metadata`: `{"date":"2026-08-10","weightKg":81}` wrote weight 81 to **today** and
+  returned `{"success":true}` — the route correctly reads `localDate` and defaults to today, and the
+  non-strict schema is what turns a wrong key into a silent wrong-day write. **Not reachable from the
+  app's own clients**; filed because the repo already lost a full release to this class (the `ai-chat`
+  `localDate` regex). Eleven date-bearing write schemas are non-strict — but **`sync/push` needs care**,
+  since older-APK outbox payloads may carry fields the current schema does not name.
+- **🟡 Q-465 — `POST /api/day-checkin` creates a row from a completely empty body** (201, every metric
+  null). **The consequence is unproven and the entry says so**: both consumers were checked and neither
+  shows a user-visible bug. Worth closing anyway because the row is indistinguishable from a check-in
+  where the user answered nothing, and readiness is the pillar where "told us nothing" and "told us
+  neutral" must not collapse.
+- **NOT device-verified,** and `health-connect/ingest` was **read but not called** — it is
+  secret-gated and its validation is unverified by this sweep. The Oura BLE sample routes were not
+  exercised with real frames. Screens for these pillars are not re-reported: all five rendered clean in
+  the 2026-08-17 failure-cells sweep.
+- **Section coverage is now complete for this run** — every pillar reviewed at least once:
+  workouts (Q-460…Q-462) · nutrition/cardio/activity (Q-463) · sleep/readiness/heart-rate/body/devices
+  (Q-464, Q-465) · app-shell/platform (Q-450…Q-459). Still open by design: the **device runtime**
+  (nothing left the web build), **production data** (`claude_ro` never queried), and the
+  **offline/error paths**.
+- **Nothing was fixed.** Both are queued.
+
 ### [platform][nutrition][cardio][activity] 🟠 Nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for one question (Q-463, 2026-08-18)
 
 - **Two halves.** The nutrition/cardio/activity mutations probed cross-user exactly as workouts were;
