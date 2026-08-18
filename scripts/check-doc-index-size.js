@@ -348,12 +348,15 @@ const BASELINE = {
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
   // not: the route exists and is verified, and nobody has pressed it against production. Without
   // that split the entry reads as done and the 49 MB never gets reclaimed.
-  // Raised 2026-08-18 (Tuning): 7219 -> 7233. Live evidence added to Q-501 — after both
-  // recalibrations deployed, 0 of 96 derived rows carried a readiness model version and a bulk job
-  // had bumped updated_at on all of them without rewriting a score. The measurement belongs in the
-  // entry: it is what stops the next person auditing the ship by timestamp and getting it wrong.
-  // Recomputed from the MERGED file, not spliced.
-  'docs/implementation-backlog.md': 7233,
+  // Raised 2026-08-18 (owner-directed session, Q-543): -> 7257. One entry for the doc-index BASELINE
+  // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
+  // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
+  // fourth time. Recomputed from the MERGED file.
+  // Raised 2026-08-18 (Tuning): 7257 -> 7271. Live evidence on Q-501 — after both recalibrations
+  // deployed, 0 of 96 derived rows carried a readiness model version and a bulk job had bumped
+  // updated_at on all of them without rewriting a score. It belongs in the entry because it is what
+  // stops the next person auditing the ship by timestamp. Recomputed from the MERGED file.
+  'docs/implementation-backlog.md': 7271,
   'CLAUDE.md': 1044,
 
 };

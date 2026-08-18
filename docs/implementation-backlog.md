@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **194** | `lib/data/postgres/migrations/` (head: `193_drop_oura_raw_samples_measured_index.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **543** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **544** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -7048,6 +7048,44 @@ since the CI link check (item 1) catches a botched rewrite immediately.
   specifically" caveat is now answered — it is fine, as are the other three. **The rule at the top
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
+
+---
+
+### [platform] 🟢 Q-543 — every concurrent PR conflicts on the doc-index BASELINE object
+
+`scripts/check-doc-index-size.js` holds three numbers — `projectOverview.md`,
+`docs/implementation-backlog.md`, `CLAUDE.md` — in one object literal, under ~170 lines of
+accumulated raise-history commentary. Every lane that raises a baseline edits the same few lines of
+the same file on the same day, so the ratchet has become the repo's most reliable merge conflict.
+
+**Measured on this branch, 2026-08-18:** one docs-only PR (#69, a single `CLAUDE.md` row) took four
+CI rounds. One was a genuine ratchet failure and correct. The other three were base collisions with
+#68, then #65/#71, then #75 — **all three on this file, none on the content being changed.** The
+file's own comments record the same thing happening to other lanes repeatedly, describing "the
+fourth same-day ratchet collision on this branch" and warning in five separate places that splicing
+a conflict hunk silently un-does the other lane's raise. That warning exists because it has been got
+wrong before.
+
+**This is the same problem `docs/overview/entries/` already solved.** Per-entry journal files took
+the journal-prepend conflict class to zero on the reasoning that two PRs writing *different files*
+cannot conflict. The baselines are the remaining shared-line edit that every PR touches.
+
+**Shape worth considering** (not a spec — the decision is which, and it is cheap to reverse):
+
+- **Per-file baseline fragments** — `scripts/doc-baselines/<slug>.json` or similar, one file per
+  ratcheted doc, read and merged by the check. Directly mirrors the entries-directory fix. Costs a
+  small loader; removes the conflict class outright.
+- **Move the raise-history prose out of the source file** into a log the check does not parse. Much
+  smaller change, and it shrinks the conflict window without closing it — two lanes raising the same
+  file the same day still collide, they just collide on one line instead of thirty.
+
+**Do not** solve it by dropping the history commentary wholesale. Several of those notes are the
+only record of *why* a number moved, and at least one documents a real near-miss where a splice
+would have reverted another lane's raise.
+
+**Not urgent.** It costs minutes per PR, never correctness — the check itself works exactly as
+intended, and caught a real overrun on #69. Filed per "no orphaned findings" rather than taken,
+because restructuring a CI gate mid-merge is not a docs change.
 
 ---
 
