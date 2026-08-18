@@ -14,7 +14,8 @@ Since then, working only scores no other lane holds:
   readiness; the four firing days average readiness 79 against 65). **Resilience has emitted exactly
   one value ever** — level 5, granular at the 5.99 clamp, all 13 rows — because
   `longTermSleepRecovery` is a window *sum* where its siblings are means, carrying 70% of the
-  recovery weight. [`review`](../../reviews/2026-08-18-stress-resilience-calibration.md).
+  recovery weight. It is **also dormant** — 13 rows on 2026-08-05, the same 13 today.
+  [`review`](../../reviews/2026-08-18-stress-resilience-calibration.md).
 - **Illness radar — MEASURED, propose-only** (Q-506). It has never produced an action-bearing flag in
   46 days, and the cause is a **cold-start-poisoned temperature baseline** (stored dev 253.7 vs a true
   nightly sd of 13.5 — **18.7×**) on the biomarker carrying **40%** of the weight. Same `tempZ` also
@@ -136,7 +137,11 @@ for this work:
   was being written (`recovery_index_hours` 1.20 → 5.78, a Q-274 fragment night self-healing).
   Re-pull before quoting, and record the pull time.
 - **`/api/admin/db-query` truncates at 1000 rows** (paginate) and can return a spurious 401 under
-  burst (retry with backoff).
+  burst (retry with backoff). **A sustained `Forbidden` is different** — on 2026-08-18 it began
+  refusing *every* query including `SELECT count(*)`, and stayed refusing across retries with backoff.
+  That is not the burst 401; budget the queries a session needs rather than iterating against it, and
+  when it locks out, write up what you already measured rather than blocking (Q-508's per-gate
+  coverage was lost this way).
 - **The 30-day prune applies to `error_events`, not to the Oura tables** — check each view's real
   date range rather than assuming.
 - **The 2026-06-23 → 07-07 window is the only place Oura's own contributors sit beside our raw

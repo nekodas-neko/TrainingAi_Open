@@ -49,6 +49,11 @@ near 130–240 against the golden's 37.79 — above every band boundary, every d
 values of 0.6, two orders of magnitude below production. A golden proves a port computes the same
 function; it says nothing about whether the inputs are on the scale it was captured at.
 
+It is dormant too: 13 rows on 2026-08-05 and the same 13 today, newest dated 2026-08-05, while
+daytime stress grew 11 → 25 over the same stretch. The daily-index gate is the likely cause (12 of 96
+rows carry one, in clusters) but that was **not confirmed** — `/api/admin/db-query` began returning
+`Forbidden` to every query, trivial ones included, before the per-gate coverage could be pulled.
+
 ## Deliberately not done
 
 Neither constant was changed and no algorithm was touched. Whether the sum is faithful to the vendor

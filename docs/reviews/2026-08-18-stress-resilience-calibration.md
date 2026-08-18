@@ -152,6 +152,23 @@ our sleep score, hrvBalance, recoveryIndex and RHR contributors. A polynomial fi
 against *Oura's* contributor distribution, fed *our* contributors, is the obvious suspect — but this
 was not chased down and should not be presented as diagnosed.
 
+### 2.5 It has also been dormant for 13 days
+
+The 2026-08-05 data-analysis review recorded `resilience_level` populated on **13 of 79** rows. Today
+it is **13 of 96** — the same 13. The most recent level is **2026-08-05**, and nothing has been
+produced since, while `daytime_stress_scaled` grew 11 → 25 over the same period.
+
+The daily indices are the likely gate: only **12 of 96** rows carry a `resilience_daily_stress`, and
+they cluster (2026-07-20 → 07-27, then 08-09, 08-10, 08-16, 08-21). `runStressResilience` only emits a
+level when `validCount >= windowMinLength` within the 14-day window, so once the indices thin out past
+a certain point the level stops entirely — which matches an eight-day run followed by scattered
+singles. **This was not confirmed**: the `/api/admin/db-query` endpoint began returning `Forbidden`
+to every query, including trivial ones, before the per-gate coverage could be pulled. Whichever of
+`contributorsOk`'s four inputs is missing on recent days is the thing to check first.
+
+So the score has two problems, not one: when it speaks it says only "strong", and it has not spoken
+since 2026-08-05.
+
 ### 2.4 Proposal
 
 **Do not touch the algorithm or the constants** — the file says so and it is right; the golden is the

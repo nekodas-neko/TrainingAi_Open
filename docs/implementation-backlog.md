@@ -3071,6 +3071,14 @@ session working from a temporarily restored copy.
   `dailySleepRecovery = clamp(polyval(sleepRecoveryScalerCoef, sr))` where `sr` blends our sleep score,
   hrvBalance, recoveryIndex and RHR contributors — a vendor polynomial fitted against *Oura's*
   distribution fed *our* contributors is the obvious suspect, but this was not chased down.
+- **It is also dormant.** The 2026-08-05 review recorded `resilience_level` on **13 of 79** rows;
+  today it is **13 of 96** — the same 13, with the newest dated **2026-08-05**, while
+  `daytime_stress_scaled` grew 11 → 25 over the same period. Likely the daily-index gate: only **12 of
+  96** rows carry a `resilience_daily_stress` and they cluster (07-20 → 07-27, then 08-09, 08-10,
+  08-16, 08-21), and a level needs `validCount >= windowMinLength` inside the 14-day window.
+  **Unconfirmed** — `/api/admin/db-query` began returning `Forbidden` to every query before the
+  per-gate coverage could be pulled. Check which of `contributorsOk`'s four inputs is missing on
+  recent days first.
 - **Do NOT touch the algorithm or the constants** — the file says so and the golden is the contract.
 - **First action:** establish whether the sum is **faithful to the vendor**. If it is, Oura feeds a
   per-day index on a far smaller scale than ours and the defect is in what we supply; if not, it is a

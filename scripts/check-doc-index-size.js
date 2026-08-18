@@ -369,7 +369,7 @@ const BASELINE = {
   // 16% firing rate looks healthy until you see WHICH days fire (mean readiness 79 against 65), and
   // Q-508's is that the golden vector cannot catch the defect, which only lands with the arithmetic
   // shown. Strip either table and the next reader tunes the constant. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7454,
+  'docs/implementation-backlog.md': 7462,
   'CLAUDE.md': 1044,
 
 };
