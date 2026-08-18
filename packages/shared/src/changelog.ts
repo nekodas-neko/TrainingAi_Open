@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.3",
+    date: "2026-08-18",
+    changes: [
+      "The one-line explanation on a prescribed run now stays the same wording each time you open the screen. It was being re-written by the AI on every visit \u2014 the same run described about seven different ways \u2014 because the card asked for a fresh sentence every time it mounted.",
+    ],
+  },
+  {
     version: "1.324.2",
     date: "2026-08-18",
     changes: [

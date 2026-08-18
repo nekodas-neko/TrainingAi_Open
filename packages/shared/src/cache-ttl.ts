@@ -131,3 +131,13 @@ export const OFFLINE_SEED_TTL_FLOOR = 7 * 24 * 60 * 60;
 export function floorSeedTtl(ttlSeconds: number): number {
   return Math.max(ttlSeconds, OFFLINE_SEED_TTL_FLOOR);
 }
+
+/**
+ * The AI restatement of a prescribed run's rationale (Q-469).
+ *
+ * `TTL_LONG` because the key already carries everything that can change the answer — the local date
+ * plus the prescription fingerprint — so expiry is a backstop, not the freshness mechanism. Before
+ * this, the card re-asked the model on **every mount**: 31 redundant calls across 9 distinct runs,
+ * the same run explained about seven times, each time in different words.
+ */
+export const RUNNING_PLAN_EXPLAIN_TTL = TTL_LONG;
