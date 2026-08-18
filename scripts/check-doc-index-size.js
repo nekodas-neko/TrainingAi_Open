@@ -789,9 +789,47 @@ const BASELINE = {
 // that is a chore trigger, not an error, so CI does not fail there — failing at 20 would block
 // unrelated PRs for a tidiness task. This is the runaway guard instead: the directory reached 509
 // before anyone swept it, and at that size it stops being a readable recent-window.
+//
+// **Counted against the limit: entries a sweep can actually remove.** An entry that a durable doc
+// links to (projectOverview.md Known-Issues rows, docs/domains/*/README.md, the agent batons) must
+// NOT be folded — doing so broke 48 links on the first sweep, several inside another lane's baton.
+// Those entries are a floor, not growth, and the floor is now 41 of 60.
+//
+// Counting them made the guard fire on a condition its own remedy cannot fix. Measured 2026-08-18:
+// a sweep took the directory 62 -> 41, and it was back over the limit **twenty minutes later** —
+// at which point every lane's next feature PR failed on a tidiness rule, because a journal entry
+// rides in every feature PR. The second sweep that day cleared 19 and landed on 41 again. Chasing
+// a floor with a sweep that may not touch it is not a guard, it is a periodic outage.
+//
+// So the limit applies to the UNLINKED count, which is exactly what a sweep clears, and still
+// catches the thing this guard was written for: if nobody sweeps, unlinked entries pile up and it
+// fires. A separate, much higher ceiling on the TOTAL keeps the 509-file readability failure
+// caught, since that scenario is real and is not about sweepability.
 const ENTRIES_DIR = 'docs/overview/entries';
 const ENTRIES_CHORE = 20;
 const ENTRIES_LIMIT = 60;
+const ENTRIES_TOTAL_CEILING = 250;
+
+// An entry is "linked" when any .md outside the entries directory mentions its filename. Read once
+// into a single blob rather than grepping per entry — 60 entries x the whole docs tree is the kind
+// of thing that quietly adds a minute to every CI run.
+function linkedEntryNames(root, entriesAbs) {
+  let blob = '';
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) {
+        if (e.name === 'node_modules' || e.name === '.next' || e.name === '.git') continue;
+        if (path.resolve(full) === path.resolve(entriesAbs)) continue;
+        walk(full);
+      } else if (e.name.endsWith('.md')) {
+        blob += fs.readFileSync(full, 'utf8');
+      }
+    }
+  };
+  walk(root);
+  return blob;
+}
 
 const failures = [];
 
@@ -814,20 +852,34 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
 
 const entriesAbs = path.join(root, ENTRIES_DIR);
 if (fs.existsSync(entriesAbs)) {
-  const count = fs
+  const names = fs
     .readdirSync(entriesAbs)
-    .filter((f) => f.endsWith('.md') && f !== 'README.md').length;
-  if (count > ENTRIES_LIMIT) {
+    .filter((f) => f.endsWith('.md') && f !== 'README.md');
+  const count = names.length;
+  const blob = linkedEntryNames(root, entriesAbs);
+  const unlinked = names.filter((f) => !blob.includes(f));
+  const linked = count - unlinked.length;
+
+  if (unlinked.length > ENTRIES_LIMIT) {
     failures.push(
-      `${ENTRIES_DIR}/ holds ${count} loose entries, over the ${ENTRIES_LIMIT} runaway limit.\n` +
-        `      Run the compaction sweep in ${ENTRIES_DIR}/README.md: fold them oldest-first into a\n` +
-        `      batched docs/overview/history-*.md, starting a new one near ~250 KB, then git rm the\n` +
-        `      folded files.`,
+      `${ENTRIES_DIR}/ holds ${unlinked.length} foldable entries, over the ${ENTRIES_LIMIT} runaway limit\n` +
+        `      (${count} total; ${linked} are linked by a durable doc and must NOT be folded).\n` +
+        `      Run the compaction sweep in ${ENTRIES_DIR}/README.md: fold the UNLINKED ones oldest-first\n` +
+        `      into a batched docs/overview/history-*.md, rewriting ](../../ to ](../ in each body, then\n` +
+        `      git rm the folded files.`,
     );
-  } else if (count >= ENTRIES_CHORE) {
+  } else if (count > ENTRIES_TOTAL_CEILING) {
+    failures.push(
+      `${ENTRIES_DIR}/ holds ${count} entries, over the ${ENTRIES_TOTAL_CEILING} total ceiling — it has\n` +
+        `      stopped being a readable recent-window. Only ${unlinked.length} are foldable, so a sweep\n` +
+        `      alone will not fix this: the durable docs citing the other ${linked} need to point at the\n` +
+        `      batched history instead.`,
+    );
+  } else if (unlinked.length >= ENTRIES_CHORE) {
     console.log(
-      `check-doc-index-size: note — ${ENTRIES_DIR}/ holds ${count} entries, at or over the ` +
-        `${ENTRIES_CHORE}-file compaction chore threshold. Not a failure; sweep it when convenient.`,
+      `check-doc-index-size: note — ${ENTRIES_DIR}/ holds ${unlinked.length} foldable entries ` +
+        `(${count} total, ${linked} linked), at or over the ${ENTRIES_CHORE}-file compaction chore ` +
+        `threshold. Not a failure; sweep it when convenient.`,
     );
   }
 }
