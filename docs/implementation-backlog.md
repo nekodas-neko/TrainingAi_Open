@@ -285,46 +285,6 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
-### [platform][devices] Q-487 — a sync-push failure still cannot reach `error_events`, and production shows the shape as a zero
-
-- **Branch:** `fix/sync-push-reports-to-error-events`
-- **Added:** 2026-08-18 · review sweep (production verification round 2) ·
-  [`docs/reviews/2026-08-18-production-verification-round-2.md`](reviews/2026-08-18-production-verification-round-2.md)
-- **Placement:** mid-low. One call, and it closes a structural blind spot in the table the
-  session-start ritual reads.
-- **This is the half of Q-475 that its fix did not cover.** `#115` landed the classification correctly
-  — `isRetryableWriteError` server-side, the client no longer counting a retryable failure against
-  `MAX_MUTATION_ATTEMPTS`, and `serverUnavailable` engaging the whole-queue backoff. **Behaviour is
-  fixed. Reporting is not.**
-- **The gap:** `reportServerError` is called only in the route's **outer** catch
-  (`app/api/sync/push/route.ts:51`), which `pushMutations` never reaches because it catches
-  per-mutation by design. Failures do hit the server log
-  (`console.error('[pushMutations] error', …)`) but **never `error_events`** — the table `CLAUDE.md`
-  calls *"the only view of faults that never reach a human"*, and the one the session-start ritual
-  reads.
-- **Production evidence — the shape is an absence** (owner's rows, retained window):
-
-  | Route | Faults in `error_events` | Span |
-  |---|---|---|
-  | `/api/sync/pull` | **69** | 2026-07-19 → 2026-08-13 |
-  | `/api/sync/push` | **0** | none, ever |
-
-  Over the same window the database refused connections **125 times across six days** (39 on
-  2026-08-12), one pull row reading `[cause: timeout exceeded when trying to connect]`.
-- **Why the zero is evidence and not absent traffic:** `components/sync-provider.tsx` runs
-  `await pushMutations(userId)` at :139 and `pullDelta` at :145 — **push first, same cycle**. Push is
-  not less exposed than pull; it runs before it.
-- **Fix shape:** call `reportServerError` (or an equivalent) for the errors `pushMutations` returns —
-  ideally only for the **retryable** ones, since a validation rejection is not a server fault and
-  would be noise. The classification needed to make that distinction **already exists** as of `#115`,
-  so this is a small addition on top of it rather than new machinery.
-- **Do not "fix" it by removing the per-mutation catch** — that catch is what makes the poison-pill
-  rule work.
-- **Lane A owns this** (`app/api/sync/push`, `lib/data/postgres/adapter.ts`).
-- **⚠️ Re-derive it soon or not at all:** `error_events` prunes at **30 days**, so the pull-69/push-0
-  asymmetry above cannot be reproduced after that window. It is recorded here because it will not be
-  measurable later.
-
 ### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
 
 - **⛔ RE-TAGGED TO LANE A 2026-08-18 — the "one call in one Lane B handler" shape below is not
