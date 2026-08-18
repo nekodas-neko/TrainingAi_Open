@@ -6,10 +6,19 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.323.1",
+    version: "1.324.1",
     date: "2026-08-18",
     changes: [
       "Logging a body measurement with a wrong or misspelt field name is now rejected instead of quietly landing on today's date with a success message. Sending a date under the wrong name used to write the value onto today and report success \u2014 measured three ways. Nothing you do in the app sends the wrong names, with one exception now caught: logging water from the metric tile on the web fallback was being discarded entirely, and it now fails visibly rather than silently.",
+    ],
+  },
+  {
+    version: "1.324.0",
+    date: "2026-08-18",
+    changes: [
+      "The meal label now has the layout you asked for, and it is the new default: name, calories, macros, the ingredients, then the code \u2014 all centred. The ingredients run across the line and wrap, rather than taking a line each.",
+      "That change is what lets a ROUND label carry the whole ingredient list. Running the ingredients across spends width instead of height, and the height it gives back goes to the code \u2014 so the new default prints a code about 40% larger than the old one AND lists the ingredients, on either a round or a square die.",
+      "The stacked square layout stays as an option for anyone who prefers it. Every style is still there to cycle through.",
     ],
   },
   {

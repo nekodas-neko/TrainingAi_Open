@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/acwr-calibration` · **Q band:** 500–529 (next free: 515)
+**Updated:** 2026-08-18 · **By:** `tuning/nutrition-tdee-check` · **Q band:** 500–529 (next free: 518)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -93,8 +93,8 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | body | ✅ battery range clean; anchor measured (Q-511) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
 | **workouts** | ✅ **swept 2026-08-18** — ACWR (Q-512/513), RPE autoregulation (Q-514). **Clean:** Foster monotony, and prescription adherence (actual 73.6% vs planned 73.1%, reps +0.25 — so `INTENSITY_ZONES` is realised, and calibrating those zones would be circular since the program was generated from them). Only Q-514 and the two ACWR call sites are open. **Foster monotony CLEAN** — mean 1.29, the 2.0 gate fires on 1 of 102 windows; rest days are properly seeded at 0, which is what makes it meaningful. 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
-| **heart-rate** | ❌ **none.** `HR_REST_THRESHOLD 0.05` (documented rationale, never validated against the owner's HR), `PEAK_BANDS` (their "stable per-bucket sample sizes" justification is an empirical claim nobody measured), zone boundaries |
-| **nutrition** | 🟡 **movement goals ARE calibrated** — `STRENGTH_FREQ_GOAL 5` (Q-137, 91 days) and `SESSION_VOLUME_GOAL_KG 5200` (Q-190, 40 sessions), see [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md). `STEP_GOAL 8000` / `ZONE_MINUTES 22` / `BMR_FRACTION 0.24` are **deliberate population anchors** (Paluch 2022, WHO 150 min/wk), not unchecked round numbers. **Genuinely uncalibrated: the calorie/macro targets vs the owner's observed weight change** — a TDEE outcome check nobody has run |
+| **heart-rate** | 🟡 **swept 2026-08-18** — `HR_REST_THRESHOLD` (**Q-515**: shrank 3× in a month because the owner got fitter; no fraction fixes it, the *anchoring* is the defect) and `PEAK_BANDS` (**Q-516**: observed set-peaks are 59–132, so 2 of 5 bands are **structurally unreachable** and 72% of episodes land in the band the spec de-emphasises — one usable bucket). **Karvonen zone boundaries checked and deliberately NOT filed** — they are consumed on *cardio* surfaces only, and the history holds ~13 run/treadmill sessions (newest 2026-07-24). Fitting five boundaries to that is fitting noise. **Do not re-open by measuring all-day HR** — that gives a 99% Zone 1 figure that reads like a finding and is the wrong denominator |
+| **nutrition** | ✅ **swept 2026-08-18.** Movement goals were already calibrated (Q-137/Q-190, [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md)); step/zone-minute goals are deliberate population anchors. TDEE outcome check done (**Q-517**: the food log captures **~45%** of intake, and `adaptive-tdee`'s gates hold 75% of windows but let through values as low as **1,052 kcal** — below the owner's own BMR of 1,698) |
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
 | app-shell, platform | n/a — no scoring surface |
 
@@ -155,6 +155,39 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **A universal plausibility floor cannot protect a per-person quantity** (Q-517).
+  `MIN_PLAUSIBLE_MAINTENANCE = 1000` is 52 kcal below where this owner's under-logging artefact lands
+  (1,052), and the module's own comment had predicted the failure at 1,200. **Floor it at the user's
+  own BMR** — below-BMR maintenance is impossible by definition, not implausible by taste. Measured:
+  blocks 12 of 23 passing 14-day windows and tightens the range to 1,902–2,219.
+- **Coverage gates that count logged DAYS cannot see within-day incompleteness.** The owner's log is
+  ~45% complete per day yet sails through a 70%-coverage gate, because a day with breakfast logged and
+  nothing else counts as fully logged. **Do not respond by raising `MIN_LOGGED_FRACTION`** — it already
+  refuses 75% of windows and would drop good ones while keeping bad ones.
+- **Never scale logged intake by a factor inferred from the weight trend.** Maintenance is *derived*
+  from that trend, so it is circular and reproduces the assumed TDEE as if measured.
+- **Check what population a constant is asked to classify before measuring it.** The Karvonen zone
+  boundaries look catastrophic against all-day HR (99.8% of BLE samples in Zone 1) and that denominator
+  is simply wrong — they are consumed on cardio surfaces only. The fair denominator (~13 run/treadmill
+  sessions, newest 2026-07-24) is too thin to fit five boundaries to, so **nothing was filed**. Two dead
+  ends, both recorded so they are not walked again.
+- **A "for stable bucket sizes" comment is an EMPIRICAL claim — measure it** (Q-516). `PEAK_BANDS`
+  says exactly that and is false here: observed set-peaks are 59–132, so the 150–169 and 170+ bands are
+  **structurally unreachable**, 130–149 holds 2 episodes, and 72% land in the `<110` band the spec tells
+  callers to de-emphasise. **And the de-emphasis is correct** (mean `drop_60s` 3.0 below 110 vs 14.9
+  above), so re-banding recovers no hidden signal — peak HR in a lifting set mostly does not reach the
+  range where HR recovery means anything. **Re-banding without saying so converts a visibly-empty
+  feature into an invisibly-noisy one.**
+- **A boundary pinned to resting HR moves ~2× as fast as waking HR** (Q-515). Resting HR is the more
+  responsive fitness marker: over one month the owner's resting fell 8.5 bpm while waking HR fell 4.2,
+  so the rest/active boundary dropped 8.9 and the charge window collapsed 26.5% → 8.2%. **Every input
+  was correct** — a real fitness gain plus `resolveHrProfile` maturing `hr_max` from the age formula to
+  an observed ceiling. Sweeping `HR_REST_THRESHOLD` narrows the July/August gap from 3.2× to 1.4× but
+  never closes it, so **the constant is not the lever; the anchoring is.**
+- **A self-referential boundary is fine for a pure classifier and wrong for anything feeding a score.**
+  The tempting fix for Q-515 — a percentile of the owner's own waking HR — is stable by construction
+  and therefore makes Body Battery charge near-constant, so a genuinely restful day cannot read as one.
+  That is "the treadmill" the repo already removed from the activity-goal volume lane (Q-190).
 - **Foster monotony is clean — do not re-open it.** 7-day monotony over 102 windows: mean 1.29,
   median 1.34, sd 0.31, range 0.41–2.32; `HIGH_MONOTONY = 2.0` fires on **1 window (1.0%)**, which is
   right for a risk flag. `assemble-plan-context` seeds all 7 days at 0 so rest days count, which is the

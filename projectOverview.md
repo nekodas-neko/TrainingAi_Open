@@ -103,6 +103,43 @@ order.
   `error_events` prunes at 30 days. Every count is *the owner's data, recently* — never "the system's".
   A zero means the owner has never done the thing; other accounts are structurally invisible here.
 
+### [workouts][platform] 🔴 Completing one workout twice at once counts it twice — the counter that has already drifted three times, measured drifting again (Q-473, Q-474, 2026-08-18)
+
+- **The first sweep to actually fire concurrent writes and read the result.** `CLAUDE.md` records a
+  real incident in this class (*"5 rapid taps once fired 4 `complete-workout` POSTs"*) and a standing
+  **Stored Counters** rule opening *"Every stored counter in this project has drifted"* — naming
+  `sessions_in_phase` as fixed three separate times. Three earlier reviews discuss races; none had
+  ever measured one. [`docs/reviews/2026-08-18-write-concurrency.md`](docs/reviews/2026-08-18-write-concurrency.md).
+- **Q-473 — reproduced in 4 of 5 bursts.** Four concurrent `POST /api/complete-workout` for **one**
+  workout session: all four return `200`, `completed_at` is stamped on exactly one row (that UPDATE
+  *is* guarded), and `sessions_in_phase` lands on **3, 3, 2, 1** across four trials. The idempotency
+  decision is taken from a read that happens *before* the guarded write, so every request that read
+  first believes it is first. The function's own comment promises the opposite: *"Idempotent: a
+  retried/replayed completion … must not … double-increment the sessions_in_phase stored counter."*
+- **Why it is 🔴 and not 🟠:** `sessions_in_phase` advances the periodization phase, so an over-count
+  moves the lifter into the next phase — and into a deload — **early, off a session never trained**.
+  Nothing reconciles it against `workout_sessions`, and the workout row itself looks perfect, so the
+  only symptom is "my programme advanced too soon". The outbox replay path calls the same shared
+  function, which is precisely the case that comment names.
+- **The fix already exists in the same file's neighbourhood.** `upsertPersonalRecordIfBetter` does the
+  same read-then-conditionally-write correctly (`db.transaction` + `SELECT … FOR UPDATE`). Cheaper
+  still, and it is `CLAUDE.md`'s own write-path rule (a): return the guarded UPDATE's affected-row
+  count and decide from that. The count is currently computed and thrown away.
+- **Q-474 — the trap that nearly buried it.** `workout_sessions` carries **two** FKs to
+  `program_sessions`: the live `session_id` and a dead `program_session_id` (migration 079, **zero**
+  code references, 0 of the owner's 91 prod rows populated). The dead column owns the name the live
+  one is used under — `getWorkoutSessionProgramSessionId()` reads `session_id`, and
+  `ensureWorkoutSession`'s `programSessionId` argument is written to `session_id`. The first Q-473
+  repro populated the dead column, the periodization block silently skipped, and the honest reading
+  of that run was *"the race does not exist"*. It does.
+- **Four clean results recorded** so they are not re-run: `day-checkin` is idempotent under
+  concurrency (5 → 1 row), `completeWorkoutSession`'s own UPDATE is correctly guarded,
+  `upsertPersonalRecordIfBetter` is correctly locked, and the phase-`transition` route is idempotent
+  by construction. `activity-logs` duplicates freely but every caller holds an in-flight guard, so it
+  was deliberately **not** filed.
+- **Not verified on:** production (correct — this writes), the APK, or a multi-replica deployment.
+  Measured on local `pnpm dev`, a single node; more replicas widen the window rather than narrow it.
+
 ### [platform][workouts][cardio][nutrition] 🟠 The AI-usage screen's double-trips traced to cause — the top row is an artefact, two rows are real (Q-469…Q-471, 2026-08-18)
 
 - **First production-data finding of this review run.** The owner supplied three screenshots of

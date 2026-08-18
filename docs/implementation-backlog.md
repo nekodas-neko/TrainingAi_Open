@@ -285,6 +285,61 @@ below threshold and left in place for next time.
 > Journal: [`entries/2026-08-16-health-stale-goal.md`](overview/history-2026-08-15.md).
 
 
+### [workouts][platform] Q-473 — completing one workout twice at once counts it twice: `sessions_in_phase` over-increments, in the function whose comment promises it cannot
+
+- **Branch:** `fix/complete-workout-increment-race`
+- **Added:** 2026-08-18 · review sweep (write-concurrency lens) ·
+  [`docs/reviews/2026-08-18-write-concurrency.md`](reviews/2026-08-18-write-concurrency.md)
+- **Placement:** high for a Review finding. It is **measured, reproducible, and silent**, it lands on
+  the one counter `CLAUDE.md` says has already drifted three separate times, and the fix is small.
+- **Measured, not inferred.** Four concurrent `POST /api/complete-workout` for **one** workout
+  session, fresh row, counter reset to 0, trials spaced past the `5 / 60 s` limit:
+
+  | Trial | Codes | `completed_at` set | `sessions_in_phase` after |
+  |---|---|---|---|
+  | A | 200 ×4 | 1 row | **3** |
+  | B | 200 ×4 | 1 row | **3** |
+  | C | 200 ×4 | 1 row | **2** |
+  | D | 200 ×4 | 1 row | 1 |
+
+  A fifth burst that the limiter cut to two survivors gave **2**. Reproduced in **4 of 5**. The
+  workout row is correct every time — only the counter is wrong.
+- **The shape** (`packages/shared/src/workout/complete-workout.ts:56-77`): read `completedAt` →
+  write → `if (programSessionId && !alreadyCompleted) incrementSessionsInPhase(...)`. The idempotency
+  decision comes from the **earlier read**, so every request that read before the winner wrote
+  believes it is the first.
+- **`completeWorkoutSession` is already guarded and that is the whole point** — `adapter.ts:806-814`
+  carries `isNull(completedAt)` in its `WHERE`, so exactly one request stamps the column. It just
+  returns `void`, and the affected-row count that would settle this is thrown away.
+- **The function's own comment claims this is handled:** *"Idempotent: a retried/replayed completion
+  (network retry, or an outbox mutation re-pushed after its response was lost) must not … double-
+  increment the sessions_in_phase stored counter."* Worth fixing the comment's honesty alongside the
+  code.
+- **Two live vectors.** (1) Rapid taps — `CLAUDE.md` records *"5 rapid taps once fired 4
+  `complete-workout` POSTs"*. (2) **Outbox replay** — `pushMutations`' `complete_workout` branch calls
+  the same shared function, so a re-pushed mutation takes the same path. That is the exact case the
+  comment names.
+- **Why it hurts:** `sessions_in_phase` advances the periodization phase (baseline → accumulation →
+  intensification → realisation → deload). Over-counting moves the lifter into the next phase, and
+  into a deload, **early**, off a session that was never trained. Nothing reconciles the counter
+  against `workout_sessions`, so it surfaces only as "my programme advanced too soon".
+- **Fix shape (implementer's call, two options, both already in this codebase):**
+  1. *Cheapest, and it is `CLAUDE.md`'s own write-path rule (a).* Have `completeWorkoutSession`
+     return its affected-row count and derive `alreadyCompleted` from **that** instead of the prior
+     read. The guarded UPDATE exists; only its return value is missing.
+  2. *If a transaction is wanted anyway:* copy `upsertPersonalRecordIfBetter`
+     (`adapter.ts:2987-3004`), which does the same read-then-conditionally-write correctly with
+     `db.transaction` + `SELECT … .for('update')`.
+  Prefer (1) — smaller, no new transaction on a hot path, and it fixes the pattern rather than
+  wrapping it. Whichever lands, `CLAUDE.md`'s **Stored Counters** rule asks for a reconcile-on-read
+  (`reconcileSessionsInPhase` already exists) — check it covers the drift already in the DB.
+- **Lane A owns this** — `packages/shared/**` and `lib/data/**`.
+- **Not verified on:** production (correct — it writes), the APK, or a multi-replica deployment.
+  Local `pnpm dev` is a single node; more replicas widen the window, not narrow it.
+- **Setting up a repro? Read Q-474 first** — populating `workout_sessions.program_session_id` (the
+  obvious-looking column) makes the periodization block silently skip and the race look absent. The
+  live column is `session_id`.
+
 ### [platform] Q-548 — a bare `catch` turns a database outage into "403 Forbidden"
 
 - **Branch:** `fix/db-query-403-masks-outage`
@@ -621,15 +676,58 @@ moving *beside* the calories rather than under them.
   pitch is **0.353 mm** — below every shipped style, not merely below the "0.487 floor" this entry
   names. It buys three of five ingredient lines at 6.5 px in exchange for the least reliable code in
   the set. Recommendation: do not build it; the square die is the answer to wanting the list on paper.
-- **Still open:** option 2 above, and **the stored default**, which stays blocked on **Q-392** exactly
+- **✅ SUPERSEDED AND CLOSED by Q-397, shipped 2026-08-18 (v1.324.0).** This entry's central
+  premise — that the list "does not fit on a round one" — was true only for a **stacked** list. The
+  owner's actual suggestion was an **inline wrapping run**, which spends width instead of height:
+  five ingredients become three wrapped lines rather than five, and the height handed back goes to
+  the code. The complete list now fits a **round** label with a code larger than the old default's.
+  **B2 — round-safe, inline, centred, complete list — is the new `DEFAULT_MEAL_LABEL_STYLE`**, at
+  0.529 mm per module against the old default's 0.369, both now asserted in
+  `components/nutrition/__tests__/meal-label-code-size.test.ts` per Q-397's verification note.
+  Option 2 as costed here is moot; the stacked square style stays in the picker.
+- **Still open:** **the stored default**, which stays blocked on **Q-392** exactly
   as this entry says — the style remains picked-at-print-time and nothing was persisted.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
-  whichever option is chosen, **the code's module pitch is not reduced below the shipped 0.487 mm**
-  without an explicit owner decision recorded here; and if a square-only variant ships, the app makes
+  whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
+  decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
+  now 0.529 and the old one measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
   clear which labels are square-only rather than letting a round die silently crop the list.
 - **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
+
+### [workouts][platform] Q-474 — `workout_sessions` has two foreign keys to `program_sessions`, and the dead one owns the name the live one is used under
+
+- **Branch:** `chore/workout-sessions-dead-program-session-id`
+- **Added:** 2026-08-18 · review sweep (write-concurrency lens) ·
+  [`docs/reviews/2026-08-18-write-concurrency.md`](reviews/2026-08-18-write-concurrency.md)
+- **Placement:** low. **Nothing is broken today** — nothing uses the dead column. File it as the
+  maintenance hazard it is, not as a bug.
+- **What.** `lib/data/postgres/schema.ts` declares both:
+  ```ts
+  sessionId:        uuid('session_id').references(() => programSessions.id, ...)          // 157 — live
+  programSessionId: uuid('program_session_id').references(() => programSessions.id, ...)  // 168 — dead
+  ```
+  `program_session_id` came from `079_ai_dynamic_periodization.sql:19` ("for prescription trigger
+  linkage"). `grep workoutSessions.programSessionId` across `lib app packages` returns **zero hits** —
+  nothing writes it, nothing reads it.
+- **Confirmed in production:** 0 of the owner's 91 `workout_sessions` rows have `program_session_id`
+  set; 45 have `session_id`. (`claude_ro` is row-scoped to one user, so that is the owner's rows —
+  but a column no code references cannot be populated for anyone else either.)
+- **The trap, which is the actual finding.** The identifier `programSessionId` means the **live**
+  column everywhere in code, while the column actually named `program_session_id` is inert:
+  - `getWorkoutSessionProgramSessionId()` — named for the dead column — selects
+    `s.workoutSessions.sessionId` (`slices/periodization.ts:299-306`).
+  - `ensureWorkoutSession(userId, sessionId, programSessionId, …)` writes its `programSessionId`
+    argument into the `sessionId` field (`adapter.ts:772-780`).
+- **It has already cost a session.** The Q-473 repro fixture populated `program_session_id`, the
+  periodization block took the `null` branch, the counter never moved, and the honest reading of that
+  run was "the race does not exist". It does. The next person to build that fixture hits the same wall.
+- **Fix shape:** rename the reader (and comment the schema) — zero-risk, removes most of the trap on
+  its own. Dropping the column is cleaner but is a **data-losing migration**, so it needs owner
+  confirmation under `CLAUDE.md` and a Lane A migration number; it is not obviously worth that on its
+  own, and would ride better alongside other schema work.
+- **Lane A owns this** — schema and migrations.
 
 ### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
 
@@ -919,76 +1017,48 @@ blocker and the intended shape were both already named, so **do not re-derive th
   APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
   the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
-### [nutrition] Q-397 — the shipped ingredient label is the SUPERSEDED design; inline wrapping is what was agreed
+### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 
-- **Branch:** `fix/meal-label-inline-ingredients`
-- **Added:** 2026-08-18, after the owner asked whether the agreed label reached an implementer. It
-  did — v1.323.0, PR #94 — but **what shipped is the analysis Q-393 was corrected away from.**
-  Lane B built the entry faithfully; **the entry was wrong.** Filed by the author of that entry.
-- **Lane B.** Canvas only (`components/nutrition/meal-label-render.ts`), no schema, no route.
+- **Branch:** `feat/meal-plan-to-saved-meals`
+- **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
+  used too much; it will be created - then likely not used again. It would be good if each item from
+  the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
+  sections."*
+- **Lane B** for the UI. **Lane A** if the plan→meal copy needs a column or a sync change — check
+  before starting, and hand that half over rather than taking a migration number.
 
-**What the owner actually asked for**, verbatim across two messages: *"can you show me this model
-with it centered and having the food go across the screen like (200g Beef mince, 150g pasta, 100g
-pasata, +2more) so it stays on one line and wraps when needed"*, then the layout
-*"/ Beef Pasta Bake / 512KCAL / P38 C46 F18 / (ingredients) / {QR Code}"*, then
-*"lets keep them all as options to cycle through and choose a default."*
+**What this replaces.** The meal plan is five surfaces — `meal-plan-section`, `meal-plan-review-card`,
+`meal-plan-setup-sheet`, `meal-plan-edit-sheet`, `meal-plan-manage-sheet` — plus its own row shape,
+its own staleness banner and its own editing model. All of it exists to maintain a thing the owner
+builds once and then stops opening. That is a lot of surface earning very little.
 
-**What shipped instead.** One new style, `square`, **square-die only**, printing the ingredients
-**one per line, left-aligned** (`meal-label-render.ts` — `MAX_LINES = 5`, `lineH = 9`, a
-`ctx.fillText` per ingredient), with calories and macros **beside** the code rather than centred
-above it. Its own comment restates the superseded reasoning: *"the round box is 130 × 137 and the
-shipped default already fills all of it, leaving 7 units — zero ingredient lines."*
-
-**Why that reasoning is wrong, and it is the whole point.** It is true **for a stacked list**. The
-owner's suggestion was to run the ingredients as **one wrapping line**, which spends *width* instead
-of *height* — at 6.5 px in a 124 px column that is ~31 characters per line, so five ingredients are
-**2–3 wrapped lines rather than 5 stacked ones**, and the height handed back goes into the code.
-Measured on the drawn artboards:
-
-| Layout | Code | mm/module |
-|---|---|---|
-| Shipped default (`band`, no list) | 12.2 mm | **0.487** |
-| Stacked list on a round die (the rejected option) | 11.6 mm | 0.465 |
-| **Inline, round, 3 + "+2 more"** | 15.6 mm | **0.624** |
-| **Inline, round, ALL FIVE** | 13.2 mm | **0.529** |
-
-So the full list fits a **round** label with a code **larger than the one already shipping**. There
-was never a trade to make between the list, the round die and a readable code — inline wrapping buys
-all three. Q-393's heading (*"which does not fit on a round one"*) and its three costed options all
-predate that correction and should have been rewritten; they were not.
+**The reframe, and it is the owner's:** a plan is not somewhere you live, it is a **batch generator**.
+Each meal it produces gets a **Save** action; saved, it becomes an ordinary `saved_meals` row and
+inherits everything that already works — the detail screen, the macro split, the printable label and
+its QR, logging in one tap. The plan can then be discarded without losing anything worth keeping.
 
 **What to build.**
-1. **Wrap the ingredient run as one line**, comma-separated, `+N more` when it overflows the line
-   budget — not one `fillText` per ingredient.
-2. **A round-capable ingredients style**, since that is what inline wrapping unlocks. Drop
-   `squareOnly` for it; keep the square variant for anyone who wants the stacked alignment.
-3. **The centred layout the owner specified** — name / calories / macros / ingredients / code, each
-   centred — as its own style. Note the black band costs ~10 px over a plain centred name, which is
-   why the all-five centred variant drops the band; band + centred + all five puts the code at
-   0.392 mm/module, well under shipped, and must not be built.
-4. **All of these are cycleable styles with a stored default**, per the owner's "keep them all as
-   options". The registry (`MEAL_LABEL_STYLES`) already supports this; the default is a stored
-   preference and routes through Q-392.
+1. **A `Save` action per plan meal, and a `Save all N`.** Saving writes `saved_meals` +
+   `saved_meal_items` from the plan's own items — the same rows the meal builder writes, so there is
+   exactly one representation of a meal in the app. A saved row shows its QR affordance in place of
+   the Save button, which is also how you see at a glance what you have already kept.
+2. **A `plan` tag on the resulting My Meals row**, so provenance is visible and nothing else about
+   the row is special.
+3. **Then delete surface, do not add it.** Once meals live in My Meals, `meal-plan-section` on the
+   day screen and `meal-plan-review-card`'s staleness nag have no job — the plan is not a live thing
+   to keep fresh any more. **Confirm that with the owner before removing anything**; this entry
+   proposes the reduction, it does not authorise it.
 
-**✅ THE DEFAULT IS DECIDED — B2, owner, 2026-08-18** (*"Yes have B2 as the default"*): round-safe,
-inline-wrapped, the **complete** ingredient list, centred as name / calories / macros / ingredients /
-code. Measured **0.529 mm per module**, against the **0.487** that `DEFAULT_MEAL_LABEL_STYLE = 'band'`
-ships today — so the new default prints a *more* forgiving code than the current one **and** carries
-the breakdown, on either die. Change that constant in the same PR; do not leave B2 as an opt-in
-style the owner has to go and find.
-
-**Do not read this as "ship B2 only."** The other four stay in the picker — that is what "keep them
-all as options" asked for, and the shipped square style is the right pick for anyone who prefers the
-stacked alignment and is using square stock.
-
-- **Verification.** Recompute mm/module per style and assert it in the existing unit test — the
-  preview's own size figure was wrong once already (fixed in v1.323.0), so a number nobody asserts
-  is a number that drifts. Then a physical test print, which is the only real check.
-- **Process note, recorded because it is the reusable lesson:** the correction was made *to the
-  owner in chat* and drawn on the canvas, and never written back into the queue entry. The queue is
-  the record. **When a finding is corrected mid-conversation, the entry gets rewritten in the same
-  session** — a superseded analysis left in the backlog is not stale documentation, it is a work
-  order.
+- **⚠ Do not merge the two data models.** `saved_meals` is the destination, the plan stays its own
+  tables. Copy on save; never make a plan row and a meal row the same record. A plan is a schedule of
+  suggestions and a saved meal is a recipe you own — collapsing them means editing a saved meal
+  silently rewrites a plan, or deleting a plan takes your meals with it.
+- **Idempotence matters more than it looks.** "Save all" pressed twice must not produce nine
+  duplicates. Key the copy on `(plan id, plan item id)` and make a repeat save a no-op that reports
+  what already existed.
+- **Verification:** save one plan meal, then prove the resulting row logs, prints a label, and that
+  the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
+  indistinguishable from a hand-built one, so the label path is the test that proves it.
 
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
@@ -1080,6 +1150,17 @@ string onto `var(--brand)` would repaint the protein macro with whatever accent 
 The selection-state literals and the macro palette are the same eight characters and must not share
 a fate — finding 1 is the former only.
 
+
+**19 — Owner answers, 2026-08-18 (asked as four blocking questions).**
+- **Scope of the design pass:** *"the full work through; the nutrition tab; and all features from
+  logging food - to creating a meal to editing a meal."* Sixteen screens are now drawn end to end.
+- **Targets stay in Profile, with a shortcut.** `components/profile/macro-targets-pane.tsx` keeps
+  ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
+  weight, and moving them is churn — but editing them two tabs from where they are judged is the
+  friction the shortcut removes.
+- **"Complete Today's Logging" is a button at the foot of the day's log** — see **Q-387**, where the
+  decision and its wiring live.
+- **The meal plan becomes a generator of saved meals** — see **Q-398**.
 
 **11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
 MyFitnessPal screenshots and asked for a rework that reads as naturally. Six screens are drawn at
@@ -2291,6 +2372,31 @@ too, so the Balance card's "burned" figure is dragged down in step.
 - **Surface:** no device or production data required — shared-module logic plus a service wrapper,
   reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
   control, if option 1 is chosen, would need a device check.
+
+
+**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
+meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
+one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
+option 3 (silent inference) cannot be corrected by the person who knows the answer.
+
+**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
+— not in the header, not beside the ring. It is a statement about a day that has finished, and its
+position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
+is everything you ate. Only completed days are used to work out your maintenance calories."*
+Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
+must be reversible, since the whole point is that a wrong day poisons the estimate.
+
+**Ship the counter with it, not after it.** The button feeds something invisible today, and that
+invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
+had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
+for, so the two land together rather than one inventing a second version of the other.
+
+**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
+`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
+assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
+quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
+honest one, so the estimate starts from days marked after this ships and the counter shows that
+plainly.
 
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
@@ -4222,6 +4328,153 @@ session working from a temporarily restored copy.
 - **Related, recorded not filed:** `calcAmrap1RM` / `amrapScaleFactor` (the 1.0/0.97/0.93/0.88/0.82
   rep-band table) have **no production call site** — tests only. Calibrating a function nothing calls
   would be wasted; removing it is a Review-lane call.
+
+### [heart-rate][body] Q-515 — the rest/active boundary shrank 3× because the owner got fitter
+
+- **Branch:** `fix/hr-rest-threshold-anchor`
+- **Plan:** none yet — a constant plus a baseline source. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md)
+- **Blast radius.** `HR_REST_THRESHOLD = 0.05` is the single rest/active boundary shared by **Body
+  Battery's charge/drain** and the **Activity Score's "moved this hour"** signal — it propagates into
+  two pillars.
+- **Measured** over 12,471 BLE ring samples, waking hours (07:00–21:59), joined per day to that day's
+  own stored profile:
+
+  | month | resting HR | hr_max | boundary | median % of waking samples below it |
+  |---|---|---|---|---|
+  | 2026-07 | 62.9 | 187.0 | **69.1 bpm** | **26.5%** |
+  | 2026-08 | 54.4 | 171.2 | **60.2 bpm** | **8.2%** |
+
+  **A 3.2× collapse in one month at identical sample density (184/day).**
+- **Every input behaved correctly.** Resting HR 62.9 → 54.4 is a genuine fitness gain; `hr_max`
+  187 → 168 is the profile maturing from the age formula to a corroborated observed ceiling (the chest
+  strap's max is 166 over 40,230 samples) — `resolveHrProfile` working as designed. Waking HR also fell,
+  77.5 → 73.3.
+- **The trap is a RATE difference.** Resting HR fell **8.5 bpm**; waking HR fell only **4.2**. Resting
+  HR is the more responsive fitness marker, so a boundary pinned to it moves ~2× as fast as the
+  distribution it classifies. Decomposed: resting HR explains ~8.1 of the 8.9 bpm boundary drop, the
+  `hr_max` maturation ~0.9. **The owner got fitter and was rewarded with less recovery credit.**
+- **No fraction fixes it** — sweeping the constant, July vs August medians: 0.05 → 26.5/8.2 (3.2×),
+  0.08 → 38.5/22.7, 0.10 → 47.8/29.8, 0.12 → 59.6/35.2, 0.15 → 72.8/50.6 (1.4×). The gap narrows but
+  never closes. **Tuning this constant is not the fix** — fourth instance of that pattern today
+  (Q-506, Q-512, Q-514, Q-515).
+- **Two separable questions; only one is answered here.** *(a) Is it stable?* No — a defect regardless
+  of taste. *(b) Is 8.2% the right level?* **Unknown** — ~1.2 h of a 15 h day is not obviously wrong,
+  and whether Body Battery should charge more in daylight is an owner question. **Fix (a) alone**; if
+  the fraction is raised at the same time the two effects become inseparable and neither is verifiable.
+- **First action — recommendation:** anchor the boundary to a **slow-moving** resting baseline (90-day
+  trailing, or a fixed offset re-derived quarterly) so a month of fitness improvement cannot move the
+  classifier under its own data. Keeps personalisation, removes the month-scale feedback. Reversal cost
+  is low and the effect is observable within a week of BLE data.
+- **Rejected alternative:** a percentile of the owner's own recent *waking* HR (trailing-28-day p25).
+  Stable by construction — which is the objection: Body Battery charge would go near-constant and a
+  genuinely restful day could not read as one. The codebase already names this "the treadmill" and
+  removed it from the activity-goal volume lane (Q-190). **Self-referential boundaries are fine for a
+  pure classifier and wrong for anything feeding a score — this one feeds two.**
+- **Re-measure both consumers afterwards**: Body Battery's charge/drain balance (currently mean charged
+  23.1 vs drained 36.0) and the Activity Score's movement signal.
+- **On Q-272:** its "median 6.7% of waking samples" could not be reproduced — the same statistic on
+  current data gives **15.0%** pooled over 42 days. **Not filed as an error there**; the month split
+  (26.5% / 8.2%) suggests it was measured on recent data alone, and the drift documented here explains
+  the difference.
+- **Still unreviewed in this pillar:** `PEAK_BANDS` (its "stable per-bucket sample sizes" justification
+  is an empirical claim nobody has measured) and the Karvonen zone boundaries (0.6/0.7/0.8/0.9).
+
+### [heart-rate] Q-516 — `PEAK_BANDS` is calibrated for a heart-rate range strength training never reaches
+
+- **Branch:** `fix/hr-recovery-peak-bands`
+- **Plan:** none yet — re-banding is cheap; **the honesty change in "first action" is the real work.**
+  Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](reviews/2026-08-18-hr-rest-threshold-calibration.md) Part 2
+- **The claim under test.** `hr-recovery-profile.ts` justifies its bands as *"Bands, not exact bpm, for
+  stable per-bucket sample sizes (spec §3)."* That is empirical, and it is **false** for this athlete.
+- **Observed range**, 208 episodes with `coverage_ok` (2026-05-27 → 08-17): min 59, p25 93.8,
+  **median 102**, p75 110, p95 121, **max 132**.
+
+  | band | episodes | share | mean `drop_60s` |
+  |---|---|---|---|
+  | **`<110`** (spec: *low-signal, de-emphasise*) | **149** | **71.6%** | **3.0** |
+  | `110–129` | 57 | 27.4% | **14.9** |
+  | `130–149` | **2** | 1.0% | 13.5 |
+  | `150–169` | **0** | 0% | — |
+  | `170+` | **0** | 0% | — |
+
+  The highest set-peak ever recorded is **132**, so the top two bands are **structurally unreachable**,
+  not merely sparse. `LOW_SIGNAL_BAND_LABEL = '<110'` sits at the **p75**, so the profile de-emphasises
+  three quarters of its own data. **One usable bucket** (`110–129`, n = 57).
+- **The de-emphasis is CORRECT, which makes it worse.** Mean `drop_60s` is **3.0** below 110 against
+  **14.9** above it — the spec's "near-meaningless … mostly measurement noise" is **supported**. So
+  re-banding does not recover hidden signal: **peak HR during a lifting set mostly does not reach the
+  range where HR recovery is informative.** These bands read as designed for cardio/interval work.
+- **Also:** `coverage_ok` is true on only **212 of 691** rows (31%) — two thirds of set-HR rows are
+  discarded before banding. Not investigated; recorded so 208 is not mistaken for the full sample.
+- **First action:** (1) re-band to the observed range (e.g. `<90 · 90–104 · 105–119 · 120+`) so four
+  buckets populate and the 110–129 signal is not diluted; **(2) — the important one — state plainly in
+  the feature and the docs that HR recovery is informative for roughly the 28% of sets peaking above
+  110.** A re-banded profile that averages noise into four buckets is **worse** than one honest bucket,
+  because it looks like it is working. **Do not ship (1) without (2).**
+- **Owner-facing question behind it:** if HR recovery is meant to track conditioning, the range exists
+  in cardio and chest-strap data (max 166 over 40,230 samples), not strength sets. Whether the feature
+  is targeted correctly is a product decision, not a constant.
+- **Caveat:** nothing about the recovery *math* (`drop_30s`…`drop_120s`, `sec_to_hrr50`) was checked —
+  only the banding and its populations. Cardio/chest-strap **episodes** were not examined; the claim
+  that the range exists there comes from raw `oura_heartrate`, since `set_hr_stats` is strength-derived
+  by construction.
+
+### [nutrition] Q-517 — adaptive-TDEE can hand the user a maintenance below their own BMR
+
+- **Branch:** `fix/adaptive-tdee-bmr-floor`
+- **Plan:** none — one constant becomes a computed value. **Lane A implements; Tuning proposes only.**
+- **Added:** 2026-08-18 · Tuning agent ·
+  [`docs/reviews/2026-08-18-nutrition-tdee-calibration.md`](reviews/2026-08-18-nutrition-tdee-calibration.md)
+- **`adaptive-tdee.ts` already anticipated this.** Its header warns an ungated estimate *"would tell
+  the user their maintenance is 1200 kcal — actively harmful advice"*. This measures whether the gates
+  hold. **They hold 75% of the time; the lowest value that gets through is 1,052 kcal.**
+- **Input condition (not a defect, nothing filed):** the food log captures **~45%** of actual intake —
+  44 logged days of 110, mean **1,223 kcal**, 43% of logged days under 1,200, 4.8 entries/day. Against
+  75 weigh-ins over 109 days (slope **+8.0 g/day** = **+62 kcal/day** balance) and a Cunningham BMR of
+  **1,698** × 1.55 = predicted TDEE **2,632**, implied actual intake is **~2,694**. Taking the log at
+  face value implies maintenance **1,161 — below BMR**, which is arithmetic proof of under-logging.
+- **Replay of the shipped gates**, every rolling window:
+
+  | outcome | 14-day (97) | 28-day (83) |
+  |---|---|---|
+  | blocked, coverage/span | 72 | 61 |
+  | `implausible_result` | 2 | 0 |
+  | **PASSED** | **23 (24%)** | **22 (27%)** |
+  | passing range | **1,052–2,219** | **1,246–1,889** |
+
+- **`MIN_PLAUSIBLE_MAINTENANCE = 1000` sits just below the artefact** — this owner's lands at **1,052**,
+  clearing it by 52 kcal. The module's own comment predicted the failure at 1,200; the floor was set
+  200 below that prediction and the real value slipped between them.
+- **The values are also unstable** — 1,052–2,219 for the same person within weeks (a 1,167 kcal range).
+- **Why the coverage gates cannot catch it:** `MIN_LOGGED_FRACTION` counts **days carrying a log**, not
+  whether each day's log is **complete**. A day with only breakfast counts as fully logged — exactly
+  this owner's pattern — so a 45%-complete record sails through a 70%-coverage gate. **The gates
+  measure the wrong kind of incompleteness.**
+- **It reaches the user's target.** `TdeeAdaptationCard` writes the accepted value through
+  `PUT /api/nutrition/targets`, which its own docstring calls the source of truth for the daily target,
+  mirroring into `users.calorie_goal`. A 1,052 maintenance is one tap from becoming the calorie goal of
+  someone whose BMR is 1,698.
+- **First action: replace `MIN_PLAUSIBLE_MAINTENANCE` with the user's own BMR.** Maintenance below BMR
+  is impossible *by definition*, not implausible by taste, and `cunninghamBmr` is already imported in
+  the same package. Measured: 14-day passing 23 → **11**, range **1,902–2,219**; 28-day 22 → **10**,
+  range **1,707–1,889**. Every harmful value blocked.
+- **It makes the estimate SAFE, not CORRECT.** Survivors still sit ~500 kcal under the formula's 2,632
+  — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
+- **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of
+  windows and structurally cannot see within-day incompleteness, so raising it drops good windows and
+  keeps bad ones; (2) **do not scale logged intake up** by an under-logging multiplier inferred from
+  the weight trend — that is circular, since maintenance is derived from the same trend, and would
+  reproduce the assumed TDEE as if measured.
+- **Durable fix, larger and separate:** detect within-day incompleteness (expected vs logged meals, or
+  an intake floor relative to BMR) and treat such a day as **unlogged** rather than low. A feature, not
+  a constant.
+- **Recorded, not filed:** `tdeeAdjustment` (`tdee-adaptation.ts`) is **dead code** — referenced only by
+  its tests and by a comment in `TdeeAdaptationCard` explaining it was replaced. Same trap as
+  `amrapScaleFactor` (Q-514); do not calibrate it.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
