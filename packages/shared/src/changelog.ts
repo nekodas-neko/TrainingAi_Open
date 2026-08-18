@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.5",
+    date: "2026-08-18",
+    changes: [
+      "Editing or deleting something that does not exist \u2014 or is not yours \u2014 now says so, instead of reporting a server error. Six write actions answered with a generic failure and, in four cases, an empty response the app could not even read, which also meant the phone treated a permanent refusal as a temporary glitch and kept retrying it.",
+    ],
+  },
+  {
     version: "1.324.4",
     date: "2026-08-18",
     changes: [

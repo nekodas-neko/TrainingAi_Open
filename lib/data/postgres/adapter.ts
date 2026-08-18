@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { NotFoundError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
 import { getDb } from './client'
@@ -793,7 +794,15 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .from(s.workoutSessions)
       .where(and(eq(s.workoutSessions.id, sessionId), eq(s.workoutSessions.userId, userId), isNull(s.workoutSessions.deletedAt)))
     if (!existing) {
-      throw new Error(`ensureWorkoutSession: session ${sessionId} is not owned by user ${userId}`)
+      // Q-462: typed, so the route can answer 404 instead of 500. The block itself is correct and
+      // unchanged — nothing is written — but a permanent, correctly-refused condition was reported
+      // as a transient server error and logged with a full stack trace as though the server faulted.
+      //
+      // 404 rather than 403, for the same reason `meal-plans/[id]` gives: a session owned by someone
+      // else must not be distinguishable from one that does not exist, or the route becomes a
+      // membership oracle for other users' session ids. The id stays in the message for the log; the
+      // client sees only "Workout session not found".
+      throw new NotFoundError('Workout session')
     }
     return {
       id: sessionId, wasInserted: false,
@@ -2280,7 +2289,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async renameExercise(userId: string, id: string, newName: string): Promise<ExerciseLibraryEntry> {
     return await this.db.transaction(async tx => {
       const [existing] = await tx.select().from(s.exerciseLibrary).where(eq(s.exerciseLibrary.id, id))
-      if (!existing) throw new Error('Exercise not found')
+      if (!existing) throw new NotFoundError('Exercise')
       if (existing.createdBy !== userId) throw new Error('Not authorized to rename this exercise')
       const oldName = existing.name
       await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
@@ -2294,7 +2303,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async adminUpdateExercise(entry: { id: string; name: string; muscles: MuscleAssignment[]; equipment: string[]; instructions?: string; exerciseType?: ExerciseType }): Promise<ExerciseLibraryEntry> {
     return await this.db.transaction(async tx => {
       const [existing] = await tx.select().from(s.exerciseLibrary).where(eq(s.exerciseLibrary.id, entry.id))
-      if (!existing) throw new Error('Exercise not found')
+      if (!existing) throw new NotFoundError('Exercise')
 
       const oldName = existing.name
       const newName = entry.name
@@ -2558,7 +2567,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   async updateActivityType(id: string, patch: Partial<{ label: string; icon: string; isDistanceBased: boolean; sortOrder: number }>): Promise<ActivityType> {
     const [row] = await this.db.update(s.activityTypes).set(patch).where(eq(s.activityTypes.id, id)).returning()
-    if (!row) throw new Error('Activity type not found')
+    if (!row) throw new NotFoundError('Activity type')
     return { id: row.id, label: row.label, icon: row.icon, isDistanceBased: row.isDistanceBased, sortOrder: row.sortOrder }
   }
 
@@ -6547,7 +6556,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .set(set)
       .where(and(eq(s.injuries.id, id), eq(s.injuries.userId, userId)))
       .returning()
-    if (!r) throw new Error('Injury not found')
+    if (!r) throw new NotFoundError('Injury')
     return this.rowToInjury(r)
   }
 
@@ -6608,7 +6617,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .set(set)
       .where(and(eq(s.supplements.id, id), eq(s.supplements.userId, userId)))
       .returning()
-    if (!r) throw new Error('Supplement not found')
+    if (!r) throw new NotFoundError('Supplement')
     return this.rowToSupplement(r)
   }
 
@@ -6626,7 +6635,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [owns] = await this.db.select({ id: s.supplements.id }).from(s.supplements)
       .where(and(eq(s.supplements.id, supplementId), eq(s.supplements.userId, userId)))
       .limit(1)
-    if (!owns) throw new Error('Supplement not found')
+    if (!owns) throw new NotFoundError('Supplement')
     // onConflictDoUpdate (not DoNothing): a prior unlog on this same date soft-deleted
     // the row via the (supplement_id, log_date) unique constraint — re-logging must
     // revive it (clear deleted_at), not silently no-op.
