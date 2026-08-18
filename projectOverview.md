@@ -69,6 +69,29 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟢 Two sources of truth for the next Q band; the prose one was wrong (Q-552, 2026-08-18)
+
+- **Review's band 450–499 was exhausted by Q-499.** `docs/agents/README.md` says *"claim the next block
+  of 50 above 529"* — which literally gives **530–579** and collides with **fourteen numbers already
+  in use**. The predecessor baton had already written 530–579 into the handover.
+- **The ledger recorded 530–537, 538–542 and 543; `544–551` were also live** across two platform
+  handoffs, `docs/overview/history-2026-08-15.md`, the devices domain index and the backlog, and
+  appeared nowhere in it.
+- **⚠️ Correcting this row's first draft: the ledger is NOT the only defence, and the truth is more
+  interesting.** Two sources exist for the same fact — the backlog's *Live pointers* row said
+  **552** and is **CI-enforced** (`scripts/check-backlog-pointers.js`); the README's prose ledger and
+  its *"next block of 50 above 529"* said **530** and was stale. **The machine-checked pointer was
+  right the whole time**, and the collision was reachable only by following the prose instruction —
+  which is what the README tells you to do, and what the Review baton had copied.
+- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
+  in this very PR (*"a band was used without being recorded"*).
+- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
+  count in a script is a fact* — and the first where the checked copy was silently right while the
+  prose copy was silently wrong.
+- **Fixed in the same PR:** claimed **552–601**, recorded 544–551, bumped the pointer to **602**, and
+  pointed the instruction at the checked source. Kept as the record of why the procedure changed.
+
+
 ### [app-shell][health] 🟢 Three lenses — two clean, and cards that cannot tell "no data" from "the fetch failed" (Q-499, 2026-08-18)
 
 - **Two lenses came up clean and are recorded so nobody re-runs them.**
@@ -91,8 +114,17 @@ order.
 - **Why it matters more than it looks:** `cachedFetch` treats any `!res.ok` alike, **including a 429
   from the app's own limiter** — a rate-limited user watches health cards vanish rather than seeing
   "try again in a minute", and the same silence covers a 500.
-- **Not exercised:** the vanish was **not reproduced in a browser**; no card was driven to a 429 or
-  500. No device, no production.
+- **✅ REPRODUCED 2026-08-18 (sweep 34)** —
+  [`docs/reviews/2026-08-18-card-429-reproduction.md`](docs/reviews/2026-08-18-card-429-reproduction.md).
+  `/api/weights-summary` forced to 429 by route interception at the S25 viewport: **`Estimated 1RM`
+  went 1 node → 0, with no error wording anywhere on the page.** **Control holds** — blocking a
+  different endpoint left it at 1. (`Ring Status` inconclusive: absent at baseline too.)
+- **⚠️ Invisible on a warm cache, visible on a cold one.** A repeat visit paints the seed and the
+  failed refresh is silent. So the user most likely to hit it is opening fresh, and least likely to
+  reproduce it a minute later — *"the card is gone"* reads as **intermittent**, inviting the
+  "can't reproduce" dismissal the report-invalidation rule exists to prevent.
+- **Still not exercised:** on device and offline (where `cachedFetch` cannot revalidate at all). **One**
+  card proven; the other eleven remain a worklist.
 
 
 ### [platform] 🟡 Three unauthenticated routes buffer an unbounded request body; one parses it before any check (Q-498, 2026-08-18)

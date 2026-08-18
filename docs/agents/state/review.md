@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-three sweeps (2026-08-17 ×2, 2026-08-18 ×31) — **all eleven pillars covered** · **Q band:** 450–499 · **⚠️ BAND EXHAUSTED — Q-499 was the last. Your first act is to claim 530–579**, add that row to the Q-number table in [`docs/agents/README.md`](../README.md) (its own instruction: *"claim the next block of 50 above 529"*), and say so in your first PR. **500–529 is Tuning's — do not take it.**
+**Updated:** 2026-08-18 · **By:** thirty-four sweeps (2026-08-17 ×2, 2026-08-18 ×32) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **553**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
 
 ## Now
 
-Thirty-three sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-four sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,54 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 34 — Q-499 reproduced; and a Q-number ledger near-miss (2026-08-18)
+
+**Confirmed Q-499. Filed Q-552** (and fixed it in the same PR). Write-up:
+[`docs/reviews/2026-08-18-card-429-reproduction.md`](../../reviews/2026-08-18-card-429-reproduction.md).
+
+**Took sweep 33's own named next step.** `/api/weights-summary` forced to 429 by Playwright route
+interception at the S25 viewport: **`Estimated 1RM` 1 node → 0, no error wording anywhere.**
+**Control holds** — blocking a *different* endpoint left it at 1. `Ring Status` **inconclusive**
+(absent at baseline), recorded as inconclusive rather than clean.
+
+**⚠️ Four runs; the three failures were method, not app — and each gave a plausible wrong answer.**
+1. Warm cache → card survived on a stale seed. **I briefly took this as refuting my own merged
+   finding.** It was the cache masking it.
+2. Cold cache but a card absent at baseline → nothing to compare.
+3. Fired 90 requests to trip a limiter **that does not exist on that route** — all 200s, so the
+   "under-429" arm was never under a 429, **and the table still printed a tidy
+   `baseline=1 under429=1`.** Only the `TRIP 0 of 90` line exposed it.
+
+**The lesson is (3), and it is the sharpest of the run:** it would have produced the *correct general
+conclusion at the time* from a measurement that established nothing. **Always print the independent
+variable and check it actually moved.** Route interception is right because it does not depend on the
+app's config being what you assumed.
+
+**A nuance the reproduction added, worth carrying:** the vanish is invisible on a warm cache and
+appears on a cold one — so it reads as **intermittent**, inviting the "can't reproduce" dismissal.
+Any future card-vanish report should be tested cold-context first.
+
+**Reproduction spec is in the review doc, not committed** — it asserts the correct behaviour and is
+red today, so it belongs in the fix PR. (Committing a test that asserts current buggy behaviour is
+worse than none.)
+
+**Q-552 — and the correction matters more than the finding.** The README's *"claim the next block of
+50 above 529"* literally gives 530–579 and collides with **fourteen live numbers**; **this baton had
+already written 530–579 into the handover.**
+
+**My first draft said the prose ledger "is the only defence". Wrong.** The backlog's *Live pointers*
+row said **552**, was correct all along, and is **CI-enforced** (`scripts/check-backlog-pointers.js`)
+— and it caught me in the same PR when I claimed 552 without updating the band table. **The
+machine-checked source was right; only the prose was wrong, and the README points you at the prose.**
+
+**→ Read the "Next unallocated Q band" pointer in `docs/implementation-backlog.md`, never the prose
+list.** Claimed 552–601, recorded 544–551, bumped the pointer to 602.
+
+**Third confirmed instance of Q-492's thesis** (prose decays, checked values do not) — and the first
+where the checked copy was silently *right* while the prose was silently wrong. That is now a pattern
+with three data points and it should shape where the next sweeps look: **prefer auditing prose that
+duplicates a machine-checked fact.**
 
 ### Sweep 33 — three lenses, two clean (2026-08-18)
 

@@ -37,6 +37,7 @@ layer**) through §16. Read it before building any shared helper.
   — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
   the Q-number collision and the conflict-markers-on-`main` incident. **Also records that PR #1401 did
   not make the public-repo migration** and how to port it.
+- [`docs/reviews/2026-08-18-card-429-reproduction.md`](../../reviews/2026-08-18-card-429-reproduction.md) — **Q-499 reproduced in a browser, 2026-08-18** (`/api/weights-summary` forced to 429 by route interception at the S25 viewport: **`Estimated 1RM` went 1 node → 0, no error wording anywhere**; **control holds** — blocking a different endpoint left it at 1). **The vanish is invisible on a warm cache and visible on a cold one**, so it reads as intermittent. Also **Q-552** — the Q-number block ledger omitted 544–551, so the README's own *"next block of 50 above 529"* instruction would have collided with fourteen live numbers; claimed 552–601 and added the missing grep-before-claiming step.
 - [`docs/reviews/2026-08-16-goal-invalidation-audit.md`](../../reviews/2026-08-16-goal-invalidation-audit.md)
   — Q-262: does `invalidateGoalRecommendations()` do anything? **No, for all six keys.** Establishes
   the method for auditing any cache group: an invalidation can only change a *settled* value where a

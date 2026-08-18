@@ -17,7 +17,7 @@ number.
 |---|---|---|
 | Next free Postgres migration | **199** | `lib/data/postgres/migrations/` (head: `198_drop_duplicate_indexes.sql`) |
 | Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **552** | the band table in [`docs/agents/README.md`](agents/README.md) |
+| Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
 > 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
@@ -848,6 +848,39 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [platform] Q-552 — two sources of truth for the next Q band; the prose one was wrong
+
+- **Branch:** `docs/q-block-ledger-procedure` · **(fixed in the same PR that filed it — see below)**
+- **Added:** 2026-08-18 · review sweep ·
+  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md)
+- **Placement:** already actioned; kept as the record of *why* the procedure changed.
+- **The near-miss.** Review's band 450–499 was exhausted by Q-499. `docs/agents/README.md` says
+  *"claim the next block of 50 above 529"* — which literally gives **530–579** and collides with
+  **fourteen numbers already in use**. The predecessor baton had already written 530–579 into the
+  handover, so the next session would have taken it.
+- **The ledger recorded 530–537, 538–542 and 543. `544–551` were also live** — across
+  `docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
+  `docs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
+  `docs/domains/devices/README.md` and this backlog — and appeared nowhere in it.
+- **⚠️ Correction to the first draft of this entry, which said the ledger is "the only defence". It is
+  not, and the truth is more interesting — there are TWO sources for the same fact:**
+  | Source | Said | Status |
+  |---|---|---|
+  | this file → *Live pointers* → "Next unallocated Q band" | **552** | ✅ correct, **CI-enforced** by `scripts/check-backlog-pointers.js` |
+  | `docs/agents/README.md` prose ledger + "next block of 50 above 529" | **530** | ❌ stale — omitted 544–551 |
+  The machine-checked pointer was right the whole time. **The collision was reachable only by
+  following the README's prose instruction** — which is what the README tells you to do, and what the
+  Review baton had already copied.
+- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
+  with *"Q-552 is in use but the next unallocated band starts at 552 — a band was used without being
+  recorded."* It caught this in the same PR.
+- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
+  count in a script is a fact* — and the first where the checked copy was silently **right** while the
+  prose copy was silently **wrong**.
+- **Fixed in this PR:** claimed **552–601**, recorded **544–551** retroactively, bumped the pointer to
+  **602**, and pointed the instruction at the checked source — *read the "Next unallocated Q band"
+  pointer, not the prose list; then record your block in both.*
+
 ### [app-shell][health] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
 - **Branch:** `fix/card-fetch-error-states`
@@ -879,9 +912,23 @@ below threshold and left in place for next time.
 - **Fix:** pass `onError` and render a compact error state. In-repo references that already do it:
   `components/health/observed-hr-card.tsx`, `components/workout/workout-load-error.tsx`. Amend the
   `CLAUDE.md` wording in the same PR.
-- **Not exercised:** the vanish was **not reproduced in a browser** — no card was driven to a 429 or
-  500 to watch it disappear. That is the obvious next step and would turn the ten candidates into a
-  count.
+- **✅ REPRODUCED 2026-08-18 (sweep 34) —
+  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md).**
+  Forced `/api/weights-summary` to 429 by Playwright route interception at the S25 viewport:
+  **`Estimated 1RM` went from 1 node at baseline to 0 under the 429, with no error wording anywhere on
+  the page.** **The control holds** — blocking a *different* endpoint (`/api/oura/stats`) in the same
+  harness left it at 1, so the disappearance is caused by blocking that card's own endpoint, not by
+  the interception. (`Ring Status` is **inconclusive**, not clean: absent at baseline too.)
+- **⚠️ The vanish is invisible on a warm cache and appears on a cold one.** A repeat visit paints the
+  seeded value and the failed refresh is silent; a first visit has no seed and the card is gone. So
+  the person most likely to hit it is opening the app fresh, and least likely to reproduce it a minute
+  later — which makes *"the card is gone"* **intermittent-looking**, inviting the "can't reproduce"
+  dismissal that `CLAUDE.md`'s report-invalidation rule exists to prevent.
+- **A paste-ready reproduction spec is in the review doc.** Deliberately not committed as a test: it
+  asserts the *correct* behaviour and is red today, so it belongs in the fix PR, not before it.
+- **Still not exercised:** on device (APK WebView + native local store) and offline, where
+  `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
+  worklist.
 
 ### [platform] Q-498 — three unauthenticated routes buffer an unbounded request body; one parses it before any check
 
