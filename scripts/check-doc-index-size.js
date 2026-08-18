@@ -487,6 +487,7 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+
   //
   // Raised 2026-08-18 (Q-464 ratchet, Lane A): 8257 -> 8310. Two blocks, both carrying measurements
   // a successor would otherwise have to re-derive. Q-464 gains the two corrections found while
