@@ -365,7 +365,7 @@ const BASELINE = {
   // fourth time. Recomputed from the MERGED file.
   'docs/implementation-backlog.md': 7360,
   'docs/implementation-backlog.md': 7360,
-  'CLAUDE.md': 1044,
+  'CLAUDE.md': 1063,
 
 };
 

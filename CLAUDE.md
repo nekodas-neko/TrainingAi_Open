@@ -16,6 +16,25 @@
     -d '{"sql":"SELECT url, source, left(message,120) AS message, count(*) AS hits, max(created_at) AS latest FROM claude_ro.error_events WHERE created_at > now() - interval '"'"'7 days'"'"' GROUP BY 1,2,3 ORDER BY hits DESC LIMIT 30"}'
   ```
   Anything new gets a `projectOverview.md` Known-Issues row or a backlog entry the same session — per **No orphaned findings**, a fault you saw and did not record is a dropped finding. *Something that stopped is not something that was fixed*: record it as unexplained rather than closed.
+- **Also at session start, read the database size** — one query, same endpoint, beside the `error_events` read:
+  ```
+  curl -sX POST https://trainingai-production.up.railway.app/api/admin/db-query \
+    -H "Authorization: Bearer $CLAUDE_DB_QUERY_SECRET" -H 'Content-Type: application/json' \
+    -d '{"sql":"SELECT relname, n_live_tup, pg_size_pretty(pg_total_relation_size(relid)) total, pg_size_pretty(pg_relation_size(relid)) heap, pg_size_pretty(pg_indexes_size(relid)) idx FROM pg_stat_user_tables ORDER BY pg_total_relation_size(relid) DESC LIMIT 10"}'
+  ```
+  **`pg_stat_user_tables` is NOT row-scoped** — unlike every `claude_ro` view it reports physical sizes and
+  lifetime counters for the whole database, so these numbers are complete rather than "the owner's, recently".
+  **Baseline: 171 MB total on 2026-08-18**, after the packing work took `oura_raw_samples` from 563 MB to
+  50 MB. Growth should now be ~0.4 MB/day. Anything materially above that trend gets a Known-Issues row the
+  same session.
+  **This check exists because nothing else will tell you.** Storage is billed on *use*, not provisioned size
+  (Railway: *"only charged for the amount of storage used"*), at **$0.15/GB/month** — so even the 805 MB peak
+  during the 2026-08-17 `disk_full` outage cost about **twelve cents a month**. **Cost will never warn you
+  about a storage problem here.** What used to warn was the 500 MB volume hitting `disk_full`; the volume is
+  now 5 GB and cannot be shrunk back (Railway does not support down-sizing), so that tripwire is gone and this
+  read replaces it. Read `total` **and** `idx` — the 2026-08-17 outage was 306 MB of *index and dead-tuple
+  bloat* from a non-HOT re-stamp, with the live row count going **down** and the payload unchanged, so a
+  size jump is at least as likely to be bloat as data.
   **What this query can and cannot tell you (2026-08-09 — this trap was walked into):** `claude_ro.error_events` is **row-scoped to one user**, like every `claude_ro` view. A read that returned **383 rows** was against a table holding **7,331**. So every count from this endpoint is *the owner's faults only*, on top of the 30-day prune — two separate floors stacked. Write findings as "nothing else **of the owner's**", never "nothing else is failing"; the second is a claim about other people's accounts that this endpoint structurally cannot support. When a count needs to be system-wide, `pg_stat_user_tables.n_live_tup` gives the real row total without exposing anyone's rows.
 - **Working in one area of the app? Read that pillar's index first — [`docs/domains/`](docs/domains/README.md).** The docs are otherwise organised by *document type* (plans, specs, reviews, journal entries, handoffs), so knowledge about one subject is spread across a dozen folders. `docs/domains/<pillar>/README.md` is the subject-based view: what the pillar owns, where its code lives, every reference doc about it, its open known issues, and the handoffs/reviews that already covered it. The eleven pillars are `sleep` · `readiness` · `heart-rate` · `cardio` · `activity` · `workouts` · `nutrition` · `body` · `devices` · `app-shell` · `platform`; [`docs/domains/README.md`](docs/domains/README.md) holds the boundary/routing rules for topics that could sit in two of them. Domain tags are **greppable on purpose**: every `projectOverview.md` Known-Issues heading carries them (`grep -n '^### .*\[sleep\]' projectOverview.md`) and every handoff filename carries one (`ls docs/handoff-*-sleep-*.md`). When you add a reference doc for a pillar, link it from that pillar's index in the same PR.
 - **Before building any new feature or shared helper, check [`docs/module-map.md`](docs/module-map.md) first.** It is the "what already exists and where" index of the app's modules and infrastructure — dates, cache, sync/outbox, repository, auth/security, domain formulas, AI, Oura, notifications, UI primitives, and (critically) how recurring/scheduled/background work is done (there is **no cron layer** — see §0 of that file). It exists to stop new work re-implementing infrastructure the app already has. When you add a genuinely new piece of shared infrastructure, add a one-line row to it in the same PR.
