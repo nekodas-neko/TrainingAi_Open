@@ -359,7 +359,12 @@ const BASELINE = {
   // object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
   // base collisions on THIS object, none on the content being changed, and filing the entry hit it a
   // fourth time. Recomputed from the MERGED file.
-  'docs/implementation-backlog.md': 7370,
+  // Raised 2026-08-18 (Tuning): -> 7366, recomputed from the MERGED file. Q-506 — the illness radar
+  // has never produced an action-bearing flag in 46 days because one of its four biomarkers is scored
+  // against a baseline whose deviation is 18.7x too large. The measured biomarker table and the
+  // cold-start numbers are the entry: without them the next reader lowers the threshold instead of
+  // fixing the baseline, which is the mistake Q-504 already made and reverted.
+  'docs/implementation-backlog.md': 7436,
   'CLAUDE.md': 1044,
 
 };
