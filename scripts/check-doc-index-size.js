@@ -152,6 +152,15 @@ const root = path.join(__dirname, '..');
 // ~12px higher than an unflagged one on a chart whose purpose is comparing days. The entry carries
 // the geometry, because that is the part an implementer would otherwise fix cosmetically and leave
 // broken. Rebuilt from origin/main's numbers rather than spliced.
+//
+// Raised 2026-08-18 (BugFix intake, Q-391): one owner-reported queue entry. The owner asked for a
+// calories-burnt stat on the day screen's Training card. The trace found the feature had already
+// been considered and deliberately deferred, with both the blocker (estWorkoutKcal from a client
+// component) and the intended shape (server-side in /api/day-log) already on record — so the entry
+// cites that rather than re-deriving it, and carries the two things that would otherwise be got
+// wrong: the existing workoutKcal is a DAY total already rendering in the same screen's Energy
+// section, and the estimate is duration-only, so sitting it beside measured volume implies a
+// derivation that does not exist.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -327,13 +336,19 @@ const BASELINE = {
   // the backlog, finding 4 is struck in place with the three consequences the entry did not
   // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
 
-  'projectOverview.md': 6871,
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file. Lane A's delta was +12,
   // splitting Q-315 into the half that shipped and the half that has not: the route exists and is
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
-  'docs/implementation-backlog.md': 7162,
+
+  'projectOverview.md': 6871,
+  //
+  // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
+  // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
+  // not: the route exists and is verified, and nobody has pressed it against production. Without
+  // that split the entry reads as done and the 49 MB never gets reclaimed.
+  'docs/implementation-backlog.md': 7219,
   'CLAUDE.md': 1044,
 
 };
