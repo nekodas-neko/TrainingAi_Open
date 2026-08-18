@@ -168,6 +168,12 @@ const root = path.join(__dirname, '..');
 // implementer would otherwise repeat. Also records that the pattern already exists (Q-241 made goals
 // server-authoritative and left hydrateGoalSeeds behind), and that users.food_region is a dead
 // column whose setting is device-only — the cheapest possible proof of the approach.
+//
+// Raised 2026-08-18 (BugFix intake, Q-393 + Q-394): the label ingredient-breakdown entry, plus the
+// broken-main entry marked resolved rather than deleted — Q-356's fixture fix cleared it, and the
+// sweep that entry called for is still open, which is the part worth keeping. Q-393 gained the two
+// answers checked against shipped code: the QR encoder is real (qrcode@1.5.4 at EC M) and save/share
+// already exists, so the only open question there is the physical print.
 const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
@@ -415,7 +421,7 @@ const BASELINE = {
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
   'projectOverview.md': 6910,
-  'docs/implementation-backlog.md': 7648,
+  'docs/implementation-backlog.md': 7775,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
