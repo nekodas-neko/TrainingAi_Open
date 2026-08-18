@@ -807,6 +807,22 @@ finding is **one lifter's 569 sets**. Only 8 of 117 AI insights were read closel
 requirements in Q-287/Q-288 are asserted from knowledge and should be re-checked against Google's
 current policy before building.
 
+### [sleep] ⚠️ Sleep Score recalibrated to use its range — the trend chart has an unmarked step (Q-503, v1.319.0, 2026-08-18)
+
+Sleep averaged **87.4 with 27 of 35 days ≥ 85** and no night between 40 and 69. Recalibrated
+(nine curves re-anchored + a `SCORE_CALIBRATION` on the blend): over the same 65 nights it now reads
+**mean 69.5, sd 16.6, range 32–99**, every band populated. Two real defects fixed — scoring your own
+HRV/HR baseline returned 90/86, and the REM ceiling sat below the owner's median. `LOW_SLEEP_SCORE`
+re-anchored 60 → 42 so the rest-day hint fires at its old rate (6%) rather than 26%. Evidence:
+[`docs/reviews/2026-08-18-sleep-score-range-recalibration.md`](docs/reviews/2026-08-18-sleep-score-range-recalibration.md).
+
+**Still owed, which is why this is ⚠️ and not ✅:** historical `oura_daily_derived.sleep_score` rows
+keep their old values until each day is re-read, so the trend chart shows a **step at the changeover
+with older days ~15 points higher for model reasons, not physiological ones** — and sleep stamps **no
+`model_version`** (Q-273), so nothing in the data marks where it is. Also **not device-verified**, and
+the calibration is fitted to one sleeper's distribution (a per-user rolling calibration is the real
+fix). **Readiness has the identical problem and is NOT yet fixed — Q-504.**
+
 ### [readiness][sleep][activity][body] 🔴 The five scoring pillars, measured together against production for the first time — 14 findings (Q-271…Q-284, 2026-08-15)
 
 Prior sweeps measured **one** pillar each, in isolation and months apart. The 2026-08-15

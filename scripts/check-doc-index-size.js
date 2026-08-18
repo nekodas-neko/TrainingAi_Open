@@ -162,8 +162,16 @@ const BASELINE = {
   // Both numbers are RECOMPUTED FROM THE MERGED FILES, not spliced: this raise collided with the
   // Q-389 backlog raise directly above, which is the same-day collision this file keeps warning
   // about. Splicing would have kept 6682 and silently un-done Q-389's raise.
-  'projectOverview.md': 6689,
-  'docs/implementation-backlog.md': 6781,
+  // Raised 2026-08-18 (Tuning, Q-503): 6689 -> 6705. One Known-Issues row for the shipped Sleep
+  // Score recalibration — marked ⚠️ rather than ✅ because two things are still owed (an unmarked
+  // step in the trend chart, and no device verification), and naming what is owed is the whole job
+  // of that section.
+  'projectOverview.md': 6705,
+  // Raised 2026-08-18 (Tuning, Q-504): 6781 -> 6813. One queue entry for the Readiness range
+  // recalibration. It is longer than a pointer because it carries the measured before/after table for
+  // the five action thresholds that ride on the readiness scale — the reason the item is held rather
+  // than shipped, and the thing an implementer must not have to rediscover.
+  'docs/implementation-backlog.md': 6813,
   'CLAUDE.md': 1010,
 
 };

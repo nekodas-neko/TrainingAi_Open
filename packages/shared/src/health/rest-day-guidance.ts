@@ -15,7 +15,18 @@ export interface RestDayGuidance {
   lowConfidence: boolean
 }
 
-const LOW_SLEEP_SCORE = 60
+// Re-anchored 60 -> 42 on 2026-08-17, alongside the Sleep Score recalibration in
+// `sleep-score.ts` (SCORE_CALIBRATION). This threshold is NOT an independent judgement about what
+// counts as a poor night — it was tuned against the old, compressed score, where it fired on
+// 4 of the owner's 65 nights (6%). Recalibration widened the scale without changing how often the
+// owner actually sleeps badly, so leaving it at 60 would have fired on 17 of 65 (26%) and made the
+// guidance nag about sleep three times as often for no physiological reason. 42 restores 5/65 (8%).
+//
+// The rule this encodes, for the next person who moves a score's range: a threshold written on the
+// display scale is calibrated to that scale's distribution. Re-anchor every one of them in the same
+// PR as the recalibration, preserving the firing RATE, or the range change silently ships a
+// behaviour change nobody asked for.
+const LOW_SLEEP_SCORE = 42
 const MANY_CONSECUTIVE_REST_DAYS = 3
 
 export function restDayGuidance({
