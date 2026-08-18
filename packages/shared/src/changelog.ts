@@ -6,6 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.324.5",
+    date: "2026-08-18",
+    changes: [
+      "The nutrition screens now follow your chosen accent colour. Selected chips, checkboxes, the meal plan card and the delete warnings were all painted a fixed green or red, so changing your accent left them behind \u2014 and in light mode they stayed at a shade the rest of the app deliberately darkens for readability.",
+    ],
+  },
+  {
+    version: "1.324.4",
+    date: "2026-08-18",
+    changes: [
+      "Finishing one workout no longer counts as several. If the Finish button was tapped rapidly, or an offline completion was re-sent, the programme\u2019s progress counter could jump by two or three off a single session \u2014 which pushed you into the next training phase, and into a deload, earlier than you had actually earned. The workout record itself was always correct; only the counter was wrong. It now advances exactly once no matter how many times the completion arrives.",
+    ],
+  },
+  {
     version: "1.324.3",
     date: "2026-08-18",
     changes: [

@@ -1,8 +1,8 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useState, type CSSProperties } from 'react'
 import { ChevronDown, UtensilsCrossed, Check, Loader2, Plus, X, Undo2 } from 'lucide-react'
-import { cn, accentCardStyle } from '@trainingai/shared/utils'
+import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { MealPlan, MealPlanVariant, MealPlanMeal, MealPlanDayType } from '@trainingai/shared/types/nutrition'
 
@@ -27,7 +27,27 @@ interface Props {
   onSetDeclined?: (meal: MealPlanMeal, declined: boolean) => void
 }
 
-const BRAND = '#22c55e'
+/**
+ * The plan card's accent, from the live `--color-brand` rather than a literal (Q-395).
+ *
+ * `--brand` is user-selectable at runtime (`theme-color-picker.tsx`) and light mode deliberately
+ * darkens it for text readability, so a hardcoded green opted out of both: pick a blue accent and
+ * this card stayed green.
+ *
+ * The card style is built here rather than through `accentCardStyle()` because that helper needs
+ * real colour channels for its gradient and returns an accent-less card for anything that is not a
+ * hex — so handing it a `var()` would have silently dropped the tint. This mirrors its output with
+ * `color-mix`, including the `willChange` that keeps each card on its own compositor layer (the
+ * Samsung WebView bug where an SVG in one card wipes a sibling's gradient).
+ */
+const BRAND = 'var(--color-brand)'
+const brandTint = (pct: number) => `color-mix(in oklch, var(--color-brand) ${pct}%, transparent)`
+const brandCardStyle: CSSProperties = {
+  backgroundColor: 'color-mix(in oklch, var(--muted) var(--card-tint-pct, 60%), transparent)',
+  backgroundImage: `linear-gradient(135deg, ${brandTint(30)}, ${brandTint(12)})`,
+  border: `1px solid ${brandTint(40)}`,
+  willChange: 'transform',
+}
 
 /**
  * The active meal plan, as a collapsed card on the Nutrition tab.
@@ -68,7 +88,7 @@ export const MealPlanSection = memo(function MealPlanSection({
     : variant.dayType === 'training' ? 'Training day' : 'Rest day'
 
   return (
-    <div className="rounded-2xl p-4" style={accentCardStyle(BRAND)}>
+    <div className="rounded-2xl p-4" style={brandCardStyle}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-[10px] font-semibold uppercase tracking-widest" style={{ color: BRAND }}>
@@ -79,7 +99,7 @@ export const MealPlanSection = memo(function MealPlanSection({
         {dayLabel && (
           <span
             className="flex-none text-[9px] font-semibold uppercase tracking-wide px-2 py-1 rounded-full"
-            style={{ backgroundColor: `${BRAND}22`, color: BRAND }}
+            style={{ backgroundColor: brandTint(13), color: BRAND }}
           >
             {dayLabel}
           </span>

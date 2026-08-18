@@ -203,7 +203,7 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved }: Props) {
           {STEPS.map((_, i) => (
             <span
               key={i}
-              className={cn('h-0.5 flex-1 rounded-full', i <= step ? 'bg-[#22c55e]' : 'bg-muted')}
+              className={cn('h-0.5 flex-1 rounded-full', i <= step ? 'bg-brand' : 'bg-muted')}
             />
           ))}
         </div>
@@ -430,7 +430,7 @@ function ChipGroup({ heading, hint, options, selected, onToggle }: {
               className={cn(
                 'min-h-[36px] rounded-full border px-3 text-xs font-medium transition-colors',
                 on
-                  ? 'border-[#22c55e]/50 bg-[#22c55e]/15 text-[#22c55e]'
+                  ? 'border-brand/50 bg-brand/15 text-brand'
                   : 'border-border bg-muted/50 active:bg-muted/30',
               )}
             >
