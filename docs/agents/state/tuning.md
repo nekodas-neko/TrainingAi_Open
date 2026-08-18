@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/model-version-clobber` · **Q band:** 500–529 (next free: 519)
+**Updated:** 2026-08-18 · **By:** `tuning/manual-bedtime-entry` · **Q band:** 500–529 (next free: 521)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -83,6 +83,12 @@ Since then, working only scores no other lane holds:
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
 
+## Owner reports handled
+- **2026-08-19 — ring not worn until 4 am.** Filed **Q-519** (manual bedtime entry, writes exactly one
+  column) and **Q-520** (partial-night flag, sequenced second and deliberately manual). The owner
+  proposed manual bedtime and it is smaller and better-targeted than the flag I had suggested.
+  [`review`](../../reviews/2026-08-19-partial-night-manual-bedtime.md).
+
 ## Pillar coverage — this is the real scoreboard, not "every score has a review"
 The owner asked on 2026-08-18 whether **all pillars** had been tuned against historical data. The
 answer was **no**, and the previous baton wrongly said the lane was drained. It was drained of
@@ -158,6 +164,12 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **`sleep_sessions` duration/efficiency are STORED columns, not derived from `sleep_end − sleep_start`**
+  — and Q-519's whole design depends on that staying true. Writing only `sleep_start` at source
+  `manual` (rank 5) fixes a wrong bedtime while leaving the ring's duration/HRV/HR at `oura_ble`
+  (rank 3), because the health-source merge is **per field, not per row**. **If anything ever
+  recomputes duration or efficiency from the span, that design silently yields a 9-hour night at 34%
+  efficiency.**
 - **A single positive reading of a shared mutable field proves the WRITER, not the invariant** (Q-518).
   I verified the `model_versions` merge by observing one readiness write and published that it "held in
   production"; **5h40m later a sibling writer had erased the key**. `COALESCE(excluded, existing)` on a

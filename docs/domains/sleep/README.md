@@ -63,6 +63,8 @@ canonical-display-source table in the same section).
   sleep back toward its old mean.
 ## Open issues
 
+- [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](../../reviews/2026-08-19-partial-night-manual-bedtime.md) — **an owner report: the ring was not worn until 4 am, 2026-08-19** (Q-519/Q-520 — the night holds *wrong* duration data and *right* physiology, so neither deleting it nor keeping it as-is is correct. A 4:23 start drags the 14-day bedtime estimate **~23 minutes later**. Fix: manual bedtime writing **only `sleep_start`** at source `manual`, which the **per-field** health-source merge leaves the ring's duration/HRV/HR untouched by — safe *only* because `duration_hours`/`efficiency` are stored columns, not derived from the span).
+
 ```bash
 grep -n '^### .*\[sleep\]' projectOverview.md      # 13 entries today
 grep -n '\[sleep\]' docs/implementation-backlog.md # 3 queue items today
