@@ -17,6 +17,15 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
+//
+// Raised 2026-08-18 (Review, write-concurrency sweep, Q-473/Q-474): backlog 8634 -> 8722,
+// projectOverview 6991 -> 7028. Two queue entries and the one Known-Issues row indexing them —
+// entries, per the same split as every raise above. Q-473's entry carries its four-trial
+// measurement table inline because the run is not cheaply repeatable (each trial needs a fresh
+// workout row and a 65-second wait for the rate-limit window), and an implementer fixing a race
+// needs the reproduction rate, not a claim. The sweep's prose is in
+// docs/reviews/2026-08-18-write-concurrency.md, which this ratchet does not govern.
+
 
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
 //
@@ -435,7 +444,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6991,
+  'projectOverview.md': 7028,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -476,11 +485,11 @@ const BASELINE = {
   // Raised 2026-08-18 (Tuning): -> 8592. Q-515 — first calibration of the heart-rate pillar. The tables
   // are the entry: the July/August collapse and the fraction sweep together show that tuning the
   // constant cannot fix it, which is the opposite of what the entry title suggests on its own.
-  // Raised 2026-08-18 (Tuning): -> 8687. Q-517 — adaptive-TDEE can hand the user a maintenance below
-  // their own BMR. The replay table is the entry: 75% of windows are correctly refused, which is why
-  // the obvious response (tighten the coverage gates) is wrong, and the 1,052-vs-1,000 near-miss is
-  // only legible with the numbers beside it.
-  'docs/implementation-backlog.md': 8687,
+  // Raised 2026-08-18 (Tuning): -> 8775, recomputed from the MERGED file. Q-517 — adaptive-TDEE can hand
+  // the user a maintenance below their own BMR. The replay table is the entry: 75% of windows are
+  // correctly refused, which is why the obvious response (tighten the coverage gates) is wrong, and
+  // the 1,052-vs-1,000 near-miss is only legible with the numbers beside it.
+  'docs/implementation-backlog.md': 8775,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
