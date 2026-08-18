@@ -18,6 +18,14 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, unvalidated-create-bodies sweep, Q-484): backlog 9214 -> 9264,
+// projectOverview 7277 -> 7309. One queue entry and its row. Both carry two caveats inline that are
+// the reason the entry is safe to act on: the 10 MB figure is NOT a storage number (TOAST compressed
+// a single repeated character to ~120 kB, real text would not), and the 33 no-schema routes are a
+// CANDIDATE count, not a defect count — 31 are unaudited and are neither broken nor fine. An entry
+// that dropped either caveat would get implemented against numbers that do not mean what they say.
+
+//
 // Raised 2026-08-18 (Review, malformed-route-id sweep, Q-482/Q-483): backlog 9049 -> 9138,
 // projectOverview 7243 -> 7277. Two queue entries and the row indexing them. Q-482 carries its
 // 14-route table inline because the finding IS the list — an implementer needs to know which routes
@@ -594,7 +602,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7277,
+  'projectOverview.md': 7309,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -605,7 +613,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9214,
+  'docs/implementation-backlog.md': 9264,
   'CLAUDE.md': 1075,
 
 };

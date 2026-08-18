@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** sixteen sweeps (2026-08-17 ×2, 2026-08-18 ×14) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **484**)
+**Updated:** 2026-08-18 · **By:** seventeen sweeps (2026-08-17 ×2, 2026-08-18 ×15) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **485**)
 
 ## Now
 
-Sixteen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Seventeen sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,30 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network), and the secret-gated `health-connect/ingest` validation.
+
+### Sweep 17 — the create routes nobody gave a schema (2026-08-18)
+
+**Filed Q-484 (mid-low).** `CLAUDE.md` says oversized input is *"a rejection, not a skip"*; nothing
+had tested it. Write-up:
+[`docs/reviews/2026-08-18-unvalidated-create-bodies.md`](../../reviews/2026-08-18-unvalidated-create-bodies.md).
+
+`POST /api/injuries` accepted a **10 MB** `notes` and stored all 10,000,000 characters (201). A 700 kB
+body across `muscleName`+`notes` likewise; `POST /api/supplements` the same. **The asymmetry is the
+finding:** `PATCH /api/injuries/[id]` runs `InjuryPatchSchema` (`max(100)`, `max(1000)`, a date regex)
+— the very schema `CLAUDE.md` cites as **the reference** for whitelisting — while the POST beside it
+destructures a raw body. The unvalidated `startedDate` also 500s, the Q-482 class with the same root.
+
+**Two caveats that are the reason the entry is safe to act on, both carried inline:**
+1. **10 MB is NOT a storage number.** `pg_column_size` read ~120 kB — TOAST compresses a single
+   repeated character almost perfectly. Real text would not. Defensible claims: transfer/parse cost is
+   unbounded; stored size depends on compressibility.
+2. **33 no-schema routes is a CANDIDATE count, not a defect count.** Several do hand-rolled checks,
+   several are admin-gated; only **2** were probed. Do not treat the other 31 as broken *or* as fine.
+
+**Nearly reported a meaningless ratio.** 163 `z.string()` declarations vs 31 with `.max()` under
+`app/api` — but most unbounded ones are **AI output schemas** (`generateObject` response shapes), not
+request bodies. Separate the two before quoting any such count. Same family as the sweep-15
+`JSON.stringify` mistake: a number that looks like a measurement and is not.
 
 ### Sweep 16 — an id that is not a UUID (2026-08-18)
 
