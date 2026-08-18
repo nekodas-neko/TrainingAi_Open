@@ -18,6 +18,12 @@ const path = require('path');
 
 const root = path.join(__dirname, '..');
 //
+// Raised 2026-08-18 (Review, admin range-loop termination, Q-497): backlog 9652 -> 9690,
+// projectOverview 7693 -> 7722. One queue entry and its row. The entry keeps the measured loop
+// trace (iter 32 = 10000-01-01, still looping at 5000) because the defect is invisible from the
+// source -- every guard on the route reads correct, and only the trace shows the exit condition
+// inverting. It also names the second site, which writes.
+//
 // Raised 2026-08-18 (Review, health-connect ingest, Q-493..Q-496): backlog 9557 -> 9652,
 // projectOverview 7655 -> 7693. Four queue entries and one row, for four findings on one route.
 // The rows carry the measured before/after pairs (81 kg -> 499 kg; 1 limiter key at 20 vs 30 at 1)
@@ -703,7 +709,7 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 7693,
+  'projectOverview.md': 7722,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -714,7 +720,7 @@ const BASELINE = {
   // the centred stack cannot carry the full list AND a better code than the old default, so the
   // promise has to give somewhere. Q-400 is the share button being a silent no-op on the APK —
   // both its paths only work on web, which is the green-on-web dead-on-device class.
-  'docs/implementation-backlog.md': 9652,
+  'docs/implementation-backlog.md': 9690,
   'CLAUDE.md': 1075,
 
 };

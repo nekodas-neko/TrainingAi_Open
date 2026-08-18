@@ -848,6 +848,44 @@ below threshold and left in place for next time.
   that fit in ~900 characters without a nested `<`, so a memoised component invoked with deeply nested
   children in its props could be missed; the 66 declarations are exhaustive.
 
+### [platform] Q-497 — a 31-day range that passes every guard makes two admin routes loop forever
+
+- **Branch:** `fix/shift-date-str-year-padding`
+- **Added:** 2026-08-18 · review sweep (admin date-range routes) ·
+  [`docs/reviews/2026-08-18-admin-range-loop-termination.md`](reviews/2026-08-18-admin-range-loop-termination.md)
+- **Placement:** medium. **Admin-only** — a session cookie or the `ADMIN_EXPORT_SECRET` bearer — so
+  not an unauthenticated vector. Weigh it as *"one mistyped year takes the app down"*, not an attack.
+- **The defect.** `for (let d = start; d <= end; d = shiftDateStr(d, 1))` compares **strings**.
+  `shiftDateStr` builds its year from `getUTCFullYear()` with **no width padding** (month and day both
+  get `padStart(2,'0')`; the year is the one field without it), so one day after `9999-12-31` is
+  `10000-01-01` — and `'10000-01-01' <= '9999-12-31'` is **true**, because `'1' < '9'`.
+- **Every guard passes on the way in** for `from=9999-12-01&to=9999-12-31`: `normalizeDateParamIso`
+  accepts both, `end < start` is false, and the span is **31 — exactly `MAX_RANGE_DAYS`**.
+- **Measured**, replicating the loop verbatim:
+  ```
+  iter 31 d = 9999-12-31
+  iter 32 d = 10000-01-01     <-- should have exited here
+  ...still looping at iteration 5000 d = 10013-08-08
+  CONTROL (2026-08-01..31): 31 iterations — terminates correctly
+  ```
+  It exits only once the year reaches five digits starting with `9` — ~80,000 years, ~29M iterations.
+  Each is a `buildDayAudit`, which the route's own comment puts at **~12 queries**, against a
+  `max: 10` pool.
+- **The irony is the comment directly above the loop:** it explains the days run sequentially rather
+  than concurrently because fanning out *"would starve the rest of the app (the failure mode that took
+  production down in session 165)"*. The sequential loop avoids that — and then never stops.
+- **Two sites, and the second one writes.** Three loops use `shiftDateStr` as the increment:
+  `admin/day-review:118` ❌ (read-only), `admin/backfill-derived-scores:80` ❌ (**identical guards,
+  identical loop, and `dryRun=false` commits** — an unbounded write, not just a hang),
+  `lib/health/energy-balance-service.ts:152` ✅ safe (start is derived by shifting *back* from the
+  user's today, so it cannot reach the boundary).
+- **Fix — not a year bound, that treats the symptom.** Pad the year in `shiftDateStr`
+  (`padStart(4,'0')`), the single place that produces the malformed value: it fixes both call sites at
+  once and is the one-formula-one-place answer. Cheap belt-and-braces: an iteration cap of
+  `MAX_RANGE_DAYS` in both loops, so a future ordering bug degrades to a truncated response, not a hang.
+- **Not exercised:** the loop was reproduced verbatim in isolation rather than by hitting the route —
+  deliberately, since driving it against a running server *is* the hang and the point was proven.
+
 ### [devices][platform] Q-493 — the ingest brute-force gate is bypassed by rotating one request header (7 sites)
 
 - **Branch:** `security/client-ip-from-trusted-hop`

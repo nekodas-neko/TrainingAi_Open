@@ -3,11 +3,11 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty sweeps (2026-08-17 ×2, 2026-08-18 ×28) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **497** — ⚠️ only 3 left in band)
+**Updated:** 2026-08-18 · **By:** thirty-one sweeps (2026-08-17 ×2, 2026-08-18 ×29) — **all eleven pillars covered** · **Q band:** 450–499 (next free: **498** — ⚠️ **2 left. When it runs out, claim 530–579** and record it in the table in `docs/agents/README.md` §Q-numbers, per its own instruction: "claim the next block of 50 above 529". Tuning holds 500–529.)
 
 ## Now
 
-Thirty sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
+Thirty-one sweeps have run under this role. **Every one of the eleven pillars has now been reviewed at
 least once**, at the owner's request to work through the sections:
 
 | Pillar | Lens applied | Findings |
@@ -23,6 +23,38 @@ least once**, at the owner's request to work through the sections:
 left the web build — every offline-first domain took its web fallback), **production data** (now used — sweeps 7 and 8; the
 remaining gap is a *second account*, since `claude_ro` sees only the owner), the **offline and error paths** (everything ran
 against a healthy server on a live network). **`health-connect/ingest` is now closed — sweep 30 drove it.**
+
+### Sweep 31 — the admin date-range routes; a loop that does not terminate (2026-08-18)
+
+**Filed Q-497 (medium).** Write-up:
+[`docs/reviews/2026-08-18-admin-range-loop-termination.md`](../../reviews/2026-08-18-admin-range-loop-termination.md).
+
+**Acted on sweep 30's lesson in the same session rather than filing it as a suggestion.** Sweep 30
+found that "needs configuration" had kept a surface untested for 29 sweeps and was never a real
+barrier; `admin/day-review` is the *other* secret-gated route, so it went next. **That is the pattern
+to repeat: when a sweep produces a lesson about method, spend the next sweep on it immediately —
+a suggestion in a baton is worth much less than a sweep already done.**
+
+**All three of `CLAUDE.md`'s claims about the route hold** (GET-only, fail-closed on either unset var,
+`requireAdmin` on the token path). Recorded as verified rather than passed over in silence — a lens
+that confirms is still a lens, and the next agent should not re-check them.
+
+**Q-497 — and it is in the one part that looked most careful.** The day loop compares **strings**, and
+`shiftDateStr` pads month and day but **not the year**, so one day after `9999-12-31` is
+`10000-01-01` and `'10000-01-01' <= '9999-12-31'` is *true*. `from=9999-12-01&to=9999-12-31` clears
+`normalizeDateParamIso`, clears `end < start`, and spans **exactly 31 = `MAX_RANGE_DAYS`**. Still
+looping at iteration 5000 (year 10013); control terminates at 31. **The comment directly above the
+loop** explains the sequential design exists to avoid session-165 pool starvation — it avoids that and
+then never stops. **`backfill-derived-scores` has the identical loop and `dryRun=false` commits**, so
+there it is an unbounded *write*.
+
+**Method note — the guard that fires is where to look next, not the guard that is missing.** Every
+individual guard on this route is correct. The defect is in the *relationship* between two of them:
+`MAX_RANGE_DAYS` bounds the span, but the loop's exit does not use the span, it re-derives the
+boundary by string comparison. Two correct checks, one unchecked assumption between them.
+
+**Side result: Q-496 is corroborated one directory away.** The same three malformed dates return
+**400** here (via `normalizeDateParamIso`) and **500** on `health-connect/ingest` (raw regex).
 
 ### Sweep 30 — the secret-gated ingest route, driven for real (2026-08-18)
 

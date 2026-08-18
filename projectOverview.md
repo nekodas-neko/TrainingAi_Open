@@ -69,6 +69,35 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟡 A 31-day range that passes every guard makes two admin routes loop forever (Q-497, 2026-08-18)
+
+- **Applied sweep 30's lesson to the *other* secret-gated route.** `admin/day-review` is gated by
+  `ADMIN_EXPORT_SECRET`; sweep 30 had just shown that "needs configuration" was never a real barrier.
+  [`docs/reviews/2026-08-18-admin-range-loop-termination.md`](docs/reviews/2026-08-18-admin-range-loop-termination.md).
+- **All three of `CLAUDE.md`'s claims about the route hold** — GET-only, fail-closed on either unset
+  var, and `requireAdmin` on the token path so the token widens *transport* not authority. Checked,
+  not assumed.
+- **🟡 Q-497 — the day loop compares strings, and `shiftDateStr` does not pad the year.** One day after
+  `9999-12-31` is `10000-01-01`, and `'10000-01-01' <= '9999-12-31'` is **true** (`'1' < '9'`).
+  `from=9999-12-01&to=9999-12-31` passes `normalizeDateParamIso`, passes `end < start`, and spans
+  **exactly 31 = `MAX_RANGE_DAYS`** — then runs forever. Measured: still looping at iteration 5000, at
+  year 10013; the control range terminates at 31. Each iteration is a `buildDayAudit` (~12 queries)
+  against a `max: 10` pool.
+- **The comment directly above the loop** explains the days run sequentially rather than concurrently
+  because fanning out *"would starve the rest of the app (the failure mode that took production down
+  in session 165)"*. The sequential loop avoids that — and then never stops.
+- **Two sites; the second writes.** `admin/backfill-derived-scores:80` has the identical loop and
+  identical guards, and `dryRun=false` commits — unbounded writes, not just a hang.
+  `energy-balance-service.ts:152` is safe (start derived by shifting back from today).
+- **Severity: medium — admin-only.** Weigh it as *"one mistyped year takes the app down"*, not an
+  attack. **Fix:** pad the year in `shiftDateStr`, the single place producing the malformed value.
+- **Also corroborates Q-496 directly:** `2026-13-45` / `2026-02-31` / `0000-00-00` return **400** here
+  via `normalizeDateParamIso` and **500** on `health-connect/ingest` via its raw regex. Same inputs,
+  opposite outcomes, one directory apart — the correct behaviour is already demonstrated next door.
+- **Not exercised:** the loop was reproduced verbatim in isolation, not by hitting the route — driving
+  it against a running server *is* the hang. No device, no production.
+
+
 ### [devices][platform][body] 🔴 The Health Connect ingest route, driven for real — the brute-force gate is bypassable and a far-future date poisons "latest" permanently (Q-493…Q-496, 2026-08-18)
 
 - **The only unauthenticated write into `body_metrics`, exercised for the first time.** It has sat on
