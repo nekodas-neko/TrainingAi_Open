@@ -3,11 +3,18 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/ble-era-input-drift` · **Q band:** 500–529 (next free: 511)
+**Updated:** 2026-08-18 · **By:** `tuning/battery-anchor-discontinuity` · **Q band:** 500–529 (next free: 512)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Sleep-scale consumer audit — CLEAN, plus one side effect worth protecting** (Q-511). Exactly
+  **one** comparison threshold exists on the sleep scale codebase-wide (`LOW_SLEEP_SCORE`) and it was
+  re-anchored in the recalibration PR, so nothing was missed. The audit did find that Body Battery's
+  anchor takes the sleep score **raw**, and its sleep→readiness flip was worth **−17.7 points** (sd
+  10.2, worst −51) — the owner's 2026-08-02 "the number visibly jumped" report, quantified. The
+  recalibration cut ~82% of that systematic offset as a **side effect**.
+  [`review`](../../reviews/2026-08-18-battery-anchor-discontinuity.md).
 - **BLE-era input drift — MEASURED, propose-only** (Q-509, Q-510). The Recovery Index refit on 42
   BLE nights lands at **3.31 h** against the shipped anchor of 5 — and **the anchor must not move**:
   the refit anchor and the input distribution shrank by the *same* factor (0.715× vs 0.72–0.74×), which
@@ -118,6 +125,13 @@ for this work:
   ranking disagrees with its most variable input (828 steps scored 76; 8,935 scored 64; r = +0.42).
   A score that compresses a correct ranking can be stretched; one whose ranking is wrong cannot.
   Fix the weights first, measure, and only then consider a calibration.
+- **⚠️ DO NOT lift the sleep scale back toward its old mean.** It will look tempting — the new
+  distribution reads harsh. But the sleep and readiness scales being within a few points of each other
+  is now **load-bearing for Body Battery**: its anchor takes the sleep score raw, and the
+  sleep→readiness flip was worth −17.7 points before the recalibration and ~−3 after (Q-511). Lifting
+  sleep re-opens an owner-reported bug in a different pillar. Also: the scores agreeing *on average* is
+  not the same as agreeing, so **the anchor's freeze-once rule stays load-bearing** (per-day sd is
+  still 10.2).
 - **When a refit's anchor moves by the same factor its input moved, the input is what changed.** That
   is the Q-509 test, and it is reusable for any anchored contributor: a real physiological shift moves
   the data while leaving the correct anchor put. Do not ship a constant that is silently absorbing a

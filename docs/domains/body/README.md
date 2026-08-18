@@ -34,6 +34,8 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (Q-464 — `POST /api/body-metadata` writes to today when handed a key outside its contract, because the schema is not `.strict()`). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
+- [`docs/reviews/2026-08-18-battery-anchor-discontinuity.md`](../../reviews/2026-08-18-battery-anchor-discontinuity.md) — **the Body Battery anchor flip measured, and a constraint to protect, 2026-08-18** (Q-511 — the anchor takes the sleep score **raw**, and its sleep→readiness upgrade was worth **−17.7 points** on average, sd 10.2, worst −51: the owner's 2026-08-02 "the number visibly jumped" report, quantified. The sleep recalibration cut ~82% of that systematic offset as a side effect, so **the sleep and readiness scales being comparable is now load-bearing here** — lifting sleep back toward its old mean re-opens the bug. The per-day sd of 10.2 remains, so the freeze-once rule stays load-bearing too. Flip *frequency* is unobservable: `body_battery_daily` has never persisted `anchor_source = 'sleep'`).
+
 ## Open issues
 
 ```bash
