@@ -39,7 +39,15 @@ Three consequences, and none of them is optional:
   the *decode* branch (§4), which can distinguish a 22-char base64url token from an EAN by shape.
 - **The test-print gate the entry asks for is now a hard gate, not a nicety.** Print at the chosen
   size, scan with the S25, and do it before any layout is frozen. If it fails, the entry's own lever
-  list applies (drop the MADE line ≈ 3.7 mm, then macros).
+  list applies (drop the write-on rule ≈ 3.7 mm, then macros).
+
+**Updated 2026-08-18 — the mockups were redrawn at 25×25 and the pitch is now measured per style,
+which supersedes the range above.** Same physical squares, four more modules across: **band
+0.487 mm** (the owner's default, and the tightest), editorial 0.529, ticket 0.550, plaque 0.635.
+**The code cannot simply be grown** — the content already fills the circle-safe box, so it only grows
+if something goes; variant **2b** (black band, write-on rule dropped) is drawn as that fallback at
+16.4 mm / 0.656 mm per module. **Test-print black band first**: it is both the default and the
+smallest, so if it scans the rest do.
 
 *Method note: these capacities are the QR spec's byte-mode tables, cross-checked by deriving them
 from codeword counts (v1: 26 total − 7 EC = 19 data = 152 bits; 152 − 4 mode − 8 length = 140 → 17
@@ -197,9 +205,14 @@ another reason to compute the figures in a pure shared function and pass them in
 ## 7. What only the owner can do
 
 - **The print test.** Print at 50 mm, on the actual printer, on both die shapes, and scan with the
-  S25. §1.1 says the margin is thinner than the entry assumed; this is the gate.
-- **Pick the aesthetic.** Four mockups exist in a design canvas outside this repo; none is chosen.
-  Ask for the link, or redraw from the spec in Q-389, which carries what they encode.
+  S25. §1.1 says the margin is thinner than the entry assumed; this is the gate. **Print black band
+  first** — it is both the default and the tightest at 0.487 mm per module, so if it scans the other
+  three do, and if it does not, variant 2b is the drawn fallback.
+- ~~Pick the aesthetic.~~ **Done 2026-08-17/18, in parallel with this plan:** four cycleable styles
+  with **black band as the default**, redrawn at the correct 25×25 code. The mockups are in a design
+  canvas outside this repo — ask the owner for the link, or redraw from Q-389. **Consequence for §5
+  step 3:** the renderer is a *set of four*, not one, so every face they use must be embedded (§2),
+  and dropping a face is not free — it changes what the band and plaque styles are.
 - **The staleness decision** (§4.3) if show-current turns out not to be enough in use.
 
 **One item is Lane A's, and only if it is wanted:** nothing here needs a schema change —

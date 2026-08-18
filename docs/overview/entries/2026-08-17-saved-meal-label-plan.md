@@ -59,6 +59,11 @@ preview/delivery → scan branch → print test).
 
 **No aesthetic was chosen.** Four mockups exist in a design canvas outside this repo and none is
 picked. The plan does not invent one.
+**Addendum 2026-08-18 — chosen in parallel, and the plan is updated rather than this entry:** a
+concurrent session settled it as four cycleable styles with **black band the default**, and redrew
+the mockups at the 25×25 code this session's finding 1 forced. So the renderer is a *set of four*,
+not one, and every face they use has to be embedded. The plan's §7 carries it; this paragraph stays
+as written because it was true of the plan when it landed.
 
 **The staleness question (entry decision 3) is answered provisionally, not settled.** The plan says
 build show-current rather than versioning, on the ground that versioning costs payload bytes finding
