@@ -2685,47 +2685,30 @@ session working from a temporarily restored copy.
   snapshots are **partial days** (two of 14 carry under 3% of their available samples), and since rest
   is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
 
-### [readiness] ⛔ Q-500 — re-anchor the Recovery Index curve, `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5
+### [readiness] ✅ Q-500 — SHIPPED v1.320.0: Recovery Index anchor 6 h → 5 h
 
-- **Branch:** `fix/recovery-index-anchor`
-- **⛔ blocked: owner sign-off.** This changes a scoring constant and re-scores 40 days of readiness
-  history. Do not implement until the owner agrees.
-- **Added:** 2026-08-17 · Tuning agent · evidence:
-  [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md)
-- **Supersedes Q-271**, which this measurement found substantially wrong (see below).
-- **The change:** one constant in `packages/shared/src/health/readiness-composite.ts` —
-  `RECOVERY_INDEX_OPTIMAL_HOURS = 5` (was 6). **The estimator, smoothing window and 9% weight all
-  stay as they are.**
-- **Why 5.** Fitted against Oura's own `recovery_index` contributor over the 15 nights that carry both
-  it and an overnight HR series (2026-06-23 → 07-07), the zero-bias anchor is **4.63 h** (LOO
-  4.40–5.14) and RMSE is flat 4.5–5.25. **5** sits on that floor and keeps a small negative bias, so
-  it still errs toward under-scoring.
-- **Blast radius, all 41 days with stored hours:** 40 of 41 move (the other clamps at 100). Readiness
-  **mean +0.67 pts, max +1.44, none lower**. Days above 50 go 13 → 20; cost against neutral 50 falls
-  0.55 → −0.12 pts/day.
-- **What actually changes (§5.2 — this is the part to decide on).** Isolating the anchor from the
-  Q-501 drift and testing all six numeric decision points readiness feeds: **4 of 26 reconstructable
-  days cross a threshold** — 2026-07-28/29/31 go 74 → 75, tipping rest-day guidance to "train hard",
-  and 2026-08-16 goes 69 → 70, Moderate → **High**. **No day crosses the early-deload line (45), the
-  Low/Moderate line (50), or the AI `lowReadiness` line (60).** The displayed score moves on 18 of 26
-  days, always by exactly +1. That is the entire behavioural surface of the change.
-- **What Q-271 got wrong** (it measured 8 days and generalised): "never above 50, ever" — the
-  contributor exceeds 50 on **12 of 41** days and hits **100 on 2026-07-17**; "~2.2 pts/day" — it is
-  **0.71**. Its eight quoted values are exactly 2026-08-08 → 08-15. **The estimator is sound** —
-  r = +0.712 vs Oura's, beating every stabilisation-style alternative tested (+0.636 best). That
-  hypothesis was tested and failed; do not change the estimator.
-- **Sequencing:** land **Q-273** (model versioning) first or stamp a readiness version in the same PR,
-  else 40 days of history become incomparable with no marker — the Q-501 problem. Also fix the stale
-  `lib/health/recovery-index.ts` paths (here + `adapter.ts:5518`); it lives in `packages/shared/src/health/`.
-- **Follow-up:** re-derive the anchor on ~15 BLE-era nights. The fit is Cloud-era, and BLE overnight HR
-  is ~2× noisier at the same density. If the BLE-only anchor lands well below 5, the input changed and
-  that is a `devices` finding.
-
-### [activity] ⛔ Q-505 — Activity Score: redesign as a daily effort meter with a target (2 owner decisions open)
+- **Shipped 2026-08-18** after the owner approved it (*"we will go with whatever your recommendation
+  is"*). One constant in `packages/shared/src/health/readiness-composite.ts`.
+  Evidence: [`docs/reviews/2026-08-17-readiness-calibration.md`](reviews/2026-08-17-readiness-calibration.md).
+- Fitted against Oura's own `recovery_index` contributor over the 15 pre-re-key nights where both
+  exist — the only external ground truth this app has. Our estimator tracks theirs at **r = +0.712**
+  (beating every alternative tested — do **not** change the argmin) but carried a systematic
+  **−10.2-point** bias. Zero-bias anchor **4.63 h**, LOO 4.40–5.14, RMSE flat 4.5–5.25; **5** sits on
+  that floor and keeps a small negative bias so the term still errs toward under-scoring.
+- **Thresholds deliberately NOT re-anchored, and this is the nuance in the rule.** The
+  `LOW_SLEEP_SCORE` precedent says re-anchor when the *scale* changes, to preserve firing rates. This
+  is not a scale change — it is a **bias correction** on one contributor. The 3 days that move 74 → 75
+  become "recovered" because the measurement was under-reporting, which is the fix working, not a
+  side-effect to cancel out. No day crosses the early-deload, Low/Moderate or low-readiness line.
+- **`READINESS_MODEL_VERSION` bumped to `v3:ri5:2026-08-18`** so this shift stays attributable.
+- **Follow-up (not blocking):** re-derive the anchor on ~15 BLE-era nights. This fit is Cloud-era and
+  BLE overnight HR is ~2× noisier, so the anchor is conservative for current data rather than wrong.
+### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
 
 - **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
-- **⛔ blocked: owner decision.** Not sign-off on a number — a decision about what the score means.
-  Both answers below are coherent and they are different products.
+- **No longer blocked.** All three decisions were resolved 2026-08-18 — the owner delegated them
+  (*"we will go with whatever your recommendation is, knowing we are going for best practice + future
+  proof"*). The reasoning is kept in the plan so it can be argued with, not just followed.
 - **Added:** 2026-08-18 · Tuning ·
   [`docs/reviews/2026-08-18-activity-score-calibration.md`](reviews/2026-08-18-activity-score-calibration.md)
 - **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
@@ -2749,14 +2732,23 @@ session working from a temporarily restored copy.
   Brief: steps/day, movement distribution, zone minutes (daily + against a weekly target), exercise
   minutes, a weekly-to-daily target split; hitting everything = 100; doubles as guidance
   ("keep it under X today on a deload").
-- **Two owner decisions remain open in that plan** — how hard over-exertion should hit readiness, and
-  what the colour bands mean once a *low* score can be correct on a rest day.
-- **⚠️ A prerequisite bug found while auditing the inputs: `daily_zone_minutes` computes zones against
-  `max_hr = 187` (220 − age) on all 27 days, while Body Battery resolves this owner's MEASURED max at
-  168** (`resolveBatteryHrMax`, Q-57). Every zone boundary sits ~19 bpm too high, which is why zone 2
-  averages **1 min/day** and zone 1 absorbs **554**. Two parts of the app disagree about the same
-  user's max HR — a One-Formula-One-Place violation independent of this work. **Fix it before
-  weighting any zone lane**, or the lane ships dead like `activeCalories` (non-null 1 of 47 days).
+- **The three resolved decisions:** (1) over-exertion is **fitted** against next-day HRV/RHR rather
+  than invented — if there is no correlation, ship a deliberately small weight and say so in the
+  comment; (2) bands go **target-relative**, with Activity getting its **own** band function so the
+  shared `scoreBand()` stays absolute for Sleep and Readiness; (3) the zone lane scores against
+  **`targetAnchorMax`**, the existing named answer for reachable targets.
+- **⚠️ CORRECTION 2026-08-18 — the zone HRmax is NOT a One-Formula-One-Place violation.** This entry
+  previously said two parts of the app disagreed about the owner's max HR and called it a bug to fix
+  first. Wrong: `resolveHrProfile` (`packages/shared/src/health/hr-profile.ts`) is already canonical
+  and deliberately returns `maxHr` (the ceiling) **and** `targetAnchorMax` (the reachable-target
+  anchor), with `resolveBatteryHrMax` a third for the battery's reserve. Its own comment explains why
+  the ceiling must not be the observed max. **A change was implemented and then reverted on reading
+  that.**
+- **What is true, and still gates the zone lane:** at the 187 ceiling zone 2 starts ~133 bpm, and over
+  **52,647** HR samples since 2026-07-07 only **134 (0.25%)** reach it — observed max **166**. Zone 2+
+  really is ~1 min/day for this training style; the reading is honest, not broken. Decision 3 resolves
+  it: score the lane against **`targetAnchorMax`**, which puts zone 2 near ~122 bpm (7% of samples
+  already exceed 110). **Measure the resulting distribution before assigning the lane a weight.**
 - **"Steps per hour" has no source** — `step_live_windows` holds **11 rows total**. Use the existing
   HR-derived `moveHours` proxy (`packages/shared/src/health/hourly-movement.ts`), which exists for
   exactly this reason; do not build hourly step ingest for it.

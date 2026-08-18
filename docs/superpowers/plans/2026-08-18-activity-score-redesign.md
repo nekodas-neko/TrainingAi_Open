@@ -1,7 +1,9 @@
 # Activity Score redesign — a daily effort meter with a target, and where over-exertion goes
 
 **Date:** 2026-08-18 · **Agent:** Tuning (design proposal) · **Backlog:** Q-505 · **Lane:** A
-**Status:** ⛔ two owner decisions marked below. Everything else is settled by measurement.
+**Status:** ✅ **All decisions resolved 2026-08-18** — the owner delegated them (*"we will go with
+whatever your recommendation is, knowing we are going for best practice + future proof"*). The
+recommendations and their reasoning are kept below so they can be argued with, not just followed.
 **Evidence for the problem:** [`docs/reviews/2026-08-18-activity-score-calibration.md`](../../reviews/2026-08-18-activity-score-calibration.md)
 
 The owner's brief: Activity should be *"how active I was today"* — steps per hour, total steps, zone
@@ -63,11 +65,14 @@ Readiness consumes `loadRatio` (and its trailing 7-day shape), never `displaySco
 number for "what did I do" and a separate one for "what did it cost me", which is also what stops the
 double-count the current comment worries about.
 
-> **⛔ OWNER DECISION 1 — how hard should over-exertion hit readiness?** The mechanism is settled;
-> the strength is not, and it should not be guessed. Proposal: derive it the way this session derived
-> the sleep curves — measure `loadRatio` against **next-day** HRV and resting HR over the owner's
-> history, and fit the penalty to what actually predicts a worse next morning. If that correlation is
-> absent, ship the term at a deliberately small weight and say so, rather than inventing a curve.
+> **✅ DECISION 1 (resolved) — how hard over-exertion hits readiness: fit it, do not invent it.**
+> Measure `loadRatio` against **next-day HRV and resting HR** over the owner's history and let the
+> data set the penalty, exactly as the sleep curves were set. **If the correlation is absent, ship the
+> term at a deliberately small weight and say so in its comment** rather than picking a plausible
+> curve — this session has twice shipped a "measure first" result that reversed the obvious answer,
+> and an unfitted load penalty on the score that gates training is the worst place to guess.
+> Re-measure once ~15 days exist under the new Activity model; the fit is not portable across a
+> model change (Q-273).
 
 ---
 
@@ -83,12 +88,21 @@ The brief names five inputs. Three are usable today, one needs a fix first, and 
 | **zone minutes / % per zone** | ⚠️ **broken at the source — fix first** | see §2.1 |
 | **weekly target hit** | ✅ derivable | needs a per-day split rule, §3 |
 
-### 2.1 The zone lane is miscalibrated, and would be dead on arrival
+### 2.1 The zone lane is a ceiling DECISION, not a bug — corrected 2026-08-18
 
-`daily_zone_minutes` computes zones against **`max_hr = 187` on all 27 days** — the `220 − age`
-formula. But Body Battery already resolves this owner's **measured** max at **168**
-(`resolveBatteryHrMax`, shipped in Q-57 for exactly this reason). Every zone boundary therefore sits
-about **19 bpm too high**, and the consequences are visible in the data:
+> **This section originally called the zone HRmax a One-Formula-One-Place violation — "two parts of
+> the app disagree about the same user's max HR". That was wrong, and the correction matters because
+> the original framing would have sent an implementer to "fix" a deliberate design.**
+>
+> `resolveHrProfile` (`packages/shared/src/health/hr-profile.ts`) is already the canonical resolver
+> and deliberately returns **two** differently-named answers, with `resolveBatteryHrMax` a third for
+> the battery's reserve. Its own comment explains why the *ceiling* must not be the observed max:
+> *"anchoring the ceiling on a low observed max would make every hard effort read as >100%."* Three
+> named answers to three different questions is the design, not an accident. A change here was
+> implemented, then reverted on reading that.
+
+What is true is the **consequence**, and it still gates the zone lane. Zones are computed against
+`resolveHrProfile().maxHr`, which resolves to **187** on all 27 days:
 
 | zone | mean minutes/day |
 |---|---|
@@ -96,16 +110,38 @@ about **19 bpm too high**, and the consequences are visible in the data:
 | zone 2 | **1** |
 | zones 3–5 | **1** |
 
-Zone 1 absorbs the entire day and nothing reaches zone 2. **Weighting zone minutes before fixing the
-HRmax would add a contributor that is ~0 on almost every day** — the same failure mode as
-`activeCalories` (non-null on 1 of 47 days), which is a large part of why the current score is flat.
+**And that reading is honest, not broken.** With a 187 ceiling and a 53 bpm resting HR, zone 2 starts
+around **133 bpm**. Measured over **52,647** HR samples since 2026-07-07 (both `ble` and
+`chest_strap`): only **134 of them — 0.25% — reach 133 bpm**, and the observed max is **166**. So
+zone 2+ really is ~1 minute a day for this owner's training. The code already notes why: resistance
+work with rest between sets rarely holds an elevated HR.
 
-And even after the fix, zone 1 alone will not carry much: its interquartile range is **514–582
-minutes against a 545 median** — it is essentially "hours awake wearing the ring".
+Zone 1 does not rescue it either — its interquartile range is **514–582 minutes against a 545
+median**, essentially "hours awake wearing the ring".
 
-**So: fix the zone HRmax to the measured value first (it is a One-Formula-One-Place violation
-independent of this work — two parts of the app disagree about the same user's max HR), re-measure
-the zone distribution, and only then decide the zone lane's weight.**
+**So the zone lane needs a ceiling decision before it gets any weight, and it is a tuning question
+with a measured consequence rather than a bug fix.** Anchored on the observed max (~166–168) instead,
+zone 2 would start near **122 bpm**; 3,695 samples (7%) already exceed 110 bpm, so that plausibly
+turns ~1 min/day into tens of minutes. That is a real choice with real trade-offs — the `>100% of
+every hard effort` problem `resolveHrProfile` warns about is the cost — and it should be decided and
+measured, not assumed.
+
+> **✅ DECISION 3 (resolved) — score the Activity zone lane against `targetAnchorMax`, not `maxHr`.**
+> The choice looked like "ceiling vs observed max", but `resolveHrProfile` already returns a third,
+> better-named answer for exactly this: `targetAnchorMax` (`observedMax ?? estimatedMax`), documented
+> as *"the anchor for **reachable** targets"*. Whether you did meaningful cardio work today is a
+> reachable-target question, not a ceiling question.
+>
+> This resolves the trade-off rather than splitting it. The `>100% of every hard effort` problem
+> `resolveHrProfile` warns about does not arise, because the zone lane **buckets minutes** rather than
+> expressing an effort as a percentage of max — nothing renders "112% of maximum". The ceiling stays
+> the ceiling for the surfaces that do express effort that way. And it is future-proof by
+> construction: a fitter user with a higher corroborated max gets higher boundaries automatically,
+> with no per-user constant anywhere.
+>
+> **Adds no fourth concept** — that is the point. Measure the resulting zone distribution before
+> assigning the lane a weight: at ~122 bpm for zone 2, the 7% of samples already above 110 bpm suggest
+> tens of minutes a day rather than one, but that is an inference and must be measured, not assumed.
 
 ### 2.2 "Steps per hour" already has a working proxy — use it rather than building ingest
 
@@ -143,13 +179,14 @@ Three properties worth stating because they are easy to lose:
   doing appropriately little.
 - **The score is a quantity, not a grade.** Which forces the next point.
 
-> **⛔ OWNER DECISION 2 — what do the colour bands mean now?** `scoreBand()` colours 70/50 as
-> High/Moderate/Low on an absolute scale. If a correct rest day scores 30, it renders **red "Low"**
-> and reads as failure when it is exactly right. Two options: **(a)** band against *today's target*
-> (30/30 = green, "on target"), which is coherent but means the colour no longer compares days to
-> each other; or **(b)** keep absolute bands and accept that rest days look red. Recommend (a). This
-> is a `[app-shell]` change and touches the shared `scoreBand()` contract, so it needs deciding
-> before implementation, not after.
+> **✅ DECISION 2 (resolved) — band against TODAY'S TARGET, not an absolute scale.** A correct rest
+> day scoring 30 must not render red "Low"; under a target-relative band it reads green/"on target",
+> which is what it is. The cost is real and worth naming: the colour stops comparing days to each
+> other, so a green rest day and a green training day mean "you hit your target", not "you did the
+> same amount". That is the right trade for a score whose whole purpose is now a per-day target.
+> **Do not change the shared `scoreBand()`** — it is correct for Sleep and Readiness, which remain
+> absolute. Activity needs its own band function, which is also what stops this decision leaking into
+> the other two pillars. `[app-shell]` + `[activity]`.
 
 ---
 

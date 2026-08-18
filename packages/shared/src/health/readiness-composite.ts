@@ -117,12 +117,35 @@ function plainScore(v: number | null): ReadinessContributor {
 /** Stamped onto `oura_daily_derived.model_versions.readiness` so a score can be attributed to the
  *  model that produced it. Bump whenever the weights, curves or z-slope change — Q-273.
  *  Rows written before 2026-08-18 carry no stamp at all. */
-export const READINESS_MODEL_VERSION = 'v2:z2026-08-18'
+export const READINESS_MODEL_VERSION = 'v3:ri5:2026-08-18'
 
-/** Oura's public guidance: a Recovery Index of ~6 hours or more (RHR reaching its low point in the
- *  first half of the night) indicates good recovery. `hoursToSettle` is measured from the HR minimum
- *  to wake, so MORE hours = earlier settle = better. */
-export const RECOVERY_INDEX_OPTIMAL_HOURS = 6
+/** Recovery Index hours at which this contributor scores 100. `hoursToSettle` is measured from the
+ *  overnight HR minimum to wake, so MORE hours = the heart settled earlier = better.
+ *
+ *  **6 → 5 on 2026-08-18 (Q-500), fitted rather than quoted.** The 6 came from Oura's public prose,
+ *  which describes a metric they compute differently and which the pinned v2 spec does not define at
+ *  all — it exposes `contributors.recovery_index` as a bare 1–100 integer, no hours, no curve. So it
+ *  was measured instead, against the only external ground truth this app has: the 15 nights
+ *  (2026-06-23 → 07-07) where Oura's OWN `recovery_index` contributor sits beside our raw inputs,
+ *  before the ring re-key ended Cloud data.
+ *
+ *  Our estimator tracks theirs well (**r = +0.712**, beating every alternative estimator tested — see
+ *  the review, and do not "fix" the argmin). What it carried was a level offset: a systematic
+ *  **−10.2 points** against their contributor. The zero-bias anchor is **4.63 h**, leave-one-out
+ *  4.40–5.14 across the 15 nights, with RMSE flat from 4.5 to 5.25.
+ *
+ *  **5, not 4.63**, deliberately: it sits on that flat floor, inside the LOO range, is a number a
+ *  person can reason about, and keeps a small *negative* bias (−2.7) so the term still errs toward
+ *  under-scoring — the safe direction for a recovery signal. Fitting two decimals to a 15-night
+ *  sample would be false precision.
+ *
+ *  **Re-derive on BLE-era nights once ~15 exist.** This fit is Cloud-era, and BLE overnight HR is
+ *  measurably noisier (median sample-to-sample |Δbpm| 2.0 vs 1.0 at the same density), so the anchor
+ *  is conservative for current data rather than wrong. If a BLE-only refit lands well below 5, the
+ *  input changed and that is a `devices` finding, not a scoring one.
+ *
+ *  Docs: `docs/reviews/2026-08-17-readiness-calibration.md`. */
+export const RECOVERY_INDEX_OPTIMAL_HOURS = 5
 
 /** Map Recovery-Index hours → a 0-100 sub-score with a documented monotone curve: linear from 0 at
  *  0 h to 100 at `RECOVERY_INDEX_OPTIMAL_HOURS`, clamped. This is an APPROXIMATION anchored on Oura's

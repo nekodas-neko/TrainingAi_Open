@@ -18,9 +18,10 @@ The owner's three-pillar range pass is complete as far as it can go without them
   number. [`review`](../../reviews/2026-08-18-activity-score-calibration.md).
 
 ## Next
-1. **Q-500 is now the readiness fix** — not the footnote this baton previously called it. Its
-   `recoveryIndex` contributor has mean **35.3**, lowest of the nine by 20 points, and is what caps
-   readiness at 1 day ≥85. Still awaiting the owner.
+1. **Q-505 — build the Activity redesign** (Lane A). All three decisions are resolved in
+   [`the plan`](../../superpowers/plans/2026-08-18-activity-score-redesign.md); sequencing is in its §4.
+2. **Re-derive Q-500's anchor on ~15 BLE-era nights.** The shipped fit is Cloud-era and BLE overnight
+   HR is ~2× noisier, so 5 h is conservative for current data rather than wrong.
 2. **Q-505 — Activity Score.** Analysed; waiting on the owner to choose between "score today"
    (re-weight toward the same-day lane) and "score recent training" (keep weights, fix the daily
    framing). Q-277 is the older discrimination finding this supersedes.
@@ -29,10 +30,10 @@ The owner's three-pillar range pass is complete as far as it can go without them
    displayed points around the median, which is the deliberate cost of range.
 
 ## Blocked
-- **Q-500** (`RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5) — awaiting the owner, and **re-promoted**: with
-  Q-504 refuted it is the readiness fix, not a footnote to a bigger one.
-- **Q-505** (Activity Score) — needs an owner *decision*, not sign-off. Tuning recommends "score
-  today" and the entry says why.
+- **Nothing is blocked on the owner.** They delegated all open decisions on 2026-08-18
+  (*"whatever your recommendation is… best practice + future proof"*). Q-500 shipped; Q-505's three
+  decisions are resolved in its plan.
+- **Q-505** (Activity Score) — decisions resolved, **ready for Lane A to build**. Not blocked.
 - **Q-501, Q-502** queued, not blocked — neither is a scoring change.
 
 ## Claimed paths
@@ -60,6 +61,14 @@ for this work:
 - **Q-272's direction #1 is refuted** — the Body Battery charge window is reachable on a median 6.7%
   of waking samples, so `CHARGE_RATE` scales a term that is barely active. `REST_THRESHOLD`/the
   reserve is the lever (Q-502 doc §2).
+- **The zone HRmax is NOT a One-Formula-One-Place violation** — I claimed it was, shipped the claim,
+  implemented a "fix" and reverted it. `resolveHrProfile` deliberately returns `maxHr` (ceiling) and
+  `targetAnchorMax` (reachable targets), with `resolveBatteryHrMax` a third for the battery reserve;
+  three named answers to three questions is the design. **Read a resolver's own comment before calling
+  it a duplicate.**
+- **Re-anchor thresholds for a SCALE change, not a BIAS correction.** `LOW_SLEEP_SCORE` moved with the
+  sleep recalibration because the scale moved. Q-500 corrected one contributor's bias, so the days
+  that cross a threshold are the fix working — cancelling them out would undo the change.
 - **A range calibration does NOT transfer to READINESS either, and for a different reason than
   Activity.** It breaks three invariants the composite holds — contributions summing to the score
   (the audit panel), all-neutral → 50, and no-check-in capping below 100. The z-slope alternative

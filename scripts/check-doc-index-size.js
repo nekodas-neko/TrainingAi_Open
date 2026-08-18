@@ -303,9 +303,25 @@ const BASELINE = {
   // is the measured index size, not a reclaim that has happened). On the backlog, finding 4 is
   // struck in place with the three consequences the entry did not anticipate, so the next session
   // does not re-derive them or assume findings 1-3 went with it.
-  'projectOverview.md': 6872,
-  'docs/implementation-backlog.md': 7158,
-  'CLAUDE.md': 1010,
+  // Raised 2026-08-18: 1010 -> 1044. The "Decisions That Come Back To Me" section, which sets the
+  // default shape for anything gated on an owner decision — recommendation first, alternatives with
+  // what each is better at, reversal cost, plain English — and pushes cheap reversible choices back
+  // down to the session rather than surfacing them. It belongs in the index: it governs every
+  // session's behaviour rather than recording one session's work. Drafted at 49 lines and cut to 34
+  // before raising, since a rule about brevity that arrives verbose argues against itself.
+  // Recomputed from the MERGED file after three same-day collisions with concurrent raises.
+
+  //
+  // Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files, on each of
+  // the two merges this branch took. Lane A's delta: +10 on projectOverview carrying the one
+  // distinction that item needs — the outage's MECHANISM is gone rather than mitigated, because with
+  // every reader deriving the timestamp the re-stamp that rewrote 681,005 rows is a no-op — plus the
+  // caveat that keeps the 136 MB honest (measured index size, not a reclaim that has happened). On
+  // the backlog, finding 4 is struck in place with the three consequences the entry did not
+  // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
+  'projectOverview.md': 6871,
+  'docs/implementation-backlog.md': 7150,
+  'CLAUDE.md': 1044,
 
 };
 

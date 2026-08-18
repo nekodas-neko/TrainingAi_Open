@@ -3,10 +3,20 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-17 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **357**)
+**Updated:** 2026-08-18 · **By:** the fifth Lane B run · **Q band:** 350–386 (next free: **357**)
 
 ## Now
-Nothing in flight. PRs #49, #50, #56 and #58 all merged. Thirteen items closed today:
+Nothing in flight. PRs #49, #50, #56, #58, #60 and #68 all merged. Fourteen items closed:
+
+- **Q-389 BUILT** (v1.320.0, PR #68) — printable saved-meal labels with a scannable code, four
+  styles, and a scan-back that logs one serving. **Its queue entry is removed**; the two checks it
+  still owes are both physical and are a `projectOverview.md` row.
+  [Journal](../../overview/entries/2026-08-18-saved-meal-printable-label.md).
+  Three things worth carrying: a `<canvas>` has **no implicit ARIA role** (an aria-label on it alone
+  is not exposed at all, and a test cannot find it); `SheetContent` mounts into a **portal**, so a
+  draw effect keyed on a plain `useRef` fires before the element exists and silently never runs —
+  use a state-backed callback ref; and the payload budget is **26 bytes at v2/EC-M**, of which the
+  meal id takes 22, so nothing else may ever go in the QR.
 
 - **Q-389 planned** (PR #56, docs-only) —
   [plan](../../superpowers/plans/2026-08-17-saved-meal-printable-label.md). **Three trace findings
@@ -76,14 +86,9 @@ Work the queue top-down and take the highest Lane-B-owned item, re-verifying its
 **The queue was walked end to end on 2026-08-17.** Two Lane B items are now *buildable*; the rest are
 held, blocked, or cross-lane.
 
-**Buildable — take these first:**
+**Buildable — take this first:**
 
-1. **Q-389 implementation (PR 2).** The plan is written, the owner has settled every design
-   question, and the aesthetic is chosen. Start at the plan's §5: `label-payload.ts` → encoder
-   dependency → the four-style renderer → preview/delivery → the scan branch. **Do not ship
-   `label-payload.ts` alone** — a shared module with no consumer is the shape Q-301 is filed about.
-   The print test and the scan half are owner/device-side (§7).
-2. **Q-51's residual** — but **measure `/workout` first mount before refactoring anything.** The
+1. **Q-51's residual** — but **measure `/workout` first mount before refactoring anything.** The
    split is real (1,831 and 1,457 lines, both grown) and Task 1 proved extraction moves **zero**
    bytes, so the honest case is readability, not perf. It is a large refactor of the core workout
    flow with no component-test route and device-only verification: scope it deliberately rather than
@@ -91,15 +96,15 @@ held, blocked, or cross-lane.
 
 **Not startable:**
 
-3. **Q-531** — ⛔ blocked on an owner decision, see below.
-4. **Q-281's UI half** — deliberately held by the entry: it is presentation over numbers that
+2. **Q-531** — ⛔ blocked on an owner decision, see below.
+3. **Q-281's UI half** — deliberately held by the entry: it is presentation over numbers that
    Q-500/Q-272/Q-275/Q-277 are about to change, so building it now means building it twice. When it
    is unheld, the audit's recommendation is **trend, not contributors** — only 1 of 14 surfaces shows
    a trend, and contributors are genuinely inapplicable to a chip or a timeline row.
-5. **Q-305's surface half** — needs the cross-item design decision the entry raises (one shared
+4. **Q-305's surface half** — needs the cross-item design decision the entry raises (one shared
    treatment across Q-278 / Q-302 / Q-305, or a third bespoke card) and therefore a planning PR
    first, per the backlog protocol.
-6. **Q-278** — cross-lane: its scope item 1 (generalise `ScoreAvailability`) is `lib/health/`, Lane
+5. **Q-278** — cross-lane: its scope item 1 (generalise `ScoreAvailability`) is `lib/health/`, Lane
    A's. Only the surface sweep is Lane B's, and it depends on item 1. **Read Q-281's audit before
    planning it** — two of its premises are refuted there.
 
@@ -126,6 +131,10 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
   yourself, since the entry's own point is that Q-234 reasoned taxonomically and was wrong in use.
 
 ## Owed
+- **A test print of the meal label, black band first** (Q-389) — the code is 0.49–0.66 mm per
+  module and ink spread is the expected failure; it presents as "the scanner is broken".
+- **The meal-label camera scan on device** (Q-389) — the Capacitor plugin is inert in the sandbox, so
+  that path has never executed. Same for the Web Share hand-off and the two new fonts.
 - **A TalkBack pass on the S25** (Q-261, Q-350) over More → Goals and More → Edit Profile.
 - **A look at Home with the "Accent ring" style selected on the S25** (Q-281) — the new band word is
   **7.5 px**, verified only in a browser harness at 412×915.
@@ -146,6 +155,11 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
 - **Q-356** — filed for **Lane A**: the daily 14:00–16:00 UTC CI failure above.
 
 ## Claimed paths
+- **`packages/shared/src/nutrition/label-payload.ts`** — **this is Lane A's directory** and was
+  touched anyway for Q-389, deliberately: it is a NEW file, it sits beside `oneServingItems` which it
+  uses (One Formula One Place), Lane A's baton showed *None held* and Lane A was working Oura/DB
+  paths at the time. A new file collides with nothing, which is what the contract is protecting. Said
+  plainly here rather than left to be discovered. Release the claim when convenient.
 - **`lib/github-release.ts`** + `lib/__tests__/github-release.test.ts` — neither lane lists them;
   taken for Q-457 with Lane A's baton showing no claims. Release the claim when convenient.
 - **`scripts/check-doc-index-size.js`** — not a lane path, but every Lane B PR touches its baseline.

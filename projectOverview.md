@@ -1011,15 +1011,14 @@ one backlog entry per finding, **Q-271 … Q-284**.
   0.00 h**. On 2026-08-11 and 2026-08-13 the fragment is the *entire* record for the date. These feed
   `previousNight` (16% of readiness) and `sleepBalance` (10%). **This is the sweep Q-225 asked for,
   and it found at least one more night sharing 08-13's signature.**
-- **🟠 The Recovery Index anchor is ~1 h too high — Q-271 SUPERSEDED by Q-500 (2026-08-17).** The
-  original finding ("never above 50, ever", "~2.2 points/day") was measured over **eight** days: over 41
-  the contributor exceeds 50 on **12**, hits **100 on 2026-07-17**, and costs **0.71** points/day. What
-  is real is a systematic **−10.2-point** bias — fitted against Oura's own `recovery_index` contributor
-  on the 15 nights where both exist, the zero-bias anchor is **4.63 h** (LOO 4.40–5.14), not 6. The
-  shipped estimator is **sound** (r = +0.712, beating every alternative tested) and must not change.
-  Proposal: `RECOVERY_INDEX_OPTIMAL_HOURS` 6 → 5, moving 40 of 41 days by at most **1.44** readiness
-  points. **⛔ Blocked on owner sign-off.**
-  [`docs/reviews/2026-08-17-readiness-calibration.md`](docs/reviews/2026-08-17-readiness-calibration.md)
+- **✅ The Recovery Index anchor is fixed — Q-500 SHIPPED v1.320.0 (2026-08-18).** Q-271's headline
+  ("never above 50, ever", "~2.2 pts/day") was measured over **eight** days and did not survive: over
+  41 the contributor exceeds 50 on **13** and costs **0.55** pts/day. The real defect was a systematic
+  **−10.2-point** bias, fitted against Oura's own contributor over the 15 nights where both exist —
+  zero-bias anchor **4.63 h**, shipped as **5**. The estimator is sound (r = +0.712, beating every
+  alternative) and unchanged. Thresholds deliberately not re-anchored: this is a bias correction, not
+  a scale change. `READINESS_MODEL_VERSION` → `v3:ri5:2026-08-18`.
+  [`review`](docs/reviews/2026-08-17-readiness-calibration.md)
 - **🟠 A stored readiness score cannot be re-derived from the inputs stored beside it (Q-501, 2026-08-17).**
   `oura_daily_summary` rows get recomputed; the derived readiness rows built from them do not follow, so
   **5 of 33** persisted `recoveryIndex` sub-scores disagree with their stored hours (worst: 2026-07-20,
