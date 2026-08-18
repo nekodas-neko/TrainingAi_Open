@@ -435,7 +435,7 @@ const BASELINE = {
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 
-  'projectOverview.md': 6957,
+  'projectOverview.md': 6991,
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -462,19 +462,13 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
-  // Raised 2026-08-18 (Q-395 round 4, BugFix intake). The owner reviewed the mockups screen by
-  // screen and asked for a comparison against prod so no section is silently lost. It found the
-  // first draw covered 3 of the 11 sections the Nutrition tab renders, so the entry now carries
-  // that section list as a checklist an implementation PR ticks off, the six review notes, one
-  // section (My Foods) that has no home under the agreed tabs, and the eleven sheets nobody has
-  // drawn yet — listed so they are not assumed done.
-  // Raised 2026-08-18 (Q-397, BugFix intake). Q-393 shipped the analysis it had been corrected
-  // away from: the correction (inline-wrapped ingredients spend width, not height, so the full
-  // list fits a ROUND label with a bigger code than ships today) was made to the owner in chat
-  // and drawn, and never written back into the entry. The new entry carries the measured table
-  // so the numbers cannot be re-litigated, and the process note that a correction made mid-
-  // conversation has to be written into the queue in the same session.
-  'docs/implementation-backlog.md': 8369,
+  // Raised 2026-08-18 (Q-397 + the Q-395 review fold-in, BugFix intake). Recomputed from the
+  // MERGED file after taking main's side of this baseline, rather than splicing the conflict
+  // hunks — two same-day raises spliced together silently drop one side. Q-397 records that the
+  // shipped ingredient label is the analysis Q-393 was corrected away from, with the measured
+  // mm-per-module table and the owner's choice of B2 as the default; Q-395 gains the six review
+  // notes and the 11-section prod checklist an implementation PR ticks off.
+  'docs/implementation-backlog.md': 8427,
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a

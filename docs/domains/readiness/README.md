@@ -126,6 +126,8 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 
 - [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](../../reviews/2026-08-18-ingest-and-input-validation.md) — **the ingest surface and input validation, 2026-08-18** (Q-465 — `POST /api/day-checkin` creates a check-in row from an empty body, indistinguishable from a check-in where the user answered nothing). Findings Q-464/Q-465; **no ingest route accepts a `userId` from the body, and value validation rejects physiologically impossible input on every route reachable in the harness.**
 
+- [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-465 refuted in practice — zero truly-empty check-in rows across all 50, once the six morning columns are included). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+
 ## Open issues
 
 ```bash
