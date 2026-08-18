@@ -17,6 +17,15 @@ const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
+//
+// Raised 2026-08-18 (Review, write-concurrency sweep, Q-473/Q-474): backlog 8634 -> 8722,
+// projectOverview 6991 -> 7028. Two queue entries and the one Known-Issues row indexing them —
+// entries, per the same split as every raise above. Q-473's entry carries its four-trial
+// measurement table inline because the run is not cheaply repeatable (each trial needs a fresh
+// workout row and a 65-second wait for the rate-limit window), and an implementer fixing a race
+// needs the reproduction rate, not a claim. The sweep's prose is in
+// docs/reviews/2026-08-18-write-concurrency.md, which this ratchet does not govern.
+
 
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
 //
@@ -461,6 +470,12 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
+  // Raised 2026-08-18 (Q-397, Lane B): backlog 8257 -> 8573. `main` was **376 lines over this
+  // baseline on its own**, so the Custom Rules job was failing on every branch, not just this one —
+  // several entries landed without the raise that should have ridden with them. Recomputed from the
+  // merged file: main's content, minus Q-397 (shipped by this PR), plus its closing annotation on
+  // Q-393. Recorded rather than nudged, because the second time a shared ratchet is quietly
+  // exceeded is the point at which people start assuming it is broken instead of binding.
   // Raised 2026-08-18 (Q-397 + the Q-395 review fold-in, BugFix intake). Recomputed from the
   // MERGED file after taking main's side of this baseline, rather than splicing the conflict
   // hunks — two same-day raises spliced together silently drop one side. Q-397 records that the
@@ -475,6 +490,16 @@ const BASELINE = {
   // Raised 2026-08-18 (Tuning): -> 8592. Q-515 — first calibration of the heart-rate pillar. The tables
   // are the entry: the July/August collapse and the fraction sweep together show that tuning the
   // constant cannot fix it, which is the opposite of what the entry title suggests on its own.
+  // Raised 2026-08-18 (Tuning): -> 8775, recomputed from the MERGED file. Q-517 — adaptive-TDEE can hand
+  // the user a maintenance below their own BMR. The replay table is the entry: 75% of windows are
+  // correctly refused, which is why the obvious response (tighten the coverage gates) is wrong, and
+  // the 1,052-vs-1,000 near-miss is only legible with the numbers beside it.
+  // Raised 2026-08-18 (Q-387 decision, Q-398, Q-395 round 5 — BugFix intake). Recomputed from
+  // the MERGED file after taking main's side; this branch took three same-day raises from other
+  // lanes, and splicing conflict hunks is how one side's raise silently disappears. Four blocking
+  // design questions were answered: the completeness control is an explicit button at the foot of
+  // the log (Q-387 options 2 and 3 closed with reasons), the meal plan becomes a generator of
+  // saved meals (Q-398), targets stay in Profile with a shortcut, and the pass covers the full journey.
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -485,8 +510,9 @@ const BASELINE = {
 
 
 
-  'projectOverview.md': 6991,
-  'docs/implementation-backlog.md': 8590,
+
+  'projectOverview.md': 7028,
+  'docs/implementation-backlog.md': 8749,
   'CLAUDE.md': 1075,
 
 };
