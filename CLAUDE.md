@@ -423,7 +423,7 @@ The timezone rule covers "today"; this covers **ranges and construction**, which
   window — pick a fixed-offset zone (`Etc/GMT±N`) whose local time is *currently* near 01:00 and run
   the case there, so it fires on every CI run. `faketime` does not help: it shifts node's clock, not
   Postgres's.
-- **Client code has two "today" sources** — `todayInTz()` vs the device's own timezone. Pick one per feature and don't mix them for keys that must match server bucketing. Repo day-window helpers currently hardcode `DEFAULT_TZ` — thread the session tz through when touching them, and never re-declare `DEFAULT_TZ` locally.
+- **Client code has two "today" sources** — `todayInTz()` vs the device's own timezone. Pick one per feature and don't mix them for keys that must match server bucketing. Repo day-window helpers (`getCalendarData`, `getRecentTrainedDays`, `getNextSession`) take `timezone = DEFAULT_TZ` as a **default parameter** and every current caller passes the session tz — they are the pattern to copy, not a known-broken area (Q-480). Keep threading it when touching them: a default every caller overrides is a safety net, and it is what makes forgetting silent. Never re-declare `DEFAULT_TZ` locally.
 
 ---
 

@@ -2173,105 +2173,17 @@ switching from bare `fetch` to local-delete + `queueMutation`.
   that is the real source of truth on the APK. Re-check the first-load window **on device**, where the
   worker's install timing and the WebView lifecycle differ.
 
-### [platform] Q-554 — the orientation indexes named paths that do not exist, including a module that was never built
-
-- **Status: FILED AND FIXED in the same PR** (docs + a new CI check, Custom Rules now **42 of 42**).
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-orientation-index-paths.md`](reviews/2026-08-18-orientation-index-paths.md)
-- **The gap.** `scripts/check-claude-md-paths.js` guards `CLAUDE.md` for the reason in its header —
-  *"a wrong path in a rulebook is worse than a wrong path in code: nothing compiles it, so it rots
-  silently and is copied confidently"* (Q-153). Sessions are also told to read `docs/module-map.md`
-  before building any shared helper and `docs/domains/<pillar>/README.md` before working in a pillar.
-  **Nothing checked either.**
-- **⚠️ `docs/module-map.md:232` carried a row for a module that has never existed.**
-  `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket(cols27)`: **zero references to either in
-  the whole tree.** What exists is the row twenty lines below — `lib/oura-models/steps-motion-decoder.ts`
-  → `runStepsMotionDecoder(input)`, golden-verified and described there as **"NOT yet wired"** into the
-  BLE decode or the step pipeline. So row 232 described *that wiring*, in the present tense, in a table
-  whose stated purpose is **"what already exists and where … to stop new work re-implementing
-  infrastructure the app already has."** It produced both errors at once: someone looking for the
-  decoder finds nothing, someone checking whether the wiring is done reads that it is.
-- **Three stale domain-index rows:** `workouts` listed a UI route `app/history/` (gone — history renders
-  via `components/exercise-history-sheet.tsx`), `devices` listed `docs/oura-models/` (no such dir; the
-  ops reference is `docs/oura-ble-operations.md`), `app-shell` listed `app/overview/` (no such route).
-- **49 malformed display paths.** Every domain index rendered history links as
-  `` `docs/../overview/history-…md` `` — **link target correct, visible label wrong** (`docs/../overview/`
-  normalises to `overview/`, which does not exist). Fixed across all eleven; link targets untouched.
-- **The check:** `scripts/check-index-doc-paths.js` — **748 paths across 12 docs**. Deliberately
-  narrower than its sibling: root-anchored backticked paths only; globs/ellipses/templates skipped; a
-  path named *while saying it is gone* needs a `DELIBERATE` entry with a reason.
-- **⚠️ Those narrowings were earned, not designed.** The first pass reported **59 of 787**, all but four
-  being relative fragments, globs, or the display-path bug. **And the fixes then re-triggered the
-  check** — writing *"there is no `app/overview/` route"* names the path in backticks just as surely as
-  claiming it exists. Four `DELIBERATE` entries now carry their reason.
-- **Not exercised:** existence only. The check does **not** verify that the description beside a path is
-  accurate — row 232 was caught only because its path was wrong too. A row naming a real file while
-  describing behaviour it does not have still passes.
-
-### [platform] Q-553 — a Known Issue was in both the live list and the resolved archive; nothing checked
-
-- **Status: FILED AND FIXED in the same PR** (docs + a new CI check). Kept as the record of the class.
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-known-issue-duplication.md`](reviews/2026-08-18-known-issue-duplication.md)
-- **The invariant nothing enforced.** `CLAUDE.md`: *"Striking a Known Issue means MOVING it … Cut the
-  entry whole, append it to the archive, **leave nothing behind**."* Two entries were in both lists.
-- **Q-139 — `🔴 OPEN` live and `✅ fixed` archived, for ten days.** `projectOverview.md` carried 69
-  lines describing the bug as unfixed while the archive recorded it fixed 2026-08-08 in v1.270.25.
-  **Every session's mandated orientation read showed a red, highest-severity open issue for a
-  ten-day-old fix.** Both halves verified fixed **in source**, not taken on the archive's word — the
-  backstop the live row called still-open is closed at
-  `packages/shared/src/health/step-estimate.ts:176`, whose comment names Q-139.
-- **Q-81 — a byte-identical 31-line entry in both files.** A pure copy.
-- **⚠️ Both were also archived *early*.** `CLAUDE.md` says only move when nothing is owed, *including a
-  pending device check* — and both entries say one is outstanding (Q-139: not verified on device;
-  Q-81: whether the model fits the owner's real data). So the mistake was two-part: **copied rather
-  than moved, and moved before it was allowed.**
-- **Applied here:** cut the premature archive copies and kept the live entries (the conservative
-  direction — the live list is what everyone reads and where an owed check belongs). Q-81's copy was
-  identical so nothing was lost; Q-139's unique material was folded into the live entry first, and its
-  stale 69-line `🔴 OPEN` body replaced with a compact `⚠️ FIXED, not verified on device` row.
-  `docs/domains/activity/README.md` had the same stale claim (*"needs one owner decision"*, which had
-  been made) — updated.
-- **The check:** `scripts/check-known-issue-duplication.js`, now step **41 of 41** in Custom Rules.
-  **Its first version reported 4 and only 2 were real**, so two narrowings are written into its header:
-  a heading's identity is its **first** Q number (an archive heading may name a second issue in
-  passing), and **range headings are skipped** (a batch row spanning `Q-63…Q-69` overlapping one
-  archived member is a stale range wanting a human, not a red build).
-- **Not exercised:** static reconciliation. Q-139's own outstanding item is an on-device check after the
-  next history drain, and Q-81's needs production — neither possible here.
-
-### [platform] Q-552 — two sources of truth for the next Q band; the prose one was wrong
-
-- **Branch:** `docs/q-block-ledger-procedure` · **(fixed in the same PR that filed it — see below)**
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md)
-- **Placement:** already actioned; kept as the record of *why* the procedure changed.
-- **The near-miss.** Review's band 450–499 was exhausted by Q-499. `docs/agents/README.md` says
-  *"claim the next block of 50 above 529"* — which literally gives **530–579** and collides with
-  **fourteen numbers already in use**. The predecessor baton had already written 530–579 into the
-  handover, so the next session would have taken it.
-- **The ledger recorded 530–537, 538–542 and 543. `544–551` were also live** — across
-  `docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
-  `docs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
-  `docs/domains/devices/README.md` and this backlog — and appeared nowhere in it.
-- **⚠️ Correction to the first draft of this entry, which said the ledger is "the only defence". It is
-  not, and the truth is more interesting — there are TWO sources for the same fact:**
-  | Source | Said | Status |
-  |---|---|---|
-  | this file → *Live pointers* → "Next unallocated Q band" | **552** | ✅ correct, **CI-enforced** by `scripts/check-backlog-pointers.js` |
-  | `docs/agents/README.md` prose ledger + "next block of 50 above 529" | **530** | ❌ stale — omitted 544–551 |
-  The machine-checked pointer was right the whole time. **The collision was reachable only by
-  following the README's prose instruction** — which is what the README tells you to do, and what the
-  Review baton had already copied.
-- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
-  with *"Q-552 is in use but the next unallocated band starts at 552 — a band was used without being
-  recorded."* It caught this in the same PR.
-- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
-  count in a script is a fact* — and the first where the checked copy was silently **right** while the
-  prose copy was silently **wrong**.
-- **Fixed in this PR:** claimed **552–601**, recorded **544–551** retroactively, bumped the pointer to
-  **602**, and pointed the instruction at the checked source — *read the "Next unallocated Q band"
-  pointer, not the prose list; then record your block in both.*
+> **Swept 2026-08-19 — Q-552, Q-553 and Q-554 removed as complete.** All three were review findings
+> that were *fixed in the PR that filed them*, and each left behind a CI check that now enforces it:
+> `check-backlog-pointers.js`, `check-known-issue-duplication.js` and `check-index-doc-paths.js`
+> (steps 45, 47 and 48 of 49). Nothing was owed on any of them.
+>
+> **Q-552 was explicitly annotated *"kept as the record of why the procedure changed"*, which is what
+> this file's own protocol forbids** — *"History is not kept in this file"*, and a completed item
+> *"must never linger in the queue"*. Removing it loses nothing: the band ledger it created, including
+> the retroactive 544–551 and Review's 552–601, lives in
+> [`docs/agents/README.md`](agents/README.md) where the procedure itself is documented, and the
+> narrative is in `docs/reviews/2026-08-18-*.md`. A record kept in the work queue is read as work.
 
 ### [app-shell][health] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
@@ -2416,44 +2328,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 - **Not verified: no screen-reader testing.** The claim is that the attribute is absent, not that a
   specific announcement is wrong. Not on the APK, where TalkBack is the relevant reader.
   `app/coach/coach-content.tsx` was examined and **excluded** — its chevron is a back button.
-
-### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
-
-- **Branch:** `docs/claude-md-repo-tz-line`
-- **Added:** 2026-08-18 · review sweep (server-side verification) ·
-  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](reviews/2026-08-18-server-tz-and-rate-limit-verification.md)
-- **Placement:** low. A one-clause documentation correction — but a load-bearing one, because it
-  misdirects anyone picking up **Q-477**.
-- **The line**, in the Date Arithmetic section:
-  > *"Repo day-window helpers currently **hardcode** `DEFAULT_TZ` — thread the session tz through when
-  > touching them, and never re-declare `DEFAULT_TZ` locally."*
-- **They do not hardcode it — they take it as a default parameter, and every caller passes the session
-  timezone:**
-
-  | Helper | Callers | Threads tz? |
-  |---|---|---|
-  | `getCalendarData(…, timezone = DEFAULT_TZ)` | `app/api/calendar-data` | ✅ |
-  | `getRecentTrainedDays(…, timezone = DEFAULT_TZ)` | `app/api/streak-data` | ✅ |
-  | `getNextSession(…, timezone = DEFAULT_TZ)` | 5 sites incl. `lib/ai-chat/tools.ts` | ✅ at all 5 |
-
-  A default every caller overrides is a safety net, not a hardcoded value.
-- **Why the stale line costs something.** It marks `lib/data` as a known-broken area, so an
-  implementer taking Q-477 (the client-side timezone sweep) starts there, finds nothing, and a
-  reviewer treats a repo call site as suspect when it is in fact the pattern to copy.
-- **The other half of the same sentence is holding** — zero local re-declarations of `DEFAULT_TZ`
-  outside `packages/shared/src/date-utils.ts`. Keep that clause verbatim.
-- **Fix:** replace the "currently hardcode" clause with what is true — the helpers *default* to
-  `DEFAULT_TZ` and every current caller threads the session tz; keep the instruction to keep doing so,
-  since the default is what makes forgetting silent.
-- **Filed rather than edited directly** because `CLAUDE.md` is the contract all five agents read, and
-  a Review agent quietly rewriting a rule line is a change the other four should see come through the
-  queue. Any lane can take it.
-- **Verified alongside, and worth keeping in the entry so it is not re-derived:** all 4
-  timezone-sensitive SQL sites in `lib/data` interpolate a parameter (no hardcoded zone string
-  anywhere in the repository layer), and every caller of the shared sleep helpers
-  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend`)
-  passes `tz`. **This bounds Q-477 to the client** — its fix does not need to touch `lib/data` or
-  `packages/shared/src/health`.
 
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
 
