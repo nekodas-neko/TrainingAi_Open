@@ -8,6 +8,7 @@ import { DEFAULT_TZ, toAestDay } from '@trainingai/shared/date-utils'
 import { buildRecapFacts } from '@trainingai/shared/workout/session-recap'
 import { errorLog } from '@trainingai/shared/logger'
 import { reportServerError } from '@/lib/observability'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,6 +17,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id: sessionId } = await params
+    const badId = invalidUuidResponse(sessionId)
+    if (badId) return badId
     const repo = await getRepository()
     const tz = session.user?.timezone ?? DEFAULT_TZ
 

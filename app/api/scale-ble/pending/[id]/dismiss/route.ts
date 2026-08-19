@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // Dismisses a pending scale reading (e.g. it was the owner's partner, not them) — the raw
 // sample stays archived in scale_raw_samples (never deleted) but never reaches body_metrics.
@@ -10,6 +11,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const userId = session.user.id
 
   const { id: idParam } = await params
+  const badId = invalidUuidResponse(idParam)
+  if (badId) return badId
   const id = Number(idParam)
   if (!Number.isInteger(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
