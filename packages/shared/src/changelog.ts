@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.3",
+    date: "2026-08-19",
+    changes: [
+      "Groundwork for the nutrition redesign \u2014 no visible change. Two of the screens it lands on had grown to the size limit the project enforces, so nothing could be added to them; the food-log loader and the \u201cadd a food by hand\u201d form now live in their own files. One small repair rode along: if adding a food by hand fails, the form keeps what you typed instead of clearing it.",
+    ],
+  },
+  {
     version: "1.325.2",
     date: "2026-08-19",
     changes: [

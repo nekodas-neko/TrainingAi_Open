@@ -819,7 +819,14 @@ const BASELINE = {
   // importantly, that the two numbers still disagree: this PR makes the disagreement legible, it
   // does not remove it. An entry struck here would read as "the calorie budgets were unified",
   // which is the claim nobody has earned yet.
-  'docs/implementation-backlog.md': 10189,
+  // Raised 2026-08-19 (Lane B, Q-406 headroom half): the entry STAYS and grows, because its
+  // mechanism was wrong in two measurable ways and a struck entry would leave the next session to
+  // rediscover both. (a) Extracting a food row frees ZERO lines from either landing file — neither
+  // contains row markup, which is the whole premise. (b) The four call sites are four different
+  // shapes, so a faithful extraction needs a variant-heavy wrapper, and unifying them properly is a
+  // visual change the entry itself forbids. The lines are the per-site evidence; without it the
+  // correction is an opinion and the entry gets attempted as written a second time.
+  'docs/implementation-backlog.md': 10221,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
