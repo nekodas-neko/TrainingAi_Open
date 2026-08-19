@@ -2,11 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { safeCompare } from "@/lib/security/constant-time";
 import { getRepositoryAsync } from "@/lib/data";
-import { formatInTimeZone } from "date-fns-tz";
-import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { DEFAULT_TZ, todayInTz } from "@trainingai/shared/date-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
 import { reportServerError } from '@/lib/observability'
+import { resolveIngestDate } from "@trainingai/shared/validation/ingest-clock";
 
 // Called by Tasker on Android — no session cookie, auth via shared secret.
 // Set HEALTH_CONNECT_INGEST_SECRET in Railway env vars.
@@ -85,8 +85,12 @@ export async function POST(req: NextRequest) {
     const repo = await getRepositoryAsync();
     const webhookUser = await repo.getUserById(userId);
     const tz = webhookUser?.timezone ?? DEFAULT_TZ;
-    const dateSlash = body.date ?? formatInTimeZone(new Date(), tz, "yyyy/MM/dd");
-    const dateIso = dateSlash.replace(/\//g, "-").slice(0, 10);
+    // Q-494: the schema's regex bounds the date's SHAPE, nothing bounded its RANGE — so
+    // `{"date":"9999/12/30","weightKg":499}` answered 200 and then owned
+    // `getMostRecentConfirmedWeightKg`'s `ORDER BY date DESC LIMIT 1` permanently, feeding the BLE
+    // scale's confirmation step and every `deriveActivityKcal` estimate. Routed through the shared
+    // ingest clock rather than a bespoke check here, since three sibling ingest paths already use it.
+    const dateIso = resolveIngestDate(body.date, todayInTz(tz));
     await repo.upsertBodyMetrics(userId, [{
       date: dateIso,
       weightKg:   body.weightKg   ?? undefined,

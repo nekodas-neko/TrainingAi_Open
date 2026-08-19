@@ -2406,45 +2406,15 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
   trusted-proxy count — the treatment `safeCompare` already has. Seven call sites should not each
   re-decide this.
 
-### [devices][body] Q-494 — a far-future ingest date permanently captures every "most recent" read
-
-- **Branch:** `fix/ingest-date-range-bounds`
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement: high.** Single request, permanent, silent, and it corrupts a value feeding the scale
-  pipeline and every activity-calorie estimate.
-- **Measured.** The regex bounds the date's shape, nothing bounds its range:
-  ```
-  before: getMostRecentConfirmedWeightKg -> 2026-08-18, 81 kg
-  POST {"date":"9999/12/30","weightKg":499} -> {"success":true}
-  after:  getMostRecentConfirmedWeightKg -> 9999-12-30, 499 kg
-  ```
-  `ORDER BY date DESC LIMIT 1` answers **499 kg until the year 9999**; no later write can outrank it.
-  Two readers use that shape: `getMostRecentConfirmedWeightKg` (BLE-scale confirmation) and
-  `deriveActivityKcal` (multiplies body weight into activity calories).
-- **The ranked source merge cannot help, and the reason is worth keeping.** `health-source.ts` ranks
-  per **column, per date** — it stops a worse source overwriting a better one *on the same day*. A row
-  on a date nothing else ever writes has no competitor, so rank 1 (`health_connect`, the lowest) wins
-  outright. The documented protection is orthogonal to this, not weak against it.
-- **⚠️ This is not a novel class — it is the one ingest path that never got the fix its siblings have.**
-  `packages/shared/src/validation/ingest-clock.ts` already exists for exactly this
-  (`INGEST_PAST_TOLERANCE_MS` 7 d, `INGEST_FUTURE_TOLERANCE_MS` 60 s, `resolveMeasuredAt`), and the
-  workout path has its own parallel guard `resolveCompletedAt` from **Q-24 §7** — whose comment says
-  `completedAtMs` *"was accepted unbounded and uncompared"*, the same sentence that describes `date`
-  here. Coverage: `scale-ble/samples` ✅, `oura-ble/samples` ✅ (downstream, via `step-day-buckets.ts`),
-  `complete-workout` ✅, **`health-connect/ingest` ❌ — none, anywhere in its chain.** The
-  sibling-surface rule was missed twice: once when `resolveMeasuredAt` was written, once at Q-24 §7.
-- **Fix:** route the ingest date through the existing **`ingest-clock`** module rather than adding a
-  bespoke range check — the one-formula-one-place answer, and it inherits the reconcile-don't-reject
-  behaviour the other paths chose (`resolveCompletedAt`'s comment argues that case and it applies
-  verbatim: a 400 would quarantine the outbox mutation and lose a real reading over a bad clock).
-  **Caveat:** `resolveMeasuredAt` takes an *instant*, this route takes a *calendar date* in the user's
-  timezone — the bound belongs on the resolved date against the user's today, not on a UTC instant.
-- **Wider lens, checked:** 10 `desc(...).limit(1)` "latest X" readers exist; the other 9 read
-  server-derived or device-monotonic columns, and `workoutSessions.completedAt` — the one that *was*
-  exposed — is now guarded. **`bodyMetrics.date` is the only unguarded one.**
-
 ### [devices] Q-496 — a regex-passing but invalid ingest date returns 500 and writes an `error_events` row
+
+> **⚠️ Partly closed by Q-494 — re-verify before starting.** `health-connect/ingest` now routes its
+> date through `resolveIngestDate`, which rejects a shape-passing non-date (`2026-02-31`, `2026-13-01`)
+> and falls back to today rather than letting it reach the handler. Measured after the fix:
+> `POST {"date":"2026-02-31","steps":123}` → `200 {"date":"2026-08-20"}`, no 500 and no
+> `error_events` row. **If this entry names other routes, they are untouched** — check which of its
+> sites remain before implementing, and remove the entry outright if the ingest route was the only one.
+
 
 - **Branch:** `fix/ingest-date-semantic-validation`
 - **Added:** 2026-08-18 · review sweep ·
