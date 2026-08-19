@@ -396,6 +396,17 @@ directly — green on web, dead on the device, because the failing path is unrea
   (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
   one the owner picked.
 
+**A small one alongside it, and the owner has set the priority: the chosen label style does not
+persist.** `meal-label-sheet.tsx` holds it in `useState(DEFAULT_MEAL_LABEL_STYLE)` and never stores
+it, so every open resets to the default. The docstring calls that deliberate (*"picked at print time
+… cycling is the point anyway"*), which was right when there were four styles and no settled
+favourite. **The owner's own read, 2026-08-19:** *"I would make the image very rarely; happy for it
+to default to the default and I can change it whenever I want. Keep in mind I just save the image
+and reuse that. Happy for it to persist if its easy."* So: **do it only if it is genuinely a few
+lines** — a `localStorage`-backed initial value, no schema, no settings surface — and drop it
+otherwise. It is a papercut on a flow used a handful of times, and the label PNG is saved and reused
+externally, so the cost of re-picking is near zero. **Do not spend a migration on this.**
+
 **A second defect on the same button, found 2026-08-19 — the PNG has no physical size, so it prints
 at the wrong size even once it reaches the gallery.** The owner's ask is *"download in full res to
 print onto a label"*, and **the resolution half is already done**: `DEFAULT_RENDER_SCALE = 6.24`
@@ -509,6 +520,60 @@ supposed to tidy. **Land this first**, then Q-412 calls it.
   timezone regression test must not wait for the clock to reach the failing window, so pick an
   `Etc/GMT±N` that is near 01:00 *now* and run the case there. Then confirm end to end that a log
   created for yesterday from today's session stores yesterday's midpoint, not this morning.
+
+### [nutrition][health] Q-414 — energy in against energy out, on one timeline
+
+- **Branch:** `feat/energy-timeline-chart`
+- **Added:** 2026-08-19 · owner, once Q-413 made the timestamp mean something
+- **Owner's words:** *"This would just be a display of calorie intake over time? would be nice on a
+  graph like widget; could be superset with calorie out too; so can see what times energy is
+  expended vs refueled."*
+- **Lane B** (`components/**` + an aggregate GET, which is Lane A if a new route is needed — check
+  whether `day-timeline` can carry it before adding one).
+- **⚠ BLOCKED ON Q-413, and this is not a soft dependency.** `food_logs.logged_at` currently records
+  when the row was created, so a chart built today would plot **when the user reached for their
+  phone**, not when they ate. Every back-filled day would spike at whatever hour it was logged.
+  Q-413 makes the column mean what its name says; do that first or this graph is confidently wrong.
+
+**What it is.** One chart, x = time of day, two series:
+- **In** — calories eaten, from `food_logs` bucketed by the resolved `logged_at`.
+- **Out** — calories expended across the day.
+The point is the *relationship*: where refuelling sits against expenditure, so a 2,000 kcal day
+eaten entirely after 7 pm reads differently from the same total spread across it.
+
+**Design decisions to make before building — these are the real content of this entry.**
+1. **Which shape.** Intake is **discrete events** (four meals), expenditure is **continuous**. Do
+   not draw both as lines: a line through four meal points implies the user was eating at 10:30
+   because the segment passes through it. Recommendation: **bars for intake, a filled area or line
+   for expenditure**, same axis. That is the honest encoding of "events against a flow".
+2. **Cumulative or per-hour?** Both are defensible and they answer different questions. Per-hour
+   shows *when*; cumulative (two rising curves, the gap between them being the running balance) shows
+   *whether you are ahead or behind*, which is closer to what the owner already sees on the energy
+   bar. Recommendation: **cumulative**, because the gap between the curves is the day's energy
+   balance and this app already frames nutrition that way (Q-401 retired the second budget precisely
+   to have one number). Per-hour bars can be the intake series drawn against it.
+3. **Where "out" comes from, and it is not one source.** BMR accrues continuously (~1 kcal/min and
+   flat), movement is bursty. Decide whether the curve is BMR + measured movement (honest, and
+   already the app's model since Q-401) or measured only (misleading — it implies you burn nothing
+   sitting still). Recommendation: **BMR + movement**, drawn as one curve, with the method stated
+   under the chart. Do not invent a third TDEE model — Q-401 exists because there were two.
+4. **Resolution.** Movement data granularity decides this, not taste. Check what the step/activity
+   pipeline actually stores per interval before picking an hourly or 15-minute bucket; a chart
+   smoother than its data is a lie with a nice curve.
+
+**Where it lives.** The owner said *"graph like widget"*. Two candidates: the Nutrition tab under the
+existing energy bar, or the day-detail screen. Recommendation: **day detail**, and link to it from
+the energy bar — the Nutrition tab is already the densest screen in the app and Q-395 is trying to
+make it lighter, not heavier. A widget on the tab that opens the full chart is the compromise if the
+owner wants it visible.
+
+- **Per the repo's own rules:** chart colours resolve through `resolveColor`, never a `var(--x)`
+  string handed to canvas (that renders black and has shipped twice); the intake series uses the
+  shared `MACRO_COLORS` only if it is split by macro, otherwise a single accent; and the card seeds
+  from cache and uses `useCachedValue`, never a fetch-once effect (Q-402/Q-359).
+- **Verification.** Compare the chart's totals against the day's existing figures — the intake curve
+  must end exactly on the day's logged calories and the expenditure curve on the day's burn. A chart
+  that disagrees with the number above it is worse than no chart.
 
 ### [nutrition] Q-412 — "reassign them first" instructs the user to do something the app cannot do
 
@@ -1603,9 +1668,16 @@ cadence showing **`--`**.
 
 **Split this into three pieces, because they are not equally ready.**
 
-**1 — Speed. Ready now, small.** `useGuidedWalkStore` already holds `currentPaceSecPerKm`
-(`walk-active.tsx:35-36`) and the screen renders only `distanceKm`. The number the owner wants is
-in the store and simply is not on screen. **Decide the unit deliberately**: pace (`min/km`) is the
+**1 — Speed. ⚠ CORRECTED 2026-08-19 — pace IS already rendered, and the earlier wording here was
+misleading.** `walk-active.tsx:167-176` renders pace as **min/km** whenever `currentPaceSecPerKm`
+is non-null, and drops to an HR-primary layout when it is null (no GPS lock — indoor or treadmill).
+**The owner's screenshot was that fallback**, which is why no pace appeared; it is a GPS-lock
+situation, not a missing feature. An implementer reading the old sentence would have gone looking
+for an absent line and found it already there.
+**What is genuinely missing is the unit the owner asked for — km/h — and a step total.** That
+layout also carries a prior owner decision, recorded in its own comment: *"pace is the real
+fast/slow signal, HR drifts set-over-set and is only a secondary confirmation."* So the screen
+already has a primary-metric hierarchy, and cadence slots into it rather than replacing it. **Decide the unit deliberately**: pace (`min/km`) is the
 convention for running and is what the summary already computes (`computeAvgPaceSecPerKm`), while
 speed (`km/h`) is the more natural reading for a walk and is what the owner asked for by name.
 Recommendation: show **km/h** on the live screen, keep min/km in the summary where it sits beside
@@ -1651,8 +1723,17 @@ should not be built.
   HR takes 30–60 s to catch up with a pace change, so a prompt driven by it arrives after the
   moment it is about. Cadence changes the instant the legs do — which is exactly what makes it
   useful as a *"walk faster"* cue rather than a report.
-- Keep `classifyZone`'s three-state shape (`push` / `in` / `ease`) and swap what it reads. The
-  copy and the thresholds change; the structure does not.
+- **The pacer runs in BOTH directions — owner, 2026-08-19:** *"Should also be able to say to
+  slowdown during the slow part. so pacer for speed/steps both ways"*. A slow segment is not an
+  unpaced rest; walking it too hard is what stops the fast set from being fast. So a fast segment
+  reads against a **floor** (`Walk faster — aim ≥120 spm`) and a slow segment against a **ceiling**
+  (`Ease off — aim ≤95 spm`), from the same control and the same bar.
+- Keep `classifyZone`'s three-state shape (`push` / `in` / `ease`) and swap what it reads — **it is
+  already symmetric**, which is why this costs nothing structurally: `push` and `ease` exist today
+  and are chosen by `kind === 'fast'`. The copy and the thresholds change; the shape does not.
+- **So `walk-config.tsx` needs a cadence PAIR, not a single target** — a fast floor and a slow
+  ceiling, mirroring the two HR targets it already stores. A single cadence number cannot express
+  the slow half.
 - **The fast/slow interval targets become cadence numbers**, so `walk-config.tsx`'s target model
   needs a cadence pair beside the HR pair rather than in place of it — see the fallback below,
   which needs both.
@@ -1672,6 +1753,16 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Do not silently fall back.** A user who thinks they are being paced by cadence and is actually
   being paced by HR will not understand why the prompt is late. The unit on the line is the tell,
   and it is already there.
+
+**Drawn 2026-08-19 — four states, and the layout follows from the fallback rule above.** Speed
+leads at 40 px; cadence and HR sit beneath it as a pair; the step total joins distance on one grey
+line; and the verdict gains a **progress bar against the cadence target**, so *"walk faster"* is a
+reading rather than a sentence. The slow panel shows the bar reading against a
+ceiling rather than a floor, so both directions use one control. The degraded panel is the important
+one: cadence dims to `--`, HR takes the verdict back, and a single line says which signal is pacing
+and how to change it — *"No cadence source — pacing by heart rate. Wear the strap for step pacing."*
+Without that line the screen silently changes what it means. **`walk-active.tsx` is 224 lines**, so
+this fits without an extraction.
 
 - **Lane.** `components/guided-walk/**` is Lane B. Any ring octave correction is
   `packages/shared/src/health/cadence.ts` + the decoder, which is **Lane A**, and it is the harder
@@ -1743,9 +1834,44 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Why it cannot just be "throw everywhere":** a throw quarantines the mutation, and the poison-pill
   rule forbids retrying a validation failure forever. Twelve new dead-letter paths would trade an
   invisible failure for a queue of red badges over values the user cannot correct from a badge.
-- **Blocked on the owner** for the per-field call. The mechanism is built; only the policy is missing.
+- **✅ UNBLOCKED 2026-08-19 — the owner delegated the call** (*"Unsure how to continue on this. I
+  dont understand enough - happy for you to make the best guess on how to proceed"*), and the answer
+  is **none of the twelve should quarantine.** The two that throw are the two that should, and the
+  principle behind them is real rather than a coin flip:
+  - **Quarantine when the value IS the mutation.** `waterMlDelta` is an *increment* — drop it and
+    the user's add is gone with nothing left behind. A malformed `sleep_session` is meaningless
+    rather than incomplete. Both are "the payload has no residual value".
+  - **Coerce when the field is one independent observation among many.** Every `body_metrics`
+    column is a separate daily figure on a shared row; dropping an implausible HRV still leaves a
+    valid weight, step count and macro set on the same day. Twelve new dead-letter paths would
+    trade one invisible failure for a queue of red badges over values the user cannot correct from
+    a badge — which the entry above already argues, and which holds field by field.
+- **But the framing hid the better fix, and this is the part worth building.** Coerce-vs-quarantine
+  is the wrong axis. The one that matters is **whether the person can act on it**:
+  - **Device-sourced** (`hrvMs`, `spo2Pct`, `restingHr`, `steps`, `distanceKm` from the ring or
+    Health Connect) — the user cannot fix a bad reading. Silent coercion plus the `warnings[]` entry
+    Q-485 already emits is exactly right. **No change.**
+  - **User-typed** (`weightKg`, `bodyFatPct`, the six `measurementCm` fields, macros and calories
+    entered by hand) — the user *can* fix it, and dropping it three layers later is the actual
+    defect. **Measured 2026-08-19: `components/health/metric-log-sheet.tsx:60-96` writes to the
+    local store and queues the mutation with no bounds check at all**, and
+    `packages/shared/src/validation/body-metrics.ts` — which holds every threshold already — is
+    imported by nothing under `components/` or `app/`. A 5,000 kg weight is accepted by the sheet,
+    stored locally, queued, pushed, silently dropped server-side, and the number the user typed
+    never appears anywhere.
+  - **So the work is: import the existing validators into the log sheet, reject at the keyboard with
+    an inline message, and never queue the value.** No new thresholds, no new policy, no schema — the
+    bounds are already written and shared. That is a smaller change than twelve quarantine paths and
+    it fixes the case the user can actually do something about.
+- **One bug found while deciding this, worth fixing in the same PR:** `validStepsOrNull` uses
+  `Number.isInteger`, so a **fractional** step count is rejected outright rather than rounded. Any
+  decoder or estimator that produces `8000.5` loses the whole day's steps. Every sibling validator
+  takes `Number.isFinite` and rounds where it matters (`validRestingHrOrNull` does exactly that).
+  Round it.
 - **Related, and the natural client half:** nothing renders `warnings[]` yet. Surfacing it is
-  `components/**` (Lane B) and should follow whatever this decides, not precede it.
+  `components/**` (Lane B). With the decision above it is **lower value than it looked** — the
+  warnings that remain are all device-sourced and unactionable, so a badge would report noise the
+  user cannot clear. Worth doing only as a diagnostic surface, not a user-facing alert.
 
 ### [platform] Q-322 — 92 route files still read their body with bare `req.json()`; the ratchet holds the line
 
@@ -6196,6 +6322,89 @@ session working from a temporarily restored copy.
   HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
 - **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
 
+### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
+
+- **Branch:** `fix/move-hours-rest-boundary`
+- **Plan:** none yet — needs a candidate boundary, not just a code change. Evidence:
+  [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md) §2.
+  **Do Q-515 first** — same boundary, same root cause. Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, from the owner's direct ask (*"check zone minutes and
+  movement per hour coverage"*), deferred by Q-521's closing caveat.
+- **Measured** over 59 days with waking-hour HR (07:00–21:59 Brisbane), `claude_ro` row-scoped to the owner:
+
+  | | |
+  |---|---|
+  | waking hours with any HR data | 857 |
+  | of those, counted as "moved" | **856** (99.9%) |
+  | days scoring exactly 100 | **48 of 59** |
+  | days scoring ≥ 93 | 55 of 59 |
+
+  The only source of variance is **hours the ring was off the finger**. `W_MOVE_HOURS = 12`.
+- **Mechanism.** `computeMovedHours` counts an hour if any sample exceeds `HR_REST_THRESHOLD = 0.05`
+  of reserve — **59.7 bpm** at `hrMaxFromAge(33) = 187` / resting 53. The owner's waking HR is ring
+  p50 **69**, p90 **88**; it is essentially never below the boundary while awake.
+- **This is Q-188 returning through the other half of the fraction.** `hourly-movement.ts`'s own
+  comment records Q-188 fixing this same contributor for being *"pinned at 100… it could never carry
+  information"* — that fix corrected the **denominator** (the goal window). The **numerator** now
+  saturates for an unrelated reason, so the earlier fix could not have prevented this. Same symptom,
+  different half.
+- **Open question for the fix — this is the whole difficulty.** A boundary that is a fixed fraction
+  of reserve re-saturates as soon as the owner's resting HR drops again (which is exactly what Q-515
+  measured happening). Candidates, none yet fitted: a **personal EMA of waking HR** rather than
+  resting HR; a **per-hour delta** against that day's own quiet hours; or dropping HR entirely and
+  keeping the hour if it carries steps. The last is the only one immune to fitness drift, and steps
+  have full coverage (Q-521).
+- **Pass test:** the "moved" fraction of waking hours with data must fall well below 1.0, and the
+  contributor's day-to-day spread must survive when days with full ring wear are considered alone —
+  i.e. the variance must stop coming from missing data.
+- **Caveats:** n = 59 days, one athlete. A boundary fitted here is fitted to one person's HR profile
+  and must be re-checked before any second user relies on the Activity Score.
+
+### [activity][heart-rate] Q-523 — zone minutes read 0 on 90% of days: the Zone 2 floor sits above where strength training lives
+
+- **Branch:** `fix/zone-minutes-floor-and-gap-cap`
+- **Plan:** none yet — the threshold question needs the owner's labels (below). Evidence:
+  [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md) §3–4.
+  Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, same ask as Q-522.
+- **Measured** over the same 59 days, computed as the runtime computes it (Z2 min + 2 × Z3+ min):
+
+  | active minutes | days |
+  |---|---|
+  | **0** | **53** |
+  | 1–4 | 3 |
+  | 5–14 | 1 |
+  | ≥ 15 | 2 |
+
+  Mean **1.39 min/day** against `DEFAULT_ZONE_MINUTES_GOAL = 22` → a contributor pinned at **~6/100**.
+  `W_ZONE_MINUTES = 10`.
+- **It is not a sampling artefact — the training does not reach the floor.** The chest strap is worn
+  for workouts and samples at ~1 Hz; its **p99 is 121 bpm** against a Zone 2 floor of **133** (60% of
+  reserve). Only **0.29%** of strap samples reach Z2, 0.11% reach Z3. **This is Q-516 (`PEAK_BANDS`
+  is calibrated for a heart-rate range strength training never reaches) in a second consumer of the
+  same banding** — resolve them together or the two will drift apart.
+- **The existing guard covers the wrong half of the calendar.** `activity-score.ts:144` suppresses
+  the contributor when `zoneMinutes === 0 && strengthSessionToday`. It fires on 40 of 44 strength
+  days — but **13 of 15 non-strength days score a hard 0**, costing 10 points of weight on the days
+  the metric has nothing to say about. (Both group means are indistinguishable from zero at n = 15;
+  do not read non-strength 2.80 vs strength 0.91 as an inversion.)
+- **Second, separable defect — the gap cap does not match the ring's cadence.**
+  `DEFAULT_MAX_GAP_SEC = 120`, and its comment says a ring "samples ~1/min". **This ring samples on
+  an exact 300 s cadence** (p50 = p90 = 300.0 s), so **80.1% of its intervals are truncated** and it
+  keeps **35%** of elapsed time against the strap's **84%**. The same minute of the same effort is
+  worth **0.4 min on a ring-only day and 0.84 min on a strap day**, and
+  `activeMinutesFromZoneSeconds` then doubles vigorous minutes, doubling the gap with it. Only 26 of
+  59 days have strap data. **Fixing the floor without fixing this leaves zone minutes
+  non-comparable across days** — derive the cap from the observed source cadence.
+- **Open question this entry deliberately does not answer:** what Zone 2 floor *would* carry signal
+  for this athlete. Fitting one needs days the owner would call "active" to fit against — owner
+  labels, not more SQL. Do not guess a number into the code.
+- **Pass test:** zero-zone-minute days must fall from 53/59 to something that tracks the owner's own
+  sense of an active day, and ring-only vs strap days must produce comparable minutes for comparable
+  effort.
+- **Caveats:** n = 59, one athlete, and zone floors are the single most person-specific constant in
+  the app.
+
 ### [body] Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did
 
 - **Branch:** `feat/exertion-integrated-battery-drain`
@@ -6242,10 +6451,16 @@ session working from a temporarily restored copy.
   **Q-276** by making Body Battery explicitly *not* a recovery number.
 - **Pass test:** re-run the four correlations above. `corr(steps, total_drained)` must become clearly
   positive, and workout vs non-workout `end_value` must separate by far more than 0.6 points.
+- **⚠️ Coverage check done 2026-08-19 — two of the four proposed inputs are unusable (Q-522, Q-523).**
+  `moveHours` is **saturated**: 856 of 857 waking hours with data qualify as "moved", 48 of 59 days
+  score exactly 100. `zoneMinutes` is **floored**: 0 on 53 of 59 days, because the Zone 2 boundary
+  (133 bpm) sits above where the owner's strength training reaches (strap p99 **121 bpm**). Put into
+  a drain model as they stand, they would enter as a constant ≈ 1.0 and a constant ≈ 0 while reading,
+  in review, as working movement and intensity terms. **Build the first slice on steps + workout load
+  only**, and add the other two once Q-522/Q-523 land. Evidence:
+  [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md).
 - **Caveats:** n = 51, one athlete, Pearson on daily aggregates — the weak values (+0.112, −0.153) mean
-  *"no relationship"* rather than a precise signed effect. **Zone minutes and movement-per-hour were
-  not pulled or coverage-checked** — they are named because the owner named them, and checking their
-  coverage is the first implementation step, given what `active_calories` shows.
+  *"no relationship"* rather than a precise signed effect.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
