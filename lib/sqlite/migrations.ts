@@ -221,6 +221,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'meal_plan_meals', column: 'ingredients',    ddl: `ALTER TABLE meal_plan_meals ADD COLUMN ingredients TEXT NOT NULL DEFAULT '[]'` },
   { table: 'meal_plan_meals', column: 'suggested_time', ddl: `ALTER TABLE meal_plan_meals ADD COLUMN suggested_time TEXT` },
   { table: 'saved_meals',     column: 'servings',       ddl: `ALTER TABLE saved_meals ADD COLUMN servings REAL NOT NULL DEFAULT 1` },
+  { table: 'saved_meals',     column: 'image_data_uri',  ddl: `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT` },
   { table: 'workout_sessions', column: 'deleted_at',  ddl: `ALTER TABLE workout_sessions ADD COLUMN deleted_at TEXT` },
   { table: 'workout_sessions', column: 'sync_status', ddl: `ALTER TABLE workout_sessions ADD COLUMN sync_status TEXT NOT NULL DEFAULT 'synced'` },
   { table: 'exercise_logs',    column: 'deleted_at',  ddl: `ALTER TABLE exercise_logs ADD COLUMN deleted_at TEXT` },
@@ -682,9 +683,10 @@ const CREATE_MEAL_PLAN_MEALS_IDX =
   `CREATE INDEX IF NOT EXISTS idx_meal_plan_meals_variant ON meal_plan_meals(variant_id, position)`;
 
 const CREATE_SAVED_MEALS = `CREATE TABLE IF NOT EXISTS saved_meals (
-  id          TEXT PRIMARY KEY,
-  name        TEXT NOT NULL,
-  servings    REAL NOT NULL DEFAULT 1,
+  id             TEXT PRIMARY KEY,
+  name           TEXT NOT NULL,
+  servings       REAL NOT NULL DEFAULT 1,
+  image_data_uri TEXT,
   created_at  TEXT NOT NULL,
   updated_at  TEXT NOT NULL,
   deleted_at  TEXT,
@@ -1257,6 +1259,15 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // above is a no-op for them — this ALTER is the only thing that reaches them, and the
       // RECONCILE_COLUMNS row is the authority if this upgrade half-applies.
       `ALTER TABLE day_checkins ADD COLUMN food_logging_completed_at TEXT`,
+    ],
+  },
+  {
+    toVersion: 28,
+    statements: [
+      // Q-396. Same shape as v27: `saved_meals` exists on every upgraded device, so the column added
+      // to the CREATE TABLE body above reaches fresh installs ONLY — this ALTER is what reaches
+      // everyone else, and the RECONCILE_COLUMNS row is the authority if the upgrade half-applies.
+      `ALTER TABLE saved_meals ADD COLUMN image_data_uri TEXT`,
     ],
   },
 ];

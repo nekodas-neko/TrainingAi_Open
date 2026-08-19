@@ -592,6 +592,10 @@ export const savedMeals = pgTable('saved_meals', {
   // How many portions the recipe makes. 1 for an ordinary meal; >1 for a batch (the owner's
   // protein ice cream makes two), so a plan can take one portion instead of the whole tub.
   servings:  doublePrecision('servings').notNull().default(1),
+  // A 128x128 WebP thumbnail as a base64 data URI, capped at SAVED_MEAL_IMAGE_MAX_BYTES (Q-396).
+  // Not a URL: this row syncs to a phone and has to render offline. Not 5 MB like `users.avatar`:
+  // that column never enters the sync delta and this one does.
+  imageDataUri: text('image_data_uri'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 
