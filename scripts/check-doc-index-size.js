@@ -997,7 +997,12 @@ const BASELINE = {
   // 2026-08-20 (Tuning): owner acceptance criterion on Q-529 -- accurate on first open. The
   // 62-minute ring upload cadence and the three-link ordering live in the entry because an
   // implementer who shortens the rollup alone fixes the 4-minute term and none of the 62.
-  'docs/implementation-backlog.md': 11177,
+  // Raised 2026-08-19: the number is re-measured from the MERGED file, not taken from either side of
+  // the conflict. Two parallel-merge races landed here in one evening — #245 and #246 each grew the
+  // backlog past 11127 and each was green when its own CI ran, leaving `main` red on Custom Rules
+  // and failing every unrelated branch; another lane raised it to 11177 while this branch raised it
+  // to 11173. Splicing either hunk would have re-broken it. Re-measure, never pick.
+  'docs/implementation-backlog.md': 11192,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
