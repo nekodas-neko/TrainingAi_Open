@@ -6,6 +6,11 @@ import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One SQL statement. The audit log truncates it at 20,000 characters, so 64 KB is generous past
+// anything that is meaningfully recorded.
+const MAX_BODY_BYTES = 64 * 1024
 
 /**
  * Read-only production query endpoint (plan:
@@ -91,14 +96,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Read-only database access is not configured' }, { status: 503 })
   }
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const sql = (body as { sql?: unknown })?.sql
+  const sql = (read.body as { sql?: unknown } | null)?.sql
   if (typeof sql !== 'string' || !sql.trim()) {
     return NextResponse.json({ error: 'Body must be { sql: string }' }, { status: 400 })
   }
