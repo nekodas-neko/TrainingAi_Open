@@ -11,12 +11,11 @@
 // path and then streams with a real byte counter, cancelling on overflow. Measured against the same
 // 20 MB body on a route with a 16 KB cap: cut off at 2,949,120 bytes.
 //
-// **This is a ratchet, not a sweep.** 104 bare reads across 92 route files remained after the three
-// unauthenticated ones were converted (slice 1); slice 2 took the six offline-first hot paths, so 98
-// across 86 remain. Converting them all at once is how a mistake hides in a diff nobody can read. So: every file below is baselined at the number of bare reads it has, the
-// number may only go DOWN, and a file that is not listed must have none. A route converted to
-// `readJsonLimited` lowers its own number in the same PR; a file that reaches zero is removed from
-// the list. Q-322 tracks the remaining sweep, and this check is what makes doing it slowly safe.
+// **This is a ratchet, not a sweep.** 104 bare reads across 92 route files remained after slice 1
+// converted the three session-less routes, and converting the rest at once is how a mistake hides in
+// a diff nobody can read. So: every file below is baselined at the number of bare reads it has, the
+// number may only go DOWN, and a file not listed must have none. A route converted to
+// `readJsonLimited` lowers its own number in the same PR; a file that reaches zero leaves the list.
 //
 // **What is left is printed by this script on every run and is deliberately NOT written down here.**
 // A hand-maintained running total is one more thing to re-edit per slice and get wrong, and it
@@ -56,8 +55,6 @@ const BASELINE = {
   'app/api/admin/invites/route.ts': 2,
   'app/api/admin/mirror-dataset-gifs/route.ts': 1,
   'app/api/admin/timing-baseline/route.ts': 1,
-  'app/api/admin/users/route.ts': 2,
-  'app/api/admin/vacuum/route.ts': 1,
   'app/api/ai-periodization/baseline/complete/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/prescribe/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
@@ -114,9 +111,6 @@ const BASELINE = {
   'app/api/supplements/[id]/route.ts': 1,
   'app/api/supplements/route.ts': 1,
   'app/api/user/equipped-title/route.ts': 1,
-  'app/api/user/goals/route.ts': 1,
-  'app/api/user/password/route.ts': 1,
-  'app/api/user/profile/route.ts': 1,
   'app/api/weekly-digest/route.ts': 1,
   'app/api/workout-entry/route.ts': 2,
   'app/api/workout-review/session/[sessionId]/apply/route.ts': 1,
