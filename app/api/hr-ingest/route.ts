@@ -9,6 +9,11 @@ import {
   MIN_PLAUSIBLE_RR_MS, MAX_PLAUSIBLE_RR_MS,
   rrContradictsBpm,
 } from '@trainingai/shared/validation/plausibility'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// 2,000 samples of `{at, bpm, rr[<=16]}` is ~240 KB of JSON at the schema's own limit. 512 KB
+// matches the `oura-ble/samples` sibling.
+const MAX_BODY_BYTES = 512 * 1024
 
 // Structural validation only — value ranges are filtered per-sample below, never rejected as a
 // batch. The H10 routinely emits bpm=0 during signal acquisition at strap-on and RR artifacts
@@ -48,9 +53,13 @@ export async function POST(req: Request) {
   if (!rateLimit(`hr-ingest:${userId}`, 120, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  let body: unknown
-  try { body = await req.json() } catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const parsed = BodySchema.safeParse(body)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = BodySchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
 
   const repo = await getRepositoryAsync()
