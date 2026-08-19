@@ -1205,6 +1205,22 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 ### [nutrition][platform] Q-409 — paste a recipe URL and get a meal; the fetch is the whole security surface
 
+> **⚠️ The Lane A half SHIPPED (PR #180). What is left is Lane B only** — the UI in
+> `components/nutrition/my-meals-picker.tsx` that sends a `url` and renders what comes back.
+> `POST /api/nutrition/scan` now takes `{ url }`, answering with the ordinary scan payload plus
+> **`sourceUrl`** (the final URL after redirects — that is the attribution this entry asked for) and
+> **`recipeYield`** (servings, or **`null`**).
+>
+> **`recipeYield: null` is the one thing Lane B must handle, and it is not cosmetic.** With a stated
+> yield the route has already divided and the payload is per-serving (`notes` leads with *"Per
+> serving (1 of 12)."*). Without one the payload is the **whole recipe** — verified live: a
+> banana-bread page returned 1,956 kcal for the loaf. This entry's own rule applies — *ask, do not
+> assume 1* — so the picker must prompt for serves and divide, or it logs a tray as a meal.
+>
+> Rationale, measurements and the SSRF verification are in
+> [`entries/2026-08-19-recipe-url-to-meal.md`](overview/entries/2026-08-19-recipe-url-to-meal.md);
+> the modules are in [`module-map.md`](module-map.md). Everything below is the original entry.
+
 - **Branch:** `feat/recipe-url-to-meal`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner
 - **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
@@ -1265,7 +1281,8 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   a meal came from six months later, and it is the honest thing to do with someone else's recipe.
 
 - **Lane.** `app/api/nutrition/scan/route.ts` and any shared parser are **Lane A**;
-  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first.
+  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first — **it has
+  (PR #180), so only Lane B remains.**
 
 - **Verification.** Paste three real recipe URLs — one with JSON-LD, one without, one that 404s —
   and confirm: ingredients and yield resolve from the structured path; the fallback produces a
