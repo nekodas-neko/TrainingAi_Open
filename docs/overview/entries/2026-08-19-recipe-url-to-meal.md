@@ -1,6 +1,6 @@
 # 2026-08-19 — Q-409 Lane A: paste a recipe URL, get a meal (the fetch half)
 
-**PR #178** · branch `feat/recipe-url-to-meal` · Implementation Lane A · JS/server only, no APK needed.
+**PR #180** · branch `feat/recipe-url-to-meal` · Implementation Lane A · JS/server only, no APK needed.
 
 ## What shipped
 

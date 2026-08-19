@@ -836,7 +836,12 @@ const BASELINE = {
 // gains the handover block Lane B needs to build against — the endpoint's contract, the Undo, and
 // the warning that the feature is INERT until the button exists. A half-shipped item that does not
 // say which half is how the other lane rebuilds the wrong one.
-  'docs/implementation-backlog.md': 10618,
+  // Raised 2026-08-19 (Lane A, Q-409): 10618 -> 10635. Same shape, same reason: the route half
+  // shipped and the entry has to say what the payload now hands Lane B. The 17 lines are almost
+  // all one warning — `recipeYield: null` means the numbers are for the WHOLE recipe, so the
+  // picker must ask for serves. The narrative went to the journal entry instead, which is why
+  // this is 17 lines and not the 31 it started at.
+  'docs/implementation-backlog.md': 10635,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

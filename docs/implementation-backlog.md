@@ -1205,35 +1205,21 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 ### [nutrition][platform] Q-409 — paste a recipe URL and get a meal; the fetch is the whole security surface
 
-> **⚠️ The Lane A half SHIPPED (PR #178). What is left is Lane B only — the UI in
-> `components/nutrition/my-meals-picker.tsx` that sends a `url` and renders what comes back.**
-> `POST /api/nutrition/scan` now takes `{ url }` beside `image` and `text`, and answers with the
-> ordinary scan payload plus two new fields: **`sourceUrl`** (the final URL after redirects — show it,
-> that is the attribution this entry asked for) and **`recipeYield`** (servings, or **`null`**).
+> **⚠️ The Lane A half SHIPPED (PR #180). What is left is Lane B only** — the UI in
+> `components/nutrition/my-meals-picker.tsx` that sends a `url` and renders what comes back.
+> `POST /api/nutrition/scan` now takes `{ url }`, answering with the ordinary scan payload plus
+> **`sourceUrl`** (the final URL after redirects — that is the attribution this entry asked for) and
+> **`recipeYield`** (servings, or **`null`**).
 >
-> **`recipeYield: null` is the one thing Lane B must handle, and it is not cosmetic.** When the page
-> states a yield, the route divides the whole-recipe estimate by it in code and the payload is already
-> per-serving (`notes` leads with `"Per serving (1 of 12)."`). When it does not, the payload is the
-> **whole recipe** — verified live: a banana-bread page with no yield returned 1,956 kcal for the loaf.
-> This entry's own rule applies — *ask, do not assume 1* — so the picker must prompt for serves and
-> divide before saving, or it logs a whole tray as one meal.
+> **`recipeYield: null` is the one thing Lane B must handle, and it is not cosmetic.** With a stated
+> yield the route has already divided and the payload is per-serving (`notes` leads with *"Per
+> serving (1 of 12)."*). Without one the payload is the **whole recipe** — verified live: a
+> banana-bread page returned 1,956 kcal for the loaf. This entry's own rule applies — *ask, do not
+> assume 1* — so the picker must prompt for serves and divide, or it logs a tray as a meal.
 >
-> **Shipped in the Lane A half:** `lib/net/safe-fetch.ts` (`fetchPublicUrl` — the sanctioned way to
-> fetch any user-supplied URL: https-only, port 443, no credentials, every resolved address checked,
-> each redirect hop re-validated, bounded by bytes/timeout/content-type, and a `reason` code the caller
-> maps to a message rather than echoing) and `packages/shared/src/nutrition/recipe-parse.ts` (JSON-LD
-> first, model fallback on extracted text only).
->
-> **Measured rather than assumed, and both changed the code:** an ordinary recipe page is 553 KB
-> (bbcgoodfood), so the byte cap is 3 MB and not 1 MB; and the first 4,000 characters of a page with no
-> JSON-LD are navigation chrome, so the fallback strips `nav`/`header`/`footer`/`aside` and starts at
-> the "Ingredients" heading. The five SSRF cases this entry names as acceptance criteria are proven by
-> test **and** exercised live against the dev server — see
-> [`entries/2026-08-19-recipe-url-to-meal.md`](overview/entries/2026-08-19-recipe-url-to-meal.md).
->
-> **Residual risk, stated not hidden:** DNS rebinding is not closed out — the address is validated and
-> then the hostname is connected to by name. Closing it needs connecting to the pinned IP with the Host
-> header preserved, which undici does not expose. It is written in `safe-fetch.ts`'s own docstring.
+> Rationale, measurements and the SSRF verification are in
+> [`entries/2026-08-19-recipe-url-to-meal.md`](overview/entries/2026-08-19-recipe-url-to-meal.md);
+> the modules are in [`module-map.md`](module-map.md). Everything below is the original entry.
 
 - **Branch:** `feat/recipe-url-to-meal`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner
@@ -1296,7 +1282,7 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 - **Lane.** `app/api/nutrition/scan/route.ts` and any shared parser are **Lane A**;
   `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first — **it has
-  (PR #178), so only Lane B remains.**
+  (PR #180), so only Lane B remains.**
 
 - **Verification.** Paste three real recipe URLs — one with JSON-LD, one without, one that 404s —
   and confirm: ingredients and yield resolve from the structured path; the fallback produces a
