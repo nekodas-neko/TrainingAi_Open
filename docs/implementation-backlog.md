@@ -439,6 +439,21 @@ is what makes the number read as misaligned rather than merely offset.
 - **`band` uses a different calorie path** (`:422`, `L + calW + 4`, left-aligned in the reversed
   header) and is **not** affected. Do not "fix" it to match.
 
+**And the unit is too large — owner, 2026-08-19:** *"Make the KCAL text still a little bit smaller -
+as small as the nutritional text."* **This needs the spec split before it can be done at all**, which
+is the part worth knowing before someone reaches for the obvious edit:
+- `KCAL` is drawn at **`spec.macroSize`** (`:544`, `:552`) — **the same constant that sets the P/C/F
+  line** (`:561`). Shrinking the unit by editing `macroSize` shrinks the macros with it. There is no
+  way to satisfy this request through the existing fields.
+- **Add a `unitSize` to `StyleSpec`, defaulting to the list size (`listSize = 7`, `:583`)** — the
+  smallest type on the label and the "nutritional text" the owner is matching to. That is 7.5 → 7:
+  a real reduction, and the unit stays comfortably legible at 600 dpi.
+- Six styles get one new field. `band` reads `macroSize` for its unit too (`:420`, `:424`) and should
+  take the same `unitSize`, since its calorie path differs in *position* rather than in type scale.
+- **Do not go below the list size without asking.** Drawn at 6 for comparison during the review: the
+  unit stops reading as a word and becomes a mark on the numeral. That may be desirable, but it is a
+  different decision from "match the nutritional text" and the owner has not made it.
+
 - **⚠ Do NOT absorb the slack into the code.** It is the obvious alternative and it is wrong: the
   slack varies with the ingredient count (8.6 mm down to 2.2 mm), so a code sized to fill it would
   print at a **different physical size per meal** — and the sheet's *"Code is 18.5 mm at 0.56 mm per
