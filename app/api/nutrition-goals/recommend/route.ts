@@ -15,6 +15,10 @@ import type { BodyMetrics, SleepSession, MoodLog } from '@trainingai/shared/type
 import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
 import type { UserGoals } from '@/lib/data/repository'
 import type { ProgramPhaseType } from '@trainingai/shared/types/program'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// An optional source marker; the body is normally absent.
+const MAX_BODY_BYTES = 4 * 1024
 
 const recommendationSchema = z.object({
   recommendedStepsGoal: z.number(),
@@ -132,9 +136,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  let body: { source?: string } = {}
-  try { body = await req.json() } catch { /* default to on_demand */ }
-  const source = body.source === 'scheduled' ? 'scheduled' : 'on_demand'
+  // Optional body: an absent or unreadable one keeps the default, only an oversized one is refused.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+  }
+  const body = (read.ok ? read.body : null) as { source?: string } | null
+  const source = body?.source === 'scheduled' ? 'scheduled' : 'on_demand'
 
   const repo = await getRepository()
   const user = await repo.getUserById(userId)

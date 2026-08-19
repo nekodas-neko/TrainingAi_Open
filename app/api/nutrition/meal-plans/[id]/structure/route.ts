@@ -11,6 +11,10 @@ import {
 import type { MealPlanDayType } from '@trainingai/shared/types/nutrition'
 import type { MealPlanVariantInput } from '@/lib/data/postgres/slices/meal-plans'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Meal counts and a reorder.
+const MAX_BODY_BYTES = 32 * 1024
 
 /**
  * Change a saved plan's shape: how many meals it splits into, when training sits, and whether it
@@ -51,8 +55,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (badId) return badId
 
   let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
   const parsed = PatchSchema.safeParse(raw)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
