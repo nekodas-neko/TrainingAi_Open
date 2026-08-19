@@ -1723,8 +1723,17 @@ should not be built.
   HR takes 30–60 s to catch up with a pace change, so a prompt driven by it arrives after the
   moment it is about. Cadence changes the instant the legs do — which is exactly what makes it
   useful as a *"walk faster"* cue rather than a report.
-- Keep `classifyZone`'s three-state shape (`push` / `in` / `ease`) and swap what it reads. The
-  copy and the thresholds change; the structure does not.
+- **The pacer runs in BOTH directions — owner, 2026-08-19:** *"Should also be able to say to
+  slowdown during the slow part. so pacer for speed/steps both ways"*. A slow segment is not an
+  unpaced rest; walking it too hard is what stops the fast set from being fast. So a fast segment
+  reads against a **floor** (`Walk faster — aim ≥120 spm`) and a slow segment against a **ceiling**
+  (`Ease off — aim ≤95 spm`), from the same control and the same bar.
+- Keep `classifyZone`'s three-state shape (`push` / `in` / `ease`) and swap what it reads — **it is
+  already symmetric**, which is why this costs nothing structurally: `push` and `ease` exist today
+  and are chosen by `kind === 'fast'`. The copy and the thresholds change; the shape does not.
+- **So `walk-config.tsx` needs a cadence PAIR, not a single target** — a fast floor and a slow
+  ceiling, mirroring the two HR targets it already stores. A single cadence number cannot express
+  the slow half.
 - **The fast/slow interval targets become cadence numbers**, so `walk-config.tsx`'s target model
   needs a cadence pair beside the HR pair rather than in place of it — see the fallback below,
   which needs both.
@@ -1745,14 +1754,15 @@ the H10 at home — which is the walk in the screenshot that started this.
   being paced by HR will not understand why the prompt is late. The unit on the line is the tell,
   and it is already there.
 
-**Drawn 2026-08-19 — three states, and the layout follows from the fallback rule above.** Speed
+**Drawn 2026-08-19 — four states, and the layout follows from the fallback rule above.** Speed
 leads at 40 px; cadence and HR sit beneath it as a pair; the step total joins distance on one grey
 line; and the verdict gains a **progress bar against the cadence target**, so *"walk faster"* is a
-reading rather than a sentence. The degraded panel is the important one: cadence dims to `--`, HR
-takes the verdict back, and a single line says which signal is pacing and how to change it —
-*"No cadence source — pacing by heart rate. Wear the strap for step pacing."* Without that line the
-screen silently changes what it means. **`walk-active.tsx` is 224 lines**, so this fits without an
-extraction.
+reading rather than a sentence. The slow panel shows the bar reading against a
+ceiling rather than a floor, so both directions use one control. The degraded panel is the important
+one: cadence dims to `--`, HR takes the verdict back, and a single line says which signal is pacing
+and how to change it — *"No cadence source — pacing by heart rate. Wear the strap for step pacing."*
+Without that line the screen silently changes what it means. **`walk-active.tsx` is 224 lines**, so
+this fits without an extraction.
 
 - **Lane.** `components/guided-walk/**` is Lane B. Any ring octave correction is
   `packages/shared/src/health/cadence.ts` + the decoder, which is **Lane A**, and it is the harder
