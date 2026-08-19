@@ -397,9 +397,43 @@ eaten entirely after 7 pm reads differently from the same total spread across it
    already the app's model since Q-401) or measured only (misleading — it implies you burn nothing
    sitting still). Recommendation: **BMR + movement**, drawn as one curve, with the method stated
    under the chart. Do not invent a third TDEE model — Q-401 exists because there were two.
-4. **Resolution.** Movement data granularity decides this, not taste. Check what the step/activity
-   pipeline actually stores per interval before picking an hourly or 15-minute bucket; a chart
-   smoother than its data is a lie with a nice curve.
+4. **Resolution. ⛔ MEASURED 2026-08-19 (Lane B), and the answer breaks two of this entry's own
+   rules against each other.** The instruction was to check what the pipeline stores per interval
+   before picking a bucket. It stores almost nothing, and the component that is missing is the
+   dominant one.
+
+   | source of "out" | placeable in time? | production volume (owner's account) |
+   |---|---|---|
+   | BMR | yes — continuous by definition | ~1,600 kcal/day |
+   | workouts | yes — `started_at`/`completed_at` | 76 days of 111 |
+   | logged activities | yes — `start_time`/`end_time` | 36 days of 111, **5,082 kcal total, ever** |
+   | **steps** | **NO — daily total only** | 111 days, **668,749 steps**, avg 6,025/day |
+
+   `step_live_windows` looks like the intra-day source and is not: **11 rows and 8,261 steps in the
+   whole table's history**, against 668,749 steps counted in `body_metrics`. That is **1.2%
+   coverage**. Everything else arrives as one number per day with no distribution.
+
+   **So the two rules collide.** This entry requires *"the expenditure curve must end exactly on the
+   day's burn"* and separately forbids *"a chart smoother than its data"*. Step energy is roughly
+   five times the logged-activity energy and cannot be placed in time — so a curve that reconciles
+   with the day's total **must** smear it, and a curve that does not smear it **cannot** reconcile.
+   There is no encoding that satisfies both as written. This is not a build problem to solve in
+   code; it is a decision about what the chart is allowed to claim, and it is the owner's.
+
+   **Recommendation, if it helps whoever picks it up:** draw the part whose timing is known — BMR
+   plus timed workouts and activities — and state the remainder rather than distributing it
+   (*"plus 240 kcal from 6,000 steps, time not recorded"*). Nothing is smeared, the totals still
+   reconcile because the unplaced part is named, and the chart claims exactly what the data
+   supports. The cost is that the headline "when did you burn it" answer is partial on the ~2 days
+   in 3 that carry no timed activity.
+
+   **The intake half has no such problem** and is ready: 222 food logs across 45 days already carry
+   a resolved `logged_at` after Q-413.
+
+5. **No new route is needed, so this stays in Lane B.** `/api/day-timeline` already returns meals
+   with `timeMs` and `calories`, and walks and workouts with their times and calories — the intake
+   series and the timed half of expenditure, both already assembled server-side. Confirmed against
+   `app/api/day-timeline/route.ts` on 2026-08-19. Do not add a route before re-checking that.
 
 **Where it lives.** The owner said *"graph like widget"*. Two candidates: the Nutrition tab under the
 existing energy bar, or the day-detail screen. Recommendation: **day detail**, and link to it from
