@@ -859,7 +859,12 @@ const BASELINE = {
   // record, which one print could falsify. Q-358's entry goes with it: it was built rather than
   // deferred because Q-411 resized every code and the fractional-grid flake it describes came
   // straight back, and a decode E2E that passes on a coin flip cannot gate the change that caused it.
-  'docs/implementation-backlog.md': 10519,
+  // Raised 2026-08-19 (Lane A, Q-322 slice 2): 10519 -> 10526. Seven lines recording what the slice
+  // actually did — above all that `sync/push`'s 4 MB cap is MEASURED (a worst-case 100-mutation
+  // batch is 0.57 MB) and must not be lowered without re-measuring, because that route is the
+  // outbox and a rejected batch is the app's worst-case data-loss path. A cap with no stated
+  // derivation is one someone tightens later on a hunch.
+  'docs/implementation-backlog.md': 10526,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
