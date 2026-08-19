@@ -783,7 +783,13 @@ const BASELINE = {
   // seven fewer, recomputed from the merged file on top of the raise above. Q-357 is the four
   // defeated memo call sites Q-490's review said did not exist ("no inline arrows exist
   // anywhere"); the new check freezes them rather than leaving them to be rediscovered.
-  'docs/implementation-backlog.md': 10124,
+  // Raised 2026-08-18 (Q-404, Q-405 — BugFix intake). Q-404 exists because a deliberate deferral
+  // (the Sentry SDK) was recorded in a handoff and never queued, so nothing was going to pick it
+  // up — Sentry's own email surfaced it, not this repo. Most of that entry is the verification
+  // requirement the deferring session named, and the PII scrubbing a health app needs shipped in
+  // the same PR as the DSN. Q-405: a Coach swap never writes exercise_role, so the new exercise
+  // inherits the old one's — and role selects the progression style, so it is a wrong prescription.
+  'docs/implementation-backlog.md': 10204,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
