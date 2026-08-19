@@ -447,6 +447,66 @@ blocker and the intended shape were both already named, so **do not re-derive th
   note says the server half is the correct home, so **route it to Lane A** with the display change
   riding along.
 
+### [workouts][nutrition] Q-419 — the done screen and the day's energy budget disagree about the same workout, because only one of them reads your RPE
+
+- **Branch:** `fix/day-energy-ignores-session-rpe`
+- **Added:** 2026-08-19 · found while answering the owner's question *"how can we make energy usage/burned
+  from excercuse more accurate, what type of data can we feed to calibrate it over time"*. Not a report —
+  this is the first rung of that answer, and it is a straight defect rather than a calibration change.
+
+**Two live paths call the same estimator with different intensities for the same session.**
+
+| path | intensity | file |
+|---|---|---|
+| done screen → `GET /api/workout-sessions/[id]/energy` | `intensityFromRpe(rpe)` — easy / moderate / hard | `app/api/workout-sessions/[id]/energy/route.ts:64` |
+| day ENERGY row, Nutrition earned-kcal, Home budget | **hardcoded `'moderate'`** | `packages/shared/src/health/daily-energy.ts:103` |
+
+`computeActiveEnergy` never receives an RPE — `ActiveEnergyInput.strengthSessions` is
+`{ durationMin }[]` and nothing else (`daily-energy.ts:66-67`), so the tier cannot be threaded without
+widening that type.
+
+- **The user watches the number change and then watches it not apply.** `done-screen.tsx:130-152`
+  re-fetches on every RPE tap, keyed by `workout-energy:<id>:<activityId>:<rpe>` precisely so a different
+  rating re-estimates. So on the done screen an RPE 9 session reads higher than an RPE 3 one — and the
+  moment that session lands in the day's ENERGY section, in Nutrition's earned calories, and in the Home
+  budget, it reverts to the moderate figure. The tap looks load-bearing and is not.
+- **Magnitude is exact in form even though the tiers are not readable here.** `estWorkoutKcal` is
+  `durationMin × (MET − 1.5) × bmrPerMinute` (`workout-energy.ts:113`), so the ratio between tiers is
+  `(met_hard − 1.5) / (met_moderate − 1.5)` — nothing else in the expression changes. The **real** MET
+  table cannot be quoted from the sandbox: `lib/oura-models/constants/` is runtime-only (absent here) and
+  the committed fixture is deliberately scrubbed — it lists strength as `met_easy: 1, met_moderate: 0.6,
+  met_hard: 3`, which is not a MET table (that scrubbing is Q-312). **Measure against the runtime table
+  before quoting a kcal delta anywhere user-facing.**
+- **`sessionRpe` is already stored and already synced.** `workout_sessions.session_rpe`
+  (`schema.ts:169`), written through the `session_rpe` outbox domain by `handleRpeTap` (`done-screen.tsx:154-170`). This
+  needs no new capture, no migration, no schema change — only for the day-level path to read a column it
+  already has.
+- **Where it has to be plumbed.** `energy-balance-service.ts:122-126` and `app/api/body-metadata/route.ts:148`
+  both build `strengthSessions` from workout rows they have already fetched, so `ws.sessionRpe` is in hand
+  at both sites. Widen `ActiveEnergyInput.strengthSessions` to `{ durationMin; rpe?: number | null }` and
+  call `intensityFromRpe(s.rpe)` instead of the literal. `intensityFromRpe` already defaults to
+  `'moderate'` on null (`workout-energy.ts:87`), so an unrated session is unchanged — which is what keeps
+  this from re-scoring history that has no RPE.
+- **⚠ It DOES re-score history that has one, and that is the thing to size before shipping.** Every past
+  day carrying a rated session moves. Per the Tuning rule, state how many days change and by how much
+  before this lands — and note it moves *maintenance* too, since `adaptive-tdee`'s calibration window
+  reads the same active-energy figures. A silent re-score of the number the app eats against is worse
+  than the disagreement it fixes.
+- **Fixes a stated invariant, not just an oddity.** `energy-summary.ts`'s own header says the day screen
+  disagreeing with Nutrition about how much was burned is worse than either being slightly off. This is
+  that disagreement, one layer up — the done screen against both of them.
+- **Relationship to Q-391:** same file, same function, adjacent change. Q-391 needs
+  `computeActiveEnergy` to return its per-session breakdown instead of discarding it; this needs the same
+  loop to read an intensity per session. **Do them in one visit** — and if Q-391 ships first, its
+  per-session figures must carry the tier, or the Training card inherits this same contradiction.
+- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — complete a workout, tap
+  an RPE, compare the done screen's kcal with the same day's ENERGY row. No device, no production data.
+  Spans `packages/shared/**`, `lib/health/**` and `app/api/**` — all Lane A.
+- **What would count as done:** the kcal the done screen shows for a session is the kcal that session
+  contributes to the day's ENERGY row, Nutrition's earned calories and the Home budget, for every RPE
+  value; an unrated session is unchanged; and a test pins the three surfaces to one number.
+
+
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`

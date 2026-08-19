@@ -1002,7 +1002,7 @@ const BASELINE = {
   // backlog past 11127 and each was green when its own CI ran, leaving `main` red on Custom Rules
   // and failing every unrelated branch; another lane raised it to 11177 while this branch raised it
   // to 11173. Splicing either hunk would have re-broken it. Re-measure, never pick.
-  'docs/implementation-backlog.md': 11192,
+  'docs/implementation-backlog.md': 11225,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
