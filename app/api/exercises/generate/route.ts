@@ -5,6 +5,10 @@ import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One exercise name, capped at 120 characters by the schema below.
+const MAX_BODY_BYTES = 4 * 1024
 
 const RequestSchema = z.object({
   name: z.string().min(1).max(120),
@@ -34,7 +38,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Rate limit exceeded' }, { status: 429 })
   }
 
-  const body = RequestSchema.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  }
+  const body = RequestSchema.safeParse(read.body)
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   try {

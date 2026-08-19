@@ -899,7 +899,12 @@ const BASELINE = {
   // blocked behind Q-272, and Q-72's "get more spread in the ratings" is now explicitly withdrawn.
   // A stale instruction is worse than a long one. Rebuilt from origin/main after a parallel PR
   // raised the same baseline -- splicing the conflict hunks would produce two baselines for one number.
-  'docs/implementation-backlog.md': 11045,
+  // Raised 2026-08-19 (Lane B, Q-359 slice 3): the added lines are a correction, and correcting a
+  // number in place would have been cheaper and wrong. The scanner this Q shipped was over-counting
+  // by ten of twenty-five, so two sessions planned work around sites that did not exist — the entry
+  // has to say WHICH files were phantom and why, or the next session re-derives it from the same
+  // bad numbers.
+  'docs/implementation-backlog.md': 11160,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
