@@ -69,6 +69,37 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] Food logs changed shape three times in one day and none of it is device-verified (Q-413, Q-325, Q-412 · v1.327.0–1.328.0) — NOT verified on device · needs: hardware
+
+- **What shipped**, all on `food_logs`, which is **offline-first** — so the local mirror is where a
+  sync half fails silently, and `pnpm dev` proves the server half only (`getLocalStore` returns null
+  in the web sandbox).
+  - **Q-413** — `logged_at` now means when you *ate*, not when you tapped: inside the meal's window on
+    the log's own date keeps the real instant, otherwise it takes the window midpoint in the user's
+    timezone. Migration **203** corrected stored rows whose timestamp fell on a different local date
+    than their `date`. [`journal`](docs/overview/entries/2026-08-19-resolve-eaten-at.md).
+  - **Q-325** — `applyDelta`'s `food_logs` conflict arm updated only 4 of 8 columns, so a device that
+    already held a row could never learn a changed `date`, `meal_type_id`, `food_item_id` or
+    `logged_at`. **Without this, Q-413's corrections would have stopped at the server.**
+  - **Q-412** — a meal type with entries can be deleted by moving them, in one transaction, with each
+    moved row re-timed against the new window.
+    [`journal`](docs/overview/entries/2026-08-19-meal-type-reassign.md).
+- **The checks owed**, all on the APK:
+  1. Back-fill yesterday's dinner **while offline** and confirm the row shows the window midpoint
+     rather than the current time — before *and* after it syncs. That is the pair that proves the
+     local resolver and Q-325's pull together.
+  2. Reassign a meal type that has logs, then confirm the entries appear under the new type with the
+     same calories, the day total is unchanged, and it survives an app restart.
+- **Why it is one row rather than three:** the same offline path carries all three, and one session
+  on the device settles them together.
+
+- **A deliberate, stated cost in Q-413's migration:** it corrected only rows whose timestamp fell on
+  a *different local date* than their own `date`. A pre-existing row logged on the right day but
+  outside its meal's window keeps its original time, while an identical new row is moved to the
+  midpoint. So a handful of historical points sit outside their meal's window. That was the
+  conservative choice — where the user logged as they ate, the stored instant is the better datum —
+  and Q-414's chart entry carries the caveat so it is not met as a surprise.
+
 ### [nutrition][platform] Meal label saves to the gallery and declares 600 dpi (Q-400, v1.326.0) — NOT verified on device · needs: hardware + a printer
 
 - **What shipped**: the dead "Share or save" button became **Save to gallery** (native, over a new

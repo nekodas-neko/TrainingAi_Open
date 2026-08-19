@@ -3,24 +3,33 @@
 > **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** the third session to run as Lane A · **Q band:** 314–349 (next free: **319**)
-**Migrations:** 189–202 taken; next free is **203**. Local SQLite **v27**.
+**Updated:** 2026-08-19 · **By:** the fourth session to run as Lane A · **Q band:** 314–349 (next free: **327**)
+**Migrations:** 189–203 taken; next free is **204**. Local SQLite **v27**, untouched this session.
 
 ## Now
 
-**The nutrition cluster is the owner's stated priority** (*"lets focus on the nutrition changes now"*,
-2026-08-18) and it is ordered by dependency, not Q number, at the top of
-`docs/implementation-backlog.md`. Lane A's share of it is **done**: Q-401, Q-387 and Q-409's route
-half have all merged. **Everything remaining in that cluster is Lane B** — the label canvas (Q-411),
-the `food-row.tsx` extraction that gates the rest (Q-406), the visual pass (Q-395), and the recipe-URL
-picker (Q-409's other half).
+**Nothing is half-built.** Every branch this session opened is either merged or has an open PR with
+CI running; there is no work-in-progress to pick up mid-stream. Start by clearing the open PRs below,
+then take the queue top-down.
 
-**So Lane A is currently working the general queue below the cluster, not the cluster.** That is
-correct, not a drift — there is nothing in it for this lane until Lane B's gate lands.
+### The one thing that recurred often enough to be the headline
+
+**Re-verify an entry's premise against current `main` before implementing it, and write down what you
+checked.** Seven entries in a row failed this check in one session, and the checks were cheap:
+
+| Entry | What the entry said | What was true |
+|---|---|---|
+| **Q-412** | needs the full outbox + push + delta chain | `meal_types` is not an outbox domain — that code would have had no caller |
+| **Q-360** | the seed uses literal dates, make it relative | it has been relative since the repo's first commit; the DB was just stale |
+| **Q-324** | the first suite run on a fresh DB times out | did not reproduce — 516 files green on the exact condition |
+| **Q-405** | recommend from the library's default-role column | there is no such column, and the owner's own exercise is not in the library at all |
+
+It is also what *found* things: scoping Q-412 turned up **Q-325**, a live defect that would have
+silently voided Q-413's whole point. Budget the check; it has paid every time.
 
 ### The database reclaim is still the standing deadline item, and it has not moved
 
-Inherited unchanged from the previous baton, because **nothing in this session touched it**:
+Inherited unchanged for the third baton running, because **no session has been able to touch it**:
 
 | Step | Worth | State |
 |---|---:|---|
@@ -28,84 +37,117 @@ Inherited unchanged from the previous baton, because **nothing in this session t
 | Pack the raw frames (Q-541 Task 5 backfill) | **~630 MB** | ⛔ **needs a press against production** |
 | `VACUUM FULL error_events` (Q-315) | **~49 MB** | ⛔ **needs a press against production** |
 
-**Nothing has been packed and no row has moved.** Every reclaim is admin-session-gated and a sandbox
-session cannot authenticate to production (`CLAUDE_DB_QUERY_SECRET` is read-only;
-`ADMIN_EXPORT_SECRET` is GET-only on one route). Either the owner runs the curls, or Lane B builds the
-buttons (Q-316), or a **confirm-first** bearer path is added — **do not build the third without an
-explicit yes, it is an auth change.** Runbook:
+Every reclaim is admin-session-gated and a sandbox session cannot authenticate to production
+(`CLAUDE_DB_QUERY_SECRET` is read-only; `ADMIN_EXPORT_SECRET` is GET-only on one route). Either the
+owner runs the curls, or Lane B builds the buttons (Q-316), or a **confirm-first** bearer path is
+added — **do not build the third without an explicit yes, it is an auth change.** Runbook:
 [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md).
+
+## Open PRs — clear these first
+
+- **#220** `docs/q405-premise-check` — the Q-405 premise findings, annotated onto the entry.
+  **Merge this BEFORE #222**, which removes that entry entirely; the findings survive in #222's
+  journal entry, so the annotation vanishing is correct, not a loss.
+- **#222** `feat/coach-swap-role-prompt` — Q-405 itself. Version bumped to **1.330.0**.
+- **#124 (Q-479) is deliberately open and must NOT be merged.** Owner, verbatim: *"leave that as a
+  known issue for now - only admin will be me for a long time."* Do not re-implement it either.
 
 ## Shipped this session (for orientation, not credit)
 
-All on `main`: **Q-473**, **Q-475**, **Q-481**, **Q-485**, **Q-484**, **Q-487**, **Q-548**, **Q-401**
-(retire the second TDEE model), **Q-387** (day-completeness gate on calibrated maintenance),
-**Q-320** (a caught error stops being the response body), **Q-498 + Q-322 slice 1** (bounded request
-bodies + ratchet). **Q-409's Lane A half** (recipe URL → meal, behind an SSRF-closed fetch).
+**Q-322 finished** — slices 6–9 landed and the bounded-body sweep is complete: **210 route files, 0
+bare `req.json()` reads**, and the shrink-only ratchet became a flat check in the same PR. It began
+at 104 reads across 92 files.
 
-**#124 (Q-479) is deliberately open and must NOT be merged.** The owner's decision, verbatim:
-*"leave that as a known issue for now - only admin will be me for a long time."* Do not re-implement
-it either.
+Also merged: **Q-400** (meal label → gallery over a new `MediaSave` MediaStore bridge, plus the
+`pHYs` chunk so it prints at 50 mm rather than 312), **Q-413** (`logged_at` means when you ate),
+**Q-325** (the `food_logs` pull updated 4 of 8 columns), **Q-412** (reassign a meal type's entries
+instead of deleting them), **Q-360** (retired as a wrong premise), **Q-324's mechanism half** (the
+local migration runner records what it applied), **Q-323's Lane A half** (carbs and fat scale with
+earned calories, protein holds).
 
 ## Next
 
-1. **Q-486** `[workouts][devices]` sits above most of the queue but is **Lane B** (`components/**`).
-   Skip it; do not take it because it is next in the file.
-2. **Q-322 slice 2** — the ratchet is in place and the baseline is the worklist: **104 bare
-   `req.json()` reads across 92 route files**. Take a slice, not the sweep. Suggested order by
-   exposure: `nutrition/food-logs`, `log-exercise`, `complete-workout`, `sync/push`, `water-log`,
-   then `user/password`, then the rest.
-3. **Q-482** `[platform][nutrition][workouts]` — a non-UUID id reaches Postgres and 500s on 21
-   route/method pairs. Adjacent to Q-320/Q-483 which are now both done, so the context is fresh.
-4. **Q-489** `[platform][readiness]` — five sites turn an ms offset into a calendar day; in a DST zone
-   three compute "today" when they mean "yesterday".
-5. **Q-323** `[nutrition][app-shell]` — the Lane A half is small (which macro absorbs earned
-   calories, in `packages/shared/src/nutrition/calorie-balance.ts`) but the entry says it needs the
-   product call first. Q-401 recorded the answer as *carbs*; confirm before building, and do not scale
-   all three uniformly — that reintroduces Q-401's shape inside one card.
-6. **Q-321** is owner-gated by its own text. Leave it.
+1. **Q-403** is tagged **Lane B** by its own entry even though `app/api/coach/route.ts` is a Lane A
+   path — the fix is the system prompt. Honour the tag; do not take it on the path rule.
+2. **Q-404** `[platform]` — wire the Sentry SDK. Lane A, but it involves a DSN and config, so treat
+   the secret handling as **confirm-first**.
+3. **Q-410** `[cardio][devices]` — the guided walk's cadence signal is gated and reads `--`.
+4. **Q-396** `[nutrition][platform]` — a photo per saved meal; the entry says the size cap is the
+   whole design, so it is mostly a storage/API decision.
+5. **Skip:** Q-359, Q-414, Q-415, Q-486, Q-326 (all Lane B) and Q-479 (owner-deferred).
 
-**Filed by this session and not started:** Q-321, Q-322 (rewritten), Q-323.
+**Entries deliberately left in the queue, annotated as partially done — do not remove them and do not
+re-implement their shipped halves:** **Q-324** (mechanism fixed, timeout symptom unconfirmed),
+**Q-323** (arithmetic + API shipped, the ring/bar rendering is Lane B), **Q-387** (storage shipped,
+the button and counter are Lane B).
+
+**Filed by this session:** Q-324, Q-325 (shipped inside Q-413's PR), Q-326 (Lane B follow-up to
+Q-412).
 
 ## Blocked
 
 - **Q-541 Task 5 and Q-315** — on the owner (the three options above).
 - **Q-537** — approved, unverifiable from the sandbox.
 
-**Owed rather than blocked:** the device check on Q-310, filed as a `projectOverview.md` Known-Issues
-row. Confirm at the next engine-chosen deload: header "Deload", reduced weights, no PR badge.
+**Owed rather than blocked — the device checks are accumulating, and one of them gates another
+entry:**
+
+- **Q-400 is the important one.** Install the APK from `apk-latest`, tap **Save to gallery**, find
+  the file in the Samsung Gallery, then **print once and measure**. That single print answers three
+  questions: does the file arrive, does it measure 50 mm rather than 312, and **does Q-411's circle
+  template crop the corners or scale the square inside the circle** — which decides whether Q-411 was
+  a 40% gain or a small regression.
+- **Q-413** — back-fill yesterday's dinner on the APK while offline and confirm the row shows the
+  window midpoint, before and after it syncs.
+- **Q-412** — reassign a meal type with logs and confirm on the APK that the entries appear under the
+  new type with the same calories and survive a restart.
+- **Q-405** — swap a compound for an isolation and watch the *prescribed sets* change, not just the
+  role.
+- **Q-310** — confirm at the next engine-chosen deload: header "Deload", reduced weights, no PR badge.
 
 ## Claimed paths
 
-- **`lib/net/`** — new this session (`safe-fetch.ts`), engine-side, Lane A's. Listed in
-  `docs/module-map.md`.
-- `app/api/admin/vacuum/`, `app/api/oura-ble/rekey/`, `lib/data/postgres/slices/oura-raw-{frames,pack}.ts`
-  — inherited, still Lane A's.
+- **`lib/media/`** and **`android/app/src/main/java/com/trainingai/app/media/`** — new this session
+  (Q-400's gallery bridge). Engine/native, Lane A's.
+- **`lib/net/`** (`safe-fetch.ts`) — inherited, still Lane A's.
+- `app/api/admin/vacuum/`, `app/api/oura-ble/rekey/`,
+  `lib/data/postgres/slices/oura-raw-{frames,pack}.ts` — inherited, still Lane A's.
+- **`components/nutrition/meal-label-*`** was touched this session for Q-400 because that entry
+  assigns the whole item to Lane A. It is otherwise **Lane B's**; hand it back.
 
 ## Findings recorded, so they are not re-derived
 
 **From this session:**
 
-- **One defect shape recurred three times: deriving a decision from a read taken *before* the write.**
-  Q-460, Q-473 and Q-481 were all this. Every fix is the same — read the write's own affected-row
-  count (`.returning()`, `onConflictDoNothing().returning()`), never a prior SELECT. Expect a fourth.
-- **A deliberate refusal and a driver failure are indistinguishable through `e.message`**, which is
-  what made Q-320 an item rather than a sed. Marked at the throw now:
-  `UserFacingError(message, status)` in `packages/shared/src/errors.ts`, answered by
-  `refusalResponse(err, fallback)` in `lib/api/route-errors.ts`. **Substring status-matching is gone
-  with it** — `msg.includes('default')` fired on any error carrying the word.
-- **`app/api/admin/db-query` echoing its raw error is correct and exempt.** There the DB's error text
-  *is* the answer the operator asked for. `coach/apply/[id]/undo`'s `detail` was never a leak either —
-  an author-written literal off a structured result. Both were false positives in Q-320's own list.
-- **A rate limiter keyed on the request IP can move above the body read with no contract change.**
-  Q-498 claimed `health-connect/ingest` needed its secret moved to a header to gate before parsing.
-  It did not — the limiter reads the IP from headers. Moving the secret would have broken the owner's
-  Tasker profile for nothing.
-- **A recipe page is ~550 KB and its first 4,000 characters are navigation.** Both measured against
-  real sites and both changed the code (Q-409): the byte cap is 3 MB, and the model fallback strips
-  page furniture and starts at the "Ingredients" heading.
-- **DNS rebinding is NOT closed out in `fetchPublicUrl`.** The address is validated and then the
-  hostname is connected to by name. Closing it needs connecting to the pinned IP with the Host header
-  preserved, which undici does not expose. Written in the module's docstring; do not claim otherwise.
+- **A stale local database produces failures that look like code defects.** `setup.sh` will not
+  re-seed a non-empty DB, so one seeded days ago holds history ending days ago, and a "today"
+  assertion fails locally while passing in CI (which builds a fresh Postgres every run). This is now
+  in `CLAUDE.md`; the check is `SELECT max(date) FROM body_metrics WHERE steps IS NOT NULL`, and
+  re-seeding means dropping `/var/lib/postgresql/local-dev` — `pnpm db:local` alone will not.
+- **`npx next lint --dir app` is NOT `pnpm lint`.** Different runner, different ruleset; the first
+  reported warnings only while CI failed on a `prefer-const` error. **`pnpm ci:local` is the gate.**
+- **`computeActiveEnergy` cannot run in this sandbox at all** — it reads a vendored model constants
+  file object storage will not serve, so any complete-profile `energy-balance` request 500s here,
+  **on `main` too**. Do not diagnose it as your change.
+- **A conflicted doc-size baseline must be RE-MEASURED, never picked.** Two branches raised the
+  backlog baseline to 11220 and 11222; the correct merged value was **11197** — lower than both,
+  because a removal landed in between.
+- **The baseline conflict resolver keeps only one side's header prose.** After running it on
+  `check-bounded-request-body.js`, hand-check that every `// N:` slice-log line survived; three were
+  lost or missing across the sweep.
+- **`createMissingExercise` is admin-gated**, so a Coach test that swaps to an uncatalogued exercise
+  needs `is_admin` on its user. That gate is also how the owner reached the Q-405 path.
+- **Drizzle will not marshal a JS array into `unnest(...)`** in a raw `sql` template — it arrives as
+  a malformed array literal. Use per-row updates or build the literal explicitly.
+- **A backtick inside a SQL comment nested in a template literal is a parse error.** Cost one
+  round-trip on Q-325.
+- **Whole-gram rounding is coarse for fat** (9 kcal/g), so a macro-ratio assertion needs a 0.05
+  tolerance, not 0.005. Pin the exact arithmetic with numbers that divide cleanly instead.
+- **Exercise-role classification: the signal is TOTAL muscle count, not `main` count.** 117 of 142
+  catalogue entries carry exactly one `main` muscle, Barbell Bench Press among them. Validated across
+  all 142 rows — 16 primary / 39 secondary / 86 accessory / 1 unrecommendable, with the barbell curls
+  correctly in accessory. Known imprecision: Plank, Side Plank and Mountain Climbers read as
+  `secondary`; demoting bodyweight wholesale would break Pull-Up and Chin-Up, so the trade stands.
 
 **Inherited and still true:**
 
@@ -114,81 +156,7 @@ row. Confirm at the next engine-chosen deload: header "Deload", reduced weights,
 - **An aggregate cannot use that reader's dedupe** — count via an anti-join on `(epoch, tag, ds_bucket)`.
 - **`oura_raw_samples.measured_at` and `event_name` are DEAD COLUMNS.** Do not add a reader; dropping
   them is data-dropping and owner-gated.
-- **A ds regression is NOT evidence of a ring-clock reset** (Q-314). A re-drain produces one. The
-  discriminator is the ratio to the epoch ceiling, and it is unvalidated in the direction it exists
-  for because there is no observed true reset in the data.
+- **A ds regression is NOT evidence of a ring-clock reset** (Q-314). A re-drain produces one.
 - **The `VACUUM FULL` allowlist is a safety boundary, not validation.** `hasOwnProperty`, never `in`.
-- **`error_events`: 4 live rows in 49 MB.** Not a leak — space MVCC never handed back.
-- **The redecode's `?async=1` job path is opt-in** and the default is unchanged deliberately (Q-535);
-  **Q-318** is the other half.
-
-## Do not re-litigate
-
-- Lane contract, authority limits and Q bands: [`docs/agents/README.md`](../README.md). Take Q numbers
-  from the band, never from the backlog's next-free pointer.
-- **Q-479 is the owner's decision to leave open.** See above.
-- **Q-322's piece 1 already exists** — `readJsonLimited`. Do not build a second bounded reader.
-- **Q-541 Task 0 is answered structurally and must not be re-answered by counting.**
-- **Q-540 is superseded by Q-541.**
-- **Q-310's fix-direction items 2 and 3 were refuted and deliberately not built.**
-- **Q-185 is closed**, despite `docs/domains/workouts/README.md` saying otherwise.
-
-## Method notes worth keeping
-
-**Learned this session:**
-
-- **An in-process concurrency test can pass on broken code.** Q-473's four parallel calls did not race
-  because the first paid for the lazy import, the `getRepository` singleton and cold pg connections.
-  Add a warm-up pass before the parallel one, or the test proves nothing.
-- **Unit tests passing is not a rehearsal.** Q-475's retryable classifier passed every test and
-  returned `retryable: None` live, because the dev `DATABASE_URL` is the **Unix-socket** form — a dead
-  server gives `ENOENT`, not `ECONNREFUSED`. Rehearse through `pnpm dev`.
-- **`next build` catches what `tsc` and 4,165 tests do not.** Q-401 dragged `node:path` into the client
-  bundle through a shared import; only the real build saw it. Fix shape: a zero-import leaf module.
-- **Node's `fetch` ignores `HTTPS_PROXY` in this sandbox** — outbound requests 403 until you set
-  `NODE_USE_ENV_PROXY=1`. `curl` works either way, which makes the failure look like the remote site
-  blocking you. Cost a diagnosis this session.
-- **A guard proven only against a mocked resolver is not proven.** Every SSRF case in Q-409 was also
-  fired at `pnpm dev` with a real session cookie, and both halves matter: the refusals still echo
-  their message, the faults do not.
-- **Prove a new CI check bites.** Revert one site to the banned shape, watch it go red naming that
-  line, restore it. Done for both checks added this session; it is thirty seconds and it is the only
-  thing separating a check from a comment.
-- **Log in to `pnpm dev` with:** `GET /api/auth/csrf` for the token, then
-  `POST /api/auth/callback/credentials` with `email=test@local.dev&password=testpass123&csrfToken=…&json=true`
-  into a cookie jar. Everything session-gated is then testable by `curl`.
-- **Kill the dev server by port, never `pkill -f "next dev"`** — that matches and kills your own shell
-  (exit 143/144). Use `ps -eo pid,args | grep next-server` and kill the pid.
-
-**Inherited:**
-
-- **A migration verified on a fixture is not verified.** Ask the production row count *before* writing
-  a data migration; the pool's `statement_timeout` is **15 s**.
-- **The tell that a migration silently failed:** absent from `schema_migrations` while `/api/version`
-  reports the release carrying it. There is no `error_events` row.
-- **A new table needs a regenerated `claude_ro` view migration**, generated **after** the table exists
-  locally, into a **new** migration number — `ensureSchema` tracks by filename, so editing an applied
-  migration means the change never lands. The generator needs the production owner id
-  `fe481797-4114-4f59-824d-223e0281823e` and `2>/dev/null` (its log line otherwise lands in the SQL).
-  `claude-ro-readonly-role.test.ts` pins the newest views migration by filename — repoint it in the
-  same commit.
-- **A Next.js `route.ts` may not export arbitrary symbols.** Put test helpers in a sibling module.
-- **`CLAUDE_DB_QUERY_SECRET` works from the sandbox**, but the `claude_ro` search_path makes
-  `pg_total_relation_size('oura_raw_samples')` resolve to the **view** and return 0. Join `pg_class`
-  to `pg_stat_user_tables` on `relnamespace = 'public'::regnamespace`.
-- **The seed user is not an admin.** `UPDATE users SET is_admin = true WHERE email='test@local.dev'`
-  and **revert after**.
-- **The rate limiter has an in-memory L1 in the dev-server process.** `DELETE FROM rate_limits` does
-  not clear it — restart `pnpm dev` if you 429 yourself. Do clear the table before believing a
-  `Too many requests` assertion failure in the suite.
-- **The local DB is shared across branches.** A table from another branch's migration fails the
-  `claude_ro` coverage guard on a branch that lacks it — local skew, not a defect.
-- **`scripts/check-doc-index-size.js` conflicts on nearly every merge, every session.** Resolve
-  mechanically: keep **both** prose blocks, re-measure the merged files, write the numbers back. Never
-  splice. Same for `package.json`/`changelog.ts` — rebuild from `git show origin/main:…`.
-- **`get_check_runs` returning `total_count: 0` minutes after opening a PR is a stale base, not slow
-  CI.** Fetch, merge, push. Conversely, when it looks frozen on a current base, attempting the merge
-  is the reliable check — branch protection refuses a genuinely pending required check.
-- **Bash `curl` to `api.github.com` is unauthenticated here.** Use the `mcp__github__*` tools.
-- **After merging another lane's work, `pnpm install` before believing a `tsc` error.**
-- The local dev DB reports three pre-existing `ensureSchema` failures (`038`, `040`, `041`). Ignore.
+- **DNS rebinding is NOT closed out in `fetchPublicUrl`.** The address is validated and then the
+  hostname is connected to by name; closing it needs a pinned-IP connection undici does not expose.

@@ -778,7 +778,14 @@ const BASELINE = {
   // observable from the sandbox. It carries the measured figures (600.0 dpi, 49.9 mm vs 311.9 mm)
   // because "the PNG now declares its size" is a claim and those are the evidence, and it names the
   // one physical print that also settles Q-411, so the owner does not do two.
-  'projectOverview.md': 7951,
+  // Raised 2026-08-19 (Lane A, the food_logs device checks): 7951 -> 7982. Three changes landed on
+  // one offline-first domain in a day (Q-413, Q-325, Q-412) and none is device-verified; the
+  // standing rule says that is a row here, not a line in a lane's private baton, because this file
+  // is what every session reads before it can start. One row rather than three, because the same
+  // offline path carries all of them and one session on the device settles them together. It also
+  // records the migration's deliberately-narrow scope, which leaves a few historical rows outside
+  // their meal's window — a stated cost is not a bug report, and it is the kind that gets rediscovered.
+  'projectOverview.md': 7982,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -961,12 +968,19 @@ const BASELINE = {
   // daily HR chart, and HR is timestamped, all-day and dense. The correction stays inline with the
   // numbers because the wrong conclusion is the more quotable one, and a session reading only the
   // table would re-derive it.
+  // Raised 2026-08-19 (Lane A, Q-405 premise check): 11197 -> 11223. Three measured facts written
+  // onto the entry BEFORE the recommender was built, because each one changes the design and two of
+  // them contradict the entry as written — the catalogue has no default-role column, and the owner's
+  // own exercise is not in the catalogue at all, so its muscles are model-proposed and cannot be
+  // turned into a prescription. Cheaper here than as a rediscovery.
+  // 2026-08-19 (Tuning): +3 on Q-72, marking motivation/resting_soreness/wake_mood RETIRED -- the
+  // entry listed three dead scales beside two live ones as if all five were evidence.
   // Ratchets DOWN 2026-08-19 (Lane B, Q-414 shipped): its entry out, Q-361 in, net smaller. Q-361 is
   // what building Q-414 uncovered rather than what it set out to do — two routes 500 in every
   // sandbox session because their vendor constants file is gitignored, so the Energy card has never
   // once been renderable locally. Its lines are the evidence that "tested on pnpm dev" was untrue
   // for a family of screens, which is not a claim to leave to memory.
-  'docs/implementation-backlog.md': 11153,
+  'docs/implementation-backlog.md': 11238,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

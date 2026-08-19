@@ -1,6 +1,6 @@
 # 2026-08-19 — Q-414: energy in against energy out, on one timeline
 
-**Branch:** `feat/energy-timeline-chart` · **Lane B** · v1.330.0
+**Branch:** `feat/energy-timeline-chart` · **Lane B** · v1.331.0
 
 The owner asked for *"a display of calorie intake over time… could be superset with calorie out too;
 so can see what times energy is expended vs refueled."* It shipped on day detail, under the Energy
