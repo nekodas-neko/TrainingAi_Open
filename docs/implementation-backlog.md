@@ -507,6 +507,153 @@ widening that type.
   value; an unrated session is unchanged; and a test pins the three surfaces to one number.
 
 
+### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
+
+- **Branch:** `feat/derive-session-rpe-from-set-rpe`
+- **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
+  rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
+  sessionnrpe and it can be overwritten if needed."*
+
+**The report is measured, not just felt.** Production, the owner's own rows:
+
+| | rated | total | fill |
+|---|---|---|---|
+| `workout_sessions.session_rpe` | 20 | 78 completed | **25.6%** |
+| `set_logs.rpe` | 625 | 1,047 | **59.7%** |
+
+Sets get rated **2.3× more often** than sessions. **24 completed sessions carry rated sets and no
+session RPE** — deriving would take session-RPE coverage from 20 to 44, a 120% increase, with no new
+tapping. Observed set-RPE range is 6–10, mean 7.48.
+
+- **⚠ THE SCALES DO NOT MATCH, and this is the thing that makes a naive mean wrong.** The per-set
+  strip offers **6–10** (`components/workout/rpe-strip.tsx:30`; the wire schema allows 5–10,
+  `packages/shared/src/workout/log-exercise.ts:43`; production has never seen below 6). The session
+  grid offers **1–10** (`components/workout/done-screen.tsx:399-400`). `intensityFromRpe`
+  (`workout-energy.ts:86-91`) splits **≤4 easy / ≥8 hard**. So a mean of set RPEs **can never reach
+  the easy tier** — the floor is 6 — which silently deletes one of three intensity tiers and biases
+  every derived session upward. An identity mapping is not available; a real one has to be chosen.
+- **⚠ They also measure different things.** Per-set RPE is proximity to failure on *that set*; Foster
+  session RPE is global exertion across the whole session, which inherently carries volume and
+  duration. Three sets at RPE 9 and twenty sets at RPE 9 have the same mean and are not equally hard.
+  Weight by set count or working time, or accept that the derived value under-reads long sessions —
+  but decide it deliberately.
+- **There is a calibration set, and it says the mean is close but reads low.** 20 sessions carry both
+  values. Mean set RPE tracks the owner's own rating monotonically, which is the encouraging part:
+
+  | owner's session RPE | n | mean set RPE | max set RPE |
+  |---|---|---|---|
+  | 7 | 3 | 7.15 | 7.67 |
+  | 8 | 15 | 7.41 | 8.53 |
+  | 9 | 2 | 8.25 | 10.00 |
+
+  In the dominant bucket a plain mean of **7.41 rounds to 7 where the owner said 8** — off by one,
+  and one point is a whole intensity tier at the 8 boundary. Max-set tracks more steeply and may be
+  the better signal, or a blend. **n = 20: fit something simple and defensible, do not tune a curve
+  to it.**
+- **Override needs provenance, which is a schema change.** The owner asked for "overwritten if
+  needed", so the app must know whether a stored value was derived or entered — otherwise a re-derive
+  silently eats a manual correction, and a manual rating cannot be told from a computed one.
+  `workout_sessions.session_rpe` is a bare nullable integer today (`schema.ts:169`). **Adding a
+  source flag is Lane A's call and needs a migration number from Lane A.**
+- **Decide the re-derive rule explicitly:** editing or adding a rated set after the fact should
+  re-derive a *derived* value and must never touch an *overridden* one. Never overwrite an existing
+  manual rating on first derivation either.
+- **⚠ This is a prerequisite for Q-419 mattering, not a parallel nice-to-have.** Q-419 makes the day's
+  energy budget read session RPE — but **75% of sessions have no session RPE**, so Q-419's fix is
+  inert on three sessions in four until this lands. Land Q-420 first, or land them together.
+- **Surface:** browser-reproducible at the S25 viewport against the seeded DB. Touches
+  `packages/shared/**`, `lib/data/**` and a migration — **Lane A throughout**.
+- **What would count as done:** a session with rated sets and no manual rating shows a derived session
+  RPE the owner can see and change; the derived value maps onto the 1–10 session scale rather than
+  being copied off the 6–10 set scale; an override survives later set edits; and the intensity tier it
+  produces is checked against the 20 paired sessions above before it feeds any calorie figure.
+
+### [workouts][platform] Q-421 — the accurate energy model is already vendored, downloaded and tested, and has zero callers
+
+- **Branch:** `feat/hr-based-workout-energy`
+- **Added:** 2026-08-19 · from the owner's question *"how can we make energy usage/burned from
+  excercuse more accurate"*. Tier 2 of the three-rung answer (Q-419 is tier 1, Q-422 tier 3).
+
+**The MET formula in use is explicitly the fallback path.** `workout-energy.ts:1-14` says so: it ports
+Oura's closed form for the branch where `has_enough_motion === false`. The primary path is a neural
+model, and **it is already in this repo** — `lib/oura-models/inference/energy.ts` exposes
+`runEnergyExpenditure` over two heads, `energy_expenditure_1_0_0_hr.onnx` (50 features) and
+`_no_hr.onnx` (42), both listed in `model-files.json:9-10` and downloaded at runtime.
+
+**Its only caller in the entire repo is its own test file.** The module's header names the gap
+outright: *"Assembling the feature vector from motion/steps/HR is a separate step."* That step was
+never written.
+
+- **The HR inputs exist and are already trusted elsewhere.** Production, the owner's rows:
+  `workout_hr_stats` **77 rows, 42 with `avg_bpm`**; `set_hr_stats` **709 rows**;
+  `daily_zone_minutes` **78 days**. Heart-rate reserve is already computed and stored — the zone rows
+  carry the profile they were computed under, currently **maxHr 187 / restingHr 53** across the last
+  62 days — and `computeHrZones({ maxHr, restingHr })` plus `packages/shared/src/health/hr-profile.ts`
+  (which tracks `maxHrSource: 'observed'` vs age-derived) already feed Readiness and Activity.
+  **The workout calorie estimator is the only consumer that ignores all of it.**
+- **⚠ Do NOT source max/resting HR from `running_baselines` — that table is empty in production**
+  (0 rows). Use the hr-profile path the zone splits already use.
+- **Two routes, and the cheaper one should go first.**
+  **(a) Closed-form HR estimator (Keytel-style)** from avg HR + age + weight + sex, optionally scaled
+  by HR reserve. No model, no feature vector, no new dependency — and immediately better than
+  duration × MET because it responds to effort. **Recommended first.**
+  **(b) Assemble the 50-feature ONNX vector.** Highest fidelity and it is what the model was trained
+  for, but the feature order and units are **not documented in this repo**. Per the external-field-names
+  rule, that layout must be read out of the pinned model source — **never guessed**, and never inferred
+  from the feature count. Do this only once the spec is genuinely in hand.
+- **⚠ Coverage is partial and must degrade gracefully.** Roughly 54% of sessions carry an `avg_bpm`.
+  An HR path therefore has to fall back to the MET path per session — and the two must not produce a
+  visibly different number for the *same* session across surfaces, which is the Q-419 failure mode
+  repeating one layer up. Pick the basis per session, store which was used, and label it.
+- **⚠ Re-scores history** for every session with HR. Size it before shipping, per the Tuning rule —
+  and note it moves the `adaptive-tdee` maintenance window too, since that reads the same figures.
+- **Surface:** `packages/shared/**`, `lib/oura-models/**`, `app/api/**` — **Lane A**. The ONNX runtime
+  is server-only, so none of this can move client-side.
+
+### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
+
+- **Branch:** `feat/calibrated-active-energy-multiplier`
+- **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
+  calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app
+  is used.
+
+**The app already does this for the day total, and the method is sound.** `adaptive-tdee.ts`
+back-solves real maintenance from paired intake and weight:
+`maintenance = mean intake − (Δweight × 7700 / days)`, gated on ≥10 logged days, ≥4 weigh-ins spanning
+≥10 days, 70% coverage, and the Q-387 "finished logging" flag. **What it calibrates is the day, not
+the workout.** The residual between calibrated maintenance and (resting base + estimated active) is
+the estimator's aggregate error, and fitting a multiplier on the active term is what turns that
+residual into a correction rather than a mystery.
+
+- **⚠ Identifiability is the trap, and it is easy to walk into.** One equation carries several unknowns
+  at once: BMR error, workout error, step error, and intake under-logging. **Separate strength / cardio
+  / steps multipliers are not identifiable from a single scalar residual** — they only become
+  separable if the data contains days that vary those terms independently. Ship **one** multiplier on
+  the whole active term unless the variation is demonstrably there. One honest number beats three
+  invented ones.
+- **⚠ Under-logging looks exactly like a high burn.** Q-387 measured six half-logged days dragging
+  maintenance **514 kcal low** while passing every other gate. The same mechanism pushes a fitted
+  multiplier the wrong way, and it does so silently. **The multiplier must inherit `adaptive-tdee`'s
+  gates in full** — it must never run on ungated data, and it must hold at 1.0 rather than guess.
+- **⚠ Fit against weight, not against the app's own targets.** The multiplier changes active energy →
+  changes the budget → changes what the owner eats. Weight change is the one exogenous signal in the
+  loop; anything derived from the app's own recommendation makes the fit circular.
+- **Shrink toward 1.0 by confidence** and clamp the result (a plausible band is roughly 0.6–1.6 — pick
+  and justify it). `adaptive-tdee` already emits `confidence: 'low' | 'medium' | 'high'`; reuse it
+  rather than inventing a second notion of trust.
+- **⚠ Re-scores every historical day it applies to.** Per the Tuning rule the proposal is incomplete
+  until it states how many days move and by how much. This is the largest-blast-radius item of the
+  three by a wide margin.
+- **Ordering:** worth doing **after** Q-421. Calibrating a duration-only estimator mostly learns "this
+  user's sessions are harder than MET 8 assumes"; calibrating an HR-aware one learns something about
+  the person rather than about the formula's blind spot.
+- **Routing:** this is a scoring change, so **Tuning proposes and the owner signs off; Lane A
+  implements.** Per CLAUDE.md, Tuning never ships a calibration itself.
+- **What would count as done:** a stated multiplier with its confidence, derived only from gated
+  windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
+  — and a written measurement of how many past days it moved.
+
+
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`
