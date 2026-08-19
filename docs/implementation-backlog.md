@@ -7,29 +7,33 @@ git history and the session journal (`docs/overview/`).
 
 ## Live pointers
 
-**These three numbers are the ones sessions collide on.** They are checked by
+**These two numbers are the ones sessions collide on.** They are checked by
 `scripts/check-backlog-pointers.js` in the Custom Rules job, which reads the real values from the
-migrations directory, `lib/sqlite/migrations.ts` and the queue below — so a stale line here fails
-CI instead of silently misdirecting the next session. Update them in the same PR that consumes a
-number.
+migrations directory and `lib/sqlite/migrations.ts` — so a stale line here fails CI instead of
+silently misdirecting the next session. Update them in the same PR that consumes a number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` (head: `205_claude_ro_views_saved_meal_image.sql`) |
+| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
-> **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
-> 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
-> its own, so no agent needs to read or write this table for a routine finding. The bands exist
-> because a shared next-free pointer is a *floor*, not an authority: it cannot see an unmerged PR,
-> and a number can be claimed and merged inside a single session without ever appearing in an open
-> one. That caused six collisions in three days, and two live ones — **Q-306 and Q-307 were each
-> held by two different entries** — survived in this file until 2026-08-17.
+> **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
+> never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
+> unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
+> bands replaced it and bought exhaustion instead — Tuning reached 29 of its 30, Review burned all
+> 50 in two days — plus a ledger that drifted twice.
 >
-> Q numbers are identifiers, not priorities. Priority is queue position, so a Q-451 sitting above a
-> Q-314 is correct and expected. When a band runs out, claim the next block of 50 from the pointer
-> above, record it in the band table, and bump this row.
+> **Each agent now owns a letter and counts up forever:** Lane A `A-` · Lane B `B-` · BugFix `F-` ·
+> Review `R-` · Tuning `T-` · one-off sessions `P-`. Find your next number with
+> `grep -rhoE '\bR-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The full reasoning is in
+> [`docs/agents/README.md`](agents/README.md) §3.
+>
+> **The letter says who found the item, not who ships it, and it never changes** — an entry filed by
+> Review and built by Lane A keeps its `R-`. Priority is queue position, so an `R-31` above an
+> `A-12` is correct and expected.
+>
+> **Legacy `Q-` numbers stay exactly as they are** and remain valid IDs. There are over 10,000
+> references across 775 files; renumbering would be risk for no function.
 >
 > **Postgres migration numbers and local SQLite versions belong to Implementation Lane A alone.**
 >
@@ -46,16 +50,35 @@ number.
 > per-pillar sweep, so `scripts/check-backlog-pointers.js` fails on one. Read that pillar's index
 > (`docs/domains/<pillar>/README.md`) before starting: it carries the pillar's reference docs, open
 > known issues and gotchas.
+>
+> Tags are **mutable** — retag an entry as understanding improves. The ID never changes, which is
+> why subject lives in the tag and not in the identifier.
 
-## The optional `Lane:` field
+## The fields that decide whether an entry can be started
 
-> Most entries have no lane line, and that is correct — **lane ownership is decided by the file
-> paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md), which is the
-> authority. An entry states a lane only when the answer is worth writing down: the item spans paths
-> that are **unlisted** in §3 and therefore need a baton claim, it needs a Postgres migration number
-> or local SQLite version (**Lane A alone**), or two queued entries share a path and must not run
-> concurrently. Introduced 2026-08-17 on Q-530/Q-288, which are all three at once. Do not read the
-> absence of the field as "unassigned" — read it as "§3 already answers it".
+> **`node scripts/next-item.js --lane A`** is what an implementer runs. It prints READY in queue
+> order, PARKED with the reason, and UNCLASSIFIED for anything it could not place. Priority is still
+> yours and still queue position — the script computes *readiness*, never priority.
+>
+> - **`Lane: A` / `Lane: B`** — optional, and usually absent, which is correct: **lane ownership is
+>   decided by the file paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md).
+>   State a lane when the rule is genuinely ambiguous, when the item needs a migration number
+>   (**Lane A alone**), or when two queued entries share a path and must not run concurrently. Where
+>   the filer cannot tell, write **`Lane: ?`** — the first lane to reach it decides and edits the
+>   entry. Do not read an absent field as "unassigned"; read it as "the rule already answers it".
+> - **`Needs: <ID>`** — this entry cannot start until that one ships. **A target no longer in the
+>   queue counts as satisfied**, because a completed entry is removed by the protocol below. That
+>   makes a typo look exactly like a success, so the check fails on a target that has never existed
+>   anywhere under `docs/`. Cycles fail too.
+> - **`Gate: owner`** / **`Gate: device`** — waiting on an owner decision, or on the S25 smoke run.
+>   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
+>   not a gate.
+>
+> An item needing both halves of the app is **two entries** — `P-4a` with `Lane: A`, `P-4b` with
+> `Lane: B` and `Needs: P-4a` — not one entry with a paragraph asking readers not to re-sort it.
+>
+> Some entries still carry the older prose `⛔` marker. The query parks them and prints the marker
+> text, so they stay visible; convert one to a field when you next touch its entry.
 
 ## Before you start any item
 
@@ -81,13 +104,17 @@ number.
 1. Write the implementation plan to `docs/superpowers/plans/YYYY-MM-DD-<name>.md`
    (per the writing-plans conventions). Do **not** implement it.
 2. Insert an entry into the Queue below at the priority you judge right (position
-   in the list IS the priority). Include: plan doc path, a stable feature-branch
-   name, date added, and a one-line rationale for its placement.
+   in the list IS the priority). Take the next number from **your own letter** (see
+   Live pointers). Include: plan doc path, a stable feature-branch name, date
+   added, a one-line rationale for its placement, and any `Needs:` / `Gate:` /
+   `Lane: ?` that applies.
 3. Land the plan + backlog entry via a docs-only PR (no merge-confirmation gate
    needed per CLAUDE.md).
 
 **For implementer sessions (working the queue):**
-1. Take the **top** item in the Queue. One item per session run.
+1. Run `node scripts/next-item.js --lane <A|B>` and take the **top READY** item.
+   One item per session run. Do not hand-scan the file — the query is what knows
+   which entries are parked behind a `Needs:` or a `Gate:`.
 2. Dedup check before starting: if the item's branch already exists on `origin`,
    check it out and **continue** it (don't restart); if an open PR already covers
    the item, don't duplicate — babysit that PR to green or stop.
