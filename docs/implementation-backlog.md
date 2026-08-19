@@ -465,6 +465,16 @@ written this way.
 - **It rewrites history and that is the intent, but say it in the dialog.** A 3 pm snack reassigned
   to Lunch will read as Lunch on every past day. For "I want three meals a day from now on" that is
   what the owner wants; it should still not be a surprise.
+- **✅ The pull-side gap this depended on is closed (Q-325, shipped with Q-413).** `applyDelta`'s
+  `food_logs` conflict arm used to update only `quantity_multiplier`/`updated_at`/`deleted_at`, so a
+  server-side `meal_type_id` change could never reach a device that already held the row — the
+  reassign would have looked correct on the web and done nothing on the APK. The arm now carries
+  `date`, `meal_type_id`, `food_item_id` and `logged_at`, with the `sync_status='synced'` guard
+  intact. **Do not re-derive this as new work.**
+- **`meal_types` is NOT an outbox domain** (verified 2026-08-19 against `pushMutations`), so
+  meal-type CRUD is already online-only and the reassign does not need a new outbox domain or push
+  branch. The pull direction is covered because `getSyncDelta` cursors on `updated_at` and the moved
+  rows bump it. **This narrows this entry's "full sync chain" line** — re-verify before widening it.
 - **⚠ The reassign must also re-resolve `logged_at`. Q-413 has landed**, so the resolver exists:
   import `resolveEatenAt` from `@trainingai/shared/nutrition/eaten-at` and call it against the NEW
   window — do not re-derive the midpoint. A log

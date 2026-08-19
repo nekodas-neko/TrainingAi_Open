@@ -1839,7 +1839,16 @@ export class SQLiteLocalStore implements LocalStore {
               logged_at, updated_at, deleted_at, sync_status)
            VALUES (?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(id) DO UPDATE SET
+             -- Q-325: this arm used to set only quantity_multiplier, updated_at and deleted_at, so a
+             -- server-side change to any OTHER column never reached a device that already held the
+             -- row. Found while shipping Q-413, whose whole point is correcting logged_at -- the
+             -- correction would have stopped at the server. meal_type_id is the same story and is
+             -- what Q-412's reassign will move. The sync_status='synced' guard below is what
+             -- protects a pending local edit; the narrow SET was never the protection.
+             date=excluded.date, meal_type_id=excluded.meal_type_id,
+             food_item_id=excluded.food_item_id,
              quantity_multiplier=excluded.quantity_multiplier,
+             logged_at=excluded.logged_at,
              updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
              sync_status='synced'
            WHERE food_logs.sync_status='synced'`,

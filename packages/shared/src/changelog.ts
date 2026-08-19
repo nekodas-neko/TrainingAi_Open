@@ -11,6 +11,7 @@ export const CHANGELOG: ChangelogEntry[] = [
     changes: [
       "A food log now records when you ate, not when you tapped. Log it inside the meal's own time window and it keeps the real time; log it outside — including when you back-fill yesterday the next morning — and it lands in the middle of that meal's window, on the day you filed it against.",
       "Existing logs whose time fell on a different day than the date they were filed under have been corrected the same way. Logs entered on the right day were left exactly as they were, because that time was real.",
+      "Fixed a sync gap that would have kept those corrections on the server: a food log already on your phone could not learn a changed time or meal from a sync, only a changed quantity.",
     ],
   },
   {

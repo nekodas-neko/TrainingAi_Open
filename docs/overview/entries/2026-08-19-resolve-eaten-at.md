@@ -76,6 +76,22 @@ reported `UPDATE 0`, so it is idempotent. All three moved values match what the 
 produces for the same inputs — the SQL and the formula agree, which is the thing worth checking when
 the same rule is written twice.
 
+## Q-325, found while shipping this: the corrected timestamps would not have reached the device
+
+`applyDelta`'s `food_logs` upsert (`lib/local-store/sqlite-backend.ts`) had an `ON CONFLICT DO
+UPDATE` arm setting **only** `quantity_multiplier`, `updated_at`, `deleted_at` and `sync_status`. A
+row the device already held could therefore never learn a server-side change to `date`,
+`meal_type_id`, `food_item_id` or **`logged_at`** — so migration 203's corrections would have landed
+in Postgres and stopped there, silently, on the one runtime that matters. The same gap is what
+Q-412's reassign is about to walk into: `meal_type_id` is exactly the column it moves.
+
+Fixed here rather than filed for later, because it is the sync half of this change — a correction
+that does not reach the device is not a correction. The four columns are added to the update arm and
+the `WHERE food_logs.sync_status='synced'` guard is untouched: that guard is what protects a pending
+local edit, and the narrow SET was never the protection. Pinned by a test that asserts each column
+appears in the conflict arm **and** that the guard survives; it was confirmed to fail against the old
+statement before the fix went in.
+
 ## Verification
 
 `npx tsc --noEmit` clean · `pnpm lint` clean · `pnpm check:rules` **Ran 49 of 49** · full suite
