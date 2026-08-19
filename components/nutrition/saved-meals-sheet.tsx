@@ -13,6 +13,7 @@ import { cancelMealReminder } from '@/lib/meal-reminders'
 import { logMealItems } from '@trainingai/shared/nutrition/log-meal'
 import { mealTypeForHour } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
+import { AddFoodByHandForm, type AddFoodByHandValues } from './add-food-by-hand-form'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { invalidateSavedMeals } from '@/lib/cache-groups'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
@@ -83,7 +84,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   const [unitById, setUnitById] = useState<Record<string, QtyUnit>>({})
   const [saving, setSaving] = useState(false)
   const [showAddFood, setShowAddFood] = useState(false)
-  const [addFoodForm, setAddFoodForm] = useState({ name: '', calories: '', proteinG: '', carbsG: '', fatG: '' })
   const [addFoodSaving, setAddFoodSaving] = useState(false)
 
   useEffect(() => {
@@ -133,7 +133,6 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setQuery('')
     setSearchResults([])
     setShowAddFood(false)
-    setAddFoodForm({ name: '', calories: '', proteinG: '', carbsG: '', fatG: '' })
     setTab('build')
   }
 
@@ -307,25 +306,25 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     )
   }
 
-  async function handleAddFoodAndIngredient() {
-    const name = addFoodForm.name.trim()
-    const calories = parseFloat(addFoodForm.calories)
-    if (!name || isNaN(calories)) { toast.error('Name and calories are required'); return }
+  // Returns whether the food was created, so `AddFoodByHandForm` clears itself only on success —
+  // the previous version cleared the fields in the same block that hid the form, so a failed save
+  // would have thrown away what the user typed had it ever reached that line.
+  async function handleAddFoodAndIngredient(v: AddFoodByHandValues): Promise<boolean> {
+    if (!v.name || isNaN(v.calories)) { toast.error('Name and calories are required'); return false }
     setAddFoodSaving(true)
     try {
       addIngredient(await createFoodItem({
-        name, calories,
-        proteinG: parseFloat(addFoodForm.proteinG) || 0,
-        carbsG: parseFloat(addFoodForm.carbsG) || 0,
-        fatG: parseFloat(addFoodForm.fatG) || 0,
+        name: v.name, calories: v.calories,
+        proteinG: v.proteinG, carbsG: v.carbsG, fatG: v.fatG,
         servingSizeG: 100,
         source: 'manual',
       }, userId))
       setShowAddFood(false)
-      setAddFoodForm({ name: '', calories: '', proteinG: '', carbsG: '', fatG: '' })
-      toast.success(`${name} added`)
+      toast.success(`${v.name} added`)
+      return true
     } catch {
       toast.error(offlineHint() ?? 'Failed to add food')
+      return false
     } finally {
       setAddFoodSaving(false)
     }
@@ -719,55 +718,16 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                 addingExternal={addingExternal}
                 onAddExternal={food => void addExternalFood(food)}
                 showAddFood={showAddFood}
-                onAddByHand={() => { setShowAddFood(true); setAddFoodForm(f => ({ ...f, name: query.trim() })) }}
+                onAddByHand={() => setShowAddFood(true)}
               />
 
               {showAddFood && (
-                <div className="rounded-xl border border-brand/30 bg-brand/5 p-3 space-y-3">
-                  <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Add new food</p>
-                  <div className="space-y-2">
-                    <input
-                      type="text"
-                      value={addFoodForm.name}
-                      onChange={e => setAddFoodForm(f => ({ ...f, name: e.target.value }))}
-                      placeholder="Food name"
-                      className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-1 ring-brand"
-                    />
-                    <input
-                      type="number"
-                      inputMode="decimal"
-                      value={addFoodForm.calories}
-                      onChange={e => setAddFoodForm(f => ({ ...f, calories: e.target.value }))}
-                      placeholder="Calories per serving *"
-                      className="w-full rounded-xl border bg-background px-3 py-2 text-sm outline-none focus:ring-1 ring-brand"
-                    />
-                    <div className="grid grid-cols-3 gap-2">
-                      {([['proteinG', 'Protein g'], ['carbsG', 'Carbs g'], ['fatG', 'Fat g']] as [keyof typeof addFoodForm, string][]).map(([field, placeholder]) => (
-                        <input
-                          key={field}
-                          type="number"
-                          inputMode="decimal"
-                          value={addFoodForm[field]}
-                          onChange={e => setAddFoodForm(f => ({ ...f, [field]: e.target.value }))}
-                          placeholder={placeholder}
-                          className="w-full rounded-xl border bg-background px-2 py-2 text-sm outline-none focus:ring-1 ring-brand"
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <Button variant="outline" size="sm" className="flex-1" onClick={() => setShowAddFood(false)}>Cancel</Button>
-                    <Button
-                      size="sm"
-                      className="flex-1"
-                      disabled={addFoodSaving || !addFoodForm.name.trim() || !addFoodForm.calories}
-                      onClick={handleAddFoodAndIngredient}
-                    >
-                      {addFoodSaving && <Loader2 className="w-3 h-3 animate-spin mr-1" />}
-                      Add &amp; use
-                    </Button>
-                  </div>
-                </div>
+                <AddFoodByHandForm
+                  saving={addFoodSaving}
+                  initialName={query.trim()}
+                  onCancel={() => setShowAddFood(false)}
+                  onSubmit={handleAddFoodAndIngredient}
+                />
               )}
             </div>
 
