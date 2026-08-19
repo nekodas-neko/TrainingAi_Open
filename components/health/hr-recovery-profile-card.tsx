@@ -1,8 +1,7 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useState } from 'react'
 import { HeartPulse, Info } from 'lucide-react'
-import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { HR_RECOVERY_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
 import { formatHrChange } from '@trainingai/shared/health/hr-change-display'
 import { Sparkline } from '@/components/ui/sparkline'
@@ -36,23 +35,9 @@ function sourceMixLabel(bySource: Record<string, number | undefined>): string | 
 }
 
 export function HrRecoveryProfileCard() {
-  const [profile, setProfile] = useState<HrRecoveryProfileResponse | null>(null)
-
-  useLayoutEffect(() => {
-    const cached = readCacheSync<HrRecoveryProfileResponse>('hr-recovery-profile')
-    if (cached) setProfile(cached)
-  }, [])
-
-  useEffect(() => {
-    let cancelled = false
-    cachedFetch<HrRecoveryProfileResponse>(
-      'hr-recovery-profile',
-      '/api/health/hr-recovery-profile',
-      HR_RECOVERY_PROFILE_TTL,
-      d => { if (!cancelled) setProfile(d ?? null) },
-    )
-    return () => { cancelled = true }
-  }, [])
+  const profile = useCachedValue<HrRecoveryProfileResponse>(
+    'hr-recovery-profile', '/api/health/hr-recovery-profile', HR_RECOVERY_PROFILE_TTL,
+  )
 
   if (!profile || profile.bands.length === 0) return null
 

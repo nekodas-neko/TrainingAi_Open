@@ -1,8 +1,8 @@
 'use client'
 
-import { memo, useEffect, useState } from 'react'
+import { memo, useState } from 'react'
 import { Dumbbell } from 'lucide-react'
-import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { accentCardStyle } from '@trainingai/shared/utils'
 import { computeBarMetric, type BarMetric, type StrengthMode } from '@trainingai/shared/health/strength-progress'
@@ -24,19 +24,10 @@ const TREND_COLOR: Record<string, string> = {
 }
 
 export const StrengthProgressCard = memo(function StrengthProgressCard() {
-  const [data, setData] = useState<SummaryData>({ exercises: [], phaseName: null, cycleLabel: null })
   const [mode, setMode] = useState<StrengthMode>('working')
+  const summary = useCachedValue<SummaryData>('weights-summary', '/api/weights-summary', TTL_MEDIUM)
 
-  useEffect(() => {
-    const cached = readCacheSync<SummaryData>('weights-summary')
-    if (cached) setData({ exercises: cached.exercises ?? [], phaseName: cached.phaseName ?? null, cycleLabel: cached.cycleLabel ?? null })
-    cachedFetch<SummaryData>(
-      'weights-summary', '/api/weights-summary', TTL_MEDIUM,
-      d => setData({ exercises: d?.exercises ?? [], phaseName: d?.phaseName ?? null, cycleLabel: d?.cycleLabel ?? null }),
-    ).catch(() => {})
-  }, [])
-
-  const withData = data.exercises.filter(e => e.estimated1rm != null)
+  const withData = (summary?.exercises ?? []).filter(e => e.estimated1rm != null)
   if (withData.length === 0) return null
 
   let lastSessionName: string | null = null
@@ -89,9 +80,9 @@ export const StrengthProgressCard = memo(function StrengthProgressCard() {
 
       {/* Phase + last session meta */}
       <div className="flex items-center gap-2 mb-4 min-h-[18px]">
-        {data.phaseName && (
+        {summary?.phaseName && (
           <span className="text-[10px] font-semibold px-1.5 py-0.5 rounded-md" style={{ background: 'rgba(191,95,255,0.15)', color: '#bf5fff' }}>
-            {data.phaseName}{data.cycleLabel ? ` · ${data.cycleLabel}` : ''}
+            {summary.phaseName}{summary.cycleLabel ? ` · ${summary.cycleLabel}` : ''}
           </span>
         )}
         {lastSessionName && (

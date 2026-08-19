@@ -694,9 +694,36 @@ Worth reaching for only if the reassign proves harder than it looks.
   **`useCachedValue` gained an `onError` callback** in the same change, because the first real
   conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
   card without it cannot tell "no data" from "the request failed".
+- **✅ SLICE 1 SHIPPED 2026-08-19 (v1.325.6) — six leaf-card files, 36 → 29.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-1.md). Converted: `home-day-timeline`
+  (2), `calendar-widget` (its keyed `calendar-data:` effect too, which the ratchet does not count
+  because its deps are not `[]` but which goes stale the same way), `activity/exercise-detected-card`,
+  `health/hr-recovery-profile-card`, `health/strength-progress-card`, `cardio/trends-section`.
+  Three results worth carrying:
+  1. **`useCachedValue` gained a `today` option.** Without it the hook could only ever convert the
+     plain-`cachedFetch` half of the sweep, and the `cachedFetchToday` half would have had to
+     *switch variant* to adopt it — the exact drift the one-variant rule forbids.
+     `lib/hooks/__tests__/use-cached-value-today-agreement.test.ts` cross-checks every literal-key
+     hook call against `sync-provider`'s warm list, and is mutation-checked both ways.
+  2. **`home-day-timeline`'s bespoke `ta:oura-ble-synced` listener is gone.** Q-91 added it because
+     that widget never refetched after a BLE drain invalidated its key — Q-402's bug with a
+     hand-built workaround for one event. The invalidation signal covers every writer instead.
+     Safe because `cache-groups.test.ts` already asserts `invalidateOuraSync` clears that key.
+     **Three sibling listeners remain** (`session-select-content`, `health-content`,
+     `sleep-content`) and should go the same way when those files are converted.
+  3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
+     19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
+- **⚠ Next slice: `lib/__tests__/q165-cache-seeded-reads.test.ts` will need updating.** It asserts
+  `readCacheSync<` and `cachedFetch<` appear literally in `activity/exercise-review-sheet.tsx`,
+  `activity/activity-detail-sheet.tsx` and `coach/coach-history.tsx` — all three of which are on the
+  remaining list. Converting them to the hook removes both strings and reds that test, which is the
+  test doing its job on a changed mechanism rather than a regression. Update it in the same PR.
 - **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
-- **Not verified:** static scan. **No screen was observed going stale** — the 36 are inferred from
-  the shape, and the one confirmed instance is Q-402's, which is fixed.
+- **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
+  are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's
+  six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
+  routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
+  fixture below, which still does not exist.
 - **A guard needs a fixture that does not exist, and this is the reusable part.** Q-402's fix could
   not be driven end to end because the seeded user has no `height_cm`/`date_of_birth`/`sex` (so the
   energy card shows "add your details") **and** `DEFAULT_CARD_WIDGETS` is empty, so Home renders no
@@ -1754,7 +1781,64 @@ the H10 at home — which is the walk in the screenshot that started this.
   being paced by HR will not understand why the prompt is late. The unit on the line is the tell,
   and it is already there.
 
-**Drawn 2026-08-19 — four states, and the layout follows from the fallback rule above.** Speed
+**REVISED 2026-08-19 after the owner reviewed the drawing — three changes, all of them load-bearing.**
+
+**(a) The bar is banded, and "the right direction" is never an error.** *"color code the bar based on
+whether its in the right direction of the pacer; i.e slower than expected = green … green for in
+range: orange for slightly out; and red for way off."* So the band is chosen by **signed** distance
+from the target, not absolute:
+- **Fast** segment, floor `F` — `spm ≥ F` **green** (and it stays green however far above; on a fast
+  set, faster is the point) · `F − 10% ≤ spm < F` **amber** · below that **red**.
+- **Slow** segment, ceiling `C` — `spm ≤ C` **green** · `C < spm ≤ C + 10%` **amber** · above that
+  **red**.
+- **10% of the target is the proposed band width**, not a measured one. It is a starting value and
+  should be a named constant next to the thresholds so it can be tuned after a few real walks — do
+  not scatter it inline.
+- **Colour never travels alone** — CLAUDE.md forbids it, and the drawn version pairs each band with
+  a mark and a sentence (`✓ On pace`, `▲ Walk faster — aim ≥120`, `▼ Way over — ease off to ≤95`).
+  A red bar with no words is a rule violation, not a style choice.
+- **⚠ One consequence worth deciding rather than discovering: standing still scores green.** On a
+  slow set, "slower is always better" means stopping is perfect. Recommend a **stopped** state below
+  roughly 40 spm that renders **neutral rather than green** — not scolding, but not congratulating a
+  walk that has stopped being a walk. Flagged, not decided.
+
+**(b) When cadence is absent the pacer falls to SPEED, not heart rate.** *"when no source detected
+for cadence it still shouldn't be BPM; probably speed would be good there."* That gives a precedence
+ladder of **cadence → speed → heart rate**, and it is consistent with the decision already recorded
+in `walk-active.tsx`'s own comment (*"pace is the real fast/slow signal, HR drifts set-over-set and
+is only a secondary confirmation"*). HR becomes the last resort, reached only when GPS is out too —
+which is the treadmill case.
+- **This needs a speed target pair**, the same way cadence does. **Do not add a third manual config
+  block**: `walk-config.tsx` would then ask for HR, cadence *and* speed targets for one walk, which
+  is three ways to say the same intent. Recommend **deriving the speed pair from the user's own
+  recent fast/slow segments** — `segments` already stores `avgPaceSecPerKm` per segment, so the data
+  to seed it is in the table today — and letting the cadence pair stay the thing the user sets.
+
+**(c) Storage — mostly already done, and the entry should say so rather than asking for "store
+everything".** *"make sure all these values get stored so we can do data analysis on it later like
+steps x distance x time."* Measured against `schema.ts` and `walk-summary.tsx`:
+- **Already persisted per walk:** `steps` (Q-230, integrated from strap cadence), `distanceKm`,
+  `durationMin`, `paceSeries`, `avgPaceSecPerKm`, `splits`, `bestEfforts`, elevation gain/loss/profile,
+  `cadenceSpm`, `cadenceSeries`, `cadenceSource`, `avgHr`/`maxHr`.
+- **Already persisted per segment** (`activity_logs.segments` JSONB): `index`, `setNumber`, `kind`,
+  `startSec`, `endSec`, `avgHr`, `maxHr`, `hrAtStart`, `avgPaceSecPerKm`, `distanceKm`,
+  `avgCadenceSpm`.
+- **So steps × distance × time is already answerable at the walk level.** What is genuinely missing
+  is small and specific, and all three are additions to the existing `segments` object rather than
+  new columns:
+  1. **`steps` per segment** — derivable from `avgCadenceSpm × duration`, but derived-at-read-time
+     means every consumer re-derives it differently. Store it.
+  2. **Adherence per segment** — the fraction of the segment spent in each band. This is the number
+     the pacer *creates* and the most interesting thing to analyse later ("did I actually hit the
+     targets, or just see the prompt"). Nothing records it today because nothing computed it before.
+  3. **Which signal paced the segment** (`cadence` | `speed` | `hr`). With the ladder in (b) an
+     adherence figure is uninterpretable without it — 60% in-range against a cadence target and
+     against an HR target are not the same measurement.
+- **Adding a key to the `segments` JSONB type is a schema edit** (`lib/data/postgres/schema.ts:344`)
+  and therefore **Lane A**, and per the offline-sync rule the local SQLite mirror, the outbox
+  payload, `getSyncDelta` and `applyDelta` all move in the same PR.
+
+**Drawn 2026-08-19, redrawn after the review — five states, and the layout follows from the fallback rule above.** Speed
 leads at 40 px; cadence and HR sit beneath it as a pair; the step total joins distance on one grey
 line; and the verdict gains a **progress bar against the cadence target**, so *"walk faster"* is a
 reading rather than a sentence. The slow panel shows the bar reading against a
