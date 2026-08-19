@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // Mark a prescribed run completed/skipped (optionally linking the actual activity_logs run).
 // This is the exact write the pushMutations 'prescribed_run' branch performs — same shared
@@ -16,6 +17,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   }
 
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const parsed = PrescribedRunPatchBody.safeParse({ ...(await req.json().catch(() => ({}))), id })
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 

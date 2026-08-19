@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { withRouteErrors, routeErrorResponse } from '@/lib/api/route-errors'
+import { withRouteErrors, routeErrorResponse, invalidUuidResponse } from '@/lib/api/route-errors'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -21,6 +21,8 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const parsed = MealTypePutSchema.safeParse(await req.json().catch(() => null))
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const repo = await getRepository()
@@ -36,6 +38,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const repo = await getRepository()
   try {
     await repo.deleteMealType(id, userId)

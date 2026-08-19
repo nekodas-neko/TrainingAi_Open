@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import type { PeriodizationPhase } from '@trainingai/shared/types/ai-periodization'
 import { POST_TRANSITION_STATUS } from './status'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 const BodySchema = z.object({
   newPhase: z.enum(['accumulation', 'intensification', 'realisation', 'deload']),
@@ -38,6 +39,8 @@ export async function POST(
   }
 
   const { sessionId } = await params
+  const badId = invalidUuidResponse(sessionId)
+  if (badId) return badId
   const repo = await getRepository()
 
   const state = await repo.getSessionPeriodization(userId, sessionId)

@@ -7,6 +7,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { undoCoachChange } from '@/lib/coach/apply'
 import { invalidateProgramStructure } from '@/lib/cache-groups'
 import { errorLog } from '@trainingai/shared/logger'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 /**
  * Undo a change AI Coach applied.
@@ -26,6 +27,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   try {
     await ensureSchema()

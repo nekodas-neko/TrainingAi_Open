@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { buildCardExerciseSignals } from '@trainingai/shared/ai-periodization/signals'
 import { normalizeStoredPrescription } from '@trainingai/shared/ai-periodization/reconcile-prescription'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export async function GET(
   _req: NextRequest,
@@ -14,6 +15,8 @@ export async function GET(
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { sessionId } = await params
+  const badId = invalidUuidResponse(sessionId)
+  if (badId) return badId
   const repo = await getRepository()
 
   // Verify the session belongs to the user's active program before inserting
