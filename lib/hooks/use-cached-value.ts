@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { cachedFetch, readCacheSync, subscribeToInvalidation } from '@/lib/sqlite/cache'
+import {
+  cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync, subscribeToInvalidation,
+} from '@/lib/sqlite/cache'
 
 /**
  * Seed from cache, fetch, and **fetch again whenever the key is invalidated**.
@@ -36,6 +38,18 @@ export function useCachedValue<T>(
      * the standing rule is that it must show an error state rather than vanishing.
      */
      onError?: () => void
+    /**
+     * Read and write through the today-scoped variant (`cachedFetchToday` / `readTodayCacheSync`)
+     * for the date-less "today" keys, which treat an entry stored on a previous day as a miss.
+     *
+     * **This is not a preference — it is a property of the KEY**, and the two must never be mixed:
+     * one canonical variant per key, every read site and the `sync-provider` warm list together.
+     * Set it wherever the site you are converting called `cachedFetchToday`, and check the warm
+     * list's `today:` flag agrees. Without this flag the hook could only ever convert half the
+     * sites in the Q-359 sweep, and the other half would have to switch variant to adopt it —
+     * which is the exact drift the one-variant rule exists to stop.
+     */
+    today?: boolean
   },
 ): T | null {
   const [data, setData] = useState<T | null>(null)
@@ -45,12 +59,14 @@ export function useCachedValue<T>(
   const onErrorRef = useRef(opts?.onError)
   onErrorRef.current = opts?.onError
 
+  const today = opts?.today ?? false
+
   // Seed in an effect, never a useState initializer — a cache read in an initializer causes a
   // hydration mismatch (session 165).
   useEffect(() => {
-    const seed = readCacheSync<T>(key)
+    const seed = today ? readTodayCacheSync<T>(key) : readCacheSync<T>(key)
     if (seed) setData(seed)
-  }, [key])
+  }, [key, today])
 
   // `alive` guards against a response landing after unmount or after `key` changed.
   const keyRef = useRef(key)
@@ -58,8 +74,9 @@ export function useCachedValue<T>(
 
   useEffect(() => {
     let alive = true
+    const fetcher = today ? cachedFetchToday : cachedFetch
     const load = () => {
-      void cachedFetch<T>(key, url, ttlSeconds, d => {
+      void fetcher<T>(key, url, ttlSeconds, d => {
         if (alive && keyRef.current === key) setData(d ?? null)
       }, { onError: () => { if (alive && keyRef.current === key) onErrorRef.current?.() } })
     }
@@ -72,7 +89,7 @@ export function useCachedValue<T>(
     })
 
     return () => { alive = false; unsubscribe() }
-  }, [key, url, ttlSeconds])
+  }, [key, url, ttlSeconds, today])
 
   return data
 }
