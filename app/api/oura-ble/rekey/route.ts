@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// An optional note, truncated to 500 characters below.
+const MAX_BODY_BYTES = 4 * 1024
 
 // Q-314 — declare that the ring was deliberately re-keyed.
 //
@@ -47,13 +51,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  let note: string | null = null
-  try {
-    const body = await req.json() as { note?: unknown }
-    if (typeof body?.note === 'string') note = body.note.slice(0, 500)
-  } catch {
-    // No body is the normal case.
+  // No body is the normal case, so an unreadable one is not an error here — only an oversized one.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
   }
+  const rawNote = read.ok ? (read.body as { note?: unknown } | null)?.note : undefined
+  const note: string | null = typeof rawNote === 'string' ? rawNote.slice(0, 500) : null
 
   const repo = await getRepositoryAsync()
   const result = await repo.declareOuraRekey(session.user.id, note)
