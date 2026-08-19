@@ -1617,46 +1617,6 @@ silently breaks upgraded devices while every test and fresh install passes.
 - **Not in scope:** photos on individual food items or on logged entries. One image per *saved
   meal*, which is the surface the owner asked about and the only one where the row is durable.
 
-### [workouts][platform] Q-405 — a Coach swap silently inherits the old exercise's role, and the role sets the loading
-
-- **Branch:** `feat/coach-swap-role-prompt`
-- **Added:** 2026-08-18 · owner, after swapping Barbell Romanian Deadlift → Barbell Jefferson Curl:
-  *"it should ask what role the exercise should be with a recommendation; this changed from RDL →
-  Jefferson; and it looks like it took the 'secondary' role rather than accessory."*
-- **Lane A** — `lib/coach/domains/session-exercise.ts` is the write path. The picker UI half is Lane B
-  if one is added; check before starting.
-
-**Confirmed: the swap never touches the role.** `session_exercises.exercise_role` is
-`'primary' | 'secondary' | 'accessory'` (`schema.ts:132`, default `'primary'`), and
-`lib/coach/domains/session-exercise.ts` contains **no reference to it** — grep returns nothing. The row
-keeps whatever the outgoing exercise had, so RDL's `secondary` carried straight onto Jefferson Curl.
-
-**This is not a badge problem.** Role selects the progression style —
-`resolveStyleForExercise(program, phase, { exerciseRole })` — so it decides the prescribed percentages
-and sets. In the owner's screenshot the inherited role prescribed **60 kg × 6 at 80%** for a
-Jefferson Curl: a heavy secondary loading pattern on a slow spinal-flexion movement that is normally
-loaded light. **A wrong role is a wrong prescription, on a movement where that carries injury risk.**
-
-**What to build.**
-1. **Ask, with a recommendation pre-selected** — the owner's words. Three options, the suggested one
-   already chosen, so the common case is one confirm rather than a decision.
-2. **Where the recommendation comes from, in order of preference:** the incoming exercise's own entry
-   in `exercise_library` if it carries a default role; otherwise its muscle groups and equipment
-   (a compound barbell lift on a primary mover → primary/secondary; an isolation or mobility movement
-   → accessory). **Do not ask the model to invent it** — a guessed role feeds a real prescription, and
-   CLAUDE.md is explicit that no LLM self-reported value may gate an automatic action.
-3. **Never silently inherit.** If no recommendation can be derived, ask without a pre-selection rather
-   than defaulting to the outgoing role — inheriting is what produced this.
-
-- **Sibling sweep:** the same silent inheritance applies to any other path that replaces an exercise in
-  a session. Grep for writers of `exercise_role` before calling this done; the Coach may not be the
-  only one.
-- **Related, and worth doing together:** **Q-403** — the same swap flow calls an applied change a
-  "proposal" and says so after the fact. Both are about the swap telling the user what it actually did.
-- **Verification:** swap a compound for an isolation movement and confirm the role prompt appears, the
-  recommendation is sensible, and the prescribed sets change to match the chosen role — the last part
-  is the one that proves the fix reached the thing that matters.
-
 ### [platform] Q-404 — the Sentry SDK was deliberately deferred and never queued, so nothing was going to wire it
 
 - **Branch:** `feat/wire-sentry-sdk`

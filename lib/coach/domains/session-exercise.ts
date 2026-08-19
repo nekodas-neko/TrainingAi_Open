@@ -1,4 +1,6 @@
 import { and, eq } from 'drizzle-orm'
+import { recommendExerciseRole, UNCLASSIFIED_EXERCISE_ROLE } from '@trainingai/shared/workout/exercise-role'
+import type { ExerciseRole } from '@trainingai/shared/types/program'
 import * as s from '@/lib/data/postgres/schema'
 import { normalizeMuscle } from '@trainingai/shared/muscles'
 import { FIELD_LABEL, type PatchChange } from '../patch'
@@ -13,6 +15,7 @@ interface TargetRow {
   styleId: string | null
   position: number
   muscleGroups: string[]
+  exerciseRole: ExerciseRole
   sessionName: string
 }
 
@@ -27,6 +30,7 @@ async function loadTarget(db: Db, userId: string, id: string): Promise<TargetRow
       styleId: s.sessionExercises.styleId,
       position: s.sessionExercises.position,
       muscleGroups: s.sessionExercises.muscleGroups,
+      exerciseRole: s.sessionExercises.exerciseRole,
       sessionName: s.programSessions.name,
     })
     .from(s.sessionExercises)
@@ -148,16 +152,41 @@ export const sessionExerciseHandler: DomainHandler = {
     const proposedMuscles = newMuscles
       ? (newMuscles.to as string).split(',').map(m => m.trim()).filter(Boolean)
       : undefined
-    if (swap && proposedMuscles?.length) {
+    if (swap) {
       const [existing] = await db
-        .select({ id: s.exerciseLibrary.id })
+        .select({
+          id: s.exerciseLibrary.id,
+          muscles: s.exerciseLibrary.muscles,
+          equipment: s.exerciseLibrary.equipment,
+        })
         .from(s.exerciseLibrary)
         .where(eq(s.exerciseLibrary.name, swap.to as string))
         .limit(1)
-      if (!existing) {
+
+      if (!existing && proposedMuscles?.length) {
         consequences.push({
           kind: 'info',
           text: `Adds "${swap.to}" to the exercise library, recorded as training ${formatList(proposedMuscles)}`,
+        })
+      }
+
+      // **The role, said out loud before it is written (Q-405).** It selects the progression style,
+      // so it decides the prescribed percentages and sets — and the swap used to carry the OUTGOING
+      // exercise's role across in silence, which put a heavy secondary loading on a Jefferson Curl.
+      // Surfacing it here is what turns the write into something the user confirms.
+      const recommended = existing
+        ? recommendExerciseRole({
+            muscles: (existing.muscles as { muscle: string }[] | null) ?? [],
+            equipment: existing.equipment ?? [],
+          })
+        : null
+      const role = recommended ?? UNCLASSIFIED_EXERCISE_ROLE
+      if (role !== row.exerciseRole) {
+        consequences.push({
+          kind: recommended ? 'info' : 'warn',
+          text: recommended
+            ? `Sets the role to ${role} (was ${row.exerciseRole}) — this changes the prescribed sets and percentages`
+            : `Sets the role to ${role}, the lightest option, because nothing is known about "${swap.to}" yet — check it if this should be a heavier lift`,
         })
       }
     }
@@ -209,9 +238,18 @@ export const sessionExerciseHandler: DomainHandler = {
     // leaving a half-applied patch behind.
     const swap = accepted.find(c => c.field === 'exerciseName')
     let replacement: { id: string; muscles: { muscle: string }[] } | null = null
+    // The role the incoming exercise should carry. Never the outgoing one: `exercise_role` selects
+    // the progression style, so inheriting it prescribed a heavy secondary loading on a Jefferson
+    // Curl (Q-405).
+    let newRole: ExerciseRole | null = null
     if (swap) {
       const [entry] = await db
-        .select({ id: s.exerciseLibrary.id, muscles: s.exerciseLibrary.muscles, mergedInto: s.exerciseLibrary.mergedInto })
+        .select({
+          id: s.exerciseLibrary.id,
+          muscles: s.exerciseLibrary.muscles,
+          equipment: s.exerciseLibrary.equipment,
+          mergedInto: s.exerciseLibrary.mergedInto,
+        })
         .from(s.exerciseLibrary)
         .where(eq(s.exerciseLibrary.name, swap.to as string))
         .limit(1)
@@ -219,11 +257,18 @@ export const sessionExerciseHandler: DomainHandler = {
         const created = await createMissingExercise(db, userId, swap.to as string, accepted)
         if ('error' in created) return { ok: false, reason: 'invalid', detail: created.error }
         replacement = created
+        // Just invented by the Coach, so its muscles are model-proposed and cannot be turned into a
+        // prescription (Q-405). Not the outgoing role either — inheriting is the defect.
+        newRole = UNCLASSIFIED_EXERCISE_ROLE
       } else {
         // A merged-away catalogue row is kept only so historical FKs stay valid (migration 165) — it
         // must never become a new selection.
         if (entry.mergedInto) return { ok: false, reason: 'invalid', detail: `"${swap.to}" has been merged into another exercise` }
         replacement = { id: entry.id, muscles: (entry.muscles as { muscle: string }[] | null) ?? [] }
+        newRole = recommendExerciseRole({
+          muscles: (entry.muscles as { muscle: string }[] | null) ?? [],
+          equipment: entry.equipment ?? [],
+        }) ?? UNCLASSIFIED_EXERCISE_ROLE
       }
     }
 
@@ -238,6 +283,7 @@ export const sessionExerciseHandler: DomainHandler = {
           set.exerciseName = c.to
           set.exerciseId = replacement.id
           set.muscleGroups = replacement.muscles.map(m => m.muscle)
+          if (newRole) set.exerciseRole = newRole
         } else if (c.field === 'styleId') set.styleId = c.to
         else if (c.field === 'position') set.position = c.to
       }
@@ -257,6 +303,7 @@ export const sessionExerciseHandler: DomainHandler = {
         styleId: (r.styleId as string | null) ?? null,
         position: r.position as number,
         muscleGroups: (r.muscleGroups as string[]) ?? [],
+        exerciseRole: (r.exerciseRole as ExerciseRole | undefined) ?? 'primary',
       })
       return { ok: true }
     }
@@ -272,6 +319,7 @@ export const sessionExerciseHandler: DomainHandler = {
       // `in` rather than a truthiness check: the FK is legitimately null on rows that predate the
       // catalogue link, and null is the value to restore.
       if ('exerciseId' in before) set.exerciseId = before.exerciseId ?? null
+      if ('exerciseRole' in before && before.exerciseRole) set.exerciseRole = before.exerciseRole
     }
     if ('styleId' in before) set.styleId = before.styleId
     if ('position' in before) set.position = before.position
@@ -291,6 +339,9 @@ function captureBefore(accepted: PatchChange[], target: TargetRow): Record<strin
       // name left the row reading "Barbell Romanian Deadlift" while `exercise_id` still pointed at
       // the replacement — observed 2026-08-09, and invisible to anything that reads the name.
       before.exerciseId = target.exerciseId
+      // The role moves with the swap now (Q-405), so an undo that left it behind would restore the
+      // old exercise under the new exercise's prescription.
+      before.exerciseRole = target.exerciseRole
     } else if (c.field === 'styleId') before.styleId = target.styleId
     else if (c.field === 'position') before.position = target.position
     else if (c.field === 'removed') {
@@ -301,6 +352,7 @@ function captureBefore(accepted: PatchChange[], target: TargetRow): Record<strin
         styleId: target.styleId,
         position: target.position,
         muscleGroups: target.muscleGroups,
+        exerciseRole: target.exerciseRole,
       }
     }
   }

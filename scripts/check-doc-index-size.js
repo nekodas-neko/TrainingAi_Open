@@ -961,13 +961,20 @@ const BASELINE = {
   // daily HR chart, and HR is timestamped, all-day and dense. The correction stays inline with the
   // numbers because the wrong conclusion is the more quotable one, and a session reading only the
   // table would re-derive it.
-  // Raised 2026-08-19 (Tuning, retired-scales correction): 11227 -> 11230. Three lines on Q-72,
-  // marking motivation/resting_soreness/wake_mood as RETIRED. The entry previously listed them
-  // beside two live scales as evidence, which reads as "six poor self-reports" when it is really
-  // two live ones and three fossils -- a different instruction to whoever acts on it.
-  // Rebuilt from origin/main after a parallel PR raised the same baseline -- splicing the conflict
+  // Raised 2026-08-19 (Lane A, Q-405 premise check): 11197 -> 11223. Three measured facts written
+  // onto the entry BEFORE the recommender was built, because each one changes the design and two of
+  // them contradict the entry as written — the catalogue has no default-role column, and the owner's
+  // own exercise is not in the catalogue at all, so its muscles are model-proposed and cannot be
+  // turned into a prescription. Cheaper here than as a rediscovery.
+  // RATCHETS DOWN 2026-08-19 (Tuning, retired-scales correction): 11253 -> 11190, even though three
+  // lines were added to Q-72 marking motivation/resting_soreness/wake_mood as RETIRED. A parallel
+  // compaction reclaimed more than this adds, and shrink-only means that space is locked in rather
+  // than left free to refill silently. The Q-72 lines matter because the entry previously listed
+  // three retired scales beside two live ones as evidence, which reads as "six poor self-reports"
+  // when it is two live ones and three fossils -- a different instruction to whoever acts on it.
+  // Rebuilt from origin/main after a parallel PR moved the same baseline -- splicing the conflict
   // hunks would have produced two baselines for one number.
-  'docs/implementation-backlog.md': 11230,
+  'docs/implementation-backlog.md': 11190,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
