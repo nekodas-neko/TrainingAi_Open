@@ -1,13 +1,23 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One number. 4 KB is already two orders of magnitude of headroom.
+const MAX_BODY_BYTES = 4 * 1024
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
-  const { quantityMultiplier } = await req.json()
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { quantityMultiplier } = (read.body ?? {}) as { quantityMultiplier?: unknown }
   if (typeof quantityMultiplier !== 'number' || quantityMultiplier < 0.01 || quantityMultiplier > 100) {
     return NextResponse.json({ error: 'quantityMultiplier must be between 0.01 and 100' }, { status: 400 })
   }

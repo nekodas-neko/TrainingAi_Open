@@ -1673,15 +1673,22 @@ the H10 at home — which is the walk in the screenshot that started this.
     The three converted routes are at zero, so re-adding a bare read to any of them fails
     immediately. Verified by reverting one and watching it go red.
 
-- **What is left: 104 bare reads across 92 route files.** The baseline in that script is the list.
+- **Slice 2 shipped (PR #184): the six offline-first hot paths.** `nutrition/food-logs` (+ `[id]`),
+  `log-exercise`, `complete-workout`, `sync/push`, `water-log`. Two of them threw on malformed JSON —
+  a bare `req.json()` with no `.catch()`, which Next turned into a **500** rather than the 400 it is —
+  so those now answer 400 as well. `sync/push`'s cap was **measured**, not guessed: the envelope caps
+  the batch at 100 and the largest bounded domain (`workout_log`, arrays capped at 20, strings at 200)
+  is 6,010 bytes at its own limits, so a full worst-case batch is 0.57 MB against a 4 MB cap. **Do not
+  lower that one without re-measuring** — it is the outbox, and a rejected batch is the app's
+  worst-case data-loss path.
+- **What is left: 98 bare reads across 86 route files.** The baseline in that script is the list.
   The number may only go down; a file that reaches zero is removed from it in the same PR.
 - **Do this in slices, not one sweep** — that is what the ratchet is for. Converting 92 files at
   once is how a mistake hides in a diff nobody can read.
 - **This is a candidate count, not a defect count.** All 92 require a session, several do
   hand-rolled checks, several are admin-gated. Read each before calling it broken *or* fine. The
-  suggested next slices, by exposure: the offline-first hot paths (`nutrition/food-logs`,
-  `log-exercise`, `complete-workout`, `sync/push`, `water-log`), then `user/password`, then the
-  rest.
+  suggested next slice, by exposure: `user/password`, `profile`, `user/goals`, then the admin and
+  AI routes, then the rest.
 - **Priced honestly.** Not attack — this app's users are its own account holders. It is worth doing
   because `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full`
   outage (2026-08-17), and an unbounded user-writable body is the shape that ritual exists to
