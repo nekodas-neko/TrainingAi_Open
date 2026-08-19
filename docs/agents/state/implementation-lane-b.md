@@ -69,6 +69,22 @@ The queue was re-prioritised mid-run to put the nutrition cluster on top. Three 
 - **Journal compaction sweep** — `main` was over the 60-file runaway limit, so Custom Rules was red
   on every open branch. 61 → 41 into `docs/overview/history-2026-08-18.md`.
 
+- **Q-411 SHIPPED** (v1.325.5, PR #184) — every style draws on a square canvas. The renderer had been
+  reserving the 130 × 137 box a round crop leaves, against 171 × 171: **64% of the area, spent on a
+  constraint the owner does not have** (the round die is handled at the printer). `squareOnly` is
+  gone as a concept. Every code grew and the default gained a fourth ingredient line.
+  [Journal](../../overview/entries/2026-08-19-square-label-canvas.md).
+  **Three things this cost, all worth carrying:**
+  1. `codeUnits` is bounded by a style's **vertical clearance**, not by the area freed. The first
+     draft used the second and drew `editorial`'s and `ticket`'s codes over their body text — and
+     neither is in the E2E's decode list, so nothing failed.
+  2. **`square` gained nothing and was raised anyway.** It already drew square. 70 → 90 took its
+     ingredient list from three of eight to **one** — the Q-399 shape again, on the style that
+     promises the breakdown. Capped at 76, the largest code that leaves three lines.
+  3. **The assertion that caught (2) caught it by luck** — it required plural "N ingredients" and
+     failed on "1 ingredient". Two would have shipped. It carries an explicit floor now. *Check what
+     a passing regex would accept, not just that it passes.*
+
 ### Earlier runs
 
 - **Q-478 SHIPPED** (v1.324.8, PR #154) — `isBodyMetadataFresh`/`isWorkoutDataToday` compared a
@@ -269,10 +285,13 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
 - **Q-357** — FILED, not built. Four memoised call sites still defeated; `SavedMealCard` is inside a
   `.map` so its fix is a callback-contract change, not a `useCallback`. Baselined, so nothing new
   can join them.
-- **Q-358** — FILED, not built. Every label QR is drawn on a fractional device-pixel grid.
-  **Mitigated by Q-399's 600 dpi**, which is why it is low: 9.5 px per module rather than 4.7.
-  Snapping shrinks the drawn box and every reported figure with it, which is the whole reason it was
-  not folded into Q-399.
+- **Q-358** — DONE (v1.325.5), built inside Q-411 rather than taken in its own turn. Q-411 resized
+  every code, every module width changed with it, and the decode flake the 600 dpi bump was thought
+  to have fixed came straight back — `plaque` at 14.94 device px/module one run, `square` at 17.02
+  the next. **That is the lesson worth keeping: the 600 dpi bump was margin, and margin expires the
+  moment a size changes.** `drawCode` paints in device space on a whole-pixel cell now, and the
+  `+0.04` seam patch is gone with it. The feared shrink was under 0.2% (561 px against 561.6 for
+  `square`), so the reported millimetre figures still derive from `codeUnits`.
 - **Q-359** — FILED, not built. The other 36 fetch-once effects. **Latent, not broken** — they
   unmount. Some are deliberately fetch-once and must NOT be converted. Suggests a shrink-only
   ratchet over a sweep.
