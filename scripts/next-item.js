@@ -93,7 +93,11 @@ for (const e of entries) {
   const reasons = [];
   if (unmet.length) reasons.push(`Needs: ${unmet.join(', ')}`);
   for (const g of e.gates) reasons.push(`Gate: ${g}`);
-  if (e.legacyBlocked) reasons.push(`unmigrated marker — ${e.legacyBlocked}`);
+  // A structured field is authoritative. The prose marker stays in the body for its detail, and is
+  // only reported as unmigrated where nothing structured has replaced it yet.
+  if (e.legacyBlocked && !e.gates.length && !unmet.length) {
+    reasons.push(`unmigrated marker — ${e.legacyBlocked}`);
+  }
 
   if (reasons.length) parked.push({ e, reasons });
   else if (e.lane === '?') unclassified.push(e);

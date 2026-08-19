@@ -2022,6 +2022,8 @@ this fits without an extraction.
 
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
+- **Gate:** owner
+
 - **⛔ OWNER-DEFERRED 2026-08-18 — accepted risk, do NOT implement. The fix already exists.**
   The owner's call: *"leave that as a known issue for now — only admin will be me for a long time."*
   The window opens only on **revocation**, and with a single permanent admin it never opens.
@@ -2676,6 +2678,8 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
+- **Gate:** owner
+
 - **Branch:** `feat/meal-label-ingredient-breakdown`
 - **⬆ MOVED TO THE TOP OF THE QUEUE by the owner, 2026-08-18** — *"can this be added to the top
   of the lanes queue - I will test and get back"*. Take this before the numbered items below it.
@@ -2917,6 +2921,8 @@ moving *beside* the calories rather than under them.
   drive adoption, or narrow? **Owner's call, not Lane A's.**
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
+
+- **Needs:** Q-468
 
 - **Branch:** `feat/coach-undo-control`
 - **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
@@ -3681,6 +3687,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   and the notification arrives.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
+
+- **Gate:** owner
 
 - ⛔ **blocked: needs an owner decision before any code moves.** Skipped by Implementation Lane B on
   2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
@@ -5089,6 +5097,8 @@ session working from a temporarily restored copy.
 
 ### [platform] Q-287 — there is no self-service account deletion, and the Play Store requires one
 
+- **Gate:** owner
+
 - **Branch:** `feat/account-deletion`
 - **Plan:** **required before any code** — this is destructive and irreversible
 - **Added:** 2026-08-15 · from the uncovered-lenses review §4
@@ -5404,6 +5414,8 @@ session working from a temporarily restored copy.
 - **Follow-up (not blocking):** re-derive the anchor on ~15 BLE-era nights. This fit is Cloud-era and
   BLE overnight HR is ~2× noisier, so the anchor is conservative for current data rather than wrong.
 ### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
+
+- **Needs:** Q-526
 
 - **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
 - **No longer blocked.** All three decisions were resolved 2026-08-18 — the owner delegated them
@@ -7316,6 +7328,8 @@ session working from a temporarily restored copy.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+- **Gate:** device
+
 > **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
 > Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
 > in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
@@ -7956,6 +7970,8 @@ session working from a temporarily restored copy.
 
 ### [nutrition][platform] Q-201 — a plan meal's suggested time is stored, shown, and never used for anything
 
+- **Gate:** owner
+
 - **⛔ Needs an owner decision before implementing (added 2026-08-12, while shipping Q-200).** The
   two things are not the same notification. The existing reminders fire at a **meal type's end
   hour** as a *"you didn't log this"* catch-up (`computeMealReminderActions`); a plan's
@@ -8573,6 +8589,8 @@ measured, not the ~3,300-test full suite.
 
 ### [sleep][readiness] 🔴 Q-72 — the Sleep Score cannot tell a good night from a bad one (MEASURED, needs an owner decision)
 
+- **Gate:** owner
+
 - **Added:** 2026-08-04. Started as *"put the sleep rating on the morning check-in"* (the owner's
   idea). **That turned out to be already built** — `MorningCheckinSheet` has collected
   `sleepQualityFeel` (1–5, 1 = best) since at least 2026-07-03, and
@@ -8712,6 +8730,8 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
+- **Gate:** device
+
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
   entry is removed per this file's own rule that a finished item must never linger.
 - **What Q-157 delivered:** five write domains (session exercises, macro targets, user goals,
@@ -8798,6 +8818,8 @@ per-field merge where an AI write has no honest source rank to claim.
 
 
 ### [app-shell] ⛔ Q-147 — cold app start has never been measured on the device (owner action)
+
+- **Gate:** device
 
 - **Added:** 2026-08-08 · [journal](overview/history-2026-08-07.md)
 - **⛔ blocked: needs the S25.** Not implementable in a session — filed so the gap is tracked rather
@@ -8979,6 +9001,8 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [activity][readiness] Q-137 — the Activity Score is effectively a step counter: 57 of 100 weight is constant, and it lost its second-best input a month ago
 
+- **Gate:** owner
+
 - **Branch:** `fix/activity-score-calibration`
 - **Added:** 2026-08-07 · [review §6.1-6.3](reviews/2026-08-07-full-app-review.md)
 - **⛔ Needs an owner decision before code**, same shape as Q-72 — this changes a number read daily.
@@ -9099,6 +9123,8 @@ first, so the output is a design discussion, not a patch:
 
 
 ### [workouts] Q-85 — a shortened session keeps full-length rest periods, which is what actually caps its exercise count
+
+- **Gate:** owner
 
 - **Branch:** `feat/preset-aware-rest-compression`
 - **Plan:** [`2026-08-15-preset-aware-rest-compression.md`](superpowers/plans/2026-08-15-preset-aware-rest-compression.md)
@@ -9449,6 +9475,8 @@ first, so the output is a design discussion, not a patch:
   when this ships.
 
 ### [sleep] ⛔ Q-102 — wire the morning sleep-feel rating into the live Sleep Score, neutral at 3/5 — OWNER DECLINED 2026-08-06
+
+- **Gate:** owner
 
 > **⛔ Owner explicitly ruled this out, in person, 2026-08-06** — walked through it live against a
 > real disrupted night: does not want `sleep_quality_feel` driving the score at all, wants it kept
@@ -10488,6 +10516,8 @@ Two independent findings, both low-urgency:
 
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
+- **Gate:** owner
+
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
 
@@ -10497,6 +10527,8 @@ is essentially never worn for sleep, so there's no ground truth to calibrate
 against yet. Blocked on real-data capture, not code.
 
 ### [devices][readiness] 🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
+
+- **Gate:** device
 
 > **⚑ Re-measured 2026-08-08 — it is ten, not eight, and here is the exact list.** Machine-counted
 > every column in the table against 82 rows rather than spot-checking: **`active_calories_est`,
@@ -10562,6 +10594,8 @@ What is left of Q-10 is only the nice-to-have above: persisting Oura's session
 `type` / the ring's bedtime-period tag.
 
 ### [sleep] 🟢 Q-34 — sleep-staging Phase 1b: items 2 and 4 remain
+
+- **Gate:** device
 
 Plan: [`docs/superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md`](superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md).
 Branch: `feat/sleep-staging-ultradian-prior` (item 2).
@@ -10954,44 +10988,6 @@ since the CI link check (item 1) catches a botched rewrite immediately.
   specifically" caveat is now answered — it is fine, as are the other three. **The rule at the top
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
-
----
-
-### [platform] 🟢 Q-543 — every concurrent PR conflicts on the doc-index BASELINE object
-
-`scripts/check-doc-index-size.js` holds three numbers — `projectOverview.md`,
-`docs/implementation-backlog.md`, `CLAUDE.md` — in one object literal, under ~170 lines of
-accumulated raise-history commentary. Every lane that raises a baseline edits the same few lines of
-the same file on the same day, so the ratchet has become the repo's most reliable merge conflict.
-
-**Measured on this branch, 2026-08-18:** one docs-only PR (#69, a single `CLAUDE.md` row) took four
-CI rounds. One was a genuine ratchet failure and correct. The other three were base collisions with
-#68, then #65/#71, then #75 — **all three on this file, none on the content being changed.** The
-file's own comments record the same thing happening to other lanes repeatedly, describing "the
-fourth same-day ratchet collision on this branch" and warning in five separate places that splicing
-a conflict hunk silently un-does the other lane's raise. That warning exists because it has been got
-wrong before.
-
-**This is the same problem `docs/overview/entries/` already solved.** Per-entry journal files took
-the journal-prepend conflict class to zero on the reasoning that two PRs writing *different files*
-cannot conflict. The baselines are the remaining shared-line edit that every PR touches.
-
-**Shape worth considering** (not a spec — the decision is which, and it is cheap to reverse):
-
-- **Per-file baseline fragments** — `scripts/doc-baselines/<slug>.json` or similar, one file per
-  ratcheted doc, read and merged by the check. Directly mirrors the entries-directory fix. Costs a
-  small loader; removes the conflict class outright.
-- **Move the raise-history prose out of the source file** into a log the check does not parse. Much
-  smaller change, and it shrinks the conflict window without closing it — two lanes raising the same
-  file the same day still collide, they just collide on one line instead of thirty.
-
-**Do not** solve it by dropping the history commentary wholesale. Several of those notes are the
-only record of *why* a number moved, and at least one documents a real near-miss where a splice
-would have reverted another lane's raise.
-
-**Not urgent.** It costs minutes per PR, never correctness — the check itself works exactly as
-intended, and caught a real overrun on #69. Filed per "no orphaned findings" rather than taken,
-because restructuring a CI gate mid-merge is not a docs change.
 
 ---
 
