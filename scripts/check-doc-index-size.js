@@ -945,7 +945,12 @@ const BASELINE = {
   // entry's own rules unsatisfiable together — the numbers are inline because the next session
   // would otherwise re-measure production to find that out, and because "check the granularity"
   // reads like a formality until you see 11 rows against 668,749 steps.
-  'docs/implementation-backlog.md': 11208,
+  // Raised 2026-08-19 (Lane B, Q-414 corrected): the previous raise recorded a measurement and the
+  // wrong conclusion from it — that no honest burn curve could be drawn. The owner pointed at the
+  // daily HR chart, and HR is timestamped, all-day and dense. The correction stays inline with the
+  // numbers because the wrong conclusion is the more quotable one, and a session reading only the
+  // table would re-derive it.
+  'docs/implementation-backlog.md': 11201,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
