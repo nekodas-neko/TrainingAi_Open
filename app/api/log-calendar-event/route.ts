@@ -22,19 +22,18 @@ export async function POST(req: NextRequest) {
   const refreshToken = session?.refreshToken;
   if (!refreshToken) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: {
-    sessionType: string;
-    startMs: number;
-    endMs: number;
-    exercises: { name: string; setWeights: number[]; reps: number[] }[];
-  };
   const read = await readJsonLimited(req, MAX_BODY_BYTES);
   if (!read.ok) {
     return read.reason === 'too_large'
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  body = read.body as typeof body;
+  const body = read.body as {
+    sessionType: string;
+    startMs: number;
+    endMs: number;
+    exercises: { name: string; setWeights: number[]; reps: number[] }[];
+  };
 
   const { sessionType, startMs, endMs } = body;
   if (!sessionType || !startMs || !endMs) {
