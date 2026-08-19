@@ -32,6 +32,7 @@ import { cn } from "@trainingai/shared/utils";
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, todayDayOfWeek, shiftDateStr, dayKeyInTz } from "@trainingai/shared/date-utils";
 import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
@@ -718,20 +719,18 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     return () => window.removeEventListener('ta:oura-ble-synced', onBleSynced);
   }, []);
 
+  // Q-359: synced into state, not derived — `goalsProfile` also takes optimistic local writes that
+  // must outlive a refetch. Safe because the goals card gates on `goalsCheckinDismissed` first.
+  const userProfile = useCachedValue<{ user?: { displayName?: string | null; name?: string | null; avatar?: string | null; activityLevel?: string | null; fitnessGoal?: string | null; lastGoalReviewAt?: string | null } }>(
+    'more-user-profile', '/api/user/profile', TTL_MEDIUM,
+  );
   useEffect(() => {
-    cachedFetch<{ user?: { displayName?: string | null; name?: string | null; avatar?: string | null; activityLevel?: string | null; fitnessGoal?: string | null; lastGoalReviewAt?: string | null } }>(
-      'more-user-profile', '/api/user/profile', TTL_MEDIUM,
-      d => {
-        setDisplayName(d.user?.displayName ?? d.user?.name ?? null);
-        if (d.user?.avatar) setUserAvatar(d.user.avatar);
-        setGoalsProfile({
-          activityLevel: d.user?.activityLevel ?? null,
-          fitnessGoal: d.user?.fitnessGoal ?? null,
-          lastGoalReviewAt: d.user?.lastGoalReviewAt ?? null,
-        });
-      },
-    ).catch(() => {})
-  }, []);
+    const u = userProfile?.user;
+    if (!u) return;
+    setDisplayName(u.displayName ?? u.name ?? null);
+    if (u.avatar) setUserAvatar(u.avatar);
+    setGoalsProfile({ activityLevel: u.activityLevel ?? null, fitnessGoal: u.fitnessGoal ?? null, lastGoalReviewAt: u.lastGoalReviewAt ?? null });
+  }, [userProfile]);
 
   useEffect(() => {
     let cancelled = false;
