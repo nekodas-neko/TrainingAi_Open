@@ -186,6 +186,16 @@ for this work:
   production"; **5h40m later a sibling writer had erased the key**. `COALESCE(excluded, existing)` on a
   `jsonb` column replaces the document whole, so the merge lives in each caller and only one of two
   does it. **When checking a shared field, the thing to observe is the NEXT write by someone else.**
+- **Range is a first FILTER, not a verdict — and the cross-pillar table already exists.**
+  [`2026-08-19-cross-pillar-score-ranges.md`](../../reviews/2026-08-19-cross-pillar-score-ranges.md)
+  has every pillar's spread side by side; do not re-derive it. Headline: **only Body Battery genuinely
+  spans** (sd 29.6, though 5 of 51 days sit exactly on a clamp bound), **activity is the most
+  compressed thing in the app** (sd **6.0**, zero days under 50), and **sleep's stored 85.3 is the OLD
+  model** — the shipped one replays to 69.5.
+  **Range catches the stuck-score class instantly** (resilience's one value, illness never firing,
+  `strengthFreq` at exactly 100 on 91 days) **and cannot see a score that moves the wrong way** —
+  Q-507's stress metric has a fine spread and correlates **+0.40** with readiness. Always pair it with
+  a correlation against a signal the score did not come from, and count days sitting on a clamp bound.
 - **`bdi_derived` and `body_comp` are checked and have nothing to tune — do not re-measure them.**
   BDI has **no threshold anywhere**; its only consumer is a debug console that labels it observational,
   and `validation/oura-summary.ts` classes it an open-ended research metric. `body_comp` is a
