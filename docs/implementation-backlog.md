@@ -480,53 +480,6 @@ is the part worth knowing before someone reaches for the obvious edit:
   down the sheet and nothing else — if any of those three shift, the change has gone further than it
   should.
 
-### [platform] Q-361 — two core routes 500 in every sandbox session, so their screens have never been verifiable locally
-
-- **Branch:** `fix/sandbox-energy-constants`
-- **Added:** 2026-08-19 · Lane B, found building Q-414's chart · [`journal`](overview/entries/2026-08-19-energy-timeline.md)
-- **Placement:** mid. Nothing is broken in production — this is a **verification** hole, and its cost
-  is that "tested on `pnpm dev`" has been silently untrue for a whole family of screens.
-
-**What happens.** `GET /api/nutrition/energy-balance` and `GET /api/body-metadata` both return
-**500** in a sandbox session, every time:
-
-```
-Error: ENOENT: no such file or directory, open
-  '/home/user/TrainingAi_Open/lib/oura-models/constants/energy-expenditure-features.json'
-```
-
-`lib/oura-models/constants/*` is **gitignored** — vendor data pulled in the public-repo cut (Q-49).
-`readJson` throws deliberately, and the comment says why: *"A missing constant is a wrong number, not
-a missing feature — there is no degraded answer to fall back to."* That reasoning is right for
-production. In the sandbox it means the file is simply never there.
-
-**What it costs.** The Energy card on day detail, the energy bar on Nutrition, and anything else
-reading either route render **nothing at all** locally — not a degraded state, an empty one. Q-414's
-chart could not be seen until a stub MET table was written by hand. Any session that claimed a
-`pnpm dev` pass on those screens was claiming something it could not have done.
-
-**A second, independent blocker in the same place.** The seeded user has **no `date_of_birth`**
-(`sex` and `height_cm` are seeded, `date_of_birth` is not), so `computeEnergyBalance` has no age,
-returns no balance, and the surfaces stay blank *even with the constants present*. Both must be
-fixed or the fix is worthless.
-
-**Options, and the second is the one to take.**
-- Commit a small placeholder constants file. Rejected: it puts plausible-looking wrong MET numbers in
-  the repo where nothing marks them as fake, which is how a wrong number ships.
-- **Have `scripts/local-db/setup.sh` write a clearly-labelled stub when the real file is absent**,
-  and add `date_of_birth` to the seed. The stub says in its own `_note` field that its values are
-  placeholders, it only ever exists in a sandbox, and the gitignore keeps it out of commits. The
-  route then returns a *shaped* answer whose totals are wrong-but-present, which is exactly what a
-  UI verification needs and production never sees.
-- **Lane B owns the chart surfaces; `scripts/local-db/` is unlisted in §3** — claim it in the baton
-  or hand that half to Lane A.
-- **Not verified:** whether CI hits this. CI runs `pnpm build` and the E2E suite green, so either the
-  collected routes do not touch the loader at build time (it is read on first use, not at module
-  scope — deliberately, see the comment at `workout-energy.ts:31`) or no E2E asserts on those
-  screens. **Establish which before fixing**, because "green in CI, dead locally" is the shape that
-  trains sessions to stop believing local runs.
-
-
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`

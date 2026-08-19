@@ -33,6 +33,15 @@ layer**) through §16. Read it before building any shared helper.
   have never run against production**, because a sandbox session cannot authenticate there. Carries
   the paste-ready runbook, the three ways to unblock it, and what protects the run.
 
+- [`docs/overview/entries/2026-08-19-sandbox-energy-constants.md`](../../overview/entries/2026-08-19-sandbox-energy-constants.md)
+  — **`pnpm dev` could not render the energy screens at all, and CI could not tell you (Q-361).**
+  `/api/nutrition/energy-balance` and `/api/body-metadata` answered **500 in every session** because
+  the gitignored model constants are never on disk here; the boot delivery now falls back to the
+  committed synthetic fixtures outside production. Records why each CI job missed it (build reads on
+  first use, vitest already points at the fixtures, no E2E spec visits either screen) — and the
+  caveat to carry forward: **the energy numbers a sandbox now shows are arbitrary**, so they verify
+  plumbing and never a value.
+
 - [`docs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`](../../handoff-2026-08-17-cross-comprehensive-review-six-rounds.md)
   — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
   the Q-number collision and the conflict-markers-on-`main` incident. **Also records that PR #1401 did
