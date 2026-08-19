@@ -911,10 +911,29 @@ whether or not anyone draws them first.
   colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
 - No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
 
-- **First step is done — the drawings exist** (finding 6). What is still open is the owner's pick
-  between srv/g options A, B and C, and whether the collapse-when-not-editing row in the proposed
-  Edit Meal artboard is wanted. Do not start coding the ingredient row before that answer; findings
-  1, 2, 3, 7 and 8 do not depend on it and can go first.
+- **DECIDED BY THE OWNER, 2026-08-19 — the ingredient row is unblocked.** Both open questions were
+  answered in one reply: ***"go with A, and yes collapse the row when not editing"***.
+  1. **Option A wins** — the unit rides on the number as a chip inside the field, `60 g` ⇄ `2 srv`
+     on one tap. B and C are dead; do not revisit them. The control comes from
+     `components/ui/segmented-tabs`, not a fourth hand-rolled segmented control (finding 8).
+  2. **Rows collapse when not being edited**, one expanded at a time. The collapsed shape is
+     finding 13's single row component — name · grey secondary line · calories right-aligned ·
+     chevron — so this is not a second component, it is `food-row.tsx` with an expanded state.
+  **Read this together with finding 12, which is not contradicted by it.** Finding 12 retired A/B/C
+  *as a fork over what sits on a list row*, because the answer there is **nothing** — a diary or
+  search row carries no editor and never expands. What the owner has now chosen is the shape of the
+  quantity control **wherever it does appear**: the quantity sheet, and the expanded row in Edit
+  Meal, which is a builder rather than a list. Finding 12 already anticipated this
+  (*"Option A's shape (unit chip on the number) is what that sheet uses"*), so the decision confirms
+  it rather than reopening it. **A row in the diary that expands to edit would be a
+  misreading of both.**
+- **The drawings exist** (finding 6); `unit-options.png`'s column A is the reference for the
+  expanded row, and its `Full Cream Milk` row is the reference for the collapsed one. Findings 1, 2,
+  3, 7 and 8 never depended on this answer and can still go first — but nothing is blocked now.
+- **Still open, and deliberately not blocking: where `My Foods` lives** (note 17). Recommendation
+  stands — a **fourth tab** beside Recent, Frequent and Saved meals, because it is a list of foods
+  like the other three and a tab is where someone looks for it. Build it that way unless the owner
+  says otherwise; it is one line to move later.
 - **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
   nothing here touches an engine path.
 - **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
