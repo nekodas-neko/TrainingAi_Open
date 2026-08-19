@@ -27,6 +27,7 @@
 // re-adding a bare read to any of them fails immediately.  2: the offline-first hot paths.
 // 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths.
 // 6: the workout and activity write routes.
+// 7: the nutrition CRUD routes.
 // 9: everything the numbered slices left over — the periodization, running-plan, phase-set,
 // progression-style, friends, injuries, supplements, digest, mood and calendar routes.
 'use strict';
@@ -54,20 +55,6 @@ const BASELINE = {
   'app/api/admin/invites/route.ts': 2,
   'app/api/admin/mirror-dataset-gifs/route.ts': 1,
   'app/api/admin/timing-baseline/route.ts': 1,
-  'app/api/nutrition-goals/[id]/route.ts': 1,
-  'app/api/nutrition-goals/recommend/route.ts': 1,
-  'app/api/nutrition/dietary-restrictions/route.ts': 1,
-  'app/api/nutrition/food-items/route.ts': 1,
-  'app/api/nutrition/meal-plans/[id]/route.ts': 1,
-  'app/api/nutrition/meal-plans/[id]/structure/route.ts': 1,
-  'app/api/nutrition/meal-plans/meals/[mealId]/route.ts': 1,
-  'app/api/nutrition/meal-plans/route.ts': 1,
-  'app/api/nutrition/meal-types/[id]/route.ts': 1,
-  'app/api/nutrition/meal-types/route.ts': 2,
-  'app/api/nutrition/plan-meal-answers/route.ts': 2,
-  'app/api/nutrition/saved-meals/[id]/route.ts': 1,
-  'app/api/nutrition/saved-meals/route.ts': 1,
-  'app/api/nutrition/targets/route.ts': 1,
 };
 
 const counts = new Map();

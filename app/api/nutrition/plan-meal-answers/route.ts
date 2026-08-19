@@ -3,6 +3,10 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { normalizeDateParam } from '@trainingai/shared/date-utils'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Two uuids and a date.
+const MAX_BODY_BYTES = 4 * 1024
 
 /**
  * Q-187 phase 2 — "did you eat this planned meal?", the "no" half.
@@ -52,11 +56,14 @@ export async function POST(req: NextRequest) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
-  const parsed = BodySchema.safeParse(raw)
+  const parsed = BodySchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
@@ -81,11 +88,14 @@ export async function DELETE(req: NextRequest) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
-  const parsed = DeleteSchema.safeParse(raw)
+  const parsed = DeleteSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

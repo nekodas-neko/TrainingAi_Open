@@ -3,6 +3,10 @@ import { withRouteErrors, routeErrorResponse, invalidUuidResponse } from '@/lib/
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One meal type's editable fields.
+const MAX_BODY_BYTES = 8 * 1024
 
 // Mirrors MealType's client-editable fields (components/nutrition/meal-type-manager.tsx's
 // edit form sends name/emoji/timeStartHour/timeEndHour/remindersEnabled/required).
@@ -23,7 +27,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params
   const badId = invalidUuidResponse(id)
   if (badId) return badId
-  const parsed = MealTypePutSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = MealTypePutSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const repo = await getRepository()
   // Q-463: an id that is not yours (or does not exist) answered 500 with an empty body.
