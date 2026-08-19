@@ -5,6 +5,10 @@ import * as s from '@/lib/data/postgres/schema'
 import { and, eq } from 'drizzle-orm'
 import { getVapidPublicKey } from '@/lib/push'
 import { z } from 'zod'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A push endpoint and its keys.
+const MAX_BODY_BYTES = 8 * 1024
 
 const SubscribeSchema = z.object({
   endpoint: z.string().url(),
@@ -27,7 +31,13 @@ export async function POST(req: NextRequest) {
 
   let body: z.infer<typeof SubscribeSchema>
   try {
-    body = SubscribeSchema.parse(await req.json())
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok) {
+      return read.reason === 'too_large'
+        ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+        : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    }
+    body = SubscribeSchema.parse(read.body)
   } catch {
     return NextResponse.json({ error: 'Invalid subscription' }, { status: 400 })
   }
@@ -48,8 +58,18 @@ export async function DELETE(req: NextRequest) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { endpoint } = await req.json()
-  if (!endpoint) return NextResponse.json({ error: 'Missing endpoint' }, { status: 400 })
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { endpoint } = (read.body ?? {}) as { endpoint?: unknown }
+  // Typed explicitly now the body is `unknown` — this went straight into a Drizzle `eq()` on a
+  // truthiness check alone.
+  if (typeof endpoint !== 'string' || !endpoint) {
+    return NextResponse.json({ error: 'Missing endpoint' }, { status: 400 })
+  }
 
   const db = getDb()
   await db.delete(s.pushSubscriptions)

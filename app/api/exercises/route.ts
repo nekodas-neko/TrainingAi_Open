@@ -6,6 +6,10 @@ import { z } from 'zod'
 import type { MuscleAssignment } from '@trainingai/shared/types/program'
 import { reportServerError } from '@/lib/observability'
 import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// An exercise with muscles, equipment and instructions.
+const MAX_BODY_BYTES = 32 * 1024
 
 const CreateBody = z.object({
   name:         z.string().min(1).max(120),
@@ -20,7 +24,13 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = CreateBody.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const body = CreateBody.safeParse(read.body)
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const repo = await getRepository()

@@ -11,6 +11,10 @@ import { pacesFromVdot } from '@trainingai/shared/health/vdot'
 import type { GateAction } from '@trainingai/shared/running/recovery-gate'
 import type { GoalKind, Prescription, RunType } from '@trainingai/shared/running/types'
 import { assembleInputs, resolveSnapshot, resolvePushContext } from '@trainingai/shared/running/assemble-plan-context'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A running plan.
+const MAX_BODY_BYTES = 128 * 1024
 
 // The prescription can now change multiple times within seconds via the run-type
 // carousel's override calls, and a plain `fetch(url)` (no `cache` option — lib/sqlite/cache.ts's
@@ -120,7 +124,13 @@ export async function POST(req: Request) {
   if (!rateLimit(`${userId}:running-plan`, 20, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const parsed = CreateBody.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = CreateBody.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const tz = session.user?.timezone ?? DEFAULT_TZ

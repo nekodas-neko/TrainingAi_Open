@@ -3,6 +3,10 @@ import { withRouteErrors, invalidUuidResponse } from '@/lib/api/route-errors'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { SupplementPatchSchema } from '@trainingai/shared/validation/supplement'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One supplement.
+const MAX_BODY_BYTES = 16 * 1024
 
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -11,7 +15,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const badId = invalidUuidResponse(id)
   if (badId) return badId
-  const parsed = SupplementPatchSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = SupplementPatchSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const repo = await getRepository()
   // Q-463: an id that is not yours (or does not exist) answered 500 with an empty body.

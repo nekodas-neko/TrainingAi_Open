@@ -4,6 +4,10 @@ import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A date and a boolean.
+const MAX_BODY_BYTES = 4 * 1024
 
 /**
  * Q-387 — "I have finished logging today", and its Undo.
@@ -32,7 +36,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const parsed = Body.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = Body.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const tz = session.user.timezone ?? DEFAULT_TZ

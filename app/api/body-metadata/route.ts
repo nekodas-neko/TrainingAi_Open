@@ -6,6 +6,10 @@ import { DEFAULT_TZ, startOfWeekInTz, ageFromDob } from "@trainingai/shared/date
 import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metrics";
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One day's body metadata.
+const MAX_BODY_BYTES = 16 * 1024
 
 // Reject an implausibly long session span (a midnight `startedAt` fallback + evening completion).
 const MAX_PLAUSIBLE_SESSION_MIN = 240;
@@ -222,11 +226,14 @@ export async function POST(req: NextRequest) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let raw: unknown;
-  try { raw = await req.json(); }
-  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: "Request too large" }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  const parsed = BodyMetadataPostSchema.safeParse(raw);
+  const parsed = BodyMetadataPostSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, { status: 400 });
   }

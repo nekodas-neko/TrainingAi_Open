@@ -4,6 +4,10 @@ import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One email or friend code.
+const MAX_BODY_BYTES = 4 * 1024
 
 export async function GET() {
   const session = await auth()
@@ -24,7 +28,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
   }
 
-  const { emailOrCode } = await req.json()
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { emailOrCode } = (read.body ?? {}) as { emailOrCode?: unknown }
   if (!emailOrCode || typeof emailOrCode !== 'string') {
     return NextResponse.json({ error: 'emailOrCode required' }, { status: 400 })
   }

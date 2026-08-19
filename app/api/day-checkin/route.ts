@@ -5,6 +5,10 @@ import { z } from 'zod'
 import { todayInTz, DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { DayCheckinScalesSchema, DayCheckinExtrasSchema } from '@trainingai/shared/validation/day-checkin'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One check-in's answers.
+const MAX_BODY_BYTES = 16 * 1024
 
 const Body = DayCheckinScalesSchema.extend(DayCheckinExtrasSchema.shape).extend({
   // Both separators: the client fills this from localDateString(), which emits slashes —
@@ -37,7 +41,13 @@ export async function POST(req: Request) {
   if (!rateLimit(`day-checkin:${userId}`, 60, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const parsed = Body.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = Body.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const b = parsed.data
   const date = b.date ?? todayInTz(session.user?.timezone ?? DEFAULT_TZ)
