@@ -2291,21 +2291,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
   trusted-proxy count — the treatment `safeCompare` already has. Seven call sites should not each
   re-decide this.
 
-### [devices] Q-495 — `z.coerce.number()` launders `[]`, `true` and `""` into stored readings
-
-- **Branch:** `fix/ingest-no-coercion`
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement:** low. Needs the secret, writes at the lowest rank, and produces implausible rather
-  than dangerous values.
-- **The route's own comment is accurate about what it tested and silent about coercion.** It says the
-  bounds *"reject clearly-garbage values (a stringified `75kg`, a 1e308 double)"* — **both named
-  examples are indeed rejected.** Three unnamed ones are not: `"steps":[]` → **0**, `"steps":true` →
-  **1**, `"weightKg":""` → **0 kg**. Each landed in `body_metrics` stamped `health_connect`; a 0 kg
-  body weight is in range for `.min(0)`.
-- **Fix:** `z.number()` rather than `z.coerce.number()` (Tasker sends real JSON numbers), or reject
-  non-primitive input before the bounds. Give body weight a plausible floor, not zero.
-
 ### [platform] Q-492 — seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current
 
 - **Branch:** `docs/claude-md-counts-cite-the-command`
