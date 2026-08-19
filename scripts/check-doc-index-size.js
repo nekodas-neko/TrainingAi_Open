@@ -773,7 +773,12 @@ const BASELINE = {
   // review's "the rest, in brief" line said Q-137 should be closed in Q-277's favour; Q-277 is
   // now itself answered and removed, so the line had to say what the answer WAS (49% of effective
   // weight cannot vary) rather than point at a queue entry that no longer exists.
-  'projectOverview.md': 7933,
+  // Raised 2026-08-19 (Lane A, Q-400 save-to-gallery): 7933 -> 7951. A device-verification row, which
+  // is what this section is for — the change needs a new APK and neither of its two fixes is
+  // observable from the sandbox. It carries the measured figures (600.0 dpi, 49.9 mm vs 311.9 mm)
+  // because "the PNG now declares its size" is a claim and those are the evidence, and it names the
+  // one physical print that also settles Q-411, so the owner does not do two.
+  'projectOverview.md': 7951,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that

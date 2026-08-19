@@ -2,6 +2,8 @@ import { test, expect } from '@playwright/test'
 import { Client } from 'pg'
 import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
 import { encodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
+import { readPngDensity } from '@trainingai/shared/nutrition/png-density'
+import { readFileSync } from 'node:fs'
 
 /**
  * Q-389 — the printable saved-meal label.
@@ -138,6 +140,11 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   const canvas = page.getByRole('img', { name: `Printable label for ${MEAL_NAME}` })
   await expect(canvas).toBeVisible({ timeout: 30_000 })
 
+  // Select the style explicitly rather than trusting what the sheet opens on: since Q-400 the pick
+  // is remembered in `localStorage`, so "the default" is only what a browser that has never chosen
+  // one shows. The 25×25 figure below belongs to this style, not to whatever was last used.
+  await page.getByRole('radio', { name: /Ingredients · centred/i }).click()
+
   // The sheet reports the code's physical size, which is the number the whole print risk is about.
   await expect(page.getByText(/mm at 25×25 modules/), `console: ${errors.join(' | ')}`).toBeVisible()
 
@@ -228,4 +235,87 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
     page.getByText(/No ingredients fit on this label/),
     'the default must not be in the no-room state',
   ).toHaveCount(0)
+})
+
+/**
+ * Q-400 — the label has to be able to *leave*. The delivery half is device-only: the gallery write
+ * goes through the `MediaSave` Capacitor bridge, which does not exist in a browser, so what this
+ * spec can prove is the half that runs identically on both paths — that the button produces a PNG,
+ * and that the PNG declares the physical size it was drawn at.
+ *
+ * **The density is the part no other check can see.** The pixels are right either way and the QR
+ * decodes either way; a PNG with no `pHYs` chunk simply prints at the viewer's default of 96 dpi,
+ * which turns a 50 mm label into ~312 mm on paper. That defect survived the 300 → 600 dpi change
+ * made specifically for print quality, because nothing looks at the bytes.
+ */
+test('Save to gallery hands over a PNG that declares its print size', async ({ page }) => {
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+
+  const savedMeals = page.getByRole('button', { name: 'Saved Meals', exact: true })
+  await expect(savedMeals).toBeVisible({ timeout: 60_000 })
+  const labelButton = page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })
+  await expect(async () => {
+    const box = (await savedMeals.boundingBox())!
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(labelButton).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 90_000 })
+  await labelButton.tap()
+
+  const canvas = page.getByRole('img', { name: `Printable label for ${MEAL_NAME}` })
+  await expect(canvas).toBeVisible({ timeout: 30_000 })
+
+  // In a browser `saveImageToGallery` takes its `<a download>` branch — which is the fallback, and
+  // deliberately NOT the device path: inside the Samsung WebView it is a silent no-op, which is the
+  // bug Q-400 fixes. It is still the same blob, produced by the same code.
+  const [download] = await Promise.all([
+    page.waitForEvent('download', { timeout: 30_000 }),
+    page.getByRole('button', { name: 'Save to gallery' }).tap(),
+  ])
+  expect(download.suggestedFilename()).toMatch(/-label\.png$/)
+
+  const path = await download.path()
+  const bytes = new Uint8Array(readFileSync(path!))
+  expect([...bytes.subarray(0, 8)]).toEqual([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
+  // ~600 dpi, and therefore a label that measures what the sheet says it measures.
+  const dpi = readPngDensity(bytes)
+  expect(dpi, 'the PNG declares no physical size — it will print at ~312 mm').not.toBeNull()
+  expect(dpi!).toBeGreaterThan(560)
+  expect((bytes.length > 0 ? 1179 / dpi! : 0) * 25.4).toBeLessThan(60)
+
+  // Every branch of this button ends in a toast. A silent path is what made the original defect
+  // invisible for a release.
+  await expect(page.getByText(/Label downloaded|Saved to your gallery/)).toBeVisible()
+})
+
+/** The pick is remembered now, so it survives closing and reopening the sheet (Q-400). */
+test('the chosen label style is remembered', async ({ page }) => {
+  await page.goto('/nutrition')
+  await settleRouteBoundary(page)
+
+  const savedMeals = page.getByRole('button', { name: 'Saved Meals', exact: true })
+  await expect(savedMeals).toBeVisible({ timeout: 60_000 })
+  const labelButton = page.getByRole('button', { name: `Print a label for ${MEAL_NAME}` })
+  await expect(async () => {
+    const box = (await savedMeals.boundingBox())!
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(labelButton).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 90_000 })
+  await labelButton.tap()
+  await expect(page.getByRole('img', { name: `Printable label for ${MEAL_NAME}` })).toBeVisible({ timeout: 30_000 })
+
+  await page.getByRole('radio', { name: /Deli ticket/i }).click()
+  await expect(page.getByRole('radio', { name: /Deli ticket/i })).toHaveAttribute('aria-checked', 'true')
+
+  await page.reload()
+  await settleRouteBoundary(page)
+  await expect(async () => {
+    const box = (await savedMeals.boundingBox())!
+    await page.touchscreen.tap(box.x + box.width / 2, box.y + box.height / 2)
+    await expect(labelButton).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 90_000 })
+  await labelButton.tap()
+  await expect(page.getByRole('img', { name: `Printable label for ${MEAL_NAME}` })).toBeVisible({ timeout: 30_000 })
+  await expect(page.getByRole('radio', { name: /Deli ticket/i })).toHaveAttribute('aria-checked', 'true')
 })

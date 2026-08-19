@@ -3,15 +3,21 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Button } from '@/components/ui/button'
-import { Loader2, Share2 } from 'lucide-react'
+import { Download, Loader2, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import type { SavedMeal } from '@trainingai/shared/types/nutrition'
 import { mealLabelFigures } from '@trainingai/shared/nutrition/label-payload'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
+import { saveImageToGallery } from '@/lib/media/save-to-gallery'
+import { withPngDensity } from '@trainingai/shared/nutrition/png-density'
 import {
-  renderMealLabel, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, mealLabelStyleSpec, type MealLabelStyle,
+  renderMealLabel, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, mealLabelStyleSpec, labelPrintDpi,
+  type MealLabelStyle,
 } from './meal-label-render'
+
+/** One key, no schema — see the note on style persistence below. */
+const LABEL_STYLE_KEY = 'ta_meal_label_style'
 
 interface Props {
   meal: SavedMeal | null
@@ -22,11 +28,11 @@ interface Props {
 /**
  * Preview and share a saved meal's printable label (Q-389).
  *
- * **The style is picked here and not stored.** The spec left this open with three options: a
- * per-meal column (a migration, and therefore Lane A's), a global user setting, or picked at print
- * time. Picked-at-print-time is the only one that needs neither a schema change nor a settings
- * surface, and the renderer takes the style as a parameter either way — so persisting it later is
- * an addition rather than a rewrite. Cycling is the point anyway: the owner asked for all four.
+ * **The style is remembered in `localStorage`, and nowhere else (Q-400).** The owner's read:
+ * *"I would make the image very rarely; happy for it to default to the default and I can change it
+ * whenever I want … Happy for it to persist if its easy."* So it persists, at the cost of one key —
+ * no column, no user setting, no migration. A stored value that is no longer a known style falls
+ * back to the default rather than rendering nothing.
  *
  * **The preview is shown at true 50 mm scale**, with the code's measured physical size printed
  * under it, because the whole live risk in this feature is that the code is too fine to scan once
@@ -44,6 +50,35 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
   const styleClaimsIngredients = mealLabelStyleSpec(style).ingredients === true
   const [busy, setBusy] = useState(false)
   const { groupProps, getRadioProps } = useRovingRadioGroup(true)
+
+  // Seeded in an effect, never in a `useState` initializer — a storage read in an initializer is a
+  // hydration mismatch, which is the rule this repo already had to retrofit onto four screens.
+  useEffect(() => {
+    const stored = localStorage.getItem(LABEL_STYLE_KEY)
+    if (stored && MEAL_LABEL_STYLES.some(s => s.value === stored)) setStyle(stored as MealLabelStyle)
+  }, [])
+
+  const chooseStyle = useCallback((next: MealLabelStyle) => {
+    setStyle(next)
+    try { localStorage.setItem(LABEL_STYLE_KEY, next) } catch { /* private mode; the pick still applies */ }
+  }, [])
+
+  /**
+   * The PNG both actions hand out. `canvas.toBlob` writes no `pHYs` chunk — the canvas API has no
+   * way to set one — so the bytes are re-stamped with the density they were drawn at before they
+   * leave. Without it a 50 mm label prints at ~312 mm, because a PNG with no declared size falls
+   * back to 96 dpi almost everywhere.
+   */
+  const labelBlob = useCallback(async (): Promise<{ blob: Blob; filename: string }> => {
+    if (!canvas || !meal) throw new Error('nothing to render')
+    const raw = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
+    if (!raw) throw new Error('toBlob returned null')
+    const stamped = withPngDensity(new Uint8Array(await raw.arrayBuffer()), labelPrintDpi(canvas.width))
+    return {
+      blob: new Blob([stamped], { type: 'image/png' }),
+      filename: `${meal.name.replace(/[^\w -]/g, '')}-label.png`,
+    }
+  }, [canvas, meal])
 
   useEffect(() => {
     if (!open || !meal || !canvas) return
@@ -66,30 +101,51 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
     return () => { cancelled = true }
   }, [open, meal, style, canvas])
 
+  /**
+   * Save to the gallery. **This is the action the owner asked for**, and it is separate from Share
+   * on purpose: putting a file in the Photos app and handing it to a print app are different
+   * intents, and one button doing whichever happened to be available is what produced Q-400.
+   */
+  const saveToGallery = useCallback(async () => {
+    if (!canvas || !meal) return
+    setBusy(true)
+    try {
+      const { blob, filename } = await labelBlob()
+      const outcome = await saveImageToGallery(blob, filename)
+      if (!outcome.ok) {
+        toast.error(`Could not save the label — ${outcome.reason}`)
+      } else {
+        toast.success(outcome.where === 'gallery' ? 'Saved to your gallery' : 'Label downloaded')
+      }
+    } catch (err) {
+      console.error('Label save failed:', err)
+      toast.error('Could not save the label')
+    } finally {
+      setBusy(false)
+    }
+  }, [canvas, meal, labelBlob])
+
+  /**
+   * Hand the PNG to the system share sheet, which is where a label-printer app lives.
+   *
+   * The `canShare` guard stays. Calling `navigator.share` with files where it is unsupported
+   * rejects, and the catch below swallows `AbortError` — so removing the guard turns a dead button
+   * into a dead button that also lies in the log. What changed is that declining now *says so*
+   * and points at Save, instead of falling through to an `<a download>` that does nothing in the
+   * WebView.
+   */
   const share = useCallback(async () => {
     if (!canvas || !meal) return
     setBusy(true)
     try {
-      const blob = await new Promise<Blob | null>(res => canvas.toBlob(res, 'image/png'))
-      if (!blob) throw new Error('toBlob returned null')
-      const file = new File([blob], `${meal.name.replace(/[^\w -]/g, '')}-label.png`, { type: 'image/png' })
-
-      // Web Share with a File reaches the system sheet — which is where a print app lives — and
-      // needs no Capacitor plugin, so no new APK. `canShare` is checked because share-with-files is
-      // narrower than share-with-text and refusing loudly beats a rejected promise.
-      if (navigator.canShare?.({ files: [file] })) {
-        await navigator.share({ files: [file], title: `${meal.name} label` })
+      const { blob, filename } = await labelBlob()
+      const file = new File([blob], filename, { type: 'image/png' })
+      if (!navigator.canShare?.({ files: [file] })) {
+        toast.error('Sharing files is not available here — use Save to gallery')
         return
       }
-
-      // Browser fallback so the label is reachable in `pnpm dev`. The plan flags `<a download>` as
-      // unreliable inside the WebView, which is why it is the fallback and not the path.
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = file.name
-      a.click()
-      URL.revokeObjectURL(url)
+      await navigator.share({ files: [file], title: `${meal.name} label` })
+      toast.success('Label shared')
     } catch (err) {
       if ((err as Error)?.name === 'AbortError') return  // the user dismissed the share sheet
       console.error('Label share failed:', err)
@@ -97,7 +153,7 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
     } finally {
       setBusy(false)
     }
-  }, [meal, canvas])
+  }, [canvas, meal, labelBlob])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -172,7 +228,7 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
                 <button
                   key={s.value}
                   {...getRadioProps(on, i)}
-                  onClick={() => setStyle(s.value)}
+                  onClick={() => chooseStyle(s.value)}
                   className={`min-h-[44px] rounded-xl border px-3 py-2 text-left transition ${
                     on ? 'border-[var(--color-brand)] bg-[var(--brand-card-bg)]' : 'border-border bg-muted/30'
                   }`}
@@ -184,10 +240,16 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
             })}
           </div>
 
-          <Button onClick={share} disabled={busy || !meal} className="min-h-[48px] w-full gap-2">
-            {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Share2 className="h-4 w-4" />}
-            Share or save
-          </Button>
+          <div className="grid w-full grid-cols-2 gap-2">
+            <Button onClick={saveToGallery} disabled={busy || !meal} className="min-h-[48px] gap-2">
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+              Save to gallery
+            </Button>
+            <Button onClick={share} disabled={busy || !meal} variant="outline" className="min-h-[48px] gap-2">
+              <Share2 className="h-4 w-4" />
+              Share
+            </Button>
+          </div>
         </div>
       </SheetContent>
     </Sheet>
