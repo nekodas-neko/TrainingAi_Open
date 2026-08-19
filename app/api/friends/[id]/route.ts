@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
+import { refusalResponse, isRefusal, invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
@@ -8,6 +8,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const { action } = await req.json()
   const repo = await getRepositoryAsync()
   try {
@@ -30,6 +32,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const repo = await getRepositoryAsync()
   await repo.removeFriend(id, session.user.id)
   return new NextResponse(null, { status: 204 })

@@ -4,6 +4,7 @@ import { getRepositoryAsync } from '@/lib/data'
 import { computeBodyComposition, hasValidImpedance } from '@/lib/scale-ble/composition'
 import { ageFromDob, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { applyScaleReadingToBodyMetrics } from '@/lib/scale-ble/apply-reading'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // Confirms a pending scale reading (staged by the anomaly check because it looked like a big
 // jump from the account's usual weight) — runs the same composition calc + body_metrics upsert
@@ -14,6 +15,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const userId = session.user.id
 
   const { id: idParam } = await params
+  const badId = invalidUuidResponse(idParam)
+  if (badId) return badId
   const id = Number(idParam)
   if (!Number.isInteger(id)) return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
 
