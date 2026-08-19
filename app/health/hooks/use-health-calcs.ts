@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import { computeWeightRateKgPerWeek } from "@trainingai/shared/health/long-term-goal-progress";
-import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import { ENERGY_BALANCE_TTL } from "@trainingai/shared/cache-ttl";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
@@ -43,24 +43,24 @@ export function useWeightTrend(metaRecent: BodyMetaRow[]) {
  * derived their own TDEE — the "Balance" tile applied an activity multiplier AND subtracted
  * measured movement, double-counting it — and disagreed on the same screen.
  */
+/**
+ * Today's energy balance, live.
+ *
+ * **This used to seed and then fetch once in a `useEffect(…, [])`, and that is the Q-402 bug.**
+ * `HomeEnergyBalanceCard` lives in the persistent tab shell, so it never unmounts, so the effect
+ * never re-ran and the card held its first payload until the app was killed — which is exactly what
+ * the owner reported. The eviction was never the problem: `lib/cache-groups.ts` clears
+ * `energy-balance:` from six write groups and always did. Nothing asked the card to go and look
+ * again.
+ *
+ * `useCachedValue` is that missing half. Do not replace it with a hand-rolled effect here, and do
+ * not reach for a shorter `ENERGY_BALANCE_TTL` — an effect that never runs never consults a TTL.
+ */
 export function useEnergyBalanceToday(): EnergyBalanceResponse | null {
-  const [data, setData] = useState<EnergyBalanceResponse | null>(null);
-
-  // Seed synchronously from cache so a revisit paints last-known numbers, never a skeleton.
-  // In an effect, not a useState initializer — cache reads in initializers cause hydration
-  // mismatches (session 165).
-  useEffect(() => {
-    const seed = readCacheSync<EnergyBalanceResponse>(`energy-balance:${todayInTz()}`);
-    if (seed) setData(seed);
-  }, []);
-
-  useEffect(() => {
-    const today = todayInTz();
-    cachedFetch<EnergyBalanceResponse>(
-      `energy-balance:${today}`, `/api/nutrition/energy-balance?date=${today}`, ENERGY_BALANCE_TTL,
-      d => setData(d ?? null),
-    );
-  }, []);
-
-  return data;
+  const today = todayInTz();
+  return useCachedValue<EnergyBalanceResponse>(
+    `energy-balance:${today}`,
+    `/api/nutrition/energy-balance?date=${today}`,
+    ENERGY_BALANCE_TTL,
+  );
 }

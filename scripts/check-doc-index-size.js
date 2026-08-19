@@ -794,7 +794,16 @@ const BASELINE = {
   // label's QR is drawn on a fractional device-pixel grid, so every module edge antialiases to grey.
   // Its lines are the two pixel-per-module tables — the defect is invisible from the source (the
   // arithmetic reads correct) and only the numbers show why a smaller code stopped decoding.
-  'docs/implementation-backlog.md': 10118,
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-402 shipped): Q-402's entry out, Q-359 in, net fourteen
+  // fewer. Q-359 is the 36 sibling fetch-once effects Q-402's mechanism now covers — filed rather
+  // than swept, and its lines are the reason NOT to sweep: most are latent, some are deliberately
+  // fetch-once, and a shrink-only ratchet may beat the sweep outright.
+  // Raised again the same day (Q-402's fixture gap): the seven lines record WHY the fix could not
+  // be driven end to end — the seeded user has no body and Home renders no card widgets by default,
+  // so three probes measured zero requests. That is a reusable finding: every future Home-card guard
+  // needs the same fixture, and its absence is part of why a shell-only staleness bug reached a user
+  // report rather than a test.
+  'docs/implementation-backlog.md': 10111,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
@@ -803,7 +812,12 @@ const BASELINE = {
   // aggregate, while three local-first surfaces kept the row. It belongs beside the rule it
   // inverts, not in a journal entry, because the next person to write a delete handler reads this
   // section and not that entry.
-  'CLAUDE.md': 1077,
+  // Raised 2026-08-19 (Lane B, Q-402): 1077 -> 1078. One line, and it is the half of the cache rule
+  // that was missing rather than a restatement: every group evicted `energy-balance:` correctly and
+  // the owner still had to restart the app, because nothing told the component to look again. The
+  // rule sits in the cache-invalidation list because that is where someone writing a write path
+  // reads, and it names the wrong fix (a shorter TTL) because that is the one they would try.
+  'CLAUDE.md': 1078,
 
 };
 

@@ -297,66 +297,57 @@ The next eight entries are the nutrition cluster, **ordered by dependency rather
 Do not re-sort them numerically; the sequence is the point, and two of them block others.
 
 **Realistically today, and this is the honest split:**
-- **Achievable** — Q-402 and Q-401 are small, self-contained and independent of the rework.
-  Together they stop the Home widget freezing and unify the two calorie budgets. (**Q-399 is done**,
-  v1.325.0 — the default label draws three ingredient lines at 0.401 mm per module, and the line
-  count is asserted rather than the code size alone.)
+- **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
+  are done** — v1.325.0 gave the default label its three ingredient lines at 0.401 mm per module,
+  and v1.325.1 gave the cache an invalidation signal so Home's energy card stops freezing.)
   Q-387's wiring is a shared-module change and can run in parallel in the other lane.
 - **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
   `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
   first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
   whatever else happens.
 
-**Parallel-safe:** Q-402 and the Lane B half of Q-401 touch different files and can land in any
-order. Everything else is sequential.
+**Parallel-safe:** the Lane B half of Q-401 is now unblocked on both counts. Everything else is
+sequential.
 
-### [nutrition][app-shell] Q-402 — Home's energy-balance widget never refetches; only an app restart updates it
+### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
-- **Branch:** `fix/energy-balance-widget-refetch`
-- **Added:** 2026-08-18 · owner: *"noting the widget energy bar doesnt update natively; requires a
-  restart of the app."*
-- **Lane B.** One hook, `app/health/hooks/use-health-calcs.ts`. No schema, no route.
-
-**Confirmed cause — the hook fetches once and has nothing to make it fetch again.**
-`useEnergyBalanceToday()` seeds from cache in one effect and then:
-
-```ts
-useEffect(() => {
-  const today = todayInTz()
-  cachedFetch<EnergyBalanceResponse>(`energy-balance:${today}`, …, ENERGY_BALANCE_TTL, d => setData(d ?? null))
-}, [])          // ← empty deps: once per mount, never again
-```
-
-`HomeEnergyBalanceCard` lives in the persistent tab shell, so it does **not** unmount when you switch
-tabs — the effect never re-runs and `data` keeps whatever the first fetch returned. Killing the app is
-the only thing that remounts it. That is precisely the reported behaviour.
-
-**The invalidation is NOT the missing piece — that part already works.** `lib/cache-groups.ts` clears
-`energy-balance:` from **six** write groups. The entry is correctly evicted; nothing asks the hook to
-go and get a new one. This is the *other half* of the standing cache rule: invalidating a key and
-re-rendering the component that reads it are two different things, and the repo has no
-subscribe-to-invalidation mechanism at all (checked — no cache event, no listener; `TAB_NAV_EVENT`
-exists but is navigation only).
-
-**Why Nutrition looks fine and Home does not.** The Nutrition tab does not use this hook —
-`nutrition-content.tsx` fetches the payload itself and re-fetches on its own date and logging changes,
-then passes it down to `CalorieBalanceBar`. So the same number is live on one surface and frozen on
-the other, which is also why this reads as "the widget" rather than "energy balance".
-
-**What to fix.** Give the hook a reason to re-run, and prefer a mechanism the whole app can use over a
-one-off:
-1. **Preferred — a cache-invalidation signal.** Have `invalidateCache()` emit, and let a small
-   `useCachedValue(key, url, ttl)` hook resubscribe. This is the general fix; **every other
-   seed-and-fetch-once hook in the app has the same latent bug**, and finding them one owner report at
-   a time is the expensive path.
-2. **Minimum viable** — refetch on tab focus / on the shell's navigation event, plus after any local
-   write that queues a `body_metrics` or `food_logs` mutation.
-- **⚠ Do not "fix" this by lowering `ENERGY_BALANCE_TTL`.** A shorter TTL does not help: the effect
-  never runs again, so the TTL is never consulted. It would only add load and hide the real defect.
-- **Verification:** log food from Home without leaving the tab and watch the bar move. Then repeat on
-  the **APK**, since the persistent shell is what makes this reproduce and a browser reload masks it.
-- **Related:** **Q-401** replaces this widget's progress bar with the energy zone bar, which makes the
-  staleness more visible, not less — do this one first or alongside it.
+- **Branch:** `chore/adopt-use-cached-value`
+- **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
+- **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
+  + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
+  screens with no component-test route.
+- **What.** 37 `useEffect(() => { … cachedFetch … }, [])` blocks existed when `useCachedValue` was
+  written. All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
+  value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
+  them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
+  The persistent tab shell is the exception, and it is where the owner found it.
+- **Do the shell ones first, and identify them rather than assuming.** Anything rendered by Home /
+  the tab shell that is not behind a route change: `components/home-day-timeline.tsx` (two),
+  `components/calendar-widget.tsx`, `components/health/*-card.tsx` where Home renders them. The
+  full list, regenerated:
+  ```
+  grep -rn -A6 'useEffect(() => {' app components --include='*.tsx' --include='*.ts' | grep -B6 cachedFetch
+  ```
+  (the count above came from a small AST-free scan for `useEffect(…, [])` blocks containing
+  `cachedFetch`; it is a starting list, not a proof of completeness).
+- **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
+  data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
+  refetches with no reader waiting for them. Judge per site; this is not a codemod.
+- **Worth considering instead of a full sweep:** a Custom Rules check that fails a NEW
+  `useEffect(…, [])` containing `cachedFetch` outside an allowlist, with a shrink-only baseline of
+  the 36. That freezes the count and makes each conversion visible, which is the pattern that has
+  worked for hex literals and component size. Cheaper than the sweep and stops the growth, which is
+  the part that actually matters.
+- **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
+- **Not verified:** static scan. **No screen was observed going stale** — the 36 are inferred from
+  the shape, and the one confirmed instance is Q-402's, which is fixed.
+- **A guard needs a fixture that does not exist, and this is the reusable part.** Q-402's fix could
+  not be driven end to end because the seeded user has no `height_cm`/`date_of_birth`/`sex` (so the
+  energy card shows "add your details") **and** `DEFAULT_CARD_WIDGETS` is empty, so Home renders no
+  card widgets at all until one is turned on. Three probes measured zero
+  `/api/nutrition/energy-balance` requests. Whoever takes this should build that fixture first —
+  a seeded body plus `ta_ss_cards` via `page.addInitScript` — because every Home-card guard needs
+  it, and its absence is part of why a shell-only staleness bug reached a user report.
 
 ### [nutrition][app-shell] Q-401 — two calorie budgets on one screen, 274 apart, and the card that explains it is suppressed
 
@@ -493,9 +484,11 @@ Home's bar is the gradient fill in `home-card-widget.tsx` (`goalPct`, `scaleX`).
 training"*. Without it a number that changes during the day looks like a bug — which is exactly how
 this entry started.
 
-**5 — Both surfaces in the same PR.** Home and Nutrition, per the sibling-surface rule. And note
-**Q-402**: Home's energy card never refetches, so it will show a stale zone bar until that is fixed —
-swapping the bar in without it makes the staleness *more* visible.
+**5 — Both surfaces in the same PR.** Home and Nutrition, per the sibling-surface rule. The
+prerequisite this used to name — **Q-402**, Home's energy card never refetching — is **fixed**
+(v1.325.1): the card is on `useCachedValue` now and reacts to any group that clears
+`energy-balance:`, so the zone bar can be swapped in without making staleness more visible. Build the
+new bar on `useCachedValue` too rather than a fresh `useEffect(…, [])`.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 

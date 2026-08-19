@@ -1,0 +1,65 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import { cachedFetch, readCacheSync, subscribeToInvalidation } from '@/lib/sqlite/cache'
+
+/**
+ * Seed from cache, fetch, and **fetch again whenever the key is invalidated**.
+ *
+ * The last clause is the whole point, and it is the half the app was missing (Q-402). The standing
+ * cache rule covers writing through a named group in `lib/cache-groups.ts`, and that works: the
+ * entry is evicted correctly. Nothing then asked the component reading it to go and get a new one.
+ * A `useEffect(…, [])` that fetches once is fine for a screen you navigate away from — it refetches
+ * on the next mount — and silently wrong for anything in the **persistent tab shell**, which never
+ * unmounts. Home's energy-balance card kept its first payload until the app was killed, and that is
+ * what the owner reported.
+ *
+ * Use this instead of hand-rolling seed-then-fetch. There were 37 `useEffect(…, [])` blocks calling
+ * `cachedFetch` when this was written; most are in components that do unmount, so they are latent
+ * rather than broken — see **Q-359** for the sweep.
+ *
+ * Deliberately NOT doing two things:
+ * - **No TTL shortening.** The effect never re-ran, so the TTL was never consulted; a shorter one
+ *   would add load and hide the defect. The Q-402 entry says so explicitly.
+ * - **No visibility gate.** An off-screen card in the shell will refetch. That is one GET against a
+ *   correctness bug, and `cachedFetch` already de-dupes concurrent requests for the same key, so a
+ *   write that clears several groups at once still produces one request.
+ */
+export function useCachedValue<T>(
+  key: string,
+  url: string,
+  ttlSeconds: number,
+): T | null {
+  const [data, setData] = useState<T | null>(null)
+
+  // Seed in an effect, never a useState initializer — a cache read in an initializer causes a
+  // hydration mismatch (session 165).
+  useEffect(() => {
+    const seed = readCacheSync<T>(key)
+    if (seed) setData(seed)
+  }, [key])
+
+  // `alive` guards against a response landing after unmount or after `key` changed.
+  const keyRef = useRef(key)
+  keyRef.current = key
+
+  useEffect(() => {
+    let alive = true
+    const load = () => {
+      void cachedFetch<T>(key, url, ttlSeconds, d => {
+        if (alive && keyRef.current === key) setData(d ?? null)
+      })
+    }
+    load()
+
+    const unsubscribe = subscribeToInvalidation(prefix => {
+      // A group may clear a broader prefix than this key (`energy-balance:` against
+      // `energy-balance:2026-08-19`) or clear the exact key. Match either direction.
+      if (key.startsWith(prefix) || prefix.startsWith(key)) load()
+    })
+
+    return () => { alive = false; unsubscribe() }
+  }, [key, url, ttlSeconds])
+
+  return data
+}

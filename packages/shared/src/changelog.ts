@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.1",
+    date: "2026-08-19",
+    changes: [
+      "The energy balance bar on Home updates as you log, instead of only after restarting the app. Logging food or water cleared the stored figure correctly, but nothing told the card on Home to go and fetch a new one \u2014 and because Home never closes while you use the app, it kept showing the number it had when you opened it. Cards that read stored figures can now be told when one changes.",
+    ],
+  },
+  {
     version: "1.325.0",
     date: "2026-08-19",
     changes: [

@@ -92,6 +92,45 @@ function lsInvalidate(keyPrefix: string): void {
   } catch { /* ignore */ }
 }
 
+// ── Invalidation subscribers ─────────────────────────────────────────────────
+//
+// Q-402. Invalidating a key and re-rendering the component that reads it are two different things,
+// and until this existed the app only did the first. `lib/cache-groups.ts` clears `energy-balance:`
+// from six write groups and the entry was correctly evicted every time — but Home's card seeds and
+// fetches once in a `useEffect(…, [])`, lives in the persistent tab shell so it never unmounts, and
+// therefore kept the first payload until the app was killed. The owner reported exactly that.
+//
+// This is the missing half: an invalidation now tells anyone who cares. `useCachedValue`
+// (`lib/hooks/use-cached-value.ts`) is the consumer, and it is what a fetch-once hook should be
+// built on rather than a hand-rolled effect.
+//
+// Deliberately a plain module-level Set rather than a `window` event: the cache module is the only
+// thing that can invalidate, subscribers are in the same bundle, and a DOM event would need a
+// server guard and would not fire in the node test environment where this is asserted.
+type InvalidationListener = (keyPrefix: string) => void;
+const invalidationListeners = new Set<InvalidationListener>();
+
+/**
+ * Be told when a cache key is invalidated. Returns an unsubscribe function.
+ *
+ * The argument is the **prefix** that was invalidated, because that is what `invalidateCache` takes;
+ * a listener for `energy-balance:2026-08-19` must react to `energy-balance:`, so compare with
+ * `startsWith` in whichever direction fits — `useCachedValue` does both, since a group may clear a
+ * broader prefix than the key or the exact key itself.
+ */
+export function subscribeToInvalidation(listener: InvalidationListener): () => void {
+  invalidationListeners.add(listener);
+  return () => { invalidationListeners.delete(listener); };
+}
+
+function notifyInvalidated(keyPrefix: string): void {
+  // A throwing listener must not stop the others, and must not turn a cache write into a failed
+  // mutation — this runs on every write path in the app.
+  for (const listener of invalidationListeners) {
+    try { listener(keyPrefix); } catch (err) { console.error('Cache invalidation listener failed:', err); }
+  }
+}
+
 // ── Cache API ────────────────────────────────────────────────────────────────
 
 // In-flight fetch requests per key — prevents concurrent fetches for same cache key
@@ -169,6 +208,9 @@ export async function invalidateCache(keyPrefix: string): Promise<void> {
       // SQLite unavailable or DB not open — localStorage was already cleared above
     }
   }
+
+  // Last, so a listener that refetches cannot repopulate the key before the delete lands.
+  notifyInvalidated(keyPrefix);
 }
 
 export async function clearAllCache(): Promise<void> {
