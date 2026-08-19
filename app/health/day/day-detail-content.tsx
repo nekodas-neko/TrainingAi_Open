@@ -7,13 +7,16 @@ import { ChevronLeft, Zap, HeartPulse, Moon, Flame } from "lucide-react";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
-import { DAY_LOG_TTL, ENERGY_BALANCE_TTL } from "@trainingai/shared/cache-ttl";
-import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { DAY_LOG_TTL, ENERGY_BALANCE_TTL, HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
+import { todayInTz, shiftDateStr, dateStrMidnightInTz } from "@trainingai/shared/date-utils";
 import {
   TrainingSection, ActivitySection, EnergySection, SleepSection, BodySection, DayHrTrace, SectionLabel,
 } from "@/components/health/day-detail/day-sections";
 import type { DayLogResult } from "@/app/api/day-log/route";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
+import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { EnergyTimelineChart } from "@/components/health/energy-timeline-chart";
 
 /** Cache key per day — the whole point of this screen is swiping between days, so each day's
  *  payload is seeded synchronously from cache and revalidated, never shown as a skeleton twice. */
@@ -21,6 +24,10 @@ const keyFor = (date: string) => `day-log:${date}`;
 /** Nutrition's Energy Balance card already owns this key and TTL for the same endpoint — reusing
  *  them means the two screens share one cached answer rather than racing two of their own. */
 const energyKeyFor = (date: string) => `energy-balance:${date}`;
+/** Q-414. Its own key rather than reusing `day-log:` — the day payload has no meal times. */
+const foodKeyFor = (date: string) => `food-logs:${date}`;
+/** Module-level so the empty fallback keeps one identity — it feeds a memoised chart. */
+const EMPTY_HR: DayLogResult['hr'] = [];
 
 function ScoreCell({ Icon, label, value, accent, first }: {
   Icon: typeof Zap; label: string; value: number | null; accent: string; first: boolean;
@@ -79,6 +86,17 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [data, setData] = useState<DayLogResult | null>(null);
   const [energy, setEnergy] = useState<EnergyBalanceResponse | null>(null);
+  const [foodLogs, setFoodLogs] = useState<FoodLogWithItem[] | null>(null);
+  const hrProfile = useCachedValue<{ maxHr: number; restingHr: number }>(
+    'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
+  );
+  // `loggedAt` means when the food was EATEN, not when the row was written — that is Q-413, and it
+  // is the whole reason this chart can exist. Before it, every back-filled day spiked at whatever
+  // hour the user reached for their phone.
+  const intakeEvents = useMemo(
+    () => (foodLogs ?? []).map(l => ({ atMs: new Date(l.loggedAt).getTime(), kcal: l.calories })),
+    [foodLogs],
+  );
   const dirRef = useRef(0);
   /** Mirrors selectedDate for the async guard below — a ref, not state, so an in-flight response
    *  reads the CURRENT day rather than the one captured when its fetch started. */
@@ -100,6 +118,14 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
     cachedFetch<EnergyBalanceResponse>(
       energyKeyFor(date), `/api/nutrition/energy-balance?date=${date}`, ENERGY_BALANCE_TTL,
       e => { setEnergy(prev => (dateRef.current === date ? e : prev)); },
+    ).catch(() => {});
+
+    // Q-414: the energy chart needs each meal's *time*, which the day payload does not carry —
+    // it reports the day's totals. Same date-guard as above.
+    setFoodLogs(readCacheSync<FoodLogWithItem[]>(foodKeyFor(date)) ?? null);
+    cachedFetch<FoodLogWithItem[]>(
+      foodKeyFor(date), `/api/nutrition/food-logs?date=${date}`, DAY_LOG_TTL,
+      f => { setFoodLogs(prev => (dateRef.current === date ? f : prev)); },
     ).catch(() => {});
   }, []);
 
@@ -189,6 +215,18 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
             {data && <TrainingSection data={data} />}
             {data && <ActivitySection data={data} />}
             <EnergySection energy={energy} />
+            {energy?.balance && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                <EnergyTimelineChart
+                  dayStartMs={dateStrMidnightInTz(selectedDate, tz).getTime()}
+                  restingHr={hrProfile?.restingHr ?? null}
+                  restingBaseKcal={energy.balance.restingBaseKcal}
+                  activeKcal={energy.balance.activeKcal}
+                  hr={data?.hr ?? EMPTY_HR}
+                  intake={intakeEvents}
+                />
+              </div>
+            )}
             <SleepSection sleep={data?.sleep ?? null} tz={tz} />
             {data && data.hr.length > 1 && (
               <div>
