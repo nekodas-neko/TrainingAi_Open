@@ -30,6 +30,23 @@ describe('shiftDateStr', () => {
     expect(shiftDateStr('2026-03-01', -1)).toBe('2026-02-28')
   })
 
+  // Q-497. The year was the one field without width padding, so a year under 1000 emitted three
+  // digits — and '999-01-01' sorts BEFORE '1000-01-01', silently reordering any string comparison.
+  it('pads the year to four digits, so a low year still sorts correctly', () => {
+    expect(shiftDateStr('1000-01-01', -1)).toBe('0999-12-31')
+    expect(shiftDateStr('0999-12-31', 1)).toBe('1000-01-01')
+    expect(shiftDateStr('0999-12-31', 1) > shiftDateStr('1000-01-01', -1)).toBe(true)
+  })
+
+  // The other half of Q-497, pinned so nobody reads the padding above as making string comparison
+  // safe. It does not, and cannot: a 'YYYY-MM-DD' contract has no room for a five-digit year, and
+  // padStart is a no-op on one. This is why the two admin range loops iterate a validated day COUNT
+  // instead of `for (d = start; d <= end; …)` — that comparison ran ~29M times.
+  it('cannot keep a five-digit year orderable — the reason range loops must not compare strings', () => {
+    expect(shiftDateStr('9999-12-31', 1)).toBe('10000-01-01')
+    expect('10000-01-01' <= '9999-12-31').toBe(true)
+  })
+
   it('handles year boundaries', () => {
     expect(shiftDateStr('2025-12-31', 1)).toBe('2026-01-01')
     expect(shiftDateStr('2026-01-01', -1)).toBe('2025-12-31')

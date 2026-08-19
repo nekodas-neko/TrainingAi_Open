@@ -114,9 +114,20 @@ export async function GET(req: NextRequest) {
     // Sequential on purpose: each day runs ~12 queries, and the pg pool is max:10 — fanning a
     // 31-day range out concurrently would starve the rest of the app (the failure mode that took
     // production down in session 165). A range is an offline review, latency is not the concern.
+    // Q-497: indexed over the already-validated `span`, NOT `d <= end`. That comparison is on
+    // STRINGS, and `shiftDateStr` emits an unpadded year — so one day after `9999-12-31` is
+    // `10000-01-01`, and `'10000-01-01' <= '9999-12-31'` is **true** because `'1' < '9'`. Every
+    // guard passes on the way in for `from=9999-12-01&to=9999-12-31` (the span is exactly 31), and
+    // the loop then runs ~29M iterations of ~12 queries each against a `max: 10` pool.
+    //
+    // Padding the year does not fix it — `padStart(4, '0')` is a no-op on a five-digit year, which
+    // is why this iterates by count instead. `span` comes from `daysBetweenDateStrs`, which is
+    // millisecond arithmetic and correct at any year, and it is already bounded by MAX_RANGE_DAYS
+    // above. No string ordering is involved at all now, so the whole class is gone rather than
+    // bounded.
     const days: DayAudit[] = []
-    for (let d = start; d <= end; d = shiftDateStr(d, 1)) {
-      days.push(await buildDayAudit({ repo, userId, date: d, tz }))
+    for (let i = 0; i < span; i++) {
+      days.push(await buildDayAudit({ repo, userId, date: shiftDateStr(start, i), tz }))
     }
 
     if (span === 1) return NextResponse.json(days[0])

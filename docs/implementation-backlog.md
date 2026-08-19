@@ -2354,43 +2354,30 @@ switching from bare `fetch` to local-delete + `queueMutation`.
   `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
   worklist.
 
-### [platform] Q-497 — a 31-day range that passes every guard makes two admin routes loop forever
+### [platform] Q-329 — `shiftDateStr` moves a first-century date by ~1,900 years
 
-- **Branch:** `fix/shift-date-str-year-padding`
-- **Added:** 2026-08-18 · review sweep (admin date-range routes) ·
-  [`docs/reviews/2026-08-18-admin-range-loop-termination.md`](reviews/2026-08-18-admin-range-loop-termination.md)
-- **Placement:** medium. **Admin-only** — a session cookie or the `ADMIN_EXPORT_SECRET` bearer — so
-  not an unauthenticated vector. Weigh it as *"one mistyped year takes the app down"*, not an attack.
-- **The defect.** `for (let d = start; d <= end; d = shiftDateStr(d, 1))` compares **strings**.
-  `shiftDateStr` builds its year from `getUTCFullYear()` with **no width padding** (month and day both
-  get `padStart(2,'0')`; the year is the one field without it), so one day after `9999-12-31` is
-  `10000-01-01` — and `'10000-01-01' <= '9999-12-31'` is **true**, because `'1' < '9'`.
-- **Every guard passes on the way in** for `from=9999-12-01&to=9999-12-31`: `normalizeDateParamIso`
-  accepts both, `end < start` is false, and the span is **31 — exactly `MAX_RANGE_DAYS`**.
-- **Measured**, replicating the loop verbatim:
-  ```
-  iter 31 d = 9999-12-31
-  iter 32 d = 10000-01-01     <-- should have exited here
-  ...still looping at iteration 5000 d = 10013-08-08
-  CONTROL (2026-08-01..31): 31 iterations — terminates correctly
-  ```
-  It exits only once the year reaches five digits starting with `9` — ~80,000 years, ~29M iterations.
-  Each is a `buildDayAudit`, which the route's own comment puts at **~12 queries**, against a
-  `max: 10` pool.
-- **The irony is the comment directly above the loop:** it explains the days run sequentially rather
-  than concurrently because fanning out *"would starve the rest of the app (the failure mode that took
-  production down in session 165)"*. The sequential loop avoids that — and then never stops.
-- **Two sites, and the second one writes.** Three loops use `shiftDateStr` as the increment:
-  `admin/day-review:118` ❌ (read-only), `admin/backfill-derived-scores:80` ❌ (**identical guards,
-  identical loop, and `dryRun=false` commits** — an unbounded write, not just a hang),
-  `lib/health/energy-balance-service.ts:152` ✅ safe (start is derived by shifting *back* from the
-  user's today, so it cannot reach the boundary).
-- **Fix — not a year bound, that treats the symptom.** Pad the year in `shiftDateStr`
-  (`padStart(4,'0')`), the single place that produces the malformed value: it fixes both call sites at
-  once and is the one-formula-one-place answer. Cheap belt-and-braces: an iteration cap of
-  `MAX_RANGE_DAYS` in both loops, so a future ordering bug degrades to a truncated response, not a hang.
-- **Not exercised:** the loop was reproduced verbatim in isolation rather than by hitting the route —
-  deliberately, since driving it against a running server *is* the hang and the point was proven.
+- **Branch:** `fix/shift-date-str-low-year`
+- **Added:** 2026-08-19 · Lane A, found while fixing Q-497 · [`journal`](overview/entries/2026-08-19-admin-range-loop-termination.md)
+- **Placement:** low. Exotic input on admin-only surfaces, and Q-497 removed the way it could hang
+  anything. Filed because it is a silent wrong answer rather than a visible failure, and because
+  Q-497's padding fix makes low years *look* supported when they are not.
+
+**Measured 2026-08-19:** `shiftDateStr('0001-01-01', -1)` returns **`1900-12-31`**, not `0000-12-31`.
+The cause is `Date.UTC`'s legacy two-digit-year mapping — a year of 0–99 is interpreted as 1900+y —
+and it is unaffected by the year padding Q-497 added, which only decides how the *result* is printed.
+
+- **Reachable, if absurd.** `normalizeDateParamIso`'s regex accepts `\d{4}`, so `0050-01-01` passes
+  validation on `admin/day-review` and `admin/backfill-derived-scores`. The second **commits**, so a
+  backfill over such a range would write recomputed scores onto 1950s dates.
+- **Fix:** build the date in a safe year and set the real one (`setUTCFullYear`) rather than passing
+  a sub-100 year to `Date.UTC`. It restructures the function, which is why it was not folded into
+  Q-497 — that change was about termination, and mixing a date-helper rewrite into it would have made
+  the loop fix harder to review.
+- **Cheaper alternative worth considering first:** reject a year below 1000 at
+  `normalizeDateParam`, so the out-of-contract value never reaches any helper. Decide which before
+  building — a validation change touches every date-param route, a helper change touches one file.
+- **Verification:** `shiftDateStr('0001-01-01', -1)` must give `0000-12-31`, and every existing
+  `shiftDateStr` test must still pass unchanged.
 
 ### [devices][platform] Q-493 — the ingest brute-force gate is bypassed by rotating one request header (7 sites)
 

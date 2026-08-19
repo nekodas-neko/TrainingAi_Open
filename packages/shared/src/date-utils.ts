@@ -151,11 +151,26 @@ export function normalizeDateParamIso(input: string): string | null {
 }
 
 // Shifts a YYYY-MM-DD string by N calendar days without touching toISOString().
+//
+// The year is padded to four digits (Q-497). Month and day always were; the year was the one field
+// without it, so a year under 1000 emitted `999-01-01` — three digits, which sorts BEFORE
+// `1000-01-01` in any string comparison and silently reorders a range.
+//
+// **This does NOT make the output safe to compare as a string in a loop bound**, and it is worth
+// being exact about why, because the obvious reading is that it does. `padStart` cannot help at the
+// TOP of the range: one day after `9999-12-31` is `10000-01-01`, five digits, and
+// `'10000-01-01' <= '9999-12-31'` is `true` because `'1' < '9'`. Two admin routes looped ~29M times
+// on exactly that. A `YYYY-MM-DD` contract cannot express a five-digit year, so the fix belongs at
+// the call site: iterate a validated day COUNT, never `for (d = start; d <= end; …)`.
+//
+// Known limit, deliberately not handled here: `Date.UTC` maps a year of 0–99 onto 1900–1999, so a
+// date in the first century shifts to ~1900. Tracked as Q-329 — it needs the function restructured,
+// not a pad.
 export function shiftDateStr(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   const shifted = new Date(Date.UTC(y, m - 1, d + days))
   return [
-    shifted.getUTCFullYear(),
+    String(shifted.getUTCFullYear()).padStart(4, '0'),
     String(shifted.getUTCMonth() + 1).padStart(2, '0'),
     String(shifted.getUTCDate()).padStart(2, '0'),
   ].join('-')
