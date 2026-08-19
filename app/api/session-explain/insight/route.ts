@@ -77,7 +77,11 @@ Write in second person. Be specific about which signals mattered. Do not use bul
     })
   } catch (error) {
     reportServerError(error, { url: '/api/session-explain/insight' })
-    const errMsg = errorLog(error, 'GET /api/session-explain/insight')
-    return NextResponse.json({ error: errMsg }, { status: 500 })
+    // Q-483: `errorLog` returns `[ERROR]: ${error}`, and returning that as the body published the
+    // whole failing statement — every column of `workout_sessions` — to the client. Measured on a
+    // malformed id, which reaches the driver as 22P02. The log line above keeps the full detail and
+    // `reportServerError` already banked it, so redacting the response costs no diagnostics.
+    errorLog(error, 'GET /api/session-explain/insight')
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }
