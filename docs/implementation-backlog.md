@@ -321,6 +321,105 @@ Q-402 fixed in one place, so it outranks the remaining nutrition work rather tha
 **Parallel-safe:** the Lane B half of Q-401 is now unblocked on both counts. Everything else is
 sequential.
 
+---
+
+**2026-08-19 — the owner reviewed the interactive prototype, and the cluster is now fully decided.**
+
+Prototype: <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>. **Nothing in this
+cluster is waiting on the owner any more.** Every open question that was blocking it has an answer,
+and the answers live in the entries rather than here:
+
+| decided | where it is written | build order |
+|---|---|---|
+| Label styles all draw **square** | **Q-411**, filed at the top of the queue | **1st — small, self-contained, retires a constraint** |
+| Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
+| Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
+| Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
+| Meal photo uploads from **Edit Meal**, 64 px tile left of the name | Q-396 | independent |
+| The coach must **write every plan meal into My Foods** | Q-407, and it makes Q-398 a prerequisite | after Q-398 |
+
+**Two things carry a caveat rather than a blocker, and both resolve on the same physical print:**
+Q-411's area gain is real only if the owner's circle template *crops* rather than *scales* (the
+arithmetic is in that entry), and Q-400's saved PNG currently declares no physical size at all, so
+it prints at 312 mm. One print with a ruler answers both — **do Q-400's delivery fix first, then
+print once.**
+
+**Q-406 (`food-row.tsx`) is still the gate for the visual work** and has not moved: both landing
+files sit on the 800-line limit, and Q-395, Q-398 and the tab merge all want that component.
+
+### [nutrition] Q-411 — every label style draws on a square canvas; the round constraint was costing 64% of the area
+
+- **Branch:** `feat/square-label-canvas`
+- **Added:** 2026-08-19 · owner, reviewing the interactive prototype · **top of the queue at the
+  owner's instruction**
+- **Owner's words:** *"could we just have this as a generic square? it will auto fit in the circle
+  template when I need to print it - so they could all start as squares."*
+- **Lane B** (`components/nutrition/meal-label-render.ts` + `meal-label-sheet.tsx`). No schema, no
+  migration, no APK — this is canvas geometry and ships on a Railway deploy.
+- **Do this before Q-395's row work if both are in flight**, not because it is bigger but because it
+  is small, self-contained, and it retires a constraint that three prior entries (Q-393, Q-397,
+  Q-399) each spent effort designing around.
+
+**The decision.** All six styles draw square. `squareOnly` disappears as a concept, the picker loses
+its `Square` badge, and the round die becomes a *print-time* consideration rather than a design
+constraint the renderer has to satisfy. **Draw no circle** — the owner saw a dashed round-die guide
+on the artwork and asked for it gone (*"dont have the circle background. Leave it for now"*). The
+label is a square with no circular framing, guide, or vignette; where the round die matters is at
+the printer, not on the canvas.
+
+**Why this is worth doing rather than merely allowed.** The renderer currently reserves a **centred
+usable box of 130 × 137** sheet units — *"what fits inside the inscribed circle once the corners are
+given up"* (`meal-label-render.ts:36-38`) — against a square box of **171 × 171**
+(`SQUARE_W`, `:260`). That is **17,810 against 29,241 square units, a 64% increase in usable area**,
+and the height it gives back goes to the code. Measured from the shipped `codeUnits` at 50 mm:
+
+| style | today | square | |
+|---|---|---|---|
+| `band` | 0.369 mm/module | 0.52 | the tightest, and the one that fails first |
+| `inlineCentred` (default) | 0.401 | **0.56** | **+40%** |
+| `ticket` | 0.417 | 0.61 | |
+| `editorial` | 0.481 | 0.59 | |
+| `plaque` | 0.520 | 0.68 | |
+| `square` | 0.561 | 0.72 | |
+
+Module size is the number that decides whether a printed code scans — at 300 dpi the E2E's decode of
+the default was *"a coin flip"* until the canvas scale was doubled. This buys the same kind of
+headroom a second time, for free, and `square`'s own code comment already made the argument:
+*"the most scannable code the feature has — which is the point of spending the corners."* The
+owner's message is that the corners were never actually being spent.
+
+**⚠ One measurement decides whether the gain is real, and it must be taken before anyone trusts the
+table above.** *"It will auto fit in the circle template"* has two possible meanings and they point
+opposite ways:
+- **The template CROPS the corners** (circle inscribed in a 50 mm square) → the artwork keeps 50 mm
+  of width and the module holds at **0.56 mm**. The table stands.
+- **The template SCALES the whole square to fit inside the circle** → the square lands at
+  50 ÷ √2 = **35.4 mm**, and the module falls to **0.397 mm** — *fractionally worse than the 0.401
+  it replaces.* Every gain above evaporates and the change is a small regression.
+
+**Resolve it with one test print, and it is the same print Q-400 already owes** (save the PNG,
+measure the code with a ruler against the `metrics.codeMm` figure the sheet displays). Until that
+print is done, **do not describe this entry as a scannability improvement** — describe it as a
+simplification that is *expected* to improve scannability. If the template turns out to scale rather
+than crop, the follow-up is to keep the square canvas anyway (it is simpler and the content still
+benefits) but design the critical content — name, calories, code — to sit inside the inscribed
+circle.
+
+**What it lets the other entries stop doing.** `centredStackLineBudget()` exists to clamp the
+ingredient stack into the inscribed circle, and Q-399 had to widen it to get three lines onto the
+default. On a square canvas that budget relaxes considerably — **re-derive it rather than leaving
+the round-era numbers in place**, or the extra area is reserved and never used. Keep the
+"as much of the ingredient list as fits" copy and the overflow summary: the list can still exceed
+the label, and Q-399's lesson was that a style silently printing *none* of it went unnoticed for a
+release.
+
+- **Verification.** `pnpm test` covers the geometry (`centredStackLineBudget` has regression tests
+  asserting `maxLines >= 3` for the default and `mmPerModule >= 0.36` — **both thresholds should be
+  raised** in this PR, since square makes them trivially true and a test that cannot fail is not a
+  test). Then re-run `e2e/meal-label.spec.ts`, which decodes the rendered code. **Neither proves the
+  print**, so the test print above is the acceptance criterion, and the PR should say plainly that
+  it was or was not done.
+
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
 - **Branch:** `chore/adopt-use-cached-value`
@@ -882,9 +981,12 @@ and this is the sixth.
   with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
   second ring component.
 - **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
-  search across everything · tabs **Recent · Frequent · Saved meals** · a bottom row of
-  **Barcode · Photo · Describe**. Photo is kept because it exists today and the owner did not ask
-  to remove it.
+  search across everything · tabs · a bottom row of capture actions. **Both were revised by the
+  owner on 2026-08-19 and the revision wins over this line** — the tabs are **Recent · My Foods**
+  (see note 17), and the action row is ordered **Photo · Barcode · Describe or enter**, in that
+  order, not the Barcode-first order originally drawn. The order is the owner's; it is also the
+  right default, since photo is the fastest path for a plated meal and barcode only works on
+  packaged food.
 - **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
   box and type them yourself. The fields are always visible, so neither path is a hidden mode.
 - **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
@@ -905,10 +1007,31 @@ MacroRing · **NutritionActionRow (three buttons — Saved Meals had been droppe
 and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
 quietly loses a section is the failure mode this entry exists to prevent.
 
-**17 — A section that has nowhere to go under the new tabs: `My Foods`.** The shipped capture step
-offers it (`onMyFoods` → `FoodLibrarySheet`) and the three agreed tabs are Recent, Frequent and
-Saved meals. Recommendation: make it a **fourth tab**, not a button — it is a list of foods like the
-other three, and a tab is where someone will look for it. Flagged rather than decided.
+**17 — DECIDED 2026-08-19, and it went further than the question asked. The tabs are `Recent` and
+`My Foods`. Two, not four.** The question here was where to put `My Foods`; the owner answered by
+collapsing the row: ***"I Think recent tab is fine; dont think we need frequent - saved and myfoods
+I dont think need to be seperated. Saved could contain foods made or saved. Maybe we just have 'my
+foods'"***.
+- **`Frequent` is dropped.** It was a second ordering of the same list Recent already shows.
+- **`Saved meals` and `My Foods` merge into one `My Foods` list** holding anything the user made or
+  saved. This is the right call for a reason worth writing down: a saved meal and a food you built
+  were always the same kind of row wearing two labels, which is exactly what finding 13's single
+  row component says. Two lists that render identically and differ only in provenance are one list
+  with a subtitle.
+- **Nothing is lost, and check that before building.** `FoodLibrarySheet` and `SavedMealsSheet` are
+  separate components today; merging the tabs must not silently drop a capability that only one of
+  them has (bulk delete, meal-plan linkage, the label path). Diff them first and carry every action
+  across, or say in the PR which was intentionally dropped.
+- Ordering within `My Foods`: most recently used first, so the merge does not bury saved meals under
+  one-off foods.
+- **⚠ The merge is a RENAME as well as a merge, and the rename has to be swept.** The owner spotted
+  the half-done version immediately — *"So im picking up a discrepancy between My Meals and My
+  foods? Whats the difference"* — against a prototype that still had a `My Meals` screen beside a
+  `My Foods` tab. There is no difference, and that is the point: **two names for one list is the
+  defect**. Grep for every user-facing occurrence of *Saved meals*, *My Meals* and *My Foods* —
+  sheet titles, tab labels, empty states, toasts, the `+ Add food` destinations, the nav copy — and
+  land on the single name in one pass. A surface left on the old name reads as a second list that
+  is missing rows.
 
 **18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
 assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
@@ -1071,6 +1194,21 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   3. Entering from the Nutrition tab starts you **inside the nutrition scope** — see Q-408, which is
      the general version of that and is deliberately not a blocker for this entry.
 
+- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
+  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
+  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
+  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
+  from one built by hand — loggable, editable, and with its own printable label.
+  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
+    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
+    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
+    plan is the same dead end the stepper already is.
+  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
+    whole reason this beats a plan document: the user keeps meals, not a plan.
+  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
+    meals under `My Foods` tagged *from your plan*) —
+    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
+
 - **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
   conversation as the path behind the same entry point and keep the stepped sheet reachable until
   the conversation has been used on-device for a plan the owner actually keeps. A conversational
@@ -1193,6 +1331,19 @@ Copying the 5 MB cap here would be the largest single regression the sync engine
   grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
   named constant next to the column, not inline in the route.
 
+**Where the upload lives — unspecified until now, and asked for on 2026-08-19.** The owner, looking
+at the prototype: *"Edit meal doesnt contain an image upload seciton; did we agree on this? with a
+base64 small DB? Ideally stored locally"*. The storage answer is yes and it is above — base64 data
+URI, on the device, which is what "stored locally" means here and is the whole reason it is not a
+URL. What this entry never said is **which screen uploads it**. Recommendation: a **64 px tile to
+the left of the meal-name field in Edit Meal**, tapping to camera/gallery, long-press or a clear
+action to remove. Reasons: Edit Meal already owns the meal and already saves it, so the image rides
+the existing write rather than needing its own; and the tile doubles as the preview, so there is no
+separate "current photo" row. Drawn in the prototype at
+<https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6> (screen 4, tap the tile).
+**Show the byte size on the tile after a pick** — this entry's whole risk is the cap slipping, and a
+number the user can see is the cheapest possible tripwire.
+
 **The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
 on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
 weight, no upload path — and it already carries most of the recognition benefit in the drawings,
@@ -1250,6 +1401,31 @@ directly — green on web, dead on the device, because the failing path is unrea
 - **Related:** the label this saves was missing its ingredient list — **Q-399, fixed 2026-08-19
   (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
   one the owner picked.
+
+**A second defect on the same button, found 2026-08-19 — the PNG has no physical size, so it prints
+at the wrong size even once it reaches the gallery.** The owner's ask is *"download in full res to
+print onto a label"*, and **the resolution half is already done**: `DEFAULT_RENDER_SCALE = 6.24`
+makes a 50 mm label **1,179 px, which is 600 dpi** (`meal-label-render.ts:23`), and the docstring is
+explicit that *"the canvas IS the printed artwork"*. Nothing needs to be raised. **What is missing is
+the metadata that tells a printer what those pixels are worth.**
+- `canvas.toBlob(res, 'image/png')` (`meal-label-sheet.tsx:73`) writes a PNG with **no `pHYs`
+  chunk** — the canvas API has no way to set one. A PNG without `pHYs` has no declared physical
+  size, so every print path falls back to its own default, which is **96 dpi** almost everywhere.
+- The arithmetic is the whole bug: **1,179 px ÷ 96 dpi = 12.3 inches ≈ 312 mm**. A label drawn to be
+  50 mm arrives as a third of a metre. On a label printer with fixed media it will not fit at all;
+  in a print dialog the user has to notice and hand-set the scale to ~16%, every time.
+- **Fix:** inject a `pHYs` chunk declaring 600 dpi (23,622 pixels/metre, unit = 1) into the blob
+  before it is saved or shared. It is a 21-byte chunk spliced after `IHDR` with its own CRC — a
+  small pure function, so it gets a unit test that reads the chunk back rather than a visual check.
+  Write it in `packages/shared` beside the renderer so both the save and the share path use it; two
+  copies of this would drift and only one of them is easy to notice.
+- **This is invisible in every check we run.** The PNG is valid, the pixels are correct, the E2E
+  decodes the QR fine — the defect only appears on paper, which is also why it survived the 300→600
+  dpi change that was made specifically for print quality. **Verification is a physical print**: send
+  the saved file to the label printer and measure the code with a ruler. `metrics.codeMm` in the
+  sheet says what it should measure, so the check is exact rather than a judgement call.
+- **Order matters:** there is no point testing this before the save path exists. Fix the delivery
+  first, then the metadata, then print once and measure — one print proves both halves.
 
 ### [workouts][platform] Q-405 — a Coach swap silently inherits the old exercise's role, and the role sets the loading
 
@@ -1402,6 +1578,79 @@ note is a live consideration for the WebView, not a stale one.
   standalone and are the owner's stated focus. If this plan later moves where scope lives, moving
   one conversation is a small change; waiting for the architecture before shipping any of it is how
   the nutrition work stalls.
+
+### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
+
+- **Branch:** `feat/walk-step-goal`
+- **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk
+- **Owner's words:** *"for the walking section I'd it to show the speed and total step count.
+  rather than a HR goal we should be looking at a step goal; we should enough data on how to do
+  this."*
+- **Placement:** medium, and **read the blocker below before scheduling it** — one third of this is
+  a display change that can ship next session, and two thirds depend on a measurement problem that
+  is open.
+
+**What the screen shows today.** `components/guided-walk/walk-active.tsx` (224 lines) renders the
+segment name, the countdown, live **bpm**, `distanceKm` when a route exists (`:189-190`), a cadence
+readout, and a verdict line built from HR targets: `In zone (target ≤99 bpm)` / `Push harder` /
+`Ease off` (`:201-204`). The owner's screenshot is a slow segment reading **96 bpm, in zone**, with
+cadence showing **`--`**.
+
+**Split this into three pieces, because they are not equally ready.**
+
+**1 — Speed. Ready now, small.** `useGuidedWalkStore` already holds `currentPaceSecPerKm`
+(`walk-active.tsx:35-36`) and the screen renders only `distanceKm`. The number the owner wants is
+in the store and simply is not on screen. **Decide the unit deliberately**: pace (`min/km`) is the
+convention for running and is what the summary already computes (`computeAvgPaceSecPerKm`), while
+speed (`km/h`) is the more natural reading for a walk and is what the owner asked for by name.
+Recommendation: show **km/h** on the live screen, keep min/km in the summary where it sits beside
+splits and best efforts, and derive both from the one pace series rather than adding a second
+computation — the One Formula rule applies.
+
+**2 — Total step count. Ready only when a strap is worn.** `stepsEstimate` exists and is already
+saved (`walk-summary.tsx:150,167`), and it comes from **integrating the strap's cadence series over
+the walk** (Q-230 replaced a hardcoded `null` with it). So a running total can be shown live from
+the same tracker with no new plumbing — but it is a strap-only number today, and it must be
+labelled as an estimate rather than a count, because it is integrated cadence and not counted
+steps.
+
+**3 — ⚠ Replacing the HR goal with a step goal. BLOCKED on a measurement problem, and this is the
+finding that matters.** The premise *"we should have enough data on how to do this"* is the part to
+check before building: **we do not, yet, and the screenshot is the evidence.**
+- Cadence is fused from two sources (`lib/activity/cadence-tracker.ts`): the **strap** at ~1
+  reading/second, and the **ring** at one gait window per ~30 s. The `--` in the screenshot means
+  neither was live — no H10 that walk, and the ring had delivered nothing usable.
+- The ring path is **explicitly gated**: `RING_CADENCE_VALIDATED = false`
+  (`packages/shared/src/health/cadence.ts:218`). Its docstring is worth reading in full before
+  planning this — the signal is not broken, it is **octave-ambiguous**. Three counted captures land
+  on opposite sides of an octave split (64 spm → 0.98 Hz reads as step rate; 114 spm → 1.02 Hz reads
+  as *stride* rate), and a metronome-referenced capture agreed with the strap to **0.4 spm**. The
+  comment is explicit that shipping it uncorrected gives a number **wrong by 2×**, which is worse
+  than showing none.
+- **So a step goal built on today's cadence would be paced by a signal that is absent without a
+  strap and can be double or half with one.** An HR goal, whatever its faults, is at least always
+  present — the ring gives HR continuously. **Do not swap the target over until the ring path is
+  octave-corrected and re-validated across counted cadences**, which is the concrete next step that
+  docstring already names.
+- **Recommendation:** ship pieces 1 and 2 now as *additional* readouts, keep the HR verdict as the
+  pacing target, and treat the swap as a follow-up gated on ring validation. That gives the owner
+  the two numbers asked for on the next deploy without keying the workout to a signal that reads
+  `--`.
+
+**One question the plan must answer.** *"Step goal"* has two readings and they build differently:
+a **cadence target** (walk at ≥120 spm through the fast segment — the direct analogue of the HR
+zone, and what the interval structure implies), or a **session/daily step total** (hit 8,000 steps,
+which is a goal the walk contributes to rather than a way to pace it). Both are reasonable; only
+the first replaces the verdict line. Ask before building — this is the difference between changing
+one line and adding a goal system.
+
+- **Lane.** `components/guided-walk/**` is Lane B. Any ring octave correction is
+  `packages/shared/src/health/cadence.ts` + the decoder, which is **Lane A**, and it is the harder
+  half by a distance.
+- **Verification.** Speed is checkable in `pnpm dev` against a mocked pace series. **Steps and
+  cadence are not** — they need a real walk with the H10 paired, and the ring half needs a counted
+  capture against a metronome, which is the procedure that produced the numbers in the docstring.
+  State plainly that no device pass was run if none was.
 
 ### [platform] Q-320 — `e.message` as a 500 body leaks the same SQL Q-483 just closed, at 14 sites
 
