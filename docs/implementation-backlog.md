@@ -737,12 +737,28 @@ Worth reaching for only if the reassign proves harder than it looks.
   - **So the can-bite group was two sites, not eight.** This slice converts one —
     `session-select-content`'s `more-user-profile`, which is load-bearing: two paths invalidate that
     key, so changing a display name or avatar left Home's greeting stale until an app restart.
-  - **One can-bite site remains**: session-select's `ta:oura-ble-synced` listener, which refetches
-    `sleep-sessions` on one event because nothing refetches it on invalidation. Same workaround
-    `home-day-timeline` carried, but it cannot be deleted the same way — that screen's sleep read is
-    a `[userId]` effect with a local-first store seed and a `fetchWithRetry` wrapper, so moving it to
-    `useCachedValue` is a genuine state refactor. **That is the one remaining shell-level item, and
-    it wants its own PR.** The other 13 sites unmount and are latent.
+  - ~~One can-bite site remains.~~ **Done in slice 4.**
+- **✅ SLICE 4 SHIPPED 2026-08-19 (v1.325.9) — the can-bite group is now ZERO.**
+  [`Journal`](overview/entries/2026-08-19-invalidation-refetch-hook.md). **12 sites across 10 files
+  remain and every one of them unmounts on navigate**, so what is left is latent by definition. The
+  shell-level half of this entry is finished.
+  - **A second hook was needed and is the reusable part**: `lib/hooks/use-invalidation-refetch.ts`.
+    `useCachedValue` replaces a read outright — it holds, seeds and fetches the value — which does
+    not fit a read that also seeds from the local SQLite store, wraps its fetch in `fetchWithRetry`,
+    or sets several pieces of state. `useInvalidationRefetch(keys, fn)` gives such a read the half it
+    does need: something asks for a new value when a write clears the old one.
+  - **The real bug it fixed, beyond the ratchet**: three screens listened for `ta:oura-ble-synced`
+    and refetched. `sleep-sessions` is also cleared by `invalidateBiometrics`, so a manually-edited
+    sleep row or a Health Connect ingest left all three stale until a remount — only the BLE path
+    self-healed, because it was the only writer that dispatched an event. All three converted
+    together per the sibling-surface rule.
+  - **It coalesces, and the three-key call site needs that**: `invalidateCache` fires once per key,
+    so a group clearing all of health-content's three would otherwise run its whole meta load three
+    times.
+- **What is left of Q-359, for whoever takes it next.** Twelve latent sites, none urgent, and the
+  entry stays queued only for them. Judge any future addition by where the component is **mounted** —
+  grep for its name and check the renderer against `components/shell/tabs.ts`. That rule has been got
+  wrong three times in this Q's own history.
   - **The lesson is about the check, not the sweep:** a scanner's own baseline is evidence, and this
     one had never been checked against a hand count. The mutation check it shipped with proved it
     caught a *new* site; nothing proved the sites it already listed were real.

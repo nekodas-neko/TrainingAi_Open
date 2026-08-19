@@ -48,6 +48,7 @@ import type { ActivityLevel } from '@trainingai/shared/types/user'
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
 import { useBmiClassification, useWeightTrend, useEnergyBalanceToday } from "@/app/health/hooks/use-health-calcs";
 import { classifyHrResponse, type HrSessionState, type HrDataResponse } from "@trainingai/shared/workout/hr-session-state";
+import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 
 type Tab = "body" | "training" | "progress";
 
@@ -312,11 +313,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   // cache entry (invalidateOuraSync) but this screen, once mounted, never learned to
   // refetch it — the hypnogram/sleep cards looked "stuck missing" until the next
   // navigate-away/remount. fetchMeta already includes 'sleep-sessions' in its fetch set.
-  useEffect(() => {
-    const onBleSynced = () => { fetchMeta(); };
-    window.addEventListener('ta:oura-ble-synced', onBleSynced);
-    return () => window.removeEventListener('ta:oura-ble-synced', onBleSynced);
-  }, [fetchMeta]);
+  // The three keys `fetchMeta` reads, not the one event that used to trigger it.
+  useInvalidationRefetch(['body-metadata', 'sleep-sessions', 'readiness-score'], () => { fetchMeta(); });
 
   // Fetches all data shown on this screen. Called on mount and after pull-to-sync.
   // This screen has three sub-tabs and renders one at a time, but used to fetch

@@ -904,7 +904,12 @@ const BASELINE = {
   // by ten of twenty-five, so two sessions planned work around sites that did not exist — the entry
   // has to say WHICH files were phantom and why, or the next session re-derives it from the same
   // bad numbers.
-  'docs/implementation-backlog.md': 11160,
+  // Raised 2026-08-19 (Lane B, Q-359 slice 4): the can-bite group reached zero, and the added lines
+  // are what stops the entry reading as finished when it is not — twelve latent sites stay queued,
+  // and the second hook (`useInvalidationRefetch`) needs its existence and its reason recorded
+  // where the next session looks, or the next read that cannot use `useCachedValue` gets a fourth
+  // hand-rolled event listener.
+  'docs/implementation-backlog.md': 11176,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
