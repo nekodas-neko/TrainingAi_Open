@@ -18,9 +18,16 @@
 // `readJsonLimited` lowers its own number in the same PR; a file that reaches zero is removed from
 // the list. Q-322 tracks the remaining sweep, and this check is what makes doing it slowly safe.
 //
-// The three routes reachable **without a session** — `auth/register`,
-// `auth/exchange-mobile-token`, `health-connect/ingest` — were converted first and are deliberately
-// absent from the baseline, so re-adding a bare read to any of them fails immediately.
+// **What is left is printed by this script on every run and is deliberately NOT written down here.**
+// A hand-maintained running total is one more thing to re-edit per slice and get wrong, and it
+// conflicts on every parallel merge. The BASELINE below is the worklist; the summary line is the
+// score.
+//
+// Slices so far — 1: the three routes reachable **without a session** (`auth/register`,
+// `auth/exchange-mobile-token`, `health-connect/ingest`), deliberately absent from the baseline so
+// re-adding a bare read to any of them fails immediately.  2: the offline-first hot paths.
+// 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths.
+// 6: the workout and activity write routes.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -38,8 +45,6 @@ function stripComments(src) {
 
 // Shrink-only. Each number is how many bare reads that file still has.
 const BASELINE = {
-  'app/api/activity-logs/[id]/metrics/route.ts': 1,
-  'app/api/activity-logs/route.ts': 2,
   'app/api/admin/activity-types/route.ts': 2,
   'app/api/admin/db-query/route.ts': 1,
   'app/api/admin/exercises/route.ts': 2,
@@ -62,13 +67,10 @@ const BASELINE = {
   'app/api/coach/route.ts': 1,
   'app/api/coach/threads/route.ts': 1,
   'app/api/complete-workout/route.ts': 1,
-  'app/api/confirm-early-deload/route.ts': 1,
   'app/api/daily-digest/route.ts': 1,
   'app/api/day-checkin/route.ts': 1,
-  'app/api/exercise-estimates/route.ts': 1,
   'app/api/exercises/generate/route.ts': 1,
   'app/api/exercises/route.ts': 1,
-  'app/api/fitness-tests/route.ts': 2,
   'app/api/food-logging-complete/route.ts': 1,
   'app/api/friends/[id]/route.ts': 1,
   'app/api/friends/route.ts': 1,
@@ -124,12 +126,7 @@ const BASELINE = {
   'app/api/user/profile/route.ts': 1,
   'app/api/water-log/route.ts': 1,
   'app/api/weekly-digest/route.ts': 1,
-  'app/api/workout-entry/route.ts': 2,
-  'app/api/workout-review/session/[sessionId]/apply/route.ts': 1,
-  'app/api/workout-sessions/route.ts': 1,
-  'app/api/workout-sessions/rpe/route.ts': 1,
   'app/api/workout-templates/route.ts': 2,
-  'app/api/workout/backfill-set-hr-stats/route.ts': 1,
 };
 
 const counts = new Map();
