@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.0",
+    date: "2026-08-19",
+    changes: [
+      "Meal labels print the ingredient list again. The centred style \u2014 the default \u2014 had no room left for it once the name, calories and macros were drawn, so it printed none at all, at any meal name length, and the preview quietly stopped mentioning ingredients rather than saying so. The headline figures are slightly smaller now and three wrapped lines of ingredients fit beneath them; the code is still larger than the style this replaced. If a label ever has no room for the list again, the preview says so in red instead of going silent.",
+      "Labels are drawn at twice the resolution, so the printed artwork is 600 dpi rather than 300. The scannable code was being drawn with soft, half-pixel edges, which is exactly what ink spread then merges \u2014 this affects every label style, not just the default.",
+      "The style picker no longer promises \u201cthe full ingredient list\u201d, since long lists are summarised; and it had gone on calling Black band \u201cthe default\u201d after it stopped being one.",
+    ],
+  },
+  {
     version: "1.324.9",
     date: "2026-08-18",
     changes: [
