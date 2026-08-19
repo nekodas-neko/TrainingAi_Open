@@ -1,4 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A user id and a one-word action. 4 KB is generous.
+const MAX_BODY_BYTES = 4 * 1024
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
@@ -30,8 +34,14 @@ export async function PATCH(req: NextRequest) {
     return adminErrorResponse(err)
   }
 
-  const { userId, action } = await req.json()
-  if (!userId || !['activate', 'deactivate'].includes(action)) {
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { userId, action } = (read.body ?? {}) as { userId?: unknown; action?: unknown }
+  if (typeof userId !== 'string' || typeof action !== 'string' || !['activate', 'deactivate'].includes(action)) {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
 
@@ -54,8 +64,14 @@ export async function DELETE(req: NextRequest) {
     return adminErrorResponse(err)
   }
 
-  const { userId } = await req.json()
-  if (!userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { userId } = (read.body ?? {}) as { userId?: unknown }
+  if (typeof userId !== 'string' || !userId) return NextResponse.json({ error: 'userId required' }, { status: 400 })
   if (userId === session.user.id) return NextResponse.json({ error: 'Cannot delete yourself' }, { status: 400 })
 
   const repo = await getRepository()
