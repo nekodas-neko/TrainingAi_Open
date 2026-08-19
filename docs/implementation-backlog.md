@@ -669,6 +669,20 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 
 ### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
 
+> **⚠️ THE LANE A HALF SHIPPED 2026-08-19 — what is left is Lane B**
+> ([`journal`](overview/entries/2026-08-19-macros-follow-earned-calories.md)).
+> `scaleMacrosForEarnedKcal(base, earnedKcal)` lives in
+> `packages/shared/src/nutrition/calorie-balance.ts` and **`GET /api/nutrition/energy-balance` already
+> returns the answer**: `macroTargets: { base, scaled, earnedKcal }`. Do not re-derive it client-side.
+>
+> **What is left:** the two display changes below — the macro ring's grey remainder, and the zone bar
+> as a progress bar with a short overshoot tail — plus rendering `scaled` instead of the stored row.
+> **The bar still must ship in the same PR as Q-415**, or it fills toward the wrong number.
+>
+> **One precision worth carrying:** what the split preserves is the **carbs:fat energy ratio**, not
+> each macro's share of the day — protein's share necessarily falls as the budget grows. Both are
+> pinned by test. Everything below is the original entry.
+
 - **Branch:** `feat/macros-follow-earned-calories`
 - **Added:** 2026-08-19 · Lane A/B split, the residual of Q-401 after both its halves landed.
 - **What is now true.** One TDEE model: `nutrition_targets.calories` is the **rest-day floor**, and
