@@ -3345,6 +3345,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>) { return n.createMealType(this.db, userId, data) }
   async updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>) { return n.updateMealType(this.db, id, userId, data) }
   async deleteMealType(id: string, userId: string) { return n.deleteMealType(this.db, id, userId) }
+  async countLiveFoodLogsForMealType(userId: string, mealTypeId: string) { return n.countLiveFoodLogsForMealType(this.db, userId, mealTypeId) }
+  async reassignAndDeleteMealType(userId: string, fromId: string, toId: string) { return n.reassignAndDeleteMealType(this.db, userId, fromId, toId) }
   async reorderMealTypes(userId: string, orderedIds: string[]) { return n.reorderMealTypes(this.db, userId, orderedIds) }
   async seedDefaultMealTypes(userId: string) { return n.seedDefaultMealTypes(this.db, userId) }
   async createFoodItem(userId: string, data: Omit<FoodItem, 'id' | 'userId' | 'createdAt'> & { id?: string }) { return n.createFoodItem(this.db, userId, data) }

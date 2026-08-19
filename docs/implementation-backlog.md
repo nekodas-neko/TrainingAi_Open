@@ -449,93 +449,31 @@ owner wants it visible.
   must end exactly on the day's logged calories and the expenditure curve on the day's burn. A chart
   that disagrees with the number above it is worse than no chart.
 
-### [nutrition] Q-412 — "reassign them first" instructs the user to do something the app cannot do
+### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
-- **Branch:** `feat/meal-type-reassign`
-- **Added:** 2026-08-19 · owner, from Nutrition Settings on v1.325.x, with a screenshot
-- **Owner's words:** *"how would I delete meals? say I wanted to move back to 3 a day or so. it
-  seems I cant if there are meals assigned"*
-- **Lane A** — the fix is a new write path (`app/api/**` + repo slice + the sync chain). The dialog
-  that calls it is Lane B and is small; land the endpoint first.
-- **Placement:** medium-high. It is not a data-loss bug, but it is a **dead end with no exit**, and
-  the only way out a user can find on their own destroys history.
+- **Branch:** `feat/meal-type-reassign-dialog`
+- **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-412 once the endpoint shipped
+- **Lane B** (`components/nutrition/meal-type-manager.tsx`). The server half is done and merged —
+  see [`entries/2026-08-19-meal-type-reassign.md`](overview/entries/2026-08-19-meal-type-reassign.md).
 
-**The trap, end to end.**
-1. `deleteMealType` (`lib/data/postgres/slices/nutrition.ts:100`) probes `food_logs` for any live row
-   pointing at the meal type and throws `MEAL_TYPE_HAS_LOGS` if one exists.
-2. The route turns that into a 409 reading **"Meal type has food log entries — reassign them
-   first"** (`app/api/nutrition/meal-types/[id]/route.ts:45`).
-3. **There is no reassign, anywhere.** `PATCH /api/nutrition/food-logs/[id]` accepts
-   `quantityMultiplier` and nothing else — `meal_type_id` is not a settable field on any route, and
-   no UI offers to move a logged item between meal types.
+**What already exists, so it is not rebuilt.** `DELETE /api/nutrition/meal-types/[id]` refuses with
+**409** carrying `code: 'MEAL_TYPE_HAS_LOGS'`, a human message, and **`logCount`**; adding
+`?reassignTo=<uuid>` moves every entry onto that meal type and soft-deletes the source in one
+transaction, re-stamping each moved log's time against the new window, and answers
+`{ success: true, moved }`. Refusals are already shaped for a UI: **400** for the same id or a
+malformed one, **404** for a target that is not yours, and nothing is changed in either case.
 
-So the message names the one action that would clear the block and the app has never implemented it.
-**The only escape a user can actually perform is deleting every food log ever recorded against that
-meal type**, which throws away nutrition history to change a setting. The owner's case — dropping
-from five meal types back to three — is the ordinary case, not an edge one.
+**What is left.**
+- **The delete button should not be able to only fail.** Today it fires the DELETE, gets a 409 and
+  shows a toast. Use `logCount` to open the move dialog directly, or disable-with-explanation.
+- **The dialog is a choice, not an error**: *"Afternoon Snack has 34 entries. Move them to…"* with a
+  picker of the remaining live meal types, and a secondary *"Delete them instead"*.
+- **Say that it rewrites history.** A 3 pm snack moved to Lunch reads as Lunch on every past day.
+  That is the intent — it is what "I want three meals a day" means — but it should not be a surprise.
+- **Verification is on-device**, per the offline-first rule: reassign a meal type with logs, then
+  confirm on the APK that the entries show under the new type with the same calories, that the day
+  total is unchanged, and that it survives an app restart.
 
-**What is NOT the problem, so nobody re-derives it.** This is not a foreign-key limitation and the
-guard is not protecting the database. `meal_types` already soft-deletes (`deleted_at`, Q-179), and
-that function's own docstring says so: *"Soft-deleting sidesteps the RESTRICT entirely: the
-soft-deleted logs keep pointing at a row that still exists."* The row survives, so historical logs
-would still resolve their meal type.
-
-**What the guard IS protecting is the day view, and this is the constraint the fix has to satisfy.**
-`listMealTypes` filters `deleted_at IS NULL` (`:65-70`) and `nutrition-content.tsx:591` renders
-`mealTypes.map(...)`. Soft-delete a type that has logs and **those logs stop being rendered at all** —
-they still exist, still count toward the day's totals, and have no section to appear under. An
-invisible-but-counted food log is worse than the dead end, which is presumably why the probe was
-written this way.
-
-**Recommendation — build the reassign the message already promises.**
-- **The delete flow becomes a choice, not an error.** Count the affected logs first and say so:
-  *"Afternoon Meal has 34 entries. Move them to…"* with a picker of the remaining live meal types,
-  and a secondary *"Delete them instead"*. A 409 that names a number and offers the fix is a
-  different product from one that names a number and stops.
-- **One new endpoint**: bulk `UPDATE food_logs SET meal_type_id = $new WHERE meal_type_id = $old AND
-  user_id = $user`, then the existing soft-delete, **in one transaction** — a partial reassign that
-  then fails the delete leaves the user halfway with no way back. Validate the target belongs to the
-  user and is not the type being deleted.
-- **It rewrites history and that is the intent, but say it in the dialog.** A 3 pm snack reassigned
-  to Lunch will read as Lunch on every past day. For "I want three meals a day from now on" that is
-  what the owner wants; it should still not be a surprise.
-- **✅ The pull-side gap this depended on is closed (Q-325, shipped with Q-413).** `applyDelta`'s
-  `food_logs` conflict arm used to update only `quantity_multiplier`/`updated_at`/`deleted_at`, so a
-  server-side `meal_type_id` change could never reach a device that already held the row — the
-  reassign would have looked correct on the web and done nothing on the APK. The arm now carries
-  `date`, `meal_type_id`, `food_item_id` and `logged_at`, with the `sync_status='synced'` guard
-  intact. **Do not re-derive this as new work.**
-- **`meal_types` is NOT an outbox domain** (verified 2026-08-19 against `pushMutations`), so
-  meal-type CRUD is already online-only and the reassign does not need a new outbox domain or push
-  branch. The pull direction is covered because `getSyncDelta` cursors on `updated_at` and the moved
-  rows bump it. **This narrows this entry's "full sync chain" line** — re-verify before widening it.
-- **⚠ The reassign must also re-resolve `logged_at`. Q-413 has landed**, so the resolver exists:
-  import `resolveEatenAt` from `@trainingai/shared/nutrition/eaten-at` and call it against the NEW
-  window — do not re-derive the midpoint. A log
-  moved into Lunch keeps its old 15:00 stamp, which sits outside Lunch's 12–15h window and leaves
-  the very inconsistency the move was meant to tidy. Call Q-413's shared resolver against the
-  **new** window: inside it, keep the time; outside it, take the new window's midpoint.
-- **`food_logs` is an offline-first domain, so this is a full sync chain, not one UPDATE** — the
-  outbox mutation, the `pushMutations` branch, `getSyncDelta` and the `applyDelta` mapping all need
-  it, per the standing rule. A bulk row-rewrite is also the shape most likely to conflict with a
-  device that has unsynced edits: **gate the local upsert on `sync_status === 'synced'`** so a pull
-  cannot clobber a pending local edit, exactly as the other branches do.
-
-**The alternative, and why it loses.** Let the soft-delete through and render orphaned logs under
-their archived meal type on days that have them, labelled *Archived*. It preserves history perfectly
-and needs no data movement — but it leaves a ghost section on old days forever, complicates the day
-query, and does not give the owner what he asked for, which is a tidy three-meal day going forward.
-Worth reaching for only if the reassign proves harder than it looks.
-
-- **A smaller thing worth fixing in the same PR:** the manager's delete button gives no warning
-  before the attempt. It fires the DELETE, gets a 409, and shows a toast. Fetch the count when the
-  sheet opens and disable-with-explanation, or open the move dialog directly — a button that can
-  only fail is worse than one that explains itself.
-- **Verification.** Reassign a meal type with logs across several days, then confirm on the day view
-  that the entries appear under the new type with the same calories, that the day total is
-  unchanged, and that the old type is gone from the picker. Then **verify on the APK** — this is an
-  offline-first domain and the local mirror is where the sync half fails silently. Prove the reassign
-  survives an app restart with the network off.
 
 ### [platform] Q-360 — `goal-invalidation.spec.ts` depends on the seed's step data reaching today, and it does not
 
@@ -6535,6 +6473,50 @@ session working from a temporarily restored copy.
   a Cloud-era adjustment is distinguished from our own base) and something may read it. Merge, do not
   replace.
 
+### [devices][platform] Q-528 — a full-history rollup can wipe every stored daily summary, and the guard is on the wrong side of the delete
+
+- **Branch:** `fix/daily-summary-replace-guard` · **Lane:** A
+- **Plan:** none needed for the guard — it is one reordering. **The rebuild after it is the real work.**
+  Evidence: [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](reviews/2026-08-19-daily-summary-replace-wipe.md).
+- **Added:** 2026-08-19 · Tuning agent, found while running Q-525's first action.
+- **Measured via `pg_stat_user_tables` — whole-database counts, not row-scoped:**
+
+  | table | live rows |
+  |---|---|
+  | `oura_raw_samples` | **198,223** |
+  | **`oura_daily_summary`** | **1** |
+  | `oura_bucket` | **0** |
+  | `step_live_windows` | **0** |
+
+  For contrast `oura_daily_derived` holds 96 rows, **46 with illness scores computed from the very
+  `summaryRows` array `oura_daily_summary` is the persisted copy of.**
+- **Mechanism.** `replaceOuraDailySummary` deletes unconditionally and *then* checks for emptiness:
+
+  ```ts
+  await db.delete(s.ouraDailySummary).where(eq(s.ouraDailySummary.userId, userId))
+  if (rows.length === 0) return          // guards the INSERT, not the DELETE
+  await db.insert(...)
+  ```
+
+  A full-history pass producing few or zero rows replaces the whole history and **returns
+  successfully** — no error, no log. The windowed path (`upsertOuraDailySummary`, per-day
+  `onConflictDoUpdate`) is safe, which is why this survived: **only the rarely-taken `fullHistory`
+  branch can do it.** Illness scores survived the same pass because they write to
+  `oura_daily_derived` through a COALESCE upsert — same input, different durability, and that
+  asymmetry is the evidence the input existed.
+- **First action:** move the guard above the delete, or make it a transactional
+  delete-and-insert so an empty computation cannot commit a wipe. **Then rebuild the summaries from
+  `oura_raw_samples`**, which still holds 198,223 rows and is the archival source of truth
+  (`CLAUDE.md`: never prune or mutate the server copy of `body_hex` — this is why).
+- **Do the guard BEFORE the rebuild.** Rebuilding into a function that can wipe on the next
+  full-history pass buys nothing.
+- **Pass test:** a full-history pass over a deliberately narrow input leaves prior rows intact; a
+  pass over the full archive produces a summary row per night with raw data.
+- **Caveats:** the mechanism is **read from source and matches the observed state; it is not
+  reproduced.** A dev-DB repro — populate, run full-history over one night, count rows — would settle
+  it. The alternative, that a full-history pass has simply never run over more than one night, is not
+  excluded.
+
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
 
 - **Branch:** `fix/chronic-stress-gate` · **Lane:** A
@@ -6553,6 +6535,13 @@ session working from a temporarily restored copy.
   pass covering ≥21 nights of real ring data (owner/device-gated)."* **It is not enough for 21 good
   nights to exist — they must be present in ONE pass**, so a nightly incremental rollup can never
   satisfy it however long it runs.
+- **⚠️ DIAGNOSIS CORRECTED 2026-08-19 — do not check the summary table to answer this.**
+  `oura_daily_summary` holds **1 row** system-wide against 198,223 raw samples (**Q-528** — a
+  full-history pass deletes unconditionally before checking for emptiness). So **nothing can be
+  concluded from stored data about whether 21 qualifying nights exist**: the gate may be fine and the
+  history adequate, and the evidence was destroyed rather than never created. The "21 nights in one
+  pass" reading below still describes the gate accurately, but it was too confident as a *cause*.
+  **Do Q-528 first, rebuild the summaries, then ask this question again.**
 - **First action:** confirm whether ≥21 qualifying nights exist in the data at all before touching the
   gate. If they do, this is a *trigger* problem (run the wide pass) and needs no code. If they do not,
   it is a coverage problem and belongs with Q-510, which found daytime-stress coverage is not
@@ -6618,6 +6607,13 @@ session working from a temporarily restored copy.
   information"* — that fix corrected the **denominator** (the goal window). The **numerator** now
   saturates for an unrelated reason, so the earlier fix could not have prevented this. Same symptom,
   different half.
+- **⚠️ The drift-proof anchor exists as a table and is EMPTY (2026-08-19).** `oura_bucket` — source
+  comment: *"the durable server backup of the on-device `oura_bucket`"* — carries `met_mean`,
+  `met_minutes` and `motion_mad`. **MET and motion do not drift with fitness**: they measure the
+  effort rather than the body's response to it, so a MET of 3.0 is 3.0 at any training age. That is
+  the principled answer to the difficulty below. **It has 0 rows system-wide** (as does
+  `step_live_windows`), so it is unavailable — see Q-528 §4. Until that sync path delivers, this fix
+  must come from heart rate or steps, and will inherit the drift.
 - **Open question for the fix — this is the whole difficulty.** A boundary that is a fixed fraction
   of reserve re-saturates as soon as the owner's resting HR drops again (which is exactly what Q-515
   measured happening). Candidates, none yet fitted: a **personal EMA of waking HR** rather than

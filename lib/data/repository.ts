@@ -696,6 +696,10 @@ export interface WorkoutRepository {
   createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>): Promise<MealType>
   updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType>
   deleteMealType(id: string, userId: string): Promise<void>
+  /** Live (non-soft-deleted) food logs pointing at a meal type — what the delete refusal reports (Q-412). */
+  countLiveFoodLogsForMealType(userId: string, mealTypeId: string): Promise<number>
+  /** Move every live log onto `toId`, re-stamping each one's eaten-at against the new window, then soft-delete `fromId`. One transaction (Q-412). */
+  reassignAndDeleteMealType(userId: string, fromId: string, toId: string): Promise<{ moved: number }>
   reorderMealTypes(userId: string, orderedIds: string[]): Promise<void>
   seedDefaultMealTypes(userId: string): Promise<void>
 
