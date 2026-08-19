@@ -331,8 +331,8 @@ and the answers live in the entries rather than here:
 
 | decided | where it is written | build order |
 |---|---|---|
-| Label styles all draw **square** | **Q-411**, filed at the top of the queue | **1st — small, self-contained, retires a constraint** |
-| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **2nd — it is the gate on every print test** |
+| Label styles all draw **square** | **✅ Q-411 SHIPPED 2026-08-19 (v1.325.5)** — [`journal`](overview/entries/2026-08-19-square-label-canvas.md) | done |
+| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **now 1st — it is the gate on every print test** |
 | Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
 | Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
 | Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
@@ -340,93 +340,21 @@ and the answers live in the entries rather than here:
 | The coach must **write every plan meal into My Foods** | Q-407, and it makes Q-398 a prerequisite | after Q-398 |
 
 **Two things carry a caveat rather than a blocker, and both resolve on the same physical print:**
-Q-411's area gain is real only if the owner's circle template *crops* rather than *scales* (the
-arithmetic is in that entry), and Q-400's saved PNG currently declares no physical size at all, so
-it prints at 312 mm. **That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19:
-*"I can only do a print once the option to save to gallery exists"*. There is no export path on the
-APK, so **Q-400 moved to 2nd in this queue** and is the gate on three separate answers. Ship Q-411
-anyway without waiting for it, and leave the scannability claim unverified rather than asserted.
+Q-411 shipped the square canvas and every module grew (the default 0.401 → **0.561 mm**), **but that
+gain is only real if the owner's circle template CROPS rather than SCALES.** If it scales, the square
+lands at 50 ÷ √2 = 35.4 mm and the default falls to **0.397** — fractionally worse than what it
+replaced. Q-400's saved PNG also declares no physical size, so it prints at 312 mm.
 
-**Q-406 (`food-row.tsx`) is still the gate for the visual work** and has not moved: both landing
-files sit on the 800-line limit, and Q-395, Q-398 and the tab merge all want that component.
+**That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19: *"I can only do a
+print once the option to save to gallery exists"*. There is no export path on the APK, so **Q-400 is
+the gate on three separate answers** and is now first in this queue. Until it lands, **describe
+Q-411 as a simplification, not a scannability improvement.**
 
-### [nutrition] Q-411 — every label style draws on a square canvas; the round constraint was costing 64% of the area
-
-- **Branch:** `feat/square-label-canvas`
-- **Added:** 2026-08-19 · owner, reviewing the interactive prototype · **top of the queue at the
-  owner's instruction**
-- **Owner's words:** *"could we just have this as a generic square? it will auto fit in the circle
-  template when I need to print it - so they could all start as squares."*
-- **Lane B** (`components/nutrition/meal-label-render.ts` + `meal-label-sheet.tsx`). No schema, no
-  migration, no APK — this is canvas geometry and ships on a Railway deploy.
-- **Do this before Q-395's row work if both are in flight**, not because it is bigger but because it
-  is small, self-contained, and it retires a constraint that three prior entries (Q-393, Q-397,
-  Q-399) each spent effort designing around.
-
-**The decision.** All six styles draw square. `squareOnly` disappears as a concept, the picker loses
-its `Square` badge, and the round die becomes a *print-time* consideration rather than a design
-constraint the renderer has to satisfy. **Draw no circle** — the owner saw a dashed round-die guide
-on the artwork and asked for it gone (*"dont have the circle background. Leave it for now"*). The
-label is a square with no circular framing, guide, or vignette; where the round die matters is at
-the printer, not on the canvas.
-
-**Why this is worth doing rather than merely allowed.** The renderer currently reserves a **centred
-usable box of 130 × 137** sheet units — *"what fits inside the inscribed circle once the corners are
-given up"* (`meal-label-render.ts:36-38`) — against a square box of **171 × 171**
-(`SQUARE_W`, `:260`). That is **17,810 against 29,241 square units, a 64% increase in usable area**,
-and the height it gives back goes to the code. Measured from the shipped `codeUnits` at 50 mm:
-
-| style | today | square | |
-|---|---|---|---|
-| `band` | 0.369 mm/module | 0.52 | the tightest, and the one that fails first |
-| `inlineCentred` (default) | 0.401 | **0.56** | **+40%** |
-| `ticket` | 0.417 | 0.61 | |
-| `editorial` | 0.481 | 0.59 | |
-| `plaque` | 0.520 | 0.68 | |
-| `square` | 0.561 | 0.72 | |
-
-Module size is the number that decides whether a printed code scans — at 300 dpi the E2E's decode of
-the default was *"a coin flip"* until the canvas scale was doubled. This buys the same kind of
-headroom a second time, for free, and `square`'s own code comment already made the argument:
-*"the most scannable code the feature has — which is the point of spending the corners."* The
-owner's message is that the corners were never actually being spent.
-
-**⚠ One measurement decides whether the gain is real, and it must be taken before anyone trusts the
-table above.** *"It will auto fit in the circle template"* has two possible meanings and they point
-opposite ways:
-- **The template CROPS the corners** (circle inscribed in a 50 mm square) → the artwork keeps 50 mm
-  of width and the module holds at **0.56 mm**. The table stands.
-- **The template SCALES the whole square to fit inside the circle** → the square lands at
-  50 ÷ √2 = **35.4 mm**, and the module falls to **0.397 mm** — *fractionally worse than the 0.401
-  it replaces.* Every gain above evaporates and the change is a small regression.
-
-**Resolve it with one test print — but that print is BLOCKED until Q-400 ships**, because there is
-no way to get the PNG off the device at all today (*"I can only do a print once the option to save
-to gallery exists"*). **This entry can and should still ship without it**: the square canvas is a
-simplification worth having either way, and holding a small self-contained change behind another
-lane's APK work helps nobody. Ship it, and leave the scannability claim unverified in the PR rather
-than asserting it. **It is the same print Q-400 already owes** (save the PNG,
-measure the code with a ruler against the `metrics.codeMm` figure the sheet displays). Until that
-print is done, **do not describe this entry as a scannability improvement** — describe it as a
-simplification that is *expected* to improve scannability. If the template turns out to scale rather
-than crop, the follow-up is to keep the square canvas anyway (it is simpler and the content still
-benefits) but design the critical content — name, calories, code — to sit inside the inscribed
-circle.
-
-**What it lets the other entries stop doing.** `centredStackLineBudget()` exists to clamp the
-ingredient stack into the inscribed circle, and Q-399 had to widen it to get three lines onto the
-default. On a square canvas that budget relaxes considerably — **re-derive it rather than leaving
-the round-era numbers in place**, or the extra area is reserved and never used. Keep the
-"as much of the ingredient list as fits" copy and the overflow summary: the list can still exceed
-the label, and Q-399's lesson was that a style silently printing *none* of it went unnoticed for a
-release.
-
-- **Verification.** `pnpm test` covers the geometry (`centredStackLineBudget` has regression tests
-  asserting `maxLines >= 3` for the default and `mmPerModule >= 0.36` — **both thresholds should be
-  raised** in this PR, since square makes them trivially true and a test that cannot fail is not a
-  test). Then re-run `e2e/meal-label.spec.ts`, which decodes the rendered code. **Neither proves the
-  print**, so the test print above is the acceptance criterion, and the PR should say plainly that
-  it was or was not done.
+**Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
+`saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
+already stale when written. What remains of Q-406 is the row component itself, and it now waits on
+Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
+design decision. See the correction at the top of that entry.
 
 ### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
 
@@ -1205,6 +1133,22 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 ### [nutrition][platform] Q-409 — paste a recipe URL and get a meal; the fetch is the whole security surface
 
+> **⚠️ The Lane A half SHIPPED (PR #180). What is left is Lane B only** — the UI in
+> `components/nutrition/my-meals-picker.tsx` that sends a `url` and renders what comes back.
+> `POST /api/nutrition/scan` now takes `{ url }`, answering with the ordinary scan payload plus
+> **`sourceUrl`** (the final URL after redirects — that is the attribution this entry asked for) and
+> **`recipeYield`** (servings, or **`null`**).
+>
+> **`recipeYield: null` is the one thing Lane B must handle, and it is not cosmetic.** With a stated
+> yield the route has already divided and the payload is per-serving (`notes` leads with *"Per
+> serving (1 of 12)."*). Without one the payload is the **whole recipe** — verified live: a
+> banana-bread page returned 1,956 kcal for the loaf. This entry's own rule applies — *ask, do not
+> assume 1* — so the picker must prompt for serves and divide, or it logs a tray as a meal.
+>
+> Rationale, measurements and the SSRF verification are in
+> [`entries/2026-08-19-recipe-url-to-meal.md`](overview/entries/2026-08-19-recipe-url-to-meal.md);
+> the modules are in [`module-map.md`](module-map.md). Everything below is the original entry.
+
 - **Branch:** `feat/recipe-url-to-meal`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner
 - **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
@@ -1265,7 +1209,8 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   a meal came from six months later, and it is the honest thing to do with someone else's recipe.
 
 - **Lane.** `app/api/nutrition/scan/route.ts` and any shared parser are **Lane A**;
-  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first.
+  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first — **it has
+  (PR #180), so only Lane B remains.**
 
 - **Verification.** Paste three real recipe URLs — one with JSON-LD, one without, one that 404s —
   and confirm: ingredients and yield resolve from the structured path; the fallback produces a
@@ -1861,49 +1806,6 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Not verified:** the mismatch was measured with `date-fns-tz` directly, not by driving the app with
   a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
   but not Postgres's). The consequence at each call site is read from source.
-
-### [nutrition] Q-358 — every meal-label QR is drawn on a fractional pixel grid, so every module edge is grey
-
-- **Branch:** `fix/label-code-pixel-snap`
-- **Added:** 2026-08-19 · Lane B, found while fixing Q-399 ·
-  [`journal`](overview/entries/2026-08-19-label-line-budget.md)
-- **Placement:** low-mid. **Mitigated, not fixed**, and the mitigation is what makes it low: Q-399
-  doubled the canvas to 600 dpi, which took the default's module from 4.7 device pixels to 9.5 and
-  made the E2E decode reliable again. The grid is still fractional; there is just enough resolution
-  now that it does not matter. That is a margin, not a fix.
-- **What.** `drawCode` sizes a module as `box / 33` in sheet units and the canvas is scaled by a
-  constant, so the module width in device pixels is `box × scale / 33` — **fractional for every
-  style that ships**, at every scale tried:
-  ```
-  scale 3.12 (300 dpi)   band 4.35 px   inlineCentred 4.73   plaque 5.67   square 6.62
-  scale 6.24 (600 dpi)   band 8.70 px   inlineCentred 9.45   plaque 11.35  square 13.24
-  ```
-  Every module edge therefore lands mid-pixel and antialiases to grey. **The `+0.04` bleed in
-  `drawCode` is an acknowledgement of exactly this** — it papers over the resulting hairline seams
-  instead of removing them, and its own comment says the seams "read as a lighter code and cost scan
-  margin".
-- **How it showed up.** At 300 dpi and 0.401 mm per module, `e2e/meal-label.spec.ts`'s decode of the
-  **rendered canvas** became a coin flip — the same geometry decoded on one run and failed the next,
-  with the label visibly correct in the screenshot. That is the signature: not a broken code, a
-  fuzzy one.
-- **Why it matters beyond the test.** The canvas **is** the printed artwork — share/save hands the
-  viewer these pixels. A grey-edged module is exactly what ink spread then merges, which is the
-  failure mode the owed print test is looking for, and it would present as "the scanner doesn't
-  work".
-- **Fix shape:** snap the cell to a whole number of device pixels (`floor(box × scale / 33)`), snap
-  the origin to a pixel boundary too, and drop the `+0.04` — adjacent modules then abut exactly.
-  **The catch, and why it was not folded into Q-399:** flooring shrinks the drawn box, and at
-  300 dpi it shrank it a lot (a 50-unit box snapped to 42.3, pitch 0.401 → 0.339). Every reported
-  figure would then be wrong — `codeMm`, the sheet's mm-per-module line, and
-  `mealLabelCodeMetrics`, which is the number `meal-label-code-size.test.ts` asserts and the number
-  the owner reads before printing. **At 600 dpi the loss is much smaller** (9.45 → 9 px, ~5%), which
-  is the version worth building: snap, then make `mealLabelCodeMetrics` report the SNAPPED size so
-  the figure and the artwork agree.
-- **Verification:** run the E2E decode several times, not once — the tell is flakiness, not failure.
-  Then the physical print, which is the only real check and is already owed.
-- **Lane B owns this** (`components/nutrition/**`).
-- **Not verified:** the pixel counts are arithmetic from `scale` and `codeUnits`, not measured off a
-  rendered canvas. No print.
 
 ### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
 
@@ -6202,6 +6104,57 @@ session working from a temporarily restored copy.
 - **Do not implement this as "delete the night".** That discards valid physiology; on the reported night
   HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
 - **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
+
+### [body] Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did
+
+- **Branch:** `feat/exertion-integrated-battery-drain`
+- **Plan:** the design brief is
+  [`docs/reviews/2026-08-19-body-battery-drain-and-roadmap.md`](reviews/2026-08-19-body-battery-drain-and-roadmap.md) §3.
+  **Do Q-515 first** (see sequencing). Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, from an **owner brief** (*"body battery still doesn't seem
+  that good… id like that type of granular drain"*)
+- **Measured** over 51 days, joined to steps and completed workouts:
+
+  | relationship | measured | should be |
+  |---|---|---|
+  | `corr(hr_sample_count, total_drained)` | **+0.518** | — |
+  | `corr(steps, total_drained)` | **−0.153** | strongly **positive** |
+  | `corr(steps, end_value)` | **+0.112** | strongly **negative** |
+  | `corr(total_drained, end_value)` | −0.674 | negative ✓ |
+
+  **The strongest predictor of ending low is how many HR samples were recorded — i.e. ring wear time.**
+  Steps are *negatively* associated with drain.
+- **A workout barely registers:** `end_value` averages **50.6** on 37 workout days vs **50.0** on 14
+  non-workout days — a **0.6-point** difference.
+- **The days that hit 0 are the quiet ones.** Four days ended at exactly 0 on **828–4,152 steps**
+  (median 3,020), while **16 of 51 days cleared the 8,000-step goal** and did *not* end lower. So `0`
+  currently means *"you wore the ring a long time"* and the owner wants it to mean *"you did
+  everything"* — close to opposites.
+- **Mechanism.** Drain is `-DRAIN_RATE × (hrr − REST_THRESHOLD) × dt`, purely HR-driven; steps,
+  workouts, zone minutes and calories enter only via their HR effect. With **Q-515**'s boundary having
+  fallen to ~60 bpm, nearly every waking sample drains, and `(hrr − threshold)` varies far less than
+  wear duration — so **drain ≈ rate × time worn**, which is what +0.518 says. **Q-521 is downstream of
+  Q-515**: fixing the boundary does not fix this, but leaving it broken re-poisons any replacement.
+- **First action — exertion-integrated drain** (§3): keep the morning anchor; replace time-integrated
+  HR drain with exertion combining steps/movement, HR above rest, workout load and zone minutes;
+  **normalise against that day's `getDailyGoals`** so "everything hit" lands near empty; **floor at 0
+  and route the overshoot to an overreach signal** rather than below empty (the same resolution the
+  owner chose for Activity).
+- **⚠️ Two constraints the data imposes.** (1) **`active_calories` is unusable as a load-bearing
+  input — present on 8 of 51 days**; steps are on all 51, and any design needing calories silently
+  degrades to the HR-only model being replaced. (2) Normalising to targets means **a fitter person
+  drains less for the same absolute work** — correct for "did I do my day", wrong for "how depleted am
+  I". The owner's brief chooses the former; **write that into the model's comment so it is not
+  silently reversed.**
+- **This model must NOT be asked to detect overreaching.** On a target-hitting day a well-recovered and
+  an overreached athlete both read 0. Overreach lives in ACWR/readiness/illness. This arguably resolves
+  **Q-276** by making Body Battery explicitly *not* a recovery number.
+- **Pass test:** re-run the four correlations above. `corr(steps, total_drained)` must become clearly
+  positive, and workout vs non-workout `end_value` must separate by far more than 0.6 points.
+- **Caveats:** n = 51, one athlete, Pearson on daily aggregates — the weak values (+0.112, −0.153) mean
+  *"no relationship"* rather than a precise signed effect. **Zone minutes and movement-per-hour were
+  not pulled or coverage-checked** — they are named because the owner named them, and checking their
+  coverage is the first implementation step, given what `active_calories` shows.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
