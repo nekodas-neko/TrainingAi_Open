@@ -3,11 +3,20 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/manual-bedtime-entry` · **Q band:** 500–529 (next free: 522)
+**Updated:** 2026-08-19 · **By:** `tuning/zone-minutes-move-hours-coverage` · **Q band:** 500–529 (next free: 524)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Zone minutes + movement-per-hour coverage — MEASURED, propose-only** (Q-522, Q-523). The check
+  Q-521 deferred, asked for directly by the owner. **Both inputs are unusable, failing in opposite
+  directions.** `moveHours` is **saturated** — 856 of 857 waking hours with data count as "moved",
+  **48 of 59 days score exactly 100**, so its only variance is ring-off hours. `zoneMinutes` is
+  **floored** — **0 on 53 of 59 days**, because Zone 2 starts at 133 bpm and the chest strap's p99
+  during workouts is **121**. Plus a third defect: `DEFAULT_MAX_GAP_SEC = 120` against the ring's
+  **exact 300 s cadence** truncates 80.1% of its intervals, so ring days keep 35% of elapsed time and
+  strap days 84%. **Q-521's first slice must be steps + workout load only.**
+  [`review`](../../reviews/2026-08-19-zone-minutes-move-hours-coverage.md).
 - **Body Battery range — CLEAN, nothing filed.** Over 50 days: mean 51.5, **sd 29.2**, full 0–100
   range, bands Charged 28% / Good 26% / Low 26% / Drained 20%. **It already passes the owner's
   acceptance test** — the only pillar that did without work. Thresholds 75/50/25 sit right for this
@@ -65,21 +74,24 @@ Since then, working only scores no other lane holds:
    against a raw blend of 77.91 (old), 08-18 stores 92 against a calibrated 92 (new).
    **The trend step falls between 2026-08-17 and 08-18**, and history is not back-filled, so 95 of 96
    rows stay pre-recalibration. [`review`](../../reviews/2026-08-18-recalibrations-live-verified.md).
-3. **Re-run the Q-509 refit after any HR-smoothing change.** The anchor-vs-input ratio (§1.3 of that
+3. **Do NOT propose a Zone 2 floor for Q-523 without the owner's labels.** Fitting a threshold needs
+   days the owner would call "active" to fit against; guessing a number into the code is how the
+   current one got there. Ask for the labels, then fit — that half *is* Tuning's.
+4. **Re-run the Q-509 refit after any HR-smoothing change.** The anchor-vs-input ratio (§1.3 of that
    review) is the pass test: if it goes to ~1.0 the estimator was fine and the input needed
    conditioning. Until then, `RECOVERY_INDEX_OPTIMAL_HOURS` stays at 5.
-4. **Once Q-510's coverage is persisted, ask whether `minDaytimeStressHours` is too strict** for this
+5. **Once Q-510's coverage is persisted, ask whether `minDaytimeStressHours` is too strict** for this
    wear pattern. That one *is* Tuning's — but it is unanswerable until the number is visible.
-5. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z in that
+6. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z in that
    review's §2 table moves by ~19×, so the radar may then fire *too* often. That is a calibration
    question and it is Tuning's, unlike the fix itself.
-6. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). Its call site passes
+7. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). Its call site passes
    **our** sleep score *and* the Recovery Index contributor, so both v1.319.0 and v1.321.0 feed it,
    all 13 existing rows predate both, and the move is *downward* on the term that is saturating.
    **Every score in the app now has a calibration review** — there is no un-reviewed pillar left to
    pick up cold.
-7. ~~Re-derive Q-500's anchor on BLE-era nights~~ — **DONE, and the answer was "do not"** (Q-509).
-8. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
+8. ~~Re-derive Q-500's anchor on BLE-era nights~~ — **DONE, and the answer was "do not"** (Q-509).
+9. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
    signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
    displayed points around the median, which is the deliberate cost of range.
 
@@ -107,22 +119,22 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 |---|---|
 | sleep | ✅ recalibrated (Q-503) + consumer audit (Q-511) |
 | readiness | ✅ Q-500 shipped, Q-504 refuted, threshold table completed (Q-511) |
-| activity | ✅ specified (Q-505) — build is Lane A's |
+| activity | ✅ specified (Q-505) — build is Lane A's. **Contributor inputs coverage-checked 2026-08-19**: `moveHours` saturated (Q-522), `zoneMinutes` floored (Q-523) — 22 of the score's 100 weight carries no information, on top of `activeEnergy`'s 15 being absent most days |
 | body | ✅ battery range clean; anchor measured (Q-511). **Derived scores closed out 2026-08-19**: `bdi_derived` (46 rows, median 4.15, nothing ≥ 15, **no threshold exists** — only consumer is a debug console labelled *"observational, not a diagnosis"*) and `body_comp` (71 rows, deterministic, published formula matched to Oura's `atlas`). **Nothing to tune in either.** [`review`](../../reviews/2026-08-19-body-derived-scores-closeout.md) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
 | **workouts** | ✅ **swept 2026-08-18** — ACWR (Q-512/513), RPE autoregulation (Q-514). **Clean:** Foster monotony, and prescription adherence (actual 73.6% vs planned 73.1%, reps +0.25 — so `INTENSITY_ZONES` is realised, and calibrating those zones would be circular since the program was generated from them). Only Q-514 and the two ACWR call sites are open. **Foster monotony CLEAN** — mean 1.29, the 2.0 gate fires on 1 of 102 windows; rest days are properly seeded at 0, which is what makes it meaningful. 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
-| **heart-rate** | 🟡 **swept 2026-08-18** — `HR_REST_THRESHOLD` (**Q-515**: shrank 3× in a month because the owner got fitter; no fraction fixes it, the *anchoring* is the defect) and `PEAK_BANDS` (**Q-516**: observed set-peaks are 59–132, so 2 of 5 bands are **structurally unreachable** and 72% of episodes land in the band the spec de-emphasises — one usable bucket). **Karvonen zone boundaries checked and deliberately NOT filed** — they are consumed on *cardio* surfaces only, and the history holds ~13 run/treadmill sessions (newest 2026-07-24). Fitting five boundaries to that is fitting noise. **Do not re-open by measuring all-day HR** — that gives a 99% Zone 1 figure that reads like a finding and is the wrong denominator |
+| **heart-rate** | 🟡 **swept 2026-08-18, extended 2026-08-19** (Q-522/Q-523 are the Activity-side continuation of Q-515 and Q-516 — same boundary, same banding, second consumer) — `HR_REST_THRESHOLD` (**Q-515**: shrank 3× in a month because the owner got fitter; no fraction fixes it, the *anchoring* is the defect) and `PEAK_BANDS` (**Q-516**: observed set-peaks are 59–132, so 2 of 5 bands are **structurally unreachable** and 72% of episodes land in the band the spec de-emphasises — one usable bucket). **Karvonen zone boundaries checked and deliberately NOT filed** — they are consumed on *cardio* surfaces only, and the history holds ~13 run/treadmill sessions (newest 2026-07-24). Fitting five boundaries to that is fitting noise. **Do not re-open by measuring all-day HR** — that gives a 99% Zone 1 figure that reads like a finding and is the wrong denominator |
 | **nutrition** | ✅ **swept 2026-08-18.** Movement goals were already calibrated (Q-137/Q-190, [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md)); step/zone-minute goals are deliberate population anchors. TDEE outcome check done (**Q-517**: the food log captures **~45%** of intake, and `adaptive-tdee`'s gates hold 75% of windows but let through values as low as **1,052 kcal** — below the owner's own BMR of 1,547) |
 | **cardio** | ❌ none, and **deprioritised**: `RIEGEL_EXPONENT 1.06` and the VDOT coefficients are published population fits, and there is too little running history here to beat them |
 | app-shell, platform | n/a — no scoring surface |
 
-**Next unblocked MEASUREMENT work: none.** Workouts, heart-rate and the nutrition TDEE check — the
-three this line used to point at — were all completed 2026-08-18. Every pillar with a scoring surface
+**Next unblocked MEASUREMENT work: none.** Workouts, heart-rate and the nutrition TDEE check were
+completed 2026-08-18, and the zone-minutes / movement-per-hour coverage check 2026-08-19. Every pillar with a scoring surface
 is measured except **cardio**, which is deliberately skipped for lack of data (~13 run/treadmill
 sessions, newest 2026-07-24), not for lack of time.
 
-**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Fifteen findings are open —
-Q-506…Q-520 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
+**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Eighteen findings are open —
+Q-506…Q-523 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
 1. **Q-518** — the model-version stamp is erased within hours, which blocks the measurement
    infrastructure the rest depend on. One conflict-arm expression.
 2. **Q-517** — a maintenance below the owner's own BMR is one tap from becoming their calorie goal.
@@ -202,7 +214,17 @@ for this work:
   boundary that moves with fitness inherits the drift.
 - **`active_calories` cannot be a load-bearing input anywhere** — present on **8 of 51** days. Steps
   are on all 51. Any design needing calories silently degrades. Check an input's coverage before
-  designing around it.
+  designing around it. **Then it happened twice more:** `moveHours` (Q-522) and `zoneMinutes` (Q-523)
+  are both present on every day and both **carry no information** — one pinned at 100, one at 0.
+  **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
+  the same reads, in code review, exactly like a working term. Steps are still the only movement
+  input that is both present and variable.
+- **A contributor fix can be undone from the other half of its own fraction.** Q-188 fixed
+  `moveHours` for being pinned at 100 by correcting the **denominator**; the **numerator** now
+  saturates for an unrelated reason and the contributor is pinned at 100 again. `hourly-movement.ts`
+  carries a comment describing the first failure, which reads as protection and is not. **When
+  re-checking a metric with a recorded past fix, re-measure the OUTPUT, not the thing that was
+  fixed.**
 - **Range is a first FILTER, not a verdict — and the cross-pillar table already exists.**
   [`2026-08-19-cross-pillar-score-ranges.md`](../../reviews/2026-08-19-cross-pillar-score-ranges.md)
   has every pillar's spread side by side; do not re-derive it. Headline: **only Body Battery genuinely

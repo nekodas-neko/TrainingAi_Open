@@ -12,7 +12,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 | Area | Where |
 |---|---|
 | Detection | `lib/activity/auto-detection-service.ts`, `detection-thresholds.ts`, `motion-detection.ts`, `motion-gate.ts`, `blend-activity.ts` |
-| Metrics | `lib/health/activity-score.ts`, `step-estimate.ts`, `hourly-movement.ts`, `daily-summary.ts`, `daily-goals.ts`, `daily-medians.ts` |
+| Metrics | `packages/shared/src/health/activity-score.ts`, `hourly-movement.ts`, `zone-minutes.ts`, `daily-goals.ts`; `lib/health/step-estimate.ts`, `daily-summary.ts`, `daily-medians.ts` |
 | Step capture (border with `devices`) | `lib/oura-ble/step-counter-pipeline.ts`, `step-orchestrator.ts`, `step-orchestrator-core.ts`, `step-day-buckets.ts`, `step-features.ts`, `gait-step-count.ts` |
 | UI | `app/activity/`, `components/activity/` |
 | Tables | `body_metrics` (steps), `oura_daily` (activity score, active calories, activity times) |
@@ -26,6 +26,16 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
   — §1.2 measured the Activity Score in production after v2: sd 5.9 over 19 days, range 66–91, 10
   distinct values. **v2 fixed the mechanism Q-137 blamed and the outcome did not move** (Q-277),
   and the score exists on only 19 of 40 days (Q-278).
+- [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](../../reviews/2026-08-19-zone-minutes-move-hours-coverage.md) — **the Activity Score's two heart-rate contributors, coverage-checked 2026-08-19**
+  (Q-522 — `moveHours` is **saturated**: 856 of 857 waking hours with HR data count as "moved" and
+  **48 of 59 days score exactly 100**, so its only source of variance is hours the ring was off. This
+  is **Q-188 returning through the other half of the fraction** — that fix corrected the denominator,
+  the numerator now saturates on its own. Q-523 — `zoneMinutes` is **floored**: **0 on 53 of 59 days**,
+  because Zone 2 starts at 133 bpm and the chest strap's **p99 during workouts is 121**; the existing
+  strength-day guard suppresses it on 40 of 44 strength days but leaves **13 of 15 non-strength days**
+  scoring a hard 0. Plus a separable defect: the 120 s gap cap versus the ring's exact **300 s**
+  cadence keeps 35% of ring time against the strap's 84%, so zone minutes are not comparable across
+  days.) **Both are named inputs in Q-521's Body Battery brief — build that on steps + workout load first.**
 - [`docs/activity-goal-calibration.md`](../../activity-goal-calibration.md) — **why the Activity
   Score barely moves** (30-day sd 5.9 while steps run sd 4,028), why re-anchoring the goals to the
   user's own baseline is the wrong instinct, what Garmin/Whoop/Strava/Apple do instead, and the
@@ -49,7 +59,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 ```bash
 grep -n '^### .*\[activity\]' projectOverview.md   # 14 entries today
-grep -n '\[activity\]' docs/implementation-backlog.md   # no queue items today
+grep -n '\[activity\]' docs/implementation-backlog.md   # 2 queue items today (Q-522, Q-523)
 ```
 
 Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
