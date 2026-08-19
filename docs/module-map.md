@@ -76,6 +76,7 @@ See the full timezone rules in `CLAUDE.md`.
 | Local midnight `Date` (overflow-safe) | `aestMidnight(y, m, d, tz?)`, `todayMidnightUtc(tz?)` |
 | Shift a date string by N days | `shiftDateStr(dateStr, days)` |
 | Is a date-**shaped** string a real day? | `isCalendarDate(dateStr)` — the shape regexes accept `2026-13-45`, `2026-02-31`, `0000-00-00`, which then fail at the driver as `[pg 22008]`: a client input error filed as a server fault (Q-496). Both separators. Used by `MutationSchema.date` and `resolveIngestDate`. |
+| Health-Connect ingest body | `packages/shared/src/validation/health-connect-ingest.ts` → `IngestBodySchema`. Moved out of the route (Q-495) so it is unit-testable. Accepts a JSON number **or** a numeric string, never `[]`/`true`/`""` — `z.coerce.number()` turned those into 0 and 1 and stored them as readings. Weight uses the shared `WEIGHT_KG_MIN`/`WEIGHT_KG_MAX`. |
 | Bound an ingest date to a plausible range | `resolveIngestDate(date, todayInUserTz)` (`packages/shared/src/validation/ingest-clock.ts`) — clamps future to today and past to the 7-day boundary, so a year-9999 row cannot own `ORDER BY date DESC LIMIT 1` forever (Q-494). |
 | Format a `Date`/ms to tz day/string | `toAestDay`, `toAestDateStr`, `fmtAest(ms, tz?)`, `formatTime12h(hhmm)` |
 | A clock time that gets **persisted** (`activity_logs.start_time`) | `msToHHMMInTz(at, tz?)` — never `d.getHours()`, which stores the phone's clock rather than the user's wall time. Replaced four private copies of the same helper. |
