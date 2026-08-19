@@ -4920,7 +4920,7 @@ session working from a temporarily restored copy.
      autoregulation fire less, never more.
   3. Investigate the non-monotonic top end separately — it may be a `maxRepsAtPct` bug, not a
      calibration issue.
-- **Gate:** re-run this exact measurement after the change. The harness is ~30 lines against
+- **Re-measure:** re-run this exact measurement after the change. The harness is ~30 lines against
   `set_logs`; the review has the query.
 - **Depends on Q-290** — the input signal's own variance bounds what any calibration can achieve.
 
@@ -5375,7 +5375,7 @@ session working from a temporarily restored copy.
      independently against the stored HR series before picking.
   2. Feed daytime HRV into the charge term. `rr_intervals` holds ~49,900 rows and
      `daytime_stress_scaled` exists on 22 of 40 days; neither reaches the battery model today.
-- **Gate:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
+- **Re-measure:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
   the before/after comparison is not interpretable.
 - **⚠️ Read [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md)
   (Q-502) before starting. It re-measured this entry (still true — 5.6× on 14 v5 days now) and found

@@ -8,11 +8,18 @@
  * Prose could not hold them. This reads the real values and fails on a mismatch.
  *
  * Checks:
- *   1. No Q number is used by two queue entries.
+ *   1. No entry ID is used by two queue entries.
  *   2. Every queue entry heading carries at least one valid [domain] tag.
  *   3. The "Next free Postgres migration" pointer matches the migrations directory.
  *   4. The "Local SQLite schema version" pointer matches lib/sqlite/migrations.ts.
- *   5. The "Next unallocated Q band" pointer sits above every Q number actually in use.
+ *   5. Every `Needs:` names an ID that exists, or has existed, somewhere in the tree.
+ *   6. No cycle among `Needs:` edges.
+ *   7. Every `Gate:` value is one this project knows how to resolve.
+ *
+ * IDs are `<letter>-<number>` with an optional lowercase suffix: A/B (implementer lanes), F
+ * (BugFix), R (Review), T (Tuning), P (one-off sessions), and the legacy Q. The old "next
+ * unallocated Q band" pointer check is gone with the bands themselves — see docs/agents/README.md
+ * for why enumerated bands were replaced by per-agent counters.
  */
 
 const fs = require('fs');
@@ -43,9 +50,31 @@ const queue = lines.slice(queueStart);
 
 // ---- 1 & 2: entry headings -------------------------------------------------
 const seen = new Map();
+const entryOrder = [];
+/** id -> { needs: [], gates: [] } for the entry whose heading most recently opened. */
+const meta = new Map();
+let currentId = null;
+
 for (let i = 0; i < queue.length; i++) {
   const line = queue[i];
-  if (!line.startsWith('### ')) continue;
+
+  if (!line.startsWith('### ')) {
+    // Body lines belong to the heading above them. `Needs:` and `Gate:` are what make readiness
+    // computable instead of prose, so they are read here rather than left for a human to notice.
+    if (currentId) {
+      const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
+      if (needs) {
+        for (const m of needs[1].matchAll(/\b([ABFRTPQ]-\d+[a-z]?)\b/g)) {
+          meta.get(currentId).needs.push(m[1]);
+        }
+      }
+      const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
+      if (gate) meta.get(currentId).gates.push(gate[1].toLowerCase());
+    }
+    continue;
+  }
+
+  currentId = null;
 
   const tags = [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]);
   const valid = tags.filter((t) => PILLARS.has(t));
@@ -56,9 +85,13 @@ for (let i = 0; i < queue.length; i++) {
     );
   }
 
-  const q = line.match(/\bQ-(\d+)([a-z]?)\b/);
+  const q = line.match(/\b([ABFRTPQ])-(\d+)([a-z]?)\b/);
   if (!q) continue;
-  const id = `Q-${q[1]}${q[2]}`;
+  const id = `${q[1]}-${q[2]}${q[3]}`;
+  entryOrder.push(id);
+  currentId = id;
+  if (!meta.has(id)) meta.set(id, { needs: [], gates: [] });
+
   if (seen.has(id)) {
     failures.push(
       `Duplicate ${id} — two queue entries hold the same number:\n` +
@@ -67,6 +100,80 @@ for (let i = 0; i < queue.length; i++) {
   } else {
     seen.set(id, line);
   }
+}
+
+// ---- 2b: Gate values -------------------------------------------------------
+// Three different blockers used to be written the same way as prose `blocked:` markers, with three
+// different resolvers. A free-text gate is the same problem wearing a field name.
+const GATES = new Set(['owner', 'device']);
+for (const [id, m] of meta) {
+  for (const g of m.gates) {
+    if (!GATES.has(g)) {
+      failures.push(
+        `${id} has \`Gate: ${g}\`, which is not a gate this project resolves. ` +
+          `Use \`Gate: owner\` (a decision) or \`Gate: device\` (the S25 smoke run). ` +
+          `A dependency on another entry is \`Needs:\`, not a gate.`,
+      );
+    }
+  }
+}
+
+// ---- 2c: Needs targets exist ----------------------------------------------
+// An absent target means SHIPPED, because the protocol removes a completed entry from the queue —
+// so a dependent must unblock, not wedge. The cost of that rule is that a typo reads exactly like a
+// success, which is why a target that has never existed anywhere in the tree is an error here.
+let treeBlob = '';
+{
+  const walk = (dir) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.name === 'node_modules' || e.name === '.next' || e.name === '.git') continue;
+      const full = path.join(dir, e.name);
+      if (e.isDirectory()) walk(full);
+      else if (e.name.endsWith('.md')) {
+        // Strip the `Needs:` declarations themselves. Otherwise a typo'd target is proved to exist
+        // by the very line that names it, and this check silently never fires.
+        treeBlob += fs
+          .readFileSync(full, 'utf8')
+          .split('\n')
+          .filter((l) => !/^\s*[-*]\s*\*{0,2}Needs:/i.test(l))
+          .join('\n');
+      }
+    }
+  };
+  walk(path.join(ROOT, 'docs'));
+}
+for (const [id, m] of meta) {
+  for (const target of m.needs) {
+    if (seen.has(target)) continue;
+    const mentioned = new RegExp(`\\b${target}\\b`).test(treeBlob);
+    if (!mentioned) {
+      failures.push(
+        `${id} declares \`Needs: ${target}\`, but ${target} does not exist and never has. ` +
+          `An absent target reads as "already shipped", so a typo here silently unblocks the entry.`,
+      );
+    }
+  }
+}
+
+// ---- 2d: no Needs cycles ---------------------------------------------------
+// Two entries waiting on each other are each individually plausible and jointly unstartable.
+{
+  const state = new Map();
+  const stack = [];
+  const visit = (id) => {
+    if (state.get(id) === 'done') return;
+    if (state.get(id) === 'open') {
+      const cycle = [...stack.slice(stack.indexOf(id)), id].join(' → ');
+      failures.push(`Needs: cycle — these entries wait on each other and none can start: ${cycle}`);
+      return;
+    }
+    state.set(id, 'open');
+    stack.push(id);
+    for (const t of meta.get(id)?.needs ?? []) if (seen.has(t)) visit(t);
+    stack.pop();
+    state.set(id, 'done');
+  };
+  for (const id of seen.keys()) visit(id);
 }
 
 // ---- 3: Postgres migration pointer ----------------------------------------
@@ -103,21 +210,6 @@ if (versions.length === 0) {
   }
 }
 
-// ---- 5: Q band pointer -----------------------------------------------------
-const bandRow = text.match(/\|\s*Next unallocated Q band\s*\|\s*\*\*(\d+)\*\*/);
-if (!bandRow) {
-  failures.push('Live-pointer table is missing its "Next unallocated Q band" row.');
-} else if (seen.size > 0) {
-  const band = parseInt(bandRow[1], 10);
-  const highest = Math.max(...[...seen.keys()].map((k) => parseInt(k.match(/\d+/)[0], 10)));
-  if (highest >= band) {
-    failures.push(
-      `Q-${highest} is in use but the next unallocated band starts at ${band} — a band was used ` +
-        `without being recorded. Claim it in the band table in docs/agents/README.md and bump this row.`,
-    );
-  }
-}
-
 // ---- report ----------------------------------------------------------------
 if (failures.length) {
   console.error('Backlog pointer check failed:\n');
@@ -125,7 +217,10 @@ if (failures.length) {
   process.exit(1);
 }
 
+const withNeeds = [...meta.values()].filter((m) => m.needs.length).length;
+const withGate = [...meta.values()].filter((m) => m.gates.length).length;
 console.log(
-  `check-backlog-pointers: OK — ${seen.size} numbered entries, no duplicates, all tagged; ` +
+  `check-backlog-pointers: OK — ${seen.size} entries, no duplicates, all tagged; ` +
+    `${withNeeds} with Needs: (no cycles, all targets known), ${withGate} with Gate:; ` +
     `migration ${nextMigration}, SQLite v${Math.max(...versions)} match source.`,
 );
