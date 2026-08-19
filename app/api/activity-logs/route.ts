@@ -62,6 +62,18 @@ export async function DELETE(req: NextRequest) {
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const repo = await getRepository()
-  await repo.deleteActivityLog(session.user.id, body.data.id)
-  return NextResponse.json({ success: true })
+  const deleted = await repo.deleteActivityLog(session.user.id, body.data.id)
+  // Q-556: this answered `{ success: true }` unconditionally, so a delete that matched nothing was
+  // indistinguishable from one that worked.
+  //
+  // **It reports the outcome rather than 404-ing on a miss, and the order matters.** Every sibling
+  // delete answers 404 for both a nonexistent id and someone else's, and matching that convention is
+  // the eventual goal — but it cannot come first. Activity logs are CREATED through the outbox
+  // (`exercise-review-sheet.tsx`, `done-activity-screen.tsx` both `queueMutation`), so a row exists
+  // locally before its push lands; deleting it in that window matches no server row. The client
+  // (`health-content.tsx`) treats any `!res.ok` as failure and skips its local delete, so a 404 here
+  // would toast "Failed to delete" and leave a row the user just removed on screen — and there is no
+  // outbox DELETE domain to reconcile it later, because delete is the one activity-log write that
+  // never queues. Q-328 closes that gap; 404 belongs in the PR after it.
+  return NextResponse.json({ success: true, deleted })
 }

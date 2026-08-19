@@ -2065,7 +2065,70 @@ this fits without an extraction.
 - **Not verified:** static analysis, same as Q-490. **No render counts were measured** — the claim
   follows from object identity and React's shallow compare, not a profiler run.
 
+### [activity][platform] Q-328 — deleting an activity is the one activity-log write with no outbox domain, so offline it just fails
+
+- **Branch:** `feat/activity-log-delete-outbox`
+- **Added:** 2026-08-19 · Lane A, found while reconciling Q-556 · [`journal`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md)
+- **Placement:** immediately above Q-556, which it gates. Small on its own; it is the prerequisite
+  that makes Q-556's 404 half safe.
+
+**The asymmetry.** An activity log is **created** through the outbox — `exercise-review-sheet.tsx:147`
+and `done-activity-screen.tsx:228` both `upsertActivityLog` + `queueMutation`, `syncStatus: 'pending'`.
+It is **deleted** by a bare `fetch("/api/activity-logs", { method: "DELETE" })`
+(`app/health/health-content.tsx:687`) with no `queueMutation` anywhere, and the `activity_logs` branch
+of `pushMutations` (`adapter.ts:4195`) handles upserts only.
+
+**What that costs.** CLAUDE.md's rule is *"every user-visible write needs an outbox domain — any POST
+reachable offline must queue a mutation or visibly fail"*. This one visibly fails, so it is not a
+silent data loss — but it is the only activity-log write that cannot be made offline at all, and it is
+what forces Q-556's route to keep answering 200 for a miss.
+
+**What to build.** A delete branch for the `activity_logs` outbox domain: a tombstone payload the
+client queues, a `pushMutations` arm that calls the same `deleteActivityLog` the web route calls (one
+write function per domain — `check-push-mutations.js` forbids raw `sql` there), and the client
+switching from bare `fetch` to local-delete + `queueMutation`.
+
+- **The local soft-delete already exists** (`sqlite-backend.ts:2654`) and already marks the row
+  `synced` rather than `pending` — deliberately, per its own comment. **That flag has to change with
+  this**, or the queued delete is a mutation the pull can clobber.
+- **`getSyncDelta` already emits `deleted_at` tombstones for `activity_logs`**, so the cross-device
+  half works; this is the push direction only.
+- **Lane:** the `pushMutations` arm and the repo function are **Lane A**;
+  `app/health/health-content.tsx` is **Lane B**. Ship Lane A first — the client cannot queue into a
+  domain that does not accept deletes.
+- **Then, and only then, Q-556's 404 half** — with the client treating 404 as success, since by that
+  point a 404 means "already gone", which is not a failure.
+
 ### [activity][platform] Q-556 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
+
+> **⚠️ PARTLY SHIPPED, and the prescribed fix was RE-ORDERED rather than applied. Read this before
+> touching the route.** `deleteActivityLog` now returns whether the `(id, user)` pair matched, and the
+> route answers `{ success: true, deleted }` — so it no longer reports success for a delete that
+> touched nothing, which was the finding. **What was NOT done is the second half, "answer 404 when
+> zero", and it must not be done next.**
+>
+> **Why 404 is unsafe today.** Activity logs are **created through the outbox** —
+> `components/activity/exercise-review-sheet.tsx:147` and `components/activity/done-activity-screen.tsx:228`
+> both `upsertActivityLog` + `queueMutation` with `syncStatus: 'pending'` — so a row exists locally
+> before its push lands, **online as well as offline**. Deleting it in that window matches no server
+> row. `app/health/health-content.tsx:687-695` treats any `!res.ok` as failure and **skips its local
+> delete**, so a 404 would toast *"Failed to delete"* and leave on screen a row the user just removed.
+>
+> **And nothing would reconcile it**, because *delete is the one activity-log write that never
+> queues*: the `activity_logs` branch of `pushMutations` (`adapter.ts:4195`) handles upserts only.
+> That gap is now filed as **Q-328** below, and it is the prerequisite — 404 belongs in the PR after
+> it, alongside a client that treats 404 as success.
+>
+> **Two cases that sound like regressions and are not**, checked rather than assumed: the WHERE does
+> not filter `deleted_at IS NULL`, so a **double-tap** and a **row already deleted on another device**
+> both still match and still report `true`. Only a genuinely absent or not-yours row reports `false`,
+> and those two stay indistinguishable — the enumeration property the review's control pass verified.
+>
+> Reason (2) in the entry below — *"a queued mutation receiving a 2xx is confirmed and dropped from
+> the outbox"* — is **void as written**, for the same reason: there is no queued delete mutation to
+> confirm. It was correctly flagged as not demonstrated; it is in fact not reachable. Reasons (1) and
+> (3) stand. See [`entries/2026-08-19-activity-log-delete-affected-rows.md`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md).
+
 
 - **Branch:** `fix/activity-log-delete-affected-rows`
 - **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
