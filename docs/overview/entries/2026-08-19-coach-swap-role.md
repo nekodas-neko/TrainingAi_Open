@@ -29,6 +29,12 @@ Three things, all measured, and each one changed the design:
    entries carry exactly one `main` muscle. The signal is the **total** count: Bench Press 3, Barbell
    Curl 2, Concentration Curl 1, Deadlift 5.
 
+**The sibling sweep the entry asks for was also run, and it came back clean.** The other writers of
+`exercise_role` are the program editor, the config screen, the workout builder, `generate-program`
+and the sync/assembler mappers — none of them replaces an exercise in place, so none of them can
+inherit a role. The Coach was the only offender, and this is the whole fix rather than the first of
+several.
+
 ## The recommender, and the validation behind it
 
 `recommendExerciseRole` (`packages/shared/src/workout/exercise-role.ts`): under 3 muscles →
