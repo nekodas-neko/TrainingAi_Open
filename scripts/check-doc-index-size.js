@@ -980,7 +980,10 @@ const BASELINE = {
   // sandbox session because their vendor constants file is gitignored, so the Energy card has never
   // once been renderable locally. Its lines are the evidence that "tested on pnpm dev" was untrue
   // for a family of screens, which is not a claim to leave to memory.
-  'docs/implementation-backlog.md': 11307,
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-416 shipped): its entry out, nothing filed in its place.
+  // The pointer above it keeps four lines rather than being struck, because the print of the FIXED
+  // artwork is still owed — the complaint came from paper and only paper closes it.
+  'docs/implementation-backlog.md': 11175,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
