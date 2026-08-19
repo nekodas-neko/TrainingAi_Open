@@ -182,6 +182,7 @@ Injuries, Supplements, AI Periodization, Oura Ring, Body Battery.
 | Mobile token exchange | `lib/mobile-auth-tokens.ts` (`createMobileAuthToken`/`consumeMobileAuthToken`), `app/api/auth/exchange-mobile-token` |
 | Rate limiting | `lib/rate-limit.ts` → `rateLimit(key, limit, windowMs)` — every AI/expensive/write route gets one, match siblings |
 | Request body guards | `lib/http/request-guards.ts` → `readJsonLimited(req, maxBytes)`, `isAllowedImageMime` |
+| Reading a request body | Always `readJsonLimited`, **never bare `req.json()`**. A Zod schema after the read bounds what is *stored*, not what is transferred and parsed — measured 2026-08-18, a 20 MB body to `auth/register` was read, buffered and fully parsed before being answered 400. `scripts/check-bounded-request-body.js` ratchets the conversion, shrink-only per file, with the three session-less routes (`auth/register`, `auth/exchange-mobile-token`, `health-connect/ingest`) already at zero (Q-322 / Q-498) |
 | PKCE (OAuth) | `lib/pkce.ts` → `computePkceChallenge`, `verifyPkce` |
 | ~~Oura webhook signature / OAuth state~~ | **Deleted 2026-08-13 with the Cloud integration (Q-224).** The fail-closed-verification and enumeration-oracle rules they demonstrated are in `CLAUDE.md` and still bind any new webhook. |
 | Server error reporting | `lib/observability.ts` → `reportServerError(err, context)` → `POST /api/client-error` |

@@ -1678,34 +1678,46 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Related, and the natural client half:** nothing renders `warnings[]` yet. Surfacing it is
   `components/**` (Lane B) and should follow whatever this decides, not precede it.
 
-### [platform] Q-322 — 31 `req.json()` routes are unaudited, and nothing bounds a request body before it is parsed
+### [platform] Q-322 — 92 route files still read their body with bare `req.json()`; the ratchet holds the line
 
 - **Branch:** `fix/bounded-request-bodies`
-- **Added:** 2026-08-19 · Lane A, the deferred halves (2) and (3) of Q-484.
-- **What Q-484 closed and what it did not.** It gave the two *measured* create routes
-  (`injuries`, `supplements`) schemas sharing one definition with their PATCH siblings, so the pair
-  cannot drift again. A 10 MB body is now **400** instead of 201 — **but it is still parsed into
-  memory first**, because the rejection happens in Zod, after `req.json()`. The transfer-and-parse
-  cost is unchanged; only the storage is bounded.
-- **Two pieces of work, in this order:**
-  1. **A shared bounded reader.** `readJsonBounded(req, maxBytes)` (or equivalent), so a body is
-     capped *before* parse rather than after. This bounds all 33 routes at once, including the 31
-     nobody has looked at — which is the point: it makes the audit safe to do slowly.
-  2. **Audit the 31.** `grep` for `req.json()` with no `safeParse`/`.parse` in `app/api/**`. **This
-     is a candidate count, not a defect count** — several do hand-rolled checks and several are
-     admin-gated, which limits reach without adding validation. Do not treat them as broken *or* as
-     fine until each is read.
-- **Priced honestly.** Not attack — this app's users are its own account holders, `claude_ro.injuries`
-  is empty and `supplements` holds 2 rows with a 9-character max name. It is worth doing because
-  `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full` outage
-  (2026-08-17), and an unbounded user-writable text column is exactly the shape that ritual exists to
+- **Added:** 2026-08-19 · Lane A, the deferred halves (2) and (3) of Q-484. **Rewritten 2026-08-19
+  after the first slice shipped (PR #182), which also closed Q-498.**
+
+- **What is already done, so it is not re-done.**
+  - **The shared bounded reader exists** — `readJsonLimited(req, maxBytes)` in
+    `packages/shared/src/http/request-guards.ts`. Piece 1 of the original entry is complete; it
+    shipped with Q-498's sibling work and is measured: against a 20 MB body on a 16 KB cap it cuts
+    off at 2,949,120 bytes.
+  - **The three routes reachable without a session are converted** — `auth/register`,
+    `auth/exchange-mobile-token`, `health-connect/ingest` (Q-498, now removed from this queue). All
+    three used to accept the full 20,000,048 bytes and then answer 400; all three now answer 413.
+  - **`health-connect/ingest`'s ordering is fixed**, which was the larger half of Q-498: the
+    per-IP brute-force limiter now runs **above** the body read. Q-498 said this needed the secret
+    moved to a header; it did not — the limiter is keyed on the IP from the request headers, so
+    nothing had to come out of the body and the owner's Tasker profile was not touched.
+  - **`scripts/check-bounded-request-body.js` is in the Custom Rules job**, shrink-only per file.
+    The three converted routes are at zero, so re-adding a bare read to any of them fails
+    immediately. Verified by reverting one and watching it go red.
+
+- **What is left: 104 bare reads across 92 route files.** The baseline in that script is the list.
+  The number may only go down; a file that reaches zero is removed from it in the same PR.
+- **Do this in slices, not one sweep** — that is what the ratchet is for. Converting 92 files at
+  once is how a mistake hides in a diff nobody can read.
+- **This is a candidate count, not a defect count.** All 92 require a session, several do
+  hand-rolled checks, several are admin-gated. Read each before calling it broken *or* fine. The
+  suggested next slices, by exposure: the offline-first hot paths (`nutrition/food-logs`,
+  `log-exercise`, `complete-workout`, `sync/push`, `water-log`), then `user/password`, then the
+  rest.
+- **Priced honestly.** Not attack — this app's users are its own account holders. It is worth doing
+  because `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full`
+  outage (2026-08-17), and an unbounded user-writable body is the shape that ritual exists to
   catch — and because the stated direction is multi-user + Play Store, at which point "nobody is
   attacking it" stops being an argument.
-- **⚠️ Do NOT quote 10 MB as a storage figure.** `pg_column_size` read ~120 kB for the probe rows
+- **⚠️ Do NOT quote 20 MB as a storage figure.** `pg_column_size` read ~120 kB for the probe rows
   because the payload was one repeated character and TOAST compressed it almost perfectly. Real text
-  would not. The defensible statements are that the **transfer and parse** cost is unbounded, and the
-  stored size is bounded only by what the content happens to compress to.
-- **Lane A owns this** (`app/api/**`).
+  would not. The defensible statement is that the **transfer and parse** cost was unbounded.
+- **Lane A owns this** (`app/api/**`, `scripts/`).
 
 ### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
 
@@ -2150,43 +2162,6 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Still not exercised:** on device (APK WebView + native local store) and offline, where
   `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
   worklist.
-
-### [platform] Q-498 — three unauthenticated routes buffer an unbounded request body; one parses it before any check
-
-- **Branch:** `security/body-size-guard-coverage`
-- **Added:** 2026-08-18 · review sweep (request-body size guards) ·
-  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](reviews/2026-08-18-unbounded-request-bodies.md)
-- **Placement:** medium. No data exposed or corrupted — memory/CPU amplification on unauthenticated
-  endpoints. Ranked above ordinary because the ingest route does the work before *any* check, and
-  because **Q-493 removes the rate bound that would otherwise contain it**.
-- **The shared guard is correct and is not the defect.** `readJsonLimited` treats `Content-Length` as a
-  fast path and streams with a real byte counter, cancelling on overflow. Measured: a 20 MB body to
-  `/api/client-error` (16 KB cap) was **cut off at 2,949,120 bytes**.
-- **Coverage:** 113 route files export `POST`/`PUT`/`PATCH`; **7** use `readJsonLimited`; **93** use bare
-  `req.json()`. Of those 93, **exactly 3 are reachable without a session**: `auth/register`,
-  `auth/exchange-mobile-token`, `health-connect/ingest`. **The seven guarded routes are all *less*
-  exposed than these three.**
-- **Measured**, same 20 MB body: `auth/register` and `health-connect/ingest` each accepted the **full
-  20,000,048 bytes** and then returned 400 — read, buffered and parsed before deciding they did not
-  want it.
-- **⚠️ Ordering separates them, and one is much worse.** `auth/register` (limiter line 9, parse line 13)
-  and `exchange-mobile-token` (8 / 12) rate-limit **before** parsing, so the rate is bounded even with
-  no size cap. **`health-connect/ingest` reads at line 35 and Zod-parses at 40, but rate-limits at 53
-  and checks the secret at 58** — an unauthenticated caller **holding no secret** makes the server
-  buffer and fully parse an arbitrary body, and the limiter cannot throttle it because it runs after.
-- **Fix — two changes, the second matters more:**
-  1. Route the three through `readJsonLimited`. Coverage, not design; the helper exists and 7 routes
-     already use it.
-  2. **On `health-connect/ingest`, move the rate limit and secret compare above the body read.**
-     Independent of the size guard, and the larger win: it converts "anyone can make us parse
-     anything" into "only a caller past the gate can". Needs `secret` moved out of the body (to a
-     header) to do cleanly — a small shape change worth making.
-- **The other 90 all require a session**, which is a real mitigation at this user count and is why the
-  finding is scoped to 3 rather than 93. Recorded because that exposed set grows with the user base if
-  registration ever opens up, not with the code.
-- **Not exercised:** the actual ceiling was **not** probed — 20 MB proved there is no cap and going
-  further risked destabilising the server for no extra information. Railway's edge may impose its own
-  request-size limit, which would reduce practical exposure; not checked.
 
 ### [platform] Q-497 — a 31-day range that passes every guard makes two admin routes loop forever
 
