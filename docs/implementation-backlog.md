@@ -1559,6 +1559,89 @@ the type, so a picker has somewhere to read from and write to.
   cheapest tripwire, and the audit view now carries `image_bytes` for the same reason.
 
 
+### [cardio][devices] Q-418 — the free walk shows no heart rate while the strap feeding it cadence is connected
+
+- **Branch:** `feat/free-activity-metrics`
+- **Added:** 2026-08-19 · owner, mid-walk screenshot: *"the normal walk activity doesnt have HR - any
+  further metrics we can give the normal walk - including the android pill displaying time"*
+- **Lane B** for the screen; **Lane A** for the notification half (see below), which is Kotlin and
+  needs a new APK.
+
+**The HR gap is the cheap one, and the screenshot proves the data is there.** The free-activity screen
+(`components/activity/active-activity-screen.tsx`, 111 lines) renders **distance · pace · cadence**
+and nothing else — there is no `bpm` anywhere in the file. Yet the same screenshot reads
+**`120 spm · strap`**, so the Polar H10 was connected and streaming at that moment. A strap that
+supplies cadence supplies heart rate; the screen simply never asks.
+- **The guided walk already does it**, from the same source: `walk-active.tsx:62` subscribes via
+  `mgr.subscribe((s: LiveHrSample) => …)` and renders `liveBpm` with a `STALE_MS` freshness guard
+  (`:126`) so a dropped strap reads *"(stale)"* rather than freezing on a stale number. **Copy that
+  shape, including the guard** — a number that silently stops updating is worse than a dash.
+- **And the data is already being persisted**: `done-activity-screen.tsx` fetches `hr-window` after
+  the fact and stores `avgHr`/`maxHr`. So HR is recorded for these walks today and is only invisible
+  *while you are walking* — the one time it is actionable.
+
+**Further metrics. Two are REQUESTED, two are proposed.** Everything here is already computed
+elsewhere in the same flow, so each is a render rather than a feature:
+1. **Heart rate — requested.** Above. The obvious gap.
+2. **Total step count — requested** (*"also a total step count would be good"*, owner, same
+   conversation). `CadenceTracker` already exposes `stepsEstimate` — it is what Q-230 used to fill
+   the saved `steps` field, so the number exists and is already trusted enough to persist.
+   **Q-410 adds the same readout to the guided walk; the two screens must show the same thing.**
+   Ship them together or the free walk becomes the surface that got forgotten, which is what this
+   entry is about. **Carry Q-410's caveat with it**: the total is *integrated cadence*, not counted
+   steps, and it is **strap-only** — with no strap it does not exist, so label it an estimate and
+   hide it rather than showing `0`.
+3. **Average pace** alongside current pace — proposed. Current pace on a 1:39 walk is noise; the
+   average is the number that means something. Distance and elapsed are both already on screen, so
+   this is division.
+4. **Elevation gain** — proposed. `computeElevationChange(rawPoints)` runs on save; running it live
+   costs one call over points already in memory. Worth it on a hilly walk, invisible on a flat one,
+   so put it behind a non-zero check rather than showing `0 m`.
+
+**Do not add all four to the metric row.** It currently holds three at `text-2xl`, centred, on a
+412 px screen. Four fits; six does not. Recommendation: **distance · pace · HR** on the primary row,
+with **cadence · steps · elevation** as a smaller secondary line — the guided-walk hierarchy, which
+is already the app's answer to this question. Both owner-requested metrics land on that layout: HR
+in the primary row where it can be acted on, steps in the secondary line where a running total
+belongs.
+
+**The Android pill — it exists, and it cannot show the time without native work.**
+- **There is already an ongoing notification during a free walk.** `lib/activity/gps-tracking.ts:29`
+  registers `@capacitor-community/background-geolocation` with
+  `backgroundTitle: 'TrainingAI · Activity'` and `backgroundMessage: 'Tracking your walk or run'`.
+  That is the pill; it is static.
+- **The plugin cannot update it.** Its whole surface is three methods — `addWatcher`,
+  `removeWatcher`, `openSettings` (`definitions.d.ts:98-116`). `backgroundMessage` is fixed at
+  watcher creation, and there is no update call. **Re-adding the watcher to change the text would
+  restart location tracking mid-walk**, which is a worse bug than a static string.
+- **Nor can we simply run our own service instead**: the plugin's own docs state the watcher only
+  continues in the background *if* `backgroundMessage` is defined, so dropping it to suppress the
+  notification also drops background tracking. Adding a second foreground service on top would show
+  **two** pills.
+- **Recommendation: extend the plugin natively rather than replacing it** — a small Kotlin addition
+  exposing `updateNotification({ id, title, message })`, applied as a patch or a fork. It keeps every
+  tested background-location behaviour the walk depends on and touches one file. The alternative,
+  writing our own location foreground service, duplicates permission handling, doze behaviour and
+  watcher lifecycle that already work. **Reversal cost is low either way** — the call site is one
+  function in `gps-tracking.ts`.
+- The app already runs **three** foreground services with notification channels (`OuraRingService`,
+  `PolarStrapService`, `ScaleBleService`), all `foregroundServiceType="connectedDevice"`, so the
+  pattern and the channel plumbing exist to copy from.
+
+**⚠ The finding worth acting on beyond the display: `FOREGROUND_SERVICE_LOCATION` is declared and
+nothing uses it.** The manifest requests it and `ACCESS_BACKGROUND_LOCATION` (`:138-140`), but all
+three declared services are `connectedDevice` — **no service declares
+`foregroundServiceType="location"`**. Background tracking therefore rests entirely on the plugin's
+own service. That is probably fine, since the plugin does run one, but **it has never been verified
+here**: nobody has confirmed a long walk with the screen off keeps its GPS points. The owner's
+screenshot is a **1:39** walk with the screen on, which exercises none of it.
+- **Verify before adding metrics**, because a screen showing four numbers about a walk that stopped
+  recording is worse than one showing three. Walk 20+ minutes with the screen off and the phone
+  pocketed, then check the saved route for gaps.
+
+- **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
+  out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
+
 ### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
 
 - **Branch:** `feat/walk-step-goal`
