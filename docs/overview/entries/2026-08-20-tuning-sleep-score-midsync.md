@@ -104,3 +104,48 @@ once the band question is settled. It is Lane B's (presentation), unlike Q-529 w
 summary columns. `duration_hours`, `awake_hours` and `sleep_end` cannot distinguish "woke at 6:07 and
 lay in bed" from "slept until 6:47" — **the per-epoch string can, and it was already stored.** Reach
 for it before concluding a timestamp is wrong.
+
+---
+
+# ⚠️ Correction, hours later: the score does recompute, and the twin was not a twin
+
+The caveat written into Q-529 asked for one cheap check before anyone built a recompute path. It ran
+at 06:59:32 and refuted the entry's central claim.
+
+| | at 06:49 | at 06:59 |
+|---|---|---|
+| `sleep_score` | 47 | **55** |
+| `computed_at` | 06:45:56 | **06:54:41** |
+| `sleep_sessions.updated_at` | 06:46:19 | **06:51:03** |
+
+**The score recomputed**, after the session settled. "Nothing recomputes it" was wrong — the ordering
+that looked broken was a snapshot of a pipeline mid-run.
+
+**The near-twin comparison also fails.** 2026-08-17 matched on *duration and onset* — the columns that
+happened to be in the query — and differs where the model actually looks:
+
+| contributor | 08-20 (55) | 08-17 (78) |
+|---|---|---|
+| `rem_sleep` | 63 | **99** |
+| `efficiency` | 57 | **82** |
+| `deep_sleep` | **76** | 62 |
+| `hrv` | **67** | 52 |
+
+REM **1.42 h vs 2.08 h**, efficiency **86% vs 90%**, awake **1.25 h vs 0.83 h**. **The remaining 23
+points are the score working, not failing.**
+
+**What survives:** a **~9-minute window (06:45:56 → 06:54:41)** in which a provisional score renders
+as final, with nothing marking it — landing exactly when someone checks last night's sleep. Same root
+as the range-label Known Issue and as Q-520. Q-529 re-scoped **Lane A → Lane B** and merged with that
+Known Issue rather than standing beside it.
+
+**Two mistakes compounded, and both were avoidable:**
+
+1. **A three-minute observation used to assert a permanent absence.** The entry itself said the
+   finding was confirmed over three minutes and not over hours — the hedge was written and the
+   conclusion ignored it.
+2. **A "twin" chosen on the summary columns that happened to be adjacent in the query** rather than on
+   the contributor vector the model reads.
+
+Both would have been caught by the same discipline — **compare contributors, not summary columns** —
+which is exactly what the hypnogram decode did an hour later, and it got its answer right first time.

@@ -6552,9 +6552,26 @@ session working from a temporarily restored copy.
   a Cloud-era adjustment is distinguished from our own base) and something may read it. Merge, do not
   replace.
 
-### [sleep][devices] Q-529 — the sleep score is stamped 23 seconds before the night finishes arriving, and never revisited
+### [sleep] Q-529 — a provisional sleep score is displayed as final while the night is still syncing
 
-- **Branch:** `fix/recompute-derived-on-session-update` · **Lane:** A
+- **⚠️ SCOPE CORRECTED 2026-08-20, hours after filing — the original claim was WRONG. Read this first.**
+  This entry originally said the score is *never* recomputed. **It is.** Re-checked at 06:59:32:
+  `sleep_score` **47 → 55**, `computed_at` **06:45:56 → 06:54:41**, after the session settled at
+  **06:51:03**. The ordering that looked broken was a snapshot of a pipeline mid-run.
+  - **The "near-twin" comparison also does not survive.** 2026-08-17 matched on *duration and onset* —
+    the columns that happened to be in the query — and differs where the model actually looks:
+    **REM 1.42 h vs 2.08 h** (contributor **63 vs 99**) and **efficiency 86% vs 90%** (**57 vs 82**).
+    The remaining 23 points are the score **working**.
+  - **What survives is smaller and real:** a **~9-minute window (06:45:56 → 06:54:41)** in which a
+    provisional score renders as final, with nothing marking it — landing exactly when someone checks
+    last night's sleep.
+  - **Re-scoped from Lane A to Lane B.** Not a missing recompute path; an unmarked provisional state.
+    **Merges with the `projectOverview.md` Known Issue** on the time-in-bed range label — same root as
+    that and as Q-520: *a still-syncing night renders identically to a settled one.*
+  - **Method lesson:** a **three-minute** observation window was used to assert a permanent absence,
+    and the twin was picked on summary columns instead of the contributor vector. **Compare
+    contributors, not summary columns.**
+- **Branch:** `fix/mark-provisional-sleep-score` · **Lane:** B
 - **Plan:** none yet — **first confirm whether a slower pass corrects it** (see caveat). Evidence:
   [`docs/reviews/2026-08-20-sleep-score-computed-mid-sync.md`](reviews/2026-08-20-sleep-score-computed-mid-sync.md).
 - **Added:** 2026-08-20 · Tuning agent, from an **owner report** (*"that wake up time is way off, I
