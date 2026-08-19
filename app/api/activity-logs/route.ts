@@ -4,6 +4,10 @@ import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from '@trainingai/shared/date-utils'
 import { z } from 'zod'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One activity log: a date, a type, a duration and a few optional numbers.
+const MAX_BODY_BYTES = 8 * 1024
 
 export async function GET(req: NextRequest) {
   const session = await auth()
@@ -25,7 +29,13 @@ export async function POST(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = ActivityLogBody.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const body = ActivityLogBody.safeParse(read.body)
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const { startTime, durationMin, endTime: providedEndTime } = body.data
@@ -42,7 +52,13 @@ export async function DELETE(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = DeleteBody.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const body = DeleteBody.safeParse(read.body)
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const repo = await getRepository()

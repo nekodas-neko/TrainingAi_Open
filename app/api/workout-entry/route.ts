@@ -6,6 +6,10 @@ import { estimateOneRm, BW_REF, type OneRmSetInput } from "@trainingai/shared/1r
 import { computeSetAggregates, computeIntensityPct } from "@trainingai/shared/workout/set-aggregates";
 import { getRepository } from "@/lib/data";
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// 20 weights and 20 reps plus a few scalars, capped by the schema below.
+const MAX_BODY_BYTES = 16 * 1024;
 
 const WorkoutEntryPatchSchema = z.object({
   exerciseLogId: z.string().uuid(),
@@ -29,7 +33,13 @@ export async function PATCH(req: NextRequest) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const parsed = WorkoutEntryPatchSchema.safeParse(await req.json().catch(() => null));
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+  const parsed = WorkoutEntryPatchSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
@@ -121,11 +131,13 @@ export async function DELETE(req: NextRequest) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let body: { exerciseLogId: string };
-  try { body = await req.json(); } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const { exerciseLogId } = body;
+  const { exerciseLogId } = (read.body ?? {}) as { exerciseLogId?: string };
   if (!exerciseLogId) return NextResponse.json({ error: "Missing exerciseLogId" }, { status: 400 });
 
   if (!(await assertOwnership(userId, exerciseLogId))) {
