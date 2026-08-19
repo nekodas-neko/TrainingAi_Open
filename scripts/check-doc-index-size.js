@@ -910,7 +910,12 @@ const BASELINE = {
   // split lands the typical day next to empty. Recording what does NOT work is the expensive half.
   // Rebuilt from origin/main after a parallel PR raised the same baseline -- splicing the conflict
   // hunks would have produced two baselines for one number.
-  'docs/implementation-backlog.md': 11234,
+  // Raised 2026-08-19 (Tuning, daily-vs-weekly windows): -> 11273. The owner asked how a daily
+  // heart-minutes goal squares with a weekly target; the answer reshapes Q-505 and had to go
+  // INTO Q-505 rather than sit in a review nobody opens before building. It also retires the
+  // strengthFreq-ceiling framing added earlier the same day, and a superseded framing left
+  // standing beside its replacement is worse than the extra lines.
+  'docs/implementation-backlog.md': 11273,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

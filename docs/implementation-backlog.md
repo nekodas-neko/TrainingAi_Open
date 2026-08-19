@@ -5696,6 +5696,39 @@ session working from a temporarily restored copy.
   the 23 stored days are still scored under the old goals because history is not back-filled — the
   same trap the sleep recalibration hit. Reconstructing from contributors at effective weights
   predicts a ceiling of **sd ≈ 10.2** under current goals (steps ⟂ strengthVolume, r = −0.016).
+- **⚑ OWNER QUESTION 2026-08-19 reshapes the redesign — read before building.**
+  [`docs/reviews/2026-08-19-daily-vs-weekly-windows.md`](reviews/2026-08-19-daily-vs-weekly-windows.md).
+  Owner: *"the goal being x heart minutes per day to depict healthy heart usage through the day —
+  but you also gotta count for weekly targets. How handle this?"*
+  - **`DEFAULT_ZONE_MINUTES_GOAL = 22` is WHO's 150 min/week ÷ 7**, and that division does not
+    preserve the guideline: 150 minutes taken in three sessions satisfies WHO and fails the daily
+    goal four days in seven.
+  - **The rule: match each contributor's window to its guideline's own unit.** Applied across all
+    six, **exactly one is wrong** — `zoneMinutes` (WHO is weekly, window is daily). `steps` (Paluch,
+    daily), `moveHours` (daily), `strengthFreq`/`strengthVolume` (weekly, already rolling-7d) are all
+    correct. The precedent is in the same file: the strength block is commented *"rolling 7-day, so a
+    rest day still scores off recent training."*
+  - **Recommendation — split into two numbers.** **Today:** `steps`, `moveHours`, session-happened.
+    **This week:** rolling-7d active minutes vs **WHO 150**, `strengthFreq` vs ≥2/wk, weekly tonnage.
+    Every number then answers one question, and a rest day inside a strong week reads as *rest today,
+    on track this week* rather than one blended number that is neither.
+  - **This retires the `strengthFreq` ceiling as a defect.** 100 on 78% of days reads wrong in a daily
+    score and reads *correct* in a weekly compliance number — *"you met the strength guideline in 78%
+    of trailing weeks."* **Its ceiling was never the problem; its scorecard was.** Supersedes the
+    "constraint the redesign must work around" framing added earlier the same day.
+  - **Q-522 rises in priority under this design** — the daily number leans on `steps` and
+    `moveHours`, so a saturated `moveHours` stops being one inert contributor of six and becomes half
+    of the daily score.
+  - **Measured (rolling 7-day ÷ 150, under Q-523's corrected threshold):** contributor mean **79.2**,
+    sd 26.7, **zero days 0/59** (against daily ÷ 22: mean 63.8, sd 38.7, 6 zero days). Weekly total
+    mean **164.4 min**, range 12–378, meeting WHO on 26 of 59 days.
+  - **⚠️ Do not read "60% of weight is rolling" as "the score is a weekly number".** The rolling
+    terms carry most of the weight and almost none of the *variance* (they saturate), so they set the
+    **level** while same-day steps move it slightly: score ↔ same-day steps **r = +0.324**, ↔
+    sessions7d +0.186, ↔ volume7d +0.026 (n = 23, directional). That is the mechanism behind this
+    entry's own headline anomaly — 76 on 828 steps vs 64 on 8,935.
+  - **Depends on Q-523 landing first.** Under today's shipped threshold the weekly total is near zero,
+    so every figure above assumes the corrected WHO band.
 - **⛔ Do Q-526 FIRST.** `activity_contributors` currently stores the blend wrapper, not the six
   components, so the old model's contributor history is not recorded anywhere. Land the redesign
   first and that history is lost permanently — and the before/after comparison that would show
@@ -6721,6 +6754,12 @@ session working from a temporarily restored copy.
   **That makes it the highest-variance contributor in the Activity Score**, above `steps` (sd 33.4).
   The published threshold is not a guess: the sweep is smooth around 0.40, so a small error in the max
   estimate does not swing it.
+- **The GOAL's window is a separate question from the threshold, and it is also wrong** — see
+  [`2026-08-19-daily-vs-weekly-windows.md`](reviews/2026-08-19-daily-vs-weekly-windows.md), folded
+  into Q-505. `DEFAULT_ZONE_MINUTES_GOAL = 22` is WHO's 150/week ÷ 7; the contributor should be scored
+  over a **rolling 7-day window against 150**, as the strength lane already is. **Fix the threshold
+  here; the window belongs to Q-505's split.** Doing the window without the threshold changes nothing
+  (the weekly total is near zero today), which is why this entry stays first.
 - **Do NOT re-cut `ZONE_DEFS`.** Zones 1–5 are *training* zones for cardio prescription and are not
   wrong; the defect is in the roll-up that borrows them for a *public-health* question. Add the WHO
   bands alongside. Likewise `maxHr` stays conservative — only the active-minutes path moves.

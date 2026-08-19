@@ -8,6 +8,19 @@
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Daily vs weekly windows — MEASURED, reshapes Q-505** (owner question, 2026-08-19). *"The goal
+  being x heart minutes per day… but you also gotta count for weekly targets. How handle this?"* —
+  correct, and bigger than it looks. `DEFAULT_ZONE_MINUTES_GOAL = 22` is **WHO 150/week ÷ 7**.
+  **Rule: match each contributor's window to its guideline's unit** — applied across all six, exactly
+  one is wrong (`zoneMinutes`). **Recommendation: split the Activity Score into Today and This Week.**
+  - **This RETIRES the `strengthFreq`-ceiling framing I added the same morning.** 100 on 78% of days
+    is a defect in a daily score and *correct* in a weekly compliance number. **Its scorecard was the
+    problem, not its ceiling** — do not re-file it as a constraint.
+  - **Q-522 rises in priority** — under the split, `moveHours` becomes half the daily number.
+  - **Do NOT claim "the score is really a weekly number" from the 60%-rolling-weight figure.** I
+    nearly did. The rolling terms saturate, so they set the LEVEL and carry almost no variance:
+    score ↔ same-day steps **+0.324**, ↔ sessions7d +0.186, ↔ volume7d **+0.026** (n = 23).
+  [`review`](../../reviews/2026-08-19-daily-vs-weekly-windows.md).
 - **Body Battery drain model — FITTED, propose-only** (Q-521 closed out, **Q-527** filed). The owner
   resolved the contradiction between their two answers and added a term: *"the fitter we get, the more
   workout stimulus we should need for draining, outside of BMR draining which should naturally go up
@@ -274,6 +287,14 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **Check a goal's WINDOW against its source, not just its value.** A weekly guideline divided by
+  seven is a different guideline. `zoneMinutesGoal = 22` is WHO 150/week ÷ 7 and had been read as a
+  daily target for months. The strength lane in the same file already does this correctly, which is
+  what made the inconsistency findable.
+- **A saturated contributor is not automatically broken — check which scorecard it belongs in.**
+  `strengthFreq` at 78% ceiling was filed as an unremovable constraint in the morning and turned out
+  to be correct behaviour in the wrong place by the afternoon. Ask what question the number answers
+  before concluding it cannot discriminate.
 - **A dormant data-quality bug becomes live the moment a new model reads that column.** One
   `body_comp` row (2026-07-29: 3% body fat, BMR 1,890 against ~1,520 around it) has sat harmless for
   weeks because nothing keys a visible number off stored BMR. Q-521 makes BMR drive baseline drain, so

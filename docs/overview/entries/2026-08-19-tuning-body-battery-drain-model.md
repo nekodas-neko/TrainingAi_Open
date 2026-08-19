@@ -89,3 +89,65 @@ current goals — including the 7,000 step goal from Q-524, which is not yet wha
 returns. Workout completion uses tonnage against `DEFAULT_SESSION_VOLUME_GOAL_KG`; if Q-505 changes
 what a full session means, these numbers move with it. `claude_ro`, row-scoped, 90 days, one athlete;
 the exponent 2.0 is fitted to one person's distribution of effort.
+
+---
+
+# Same PR — daily goal vs weekly target (reshapes Q-505)
+
+**Owner question:** *"The goal being x amount of heart minutes per day to depict healthy heart usage
+through the day right? But you also gotta count for weekly targets. How handle this?"*
+
+Correct, and larger than it looks. **`DEFAULT_ZONE_MINUTES_GOAL = 22` is WHO's 150 min/week divided
+by seven**, and that division does not preserve the guideline: 150 minutes taken in three sessions
+satisfies WHO completely and fails the daily goal on four days in seven.
+
+## The rule, and the one contributor that breaks it
+
+**Match each contributor's window to its guideline's own unit.** Applied across all six, exactly one
+is wrong: `zoneMinutes` (WHO is weekly, window is daily). `steps` (Paluch, per day), `moveHours`
+(per day) and both strength lanes (weekly, already rolling-7d) are correct.
+
+The precedent was already in the same file — `activity-score.ts` comments its strength block
+*"rolling 7-day, so a rest day still scores off recent training."* The two contributors whose
+guidelines are weekly already got the treatment the owner is asking for.
+
+Measured, rolling 7-day ÷ 150 under Q-523's corrected threshold: contributor mean **79.2**, sd 26.7,
+**zero days 0/59** (daily ÷ 22 gives 63.8 / 38.7 / 6 zero days). Weekly total mean **164.4 min**,
+range 12–378, meeting WHO on 26 of 59 days. Smoother, and no day reads zero — which is honest, since
+a rest day inside an active week is not a day of zero cardiovascular activity.
+
+## The two questions were already separate contributors
+
+The owner's phrasing splits them exactly: *"healthy heart usage through the day"* is **distribution**
+and *"weekly targets"* is **dose**. `moveHours` measures the first, `zoneMinutes` the second. They got
+conflated because the dose contributor was given a daily window it was never designed for — and
+because the distribution contributor **does not work** (Q-522, 856 of 857 hours qualify). Dividing WHO
+by seven has been standing in for a contributor that exists and is saturated.
+
+## Recommendation: two numbers
+
+**Today** — steps, moveHours, session-happened. **This week** — active minutes vs WHO 150, strength
+frequency vs ≥2/wk, weekly tonnage. Q-505 is specified but unbuilt, so this is the moment.
+
+## A framing I filed this morning and retired this afternoon
+
+`strengthFreq` sitting at 100 on 78% of days was filed as *a constraint the redesign must work
+around*. That was wrong. **In a weekly compliance number it is correct behaviour** — "you met the
+strength guideline in 78% of trailing weeks" is true and useful. **Its ceiling was never the problem;
+its scorecard was.** The earlier framing is marked superseded in Q-505 rather than left standing
+beside its replacement.
+
+## A conclusion I nearly published and the data refused
+
+60% of the Activity Score's effective weight is already rolling-7d, which reads like "the daily score
+is really a weekly number". Measured against the 23 stored scores it is not that simple: score ↔
+same-day steps **r = +0.324**, ↔ sessions7d +0.186, ↔ volume7d **+0.026**. **The rolling terms carry
+the weight and almost none of the variance, because they saturate** — so they set the *level* while
+same-day steps move it slightly around it. That is the actual mechanism behind Q-505's anomaly, where
+828 steps scored 76 and 8,935 scored 64.
+
+## Added files
+
+- `docs/reviews/2026-08-19-daily-vs-weekly-windows.md`
+- `docs/implementation-backlog.md` — folded into Q-505; Q-523 points at it for the window half
+- `docs/domains/activity/README.md`
