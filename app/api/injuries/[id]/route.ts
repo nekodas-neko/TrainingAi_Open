@@ -1,20 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withRouteErrors } from '@/lib/api/route-errors'
-import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { InjuryPatchSchema } from '@trainingai/shared/validation/injury'
 
-// SEC-I4: the web PATCH forwarded an unvalidated body — the adapter key-whitelists
-// columns (no mass assignment) but never checked value types/enums, so the offline
-// sync path (which does enforce the severity enum) was stricter than web. Validate at
-// the route, matching the supplement-patch pattern.
-const InjuryPatchSchema = z.object({
-  muscleName:   z.string().min(1).max(100).optional(),
-  notes:        z.string().max(1000).nullable().optional(),
-  severity:     z.enum(['mild', 'moderate', 'severe']).optional(),
-  startedDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  resolvedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-}).strict()
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -26,7 +15,14 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const repo = await getRepository()
   // Q-463: an id that is not yours (or does not exist) answered 500 with an empty body.
   return withRouteErrors(async () => {
-    const injury = await repo.updateInjury(id, session.user!.id!, parsed.data)
+    // The schema accepts both separators (localDateString emits slashes); the DATE columns must get
+    // dashes, since `2026/08/09` is DateStyle-dependent at the driver.
+    const { startedDate, resolvedDate, ...rest } = parsed.data
+    const injury = await repo.updateInjury(id, session.user!.id!, {
+      ...rest,
+      ...(startedDate !== undefined ? { startedDate: startedDate.replace(/\//g, '-') } : {}),
+      ...(resolvedDate !== undefined ? { resolvedDate: resolvedDate?.replace(/\//g, '-') ?? null } : {}),
+    })
     return NextResponse.json(injury)
   })
 }
