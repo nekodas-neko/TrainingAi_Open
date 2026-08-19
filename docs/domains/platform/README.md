@@ -184,6 +184,15 @@ layer**) through §16. Read it before building any shared helper.
 
 - [`docs/reviews/2026-08-19-cross-pillar-score-ranges.md`](../../reviews/2026-08-19-cross-pillar-score-ranges.md) — **every pillar's range side by side, and why range alone is the wrong test, 2026-08-19.** Only **Body Battery** genuinely spans (sd 29.6 — though 5 of 51 days sit exactly on a clamp bound); **activity is the most compressed** (sd **6.0**, zero days under 50); sleep's stored 85.3 is the **old** model. Range catches the stuck-score class instantly but **cannot see a score that moves the wrong way** — Q-507's stress metric has a fine spread and correlates **+0.40** with readiness. Pair it with a correlation against an independent signal.
 
+- [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](../../reviews/2026-08-19-daily-summary-replace-wipe.md) — **`oura_daily_summary` holds 1 row against 198,223 raw samples, 2026-08-19**
+  (Q-528). `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
+  the guard sits on the INSERT, not the DELETE — so a full-history pass over a narrow input wipes
+  the history and returns successfully, with no error and no log. The windowed path is safe, which
+  is why it survived: only the rarely-taken `fullHistory` branch can do it. **Illness scores from
+  the same array survived** because they write through a COALESCE upsert to a different table.
+  Also records `oura_bucket` and `step_live_windows` at **0 rows system-wide** — the first carries
+  `met_mean`/`motion_mad`, the drift-proof anchor Q-522 needs. **Corrects Q-525's diagnosis.**
+
 ## Open issues
 
 ```bash
