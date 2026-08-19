@@ -832,7 +832,7 @@ const BASELINE = {
   // can-bite grouping was 14 when it is 19, because the tab screens mount their sheets
   // unconditionally with a null prop. "Judge by mount site, not filename" is the reusable half, and
   // the error ran in the reassuring direction.
-  'docs/implementation-backlog.md': 10672,
+  'docs/implementation-backlog.md': 10751,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
