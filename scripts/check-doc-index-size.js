@@ -997,14 +997,12 @@ const BASELINE = {
   // 2026-08-20 (Tuning): owner acceptance criterion on Q-529 -- accurate on first open. The
   // 62-minute ring upload cadence and the three-link ordering live in the entry because an
   // implementer who shortens the rollup alone fixes the 4-minute term and none of the 62.
-  // Raised 2026-08-19 (Lane A): 11127 -> 11173. Most of it is NOT new material — this is a parallel-merge
-  // race. #245 (Q-549 measured) and #246 (Q-529 ring cadence) each grew the file and each was green
-  // against 11127 when its own CI ran; their sum is not. `main` was therefore red on Custom Rules,
-  // which fails every unrelated branch, so the number is re-measured from the merged file rather
-  // than picked — the failure mode this file's own header warns about. The remaining 15 lines are
-  // this PR's own: Q-477's step-1-done annotation, which replaces a hand-typed "100 of 125" with the
-  // command that prints the real number.
-  'docs/implementation-backlog.md': 11173,
+  // Raised 2026-08-19: the number is re-measured from the MERGED file, not taken from either side of
+  // the conflict. Two parallel-merge races landed here in one evening — #245 and #246 each grew the
+  // backlog past 11127 and each was green when its own CI ran, leaving `main` red on Custom Rules
+  // and failing every unrelated branch; another lane raised it to 11177 while this branch raised it
+  // to 11173. Splicing either hunk would have re-broken it. Re-measure, never pick.
+  'docs/implementation-backlog.md': 11192,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
