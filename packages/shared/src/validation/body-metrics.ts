@@ -45,8 +45,24 @@ export function validMacroGOrNull(n: number): number | null {
 export const STEPS_MIN = 0
 export const STEPS_MAX = 200000
 
+/**
+ * Rounds rather than rejecting a fractional count (Q-321).
+ *
+ * It was the only validator here gated on `Number.isInteger`, so an estimator or decoder producing
+ * `8000.5` lost the **whole day's** steps — the push branch discarded the field and the web route
+ * answered 400 for the entire body-metrics write, which on `metric-log-sheet`'s one-field payload
+ * means the save simply fails.
+ *
+ * Rounding is the house pattern for the integer-valued columns, not a new call: `resting_heart_rate`
+ * and `water_ml` are `integer` columns too, and `validRestingHrOrNull`/`validWaterMlDeltaOrNull`
+ * both take a finite number and `Math.round` it. Steps was the outlier.
+ *
+ * `BodyMetadataPostSchema.steps` below rounds in step with this, deliberately. Changing one without
+ * the other would leave the offline push accepting a value the web route refuses, which is exactly
+ * the drift the one-write-path-per-domain rule exists to stop.
+ */
 export function validStepsOrNull(n: number): number | null {
-  return Number.isInteger(n) && n >= STEPS_MIN && n <= STEPS_MAX ? n : null
+  return Number.isFinite(n) && n >= STEPS_MIN && n <= STEPS_MAX ? Math.round(n) : null
 }
 
 // The four fields below reach the DB ONLY through the offline sync push branch — the web schema
@@ -98,7 +114,10 @@ export const BodyMetadataPostSchema = z.object({
   protein:    z.number().min(MACRO_G_MIN).max(MACRO_G_MAX).nullish(),
   carb:       z.number().min(MACRO_G_MIN).max(MACRO_G_MAX).nullish(),
   fat:        z.number().min(MACRO_G_MIN).max(MACRO_G_MAX).nullish(),
-  steps:      z.number().int().min(STEPS_MIN).max(STEPS_MAX).nullish(),
+  // `.int()` dropped and rounded instead, to mirror `validStepsOrNull` — see its note. The column is
+  // `integer`, so the round has to happen somewhere; doing it here keeps the route a pass-through.
+  steps:      z.number().min(STEPS_MIN).max(STEPS_MAX).nullish()
+                .transform(v => (v == null ? v : Math.round(v))),
   distanceKm: z.number().min(DISTANCE_KM_MIN).max(DISTANCE_KM_MAX).nullish(),
   waistCm:    measurementCm,
   chestCm:    measurementCm,

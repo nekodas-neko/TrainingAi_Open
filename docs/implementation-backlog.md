@@ -1368,6 +1368,28 @@ whether or not anyone draws them first.
 
 ### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 
+> **⚠️ Lane check done 2026-08-19 (Lane A) — the answer is NO schema change, so this is wholly Lane
+> B.** The entry says to check before starting and hand the half over rather than take a migration
+> number; there is no half to hand over.
+>
+> - **Idempotence needs no new key.** `meal_plan_meals.saved_meal_id` already exists
+>   (`schema.ts:649`, `ON DELETE SET NULL`) and `generate/route.ts` already carries it for a plan meal
+>   that *came from* a saved meal. Saving stamps it; a repeat save is a no-op. That is better than the
+>   proposed `(plan id, plan item id)` key because `structure/route.ts:152` already preserves it
+>   across a regenerate.
+> - **The `plan` tag needs no column.** A saved meal is plan-derived iff some `meal_plan_meals` row
+>   points at it — derivable by join, and the derive-don't-store rule prefers that.
+> - **No new route either.** Each plan meal carries a denormalised `ingredients` snapshot in the
+>   `NutritionIngredient` shape, and `createFoodItem` (`packages/shared/src/nutrition/create-food-item.ts`)
+>   is already a shared offline-first helper that mints the id, writes locally and queues the outbox
+>   mutation. `POST /api/nutrition/saved-meals` takes it from there, and
+>   `PATCH /api/nutrition/meal-plans/meals/[mealId]` already accepts `savedMealId`.
+>
+> **The one thing to get right is `saved_meal_items.food_item_id` is NOT NULL** with
+> `ON DELETE restrict` — the copy must create or match a `food_items` row per ingredient, which is
+> what `createFoodItem` is for. Step 3 (deleting plan surface) still needs owner confirmation.
+
+
 - **Branch:** `feat/meal-plan-to-saved-meals`
 - **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
   used too much; it will be created - then likely not used again. It would be good if each item from
@@ -1880,6 +1902,21 @@ this fits without an extraction.
   is the reference shape.
 
 ### [platform][body][devices] Q-321 — decide per field which discarded values should quarantine the mutation
+
+> **⚠️ The Lane A half SHIPPED. What is left is Lane B only** — importing the existing validators
+> into `components/health/metric-log-sheet.tsx` so a bad user-typed value is refused at the keyboard
+> instead of three layers later. `packages/shared/**` is Lane A's, so that half could not have ridden
+> in a Lane B PR without a baton claim; it is done and out of the way.
+>
+> **`validStepsOrNull` rounds now**, matching `validRestingHrOrNull`/`validWaterMlDeltaOrNull` — the
+> other two `integer` columns. **One correction to the entry below, and it matters if anyone re-reads
+> it:** the finding said the push branch dropped a fractional count while the siblings rounded, which
+> is true, but it did not check `BodyMetadataPostSchema` in the same file — the **web route rejected
+> it too**, with `z.number().int()`, answering **400 for the entire body-metrics write**. So the two
+> paths agreed on policy and differed only in visibility, and fixing the validator alone would have
+> *created* the drift the sync-mirroring rule forbids. Both were changed together, with a test
+> asserting they agree. See [`entries/2026-08-19-steps-fractional-rounding.md`](overview/entries/2026-08-19-steps-fractional-rounding.md).
+
 
 - **Branch:** `feat/push-coercion-per-field-policy`
 - **Added:** 2026-08-19 · Lane A, the deliberately-deferred third step of Q-485.
