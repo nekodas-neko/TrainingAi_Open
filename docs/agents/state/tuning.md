@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** `tuning/manual-bedtime-entry` · **Q band:** 500–529 (next free: 521)
+**Updated:** 2026-08-18 · **By:** `tuning/manual-bedtime-entry` · **Q band:** 500–529 (next free: 522)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -84,6 +84,15 @@ Since then, working only scores no other lane holds:
    displayed points around the median, which is the deliberate cost of range.
 
 ## Owner reports handled
+- **2026-08-19 — "body battery still doesn't seem that good… id like granular drain."** Measured and
+  the owner is right: **drain tracks ring WEAR TIME, not exertion** — `corr(hr_sample_count,
+  total_drained)` = **+0.518** while `corr(steps, total_drained)` = **−0.153**, and a workout moves
+  `end_value` by **0.6 points** (50.6 vs 50.0). The four days that hit 0 had **828–4,152 steps**.
+  Filed **Q-521** with an exertion-integrated design brief.
+  **Their other two asks are already done or specified:** sleep's 90–100 band is delivered by Q-503
+  (7 of 65 replayed nights in the 90s — it just isn't visible because stored history is pre-recalibration),
+  and Activity's "everything hit = 100" is Q-505, unbuilt.
+  [`review`](../../reviews/2026-08-19-body-battery-drain-and-roadmap.md).
 - **2026-08-19 — ring not worn until 4 am.** Filed **Q-519** (manual bedtime entry, writes exactly one
   column) and **Q-520** (partial-night flag, sequenced second and deliberately manual). The owner
   proposed manual bedtime and it is smaller and better-targeted than the flag I had suggested.
@@ -186,6 +195,24 @@ for this work:
   production"; **5h40m later a sibling writer had erased the key**. `COALESCE(excluded, existing)` on a
   `jsonb` column replaces the document whole, so the merge lives in each caller and only one of two
   does it. **When checking a shared field, the thing to observe is the NEXT write by someone else.**
+- **Body Battery's drain does not respond to activity AT ALL** (Q-521) — do not re-measure this, and
+  do not try to fix it by tuning `DRAIN_RATE`. Drain is `-DRAIN_RATE × (hrr − REST_THRESHOLD) × dt`,
+  purely HR-driven, and with Q-515's boundary down at ~60 bpm nearly every waking sample drains, so
+  **drain ≈ rate × time worn**. **Q-521 is downstream of Q-515** — a new drain model built over a
+  boundary that moves with fitness inherits the drift.
+- **`active_calories` cannot be a load-bearing input anywhere** — present on **8 of 51** days. Steps
+  are on all 51. Any design needing calories silently degrades. Check an input's coverage before
+  designing around it.
+- **Range is a first FILTER, not a verdict — and the cross-pillar table already exists.**
+  [`2026-08-19-cross-pillar-score-ranges.md`](../../reviews/2026-08-19-cross-pillar-score-ranges.md)
+  has every pillar's spread side by side; do not re-derive it. Headline: **only Body Battery genuinely
+  spans** (sd 29.6, though 5 of 51 days sit exactly on a clamp bound), **activity is the most
+  compressed thing in the app** (sd **6.0**, zero days under 50), and **sleep's stored 85.3 is the OLD
+  model** — the shipped one replays to 69.5.
+  **Range catches the stuck-score class instantly** (resilience's one value, illness never firing,
+  `strengthFreq` at exactly 100 on 91 days) **and cannot see a score that moves the wrong way** —
+  Q-507's stress metric has a fine spread and correlates **+0.40** with readiness. Always pair it with
+  a correlation against a signal the score did not come from, and count days sitting on a clamp bound.
 - **`bdi_derived` and `body_comp` are checked and have nothing to tune — do not re-measure them.**
   BDI has **no threshold anywhere**; its only consumer is a debug console that labels it observational,
   and `validation/oura-summary.ts` classes it an open-ended research metric. `body_comp` is a

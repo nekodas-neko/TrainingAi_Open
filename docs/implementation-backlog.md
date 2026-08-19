@@ -1133,6 +1133,22 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 ### [nutrition][platform] Q-409 — paste a recipe URL and get a meal; the fetch is the whole security surface
 
+> **⚠️ The Lane A half SHIPPED (PR #180). What is left is Lane B only** — the UI in
+> `components/nutrition/my-meals-picker.tsx` that sends a `url` and renders what comes back.
+> `POST /api/nutrition/scan` now takes `{ url }`, answering with the ordinary scan payload plus
+> **`sourceUrl`** (the final URL after redirects — that is the attribution this entry asked for) and
+> **`recipeYield`** (servings, or **`null`**).
+>
+> **`recipeYield: null` is the one thing Lane B must handle, and it is not cosmetic.** With a stated
+> yield the route has already divided and the payload is per-serving (`notes` leads with *"Per
+> serving (1 of 12)."*). Without one the payload is the **whole recipe** — verified live: a
+> banana-bread page returned 1,956 kcal for the loaf. This entry's own rule applies — *ask, do not
+> assume 1* — so the picker must prompt for serves and divide, or it logs a tray as a meal.
+>
+> Rationale, measurements and the SSRF verification are in
+> [`entries/2026-08-19-recipe-url-to-meal.md`](overview/entries/2026-08-19-recipe-url-to-meal.md);
+> the modules are in [`module-map.md`](module-map.md). Everything below is the original entry.
+
 - **Branch:** `feat/recipe-url-to-meal`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner
 - **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
@@ -1193,7 +1209,8 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   a meal came from six months later, and it is the honest thing to do with someone else's recipe.
 
 - **Lane.** `app/api/nutrition/scan/route.ts` and any shared parser are **Lane A**;
-  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first.
+  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first — **it has
+  (PR #180), so only Lane B remains.**
 
 - **Verification.** Paste three real recipe URLs — one with JSON-LD, one without, one that 404s —
   and confirm: ingredients and yield resolve from the structured path; the fallback produces a
@@ -6080,6 +6097,57 @@ session working from a temporarily restored copy.
 - **Do not implement this as "delete the night".** That discards valid physiology; on the reported night
   HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
 - **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
+
+### [body] Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did
+
+- **Branch:** `feat/exertion-integrated-battery-drain`
+- **Plan:** the design brief is
+  [`docs/reviews/2026-08-19-body-battery-drain-and-roadmap.md`](reviews/2026-08-19-body-battery-drain-and-roadmap.md) §3.
+  **Do Q-515 first** (see sequencing). Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, from an **owner brief** (*"body battery still doesn't seem
+  that good… id like that type of granular drain"*)
+- **Measured** over 51 days, joined to steps and completed workouts:
+
+  | relationship | measured | should be |
+  |---|---|---|
+  | `corr(hr_sample_count, total_drained)` | **+0.518** | — |
+  | `corr(steps, total_drained)` | **−0.153** | strongly **positive** |
+  | `corr(steps, end_value)` | **+0.112** | strongly **negative** |
+  | `corr(total_drained, end_value)` | −0.674 | negative ✓ |
+
+  **The strongest predictor of ending low is how many HR samples were recorded — i.e. ring wear time.**
+  Steps are *negatively* associated with drain.
+- **A workout barely registers:** `end_value` averages **50.6** on 37 workout days vs **50.0** on 14
+  non-workout days — a **0.6-point** difference.
+- **The days that hit 0 are the quiet ones.** Four days ended at exactly 0 on **828–4,152 steps**
+  (median 3,020), while **16 of 51 days cleared the 8,000-step goal** and did *not* end lower. So `0`
+  currently means *"you wore the ring a long time"* and the owner wants it to mean *"you did
+  everything"* — close to opposites.
+- **Mechanism.** Drain is `-DRAIN_RATE × (hrr − REST_THRESHOLD) × dt`, purely HR-driven; steps,
+  workouts, zone minutes and calories enter only via their HR effect. With **Q-515**'s boundary having
+  fallen to ~60 bpm, nearly every waking sample drains, and `(hrr − threshold)` varies far less than
+  wear duration — so **drain ≈ rate × time worn**, which is what +0.518 says. **Q-521 is downstream of
+  Q-515**: fixing the boundary does not fix this, but leaving it broken re-poisons any replacement.
+- **First action — exertion-integrated drain** (§3): keep the morning anchor; replace time-integrated
+  HR drain with exertion combining steps/movement, HR above rest, workout load and zone minutes;
+  **normalise against that day's `getDailyGoals`** so "everything hit" lands near empty; **floor at 0
+  and route the overshoot to an overreach signal** rather than below empty (the same resolution the
+  owner chose for Activity).
+- **⚠️ Two constraints the data imposes.** (1) **`active_calories` is unusable as a load-bearing
+  input — present on 8 of 51 days**; steps are on all 51, and any design needing calories silently
+  degrades to the HR-only model being replaced. (2) Normalising to targets means **a fitter person
+  drains less for the same absolute work** — correct for "did I do my day", wrong for "how depleted am
+  I". The owner's brief chooses the former; **write that into the model's comment so it is not
+  silently reversed.**
+- **This model must NOT be asked to detect overreaching.** On a target-hitting day a well-recovered and
+  an overreached athlete both read 0. Overreach lives in ACWR/readiness/illness. This arguably resolves
+  **Q-276** by making Body Battery explicitly *not* a recovery number.
+- **Pass test:** re-run the four correlations above. `corr(steps, total_drained)` must become clearly
+  positive, and workout vs non-workout `end_value` must separate by far more than 0.6 points.
+- **Caveats:** n = 51, one athlete, Pearson on daily aggregates — the weak values (+0.112, −0.153) mean
+  *"no relationship"* rather than a precise signed effect. **Zone minutes and movement-per-hour were
+  not pulled or coverage-checked** — they are named because the owner named them, and checking their
+  coverage is the first implementation step, given what `active_calories` shows.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
