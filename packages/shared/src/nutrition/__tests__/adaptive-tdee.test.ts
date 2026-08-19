@@ -13,7 +13,12 @@ function dayStr(i: number): string {
   return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())}`
 }
 
-/** A window where every day is logged at `intake` and weight moves linearly by `kgTotal`. */
+/** A window where every day is logged at `intake` and weight moves linearly by `kgTotal`.
+ *
+ *  Q-387: a logged day now also has to be a day the user marked finished, so this helper stamps
+ *  `loggingComplete` wherever it stamps an intake. Every test below was written before that flag
+ *  existed and means "the user logged this day properly" — which is what the flag says. The
+ *  half-logged case they never covered is its own describe block at the end. */
 function window(opts: {
   days: number
   intake: number | null
@@ -26,6 +31,7 @@ function window(opts: {
   return Array.from({ length: days }, (_, i) => ({
     date: dayStr(i),
     intakeKcal: intake != null && i % logEvery === 0 ? intake : null,
+    loggingComplete: intake != null && i % logEvery === 0,
     weightKg: i % weighEvery === 0 ? kgStart + (kgTotal * i) / (days - 1) : null,
   }))
 }
@@ -178,5 +184,65 @@ describe('maintenanceGapMessage', () => {
       ...d, intakeKcal: i < MIN_LOGGED_DAYS - 1 ? 2000 : null,
     }))
     expect(maintenanceGapMessage(estimateMaintenance(days, 14))).toContain('1 more day to')
+  })
+})
+
+// Q-387 — the case this module was never tested for. It is well covered for EMPTY days and had
+// zero coverage of HALF-FULL ones, which is why the bug survived: a day abandoned after lunch is
+// byte-for-byte identical to a completed light day, and the mean cannot tell them apart.
+describe('estimateMaintenance — partial days (Q-387)', () => {
+  /** 14 days at a true 2,600 maintenance, weight perfectly flat. `partial` of them stop after
+   *  lunch at 1,400 and were never marked complete. */
+  const halfLogged = (partial: number): MaintenanceDay[] =>
+    Array.from({ length: 14 }, (_, i) => ({
+      date: dayStr(i),
+      intakeKcal: i < partial ? 1400 : 2600,
+      loggingComplete: i >= partial,
+      weightKg: 80,
+    }))
+
+  it('no longer drags the mean down — the measured 86 kcal per partial day is gone', () => {
+    // Before the flag: 0 partial → 2600, 6 partial → 2086, 14 partial → 1400, every row
+    // `confidence: 'medium'` and `excludedReason: null`. 514 kcal low at a realistic 6-of-14, and
+    // it looked exactly as trustworthy as a correct answer.
+    expect(estimateMaintenance(halfLogged(0), 14).maintenanceKcal).toBe(2600)
+    // 4 partial still leaves 10 complete days — the gate is met and the mean is now the truth,
+    // where before it read 2,257.
+    expect(estimateMaintenance(halfLogged(4), 14).maintenanceKcal).toBe(2600)
+  })
+
+  it('counts only the completed days towards the gate, and waits when that drops below it', () => {
+    const r = estimateMaintenance(halfLogged(6), 14)
+    expect(r.daysLogged).toBe(8)
+    // This is the point of the change, not a shortcoming of it: 8 of 10 is "not enough data yet",
+    // and the honest answer is silence. The old code answered 2,086 with `confidence: 'medium'`.
+    expect(r.maintenanceKcal).toBeNull()
+  })
+
+  it('waits rather than answers when too few days are complete', () => {
+    // The failure mode has to be "not enough data", not "a confident wrong number" — this used to
+    // return a plausible-looking 1400 with nothing flagged.
+    const r = estimateMaintenance(halfLogged(14), 14)
+    expect(r.daysLogged).toBe(0)
+    expect(r.maintenanceKcal).toBeNull()
+    expect(r.excludedReason).not.toBeNull()
+  })
+
+  it('excludes a day with an intake but no flag — absent is not "assumed complete"', () => {
+    const days: MaintenanceDay[] = Array.from({ length: 14 }, (_, i) => ({
+      date: dayStr(i), intakeKcal: 2600, weightKg: 80,
+    }))
+    expect(estimateMaintenance(days, 14).daysLogged).toBe(0)
+  })
+
+  it('excludes a day marked complete that carries no intake at all', () => {
+    // Marking an empty day complete must not create a zero-calorie day — that would poison the
+    // mean in the opposite direction, which is the trap `intakeKcal: null` already guards.
+    const days: MaintenanceDay[] = Array.from({ length: 14 }, (_, i) => ({
+      date: dayStr(i), intakeKcal: i < 4 ? null : 2600, loggingComplete: true, weightKg: 80,
+    }))
+    const r = estimateMaintenance(days, 14)
+    expect(r.daysLogged).toBe(10)
+    expect(r.maintenanceKcal).toBe(2600)
   })
 })

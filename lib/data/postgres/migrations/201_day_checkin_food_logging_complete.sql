@@ -1,0 +1,21 @@
+-- Q-387: "I have finished logging today", so the maintenance calibration can tell a half-logged day
+-- from a completed light one.
+--
+-- Measured with `estimateMaintenance` before this existed: 14 days at a true 2,600 maintenance,
+-- weight flat, six of them stopping after lunch at 1,400 →
+--
+--   partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
+--   0            14          2600        2600         medium      null
+--   6            14          2086        2086         medium      null
+--   14           14          1400        1400         medium      null
+--
+-- Linear at 86 kcal per partial day, every row passing every gate. It reaches
+-- `targetFromMaintenance`, so the recommended daily target inherits the whole error with a cut's
+-- deficit on top — the app telling an under-logger to eat hundreds of kcal below real maintenance.
+--
+-- On `day_checkins` rather than a new table: it is already keyed per (user, day), already synced in
+-- both directions, and already has an outbox domain, so this rides a path that is known to work
+-- instead of adding a nineteenth. The column is nullable and NULL means "not marked" — the Undo the
+-- owner asked for is setting it back to NULL, and no backfill is attempted, because a past day
+-- cannot be given an honest flag.
+ALTER TABLE day_checkins ADD COLUMN IF NOT EXISTS food_logging_completed_at TIMESTAMPTZ;

@@ -836,13 +836,19 @@ const BASELINE = {
   // can-bite grouping was 14 when it is 19, because the tab screens mount their sheets
   // unconditionally with a null prop. "Judge by mount site, not filename" is the reusable half, and
   // the error ran in the reassuring direction.
-  // Ratchets DOWN 2026-08-19 (Lane B, Q-411 shipped), recomputed from the merged file: the entry is
-  // removed and the cluster's pointers rewritten. The caveat it leaves behind is the load-bearing
-  // part and is kept in full — the square canvas only helps if the owner's circle template CROPS;
-  // if it SCALES, the default module goes to 0.397, fractionally WORSE than the 0.401 it replaced.
-  // A struck entry with no caveat would leave "the codes got bigger" as the record, which one print
-  // could falsify.
-  'docs/implementation-backlog.md': 10485,
+  // Raised 2026-08-19 (Lane A, Q-387): backlog 10436 -> 10454. The Lane A half shipped, so its entry
+  // gains the handover block Lane B needs to build against — the endpoint's contract, the Undo, and
+  // the warning that the feature is INERT until the button exists. A half-shipped item that does not
+  // say which half is how the other lane rebuilds the wrong one.
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-411 shipped), recomputed from the merged file: two entries
+  // are removed and the cluster's pointers rewritten. The caveat Q-411 leaves behind is the
+  // load-bearing part and is kept in full — the square canvas only helps if the owner's circle
+  // template CROPS; if it SCALES, the default module goes to 0.397, fractionally WORSE than the
+  // 0.401 it replaced. A struck entry with no caveat would leave "the codes got bigger" as the
+  // record, which one print could falsify. Q-358's entry goes with it: it was built rather than
+  // deferred because Q-411 resized every code and the fractional-grid flake it describes came
+  // straight back, and a decode E2E that passes on a coin flip cannot gate the change that caused it.
+  'docs/implementation-backlog.md': 10451,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
+import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 
@@ -19,8 +21,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     }
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 400 })
+    if (!isRefusal(e)) reportServerError(e, { userId: session.user.id, url: '/api/friends/[id]' })
+    return refusalResponse(e, 'Could not update that request')
   }
 }
 
