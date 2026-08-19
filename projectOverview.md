@@ -3559,17 +3559,19 @@ for the supplements case; the rest need the owner to separate "stopped logging" 
 native-STT rebuild has **not** been installed on the S25 — the JS half shipped via Railway and is
 calling a native plugin that isn't there.
 
-**Still live — re-checked 2026-08-09.** A fourth occurrence landed **2026-08-08 22:56 UTC**, again
-from `/workout`. So the count is now 4 across 2026-08-05, 08-06 and 08-08: this is not a one-off from
-the week it was found, it is the owner reaching for voice logging every couple of days and getting
-nothing.
+**Still live — re-checked 2026-08-19, and the count was three times what this row claimed:** not 4
+but **12**, latest **2026-08-18 23:41 UTC**, the day before the check. Two weeks on, the owner is
+still reaching for voice logging and still getting nothing.
 
-**Two limits on that count, both worth carrying into every future `error_events` read.**
-`error_events` prunes at 30 days, so any total is a floor. And **the `claude_ro` view is row-scoped to
-one user** — this read returned **383 rows where the real table holds 7,331**. Every `error_events`
-figure obtained through that endpoint describes the owner's faults only; other accounts' errors are
-invisible by design. "Nothing else is failing" is not a statement this endpoint can support — only
-"nothing else of the owner's".
+**The message changed spelling on 2026-08-17**, which strengthens rather than weakens the diagnosis:
+10 reads `"SpeechRecognition" plugin is not implemented` (08-05 → 08-16), the last 2 read
+`"SpeechRecognition.then()"` (08-17 → 08-18). The JS half moved again — the call is now awaited —
+into a device that still cannot run it. Only installing the `apk-latest` release fixes this, and that
+is the owner's action; until then further JS work here is invisible on the device.
+
+**Both counts above are floors** — `error_events` prunes at 30 days and the `claude_ro` view is
+row-scoped to one user. That lesson is now a standing rule in `CLAUDE.md`'s session-start ritual
+rather than a paragraph inside one device issue, which is where it belongs.
 
 Within that scope, the only other events in 24 hours were one `/api/body-battery` + one
 `/api/readiness-score` `Failed query` in **the same second** (2026-08-08 03:26:19) — one transient DB

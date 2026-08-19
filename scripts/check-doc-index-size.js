@@ -763,7 +763,13 @@ const BASELINE = {
 // up to 24h, which needs a revocation to open and there is only one permanent admin. It is longer
 // than a typical row on purpose: it has to stop the next session re-implementing a fix that already
 // exists and is green on an unmerged PR, and it has to record what would make the risk live again.
-  'projectOverview.md': 7928,
+  // Raised 2026-08-19 (Lane A, session-start error_events ritual): 7928 -> 7930. The voice-logging
+  // Known Issue said 4 occurrences, last seen 2026-08-08; production says 12, last seen 2026-08-18,
+  // and the message changed spelling on 08-17 — the JS half shipped again into a device that still
+  // cannot run it. A stale count on a live issue reads as "contained" and it is not. Paid for in
+  // part by moving the `claude_ro` row-scoping lesson out of this entry: it is a standing rule in
+  // CLAUDE.md's ritual, not a paragraph inside one device issue.
+  'projectOverview.md': 7930,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
