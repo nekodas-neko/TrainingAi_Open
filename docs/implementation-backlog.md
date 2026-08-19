@@ -404,6 +404,20 @@ survived review: the mockups were drawn with fuller lists.
 preserved exactly; only the leftover is shared between top and bottom, which is what the approved
 mockup did. One offset applied to the header, rule and ingredient block; `codeTop` does not move.
 
+**The composition to match is the interactive prototype's**, and the owner re-sent it on 2026-08-19
+for exactly this purpose: *"This was the mockup style you showed me by the way; with everything
+nicely centered."* — <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>,
+screen 5. **Read it for the vertical rhythm only, not for the numbers:** that screen predates
+Q-411, so it shows a round die at `13.2 mm / 0.40 mm per module` and a `Full breakdown SQUARE`
+badge, all three of which are now superseded. What it gets right — and what the shipped renderer
+does not — is that name, calories, macros, rule, ingredients and code read as **one centred group**
+rather than two clusters pinned to opposite edges.
+
+**Why the prototype never showed this defect, so nobody mistakes it for a regression:** it was
+hand-composed with a flex column and `justify-content: center`, which distributes leftover space
+automatically. The production renderer computes absolute offsets from both margins instead. The bug
+has always been in the renderer; the prototype simply used a layout engine that cannot express it.
+
 - **⚠ Do NOT absorb the slack into the code.** It is the obvious alternative and it is wrong: the
   slack varies with the ingredient count (8.6 mm down to 2.2 mm), so a code sized to fill it would
   print at a **different physical size per meal** — and the sheet's *"Code is 18.5 mm at 0.56 mm per
