@@ -3,11 +3,46 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/correct-retired-scales` · **Q band:** 500–529 (next free: 529 — band nearly exhausted, agree a new one with the owner)
+**Updated:** 2026-08-19 · **By:** `tuning/accurate-on-first-open` · **Q band:** 500–529 (**BAND EXHAUSTED — 529 was the last. Agree a new band with the owner before filing anything.**)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Owner acceptance criterion on Q-529: "accurate on first open, without needing time to adjust".**
+  Measured the whole chain — **the cause is neither scoring nor rollup. The ring uploads about once an
+  hour**: 214 batches over 7 days, **median gap 62.0 min**, p90 71, max 306. The owner opened in the
+  gap between the 05:40 and 06:44 uploads, so their wake was still on the ring.
+  - **Three links, ordered:** drain on app open (**native ⇒ new APK**, the dominant term) → rollup and
+    re-score on that drain (~4 min today) → provisional state until both land (**the only part
+    shippable without an APK**). **Doing the rollup alone makes the app faster at showing stale data.**
+  - **Say the limit out loud:** open before the ring registers the night's end and nothing fixes it —
+    session end was 06:47, screenshot 06:46. Target is *within seconds of the ring knowing*.
+  - **⛔ The 62-min cadence is OBSERVED, not a documented setting.** Whether it is configurable and
+    what it costs in ring battery is unknown, and the firmware is deliberately frozen — check before
+    promising an on-open drain is cheap.
+  [`review`](../../reviews/2026-08-20-accurate-on-first-open.md).
+- **⚠️ Q-529 was OVERCLAIMED and corrected hours later — read before touching it.** I filed "the
+  score is never recomputed". **It is** (47 → 55, `computed_at` 06:45:56 → **06:54:41**, after the
+  session settled 06:51:03). The "near-twin" also failed: 08-17 matched on *duration and onset* and
+  differs on **REM 1.42 vs 2.08 h** (contributor 63 vs **99**) and efficiency 86 vs 90 (**57 vs 82**) —
+  the remaining 23 points are the score **working**. What survives is a **~9-minute window where a
+  provisional score renders as final**; re-scoped Lane A → **Lane B** and merged with the range-label
+  Known Issue.
+  - **Two mistakes compounded, both avoidable:** a **three-minute** observation used to assert a
+    *permanent* absence, and a twin chosen on the summary columns that happened to be in the query
+    rather than on the contributor vector. **Compare contributors, not summary columns** — the
+    hypnogram decode an hour later did it right and got the answer first time.
+- **Owner report 2026-08-20 — sleep score stamped mid-sync** (Q-529). *"That wake up time is way
+  off, I woke up around 6am."* **The session was already right and the score was not.** `computed_at`
+  **06:45:56** vs `sleep_sessions.updated_at` **06:46:19** — the score predates its input by 23
+  seconds, and had not recomputed 3 minutes later. Session healed 4:52 am → **6:44 am**, 6.5 →
+  **7.75 h**; score stuck at **47** while the 08-17 near-twin (7.58 h, 90%, 35 m) scores **78**.
+  - **Check the cheap thing FIRST before anyone builds a recompute path:** re-read `computed_at` for
+    2026-08-20 the next day. Confirmed over 3 minutes, **not** hours — a slower nightly pass may fix
+    it, which would shrink this to surfacing provisionality.
+  - **Not a duplicate of Q-520.** That is a genuinely incomplete night; this is a complete night
+    scored against a partial copy of itself.
+  [`review`](../../reviews/2026-08-20-sleep-score-computed-mid-sync.md).
 - **`oura_daily_summary` holds 1 row against 198,223 raw samples** (Q-528). Found running Q-525's own
   first action. `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
   the guard is on the INSERT — so a full-history pass over a narrow input wipes the history and
@@ -298,6 +333,14 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **Do not assert a PERMANENT absence from a THREE-MINUTE observation.** Q-529 shipped saying a score
+  is never recomputed; it recomputed nine minutes after the read. If a claim is "X never happens",
+  the observation window has to be long enough for X to have happened. Where it is not, say what was
+  actually observed — the hedge was written and the conclusion ignored it.
+- **When a score looks wrong, compare `computed_at` against the input row's `updated_at` BEFORE
+  reaching for calibration.** Q-529 looked like a sleep-score tuning problem and was a 23-second
+  ordering bug. A near-twin day from the same week is the fastest sanity check — 7.58 h scoring 78
+  against 7.75 h scoring 47 settled it in one query.
 - **A column with rows is not a live field — check the last write date AND the write site.** I asked
   the owner to reword or drop `resting_soreness` because it read exactly 3 in all 20 entries. It had
   been **retired on 2026-07-23**, and `morning-checkin-sheet.tsx` says so in a comment two lines long:

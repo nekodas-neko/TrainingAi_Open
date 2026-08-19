@@ -354,8 +354,10 @@ behind it:
 caveat that stood all day is discharged by evidence, not by argument. `band` remains the tightest of
 the six and is still the one to re-test if a printer or label stock ever changes.
 
-**One defect the print made visible, now filed as Q-416** — the vertical dead space above the code
-is plain on paper as well as on screen.
+**One defect the print made visible, filed as Q-416 and now FIXED** (2026-08-19) — the block was
+pinned to both margins at once, so a short ingredient list left up to 8.6 mm of dead space above the
+code. Half the slack now sits above the block instead. **Still owed: a print of the fixed artwork**,
+since the complaint that started it came from paper.
 
 **Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
 `saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
@@ -363,122 +365,87 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [nutrition] Q-416 — the label leaves up to 8.6 mm of dead space above the code; the block is pinned to both edges at once
+### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
 
-- **Branch:** `fix/label-vertical-centring`
-- **Added:** 2026-08-19 · owner, comparing the shipped label to the reviewed mockup: *"that looks
-  different to what we decided on - our one looked much better more gap between the text etc"* —
-  then confirmed on a physical print.
-- **Lane B** (`components/nutrition/meal-label-render.ts`). Pure geometry: no schema, no route, no
-  APK. Ships on a Railway deploy.
-- **Placement: high within the label work.** It is small, it is arithmetic, and it is the difference
-  between the artwork the owner approved and the one now printing.
+- **Branch:** `feat/day-training-card-kcal-stat`
+- **Added:** 2026-08-18 · owner, with a screenshot of the day screen (Tuesday 18 August):
+  *"the training shohld have a stat saying the calories burnt from the workout."*
+- **What the screenshot shows:** a day detail with READY 76 / HR 51 / SLEEP 92 / MOVE 65 across the
+  top. Under **TRAINING**, one session card — "Push, 8:24am → 9:13am · 49 min" — listing five
+  exercises, footed by three stats: **VOLUME KG 2,364 · EXERCISES 5 · SETS 10**. Directly below,
+  the **ACTIVITY** card for a treadmill walk *does* show "101 kcal" alongside bpm and steps. That
+  contrast is the report: the activity gets a calorie figure and the workout does not.
 
-**The cause, from the renderer's own numbers.** `centredStackLineBudget()` lays the header out
-**downward from the top margin** and places the code **upward from the bottom**:
-```
-y       = SQUARE_MARGIN + 4, then + nameSize + gap + caloriesSize + gap + macroSize + gap + ruleGap
-codeTop = (SHEET - SQUARE_MARGIN) - (writeOnLine ? 9 : 0) - codeUnits
-```
-Ingredient lines then fill downward from `y`. **Whatever the list does not use becomes a void
-immediately above the code** — the two anchors do not meet in the middle, they leave the remainder
-wherever it falls.
+**This was already considered and deliberately deferred — the reasoning is on file.**
+`projectOverview.md` (Q-247's entry) says outright: *"Deliberately not done: a per-workout kcal
+estimate in the day screen's Training section. It needs `estWorkoutKcal` per session, which is the
+Q-230 bundle hazard from a client component — doing it properly means computing it server-side in
+`/api/day-log`."* The owner asking for it is what moves this from *deferred* to *queued*; the
+blocker and the intended shape were both already named, so **do not re-derive them.**
 
-For the shipped default (`inlineCentred`: `nameSize 12`, `caloriesSize 18`, `macroSize 7.5`,
-`stackGaps [5,4,4,6]`, `codeUnits 70`) the header ends at **69.5 units** and the code starts at
-**110**, so with `STACK_LINE_H = 8`:
+- **Where it goes:** `components/health/day-detail/day-sections.tsx:112-116` — the `TrainingSection`
+  stat row (`Volume kg` / `Exercises` / `Sets`, all derived client-side from the sets data).
+  `data.workoutDurations[sessionName]` on the same component already carries `{start, end, minutes}`
+  **per session**, so the duration the estimator needs is present; the profile inputs are not.
+- **⚠ The existing `workoutKcal` is a DAY total, not a session figure — this is the thing to get
+  right.** `computeActiveEnergy` (`packages/shared/src/health/daily-energy.ts:107-109`) sums
+  `estWorkoutKcal` over *every* strength session in the day, and that day-level number **already
+  renders on this very screen**, as the "Workouts" row of the ENERGY section
+  (`components/health/day-detail/energy-summary.ts:33`). So this is not "surface the field that
+  exists" — a card is per session, and two sessions in one day would both show the day total.
+  It needs a **per-session** call to the same shared estimator, server-side per the deferral note.
+- **⚠ The deferral note undersells the blocker: it is not a bundle-size hazard, it is impossible.**
+  `estWorkoutKcal` → `getEnergyFeatureSpec()` (`lib/oura-models/constants/index.ts:442`) → `readJson`,
+  which calls **`fs.readFileSync`**. That cannot run in a client component at all, so there is no
+  "accept the bundle cost" option — the per-session figure has to come from the server. **That makes
+  this cross-lane: `/api/day-log` is Lane A's.** Lane B can render it the moment the field exists.
+  Verified 2026-08-18 while working the queue.
+- **⚠ And it is a duration-only estimate.** `daily-energy.ts:102-103` is
+  `estWorkoutKcal({ durationMin, …, activityId: 8, intensity: 'moderate' })` — a flat MET 8 over the
+  clock. **Load, volume and reps are not inputs.** A 49-minute session moving 2,364 kg and a
+  49-minute session moving 800 kg produce the *same* number. Placing it in the same row as VOLUME KG
+  / EXERCISES / SETS — three measured facts — implies it is derived from them, and it is not. Either
+  label it so the basis is legible ("~kcal", "est."), or put it somewhere the implication is weaker.
+  This is a presentation decision, not a formula one; the formula is fine for what it is.
+- **Consistency requirement:** once a per-session figure ships, the session cards on a day must sum
+  to the ENERGY section's "Workouts" row on the same screen. `energy-summary.ts`'s own header states
+  the principle it was built on — *"the day screen disagreeing with Nutrition about how much was
+  burned is worse than either being slightly off"* — and this adds a third place on one screen for
+  the two to disagree. Assert the sum in a test.
+- **Empty state:** `computeActiveEnergy` returns zeros and `estWorkoutKcal` returns `null` when
+  age / weight / sex are missing (`workout-energy.ts:109-110`). A profile-less user must not see a
+  confident `0 kcal` — same class as Q-278 (a score that could not be computed rendering identically
+  to a real one). Decide what the stat shows when the estimate is unavailable.
+- **Not a duplicate:** nothing in the backlog covers it, and `projectOverview.md`'s only mention is
+  the deferral quoted above. **Q-312 is unrelated** despite touching `estWorkoutKcal` — that is the
+  synthetic *test* constants scrubbing METs below 1.0 in CI, not the production MET table.
+- **What would count as done:** each session card on the day screen carries a calories figure for
+  *that session*, computed server-side in `/api/day-log` from the session's own duration, labelled so
+  it does not read as measured; the figures sum to the ENERGY section's Workouts row; and a user with
+  an incomplete profile sees an honest absence rather than a zero.
 
-| ingredient lines | content ends | slack | void at 50 mm |
-|---|---|---|---|
-| 1 | 77.5 | 32.5 | **8.6 mm** |
-| 2 | 85.5 | 24.5 | **6.5 mm** |
-| 3 | 93.5 | 16.5 | 4.4 mm |
-| 4 (the budget) | 101.5 | 8.5 | 2.2 mm |
-
-The owner's `Protein Shake` prints **two** lines, so it carries **6.5 mm of nothing** — about an
-eighth of the label's height — and their printed `Ninja Creami` label shows the same band.
-**A four-ingredient meal looks fine and a one-ingredient meal looks broken**, which is why this
-survived review: the mockups were drawn with fuller lists.
-
-**The fix — shift the whole composed block down by half the slack.** Every gap the style specifies is
-preserved exactly; only the leftover is shared between top and bottom, which is what the approved
-mockup did. One offset applied to the header, rule and ingredient block; `codeTop` does not move.
-
-**The composition to match is the interactive prototype's**, and the owner re-sent it on 2026-08-19
-for exactly this purpose: *"This was the mockup style you showed me by the way; with everything
-nicely centered."* — <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>,
-screen 5. **Read it for the vertical rhythm only, not for the numbers:** that screen predates
-Q-411, so it shows a round die at `13.2 mm / 0.40 mm per module` and a `Full breakdown SQUARE`
-badge, all three of which are now superseded. What it gets right — and what the shipped renderer
-does not — is that name, calories, macros, rule, ingredients and code read as **one centred group**
-rather than two clusters pinned to opposite edges.
-
-**Why the prototype never showed this defect, so nobody mistakes it for a regression:** it was
-hand-composed with a flex column and `justify-content: center`, which distributes leftover space
-automatically. The production renderer computes absolute offsets from both margins instead. The bug
-has always been in the renderer; the prototype simply used a layout engine that cannot express it.
-
-**A second, horizontal half of the same complaint — owner, 2026-08-19:** *"Id rather it look more
-like that with the number for calories centered with small text KCAL next to it."* The calorie
-figure is **off the label's axis**, and it is one expression:
-```js
-const startX = cx - (numW + 3 + unitW) / 2      // meal-label-render.ts:547
-```
-That centres **number + gap + unit as one run**, so the numeral's own midpoint sits left of `cx` by
-`(3 + unitW) / 2` — for `inlineCentred` (`macroSize 7.5`, `letterSpacing 0.12em`) roughly **3 mm
-left of centre on a 50 mm label**. Every other element on the label is symmetric about `cx`, which
-is what makes the number read as misaligned rather than merely offset.
-- **Fix: centre the numeral, let the unit overhang.** `startX = cx - numW / 2`, with `KCAL` drawn at
-  `startX + numW + 3` as it is now. Nothing else changes — same sizes, same gap, same tracking.
-- **State the trade rather than discovering it:** the composition stops being symmetric about the
-  axis, because `KCAL` hangs to the right. That is the right call for a figure whose whole job is to
-  be read at a glance, and it is what the reviewed prototype did.
-- **Bound the overhang.** Check the widest realistic figure — a four-digit batch total on a
-  multi-portion meal — so `startX + numW + 3 + unitW` never crosses the right margin. If it can,
-  fall back to the run-centred form for that case rather than letting the unit clip.
-- **`band` uses a different calorie path** (`:422`, `L + calW + 4`, left-aligned in the reversed
-  header) and is **not** affected. Do not "fix" it to match.
-
-**And the unit is too large — owner, 2026-08-19:** *"Make the KCAL text still a little bit smaller -
-as small as the nutritional text."* **This needs the spec split before it can be done at all**, which
-is the part worth knowing before someone reaches for the obvious edit:
-- `KCAL` is drawn at **`spec.macroSize`** (`:544`, `:552`) — **the same constant that sets the P/C/F
-  line** (`:561`). Shrinking the unit by editing `macroSize` shrinks the macros with it. There is no
-  way to satisfy this request through the existing fields.
-- **Add a `unitSize` to `StyleSpec` and set it to `6`.** Three sizes were drawn — 7.5 (today), 7
-  (the list size, which was the recommendation) and 6 — and the owner's read decided it:
-  ***"looks the same to me so go 6 then."*** 7.5 → 7 is a **6.7%** change, and if the intended
-  reduction is not perceptible at true size then it is not a change; 6 is **20%** down and visibly
-  subordinate to the numeral. Take 6.
-- Six styles get one new field. `band` reads `macroSize` for its unit too (`:420`, `:424`) and should
-  take the same `unitSize`, since its calorie path differs in *position* rather than in type scale.
-- **6 is below the list size, which was flagged as a real trade and accepted.** At that size the unit
-  stops reading as a word and becomes a mark attached to the numeral — which is the intent, since its
-  job is to label the figure rather than be read. **It does mean `unitSize` is no longer derived from
-  `listSize`**: set it as its own value rather than a fraction of another, or a later change to the
-  ingredient type will drag the unit with it — the exact coupling this field exists to break.
-- **⚠ Verify 6 on paper, not on screen.** 6 units is ~1.6 mm of cap height on a 50 mm label. The
-  renderer's own header already warns that *"ink spread merges fine modules"*, and letterforms suffer
-  before QR modules do. The owner has a working print path and has run one test print, so this is
-  cheap: print one label at 6 and confirm `KCAL` is still crisp. **If it fills in, 7 is the fallback**
-  and this entry records why.
-
-- **⚠ Do NOT absorb the slack into the code.** It is the obvious alternative and it is wrong: the
-  slack varies with the ingredient count (8.6 mm down to 2.2 mm), so a code sized to fill it would
-  print at a **different physical size per meal** — and the sheet's *"Code is 18.5 mm at 0.56 mm per
-  module"* readout, plus every scannability claim resting on it, would stop being true. The code's
-  size is a promise; the whitespace is not.
-- **Check the other five styles in the same PR**, per the sibling-surface rule. `band`, `editorial`,
-  `ticket` and `plaque` share `centredStackLineBudget` and differ only in their gaps and
-  `codeUnits`, so they have the same defect at different magnitudes. `square`/`Big code` uses
-  `layout: 'beside'` and needs its own look rather than an assumption either way.
-- **Verification.** Render one meal at **1, 2, 3 and 4** ingredient lines and confirm the gap above
-  the code and the gap below the top margin are within a unit of each other in every case. The
-  existing `centredStackLineBudget` tests already assert `maxLines`; **add one asserting the residual
-  slack is split**, so a future gap change cannot silently re-pin the block to one edge.
-- **What must NOT change:** `maxLines`, `codeUnits`, and the reported mm figures. This moves pixels
-  down the sheet and nothing else — if any of those three shift, the change has gone further than it
-  should.
+- **⬆ ASKED A SECOND TIME AND MOVED TO THE TOP OF THE QUEUE, 2026-08-19.** The owner, with a fresh
+  day-screen screenshot (Wednesday 19 August — Legs, 92 min, VOLUME KG 8,618 · EXERCISES 5 · SETS 18,
+  and a treadmill walk below it showing `101 kcal`): *"i want the caloeies burned showed per event;
+  so on the training; next to volume,excercises,sets, i want Energy Usage (or calories burned) same
+  with activity so I can look at each card and see howmuch that activity burns."* Same request, same
+  contrast, one day apart — **treat the placement as settled: it goes in the stat
+  row beside Volume / Exercises / Sets**, which resolves the "or put it somewhere the implication is
+  weaker" option above in favour of labelling instead.
+- **Naming: the owner offered "Energy Usage" or "calories burned".** Prefer a form that carries the
+  estimate in the label rather than a separate disclaimer — `~410` with the label `EST. KCAL` fits
+  the existing `Stat value/label` shape without a fourth element. The tilde is doing the work the
+  bullet above asks for.
+- **Nothing new is needed to build it, and that is worth stating plainly:**
+  `computeActiveEnergy` **already calls the estimator per session** — `daily-energy.ts:107-109` loops
+  `input.strengthSessions` and calls `est(8, s.durationMin)` for each (→ `estWorkoutKcal`, `:102-103`) — and then **adds them into one
+  `workoutKcal` and discards the split**. The per-session figure is computed today and thrown away.
+  Returning the breakdown alongside the total is the whole server-side change; the consistency
+  requirement above is then satisfied by construction rather than by a second calculation.
+- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — no device or
+  production data needed. Spans `app/api/day-log` (Lane A) and `components/**` (Lane B); the deferral
+  note says the server half is the correct home, so **route it to Lane A** with the display change
+  riding along.
 
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
@@ -1674,6 +1641,89 @@ the type, so a picker has somewhere to read from and write to.
   cheapest tripwire, and the audit view now carries `image_bytes` for the same reason.
 
 
+### [cardio][devices] Q-418 — the free walk shows no heart rate while the strap feeding it cadence is connected
+
+- **Branch:** `feat/free-activity-metrics`
+- **Added:** 2026-08-19 · owner, mid-walk screenshot: *"the normal walk activity doesnt have HR - any
+  further metrics we can give the normal walk - including the android pill displaying time"*
+- **Lane B** for the screen; **Lane A** for the notification half (see below), which is Kotlin and
+  needs a new APK.
+
+**The HR gap is the cheap one, and the screenshot proves the data is there.** The free-activity screen
+(`components/activity/active-activity-screen.tsx`, 111 lines) renders **distance · pace · cadence**
+and nothing else — there is no `bpm` anywhere in the file. Yet the same screenshot reads
+**`120 spm · strap`**, so the Polar H10 was connected and streaming at that moment. A strap that
+supplies cadence supplies heart rate; the screen simply never asks.
+- **The guided walk already does it**, from the same source: `walk-active.tsx:62` subscribes via
+  `mgr.subscribe((s: LiveHrSample) => …)` and renders `liveBpm` with a `STALE_MS` freshness guard
+  (`:126`) so a dropped strap reads *"(stale)"* rather than freezing on a stale number. **Copy that
+  shape, including the guard** — a number that silently stops updating is worse than a dash.
+- **And the data is already being persisted**: `done-activity-screen.tsx` fetches `hr-window` after
+  the fact and stores `avgHr`/`maxHr`. So HR is recorded for these walks today and is only invisible
+  *while you are walking* — the one time it is actionable.
+
+**Further metrics. Two are REQUESTED, two are proposed.** Everything here is already computed
+elsewhere in the same flow, so each is a render rather than a feature:
+1. **Heart rate — requested.** Above. The obvious gap.
+2. **Total step count — requested** (*"also a total step count would be good"*, owner, same
+   conversation). `CadenceTracker` already exposes `stepsEstimate` — it is what Q-230 used to fill
+   the saved `steps` field, so the number exists and is already trusted enough to persist.
+   **Q-410 adds the same readout to the guided walk; the two screens must show the same thing.**
+   Ship them together or the free walk becomes the surface that got forgotten, which is what this
+   entry is about. **Carry Q-410's caveat with it**: the total is *integrated cadence*, not counted
+   steps, and it is **strap-only** — with no strap it does not exist, so label it an estimate and
+   hide it rather than showing `0`.
+3. **Average pace** alongside current pace — proposed. Current pace on a 1:39 walk is noise; the
+   average is the number that means something. Distance and elapsed are both already on screen, so
+   this is division.
+4. **Elevation gain** — proposed. `computeElevationChange(rawPoints)` runs on save; running it live
+   costs one call over points already in memory. Worth it on a hilly walk, invisible on a flat one,
+   so put it behind a non-zero check rather than showing `0 m`.
+
+**Do not add all four to the metric row.** It currently holds three at `text-2xl`, centred, on a
+412 px screen. Four fits; six does not. Recommendation: **distance · pace · HR** on the primary row,
+with **cadence · steps · elevation** as a smaller secondary line — the guided-walk hierarchy, which
+is already the app's answer to this question. Both owner-requested metrics land on that layout: HR
+in the primary row where it can be acted on, steps in the secondary line where a running total
+belongs.
+
+**The Android pill — it exists, and it cannot show the time without native work.**
+- **There is already an ongoing notification during a free walk.** `lib/activity/gps-tracking.ts:29`
+  registers `@capacitor-community/background-geolocation` with
+  `backgroundTitle: 'TrainingAI · Activity'` and `backgroundMessage: 'Tracking your walk or run'`.
+  That is the pill; it is static.
+- **The plugin cannot update it.** Its whole surface is three methods — `addWatcher`,
+  `removeWatcher`, `openSettings` (`definitions.d.ts:98-116`). `backgroundMessage` is fixed at
+  watcher creation, and there is no update call. **Re-adding the watcher to change the text would
+  restart location tracking mid-walk**, which is a worse bug than a static string.
+- **Nor can we simply run our own service instead**: the plugin's own docs state the watcher only
+  continues in the background *if* `backgroundMessage` is defined, so dropping it to suppress the
+  notification also drops background tracking. Adding a second foreground service on top would show
+  **two** pills.
+- **Recommendation: extend the plugin natively rather than replacing it** — a small Kotlin addition
+  exposing `updateNotification({ id, title, message })`, applied as a patch or a fork. It keeps every
+  tested background-location behaviour the walk depends on and touches one file. The alternative,
+  writing our own location foreground service, duplicates permission handling, doze behaviour and
+  watcher lifecycle that already work. **Reversal cost is low either way** — the call site is one
+  function in `gps-tracking.ts`.
+- The app already runs **three** foreground services with notification channels (`OuraRingService`,
+  `PolarStrapService`, `ScaleBleService`), all `foregroundServiceType="connectedDevice"`, so the
+  pattern and the channel plumbing exist to copy from.
+
+**⚠ The finding worth acting on beyond the display: `FOREGROUND_SERVICE_LOCATION` is declared and
+nothing uses it.** The manifest requests it and `ACCESS_BACKGROUND_LOCATION` (`:138-140`), but all
+three declared services are `connectedDevice` — **no service declares
+`foregroundServiceType="location"`**. Background tracking therefore rests entirely on the plugin's
+own service. That is probably fine, since the plugin does run one, but **it has never been verified
+here**: nobody has confirmed a long walk with the screen off keeps its GPS points. The owner's
+screenshot is a **1:39** walk with the screen on, which exercises none of it.
+- **Verify before adding metrics**, because a screen showing four numbers about a walk that stopped
+  recording is worse than one showing three. Walk 20+ minutes with the screen off and the phone
+  pocketed, then check the saved route for gaps.
+
+- **Verification.** HR live on-device with the strap paired, and the stale guard exercised by walking
+  out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
+
 ### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
 
 - **Branch:** `feat/walk-step-goal`
@@ -2205,105 +2255,17 @@ switching from bare `fetch` to local-delete + `queueMutation`.
   that is the real source of truth on the APK. Re-check the first-load window **on device**, where the
   worker's install timing and the WebView lifecycle differ.
 
-### [platform] Q-554 — the orientation indexes named paths that do not exist, including a module that was never built
-
-- **Status: FILED AND FIXED in the same PR** (docs + a new CI check, Custom Rules now **42 of 42**).
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-orientation-index-paths.md`](reviews/2026-08-18-orientation-index-paths.md)
-- **The gap.** `scripts/check-claude-md-paths.js` guards `CLAUDE.md` for the reason in its header —
-  *"a wrong path in a rulebook is worse than a wrong path in code: nothing compiles it, so it rots
-  silently and is copied confidently"* (Q-153). Sessions are also told to read `docs/module-map.md`
-  before building any shared helper and `docs/domains/<pillar>/README.md` before working in a pillar.
-  **Nothing checked either.**
-- **⚠️ `docs/module-map.md:232` carried a row for a module that has never existed.**
-  `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket(cols27)`: **zero references to either in
-  the whole tree.** What exists is the row twenty lines below — `lib/oura-models/steps-motion-decoder.ts`
-  → `runStepsMotionDecoder(input)`, golden-verified and described there as **"NOT yet wired"** into the
-  BLE decode or the step pipeline. So row 232 described *that wiring*, in the present tense, in a table
-  whose stated purpose is **"what already exists and where … to stop new work re-implementing
-  infrastructure the app already has."** It produced both errors at once: someone looking for the
-  decoder finds nothing, someone checking whether the wiring is done reads that it is.
-- **Three stale domain-index rows:** `workouts` listed a UI route `app/history/` (gone — history renders
-  via `components/exercise-history-sheet.tsx`), `devices` listed `docs/oura-models/` (no such dir; the
-  ops reference is `docs/oura-ble-operations.md`), `app-shell` listed `app/overview/` (no such route).
-- **49 malformed display paths.** Every domain index rendered history links as
-  `` `docs/../overview/history-…md` `` — **link target correct, visible label wrong** (`docs/../overview/`
-  normalises to `overview/`, which does not exist). Fixed across all eleven; link targets untouched.
-- **The check:** `scripts/check-index-doc-paths.js` — **748 paths across 12 docs**. Deliberately
-  narrower than its sibling: root-anchored backticked paths only; globs/ellipses/templates skipped; a
-  path named *while saying it is gone* needs a `DELIBERATE` entry with a reason.
-- **⚠️ Those narrowings were earned, not designed.** The first pass reported **59 of 787**, all but four
-  being relative fragments, globs, or the display-path bug. **And the fixes then re-triggered the
-  check** — writing *"there is no `app/overview/` route"* names the path in backticks just as surely as
-  claiming it exists. Four `DELIBERATE` entries now carry their reason.
-- **Not exercised:** existence only. The check does **not** verify that the description beside a path is
-  accurate — row 232 was caught only because its path was wrong too. A row naming a real file while
-  describing behaviour it does not have still passes.
-
-### [platform] Q-553 — a Known Issue was in both the live list and the resolved archive; nothing checked
-
-- **Status: FILED AND FIXED in the same PR** (docs + a new CI check). Kept as the record of the class.
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-known-issue-duplication.md`](reviews/2026-08-18-known-issue-duplication.md)
-- **The invariant nothing enforced.** `CLAUDE.md`: *"Striking a Known Issue means MOVING it … Cut the
-  entry whole, append it to the archive, **leave nothing behind**."* Two entries were in both lists.
-- **Q-139 — `🔴 OPEN` live and `✅ fixed` archived, for ten days.** `projectOverview.md` carried 69
-  lines describing the bug as unfixed while the archive recorded it fixed 2026-08-08 in v1.270.25.
-  **Every session's mandated orientation read showed a red, highest-severity open issue for a
-  ten-day-old fix.** Both halves verified fixed **in source**, not taken on the archive's word — the
-  backstop the live row called still-open is closed at
-  `packages/shared/src/health/step-estimate.ts:176`, whose comment names Q-139.
-- **Q-81 — a byte-identical 31-line entry in both files.** A pure copy.
-- **⚠️ Both were also archived *early*.** `CLAUDE.md` says only move when nothing is owed, *including a
-  pending device check* — and both entries say one is outstanding (Q-139: not verified on device;
-  Q-81: whether the model fits the owner's real data). So the mistake was two-part: **copied rather
-  than moved, and moved before it was allowed.**
-- **Applied here:** cut the premature archive copies and kept the live entries (the conservative
-  direction — the live list is what everyone reads and where an owed check belongs). Q-81's copy was
-  identical so nothing was lost; Q-139's unique material was folded into the live entry first, and its
-  stale 69-line `🔴 OPEN` body replaced with a compact `⚠️ FIXED, not verified on device` row.
-  `docs/domains/activity/README.md` had the same stale claim (*"needs one owner decision"*, which had
-  been made) — updated.
-- **The check:** `scripts/check-known-issue-duplication.js`, now step **41 of 41** in Custom Rules.
-  **Its first version reported 4 and only 2 were real**, so two narrowings are written into its header:
-  a heading's identity is its **first** Q number (an archive heading may name a second issue in
-  passing), and **range headings are skipped** (a batch row spanning `Q-63…Q-69` overlapping one
-  archived member is a stale range wanting a human, not a red build).
-- **Not exercised:** static reconciliation. Q-139's own outstanding item is an on-device check after the
-  next history drain, and Q-81's needs production — neither possible here.
-
-### [platform] Q-552 — two sources of truth for the next Q band; the prose one was wrong
-
-- **Branch:** `docs/q-block-ledger-procedure` · **(fixed in the same PR that filed it — see below)**
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md)
-- **Placement:** already actioned; kept as the record of *why* the procedure changed.
-- **The near-miss.** Review's band 450–499 was exhausted by Q-499. `docs/agents/README.md` says
-  *"claim the next block of 50 above 529"* — which literally gives **530–579** and collides with
-  **fourteen numbers already in use**. The predecessor baton had already written 530–579 into the
-  handover, so the next session would have taken it.
-- **The ledger recorded 530–537, 538–542 and 543. `544–551` were also live** — across
-  `docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
-  `docs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
-  `docs/domains/devices/README.md` and this backlog — and appeared nowhere in it.
-- **⚠️ Correction to the first draft of this entry, which said the ledger is "the only defence". It is
-  not, and the truth is more interesting — there are TWO sources for the same fact:**
-  | Source | Said | Status |
-  |---|---|---|
-  | this file → *Live pointers* → "Next unallocated Q band" | **552** | ✅ correct, **CI-enforced** by `scripts/check-backlog-pointers.js` |
-  | `docs/agents/README.md` prose ledger + "next block of 50 above 529" | **530** | ❌ stale — omitted 544–551 |
-  The machine-checked pointer was right the whole time. **The collision was reachable only by
-  following the README's prose instruction** — which is what the README tells you to do, and what the
-  Review baton had already copied.
-- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
-  with *"Q-552 is in use but the next unallocated band starts at 552 — a band was used without being
-  recorded."* It caught this in the same PR.
-- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
-  count in a script is a fact* — and the first where the checked copy was silently **right** while the
-  prose copy was silently **wrong**.
-- **Fixed in this PR:** claimed **552–601**, recorded **544–551** retroactively, bumped the pointer to
-  **602**, and pointed the instruction at the checked source — *read the "Next unallocated Q band"
-  pointer, not the prose list; then record your block in both.*
+> **Swept 2026-08-19 — Q-552, Q-553 and Q-554 removed as complete.** All three were review findings
+> that were *fixed in the PR that filed them*, and each left behind a CI check that now enforces it:
+> `check-backlog-pointers.js`, `check-known-issue-duplication.js` and `check-index-doc-paths.js`
+> (steps 45, 47 and 48 of 49). Nothing was owed on any of them.
+>
+> **Q-552 was explicitly annotated *"kept as the record of why the procedure changed"*, which is what
+> this file's own protocol forbids** — *"History is not kept in this file"*, and a completed item
+> *"must never linger in the queue"*. Removing it loses nothing: the band ledger it created, including
+> the retroactive 544–551 and Review's 552–601, lives in
+> [`docs/agents/README.md`](agents/README.md) where the procedure itself is documented, and the
+> narrative is in `docs/reviews/2026-08-18-*.md`. A record kept in the work queue is read as work.
 
 ### [app-shell][health] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
@@ -2379,111 +2341,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 - **Verification:** `shiftDateStr('0001-01-01', -1)` must give `0000-12-31`, and every existing
   `shiftDateStr` test must still pass unchanged.
 
-### [devices][body] Q-494 — a far-future ingest date permanently captures every "most recent" read
-
-- **Branch:** `fix/ingest-date-range-bounds`
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement: high.** Single request, permanent, silent, and it corrupts a value feeding the scale
-  pipeline and every activity-calorie estimate.
-- **Measured.** The regex bounds the date's shape, nothing bounds its range:
-  ```
-  before: getMostRecentConfirmedWeightKg -> 2026-08-18, 81 kg
-  POST {"date":"9999/12/30","weightKg":499} -> {"success":true}
-  after:  getMostRecentConfirmedWeightKg -> 9999-12-30, 499 kg
-  ```
-  `ORDER BY date DESC LIMIT 1` answers **499 kg until the year 9999**; no later write can outrank it.
-  Two readers use that shape: `getMostRecentConfirmedWeightKg` (BLE-scale confirmation) and
-  `deriveActivityKcal` (multiplies body weight into activity calories).
-- **The ranked source merge cannot help, and the reason is worth keeping.** `health-source.ts` ranks
-  per **column, per date** — it stops a worse source overwriting a better one *on the same day*. A row
-  on a date nothing else ever writes has no competitor, so rank 1 (`health_connect`, the lowest) wins
-  outright. The documented protection is orthogonal to this, not weak against it.
-- **⚠️ This is not a novel class — it is the one ingest path that never got the fix its siblings have.**
-  `packages/shared/src/validation/ingest-clock.ts` already exists for exactly this
-  (`INGEST_PAST_TOLERANCE_MS` 7 d, `INGEST_FUTURE_TOLERANCE_MS` 60 s, `resolveMeasuredAt`), and the
-  workout path has its own parallel guard `resolveCompletedAt` from **Q-24 §7** — whose comment says
-  `completedAtMs` *"was accepted unbounded and uncompared"*, the same sentence that describes `date`
-  here. Coverage: `scale-ble/samples` ✅, `oura-ble/samples` ✅ (downstream, via `step-day-buckets.ts`),
-  `complete-workout` ✅, **`health-connect/ingest` ❌ — none, anywhere in its chain.** The
-  sibling-surface rule was missed twice: once when `resolveMeasuredAt` was written, once at Q-24 §7.
-- **Fix:** route the ingest date through the existing **`ingest-clock`** module rather than adding a
-  bespoke range check — the one-formula-one-place answer, and it inherits the reconcile-don't-reject
-  behaviour the other paths chose (`resolveCompletedAt`'s comment argues that case and it applies
-  verbatim: a 400 would quarantine the outbox mutation and lose a real reading over a bad clock).
-  **Caveat:** `resolveMeasuredAt` takes an *instant*, this route takes a *calendar date* in the user's
-  timezone — the bound belongs on the resolved date against the user's today, not on a UTC instant.
-- **Wider lens, checked:** 10 `desc(...).limit(1)` "latest X" readers exist; the other 9 read
-  server-derived or device-monotonic columns, and `workoutSessions.completedAt` — the one that *was*
-  exposed — is now guarded. **`bodyMetrics.date` is the only unguarded one.**
-
-### [devices] Q-496 — a regex-passing but invalid ingest date returns 500 and writes an `error_events` row
-
-- **Branch:** `fix/ingest-date-semantic-validation`
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement:** medium. Needs the secret, so not an open spam vector — but it makes the fault table
-  every session is required to read less trustworthy.
-- **Measured:** `2026-13-45`, `2026-02-31`, `0000-00-00` each → **HTTP 500** plus an `error_events`
-  row (`[pg 22008]`). The regex accepts any `\d{4}[-/]\d{2}[-/]\d{2}`, so month 13 and day 45 pass
-  validation and fail at the driver.
-- **This is the class `normalizeDateParam` exists to prevent.** `CLAUDE.md` lists the routes
-  retrofitted with that guard; this one is not among them. A client input error is being recorded as a
-  server fault.
-- **Fix:** route the param through `normalizeDateParam` and return 400. Shares a location with Q-494.
-
-### [devices] Q-495 — `z.coerce.number()` launders `[]`, `true` and `""` into stored readings
-
-- **Branch:** `fix/ingest-no-coercion`
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement:** low. Needs the secret, writes at the lowest rank, and produces implausible rather
-  than dangerous values.
-- **The route's own comment is accurate about what it tested and silent about coercion.** It says the
-  bounds *"reject clearly-garbage values (a stringified `75kg`, a 1e308 double)"* — **both named
-  examples are indeed rejected.** Three unnamed ones are not: `"steps":[]` → **0**, `"steps":true` →
-  **1**, `"weightKg":""` → **0 kg**. Each landed in `body_metrics` stamped `health_connect`; a 0 kg
-  body weight is in range for `.min(0)`.
-- **Fix:** `z.number()` rather than `z.coerce.number()` (Tasker sends real JSON numbers), or reject
-  non-primitive input before the bounds. Give body weight a plausible floor, not zero.
-
-### [platform] Q-492 — seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current
-
-- **Branch:** `docs/claude-md-counts-cite-the-command`
-- **Added:** 2026-08-18 · review sweep (documentation self-maintenance) ·
-  [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](reviews/2026-08-18-claude-md-prose-counts.md)
-- **Placement:** medium. Docs-only and cheap, but `CLAUDE.md` is the file every session reads before
-  it may start, so a wrong number there is read by five concurrent agents before any code is touched.
-- **The measurement.** Every checkable count in the file, re-derived against `main` at `63fb89c`:
-  - **Script-backed: 3 of 3 current** — sparkline (3 inline / 6 exempt), `Ran 40 of 40` custom rules,
-    the rollup vitest glob.
-  - **Prose: 7 of 9 stale** — hex literals **471 → 428**; the >800-line hotspot list still names
-    `more/profile-tab.tsx` (**476 lines**); `health-sections.tsx` 795 → **777**; the script glob
-    "22 of 33" → **29 of 40**; `READINESS_SCORE_TTL` "four sites" → **6**; suite "448 files" →
-    **504**; the nine chevron paths (already Q-491). Two prose counts *are* right (score-band 17,
-    "11 inline grep rules") — the correlation is strong, not absolute, and is recorded that way.
-- **Two items that are more than drift:**
-  - `more/profile-tab.tsx` **should already have been struck** — the same paragraph mandates removing
-    a hotspot that drops under the line, and cites `health-sections.tsx` being removed on 2026-08-09
-    for exactly that. The procedure was followed once, then not again.
-  - **The rollup-glob maintenance command cannot detect what it is for.** `CLAUDE.md:976` says keep
-    the glob in step with `grep -rl aggregateOuraRawSamples lib/data/postgres/__tests__/`, to catch
-    "a new rollup test outside it". But it is scoped to the directory the glob covers, so it can only
-    confirm the glob against itself; and `grep -l` matches comments (it reports two files that never
-    call the function). **Both defects are latent** — no test outside the glob actually calls the
-    rollup today. Nothing is mis-timed; the procedure just would not fire when needed.
-- **One ratchet with slack.** `check-component-size.js` is shrink-only; four baselines are exact,
-  `components/workout-screen.tsx` is pinned at **1850** against an actual **1831** — 19 lines of
-  regrowth that would pass silently.
-- **The fix is not "correct the seven numbers"** — that resets the decay clock for about a week. For
-  each count, **cite the command or delete the number and keep the rule**. The file already contains
-  the model, in its own sparkline paragraph: *"Don't hand-count from `grep -rn '<polyline'`; run
-  `node scripts/check-sparkline-primitive.js`, which is the maintained list."* `check-hex-literals.js`
-  and `check-component-size.js` both already print their own totals.
-- **Scope:** `CLAUDE.md` (rewrite each count as a command citation); optionally lower the
-  `workout-screen.tsx` baseline to 1831 and broaden the rollup grep to repo-wide + call-site-aware.
-- **Not exercised:** static verification only, no runtime or device.
-
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
 - **Branch:** `fix/aria-expanded-collapsibles-ratchet`
@@ -2526,44 +2383,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 - **Not verified: no screen-reader testing.** The claim is that the attribute is absent, not that a
   specific announcement is wrong. Not on the APK, where TalkBack is the relevant reader.
   `app/coach/coach-content.tsx` was examined and **excluded** — its chevron is a back button.
-
-### [platform] Q-480 — a `CLAUDE.md` line marks the repository layer as timezone-broken; it is the reference pattern instead
-
-- **Branch:** `docs/claude-md-repo-tz-line`
-- **Added:** 2026-08-18 · review sweep (server-side verification) ·
-  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](reviews/2026-08-18-server-tz-and-rate-limit-verification.md)
-- **Placement:** low. A one-clause documentation correction — but a load-bearing one, because it
-  misdirects anyone picking up **Q-477**.
-- **The line**, in the Date Arithmetic section:
-  > *"Repo day-window helpers currently **hardcode** `DEFAULT_TZ` — thread the session tz through when
-  > touching them, and never re-declare `DEFAULT_TZ` locally."*
-- **They do not hardcode it — they take it as a default parameter, and every caller passes the session
-  timezone:**
-
-  | Helper | Callers | Threads tz? |
-  |---|---|---|
-  | `getCalendarData(…, timezone = DEFAULT_TZ)` | `app/api/calendar-data` | ✅ |
-  | `getRecentTrainedDays(…, timezone = DEFAULT_TZ)` | `app/api/streak-data` | ✅ |
-  | `getNextSession(…, timezone = DEFAULT_TZ)` | 5 sites incl. `lib/ai-chat/tools.ts` | ✅ at all 5 |
-
-  A default every caller overrides is a safety net, not a hardcoded value.
-- **Why the stale line costs something.** It marks `lib/data` as a known-broken area, so an
-  implementer taking Q-477 (the client-side timezone sweep) starts there, finds nothing, and a
-  reviewer treats a repo call site as suspect when it is in fact the pattern to copy.
-- **The other half of the same sentence is holding** — zero local re-declarations of `DEFAULT_TZ`
-  outside `packages/shared/src/date-utils.ts`. Keep that clause verbatim.
-- **Fix:** replace the "currently hardcode" clause with what is true — the helpers *default* to
-  `DEFAULT_TZ` and every current caller threads the session tz; keep the instruction to keep doing so,
-  since the default is what makes forgetting silent.
-- **Filed rather than edited directly** because `CLAUDE.md` is the contract all five agents read, and
-  a Review agent quietly rewriting a rule line is a change the other four should see come through the
-  queue. Any lane can take it.
-- **Verified alongside, and worth keeping in the entry so it is not re-derived:** all 4
-  timezone-sensitive SQL sites in `lib/data` interpolate a parameter (no hardcoded zone string
-  anywhere in the repository layer), and every caller of the shared sleep helpers
-  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend`)
-  passes `tz`. **This bounds Q-477 to the client** — its fix does not need to touch `lib/data` or
-  `packages/shared/src/health`.
 
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
 
@@ -2617,6 +2436,37 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
   Brisbane and the symptom does not arise.
 
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
+
+> **⚠️ MEASURED against production 2026-08-19 — both named candidates are falsified. Read this before
+> starting; the entry below sends you at two dead ends.**
+>
+> Read through `POST /api/admin/db-query` (`pg_settings`, `pg_stat_activity`, `pg_stat_database`):
+>
+> | reading | value | what it means |
+> |---|---|---|
+> | `shared_buffers` | **128 MB** (16384 × 8 kB) | the Postgres **default**, not "sized for the container" — **candidate 1 is wrong** |
+> | cache hit ratio | **99.866%** (10,063,661 hits vs 13,485 disk reads) | 128 MB is *comfortably sufficient*; shrinking it is the wrong direction and growing it buys nothing |
+> | live backends on `railway` | **3** (2 app, 1 `claude_readonly` — mine) | not the "up to 12 backend processes" of **candidate 2** |
+> | `work_mem` | 4 MB | per-backend private memory is single-digit MB at this backend count |
+> | `max_connections` | **500** | against a ceiling of ~12 (`max: 10` + `PG_POOL_MAX=2`) |
+> | database size | **188 MB** | up from the entry's 171 MB, consistent with the ~0.4 MB/day trend |
+> | version | PostgreSQL **18.6** | |
+>
+> **The one over-provision visible from inside is `max_connections = 500`.** Postgres pre-allocates
+> per-connection shared structures at startup, so that is fixed cost paid at boot whether or not the
+> connections are used. Whether Railway's managed Postgres exposes it is an owner/console question,
+> not a code one.
+>
+> **⚠️ And the premise may not hold at all.** Most of a Postgres container's RSS on a ~190 MB database
+> is `shared_buffers` plus OS page cache — **reclaimable, not a leak**. The entry's own observation
+> that memory "grows as caches warm" describes exactly that. 0.79 GB may be near the floor for this
+> container rather than $7.87/month of waste, in which case there is nothing here to reclaim.
+>
+> **What this measurement cannot settle:** container RSS attribution. Railway's metric is the
+> authority and a sandbox cannot see it. **Before spending a session here, get the owner to confirm
+> the 0.79 GB steady state is still real** — the figure is from 2026-08-18, immediately after a volume
+> incident and restart, which the entry itself flags as the wrong moment to measure.
+
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1
 - **Branch:** `perf/postgres-memory-footprint`
@@ -3170,69 +3020,6 @@ moving *beside* the calories rather than under them.
   the merge that caused it rather than two PRs later. Not this entry's work.
 - **Surface:** reproducible in the sandbox against the seeded local DB — no device, no production
   data. `app/api/body-battery/**` is Lane A's.
-
-### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
-
-- **Branch:** `feat/day-training-card-kcal-stat`
-- **Added:** 2026-08-18 · owner, with a screenshot of the day screen (Tuesday 18 August):
-  *"the training shohld have a stat saying the calories burnt from the workout."*
-- **What the screenshot shows:** a day detail with READY 76 / HR 51 / SLEEP 92 / MOVE 65 across the
-  top. Under **TRAINING**, one session card — "Push, 8:24am → 9:13am · 49 min" — listing five
-  exercises, footed by three stats: **VOLUME KG 2,364 · EXERCISES 5 · SETS 10**. Directly below,
-  the **ACTIVITY** card for a treadmill walk *does* show "101 kcal" alongside bpm and steps. That
-  contrast is the report: the activity gets a calorie figure and the workout does not.
-
-**This was already considered and deliberately deferred — the reasoning is on file.**
-`projectOverview.md` (Q-247's entry) says outright: *"Deliberately not done: a per-workout kcal
-estimate in the day screen's Training section. It needs `estWorkoutKcal` per session, which is the
-Q-230 bundle hazard from a client component — doing it properly means computing it server-side in
-`/api/day-log`."* The owner asking for it is what moves this from *deferred* to *queued*; the
-blocker and the intended shape were both already named, so **do not re-derive them.**
-
-- **Where it goes:** `components/health/day-detail/day-sections.tsx:112-116` — the `TrainingSection`
-  stat row (`Volume kg` / `Exercises` / `Sets`, all derived client-side from the sets data).
-  `data.workoutDurations[sessionName]` on the same component already carries `{start, end, minutes}`
-  **per session**, so the duration the estimator needs is present; the profile inputs are not.
-- **⚠ The existing `workoutKcal` is a DAY total, not a session figure — this is the thing to get
-  right.** `computeActiveEnergy` (`packages/shared/src/health/daily-energy.ts:104-107`) sums
-  `estWorkoutKcal` over *every* strength session in the day, and that day-level number **already
-  renders on this very screen**, as the "Workouts" row of the ENERGY section
-  (`components/health/day-detail/energy-summary.ts:33`). So this is not "surface the field that
-  exists" — a card is per session, and two sessions in one day would both show the day total.
-  It needs a **per-session** call to the same shared estimator, server-side per the deferral note.
-- **⚠ The deferral note undersells the blocker: it is not a bundle-size hazard, it is impossible.**
-  `estWorkoutKcal` → `getEnergyFeatureSpec()` (`lib/oura-models/constants/index.ts:442`) → `readJson`,
-  which calls **`fs.readFileSync`**. That cannot run in a client component at all, so there is no
-  "accept the bundle cost" option — the per-session figure has to come from the server. **That makes
-  this cross-lane: `/api/day-log` is Lane A's.** Lane B can render it the moment the field exists.
-  Verified 2026-08-18 while working the queue.
-- **⚠ And it is a duration-only estimate.** `daily-energy.ts:106` is
-  `estWorkoutKcal({ durationMin, …, activityId: 8, intensity: 'moderate' })` — a flat MET 8 over the
-  clock. **Load, volume and reps are not inputs.** A 49-minute session moving 2,364 kg and a
-  49-minute session moving 800 kg produce the *same* number. Placing it in the same row as VOLUME KG
-  / EXERCISES / SETS — three measured facts — implies it is derived from them, and it is not. Either
-  label it so the basis is legible ("~kcal", "est."), or put it somewhere the implication is weaker.
-  This is a presentation decision, not a formula one; the formula is fine for what it is.
-- **Consistency requirement:** once a per-session figure ships, the session cards on a day must sum
-  to the ENERGY section's "Workouts" row on the same screen. `energy-summary.ts`'s own header states
-  the principle it was built on — *"the day screen disagreeing with Nutrition about how much was
-  burned is worse than either being slightly off"* — and this adds a third place on one screen for
-  the two to disagree. Assert the sum in a test.
-- **Empty state:** `computeActiveEnergy` returns zeros and `estWorkoutKcal` returns `null` when
-  age / weight / sex are missing (`workout-energy.ts:109-110`). A profile-less user must not see a
-  confident `0 kcal` — same class as Q-278 (a score that could not be computed rendering identically
-  to a real one). Decide what the stat shows when the estimate is unavailable.
-- **Not a duplicate:** nothing in the backlog covers it, and `projectOverview.md`'s only mention is
-  the deferral quoted above. **Q-312 is unrelated** despite touching `estWorkoutKcal` — that is the
-  synthetic *test* constants scrubbing METs below 1.0 in CI, not the production MET table.
-- **What would count as done:** each session card on the day screen carries a calories figure for
-  *that session*, computed server-side in `/api/day-log` from the session's own duration, labelled so
-  it does not read as measured; the figures sum to the ENERGY section's Workouts row; and a user with
-  an incomplete profile sees an honest absence rather than a zero.
-- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — no device or
-  production data needed. Spans `app/api/day-log` (Lane A) and `components/**` (Lane B); the deferral
-  note says the server half is the correct home, so **route it to Lane A** with the display change
-  riding along.
 
 ### [platform][app-shell] Q-392 — preferences live only on the device, so a reinstall or a second browser starts from defaults
 
@@ -6524,6 +6311,106 @@ session working from a temporarily restored copy.
 - **Caveats:** keep `base`/`adjustment`/`trained` — the blend wrapper is real information (it is how
   a Cloud-era adjustment is distinguished from our own base) and something may read it. Merge, do not
   replace.
+
+### [sleep] Q-529 — a provisional sleep score is displayed as final while the night is still syncing
+
+- **⚠️ SCOPE CORRECTED 2026-08-20, hours after filing — the original claim was WRONG. Read this first.**
+  This entry originally said the score is *never* recomputed. **It is.** Re-checked at 06:59:32:
+  `sleep_score` **47 → 55**, `computed_at` **06:45:56 → 06:54:41**, after the session settled at
+  **06:51:03**. The ordering that looked broken was a snapshot of a pipeline mid-run.
+  - **The "near-twin" comparison also does not survive.** 2026-08-17 matched on *duration and onset* —
+    the columns that happened to be in the query — and differs where the model actually looks:
+    **REM 1.42 h vs 2.08 h** (contributor **63 vs 99**) and **efficiency 86% vs 90%** (**57 vs 82**).
+    The remaining 23 points are the score **working**.
+  - **What survives is smaller and real:** a **~9-minute window (06:45:56 → 06:54:41)** in which a
+    provisional score renders as final, with nothing marking it — landing exactly when someone checks
+    last night's sleep.
+  - **Re-scoped from Lane A to Lane B.** Not a missing recompute path; an unmarked provisional state.
+    **Merges with the `projectOverview.md` Known Issue** on the time-in-bed range label — same root as
+    that and as Q-520: *a still-syncing night renders identically to a settled one.*
+  - **Method lesson:** a **three-minute** observation window was used to assert a permanent absence,
+    and the twin was picked on summary columns instead of the contributor vector. **Compare
+    contributors, not summary columns.**
+- **⚑ OWNER REQUIREMENT 2026-08-20 — this is the acceptance criterion, and it needs an APK.**
+  *"Ideally I want the score and sleep time to be accurate on first open of the day without needing
+  time to 'adjust'."*
+  [`docs/reviews/2026-08-20-accurate-on-first-open.md`](reviews/2026-08-20-accurate-on-first-open.md).
+  **The cause is neither the scoring nor the rollup: the ring uploads roughly once an hour.** Over 7
+  days, 214 ingest batches — **median gap 62.0 min**, p90 71, max 306. The owner opened the app in the
+  gap between the 05:40 and 06:44 uploads, so their wake was **still on the ring**. No scoring change
+  could have helped.
+- **Three links, and all three are needed. Order matters.**
+  1. **Drain on app open / wake detection** — closes the ≤62-min data gap, the dominant term.
+     **Native Kotlin ⇒ new APK**, not a Railway deploy.
+  2. **Roll up and re-score immediately after that drain** — this morning the last upload landed 06:50
+     and the score settled 06:54:41, a **~4-minute** processing lag.
+  3. **Until 1 and 2 land, do not render a number that will change** — this entry's existing scope,
+     and **the only part shippable without an APK.**
+  **Doing 2 without 1 makes the app faster at showing stale data.** Do not shorten the rollup schedule
+  alone: it addresses the 4-minute term and leaves the 62-minute one, which reads as *"we made it
+  faster and it still adjusts"*.
+- **⚠️ The limit, worth saying to the owner rather than discovering later.** If the app opens **before
+  the ring has registered the end of the night**, nothing fixes it. That morning the session's own end
+  was **06:47** and the screenshot **06:46**. The achievable target is *"accurate within seconds of the
+  ring knowing"*, not *"accurate before the ring knows"*. **Three distinct states — night in progress,
+  complete but unsynced, settled — and the app renders all three identically.**
+- **Drain-lag context, last 8 nights (ingest completion vs wake):** +3, +9, **−5**, +2, +17, **+62**,
+  +4 min. Usually minutes, occasionally an hour. The **−5** matters: on 08-18 the data was complete
+  *before* wake, so today's outcome depends on where waking falls in the upload cycle — **luck, not
+  design.**
+- **⛔ Check before promising the on-open drain is cheap:** the 62-minute cadence is **observed ring
+  behaviour, not a documented setting.** Whether it is configurable, and what more frequent radio
+  wake-ups cost in ring battery, is unknown here — and the firmware is deliberately frozen, so this is
+  not a free knob.
+- **Branch:** `fix/mark-provisional-sleep-score` · **Lane:** B
+- **Plan:** none yet — **first confirm whether a slower pass corrects it** (see caveat). Evidence:
+  [`docs/reviews/2026-08-20-sleep-score-computed-mid-sync.md`](reviews/2026-08-20-sleep-score-computed-mid-sync.md).
+- **Added:** 2026-08-20 · Tuning agent, from an **owner report** (*"that wake up time is way off, I
+  woke up around 6am"*) — screenshot at 06:46 Brisbane.
+- **The session healed itself; the score did not.** The app showed 9:52 pm – **4:52 am / 6.5 h**;
+  `sleep_sessions` now stores 9:52 pm – **6:44 am / 7.75 h**, `updated_at` **06:46:19** — matching the
+  owner's account. Deep 0.8 → **1.08 h**, light 4.3 → **5.25 h**, awake 0.5 → **1.17 h**.
+- **Measured ordering, exact — both timestamps are stored:**
+
+  | field | value |
+  |---|---|
+  | `oura_daily_derived.sleep_score` | **47** |
+  | `computed_at` | **06:45:56** |
+  | `sleep_sessions.updated_at` | **06:46:19** |
+
+  **The score predates its own input by 23 seconds.** Re-checked at 06:49:04 — still 47, still stamped
+  06:45:56. Stored contributors show what it read: `total_sleep 54` is a 6.5-hour value, and
+  truncation depresses `total_sleep`, `deep_sleep`, `rem_sleep` and `efficiency` **together**, which is
+  why the composite falls so far rather than a point or two.
+- **The comparison that settles it:**
+
+  | date | duration | eff | onset | score |
+  |---|---|---|---|---|
+  | **2026-08-20** | **7.75 h** | 87% | 30 m | **47** |
+  | 2026-08-17 | 7.58 h | 90% | 35 m | **78** |
+  | 2026-08-14 | 7.42 h | 90% | 10 m | **88** |
+  | 2026-08-19 *(ring fitted 4 am)* | 3.5 h | 86% | 15 m | 39 |
+
+  **A near-twin night scores 31 points higher**, and this one sits 8 points from a night the ring
+  spent mostly off the finger. **A reader cannot tell "bad night" from "stamped mid-sync".**
+- **NOT a duplicate of Q-520.** That covers a night that is *genuinely* incomplete, where a low score
+  is arguably right. **This is a complete night scored against a partial copy of itself.** They share
+  one remedy worth building once: readiness already stores a **`provisional`** flag per contributor
+  (the reference named in Q-526's review); sleep stores no equivalent, so partial and finished scores
+  are indistinguishable.
+- **First action:** recompute derived scores when the session they read is updated, instead of
+  stamping once on first ingest. Failing that, mark the score provisional until the session stops
+  growing, so a low number carries its reason.
+- **How often it bites:** every morning the app is opened while the ring is still uploading — which is
+  the normal way to check last night's sleep. Small window, sitting exactly where the user looks.
+- **Pass test:** extend a session after its score is written and confirm the score changes.
+  Concretely, **2026-08-20 should re-score well above 47** — the 08-17 twin suggests the high 70s.
+- **⚠️ Caveat that must be checked FIRST, and it is cheap.** The failure to recompute is confirmed
+  over **3 minutes**, not hours. A slower nightly pass may still correct it. **Re-read `computed_at`
+  for 2026-08-20 the next day**: if it has moved, this is a latency problem rather than a correctness
+  one, and the fix shrinks to surfacing provisionality. Do not build the recompute path before that
+  read.
+- **Caveats:** one night, one athlete, `claude_ro` row-scoped.
 
 ### [devices][platform] Q-528 — a full-history rollup can wipe every stored daily summary, and the guard is on the wrong side of the delete
 

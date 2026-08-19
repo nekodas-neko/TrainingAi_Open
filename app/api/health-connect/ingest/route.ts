@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { z } from "zod";
 import { safeCompare } from "@/lib/security/constant-time";
 import { getRepositoryAsync } from "@/lib/data";
-import { formatInTimeZone } from "date-fns-tz";
-import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { DEFAULT_TZ, todayInTz } from "@trainingai/shared/date-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
 import { reportServerError } from '@/lib/observability'
 import { clientIp } from '@trainingai/shared/http/client-ip'
+import { resolveIngestDate } from "@trainingai/shared/validation/ingest-clock";
+import { IngestBodySchema } from "@trainingai/shared/validation/health-connect-ingest";
 
 // Called by Tasker on Android — no session cookie, auth via shared secret.
 // Set HEALTH_CONNECT_INGEST_SECRET in Railway env vars.
@@ -16,20 +16,6 @@ import { clientIp } from '@trainingai/shared/http/client-ip'
 // omission), so every numeric field is nullable as well as optional — range
 // bounds are generous but reject clearly-garbage values (a stringified "75kg",
 // a 1e308 double) before they reach the driver.
-const IngestBodySchema = z.object({
-  secret: z.string(),
-  // The mirror of the dash-only problem: slash-only here would reject a dashed date from
-  // Tasker, which is the one client that fills this (Q-130).
-  date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).optional(),
-  weightKg:   z.coerce.number().min(0).max(500).nullable().optional(),
-  bodyFat:    z.coerce.number().min(0).max(100).nullable().optional(),
-  steps:      z.coerce.number().int().min(0).max(200_000).nullable().optional(),
-  calories:   z.coerce.number().min(0).max(20_000).nullable().optional(),
-  protein:    z.coerce.number().min(0).max(2_000).nullable().optional(),
-  carb:       z.coerce.number().min(0).max(2_000).nullable().optional(),
-  fat:        z.coerce.number().min(0).max(2_000).nullable().optional(),
-  distanceKm: z.coerce.number().min(0).max(500).nullable().optional(),
-});
 
 // Ten small numbers, a date and a secret. 16 KB is two orders of magnitude of headroom over the
 // largest real Tasker payload, which is the point of a cap being generous but finite.
@@ -86,8 +72,12 @@ export async function POST(req: NextRequest) {
     const repo = await getRepositoryAsync();
     const webhookUser = await repo.getUserById(userId);
     const tz = webhookUser?.timezone ?? DEFAULT_TZ;
-    const dateSlash = body.date ?? formatInTimeZone(new Date(), tz, "yyyy/MM/dd");
-    const dateIso = dateSlash.replace(/\//g, "-").slice(0, 10);
+    // Q-494: the schema's regex bounds the date's SHAPE, nothing bounded its RANGE — so
+    // `{"date":"9999/12/30","weightKg":499}` answered 200 and then owned
+    // `getMostRecentConfirmedWeightKg`'s `ORDER BY date DESC LIMIT 1` permanently, feeding the BLE
+    // scale's confirmation step and every `deriveActivityKcal` estimate. Routed through the shared
+    // ingest clock rather than a bespoke check here, since three sibling ingest paths already use it.
+    const dateIso = resolveIngestDate(body.date, todayInTz(tz));
     await repo.upsertBodyMetrics(userId, [{
       date: dateIso,
       weightKg:   body.weightKg   ?? undefined,

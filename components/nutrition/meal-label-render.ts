@@ -165,6 +165,28 @@ export function centredStackLineBudget(style: MealLabelStyle): {
   return { headerUnits: y, codeTop, maxLines: Math.max(0, Math.floor((codeTop - y - 2) / STACK_LINE_H)) }
 }
 
+/**
+ * How far to shift the whole composed block down so the leftover space is **shared** between the
+ * top margin and the code, instead of piling up above the code (Q-416).
+ *
+ * The centred layout pins its two ends to opposite margins: the header flows down from the top, the
+ * code is anchored up from the bottom. Whatever the ingredient list does not use becomes a void
+ * immediately above the code — **8.6 mm of it on a one-ingredient meal**, an eighth of the label's
+ * height. A four-ingredient meal looks right and a one-ingredient meal looks broken, which is how
+ * this passed review: the mockups were drawn with fuller lists.
+ *
+ * Half the slack, so the group sits centred between the margins the way the approved prototype's
+ * flex column did. Every gap the style specifies is untouched — only the remainder moves, and
+ * `codeTop` does not move at all, so a batch of labels still puts every code in the same place.
+ */
+export function centredStackOffset(
+  { contentEnd, codeTop }: { contentEnd: number; codeTop: number },
+): number {
+  // Never negative: an overfull layout must not be dragged UP through the top margin. `maxLines`
+  // already clamps that, so this guards a future style rather than a live case.
+  return Math.max(0, (codeTop - contentEnd) / 2)
+}
+
 
 /**
  * Per-style geometry. `codeUnits` is the code's drawn width in sheet units; at 50 mm a unit is
@@ -524,11 +546,32 @@ function drawSquareCentredLabel(
   // ingredient list and drew zero lines).
   const [afterName, afterCalories, afterMacros, afterRule] = spec.stackGaps ?? [7, 6, 5, 8]
 
-  let y = L + 4
-
-  // --- name -------------------------------------------------------------------------------------
+  // ── Measure first, then paint (Q-416) ─────────────────────────────────────────────────────────
+  // The block has to know its own finished height before it can be centred, and that height depends
+  // on how many ingredient lines the run wraps to. So the wrap is resolved here and reused below
+  // rather than computed mid-draw, which is what forced the old top-anchored composition.
   const name = spec.uppercaseName ? figures.name.toUpperCase() : figures.name
   const nameSize = fitText(ctx, name, family, '700', spec.nameSize, colWidth)
+
+  const headerEnd = L + 4 + nameSize + afterName + spec.caloriesSize + afterCalories
+    + spec.macroSize + afterMacros + afterRule
+
+  const code = spec.codeUnits
+  const codeTop = bottom - (spec.writeOnLine ? 9 : 0) - code
+  const lineH = STACK_LINE_H
+  const listSize = 7
+  ctx.font = `400 ${listSize}px ${family}`
+  const charW = ctx.measureText('0123456789abcdefghij').width / 20
+  const charsPerLine = Math.max(8, Math.floor(colWidth / charW))
+  const maxLines = Math.max(0, Math.floor((codeTop - headerEnd - 2) / lineH))
+  const run = wrapIngredientRun({ items: ingredients, charsPerLine, maxLines })
+  // The empty-list case still draws one line ("Scan for the ingredient breakdown"), so it counts.
+  const drawnLines = ingredients.length === 0 ? 1 : run.lines.length
+  const offset = centredStackOffset({ contentEnd: headerEnd + drawnLines * lineH, codeTop })
+
+  let y = L + 4 + offset
+
+  // --- name -------------------------------------------------------------------------------------
   ctx.font = `700 ${nameSize}px ${family}`
   ctx.letterSpacing = `${spec.nameTracking}em`
   y += nameSize
@@ -544,7 +587,16 @@ function drawSquareCentredLabel(
   ctx.font = `500 ${spec.macroSize}px ${family}`
   ctx.letterSpacing = '0.12em'
   const unitW = ctx.measureText('KCAL').width
-  const startX = cx - (numW + 3 + unitW) / 2
+  // **The NUMERAL is centred, not the number-plus-unit run** (Q-416). Centring the run puts the
+  // figure's own midpoint left of the axis by `(3 + unitW) / 2` — about 3 mm on a 50 mm label —
+  // and since every other element here is symmetric about `cx`, that reads as misaligned rather
+  // than merely offset. The trade is deliberate: `KCAL` now overhangs to the right, so the
+  // composition is no longer symmetric, which is the right call for a figure whose whole job is to
+  // be read at a glance. Falls back to the run-centred form only if the overhang would clip.
+  const axisCentred = cx - numW / 2
+  const startX = axisCentred + numW + 3 + unitW <= SHEET - SQUARE_MARGIN
+    ? axisCentred
+    : cx - (numW + 3 + unitW) / 2
   ctx.letterSpacing = '0em'
   ctx.textAlign = 'left'
   ctx.font = `700 ${spec.caloriesSize}px ${family}`
@@ -581,18 +633,7 @@ function drawSquareCentredLabel(
   // The character budget is measured from the real font at the real size, then handed to a pure
   // function; the renderer is the only thing that knows the font, and the wrapping is the part worth
   // testing.
-  const listSize = 7
   ctx.font = `400 ${listSize}px ${family}`
-  const colW = colWidth
-  const charW = ctx.measureText('0123456789abcdefghij').width / 20
-  const charsPerLine = Math.max(8, Math.floor(colW / charW))
-
-  const code = spec.codeUnits
-  const codeTop = bottom - (spec.writeOnLine ? 9 : 0) - code
-  const lineH = STACK_LINE_H
-  const maxLines = Math.max(0, Math.floor((codeTop - y - 2) / lineH))
-
-  const run = wrapIngredientRun({ items: ingredients, charsPerLine, maxLines })
   for (const line of run.lines) {
     ctx.fillText(line, cx, y)
     y += lineH

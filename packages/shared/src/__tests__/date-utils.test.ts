@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone } from 'date-fns-tz'
-import { shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
+import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
 
 describe('ageFromDob', () => {
   const today = new Date('2026-07-22T00:00:00Z')
@@ -11,6 +11,34 @@ describe('ageFromDob', () => {
   it('returns null for a missing or invalid DOB', () => {
     expect(ageFromDob(null, today)).toBeNull()
     expect(ageFromDob('not-a-date', today)).toBeNull()
+  })
+})
+
+describe('isCalendarDate (Q-496)', () => {
+  // The shape regexes in the route schemas accept all three of these, and Postgres then refuses
+  // them as `[pg 22008]` — a client input error recorded as a server fault. Measured:
+  // `POST /api/day-checkin {"date":"2026-13-45"}` answered 500 and wrote an `error_events` row.
+  it('rejects a date-shaped string that is not a real day', () => {
+    expect(isCalendarDate('2026-13-45')).toBe(false)
+    expect(isCalendarDate('2026-02-31')).toBe(false)
+    expect(isCalendarDate('0000-00-00')).toBe(false)
+    expect(isCalendarDate('2026-00-10')).toBe(false)
+  })
+
+  it('accepts a real day in either separator, because the client emits slashes', () => {
+    expect(isCalendarDate('2026-08-17')).toBe(true)
+    expect(isCalendarDate('2026/08/17')).toBe(true)
+    expect(isCalendarDate('2024-02-29')).toBe(true)   // a real leap day
+  })
+
+  it('rejects the non-leap Feb 29 that Date would silently roll to March 1', () => {
+    expect(isCalendarDate('2026-02-29')).toBe(false)
+  })
+
+  it('rejects anything that is not date-shaped at all', () => {
+    expect(isCalendarDate('')).toBe(false)
+    expect(isCalendarDate('not-a-date')).toBe(false)
+    expect(isCalendarDate('2026-8-1')).toBe(false)
   })
 })
 
