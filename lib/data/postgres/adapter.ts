@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
@@ -3361,8 +3362,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listLatestMealTimes(userId: string, from: string, to: string) { return n.listLatestMealTimes(this.db, userId, from, to) }
   async listRecentFoodItemsForMealType(userId: string, mealTypeId: string, limit: number) { return n.listRecentFoodItemsForMealType(this.db, userId, mealTypeId, limit) }
   async listSavedMeals(userId: string) { return n.listSavedMeals(this.db, userId) }
-  async createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number) { return n.createSavedMeal(this.db, userId, name, items, id, servings) }
-  async updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number) { return n.updateSavedMeal(this.db, id, userId, name, items, servings) }
+  async createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null) { return n.createSavedMeal(this.db, userId, name, items, id, servings, imageDataUri) }
+  async updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null) { return n.updateSavedMeal(this.db, id, userId, name, items, servings, imageDataUri) }
   async deleteSavedMeal(id: string, userId: string) { return n.deleteSavedMeal(this.db, id, userId) }
   async getNutritionTargets(userId: string) { return n.getNutritionTargets(this.db, userId) }
   async upsertNutritionTargets(userId: string, data: Omit<NutritionTargets, 'id' | 'userId' | 'updatedAt'>) { return n.upsertNutritionTargets(this.db, userId, data) }
@@ -4173,7 +4174,22 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // Mirrors the web route's default: an older client that predates `servings` sends
             // nothing, which must read as a single-portion meal rather than zero.
             const servings = typeof p.servings === 'number' && p.servings > 0 ? p.servings : 1
-            await this.createSavedMeal(userId, name, items, p.id, servings)
+            // Same cap as the web route, re-checked here rather than trusted: this is the offline
+            // replay path, and a client-side cap is not a cap (Q-396). `undefined` leaves a stored
+            // image alone; an explicit null removes it; anything oversized quarantines the mutation
+            // rather than wedging the queue behind it.
+            const rawImage = p.imageDataUri
+            let imageDataUri: string | null | undefined
+            if (rawImage === null) imageDataUri = null
+            else if (typeof rawImage === 'string') {
+              const reject = rejectMealImage(rawImage)
+              if (reject) {
+                errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: mealImageRejectionMessage(reject) })
+                continue
+              }
+              imageDataUri = rawImage
+            }
+            await this.createSavedMeal(userId, name, items, p.id, servings, imageDataUri)
           }
           processed++
         } else if (mut.domain === 'activity_logs') {

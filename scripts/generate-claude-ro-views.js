@@ -28,6 +28,11 @@ const DENY = {
   users: ['password_hash'],
   oura_tokens: ['personal_access_token', 'access_token', 'refresh_token', 'webhook_signing_key'],
   feedback_submissions: ['screenshot_data'],
+  // Q-396. A base64 thumbnail has no audit value and every row carries one, so a SELECT * over this
+  // view would return kilobytes per meal for nothing. The size stand-in below is strictly MORE
+  // useful than the value: this feature's whole stated risk is the 16 KB cap slipping unnoticed —
+  // nothing fails loudly, the outbox just gets slower — so a queryable byte count is the tripwire.
+  saved_meals: ['image_data_uri'],
   // All three together ARE the Web Push credential — holding them lets anyone push to the device.
   push_subscriptions: ['endpoint', 'p256dh', 'auth'],
 }
@@ -42,6 +47,7 @@ const DERIVED = {
     '(t.webhook_signing_key IS NOT NULL) AS has_webhook_key',
   ],
   feedback_submissions: ['octet_length(t.screenshot_data) AS screenshot_bytes'],
+  saved_meals: ['octet_length(t.image_data_uri) AS image_bytes'],
   push_subscriptions: ['(t.endpoint IS NOT NULL) AS has_subscription'],
 }
 

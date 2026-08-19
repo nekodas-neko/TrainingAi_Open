@@ -490,7 +490,7 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
     )
     // `totals` stays the WHOLE recipe — dividing here would make every existing caller
     // silently change meaning. Callers that want one portion divide by `servings` themselves.
-    return { id: m.id, userId: m.userId, name: m.name, servings: m.servings, createdAt: m.createdAt, items, totals }
+    return { id: m.id, userId: m.userId, name: m.name, servings: m.servings, imageDataUri: m.imageDataUri ?? null, createdAt: m.createdAt, items, totals }
   })
 }
 
@@ -499,13 +499,16 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
 // offline create that replays — or a create+edit that replays out of order — lands
 // in place instead of duplicating or throwing. The meal id is client-minted (offline)
 // or generated here (online without one), and the junction rows are replaced wholesale.
-async function writeSavedMeal(db: Db, userId: string, id: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings: number): Promise<SavedMeal> {
+async function writeSavedMeal(db: Db, userId: string, id: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings: number, imageDataUri?: string | null): Promise<SavedMeal> {
   await db.transaction(async tx => {
     const [meal] = await tx.insert(s.savedMeals)
-      .values({ id, userId, name, servings })
+      // `undefined` means "the caller did not mention the image", which must not clear a stored one
+      // — only an explicit `null` removes it. That distinction is why the parameter is optional
+      // rather than defaulted (Q-396).
+      .values({ id, userId, name, servings, ...(imageDataUri !== undefined ? { imageDataUri } : {}) })
       .onConflictDoUpdate({
         target: s.savedMeals.id,
-        set: { name, servings },
+        set: { name, servings, ...(imageDataUri !== undefined ? { imageDataUri } : {}) },
         setWhere: eq(s.savedMeals.userId, userId),   // never touch another user's row
       })
       .returning({ id: s.savedMeals.id })
@@ -530,12 +533,12 @@ async function writeSavedMeal(db: Db, userId: string, id: string, name: string, 
   return all.find(m => m.id === id)!
 }
 
-export async function createSavedMeal(db: Db, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings = 1): Promise<SavedMeal> {
-  return writeSavedMeal(db, userId, id ?? randomUUID(), name, items, servings)
+export async function createSavedMeal(db: Db, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings = 1, imageDataUri?: string | null): Promise<SavedMeal> {
+  return writeSavedMeal(db, userId, id ?? randomUUID(), name, items, servings, imageDataUri)
 }
 
-export async function updateSavedMeal(db: Db, id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings = 1): Promise<SavedMeal> {
-  return writeSavedMeal(db, userId, id, name, items, servings)
+export async function updateSavedMeal(db: Db, id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings = 1, imageDataUri?: string | null): Promise<SavedMeal> {
+  return writeSavedMeal(db, userId, id, name, items, servings, imageDataUri)
 }
 
 export async function deleteSavedMeal(db: Db, id: string, userId: string): Promise<void> {

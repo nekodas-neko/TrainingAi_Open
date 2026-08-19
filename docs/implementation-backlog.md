@@ -15,8 +15,8 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **204** | `lib/data/postgres/migrations/` (head: `203_food_logs_eaten_at_backfill.sql`) |
-| Local SQLite schema version | **v27** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` (head: `205_claude_ro_views_saved_meal_image.sql`) |
+| Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
@@ -1678,66 +1678,31 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   each be rejected. Those five cases are the acceptance criteria for this entry — the feature is
   the easy half.
 
-### [nutrition][platform] Q-396 — a photo per saved meal, and the size cap is the whole design
+### [nutrition][app-shell] Q-327 — the meal photo needs somewhere to be picked
 
-- **Branch:** `feat/saved-meal-thumbnail`
-- **Added:** 2026-08-18 · owner: *"can we have base64 saved images of meals? small icons?"*, while
-  reviewing the Q-395 rework — a meal you built weeks ago is hard to recognise from its name alone.
-- **Lane A.** Needs a Postgres migration, a local SQLite column and a sync-payload change. The Q-395
-  rework it serves is Lane B; the two can land independently because the UI degrades to no image.
+- **Branch:** `feat/saved-meal-thumbnail-ui`
+- **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-396 once the column shipped.
+- **Lane B** (`components/nutrition/`). The storage half is done and merged —
+  see [`entries/2026-08-19-saved-meal-thumbnail.md`](overview/entries/2026-08-19-saved-meal-thumbnail.md).
 
-**The precedent exists and does not transfer.** `users.avatar` stores a **full `data:` URI in a text
-column**, validated by MIME whitelist and capped at **5 MB**
-(`app/api/user/avatar/route.ts:34-45`). That works because an avatar is **one row per user and is
-never in the sync delta**. A meal thumbnail is one per saved meal, and saved meals sync — so every
-image rides the outbox push, the pull delta, and the on-device SQLite mirror, on a phone, forever.
-Copying the 5 MB cap here would be the largest single regression the sync engine has ever taken.
+**What already exists, so it is not rebuilt.** `saved_meals.image_data_uri` (Postgres migration 204,
+local SQLite **v28**), carried by both saved-meal routes and by the offline `pushMutations` replay,
+mirrored locally, and hydrated back. `POST`/`PUT /api/nutrition/saved-meals` accept `imageDataUri`:
+**omit it to leave a stored photo alone, send `null` to remove it.** `SavedMeal.imageDataUri` is on
+the type, so a picker has somewhere to read from and write to.
 
-**Recommendation — a hard-capped thumbnail, stored as a data URI.**
-- **128 × 128 WebP, target ~6 KB, reject over 16 KB.** Downscale on-device with a canvas *before it
-  leaves the client*, and re-validate server-side — a client-side cap alone is not a cap. At 6 KB,
-  100 saved meals is ~600 KB across the whole sync surface, which is the same order as the text
-  already moving.
-- **Why base64 in a text column and not object storage:** the app is offline-first and has no blob
-  host. A URL renders nothing in airplane mode, which breaks the standing rule that *a local table
-  must hold everything needed to render the row offline*. A capped data URI is the only shape that
-  survives the canonical runtime. This is the rare case where the "obviously wrong" storage choice
-  is the right one, and the cap is what makes it so — **do not relax it later without re-reading
-  this paragraph**.
-- **What it costs if the cap slips:** nothing fails loudly. The outbox gets slower, the local DB
-  grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
-  named constant next to the column, not inline in the route.
+**What is left — the pick, and the downscale that makes the cap true.**
+- **A 64 px tile to the left of the meal-name field in Edit Meal**, tapping to camera/gallery, with a
+  clear action to remove. Edit Meal already owns the meal and already saves it, so the image rides
+  the existing write; the tile doubles as the preview, so there is no separate "current photo" row.
+  Prototype: <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6> (screen 4).
+- **Downscale on-device with a canvas BEFORE upload — 128 × 128 WebP, ~6 KB.** The server rejects
+  anything over **16 KB** (`SAVED_MEAL_IMAGE_MAX_BYTES`), so without the downscale a normal phone
+  photo is a 400 every time and the feature reads as broken.
+- **Show the byte size on the tile after a pick.** This feature's whole risk is the cap slipping, and
+  nothing fails loudly when it does — the outbox just gets slower. A number the user can see is the
+  cheapest tripwire, and the audit view now carries `image_bytes` for the same reason.
 
-**Where the upload lives — unspecified until now, and asked for on 2026-08-19.** The owner, looking
-at the prototype: *"Edit meal doesnt contain an image upload seciton; did we agree on this? with a
-base64 small DB? Ideally stored locally"*. The storage answer is yes and it is above — base64 data
-URI, on the device, which is what "stored locally" means here and is the whole reason it is not a
-URL. What this entry never said is **which screen uploads it**. Recommendation: a **64 px tile to
-the left of the meal-name field in Edit Meal**, tapping to camera/gallery, long-press or a clear
-action to remove. Reasons: Edit Meal already owns the meal and already saves it, so the image rides
-the existing write rather than needing its own; and the tile doubles as the preview, so there is no
-separate "current photo" row. Drawn in the prototype at
-<https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6> (screen 4, tap the tile).
-**Show the byte size on the tile after a pick** — this entry's whole risk is the cap slipping, and a
-number the user can see is the cheapest possible tripwire.
-
-**The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
-on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
-weight, no upload path — and it already carries most of the recognition benefit in the drawings,
-where every thumbnail is exactly that placeholder. If the photo work is deferred, ship this and the
-Q-395 rows still look finished.
-
-**The full chain this has to touch, per the offline-sync rule — all in one PR:**
-`saved_meals` column → the web route's Zod schema → the `pushMutations` branch → `getSyncDelta`
-output → `pullDelta` mapping → `applyDelta` upsert columns → the local SQLite migration → **and its
-row in `RECONCILE_TABLES`/`RECONCILE_COLUMNS`**, which is the one most often missed and the one that
-silently breaks upgraded devices while every test and fresh install passes.
-
-- **Verification.** Not "it saved" — prove a non-null value **round-trips to the device and renders
-  with the network off**, which is the only test that distinguishes this from a URL. Then check the
-  outbox still drains on a throttled connection with a dozen meals carrying images.
-- **Not in scope:** photos on individual food items or on logged entries. One image per *saved
-  meal*, which is the surface the owner asked about and the only one where the row is durable.
 
 ### [platform] Q-404 — the Sentry SDK was deliberately deferred and never queued, so nothing was going to wire it
 

@@ -719,8 +719,9 @@ export interface WorkoutRepository {
   deleteFoodLog(id: string, userId: string): Promise<void>
 
   listSavedMeals(userId: string): Promise<SavedMeal[]>
-  createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number): Promise<SavedMeal>
-  updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number): Promise<SavedMeal>
+  /** `imageDataUri`: omit to leave a stored thumbnail alone, `null` to remove it. Capped (Q-396). */
+  createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null): Promise<SavedMeal>
+  updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null): Promise<SavedMeal>
   deleteSavedMeal(id: string, userId: string): Promise<void>
 
   // ── Meal Plan (Q-186) ────────────────────────────────────────────────────────

@@ -72,6 +72,8 @@ export interface SavedMeal {
   name: string
   /** Portions the recipe makes. `totals` is the WHOLE recipe; divide by this for one portion. */
   servings: number
+  /** A small WebP thumbnail as a base64 data URI, or null. Capped — see `nutrition/meal-image.ts`. */
+  imageDataUri: string | null
   createdAt: Date
   items: SavedMealItem[]
   totals: { calories: number; proteinG: number; carbsG: number; fatG: number }

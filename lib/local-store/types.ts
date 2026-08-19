@@ -515,6 +515,8 @@ export interface LocalSavedMeal {
   name:       string;
   /** Portions the recipe makes. Optional so a caller written before v25 still compiles; 1 on read. */
   servings?:  number;
+  /** Base64 thumbnail data URI, capped — see `@trainingai/shared/nutrition/meal-image` (Q-396). */
+  imageDataUri?: string | null;
   createdAt:  string;
   updatedAt:  string;
   deletedAt:  string | null;
