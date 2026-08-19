@@ -717,11 +717,35 @@ Worth reaching for only if the reassign proves harder than it looks.
   [`Journal`](overview/entries/2026-08-19-fetch-once-slice-2.md). `health/training-stress-line`
   (the first real use of slice 1's `today` option), `activity/exercise-review-sheet`,
   `activity/activity-detail-sheet` (the shared `hr-profile` key in both) and
-  `workout-select-content` (`muscle-recovery`). **The can-bite group is down to 8, all of them in
-  the four tab-screen orchestrators** — `session-select-content` (4), `health-content` (2),
-  `nutrition-content` (2). Those were left for last on purpose: each seeds four to eight keys inside
-  one shared `useLayoutEffect` and feeds screen state other effects also write, so converting them
-  is a state refactor rather than a swap, and should be one file per PR.
+  `workout-select-content` (`muscle-recovery`). ~~The can-bite group is down to 8, all of them in
+  the four tab-screen orchestrators.~~ **That was wrong — see slice 3.**
+- **✅ SLICE 3 SHIPPED 2026-08-19 (v1.325.8) — and most of it was a correction, not a conversion.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-scanner-correction.md).
+  **`scripts/check-fetch-once-effects.js` was over-counting, and by a lot: 25 sites across 16 files
+  were really 15 across 12. Ten of the twenty-five never existed.** Its non-greedy regex started at
+  a `useEffect(() => {` and ran to the first `}, [])` *anywhere* after it, so when that effect had
+  real dependencies the match swallowed everything up to a later effect's close — other effects,
+  `useCallback` bodies, plain functions — and searched the lot for `cachedFetch`. Five lines
+  reproduce it, and they are in the script. It now brace-matches the effect body.
+  **What that changes about the work, which is the part worth reading:**
+  - `health-content` (2) and `nutrition-content` (2) have **no fetch-once effect at all**. Their
+    fetches sit in tab-group `useCallback`s re-run on `tabEpoch` — the shape this rule is *steering
+    people toward*. Two sessions' worth of "the hard ones, do them last" was aimed at nothing.
+  - `sync-provider` (1) the same: its warm pass is a plain function. The "deliberately fetch-once"
+    category that entry justified had no members and is gone.
+  - `workout-screen` (2) is a `[userId]` effect; `running-plan-content` was 3, not 4.
+  - **So the can-bite group was two sites, not eight.** This slice converts one —
+    `session-select-content`'s `more-user-profile`, which is load-bearing: two paths invalidate that
+    key, so changing a display name or avatar left Home's greeting stale until an app restart.
+  - **One can-bite site remains**: session-select's `ta:oura-ble-synced` listener, which refetches
+    `sleep-sessions` on one event because nothing refetches it on invalidation. Same workaround
+    `home-day-timeline` carried, but it cannot be deleted the same way — that screen's sleep read is
+    a `[userId]` effect with a local-first store seed and a `fetchWithRetry` wrapper, so moving it to
+    `useCachedValue` is a genuine state refactor. **That is the one remaining shell-level item, and
+    it wants its own PR.** The other 13 sites unmount and are latent.
+  - **The lesson is about the check, not the sweep:** a scanner's own baseline is evidence, and this
+    one had never been checked against a hand count. The mutation check it shipped with proved it
+    caught a *new* site; nothing proved the sites it already listed were real.
 - **Correction to slice 1's note about `lib/__tests__/q165-cache-seeded-reads.test.ts`:** it said
   that test would red when the two sheets converted. **It did not, and the reason is worth keeping.**
   It asserts `readCacheSync<` and `cachedFetch<` appear literally in three files; each sheet has
