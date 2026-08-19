@@ -40,6 +40,8 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 - [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](../../reviews/2026-08-18-hr-rest-threshold-calibration.md) — **first calibration review of this pillar, 2026-08-18** (Q-515 — `HR_REST_THRESHOLD` is the rest/active boundary shared by Body Battery and the Activity Score, and its charge window collapsed **26.5% → 8.2%** of waking samples in one month. **Every input was correct**: a genuine fitness gain plus `resolveHrProfile` maturing `hr_max` from the age formula to an observed ceiling. The trap is a rate difference — resting HR fell 8.5 bpm while waking HR fell 4.2 — so a boundary pinned to resting moves twice as fast as the distribution it classifies. Sweeping the constant narrows the gap 3.2× → 1.4× but never closes it: **the anchoring is the defect, not the number**).
 
+- [`docs/reviews/2026-08-19-body-derived-scores-closeout.md`](../../reviews/2026-08-19-body-derived-scores-closeout.md) — **the pillar's two unexamined derived scores, closed out 2026-08-19.** `bdi_derived` (46 rows, median 4.15, nothing ≥ 15) has **no threshold to calibrate** — its only consumer is a debug console labelling it *"observational, not a diagnosis"*. `body_comp` (71 rows) is a deterministic derivation whose one formula is deliberately matched to Oura's `atlas`. **Nothing to tune in either.** Useful byproduct: `body_comp.bmr_kcal` already persists the day's BMR, so **Q-517's proposed floor should read it rather than recompute** — with a fallback to the most recent snapshot on the 25 rows that lack one, never to the universal 1,000.
+
 ## Open issues
 
 ```bash
