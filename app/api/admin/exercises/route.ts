@@ -10,6 +10,10 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { MuscleAssignment } from "@trainingai/shared/types/program";
 import { invalidateExerciseMuscleMap } from "@/lib/data/exercise-muscle-map-cache";
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One exercise: a name, muscles, equipment and 2,000 chars of instructions.
+const MAX_BODY_BYTES = 32 * 1024;
 
 const ExerciseBody = z.object({
   name:         z.string().min(1).max(120),
@@ -58,7 +62,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = ExerciseBody.safeParse(await req.json());
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+  const body = ExerciseBody.safeParse(read.body);
   if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
   const repo = await getRepository();
@@ -94,8 +104,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { id, ...rest } = await req.json();
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const { id, ...rest } = (read.body ?? {}) as Record<string, unknown>;
+  if (typeof id !== "string" || !id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const body = ExerciseBody.safeParse(rest);
   if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });

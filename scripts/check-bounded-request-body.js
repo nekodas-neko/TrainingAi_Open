@@ -28,6 +28,7 @@
 // 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths.
 // 6: the workout and activity write routes.
 // 7: the nutrition CRUD routes.
+// 8: every remaining admin route.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -45,14 +46,6 @@ function stripComments(src) {
 
 // Shrink-only. Each number is how many bare reads that file still has.
 const BASELINE = {
-  'app/api/admin/activity-types/route.ts': 2,
-  'app/api/admin/db-query/route.ts': 1,
-  'app/api/admin/exercises/route.ts': 2,
-  'app/api/admin/fix-exercise-units/route.ts': 1,
-  'app/api/admin/generate-exercise-media/route.ts': 1,
-  'app/api/admin/invites/route.ts': 2,
-  'app/api/admin/mirror-dataset-gifs/route.ts': 1,
-  'app/api/admin/timing-baseline/route.ts': 1,
   'app/api/ai-periodization/baseline/complete/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/prescribe/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
