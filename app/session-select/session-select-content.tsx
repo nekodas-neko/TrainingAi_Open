@@ -33,6 +33,7 @@ import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, todayDayOfWeek
 import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
@@ -710,14 +711,15 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // shading) but isn't one of the refreshTick-gated effects — it was invalidated correctly
   // but nothing ever re-fetched it on this signal, same gap as sleep-content.tsx/health-content.tsx.
   useEffect(() => {
-    const onBleSynced = () => {
-      setRefreshTick(t => t + 1);
-      cachedFetch<SleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-        d => setSleepData(Array.isArray(d) ? d : []));
-    };
+    const onBleSynced = () => setRefreshTick(t => t + 1);
     window.addEventListener('ta:oura-ble-synced', onBleSynced);
     return () => window.removeEventListener('ta:oura-ble-synced', onBleSynced);
   }, []);
+
+  // Was on the BLE event; the invalidation is wider (`invalidateBiometrics` clears this key too).
+  useInvalidationRefetch('sleep-sessions', () => {
+    cachedFetch<SleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, d => setSleepData(Array.isArray(d) ? d : []));
+  });
 
   // Q-359: synced into state, not derived — `goalsProfile` also takes optimistic local writes that
   // must outlive a refetch. Safe because the goals card gates on `goalsCheckinDismissed` first.
