@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { Loader2, Send, Check } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
@@ -17,6 +18,8 @@ interface Props {
 }
 
 export function MealBackfillSection({ mealTypes, logs, date, userId, onLogged }: Props) {
+  // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
+  const tz = useUserTimezone()
   const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<string | null>(null)
 
@@ -44,7 +47,7 @@ export function MealBackfillSection({ mealTypes, logs, date, userId, onLogged }:
         return
       }
       const entries = scanResultToEntries(data as NutritionScanResult, 1)
-      const newLogs = await logFoodEntries(entries, date, mt.id, userId)
+      const newLogs = await logFoodEntries(entries, date, mt.id, userId, tz)
       for (const log of newLogs) onLogged(log)
       setDrafts(d => ({ ...d, [mt.id]: '' }))
       hapticLight()

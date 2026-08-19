@@ -85,6 +85,25 @@ describe('applyDelta pull-clobber guards', () => {
     expect(stmt).toContain(`sync_status='synced'`)
   })
 
+  it('food_logs pull carries meal_type_id, date and logged_at, not just the quantity (Q-325)', async () => {
+    // The conflict arm used to set only quantity_multiplier, updated_at and deleted_at, so a
+    // server-side change to any other column never reached a device that already held the row.
+    // Found while shipping Q-413 — the migration that corrects `logged_at` would have stopped at
+    // the server — and it is also the column Q-412's reassign moves.
+    await store.applyDelta({ foodLogs: [{
+      id: 'fl-1', date: '2026-08-17', mealTypeId: 'mt-lunch', foodItemId: 'fi-1',
+      quantityMultiplier: 1, loggedAt: '2026-08-17T03:30:00.000Z',
+      updatedAt: '2026-08-19T09:00:00.000Z', deletedAt: null, syncStatus: 'synced' as const,
+    }] })
+    const stmt = sqlCalls().find(s => s.includes('INTO food_logs'))!
+    const onConflict = stmt.slice(stmt.indexOf('ON CONFLICT'))
+    for (const col of ['meal_type_id=excluded', 'date=excluded', 'logged_at=excluded', 'food_item_id=excluded']) {
+      expect(onConflict, `the update arm must carry ${col}`).toContain(col)
+    }
+    // The guard is what protects a pending local edit — widening the SET must not remove it.
+    expect(onConflict).toContain(`WHERE food_logs.sync_status='synced'`)
+  })
+
   it('workout_sessions pull carries session_id / intensity_mode / was_override (Q-131)', async () => {
     // All three exist on both ends' schemas and were dropped by the pull mapping and this insert,
     // so a device restored from sync replayed its outbox with no program-session link and fell

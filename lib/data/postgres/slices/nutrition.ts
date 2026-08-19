@@ -1,5 +1,7 @@
 import { eq, and, inArray, gte, lte, asc, desc, sql, isNull } from 'drizzle-orm'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
+import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { randomUUID } from 'node:crypto'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -216,16 +218,51 @@ export async function listLatestMealTimes(db: Db, userId: string, from: string, 
   return rows
 }
 
+/**
+ * Resolve when the food was eaten, for a log the caller is about to write (Q-413).
+ *
+ * **This is the single place both server write paths pass through** — the web route and the offline
+ * `pushMutations` branch both land in `createFoodLog`, so the rule cannot drift between them the way
+ * this project's write paths repeatedly have. One query, because the window and the timezone are
+ * both needed and neither caller holds them: `foodLogRefsValid` has already proved the meal type is
+ * the user's by the time this runs.
+ *
+ * Falls back to the candidate instant if the meal type has somehow gone — a missing window is not a
+ * reason to refuse a food log, and the row's `date` is still correct.
+ */
+async function resolveLogEatenAt(db: Db, userId: string, mealTypeId: string, date: string, at: Date): Promise<Date> {
+  const [row] = await db
+    .select({
+      timeStartHour: s.mealTypes.timeStartHour,
+      timeEndHour:   s.mealTypes.timeEndHour,
+      timezone:      s.users.timezone,
+    })
+    .from(s.mealTypes)
+    .innerJoin(s.users, eq(s.users.id, userId))
+    .where(and(eq(s.mealTypes.id, mealTypeId), eq(s.mealTypes.userId, userId)))
+    .limit(1)
+  if (!row) return at
+  return resolveEatenAt({
+    date,
+    window: { timeStartHour: row.timeStartHour, timeEndHour: row.timeEndHour },
+    at,
+    tz: row.timezone ?? DEFAULT_TZ,
+  })
+}
+
 export async function createFoodLog(
   db: Db,
   userId: string,
   data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'> & { id?: string; loggedAt?: Date },
 ): Promise<FoodLog> {
   const { id, loggedAt, ...rest } = data
+  // The client's `loggedAt` is a CANDIDATE, not an answer — an offline replay carries the instant
+  // the button was pressed, which is the very thing Q-413 exists to stop storing unexamined.
+  const eatenAt = await resolveLogEatenAt(db, userId, rest.mealTypeId, rest.date, loggedAt ?? new Date())
   // Optional client id: offline-created logs keep their local UUID so an outbox
   // replay updates in place (idempotent) instead of duplicating the row.
   const [r] = await db.insert(s.foodLogs)
-    .values({ ...(id ? { id } : {}), ...(loggedAt ? { loggedAt } : {}), userId, ...rest })
+    .values({ ...(id ? { id } : {}), loggedAt: eatenAt, userId, ...rest })
     .onConflictDoUpdate({
       target: s.foodLogs.id,
       set: { quantityMultiplier: rest.quantityMultiplier, updatedAt: new Date() },

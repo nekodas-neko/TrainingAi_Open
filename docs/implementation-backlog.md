@@ -15,7 +15,7 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **203** | `lib/data/postgres/migrations/` (head: `202_claude_ro_views_food_logging_complete.sql`) |
+| Next free Postgres migration | **204** | `lib/data/postgres/migrations/` (head: `203_food_logs_eaten_at_backfill.sql`) |
 | Local SQLite schema version | **v27** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
@@ -358,81 +358,6 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [nutrition] Q-413 — `logged_at` records when you pressed the button, not when you ate; resolve it against the meal window
-
-- **Branch:** `feat/resolve-eaten-at`
-- **Added:** 2026-08-19 · owner, specifying the rule while reviewing Q-412
-- **Owner's words:** *"for time 'eaten' lets use the same logic we have; if its logged within the
-  time bucket - then record that as the time. If its added outside the window; then choose the
-  midpoint of the window and record that as the time. This way we can also build up a calories x
-  time on a graph which will be nice."*
-- **Lane A** — a shared formula plus the write paths and a backfill. **Build it before Q-412's
-  reassign**, which has to call the same function; see the cross-reference at the end.
-
-**What is stored today.** `food_logs.logged_at` is `timestamp notNull().defaultNow()`
-(`schema.ts:579`), and nothing computes it — `createFoodLog` passes through a client-supplied value
-when one exists (offline replay) and otherwise takes the database default. So the column means
-**"when the row was created"**, which is only accidentally the same as when the food was eaten.
-- Log yesterday's dinner over breakfast the next morning and the row says 8 am, on yesterday's
-  `date`. The timestamp and the date disagree, and the timestamp is the wrong one.
-- That is not an edge case. Back-filling a missed day is the single most common way this app's food
-  log gets used after the fact.
-
-**The rule, stated precisely.** For a log on local date `D`, assigned to meal type `M` with window
-`[M.timeStartHour, M.timeEndHour)`, created at instant `T`:
-- If `T` falls on `D` **and** its hour is inside `M`'s window → **keep `T`**. The user logged it as
-  they ate it and the real time is better than any derived one.
-- Otherwise → **the midpoint of `M`'s window on date `D`**: `(start + end) / 2` hours, so Lunch
-  12–15h stamps 13:30 and Pre Workout 6–10h stamps 08:00.
-
-**Four details that decide whether this is right or subtly wrong.**
-1. **The midpoint is computed in the USER's timezone on `D`, never device-local and never UTC.**
-   This is the repo's most-repeated bug class and the exact shape it takes: `setHours` on a `Date`
-   resolves in the device's zone, so the same log stamps a different instant on a phone set to
-   another country. Use the `packages/shared/src/date-utils.ts` helpers and thread
-   `session.user.timezone` through. Note `lib/meal-reminders.ts:39-42` already does the
-   `setHours` thing — it is defensible there because a reminder fires on the device, but **do not
-   copy that pattern into this**, and do not "fix" it in the same PR either.
-2. **Anchor to the log's `date`, not to "today".** This is what makes back-dating work and is the
-   entire value of the change. Reading `todayInTz()` here would reproduce the bug in new clothes.
-3. **Define the wrapping window before writing the arithmetic.** If `timeEndHour <= timeStartHour`
-   the window crosses midnight (22→2) and the naive midpoint lands at noon — the opposite side of
-   the clock from the truth. Either compute it as `(start + (end + 24)) / 2 mod 24`, or reject
-   wrapping windows in the meal-type editor. **Say which**, and cover it with a test either way.
-   `timeEndHour = 24` is the ordinary end-of-day case and is not a wrap: 21–24 → 22:30.
-4. **One formula, one place.** This is called from the web route, the `pushMutations` branch, the
-   local write, and Q-412's reassign. It goes in `packages/shared` as something like
-   `resolveEatenAt({ date, window, at, tz })` and is imported everywhere, per the standing rule.
-   Four copies of a midpoint calculation is how the weekly-cadence formula ended up with two
-   different semantics.
-
-**Existing rows — recommendation, and it is deliberately conservative.** A calories-over-time graph
-is only interesting with history behind it, so the stored values matter. **Do not blanket-rewrite
-`logged_at`**: for rows where the user logged as they ate, the stored instant is the *better* datum
-and overwriting it with a midpoint destroys real information. Ship a one-off idempotent migration
-that recomputes **only rows whose stored `logged_at` falls on a different local date than the row's
-`date`** — those are unambiguously "logged later" and carry no information about when the food was
-eaten. Leave everything else untouched. If a broader backfill is wanted later it can be a separate,
-explicit decision.
-
-**What this unlocks, and what is NOT in this entry.** The calories × time graph the owner is after
-becomes possible once the column means what its name says — but it is a **new surface** and is not
-in scope here. File it separately once this lands; building the chart against today's column would
-plot when the user reached for their phone.
-
-**Cross-reference — Q-412 depends on this.** Reassigning a log to a different meal type has to
-re-run the same rule against the **new** window: if the stored time is inside it, keep it; if not,
-move it to the new midpoint. Otherwise a 3 pm snack reassigned to Lunch keeps a 15:00 stamp that
-sits outside Lunch's 12–15h window, and the graph inherits the inconsistency the reassign was
-supposed to tidy. **Land this first**, then Q-412 calls it.
-
-- **Verification.** Unit-test the resolver directly and cover: inside-window, outside-window,
-  back-dated (T on a different day than D), `timeEndHour = 24`, a wrapping window, and **a
-  fixed-offset timezone whose local time is currently near midnight** — per the standing rule, a
-  timezone regression test must not wait for the clock to reach the failing window, so pick an
-  `Etc/GMT±N` that is near 01:00 *now* and run the case there. Then confirm end to end that a log
-  created for yesterday from today's session stores yesterday's midpoint, not this morning.
-
 ### [nutrition][health] Q-414 — energy in against energy out, on one timeline
 
 - **Branch:** `feat/energy-timeline-chart`
@@ -442,10 +367,13 @@ supposed to tidy. **Land this first**, then Q-412 calls it.
   expended vs refueled."*
 - **Lane B** (`components/**` + an aggregate GET, which is Lane A if a new route is needed — check
   whether `day-timeline` can carry it before adding one).
-- **⚠ BLOCKED ON Q-413, and this is not a soft dependency.** `food_logs.logged_at` currently records
-  when the row was created, so a chart built today would plot **when the user reached for their
-  phone**, not when they ate. Every back-filled day would spike at whatever hour it was logged.
-  Q-413 makes the column mean what its name says; do that first or this graph is confidently wrong.
+- **✅ UNBLOCKED — Q-413 shipped 2026-08-19.** `food_logs.logged_at` now means when the food was
+  eaten: writes resolve it against the meal window via `resolveEatenAt`
+  (`packages/shared/src/nutrition/eaten-at.ts`), and migration 203 corrected the stored rows whose
+  timestamp fell on a different local date than their own `date`. **One caveat this chart must not
+  be surprised by:** the migration was deliberately narrow, so a *pre-Q-413* row that was logged on
+  the right day but outside its window still carries its original instant — a small number of
+  historical points sit outside their meal's window. New rows do not.
 
 **What it is.** One chart, x = time of day, two series:
 - **In** — calories eaten, from `food_logs` bucketed by the resolved `logged_at`.
@@ -537,7 +465,19 @@ written this way.
 - **It rewrites history and that is the intent, but say it in the dialog.** A 3 pm snack reassigned
   to Lunch will read as Lunch on every past day. For "I want three meals a day from now on" that is
   what the owner wants; it should still not be a surprise.
-- **⚠ The reassign must also re-resolve `logged_at` — see Q-413, which should land first.** A log
+- **✅ The pull-side gap this depended on is closed (Q-325, shipped with Q-413).** `applyDelta`'s
+  `food_logs` conflict arm used to update only `quantity_multiplier`/`updated_at`/`deleted_at`, so a
+  server-side `meal_type_id` change could never reach a device that already held the row — the
+  reassign would have looked correct on the web and done nothing on the APK. The arm now carries
+  `date`, `meal_type_id`, `food_item_id` and `logged_at`, with the `sync_status='synced'` guard
+  intact. **Do not re-derive this as new work.**
+- **`meal_types` is NOT an outbox domain** (verified 2026-08-19 against `pushMutations`), so
+  meal-type CRUD is already online-only and the reassign does not need a new outbox domain or push
+  branch. The pull direction is covered because `getSyncDelta` cursors on `updated_at` and the moved
+  rows bump it. **This narrows this entry's "full sync chain" line** — re-verify before widening it.
+- **⚠ The reassign must also re-resolve `logged_at`. Q-413 has landed**, so the resolver exists:
+  import `resolveEatenAt` from `@trainingai/shared/nutrition/eaten-at` and call it against the NEW
+  window — do not re-derive the midpoint. A log
   moved into Lunch keeps its old 15:00 stamp, which sits outside Lunch's 12–15h window and leaves
   the very inconsistency the move was meant to tidy. Call Q-413's shared resolver against the
   **new** window: inside it, keep the time; outside it, take the new window's midpoint.
