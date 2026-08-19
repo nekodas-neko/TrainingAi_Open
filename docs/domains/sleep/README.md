@@ -63,8 +63,11 @@ canonical-display-source table in the same section).
   sleep back toward its old mean.
 - [`docs/reviews/2026-08-19-sleep-validation-targets.md`](../../reviews/2026-08-19-sleep-validation-targets.md) — **what the Sleep Score can be validated against, 2026-08-19** (Q-72's yardstick
   question). **The owner's 1–5 morning rating is the MOST variable self-report in the app** (sd ~0.8,
-  5 values) — `perceived_recovery` sd 0.36, **`resting_soreness` sd 0.00, exactly 3 in all 20
-  entries** — and it tracks sleep better than anything else (vs efficiency **+0.316**). **The ask to
+  5 values) — the only other **live** scale is `perceived_recovery` at sd 0.36 across 2 values — and
+  it tracks sleep better than anything else (vs efficiency **+0.316**). **Corrected 2026-08-19:**
+  `motivation`, `resting_soreness` and `wake_mood` are **retired** (nulled in
+  `morning-checkin-sheet.tsx`), so the original six-way comparison was three live fields and three
+  fossils. **The ask to
   spread the ratings was withdrawn**: honest low-variance data beats performative spread, and
   stretching the scale would invalidate the 46 nights already collected. Objective outcomes: steps
   **+0.210**, while **training volume and RPE are structurally disqualified** (volume is prescribed by

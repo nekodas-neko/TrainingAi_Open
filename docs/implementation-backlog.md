@@ -8709,7 +8709,10 @@ each other. The score has ~18 points of dynamic range and spends all of it above
     (*"upon waking I don't feel instantly super rested or not rested… generally it's a mid"*), and
     measurement backs them: `sleep_quality_feel` (sd ~0.8, 5 values used) is the **most** variable
     self-report in the app. `perceived_recovery` sd 0.36 / 2 values; `motivation` 0.34; `wake_mood`
-    0.39; **`resting_soreness` sd 0.00 — exactly 3 in all 20 entries.** Asking for performative spread
+    0.39. **⚠️ Corrected 2026-08-19 — `motivation`, `resting_soreness` and `wake_mood` are RETIRED**
+    (nulled in `morning-checkin-sheet.tsx`; last values 08-07, 07-23, 07-20), so the live comparison is
+    `sleep_quality_feel` against `perceived_recovery` alone — a field of two, which makes the
+    conclusion stronger, not weaker. Asking for performative spread
     would also invalidate the 46 nights already collected.
   - **A different outcome: only one candidate, and it is weak.** Against raw sleep measures (not the
     composite, per the Q-511 rule): **steps r = +0.210**; training volume **+0.028** and mean RPE

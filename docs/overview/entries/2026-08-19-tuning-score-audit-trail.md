@@ -126,7 +126,8 @@ owner decided what each score is *for*, which doesn't depend on where the correl
 The owner explained the flat ratings: *"upon waking I don't feel instantly super rested or not
 rested… generally it's a mid."* Measurement backs them completely. `sleep_quality_feel` is the **most**
 variable self-report in the app (sd ~0.8, 5 values used); `perceived_recovery` is 0.36 across 2
-values, and **`resting_soreness` has been exactly 3 in all 20 entries — sd 0.00.** It also tracks
+values. **(Corrected 2026-08-19 — see the retired-scales note below; `resting_soreness` is a fossil,
+not a live field.)** It also tracks
 sleep better than the alternatives (vs efficiency **+0.316**).
 
 Objective outcomes were tested too: steps **+0.210**, training volume **+0.028**, RPE **−0.023** — and

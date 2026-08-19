@@ -956,7 +956,11 @@ const BASELINE = {
   // which is the second implementation the one-formula rule exists to prevent. It also restates
   // what the split preserves (the carbs:fat ratio, not each macro's share), since the original
   // wording reads as the other one.
-  'docs/implementation-backlog.md': 11197,
+  // Raised 2026-08-19 (Tuning, retired-scales correction): 11197 -> 11201. Three lines on Q-72,
+  // marking motivation/resting_soreness/wake_mood as RETIRED. The entry previously listed them
+  // beside two live scales as evidence, which reads as "six poor self-reports" when it is really
+  // two live ones and three fossils -- a different instruction to whoever acts on it.
+  'docs/implementation-backlog.md': 11201,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
