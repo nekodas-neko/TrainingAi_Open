@@ -480,126 +480,52 @@ is the part worth knowing before someone reaches for the obvious edit:
   down the sheet and nothing else — if any of those three shift, the change has gone further than it
   should.
 
-### [nutrition][health] Q-414 — energy in against energy out, on one timeline
+### [platform] Q-361 — two core routes 500 in every sandbox session, so their screens have never been verifiable locally
 
-- **Branch:** `feat/energy-timeline-chart`
-- **Added:** 2026-08-19 · owner, once Q-413 made the timestamp mean something
-- **Owner's words:** *"This would just be a display of calorie intake over time? would be nice on a
-  graph like widget; could be superset with calorie out too; so can see what times energy is
-  expended vs refueled."*
-- **Lane B** (`components/**` + an aggregate GET, which is Lane A if a new route is needed — check
-  whether `day-timeline` can carry it before adding one).
-- **✅ UNBLOCKED — Q-413 shipped 2026-08-19.** `food_logs.logged_at` now means when the food was
-  eaten: writes resolve it against the meal window via `resolveEatenAt`
-  (`packages/shared/src/nutrition/eaten-at.ts`), and migration 203 corrected the stored rows whose
-  timestamp fell on a different local date than their own `date`. **One caveat this chart must not
-  be surprised by:** the migration was deliberately narrow, so a *pre-Q-413* row that was logged on
-  the right day but outside its window still carries its original instant — a small number of
-  historical points sit outside their meal's window. New rows do not.
+- **Branch:** `fix/sandbox-energy-constants`
+- **Added:** 2026-08-19 · Lane B, found building Q-414's chart · [`journal`](overview/entries/2026-08-19-energy-timeline.md)
+- **Placement:** mid. Nothing is broken in production — this is a **verification** hole, and its cost
+  is that "tested on `pnpm dev`" has been silently untrue for a whole family of screens.
 
-**What it is.** One chart, x = time of day, two series:
-- **In** — calories eaten, from `food_logs` bucketed by the resolved `logged_at`.
-- **Out** — calories expended across the day.
-The point is the *relationship*: where refuelling sits against expenditure, so a 2,000 kcal day
-eaten entirely after 7 pm reads differently from the same total spread across it.
+**What happens.** `GET /api/nutrition/energy-balance` and `GET /api/body-metadata` both return
+**500** in a sandbox session, every time:
 
-**Design decisions to make before building — these are the real content of this entry.**
-1. **Which shape.** Intake is **discrete events** (four meals), expenditure is **continuous**. Do
-   not draw both as lines: a line through four meal points implies the user was eating at 10:30
-   because the segment passes through it. Recommendation: **bars for intake, a filled area or line
-   for expenditure**, same axis. That is the honest encoding of "events against a flow".
-2. **Cumulative or per-hour?** Both are defensible and they answer different questions. Per-hour
-   shows *when*; cumulative (two rising curves, the gap between them being the running balance) shows
-   *whether you are ahead or behind*, which is closer to what the owner already sees on the energy
-   bar. Recommendation: **cumulative**, because the gap between the curves is the day's energy
-   balance and this app already frames nutrition that way (Q-401 retired the second budget precisely
-   to have one number). Per-hour bars can be the intake series drawn against it.
-3. **Where "out" comes from, and it is not one source.** BMR accrues continuously (~1 kcal/min and
-   flat), movement is bursty. Decide whether the curve is BMR + measured movement (honest, and
-   already the app's model since Q-401) or measured only (misleading — it implies you burn nothing
-   sitting still). Recommendation: **BMR + movement**, drawn as one curve, with the method stated
-   under the chart. Do not invent a third TDEE model — Q-401 exists because there were two.
-4. **Resolution. ⛔ MEASURED 2026-08-19 (Lane B), and the answer breaks two of this entry's own
-   rules against each other.** The instruction was to check what the pipeline stores per interval
-   before picking a bucket. It stores almost nothing, and the component that is missing is the
-   dominant one.
+```
+Error: ENOENT: no such file or directory, open
+  '/home/user/TrainingAi_Open/lib/oura-models/constants/energy-expenditure-features.json'
+```
 
-   | source of "out" | placeable in time? | production volume (owner's account) |
-   |---|---|---|
-   | BMR | yes — continuous by definition | ~1,600 kcal/day |
-   | workouts | yes — `started_at`/`completed_at` | 76 days of 111 |
-   | logged activities | yes — `start_time`/`end_time` | 36 days of 111, **5,082 kcal total, ever** |
-   | **steps** | **NO — daily total only** | 111 days, **668,749 steps**, avg 6,025/day |
+`lib/oura-models/constants/*` is **gitignored** — vendor data pulled in the public-repo cut (Q-49).
+`readJson` throws deliberately, and the comment says why: *"A missing constant is a wrong number, not
+a missing feature — there is no degraded answer to fall back to."* That reasoning is right for
+production. In the sandbox it means the file is simply never there.
 
-   `step_live_windows` looks like the intra-day source and is not: **11 rows and 8,261 steps in the
-   whole table's history**, against 668,749 steps counted in `body_metrics`. That is **1.2%
-   coverage**. Everything else arrives as one number per day with no distribution.
+**What it costs.** The Energy card on day detail, the energy bar on Nutrition, and anything else
+reading either route render **nothing at all** locally — not a degraded state, an empty one. Q-414's
+chart could not be seen until a stub MET table was written by hand. Any session that claimed a
+`pnpm dev` pass on those screens was claiming something it could not have done.
 
-   **⚠ THE ABOVE WAS THE WRONG QUESTION — corrected the same day, by the owner.** The measurement
-   is right; the conclusion drawn from it was not. It asked *"is there intra-day **step** data"*,
-   found none, and concluded a burn curve could not be drawn honestly. The owner's reply: *"We use
-   increased heart rate, and exercise and steps etc to determine calories out right? Can't we time
-   stamp each activity so we know when it was? Isn't that already being done in the daily HR
-   chart?"*
+**A second, independent blocker in the same place.** The seeded user has **no `date_of_birth`**
+(`sex` and `height_cm` are seeded, `date_of_birth` is not), so `computeEnergyBalance` has no age,
+returns no balance, and the surfaces stay blank *even with the constants present*. Both must be
+fixed or the fix is worthless.
 
-   **Two things in that are worth separating, because one is a misconception and the other is the
-   answer.**
-   - **HR is not an input to calories-out today.** `computeActiveEnergy`
-     (`packages/shared/src/health/daily-energy.ts`) is **MET × duration** — strength sessions at
-     activity 8, logged activities by type, and passive steps above a sedentary baseline. Heart
-     rate appears nowhere in it. So "we use increased heart rate to determine calories out" is not
-     what the code does.
-   - **But the timing data absolutely exists, and it is HR.** `oura_heartrate` is timestamped and
-     dense, measured 2026-08-19 over the owner's account:
+**Options, and the second is the one to take.**
+- Commit a small placeholder constants file. Rejected: it puts plausible-looking wrong MET numbers in
+  the repo where nothing marks them as fake, which is how a wrong number ships.
+- **Have `scripts/local-db/setup.sh` write a clearly-labelled stub when the real file is absent**,
+  and add `date_of_birth` to the seed. The stub says in its own `_note` field that its values are
+  placeholders, it only ever exists in a sandbox, and the gitignore keeps it out of commits. The
+  route then returns a *shaped* answer whose totals are wrong-but-present, which is exactly what a
+  UI verification needs and production never sees.
+- **Lane B owns the chart surfaces; `scripts/local-db/` is unlisted in §3** — claim it in the baton
+  or hand that half to Lane A.
+- **Not verified:** whether CI hits this. CI runs `pnpm build` and the E2E suite green, so either the
+  collected routes do not touch the loader at build time (it is read on first use, not at module
+  scope — deliberately, see the comment at `workout-energy.ts:31`) or no E2E asserts on those
+  screens. **Establish which before fixing**, because "green in CI, dead locally" is the shape that
+  trains sessions to stop believing local runs.
 
-   | source | samples, last 14 days | covers |
-   |---|---|---|
-   | `ble` (the ring) | 3,810 | **all 24 hours**, on 11–14 of 14 days per hour — one sample every 3–7 minutes around the clock |
-   | `chest_strap` | 26,034 | workouts only, very dense while worn |
-
-   Over 59 days the table holds 72,530 samples, ~1,229/day, current to today. **No hour of the day
-   is dark.** The ring power-gates when worn-idle, which thins the quiet hours — it does not empty
-   them.
-
-   **So the rules do not collide after all, and the resolution is the owner's idea.** Use HR to
-   **distribute** the day's expenditure, not to **recompute** it:
-   - the day's total active energy stays exactly what `computeActiveEnergy` already returns — one
-     model, unchanged, so the chart cannot disagree with the number above it (this is the whole
-     point of **Q-401**, which exists because there were two TDEE models);
-   - the *shape* comes from measured HR — allocate each hour a share weighted by Σ(bpm − restingHr)
-     over that hour, floored at zero, with BMR spread flat;
-   - **both of this entry's rules are then satisfied**: the curve ends exactly on the day's burn
-     because it is a partition of it, and it is not smoother than its data because its shape is
-     measured rather than assumed.
-
-   `restingHr` is already available from `/api/hr-profile`, which two activity sheets read.
-
-   **The honest caveat to carry into the build:** HR rises for reasons that are not metabolic —
-   stress, caffeine, standing up — so the allocation is a good proxy, not a measurement of when
-   energy was spent. Say so under the chart. That is a far smaller claim than smearing a daily step
-   total evenly across sixteen hours, which was the alternative.
-
-   **The intake half has no such problem** and is ready: 222 food logs across 45 days already carry
-   a resolved `logged_at` after Q-413.
-
-5. **No new route is needed, so this stays in Lane B.** `/api/day-timeline` already returns meals
-   with `timeMs` and `calories`, and walks and workouts with their times and calories — the intake
-   series and the timed half of expenditure, both already assembled server-side. Confirmed against
-   `app/api/day-timeline/route.ts` on 2026-08-19. Do not add a route before re-checking that.
-
-**Where it lives.** The owner said *"graph like widget"*. Two candidates: the Nutrition tab under the
-existing energy bar, or the day-detail screen. Recommendation: **day detail**, and link to it from
-the energy bar — the Nutrition tab is already the densest screen in the app and Q-395 is trying to
-make it lighter, not heavier. A widget on the tab that opens the full chart is the compromise if the
-owner wants it visible.
-
-- **Per the repo's own rules:** chart colours resolve through `resolveColor`, never a `var(--x)`
-  string handed to canvas (that renders black and has shipped twice); the intake series uses the
-  shared `MACRO_COLORS` only if it is split by macro, otherwise a single accent; and the card seeds
-  from cache and uses `useCachedValue`, never a fetch-once effect (Q-402/Q-359).
-- **Verification.** Compare the chart's totals against the day's existing figures — the intake curve
-  must end exactly on the day's logged calories and the expenditure curve on the day's burn. A chart
-  that disagrees with the number above it is worse than no chart.
 
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 

@@ -975,7 +975,12 @@ const BASELINE = {
   // turned into a prescription. Cheaper here than as a rediscovery.
   // 2026-08-19 (Tuning): +3 on Q-72, marking motivation/resting_soreness/wake_mood RETIRED -- the
   // entry listed three dead scales beside two live ones as if all five were evidence.
-  'docs/implementation-backlog.md': 11312,
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-414 shipped): its entry out, Q-361 in, net smaller. Q-361 is
+  // what building Q-414 uncovered rather than what it set out to do — two routes 500 in every
+  // sandbox session because their vendor constants file is gitignored, so the Energy card has never
+  // once been renderable locally. Its lines are the evidence that "tested on pnpm dev" was untrue
+  // for a family of screens, which is not a claim to leave to memory.
+  'docs/implementation-backlog.md': 11238,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
