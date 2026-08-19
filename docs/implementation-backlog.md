@@ -293,8 +293,14 @@ below threshold and left in place for next time.
 
 *"lets focus on the nutrition changes now. id like to get this perfected today"*
 
-The next eight entries are the nutrition cluster, **ordered by dependency rather than Q number**.
-Do not re-sort them numerically; the sequence is the point, and two of them block others.
+The nutrition cluster is **six entries**, ordered by dependency rather than Q number, starting at
+Q-401 below. Two have shipped since this block was written: **Q-399** (#163, the centred label now has
+room for its ingredient list) and **Q-402** (#165, a component is told when its cache key is
+invalidated). Their entries were correctly removed on merge.
+
+**Q-359 sits above the block deliberately** — it is Lane B's follow-up to Q-402, and it reports that
+**36 other fetch-once effects carry the same latent bug**. That is the general version of the defect
+Q-402 fixed in one place, so it outranks the remaining nutrition work rather than interrupting it.
 
 **Realistically today, and this is the honest split:**
 - **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
@@ -968,6 +974,86 @@ directly — green on web, dead on the device, because the failing path is unrea
 - **Related:** the label this saves was missing its ingredient list — **Q-399, fixed 2026-08-19
   (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
   one the owner picked.
+
+### [workouts][platform] Q-405 — a Coach swap silently inherits the old exercise's role, and the role sets the loading
+
+- **Branch:** `feat/coach-swap-role-prompt`
+- **Added:** 2026-08-18 · owner, after swapping Barbell Romanian Deadlift → Barbell Jefferson Curl:
+  *"it should ask what role the exercise should be with a recommendation; this changed from RDL →
+  Jefferson; and it looks like it took the 'secondary' role rather than accessory."*
+- **Lane A** — `lib/coach/domains/session-exercise.ts` is the write path. The picker UI half is Lane B
+  if one is added; check before starting.
+
+**Confirmed: the swap never touches the role.** `session_exercises.exercise_role` is
+`'primary' | 'secondary' | 'accessory'` (`schema.ts:132`, default `'primary'`), and
+`lib/coach/domains/session-exercise.ts` contains **no reference to it** — grep returns nothing. The row
+keeps whatever the outgoing exercise had, so RDL's `secondary` carried straight onto Jefferson Curl.
+
+**This is not a badge problem.** Role selects the progression style —
+`resolveStyleForExercise(program, phase, { exerciseRole })` — so it decides the prescribed percentages
+and sets. In the owner's screenshot the inherited role prescribed **60 kg × 6 at 80%** for a
+Jefferson Curl: a heavy secondary loading pattern on a slow spinal-flexion movement that is normally
+loaded light. **A wrong role is a wrong prescription, on a movement where that carries injury risk.**
+
+**What to build.**
+1. **Ask, with a recommendation pre-selected** — the owner's words. Three options, the suggested one
+   already chosen, so the common case is one confirm rather than a decision.
+2. **Where the recommendation comes from, in order of preference:** the incoming exercise's own entry
+   in `exercise_library` if it carries a default role; otherwise its muscle groups and equipment
+   (a compound barbell lift on a primary mover → primary/secondary; an isolation or mobility movement
+   → accessory). **Do not ask the model to invent it** — a guessed role feeds a real prescription, and
+   CLAUDE.md is explicit that no LLM self-reported value may gate an automatic action.
+3. **Never silently inherit.** If no recommendation can be derived, ask without a pre-selection rather
+   than defaulting to the outgoing role — inheriting is what produced this.
+
+- **Sibling sweep:** the same silent inheritance applies to any other path that replaces an exercise in
+  a session. Grep for writers of `exercise_role` before calling this done; the Coach may not be the
+  only one.
+- **Related, and worth doing together:** **Q-403** — the same swap flow calls an applied change a
+  "proposal" and says so after the fact. Both are about the swap telling the user what it actually did.
+- **Verification:** swap a compound for an isolation movement and confirm the role prompt appears, the
+  recommendation is sensible, and the prescribed sets change to match the chosen role — the last part
+  is the one that proves the fix reached the thing that matters.
+
+### [platform] Q-404 — the Sentry SDK was deliberately deferred and never queued, so nothing was going to wire it
+
+- **Branch:** `feat/wire-sentry-sdk`
+- **Added:** 2026-08-18, after the owner got Sentry's *"no errors are coming through yet"* email and
+  asked whether it was set up. It is not — and the reason is documented, but **only in a handoff.**
+- **Lane A** (root config, `instrumentation.ts`, `next.config`, a new dependency).
+
+**The state, precisely.** `docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`
+lists under *Deliberately NOT done*: **"The Sentry SDK is not wired. DSN is in Railway, a read token is
+in a session env. Deferred on purpose so the session that wires it can verify events arrive rather
+than assume — a configured DSN and a silently-dropping one look identical."** Confirmed in the tree:
+no `@sentry/nextjs` dependency, no `sentry.*.config.ts`, no `SENTRY_*` reference in any source file.
+
+**Why this entry exists at all.** The deferral was a good call, and it was recorded in the right place
+for a narrative — but **there was no backlog entry**, so nothing in the queue was going to pick it up.
+A deferral that lives only in a handoff is an orphaned finding by the repo's own rule, and Sentry's own
+email is what surfaced it rather than anything in this repo.
+
+**⚠ The verification requirement is the whole point — do not skip it.** The deferring session's
+stated reason was that a wired-but-silent DSN is indistinguishable from a working one. So this item is
+not done when the SDK is installed; it is done when **a deliberately-thrown error is observed arriving
+in the Sentry project**. Throw one from a server route and one from the client, and record both in the
+PR.
+
+**What it adds that `error_events` does not.** Server errors are already captured — `instrumentation.ts`
+`onRequestError` → `lib/observability/request-error.ts` → `error_events` — and client errors too, via
+`components/error-reporter.tsx` (mounted at `app/layout.tsx:143`) and `app/error.tsx`. So Sentry is not
+filling a capture gap. It fills the **alerting** gap: `error_events` is pull-only, prunes at 30 days,
+and CLAUDE.md records that the first read found three faults of which two had already stopped before
+anyone looked. Nothing notifies. Wire it for that, and say so in the PR so the next reader does not
+think the home-grown path is now redundant — **it is not, and it should not be removed.**
+
+**⚠ PII, and this is a health app.** Sentry's defaults capture URLs, breadcrumbs and sometimes request
+bodies. Health values, user ids and food/weight data must not leave to a third party by accident. Ship
+the scrubbing config **in the same PR as the DSN**, not after — `beforeSend`, `sendDefaultPii: false`,
+and a denylist for the health routes. There is also a **prior decision against a vendor** on record
+(`docs/overview/history-latest.md:625`, *"Decision made against a Sentry-type vendor: single user, data
+stays in Railway, no CSP changes"*) — that decision has since been reversed by the owner, and the CSP
+note is a live consideration for the WebView, not a stale one.
 
 ### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
 
