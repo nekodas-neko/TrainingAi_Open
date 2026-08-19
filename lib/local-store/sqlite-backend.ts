@@ -1163,15 +1163,20 @@ export class SQLiteLocalStore implements LocalStore {
     };
   }
 
+  // Q-387: `food_logging_completed_at` is COALESCEd rather than overwritten. The check-in sheets
+  // call this with the flag absent (so, null), and a bare `excluded.` would clear "I have finished
+  // logging today" every time the evening check-in was saved or edited — the same clobber the
+  // server-side `saveDayCheckin` guards against by omitting the column when it is undefined. Undo
+  // is its own write, which sets it explicitly.
   async upsertDayCheckin(record: LocalDayCheckin): Promise<void> {
     await runSQL(
       `INSERT INTO day_checkins
          (log_date, phase, physical_tiredness, mental_drain, barely_moved,
           hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
           sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-          sleep_quality_feel_touched, sore_muscles, journal, updated_at,
+          sleep_quality_feel_touched, sore_muscles, journal, food_logging_completed_at, updated_at,
           deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(log_date, phase) DO UPDATE SET
          physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
          barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -1182,7 +1187,9 @@ export class SQLiteLocalStore implements LocalStore {
          perceived_recovery_touched=excluded.perceived_recovery_touched,
          sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
          sore_muscles=excluded.sore_muscles,
-         journal=excluded.journal, updated_at=excluded.updated_at,
+         journal=excluded.journal,
+         food_logging_completed_at=COALESCE(excluded.food_logging_completed_at, day_checkins.food_logging_completed_at),
+         updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
       [
         record.logDate, record.phase, record.physicalTiredness, record.mentalDrain,
@@ -1190,7 +1197,8 @@ export class SQLiteLocalStore implements LocalStore {
         record.wakeMood, record.perceivedRecovery, record.motivation,
         record.sleepQualityFeel, record.restingSoreness,
         record.illnessContext, record.perceivedRecoveryTouched ? 1 : 0, record.sleepQualityFeelTouched ? 1 : 0,
-        JSON.stringify(record.soreMuscles), record.journal, record.updatedAt,
+        JSON.stringify(record.soreMuscles), record.journal,
+        record.foodLoggingCompletedAt ?? null, record.updatedAt,
         record.deletedAt, record.syncStatus,
       ],
     );
@@ -1918,9 +1926,9 @@ export class SQLiteLocalStore implements LocalStore {
              (log_date, phase, physical_tiredness, mental_drain, barely_moved,
               hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
               sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-              sleep_quality_feel_touched, sore_muscles, journal, updated_at,
+              sleep_quality_feel_touched, sore_muscles, journal, food_logging_completed_at, updated_at,
               deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(log_date, phase) DO UPDATE SET
              physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
              barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -1931,7 +1939,9 @@ export class SQLiteLocalStore implements LocalStore {
              perceived_recovery_touched=excluded.perceived_recovery_touched,
              sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
              sore_muscles=excluded.sore_muscles,
-             journal=excluded.journal, updated_at=excluded.updated_at,
+             journal=excluded.journal,
+             food_logging_completed_at=excluded.food_logging_completed_at,
+             updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
            WHERE day_checkins.sync_status='synced'
              AND excluded.updated_at > day_checkins.updated_at`,
@@ -1939,7 +1949,7 @@ export class SQLiteLocalStore implements LocalStore {
            r.hydration, r.lateHeavyMeal, r.wakeMood, r.perceivedRecovery, r.motivation,
            r.sleepQualityFeel, r.restingSoreness, r.illnessContext,
            r.perceivedRecoveryTouched ? 1 : 0, r.sleepQualityFeelTouched ? 1 : 0,
-           JSON.stringify(r.soreMuscles), r.journal,
+           JSON.stringify(r.soreMuscles), r.journal, r.foodLoggingCompletedAt ?? null,
            r.updatedAt, r.deletedAt],
         );
       }

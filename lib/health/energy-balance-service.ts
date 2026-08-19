@@ -71,7 +71,7 @@ export async function computeEnergyBalance(
 
   // The whole window is fetched, not just the requested day: a calibrated maintenance needs the
   // window's average movement to separate resting burn from habitual movement (see below).
-  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile] = await Promise.all([
+  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins] = await Promise.all([
     repo.listBodyMetrics(userId, windowStart, date).catch(() => []),
     repo.listFoodLogsSummary(userId, windowStart, date).catch(() => []),
     repo.listActivityLogs(userId, windowStart, date).catch(() => []),
@@ -79,9 +79,16 @@ export async function computeEnergyBalance(
     repo.getNutritionTargets(userId).catch(() => null),
     repo.getUserGoals(userId).catch(() => null),
     repo.getUserById(userId).catch(() => null),
+    // Q-387: which days the user marked "I have finished logging". Only those may enter the
+    // maintenance mean — a day abandoned after lunch is indistinguishable from a completed light
+    // one, and counting it dragged the estimate 86 kcal lower per partial day.
+    repo.listDayCheckins(userId, windowStart, date, 'evening').catch(() => []),
   ])
 
   const intakeByDate = new Map(foodSummary.map(r => [r.date, r.calories]))
+  const loggingCompleteByDate = new Set(
+    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate),
+  )
   const metricByDate = new Map(metrics.map(m => [m.date, m]))
 
   const byDateDesc = (a: { date: string }, b: { date: string }) => b.date.localeCompare(a.date)
@@ -153,6 +160,7 @@ export async function computeEnergyBalance(
     windowDays.push({
       date: d,
       intakeKcal: intakeByDate.get(d) ?? null,
+      loggingComplete: loggingCompleteByDate.has(d),
       weightKg: metricByDate.get(d)?.weightKg ?? null,
     })
   }

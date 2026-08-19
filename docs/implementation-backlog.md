@@ -15,8 +15,8 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **201** | `lib/data/postgres/migrations/` (head: `200_claude_ro_views_applied_mutations.sql`) |
-| Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **203** | `lib/data/postgres/migrations/` (head: `202_claude_ro_views_food_logging_complete.sql`) |
+| Local SQLite schema version | **v27** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
@@ -583,6 +583,24 @@ a ruler.
   whatever renders it. Small, but it needs the product call on carbs-only first.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
+
+- **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
+  Done: `day_checkins.food_logging_completed_at` (migration **201**, local SQLite **v27**, both sync
+  directions, `claude_ro` views **202**), `POST /api/food-logging-complete` with its Undo, and
+  `estimateMaintenance` filtering on the flag instead of `intakeKcal > 0`. The partial-day case the
+  module had **zero** coverage of now has five tests, plus an end-to-end pair through
+  `computeEnergyBalance`. [`Journal`](overview/entries/2026-08-19-tdee-day-completeness.md).
+- **⚠️ Until the button ships, the calibration cannot engage** — no day can be marked, so every day
+  is excluded and `source` stays `'formula'`. That is the intended failure mode ("the estimate
+  waits", not "the estimate is quietly wrong") and it costs nothing today, because per Q-302 **0 of
+  the last 30 rolling windows** cleared `MIN_LOGGED_DAYS` anyway. It does mean the feature is inert
+  until Lane B lands.
+- **Still open — Lane B:** the *"Complete Today's Logging"* button as the last element in the day's
+  scroll (not the header, not beside the ring), the copy beneath it, the receipt-with-Undo it
+  becomes, and the **"N of 10 days" counter shipped with it, not after** — the button feeds
+  something invisible, and that invisibility is why this bug survived. `POST /api/food-logging-complete`
+  takes `{ date?, complete }` and answers `{ date, complete, completedAt }`; sending
+  `complete: false` is the Undo.
 
 - **Branch:** `fix/tdee-partial-day-completeness`
 - **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x

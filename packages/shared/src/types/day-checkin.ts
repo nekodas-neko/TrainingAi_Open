@@ -27,6 +27,15 @@ export interface DayCheckin {
   sleepQualityFeelTouched: boolean
   soreMuscles: string[]
   journal: string | null
+  /**
+   * Q-387 — when the user said "I have finished logging today", or null if they have not.
+   *
+   * The maintenance calibration reads null as EXCLUDED, never as assumed-complete: a day abandoned
+   * after lunch is byte-for-byte identical to a completed light day, and counting it dragged the
+   * estimate 86 kcal lower per partial day with `confidence: 'medium'` and nothing flagged.
+   * Setting it back to null is the Undo.
+   */
+  foodLoggingCompletedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
