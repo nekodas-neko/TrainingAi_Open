@@ -6308,6 +6308,37 @@ session working from a temporarily restored copy.
   - **Method lesson:** a **three-minute** observation window was used to assert a permanent absence,
     and the twin was picked on summary columns instead of the contributor vector. **Compare
     contributors, not summary columns.**
+- **⚑ OWNER REQUIREMENT 2026-08-20 — this is the acceptance criterion, and it needs an APK.**
+  *"Ideally I want the score and sleep time to be accurate on first open of the day without needing
+  time to 'adjust'."*
+  [`docs/reviews/2026-08-20-accurate-on-first-open.md`](reviews/2026-08-20-accurate-on-first-open.md).
+  **The cause is neither the scoring nor the rollup: the ring uploads roughly once an hour.** Over 7
+  days, 214 ingest batches — **median gap 62.0 min**, p90 71, max 306. The owner opened the app in the
+  gap between the 05:40 and 06:44 uploads, so their wake was **still on the ring**. No scoring change
+  could have helped.
+- **Three links, and all three are needed. Order matters.**
+  1. **Drain on app open / wake detection** — closes the ≤62-min data gap, the dominant term.
+     **Native Kotlin ⇒ new APK**, not a Railway deploy.
+  2. **Roll up and re-score immediately after that drain** — this morning the last upload landed 06:50
+     and the score settled 06:54:41, a **~4-minute** processing lag.
+  3. **Until 1 and 2 land, do not render a number that will change** — this entry's existing scope,
+     and **the only part shippable without an APK.**
+  **Doing 2 without 1 makes the app faster at showing stale data.** Do not shorten the rollup schedule
+  alone: it addresses the 4-minute term and leaves the 62-minute one, which reads as *"we made it
+  faster and it still adjusts"*.
+- **⚠️ The limit, worth saying to the owner rather than discovering later.** If the app opens **before
+  the ring has registered the end of the night**, nothing fixes it. That morning the session's own end
+  was **06:47** and the screenshot **06:46**. The achievable target is *"accurate within seconds of the
+  ring knowing"*, not *"accurate before the ring knows"*. **Three distinct states — night in progress,
+  complete but unsynced, settled — and the app renders all three identically.**
+- **Drain-lag context, last 8 nights (ingest completion vs wake):** +3, +9, **−5**, +2, +17, **+62**,
+  +4 min. Usually minutes, occasionally an hour. The **−5** matters: on 08-18 the data was complete
+  *before* wake, so today's outcome depends on where waking falls in the upload cycle — **luck, not
+  design.**
+- **⛔ Check before promising the on-open drain is cheap:** the 62-minute cadence is **observed ring
+  behaviour, not a documented setting.** Whether it is configurable, and what more frequent radio
+  wake-ups cost in ring battery, is unknown here — and the firmware is deliberately frozen, so this is
+  not a free knob.
 - **Branch:** `fix/mark-provisional-sleep-score` · **Lane:** B
 - **Plan:** none yet — **first confirm whether a slower pass corrects it** (see caveat). Evidence:
   [`docs/reviews/2026-08-20-sleep-score-computed-mid-sync.md`](reviews/2026-08-20-sleep-score-computed-mid-sync.md).

@@ -3,11 +3,24 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/correct-q529` · **Q band:** 500–529 (**BAND EXHAUSTED — 529 was the last. Agree a new band with the owner before filing anything.**)
+**Updated:** 2026-08-19 · **By:** `tuning/accurate-on-first-open` · **Q band:** 500–529 (**BAND EXHAUSTED — 529 was the last. Agree a new band with the owner before filing anything.**)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Owner acceptance criterion on Q-529: "accurate on first open, without needing time to adjust".**
+  Measured the whole chain — **the cause is neither scoring nor rollup. The ring uploads about once an
+  hour**: 214 batches over 7 days, **median gap 62.0 min**, p90 71, max 306. The owner opened in the
+  gap between the 05:40 and 06:44 uploads, so their wake was still on the ring.
+  - **Three links, ordered:** drain on app open (**native ⇒ new APK**, the dominant term) → rollup and
+    re-score on that drain (~4 min today) → provisional state until both land (**the only part
+    shippable without an APK**). **Doing the rollup alone makes the app faster at showing stale data.**
+  - **Say the limit out loud:** open before the ring registers the night's end and nothing fixes it —
+    session end was 06:47, screenshot 06:46. Target is *within seconds of the ring knowing*.
+  - **⛔ The 62-min cadence is OBSERVED, not a documented setting.** Whether it is configurable and
+    what it costs in ring battery is unknown, and the firmware is deliberately frozen — check before
+    promising an on-open drain is cheap.
+  [`review`](../../reviews/2026-08-20-accurate-on-first-open.md).
 - **⚠️ Q-529 was OVERCLAIMED and corrected hours later — read before touching it.** I filed "the
   score is never recomputed". **It is** (47 → 55, `computed_at` 06:45:56 → **06:54:41**, after the
   session settled 06:51:03). The "near-twin" also failed: 08-17 matched on *duration and onset* and

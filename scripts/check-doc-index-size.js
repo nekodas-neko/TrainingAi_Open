@@ -994,7 +994,10 @@ const BASELINE = {
   // Ratchets DOWN 2026-08-19 (Lane B, Q-416 shipped): its entry out, nothing filed in its place.
   // The pointer above it keeps four lines rather than being struck, because the print of the FIXED
   // artwork is still owed — the complaint came from paper and only paper closes it.
-  'docs/implementation-backlog.md': 11259,
+  // 2026-08-20 (Tuning): owner acceptance criterion on Q-529 -- accurate on first open. The
+  // 62-minute ring upload cadence and the three-link ordering live in the entry because an
+  // implementer who shortens the rollup alone fixes the 4-minute term and none of the 62.
+  'docs/implementation-backlog.md': 11127,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

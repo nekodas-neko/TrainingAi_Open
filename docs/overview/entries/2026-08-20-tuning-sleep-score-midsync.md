@@ -149,3 +149,67 @@ Known Issue rather than standing beside it.
 
 Both would have been caught by the same discipline — **compare contributors, not summary columns** —
 which is exactly what the hypnogram decode did an hour later, and it got its answer right first time.
+
+---
+
+# Owner requirement: accurate on first open — and the cause is neither scoring nor rollup
+
+> *"Ideally I want the score and sleep time to be accurate on first open of the day without needing
+> time to 'adjust'."*
+
+**The ring uploads roughly once an hour.** Over 7 days, 214 ingest batches in `oura_raw_samples`:
+
+| | minutes |
+|---|---|
+| median gap | **62.0** |
+| p90 | 71.0 |
+| max | 306 |
+
+Each batch is a short high-rate burst — the 01:13 batch holds 1,899 samples covering 01:05–01:13 — so
+the ring records in bursts and ships them hourly rather than streaming.
+
+## What that produced
+
+| time | event |
+|---|---|
+| ~06:07 | last sleep epoch (stored hypnogram) |
+| **05:40** | **last upload before the app was opened** |
+| **06:46** | **app opened** → shows a night ending **4:52 am** |
+| 06:44 → 06:46:19 | upload lands → session ends **6:44** |
+| 06:50 → 06:51:03 | upload lands → session ends **6:47** |
+| 06:54:41 | score recomputed → **55** |
+
+**The app was opened in the gap between two hourly uploads. The wake was still on the ring.** No
+scoring or rollup change could have helped — the server did not have the data.
+
+Drain lag vs wake over 8 nights: +3, +9, **−5**, +2, +17, **+62**, +4 min. The **−5** is the
+instructive one — on 08-18 the night was complete *before* the wake timestamp. Whether today's summary
+is right on first open is **where waking falls in the upload cycle: luck, not design.**
+
+## What the requirement actually needs
+
+1. **Drain on app open / wake detection** — closes the ≤62-min gap, the dominant term. **Native
+   Kotlin ⇒ new APK.**
+2. **Roll up and re-score on that drain** — ~4 minutes of processing lag today.
+3. **Until both land, don't render a number that will change** — Q-529's existing scope, and the only
+   part shippable without an APK.
+
+**Doing 2 without 1 makes the app faster at showing stale data.** Shortening the rollup schedule alone
+fixes a 4-minute term and leaves a 62-minute one — which would read as *"we made it faster and it
+still adjusts"*.
+
+## The limit, said out loud rather than discovered later
+
+**Open the app before the ring has registered the end of the night and nothing fixes it.** That
+morning the session's own end timestamp was **06:47** and the screenshot was **06:46**. The achievable
+target is *"accurate within seconds of the ring knowing"*, not *"accurate before the ring knows"*.
+
+Three distinct states — night in progress, complete but unsynced, settled — and **the app renders all
+three identically.** That is the same root as the range-label Known Issue and Q-520.
+
+## Not measured, and it gates the recommendation
+
+**The 62-minute cadence is observed ring behaviour, not a documented setting.** Whether it is
+configurable, and what more frequent radio wake-ups cost in ring battery, is unknown here — and the
+firmware is deliberately frozen, so this is not a free knob. **Check before promising the on-open
+drain is cheap.**
