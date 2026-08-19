@@ -609,6 +609,18 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 
 ### [platform] Q-324 — the first suite run against a freshly-migrated database times out two test files, which is exactly what CI does every run
 
+> **⚠️ PARTIALLY DONE 2026-08-19 — mechanism fixed, symptom unconfirmed**
+> ([`journal`](overview/entries/2026-08-19-local-migrate-bookkeeping.md)). `migrate.js` now records
+> what it applied, so `ensureSchema()` no longer re-applies ~200 files per worker; CI runs that
+> script before `pnpm test`, so this was CI's state every run. Measured: `schema_migrations` did not
+> exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
+> suite 200.19 s → 183.18 s.
+>
+> **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
+> today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
+> Keep the entry until it is seen again with this ruled out, or stays absent long enough to close on
+> evidence. Everything below is the original entry.
+
 - **Branch:** `fix/ci-fresh-db-schema-contention`
 - **Added:** 2026-08-19 · Lane A, while diagnosing a red `Tests` job on PR #195
 - **Placement:** medium. It is **not** a product defect — it is intermittent CI red on changes that
