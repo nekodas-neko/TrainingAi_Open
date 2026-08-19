@@ -4,6 +4,10 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { VACUUM_FULL_TABLES, type VacuumFullTable } from '@/lib/data/postgres/slices/oura'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One table name. 4 KB is generous.
+const MAX_BODY_BYTES = 4 * 1024
 
 // Q-315 — admin-triggered `VACUUM FULL` on an allowlisted table.
 //
@@ -46,12 +50,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  let table: string | undefined
-  try {
-    table = (await req.json() as { table?: unknown }).table as string | undefined
-  } catch {
-    // fall through to the allowlist check, which rejects undefined
+  // The allowlist below is the real guard — VACUUM takes no bind parameter — so an unreadable body
+  // still falls through to it rather than short-circuiting here.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
   }
+  const raw = read.ok ? (read.body as { table?: unknown } | null)?.table : undefined
+  const table = typeof raw === 'string' ? raw : undefined
   if (typeof table !== 'string' || !Object.prototype.hasOwnProperty.call(VACUUM_FULL_TABLES, table)) {
     return NextResponse.json(
       { error: 'Unknown table', allowed: Object.keys(VACUUM_FULL_TABLES) },

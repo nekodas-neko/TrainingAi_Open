@@ -11,16 +11,23 @@
 // path and then streams with a real byte counter, cancelling on overflow. Measured against the same
 // 20 MB body on a route with a 16 KB cap: cut off at 2,949,120 bytes.
 //
-// **This is a ratchet, not a sweep.** 104 bare reads across 92 route files remain after the three
-// unauthenticated ones were converted, and converting all 92 at once is how a mistake hides in a
-// diff nobody can read. So: every file below is baselined at the number of bare reads it has, the
-// number may only go DOWN, and a file that is not listed must have none. A route converted to
-// `readJsonLimited` lowers its own number in the same PR; a file that reaches zero is removed from
-// the list. Q-322 tracks the remaining sweep, and this check is what makes doing it slowly safe.
+// **This is a ratchet, not a sweep.** 104 bare reads across 92 route files remained after slice 1
+// converted the three session-less routes, and converting the rest at once is how a mistake hides in
+// a diff nobody can read. So: every file below is baselined at the number of bare reads it has, the
+// number may only go DOWN, and a file not listed must have none. A route converted to
+// `readJsonLimited` lowers its own number in the same PR; a file that reaches zero leaves the list.
 //
-// The three routes reachable **without a session** — `auth/register`,
-// `auth/exchange-mobile-token`, `health-connect/ingest` — were converted first and are deliberately
-// absent from the baseline, so re-adding a bare read to any of them fails immediately.
+// **What is left is printed by this script on every run and is deliberately NOT written down here.**
+// A hand-maintained running total is one more thing to re-edit per slice and get wrong, and it
+// conflicts on every parallel merge. The BASELINE below is the worklist; the summary line is the
+// score.  Q-322 tracks the sweep, and this check is what makes doing it slowly safe.
+//
+// Slices so far — 1: the three routes reachable **without a session** (`auth/register`,
+// `auth/exchange-mobile-token`, `health-connect/ingest`), deliberately absent from the baseline so
+// re-adding a bare read to any of them fails immediately.  2: the offline-first hot paths
+// (`nutrition/food-logs` ×2, `log-exercise`, `complete-workout`, `sync/push`, `water-log`).
+// 3: the credential and admin-write ones (`user/password`, `user/profile`, `user/goals`,
+// `admin/users`, `admin/vacuum`).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -48,8 +55,6 @@ const BASELINE = {
   'app/api/admin/invites/route.ts': 2,
   'app/api/admin/mirror-dataset-gifs/route.ts': 1,
   'app/api/admin/timing-baseline/route.ts': 1,
-  'app/api/admin/users/route.ts': 2,
-  'app/api/admin/vacuum/route.ts': 1,
   'app/api/ai-periodization/baseline/complete/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/prescribe/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
@@ -119,9 +124,6 @@ const BASELINE = {
   'app/api/sync-health/route.ts': 1,
   'app/api/sync/push/route.ts': 1,
   'app/api/user/equipped-title/route.ts': 1,
-  'app/api/user/goals/route.ts': 1,
-  'app/api/user/password/route.ts': 1,
-  'app/api/user/profile/route.ts': 1,
   'app/api/water-log/route.ts': 1,
   'app/api/weekly-digest/route.ts': 1,
   'app/api/workout-entry/route.ts': 2,
