@@ -1645,6 +1645,32 @@ loaded light. **A wrong role is a wrong prescription, on a movement where that c
    (a compound barbell lift on a primary mover → primary/secondary; an isolation or mobility movement
    → accessory). **Do not ask the model to invent it** — a guessed role feeds a real prescription, and
    CLAUDE.md is explicit that no LLM self-reported value may gate an automatic action.
+
+> **⚠️ PREMISE CHECKED 2026-08-19 (Lane A, before implementing) — three facts that change this
+> design. Read them before writing the recommender.**
+>
+> 1. **`exercise_library` has NO default-role column** (`schema.ts:268` — `name`, `muscles`,
+>    `equipment`, `instructions`, `exercise_type`, `merged_into`). The "if it carries a default role"
+>    branch above does not exist, so the muscle/equipment fallback is the *only* source. Either add a
+>    column or accept that.
+> 2. **The owner's own exercise was not in the library.** `Barbell Jefferson Curl` returns zero rows,
+>    so that swap went through `createMissingExercise` — the path that creates a catalogue entry from
+>    the **model's proposed muscles**. Deriving a role from those is deriving it from model output,
+>    which is what the line above forbids. **So the created-exercise path must ask with no
+>    pre-selection**, per rule 3; only a curated library entry earns a recommendation.
+> 3. **"Compound = 2+ main muscles" does not work on this catalogue** — 117 of 142 exercises have
+>    exactly one `main` muscle, Barbell Bench Press among them. What discriminates is the **total**
+>    muscle count: Bench Press 3 (1 main + 2 secondary), Barbell Curl 2, Concentration Curl 1,
+>    Deadlift 5. Distribution over 142 rows: 1 → 45, 2 → 41, 3 → 48, 4 → 6, 5 → 1. Equipment is a
+>    closed set of six values (`dumbbell` 34, `barbell` 32, `cable` 23, `machine` 23, `bodyweight` 17,
+>    `kettlebell` 9). **Validate any heuristic against all 142 rows before shipping it** — a role
+>    drives a prescription, on a movement class where a wrong one carries injury risk.
+>
+> The silent-inheritance half is confirmed unchanged: `lib/coach/domains/session-exercise.ts` has no
+> reference to `exerciseRole`, and its apply path sets only `exerciseName`, `exerciseId` and
+> `muscleGroups`. **The sibling sweep the entry asks for has been run** — the other writers are the
+> program editor, the config screen, the workout builder, `generate-program` and the sync/assembler
+> mappers; none is a swap that inherits a role, so the Coach is the only offender.
 3. **Never silently inherit.** If no recommendation can be derived, ask without a pre-selection rather
    than defaulting to the outgoing role — inheriting is what produced this.
 
