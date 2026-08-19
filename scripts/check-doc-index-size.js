@@ -973,7 +973,7 @@ const BASELINE = {
   // them contradict the entry as written — the catalogue has no default-role column, and the owner's
   // own exercise is not in the catalogue at all, so its muscles are model-proposed and cannot be
   // turned into a prescription. Cheaper here than as a rediscovery.
-  'docs/implementation-backlog.md': 11253,
+  'docs/implementation-backlog.md': 11309,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
