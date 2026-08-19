@@ -637,12 +637,43 @@ plainly.
   waiting for the rework's turn in the queue.
 - **Lane B.** Pure extraction — no behaviour change, no schema, no route.
 
-**Why this is its own entry.** Q-395 cannot start where it stands: both files it lands in are on the
-800-line ceiling (`app/nutrition/nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at
-**793**, neither grandfathered), so **one added line fails Custom Rules**. Every screen in the rework
-also needs the same row component. So the extraction is both the unblocker and the largest single
-chunk of shared work — and unlike the rest of Q-395 it needs no design decisions, which means it can
-run while the earlier queue items are still being worked.
+- **✅ THE HEADROOM HALF IS DONE (2026-08-19, v1.325.3). THE ROW HALF IS RE-SCOPED — read the
+  correction below before starting it.** `nutrition-content.tsx` is **732** and
+  `saved-meals-sheet.tsx` is **753**, both well under 800, **with no new BASELINE rows**. Q-395 can
+  land. [`Journal`](overview/entries/2026-08-19-nutrition-headroom.md).
+
+**⚠ CORRECTED 2026-08-19 — the mechanism in this entry does not work, measured twice.**
+
+**1. Extracting a food row frees ZERO lines from either landing file.** Neither contains food-row
+markup. `nutrition-content.tsx` renders no rows at all — `MealCard` owns the diary row — and its
+only `foodItem` references are data mapping. `saved-meals-sheet.tsx` had already delegated both its
+lists, to `SavedMealCard` and `IngredientRow`. The two files are large for entirely different
+reasons, so the "unblocker" could not have unblocked anything.
+
+**What actually took them under**, and what was done instead: `AddFoodByHandForm` out of
+`saved-meals-sheet.tsx` (793 → 753 — a self-contained five-field form that owned its own state) and
+`useFoodLogsLoader` out of `nutrition-content.tsx` (800 → 732 — 69 lines, the file's largest and
+most self-contained function, no JSX and four inputs).
+
+**2. The four call sites are four DIFFERENT shapes, not one shape drawn four times.** Measured:
+- diary (`meal-card.tsx:82`) — calories in a fixed `w-16` right column, secondary line is **coloured
+  P/C/F chips**, trailing edit + delete buttons.
+- library (`food-library-sheet.tsx:100`) — calories right-aligned over a serving sub-line, whole row
+  is a button.
+- search/db (`ingredient-search.tsx:72`) — calories **inside** the secondary line, trailing `+` icon.
+- search/external (`ingredient-search.tsx:132`) — same, plus a macro-mismatch warning line and a
+  spinner.
+
+So a component covering all four **faithfully** needs a secondary-line node, a trailing slot and a
+calories-placement variant — at which point it is a wrapper, not a unification. And unifying them
+properly means **changing how three of the four look**, which this entry explicitly forbids
+(*"Behaviour must not change… Any visual difference belongs to Q-395"*). **The row cannot be
+extracted without first deciding what it should look like, and that decision is Q-395's.** Take the
+row after Q-395's design pass, not before it.
+
+**Why this was its own entry.** Q-395 could not start: both files it lands in were on the 800-line
+ceiling (`nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at **793**, neither
+grandfathered), so one added line failed Custom Rules. That part was right, and is now resolved.
 
 **What to build.** One component, `components/nutrition/food-row.tsx`, with the shape used by all six
 drawn screens: optional thumbnail · name · grey secondary line of *what and how much* · calories
@@ -657,9 +688,10 @@ line and makes the rest of Q-395 additive rather than blocked.
 
 - **⚠ Behaviour must not change in this entry.** It is an extraction. Any visual difference belongs to
   Q-395, and mixing them makes the diff unreviewable and the regression unattributable.
-- **Done when:** `node scripts/check-component-size.js` reports both files under 800 with **no new
-  BASELINE rows** (the baseline is shrink-only — adding a row here would be the opposite of the point),
-  and the four call sites render identically to before.
+- **Done when:** ~~`node scripts/check-component-size.js` reports both files under 800 with **no new
+  BASELINE rows**~~ — **met 2026-08-19** (732 and 753, no new rows). What remains is the row
+  component, and its done-condition is now Q-395's: the four call sites render *the agreed* row,
+  which is a visual change, not "identically to before".
 - **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
 
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
