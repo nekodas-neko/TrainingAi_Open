@@ -945,7 +945,12 @@ const BASELINE = {
   // entry's own rules unsatisfiable together — the numbers are inline because the next session
   // would otherwise re-measure production to find that out, and because "check the granularity"
   // reads like a formality until you see 11 rows against 668,749 steps.
-  'docs/implementation-backlog.md': 11208,
+  // Raised 2026-08-19 (Lane A, Q-324 partially done): 11208 -> 11220. A partial-completion
+  // annotation, which is what this file's own protocol asks for when a plan only half lands. It
+  // carries the measured numbers because the point of the note is the DIFFERENCE between what was
+  // fixed (the mechanism, with figures) and what was not (the timeout, which did not reproduce) —
+  // an entry saying only "partially done" is the one a later session re-implements from scratch.
+  'docs/implementation-backlog.md': 11220,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
