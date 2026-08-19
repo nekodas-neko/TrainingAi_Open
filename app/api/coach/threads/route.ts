@@ -5,6 +5,12 @@ import { getDb, ensureSchema } from '@/lib/data/postgres/client'
 import { rateLimit } from '@/lib/rate-limit'
 import { listThreads, listAppliedChanges, saveThread, loadThread } from '@/lib/coach/threads'
 import { errorLog } from '@trainingai/shared/logger'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// The same payload `coach` takes, on the way back to storage: 120 messages of up to 80 `z.unknown()`
+// parts each. Sized by the same production measurement (max message 52,571 bytes) and the same
+// reasoning — see `app/api/coach/route.ts`.
+const MAX_BODY_BYTES = 8 * 1024 * 1024
 
 const SaveSchema = z.object({
   threadId: z.string().uuid().nullable(),
@@ -50,7 +56,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const parsed = SaveSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = SaveSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
 
   try {
