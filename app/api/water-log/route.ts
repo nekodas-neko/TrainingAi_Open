@@ -4,6 +4,10 @@ import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A date and a millilitre count. 4 KB is generous.
+const MAX_BODY_BYTES = 4 * 1024
 
 export async function POST(req: NextRequest) {
   const session = await auth()
@@ -18,11 +22,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  let body: { ml?: number }
-  try { body = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
-  const ml = body.ml
+  const ml = (read.body as { ml?: unknown } | null)?.ml
   if (typeof ml !== 'number' || ml <= 0 || ml > 5000) {
     return NextResponse.json({ error: 'ml must be a positive number ≤ 5000' }, { status: 400 })
   }
