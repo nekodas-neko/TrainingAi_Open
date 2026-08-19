@@ -363,6 +363,13 @@ export interface PushResult {
    * failures. Absent/false is the safe default: bounded retry, then dead-letter.
    */
   errors:    Array<{ id?: string; domain: string; date: string; error: string; retryable?: boolean }>;
+  /**
+   * Q-485 — the mutation was accepted, but a field in it was silently discarded for being
+   * out of range. Deliberately NOT an `errors` entry: an error dead-letters the whole mutation,
+   * and a discarded field is no reason to throw away the fields that landed. The client can surface
+   * these without quarantining anything.
+   */
+  warnings?: Array<{ id?: string; domain: string; date: string; warning: string }>;
 }
 
 export interface UserGoals {

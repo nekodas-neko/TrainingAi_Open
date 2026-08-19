@@ -3842,6 +3842,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async pushMutations(userId: string, mutations: IncomingMutation[]): Promise<PushResult> {
     let processed = 0
     const errors: PushResult['errors'] = []
+    // Q-485: values the server accepted the mutation for but silently discarded. Separate from
+    // `errors` on purpose — an error dead-letters the mutation, and a discarded field is not a
+    // reason to throw away the fields that landed.
+    const warnings: NonNullable<PushResult['warnings']> = []
 
     // Resolve the user's timezone once — used by the workout_log branch.
     // Non-fatal: a transient DB error here must not 500 the whole batch
@@ -3887,10 +3891,30 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // Matches the web route's (BodyMetadataPostSchema) numeric bounds — without
           // this a corrupted local payload could push an out-of-range value straight
           // past the push path, which only checked `typeof === 'number'`.
-          const measurementField = (v: unknown): number | undefined =>
-            typeof v === 'number' ? validMeasurementCmOrNull(v) ?? undefined : undefined
-          const weightField = (v: unknown): number | undefined =>
-            typeof v === 'number' ? validWeightKgOrNull(v) ?? undefined : undefined
+          //
+          // Q-485: the bounds were never the problem — both paths import the same
+          // `validation/body-metrics.ts`, so they cannot drift. What differed was the *answer*.
+          // Same value, same field, same instant: `POST /api/body-metadata` → 400
+          // `{"error":"Too big: expected number to be <=500"}`, `POST /api/sync/push` → 200
+          // `{"processed":1,"errors":[]}` with `weight_kg` NULL. The drop was invisible in all three
+          // places it could have been recorded — no `errors[]` entry, so the client confirmed and
+          // deleted the mutation; no console line; no `error_events` row.
+          //
+          // `bounded` records what it discards. It does NOT throw: a throw quarantines the mutation,
+          // and the poison-pill rule forbids retrying a validation failure forever, so twelve new
+          // throw sites would trade an invisible failure for a queue of red badges over values the
+          // user cannot correct from a badge. Deciding *per field* which values are "incomplete,
+          // keep going" and which are "meaningless, quarantine" is a product call, not one to make
+          // in passing — `waterMlDelta` and `sleep_session` throw today and both are defensible.
+          const dropped: string[] = []
+          const bounded = (name: string, v: unknown, validate: (n: number) => number | null): number | undefined => {
+            if (typeof v !== 'number') return undefined
+            const ok = validate(v)
+            if (ok == null) { dropped.push(`${name}=${v}`); return undefined }
+            return ok
+          }
+          const measurementField = (name: string, v: unknown): number | undefined =>
+            bounded(name, v, validMeasurementCmOrNull)
           // Phase-2 A4: thread the payload's source instead of hardcoding 'manual'. An oura_ble /
           // health_connect body_metrics push must write at its real source rank so the per-field
           // mergeSet preserves higher-ranked values (a hardcoded 'manual' rank-4 would stomp genuine
@@ -3901,28 +3925,39 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
               ? (p.source as HealthSource) : 'manual'
           await this.upsertBodyMetrics(userId, [{
             date: mut.date,
-            weightKg:         weightField(p.weightKg),
-            bodyFatPct:       typeof p.bodyFatPct === 'number'       ? validBodyFatPctOrNull(p.bodyFatPct) ?? undefined : undefined,
-            calories:         typeof p.calories === 'number'         ? validCaloriesOrNull(p.calories) ?? undefined     : undefined,
-            proteinG:         typeof p.proteinG === 'number'         ? validMacroGOrNull(p.proteinG) ?? undefined       : undefined,
-            carbsG:           typeof p.carbsG === 'number'           ? validMacroGOrNull(p.carbsG) ?? undefined         : undefined,
-            fatG:             typeof p.fatG === 'number'             ? validMacroGOrNull(p.fatG) ?? undefined           : undefined,
-            steps:            typeof p.steps === 'number'            ? validStepsOrNull(p.steps) ?? undefined          : undefined,
-            distanceKm:       typeof p.distanceKm === 'number'       ? validDistanceKmOrNull(p.distanceKm) ?? undefined : undefined,
+            weightKg:         bounded('weightKg', p.weightKg, validWeightKgOrNull),
+            bodyFatPct:       bounded('bodyFatPct', p.bodyFatPct, validBodyFatPctOrNull),
+            calories:         bounded('calories', p.calories, validCaloriesOrNull),
+            proteinG:         bounded('proteinG', p.proteinG, validMacroGOrNull),
+            carbsG:           bounded('carbsG', p.carbsG, validMacroGOrNull),
+            fatG:             bounded('fatG', p.fatG, validMacroGOrNull),
+            steps:            bounded('steps', p.steps, validStepsOrNull),
+            distanceKm:       bounded('distanceKm', p.distanceKm, validDistanceKmOrNull),
             // These four reach the DB ONLY here (the web schema doesn't accept them) and were
             // type-checked with no bounds while every sibling used a validator — so a 5,000% SpO2
             // at client-chosen rank `manual` overwrote the ring's real reading.
-            waterMl:          typeof p.waterMl === 'number'          ? validWaterMlOrNull(p.waterMl)              ?? undefined : undefined,
-            restingHeartRate: typeof p.restingHeartRate === 'number' ? validRestingHrOrNull(p.restingHeartRate)   ?? undefined : undefined,
-            hrvMs:            typeof p.hrvMs === 'number'            ? validHrvMsOrNull(p.hrvMs)                  ?? undefined : undefined,
-            spo2Pct:          typeof p.spo2Pct === 'number'          ? validSpo2PctOrNull(p.spo2Pct)              ?? undefined : undefined,
-            waistCm:          measurementField(p.waistCm),
-            chestCm:          measurementField(p.chestCm),
-            armCm:            measurementField(p.armCm),
-            thighCm:          measurementField(p.thighCm),
-            hipCm:            measurementField(p.hipCm),
-            neckCm:           measurementField(p.neckCm),
+            waterMl:          bounded('waterMl', p.waterMl, validWaterMlOrNull),
+            restingHeartRate: bounded('restingHeartRate', p.restingHeartRate, validRestingHrOrNull),
+            hrvMs:            bounded('hrvMs', p.hrvMs, validHrvMsOrNull),
+            spo2Pct:          bounded('spo2Pct', p.spo2Pct, validSpo2PctOrNull),
+            waistCm:          measurementField('waistCm', p.waistCm),
+            chestCm:          measurementField('chestCm', p.chestCm),
+            armCm:            measurementField('armCm', p.armCm),
+            thighCm:          measurementField('thighCm', p.thighCm),
+            hipCm:            measurementField('hipCm', p.hipCm),
+            neckCm:           measurementField('neckCm', p.neckCm),
           }], pushSource)
+          // Q-485: the write succeeded, so this is not an error — but a value the web route refuses
+          // with a message was discarded here without one. Recorded on both channels: the log line
+          // makes it diagnosable at all, and the warning reaches the client without dead-lettering
+          // the mutation (which `errors[]` would).
+          if (dropped.length > 0) {
+            console.warn('[pushMutations] body_metrics: discarded out-of-range value(s)', { date: mut.date, dropped })
+            warnings.push({
+              id: mut.id, domain: mut.domain, date: mut.date,
+              warning: `Out-of-range value(s) discarded: ${dropped.join(', ')}`,
+            })
+          }
           processed++
         } else if (mut.domain === 'mood_logs') {
           // Q-131: this branch used to cast straight through — an arbitrary string reached the
@@ -4466,7 +4501,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       }
     }
 
-    return { processed, errors }
+    return warnings.length > 0 ? { processed, errors, warnings } : { processed, errors }
   }
 
   private rowToInjury(r: typeof s.injuries.$inferSelect): Injury {

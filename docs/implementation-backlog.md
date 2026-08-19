@@ -1145,57 +1145,24 @@ note is a live consideration for the WebView, not a stale one.
   throw reaches a `try` and suppresses the success toast — `components/health/metric-log-sheet.tsx:96`
   is the reference shape.
 
-### [body][platform][devices] Q-485 — an implausible weight is refused with a message on web and discarded without trace on the device path
+### [platform][body][devices] Q-321 — decide per field which discarded values should quarantine the mutation
 
-- **⚠️ PRODUCTION CANNOT ADJUDICATE THIS, and the obvious query is a trap (checked 2026-08-18).**
-  35 of 114 `body_metrics` rows have steps and a NULL weight — **that is the expected shape**, since
-  steps arrive daily from the ring and weight only when the owner uses a scale. **Do not cite it as
-  evidence of coerced-away weights.** Same trap as Q-460's "74% lack an RPE".
-- **Branch:** `fix/push-coercion-visibility`
-- **Added:** 2026-08-18 · review sweep (numeric bounds across both write paths) ·
-  [`docs/reviews/2026-08-18-implausible-value-silent-drop.md`](reviews/2026-08-18-implausible-value-silent-drop.md)
-- **Placement:** mid-low. Rare trigger, but the failure is designed to be undetectable and step (1) of
-  the fix is one line.
-- **Measured**, same value, same field, same instant (`weightKg: 10000` against a bound of 500):
-  ```
-  POST /api/body-metadata  →  400  {"error":"Too big: expected number to be <=500"}
-  POST /api/sync/push      →  200  {"processed":1,"errors":[]}
-                               → row written: steps 7000, weight_kg NULL
-  ```
-- **The drop is invisible in all three places it could be recorded:** `errors: []` so the client
-  confirms and deletes the mutation; **no** `console.*` in the coercion block; **no** `error_events`
-  row (verified by query). A value the web refuses with a clear message is discarded on the canonical
-  runtime with no trace and no way for the user to know.
-- **The bounds are NOT the problem and must not be "fixed".** Both paths import the same
-  `packages/shared/src/validation/body-metrics.ts`, so they cannot drift — `One Formula, One Place`
-  holding. The push branch's comment claiming it *"matches the web route's numeric bounds"* is
-  accurate about bounds; it just does not describe behaviour.
-- **The same function already has the visible behaviour, applied to 2 of 14 checks:**
-  - **12 coerce silently** — `valid…OrNull(x) ?? undefined` across weight, bodyFat, calories, macros,
-    steps, distance, RHR, HRV, water, measurements.
-  - **2 throw** — `waterMlDelta` and `sleep_session` — which become `errors[]` entries, so the
-    mutation retries, dead-letters, and surfaces on the More-tab badge.
-
-  Both throws are defensible (a dropped *increment* loses the add entirely; a malformed sleep session
-  is meaningless rather than incomplete). The question is why **weight**, the app's headline body
-  metric, sits in the silent group.
-- **⚠️ The fix is NOT "throw everywhere."** A throw quarantines the mutation, and `CLAUDE.md`'s
-  poison-pill rule forbids retrying a validation failure forever. Twelve new dead-letter paths would
-  trade an invisible failure for a queue of red badges over values the user cannot correct from the
-  badge. In rough order of cost:
-  1. **Log the coercion server-side** — one line, makes the drop visible in logs/`error_events`, no
-     client change. Worth doing regardless.
-  2. **Add a `warnings[]` channel** to the push response, separate from `errors[]`, that the client can
-     surface without dead-lettering. This is the version that tells the *user*.
-  3. **Decide per field** which values are "incomplete, keep going" and which are "meaningless,
-     quarantine" — a product decision, **not** one an implementer should make in passing.
-- **Reachability is low and honest:** bounds are generous (weight 20–500 kg) so ordinary UI input never
-  trips them. The path that reaches it is the one the code comment already names — *"a corrupted local
-  payload"* — plus a misreading BLE scale.
-- **Lane A owns this** (`lib/data/postgres/adapter.ts`, `app/api/sync/push`).
-- **Not verified on:** the APK. The client half (`errors: []` → confirm → `deleteMutations`) was read
-  from `sync-engine.ts` rather than induced here. Domain branches outside the `body_metrics` block were
-  not enumerated for the same pattern.
+- **Branch:** `feat/push-coercion-per-field-policy`
+- **Added:** 2026-08-19 · Lane A, the deliberately-deferred third step of Q-485.
+- **What Q-485 did and did not do.** It made the discard *visible* — a named `warnings[]` entry per
+  mutation and one `error_events` row per push, so a value the web route refuses with a message is no
+  longer dropped without a trace. It did **not** change which values are dropped, and that was on
+  purpose: the entry called it *"a product decision, not one an implementer should make in passing."*
+- **The question.** 12 of 14 `body_metrics` bounds checks coerce silently; 2 throw (`waterMlDelta`,
+  `sleep_session`) and both are defensible — a dropped *increment* loses the add entirely, and a
+  malformed sleep session is meaningless rather than incomplete. Which of the other 12 are
+  "incomplete, keep going" and which are "meaningless, quarantine"?
+- **Why it cannot just be "throw everywhere":** a throw quarantines the mutation, and the poison-pill
+  rule forbids retrying a validation failure forever. Twelve new dead-letter paths would trade an
+  invisible failure for a queue of red badges over values the user cannot correct from a badge.
+- **Blocked on the owner** for the per-field call. The mechanism is built; only the policy is missing.
+- **Related, and the natural client half:** nothing renders `warnings[]` yet. Surfacing it is
+  `components/**` (Lane B) and should follow whatever this decides, not precede it.
 
 ### [platform][body][nutrition] Q-484 — `POST /api/injuries` stores a 10 MB note; its own PATCH sibling caps the same field at 1,000 characters
 
