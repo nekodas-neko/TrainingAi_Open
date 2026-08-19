@@ -819,7 +819,7 @@ const BASELINE = {
   // importantly, that the two numbers still disagree: this PR makes the disagreement legible, it
   // does not remove it. An entry struck here would read as "the calorie budgets were unified",
   // which is the claim nobody has earned yet.
-  'docs/implementation-backlog.md': 10189,
+  'docs/implementation-backlog.md': 10371,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
