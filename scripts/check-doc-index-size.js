@@ -803,7 +803,7 @@ const BASELINE = {
   // so three probes measured zero requests. That is a reusable finding: every future Home-card guard
   // needs the same fixture, and its absence is part of why a shell-only staleness bug reached a user
   // report rather than a test.
-  'docs/implementation-backlog.md': 10164,
+  'docs/implementation-backlog.md': 10169,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
