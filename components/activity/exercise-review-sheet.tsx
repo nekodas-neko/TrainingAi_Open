@@ -2,6 +2,7 @@
 
 import { HR_PROFILE_TTL, HR_WINDOW_TTL } from '@trainingai/shared/cache-ttl'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { useState, useEffect, useMemo } from 'react'
 import { formatTimeOfDay, formatDayShort, toAestDay, msToHHMMInTz } from '@trainingai/shared/date-utils';
 import { getLocalStore } from '@/lib/local-store'
@@ -83,7 +84,9 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
   const [saving, setSaving] = useState(false)
   const [activityType, setActivityType] = useState<'walk' | 'run'>('walk')
   const [hrData, setHrData] = useState<HrWindow>({ avgHr: null, maxHr: null, readings: [] })
-  const [hrProfile, setHrProfile] = useState<{ maxHr: number; restingHr: number } | null>(null)
+  const hrProfile = useCachedValue<{ maxHr: number; restingHr: number }>(
+    'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
+  )
 
   useEffect(() => {
     if (!session) return
@@ -100,13 +103,6 @@ export function ExerciseReviewSheet({ sessionId, userId, onClose }: Props) {
       data => { if (data) setHrData({ avgHr: data.avgHr, maxHr: data.maxHr, readings: data.readings ?? [] }) },
     ).catch(() => {})
   }, [session?.id]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    cachedFetch<{ maxHr: number; restingHr: number }>(
-      'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
-      p => { if (p) setHrProfile(p) },
-    ).catch(() => {})
-  }, [])
 
   async function handleSave() {
     if (!session) return
