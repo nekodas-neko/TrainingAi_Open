@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { SessionRpeSchema as Body } from '@trainingai/shared/validation/session-rpe'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A session id and an RPE value.
+const MAX_BODY_BYTES = 4 * 1024
 
 export async function POST(req: Request) {
   const session = await auth()
@@ -11,7 +15,13 @@ export async function POST(req: Request) {
   if (!rateLimit(`session-rpe:${userId}`, 5, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const parsed = Body.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = Body.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const repo = await getRepository()
   // Q-460: the UPDATE is user-scoped, so a call naming someone else's session — or a session id
