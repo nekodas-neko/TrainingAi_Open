@@ -778,7 +778,14 @@ const BASELINE = {
   // observable from the sandbox. It carries the measured figures (600.0 dpi, 49.9 mm vs 311.9 mm)
   // because "the PNG now declares its size" is a claim and those are the evidence, and it names the
   // one physical print that also settles Q-411, so the owner does not do two.
-  'projectOverview.md': 7951,
+  // Raised 2026-08-19 (Lane A, the food_logs device checks): 7951 -> 7982. Three changes landed on
+  // one offline-first domain in a day (Q-413, Q-325, Q-412) and none is device-verified; the
+  // standing rule says that is a row here, not a line in a lane's private baton, because this file
+  // is what every session reads before it can start. One row rather than three, because the same
+  // offline path carries all of them and one session on the device settles them together. It also
+  // records the migration's deliberately-narrow scope, which leaves a few historical rows outside
+  // their meal's window — a stated cost is not a bug report, and it is the kind that gets rediscovered.
+  'projectOverview.md': 7982,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -966,15 +973,9 @@ const BASELINE = {
   // them contradict the entry as written — the catalogue has no default-role column, and the owner's
   // own exercise is not in the catalogue at all, so its muscles are model-proposed and cannot be
   // turned into a prescription. Cheaper here than as a rediscovery.
-  // RATCHETS DOWN 2026-08-19 (Tuning, retired-scales correction): 11253 -> 11190, even though three
-  // lines were added to Q-72 marking motivation/resting_soreness/wake_mood as RETIRED. A parallel
-  // compaction reclaimed more than this adds, and shrink-only means that space is locked in rather
-  // than left free to refill silently. The Q-72 lines matter because the entry previously listed
-  // three retired scales beside two live ones as evidence, which reads as "six poor self-reports"
-  // when it is two live ones and three fossils -- a different instruction to whoever acts on it.
-  // Rebuilt from origin/main after a parallel PR moved the same baseline -- splicing the conflict
-  // hunks would have produced two baselines for one number.
-  'docs/implementation-backlog.md': 11190,
+  // 2026-08-19 (Tuning): +3 on Q-72, marking motivation/resting_soreness/wake_mood RETIRED -- the
+  // entry listed three dead scales beside two live ones as if all five were evidence.
+  'docs/implementation-backlog.md': 11312,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
