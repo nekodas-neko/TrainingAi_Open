@@ -2,7 +2,7 @@
 
 import { memo } from 'react'
 import { barBands, barPosition } from '@trainingai/shared/nutrition/calorie-balance'
-import { budgetProvenance } from './budget-provenance'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 
 const BANDS = barBands()
 
