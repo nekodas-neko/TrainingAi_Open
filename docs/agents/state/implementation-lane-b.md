@@ -3,13 +3,73 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** the sixth Lane B run · **Q band:** 350–386 (next free: **357**)
+**Updated:** 2026-08-19 · **By:** the sixth Lane B run · **Q band:** 350–386 (next free: **360**)
 
 ## Now
 Nothing in flight. **The meal-label (food sticker) work is the live thread** — Q-389 built it, Q-393
 added the ingredient breakdown, and what remains on it is two owner decisions and a print test.
 
-### This run (2026-08-18, sixth)
+### This run (2026-08-18 → 19, sixth) — the nutrition cluster, top-down
+
+The queue was re-prioritised mid-run to put the nutrition cluster on top. Three of it are done.
+
+- **Q-399 SHIPPED** (v1.325.0, PR #163) — **the default label printed ZERO ingredient lines**, at
+  any name length, for a whole release. Its header ate 96.5 of 137 units and the code box took 66 of
+  the remaining 66.5, so the budget was negative before the clamp. **Three gates each stayed quiet**:
+  the sheet's "Printing N ingredients" copy was gated on `> 0` so it removed itself, the picker
+  promised "the full ingredient list", and the only test on that style asserted the code's *size* —
+  which a bigger code scored better on.
+  [Journal](../../overview/entries/2026-08-19-label-line-budget.md).
+  **Q-399's own conclusion was half wrong and worth knowing why:** it said the centred stack cannot
+  carry the list *and* a better code than `band`'s 0.369. True at the shipped type sizes, false at
+  the type the mockup was drawn at — 3 units of calories height and 7 of gap buy three lines at
+  **0.401**. The margin is one step: codeUnits 52 gives two lines, 50 gives three.
+  **The four gaps are spec data now** (`stackGaps`), `centredStackLineBudget` reads the same array
+  the painter draws, and a test asserts the *promise* rather than a constant.
+  **⚠️ It also surfaced Q-358, which matters to every style:** shrinking the code made the E2E's
+  decode flaky — passing, then failing, at identical geometry. A module is a **fractional number of
+  device pixels for every style that ships**, so every edge antialiases; the `+0.04` bleed in
+  `drawCode` was already papering over it. Fixed by doubling the canvas to **600 dpi**
+  (`DEFAULT_RENDER_SCALE`), which is a margin, not a fix. Three clean E2E runs after, one failure
+  before. **The canvas IS the printed artwork** — share/save hands the viewer these pixels.
+
+- **Q-402 SHIPPED** (v1.325.1, PR #165) — the owner's *"requires a restart of the app"*. The
+  eviction was never broken: six write groups clear `energy-balance:` correctly. **Nothing told the
+  component to look again**, and the card lives in the persistent tab shell so its
+  `useEffect(…, [])` never re-ran. `subscribeToInvalidation` + **`useCachedValue`** are the missing
+  half. [Journal](../../overview/entries/2026-08-19-cache-invalidation-signal.md).
+  **Use `useCachedValue` for any new self-fetching card** — this is now a CLAUDE.md rule.
+  **Owed:** the end-to-end confirmation. Three E2E probes measured **zero**
+  `/api/nutrition/energy-balance` requests and never reached the thing under test, because the
+  seeded user has no `height_cm`/`date_of_birth`/`sex` **and** `DEFAULT_CARD_WIDGETS` is empty so
+  Home renders no card widgets at all. **That fixture does not exist and every Home-card guard needs
+  it** — see Q-359.
+
+- **Q-490 SHIPPED** (v1.324.9, PR #156) — two meal-plan memos that had never held; every call site
+  built both prop objects fresh. Scalars now.
+  [Journal](../../overview/entries/2026-08-18-memo-scalar-props.md). Its review claimed "no inline
+  arrows exist anywhere"; **there are four**, on four other memoised components, now baselined by
+  `scripts/check-memo-prop-stability.js` and filed as Q-357.
+
+- **Q-478 SHIPPED** (v1.324.8, PR #154) — the two cache today-guards compared a server-stamped date
+  to Brisbane's, so both were false 14 hours a day for a New York user.
+  [Journal](../../overview/entries/2026-08-18-tz-aware-cache-guards.md).
+  Two corrections to that review, made in place: session-select's loading state **does** clear (a
+  second unconditional `setMetaLoading(false)` runs after the await — the cost is a round-trip-long
+  skeleton, not a hang), and `unwrapToday`/`cachedFetchToday` were deliberately left alone.
+  **Q-477 is still open**, including its ratchet on bare `todayInTz()` across client code.
+
+- **Q-488 RE-TAGGED TO LANE A, not built** (PR #152). The entry said "one call in one Lane B
+  handler". There is no such call: `lib/local-store` has **no** `deleteActivityLog`, and
+  `upsertActivityLog` omits `deleted_at` from **both** its INSERT list and its
+  `ON CONFLICT DO UPDATE SET`. A read-merge upsert stamping `deletedAt` compiles, type-checks, lints
+  clean and is a **no-op**. It was written here and reverted. **Nothing in this sandbox could have
+  caught it** (`getLocalStore` returns null on web), so it would have merged green as a fix.
+
+- **Journal compaction sweep** — `main` was over the 60-file runaway limit, so Custom Rules was red
+  on every open branch. 61 → 41 into `docs/overview/history-2026-08-18.md`.
+
+### Earlier runs
 
 - **Q-478 SHIPPED** (v1.324.8, PR #154) — `isBodyMetadataFresh`/`isWorkoutDataToday` compared a
   **server-stamped** date to a bare `todayInTz()`, i.e. Brisbane, so both returned false for |Δ|
@@ -135,8 +195,17 @@ added the ingredient breakdown, and what remains on it is two owner decisions an
 Work the queue top-down and take the highest Lane-B-owned item, re-verifying its premise against
 `main` first. **The queue re-prioritises daily** — re-read it rather than trusting this list.
 
-**The queue was walked end to end on 2026-08-17.** Two Lane B items are now *buildable*; the rest are
-held, blocked, or cross-lane.
+**As of 2026-08-19 the nutrition cluster is the top of the queue**, ordered by dependency rather than
+Q number — *do not re-sort it numerically*. Q-399 and Q-402 are done. **Q-401** is the next Lane B
+item and both of its stated prerequisites are now cleared: the label draws its list, and Home's
+energy card reacts to invalidation, so swapping in the energy-zone bar no longer makes staleness
+worse. **Build the new bar on `useCachedValue`**, not a fresh `useEffect(…, [])`.
+
+After that the cluster turns hard: **Q-395** is a rework across six screens gated behind extracting
+`food-row.tsx` (both landing files sit on the 800-line limit), **Q-398** wants that row component
+first, and **Q-396 / Q-400 need a new APK** so they cannot complete in one web-deploy cycle.
+
+**The 2026-08-17 walk below is still accurate for everything outside the cluster.**
 
 **Buildable — take this first:**
 
@@ -197,6 +266,16 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
 - **Q-450's device path** — the E2E run took the web fallback, not SQLite+outbox.
 
 ## Q numbers used from the band
+- **Q-357** — FILED, not built. Four memoised call sites still defeated; `SavedMealCard` is inside a
+  `.map` so its fix is a callback-contract change, not a `useCallback`. Baselined, so nothing new
+  can join them.
+- **Q-358** — FILED, not built. Every label QR is drawn on a fractional device-pixel grid.
+  **Mitigated by Q-399's 600 dpi**, which is why it is low: 9.5 px per module rather than 4.7.
+  Snapping shrinks the drawn box and every reported figure with it, which is the whole reason it was
+  not folded into Q-399.
+- **Q-359** — FILED, not built. The other 36 fetch-once effects. **Latent, not broken** — they
+  unmount. Some are deliberately fetch-once and must NOT be converted. Suggests a shrink-only
+  ratchet over a sweep.
 - **Q-350** — DONE (v1.318.7).
 - **Q-355** — DONE (v1.318.7), fixed alongside Q-350 rather than left half-shipped.
 - **Q-352** — DONE. Zero-data E2E account + first-run guards.
@@ -227,6 +306,9 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
   Release the claim when convenient.
 - **`scripts/check-component-size.js`** — not a lane path; its `health-content.tsx` baseline was
   raised by one for Q-478.
+- **`.github/workflows/ci.yml`** — not a lane path; three Custom Rules steps added this run
+  (`check-tz-aware-cache-guards.js`, `check-memo-prop-stability.js`, and Q-399's assertions ride in
+  an existing test file). Release the claim when convenient.
 
 Otherwise the lane list in [`docs/agents/README.md`](../README.md) §3.
 
@@ -292,8 +374,16 @@ Otherwise the lane list in [`docs/agents/README.md`](../README.md) §3.
 - **The remote branch ref goes stale after every squash-merge**, and push is rejected as "behind".
   Force-push is not permitted here — `git fetch origin <branch> && git merge FETCH_HEAD` is a content
   no-op that clears it. Verify with `git diff HEAD origin/main --stat` before pushing.
-- **`pnpm check:rules` ran 44 of 44 on 2026-08-18** (38 on 08-17, 43 earlier the same day). Quote
-  the count, never "pass" — it moves, sometimes twice in a session.
+- **`pnpm check:rules` ran 45 of 45 on 2026-08-19** (38 on 08-17; 43, then 44, then 45 across
+  08-18/19). Quote the count, never "pass" — it moved three times in one run.
+- **A flaky E2E decode is a resolution finding, not a retry.** Q-399's QR decode passed, then failed,
+  then passed at identical geometry. The cause was 4.7 device pixels per module with antialiased
+  edges. If an image-decoding assertion goes intermittent, measure pixels-per-feature before
+  re-running it.
+- **The E2E fixture cannot reach Home's card widgets.** `DEFAULT_CARD_WIDGETS` is `[]` and the
+  seeded user has no body measurements, so no Home card renders and no card's endpoint is ever
+  requested. Setting `ta_ss_cards` via `addInitScript` was not sufficient on its own. Budget for
+  building that fixture before promising a Home-card guard.
 - **The 800-line component ratchet will block a two-line addition to a hotspot**, and the sanctioned
   way through is in the script's own header: reclaim what you can, then raise the baseline with the
   reason in the same PR. Merging duplicate imports from the same module is the cheapest honest
