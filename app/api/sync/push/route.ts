@@ -74,6 +74,16 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Q-485: a discarded field is not a fault, so it does not go through the retryable path above —
+    // but it IS a silent data loss on the canonical runtime, refused with a clear message on web and
+    // dropped without one here. One row per push, same bound as the retryable report.
+    if (result.warnings?.length) {
+      reportServerError(
+        new Error(`sync/push: ${result.warnings.length} mutation(s) had a value discarded — first: ${result.warnings[0].warning}`),
+        { userId, url: req.nextUrl.pathname },
+      );
+    }
+
     return NextResponse.json(result);
   } catch (err) {
     console.error('[sync/push] pushMutations threw', err);

@@ -15,7 +15,9 @@ const path = require('path');
 // This list may only shrink: the check fails if a listed file is fixed but left here.
 const GRANDFATHERED = new Set([
   'app/api/admin/fix-exercise-units/route.ts',
-  'app/api/injuries/[id]/route.ts',
+  // 'app/api/injuries/[id]/route.ts' — FIXED 2026-08-19 (Lane A, Q-484). Its regex moved into
+  // packages/shared/src/validation/injury.ts, shared with the create route, and now accepts both
+  // separators; both handlers normalise slashes to dashes before the DATE column sees them.
   'app/api/user/profile/route.ts',
   'lib/perf/nav-timing.ts',
 ]);

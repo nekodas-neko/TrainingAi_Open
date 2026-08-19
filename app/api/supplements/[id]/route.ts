@@ -1,17 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { withRouteErrors } from '@/lib/api/route-errors'
-import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { SupplementPatchSchema } from '@trainingai/shared/validation/supplement'
 
-const SupplementPatchSchema = z.object({
-  name:            z.string().min(1).max(200).optional(),
-  dose:            z.string().max(200).nullable().optional(),
-  reminderEnabled: z.boolean().optional(),
-  reminderTime:    z.string().max(20).nullable().optional(),
-  sortOrder:       z.number().int().min(0).max(10_000).optional(),
-  active:          z.boolean().optional(),
-}).strict() // reject unknown keys (userId/deletedAt/createdAt) outright
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
