@@ -77,7 +77,11 @@ export async function POST(req: NextRequest) {
   const repo = await getRepository()
   const days: DayOutcome[] = []
 
-  for (let d = start; d <= end; d = shiftDateStr(d, 1)) {
+  // Q-497: indexed over the validated `span`, not `d <= end` — see the note on the identical loop
+  // in `admin/day-review`. This one is the worse of the two: `dryRun=false` COMMITS, so the
+  // non-terminating version was an unbounded write, not just a hang.
+  for (let i = 0; i < span; i++) {
+    const d = shiftDateStr(start, i)
     try {
       const audit = await buildDayAudit({ repo, userId, date: d, tz })
       const pillar = (key: 'sleep' | 'readiness') => audit.pillars.find(p => p.pillar === key) ?? null
