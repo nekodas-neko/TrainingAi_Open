@@ -956,7 +956,12 @@ const BASELINE = {
   // which is the second implementation the one-formula rule exists to prevent. It also restates
   // what the split preserves (the carbs:fat ratio, not each macro's share), since the original
   // wording reads as the other one.
-  'docs/implementation-backlog.md': 11197,
+  // Raised 2026-08-19 (Lane A, Q-405 premise check): 11197 -> 11223. Three measured facts written
+  // onto the entry BEFORE the recommender was built, because each one changes the design and two of
+  // them contradict the entry as written — the catalogue has no default-role column, and the owner's
+  // own exercise is not in the catalogue at all, so its muscles are model-proposed and cannot be
+  // turned into a prescription. Cheaper here than as a rediscovery.
+  'docs/implementation-backlog.md': 11223,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
