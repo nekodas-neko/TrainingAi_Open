@@ -43,8 +43,9 @@ have already done. For each report:
 5. **Place it by priority.** Queue position *is* priority. A data-correctness or prescription bug
    goes near the top; a cosmetic one does not.
 
-**Your Q band is 387–449.** Take numbers from it directly; do not read or write the backlog's
-next-free pointer. You take no migration numbers.
+**Your entry IDs are `BF-<n>`, counting up forever — there is no band and no pointer.** Find your
+next number with `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The letter records
+that *you* found the item; it never says who ships it and it never changes. You take no migration numbers.
 
 **A good entry carries:** the domain tag(s) in the heading, what was observed and on what surface,
 the code path it traces to, what evidence would confirm the diagnosis, and what would count as

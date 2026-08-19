@@ -23,14 +23,14 @@ silently misdirecting the next session. Update them in the same PR that consumes
 > bands replaced it and bought exhaustion instead — Tuning reached 29 of its 30, Review burned all
 > 50 in two days — plus a ledger that drifted twice.
 >
-> **Each agent now owns a letter and counts up forever:** Lane A `A-` · Lane B `B-` · BugFix `F-` ·
-> Review `R-` · Tuning `T-` · one-off sessions `P-`. Find your next number with
-> `grep -rhoE '\bR-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The full reasoning is in
+> **Each agent now owns a letter and counts up forever:** Lane A `LA-` · Lane B `LB-` · BugFix `BF-` ·
+> Review `RV-` · Tuning `TN-` · one-off sessions `PS-`. Find your next number with
+> `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The full reasoning is in
 > [`docs/agents/README.md`](agents/README.md) §3.
 >
 > **The letter says who found the item, not who ships it, and it never changes** — an entry filed by
-> Review and built by Lane A keeps its `R-`. Priority is queue position, so an `R-31` above an
-> `A-12` is correct and expected.
+> Review and built by Lane A keeps its `RV-`. Priority is queue position, so an `RV-31` above an
+> `LA-12` is correct and expected.
 >
 > **Legacy `Q-` numbers stay exactly as they are** and remain valid IDs. There are over 10,000
 > references across 775 files; renumbering would be risk for no function.
@@ -74,8 +74,8 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
 >   not a gate.
 >
-> An item needing both halves of the app is **two entries** — `P-4a` with `Lane: A`, `P-4b` with
-> `Lane: B` and `Needs: P-4a` — not one entry with a paragraph asking readers not to re-sort it.
+> An item needing both halves of the app is **two entries** — `PS-4a` with `Lane: A`, `PS-4b` with
+> `Lane: B` and `Needs: PS-4a` — not one entry with a paragraph asking readers not to re-sort it.
 >
 > Some entries still carry the older prose `⛔` marker. The query parks them and prints the marker
 > text, so they stay visible; convert one to a field when you next touch its entry.

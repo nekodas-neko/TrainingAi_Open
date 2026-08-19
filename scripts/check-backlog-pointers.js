@@ -16,8 +16,8 @@
  *   6. No cycle among `Needs:` edges.
  *   7. Every `Gate:` value is one this project knows how to resolve.
  *
- * IDs are `<letter>-<number>` with an optional lowercase suffix: A/B (implementer lanes), F
- * (BugFix), R (Review), T (Tuning), P (one-off sessions), and the legacy Q. The old "next
+ * IDs are `<letter>-<number>` with an optional lowercase suffix: LA/LB (implementer lanes), BF
+ * (BugFix), RV (Review), TN (Tuning), PS (one-off planning sessions), and the legacy Q. The old "next
  * unallocated Q band" pointer check is gone with the bands themselves — see docs/agents/README.md
  * for why enumerated bands were replaced by per-agent counters.
  */
@@ -64,7 +64,7 @@ for (let i = 0; i < queue.length; i++) {
     if (currentId) {
       const needs = line.match(/^\s*[-*]\s*\*{0,2}Needs:\*{0,2}\s*(.+)$/i);
       if (needs) {
-        for (const m of needs[1].matchAll(/\b([ABFRTPQ]-\d+[a-z]?)\b/g)) {
+        for (const m of needs[1].matchAll(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/g)) {
           meta.get(currentId).needs.push(m[1]);
         }
       }
@@ -85,7 +85,7 @@ for (let i = 0; i < queue.length; i++) {
     );
   }
 
-  const q = line.match(/\b([ABFRTPQ])-(\d+)([a-z]?)\b/);
+  const q = line.match(/\b(LA|LB|BF|RV|TN|PS|Q)-(\d+)([a-z]?)\b/);
   if (!q) continue;
   const id = `${q[1]}-${q[2]}${q[3]}`;
   entryOrder.push(id);

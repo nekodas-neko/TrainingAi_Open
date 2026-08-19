@@ -50,11 +50,12 @@ truth either. If the data says the score was defensible, the finding is that the
 inadequate — which is a real, fixable problem, and a different one from a miscalibration. Do not
 manufacture a formula change to justify the session.
 
-**Your Q band is 500–529.** Take numbers from it directly; do not read or write the backlog's
-next-free pointer. You take no migration numbers.
+**Your entry IDs are `TN-<n>`, counting up forever — there is no band and no pointer.** Find your
+next number with `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The letter records
+that *you* found the item; it never says who ships it and it never changes. You take no migration numbers.
 
 **Where your output goes.** The write-up in `docs/reviews/YYYY-MM-DD-<score>-calibration.md`, and a
-backlog entry linking it, tagged with its pillar and marked `⛔ blocked: owner sign-off` until the
+backlog entry linking it, tagged with its pillar and carrying `- **Gate:** owner` until the
 owner agrees. Your PRs are docs-only, so open and merge them without asking — but the scoring change
 itself never rides in your PR.
 

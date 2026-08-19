@@ -180,22 +180,22 @@ way through it:
 ### Identifiers — one letter per agent, counting up forever
 
 Every queue entry carries an ID. **The letter says who found it. It never says who ships it, and it
-never changes** — an item filed by Review and built by Lane A keeps its `R-` for good, which is what
+never changes** — an item filed by Review and built by Lane A keeps its `RV-` for good, which is what
 makes "what has Review found, and did any of it get built" a question you can actually ask.
 
 | Agent | Letter |
 |---|---|
-| Implementation Lane A | `A-` |
-| Implementation Lane B | `B-` |
-| BugFix | `F-` |
-| Review | `R-` |
-| Tuning | `T-` |
-| One-off sessions (planning, urgent) | `P-` |
+| Implementation Lane A | `LA-` |
+| Implementation Lane B | `LB-` |
+| BugFix | `BF-` |
+| Review | `RV-` |
+| Tuning | `TN-` |
+| One-off sessions (planning, urgent) | `PS-` |
 
 Counters are **unbounded**. Find your next free number with one command:
 
 ```bash
-grep -rhoE '\bR-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1
+grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1
 ```
 
 **Why this replaced reserved number bands.** Bands were introduced because a single shared
@@ -212,13 +212,13 @@ unavoidable in any allocation scheme, and it has happened (two sessions once ran
 chore and one PR's work was discarded whole). The difference is that counters never exhaust and need
 no ledger, and `scripts/check-backlog-pointers.js` fails CI on a duplicate ID, so a same-role
 collision surfaces at review rather than living in the queue. Resolve one by appending a letter:
-the second `R-14` becomes `R-14a`.
+the second `RV-14` becomes `RV-14a`.
 
 **Existing `Q-` numbers stay exactly as they are.** There are over 10,000 references to them across
 775 files; renumbering that surface would be days of risk for no function. `Q-` is a valid legacy
 ID, and both schemes coexist in the queue indefinitely.
 
-Priority is queue position, not the ID. A `R-31` above an `A-12` is correct and expected.
+Priority is queue position, not the ID. An `RV-31` above an `LA-12` is correct and expected.
 
 **Postgres migration numbers and local SQLite versions belong to Lane A alone.** No other agent
 takes one — not Review, not BugFix, not an urgent one-off. Work outside Lane A that turns out to
@@ -245,15 +245,15 @@ An item that needs both halves of the app is **two entries**, not one with a par
 the order:
 
 ```markdown
-### [platform] P-4a — wire the SDK into instrumentation.ts
+### [platform] PS-4a — wire the SDK into instrumentation.ts
 - Lane: A
 
-### [platform] P-4b — surface it in the admin console
+### [platform] PS-4b — surface it in the admin console
 - Lane: B
-- Needs: P-4a
+- Needs: PS-4a
 ```
 
-`P-4b` sits under PARKED until `P-4a` leaves the queue, and then unparks with nobody editing
+`PS-4b` sits under PARKED until `PS-4a` leaves the queue, and then unparks with nobody editing
 anything.
 
 ### What an implementer reads to start
@@ -276,7 +276,7 @@ form is still: **write the plan, file it at the top of a lane's queue, stop.** W
 2. **Never take a migration number.** If the fix needs a schema change it goes to Lane A, without
    exception — this is the one that turns a hotfix into a mess.
 3. Ship it, under every rule in `CLAUDE.md` that a lane would follow.
-4. **File the entry anyway** (`P-`, marked shipped in the same PR). A fix that skipped the queue is
+4. **File the entry anyway** (`PS-`, marked shipped in the same PR). A fix that skipped the queue is
    a fix nobody else can see coming.
 
 ## 4. Identity and handoff
