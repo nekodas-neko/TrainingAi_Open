@@ -1251,6 +1251,31 @@ directly — green on web, dead on the device, because the failing path is unrea
   (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
   one the owner picked.
 
+**A second defect on the same button, found 2026-08-19 — the PNG has no physical size, so it prints
+at the wrong size even once it reaches the gallery.** The owner's ask is *"download in full res to
+print onto a label"*, and **the resolution half is already done**: `DEFAULT_RENDER_SCALE = 6.24`
+makes a 50 mm label **1,179 px, which is 600 dpi** (`meal-label-render.ts:23`), and the docstring is
+explicit that *"the canvas IS the printed artwork"*. Nothing needs to be raised. **What is missing is
+the metadata that tells a printer what those pixels are worth.**
+- `canvas.toBlob(res, 'image/png')` (`meal-label-sheet.tsx:73`) writes a PNG with **no `pHYs`
+  chunk** — the canvas API has no way to set one. A PNG without `pHYs` has no declared physical
+  size, so every print path falls back to its own default, which is **96 dpi** almost everywhere.
+- The arithmetic is the whole bug: **1,179 px ÷ 96 dpi = 12.3 inches ≈ 312 mm**. A label drawn to be
+  50 mm arrives as a third of a metre. On a label printer with fixed media it will not fit at all;
+  in a print dialog the user has to notice and hand-set the scale to ~16%, every time.
+- **Fix:** inject a `pHYs` chunk declaring 600 dpi (23,622 pixels/metre, unit = 1) into the blob
+  before it is saved or shared. It is a 21-byte chunk spliced after `IHDR` with its own CRC — a
+  small pure function, so it gets a unit test that reads the chunk back rather than a visual check.
+  Write it in `packages/shared` beside the renderer so both the save and the share path use it; two
+  copies of this would drift and only one of them is easy to notice.
+- **This is invisible in every check we run.** The PNG is valid, the pixels are correct, the E2E
+  decodes the QR fine — the defect only appears on paper, which is also why it survived the 300→600
+  dpi change that was made specifically for print quality. **Verification is a physical print**: send
+  the saved file to the label printer and measure the code with a ruler. `metrics.codeMm` in the
+  sheet says what it should measure, so the check is exact rather than a judgement call.
+- **Order matters:** there is no point testing this before the save path exists. Fix the delivery
+  first, then the metadata, then print once and measure — one print proves both halves.
+
 ### [workouts][platform] Q-405 — a Coach swap silently inherits the old exercise's role, and the role sets the loading
 
 - **Branch:** `feat/coach-swap-role-prompt`
