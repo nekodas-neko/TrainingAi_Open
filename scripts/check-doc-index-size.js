@@ -961,7 +961,12 @@ const BASELINE = {
   // daily HR chart, and HR is timestamped, all-day and dense. The correction stays inline with the
   // numbers because the wrong conclusion is the more quotable one, and a session reading only the
   // table would re-derive it.
-  'docs/implementation-backlog.md': 11227,
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-414 shipped): its entry out, Q-361 in, net smaller. Q-361 is
+  // what building Q-414 uncovered rather than what it set out to do — two routes 500 in every
+  // sandbox session because their vendor constants file is gitignored, so the Energy card has never
+  // once been renderable locally. Its lines are the evidence that "tested on pnpm dev" was untrue
+  // for a family of screens, which is not a claim to leave to memory.
+  'docs/implementation-backlog.md': 11153,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
