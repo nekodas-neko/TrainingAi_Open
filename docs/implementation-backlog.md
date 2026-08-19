@@ -293,125 +293,67 @@ below threshold and left in place for next time.
 
 *"lets focus on the nutrition changes now. id like to get this perfected today"*
 
-The next eight entries are the nutrition cluster, **ordered by dependency rather than Q number**.
-Do not re-sort them numerically; the sequence is the point, and two of them block others.
+The nutrition cluster is **six entries**, ordered by dependency rather than Q number, starting at
+Q-401 below. Two have shipped since this block was written: **Q-399** (#163, the centred label now has
+room for its ingredient list) and **Q-402** (#165, a component is told when its cache key is
+invalidated). Their entries were correctly removed on merge.
+
+**Q-359 sits above the block deliberately** — it is Lane B's follow-up to Q-402, and it reports that
+**36 other fetch-once effects carry the same latent bug**. That is the general version of the defect
+Q-402 fixed in one place, so it outranks the remaining nutrition work rather than interrupting it.
 
 **Realistically today, and this is the honest split:**
-- **Achievable** — Q-399, Q-402 and Q-401 are small, self-contained and independent of the rework.
-  Together they fix the label, stop the Home widget freezing, and unify the two calorie budgets.
+- **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
+  are done** — v1.325.0 gave the default label its three ingredient lines at 0.401 mm per module,
+  and v1.325.1 gave the cache an invalidation signal so Home's energy card stops freezing.)
   Q-387's wiring is a shared-module change and can run in parallel in the other lane.
 - **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
   `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
   first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
   whatever else happens.
 
-**Parallel-safe:** Q-399, Q-402 and the Lane B half of Q-401 touch different files and can land in any
-order. Everything else is sequential.
+**Parallel-safe:** the Lane B half of Q-401 is now unblocked on both counts. Everything else is
+sequential.
 
-### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
+### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
-- **Branch:** `fix/inline-centred-line-budget`
-- **Added:** 2026-08-18 · owner, on v1.324.6 with the style selected: *"I dont see the B2 default we
-  wanted... where is my b2 default? should of shipped?"* It **did** ship (Q-397, #105) and is
-  correctly the default and correctly selected. It just draws no ingredients.
-- **Lane B.** One constant in `components/nutrition/meal-label-render.ts`. No schema, no route.
-
-**Proven arithmetic, not a data problem.** `drawSquareCentredLabel` walks the column top-down and
-then asks how many 8-unit lines fit above the code:
-
-```
-L = (189 − 137) / 2 = 26        bottom = 189 − 26 = 163
-y  = 30 (L+4)
-  + nameSize(12) + 7            →  49
-  + caloriesSize(21) + 6        →  76
-  + macroSize(7.5) + 5          →  88.5
-  + rule gap(8)                 →  96.5
-codeTop  = 163 − 0 − codeUnits(66) = 97
-maxLines = floor((97 − 96.5 − 2) / 8) = floor(−0.19) → clamped to 0
-```
-
-**Zero lines, and it is not marginal — it is negative.** `fitText` shrinking a long name does not
-rescue it: at nameSize 12/10/8/6/**4** the answer is 0 every time, because the name contributes at
-most 12 of the 66.5 units consumed. For **one** line the code box must be **≤ 56.5 units**; it ships
-at **66**.
-
-**The tell was in the spec's own comment.** It reasons *"58 units is what the stack can spare once
-name, calories, macros and five ingredient lines have taken their height"* — and the value shipped is
-66. But 58 does not fit either (it yields 0 lines as well); the budget was computed against a
-different set of gaps than the ones drawn. **Do not simply set it to 58.**
-
-**Confirming symptom, visible in the owner's screenshot:** the sheet's *"Printing N ingredients"* line
-is absent. That copy is gated on `metrics.ingredientLines > 0`, so the renderer is already reporting
-0 — the plumbing works and is telling the truth. `savedMealToIngredients` is **not** the fault; the
-local store joins `food_items` and populates `foodItem`, and the per-portion calories on the label
-(208 kcal, P 32 C 8 F 5) prove the items resolved.
-
-**What to fix, in order of preference.**
-1. **Recompute the budget from the drawn gaps rather than guessing a constant.** Derive `codeUnits`
-   from the space actually left (`bottom − y − reserved lines × 8`) so the code takes what remains
-   after N lines, instead of a hardcoded box the layout cannot honour.
-2. If a fixed constant is kept, it must be **≤ 56.5 for one line, ≤ 40.5 for three** — and three is
-   what the style promises. 40.5 units is a 10.7 mm box, symbol ~8.1 mm, **~0.32 mm per module**,
-   which is *below* the 0.487 that `band` shipped with. **That is the real finding:** the centred
-   stack cannot carry the full list *and* a better code than the old default, so one of the two has
-   to give. The mockup that promised both was drawn at tighter type (6.5 px list, smaller headline,
-   smaller gaps) than the spec that shipped.
-3. **Whatever is chosen, the picker copy must match it.** "The full ingredient list" is currently
-   false, and a style that quietly prints fewer lines than it claims is how this was missed.
-
-- **Regression test, and it is cheap:** `meal-label-code-size.test.ts` already exists. Add a case
-  asserting `ingredientLines >= 1` for a two-ingredient meal in every style whose spec sets
-  `ingredients: true`. A style that claims a list and draws none should fail CI, not a test print.
-- **Verification:** the preview must show the ingredient run **and** the "Printing N ingredients"
-  line, then a physical print at 50 mm.
-
-### [nutrition][app-shell] Q-402 — Home's energy-balance widget never refetches; only an app restart updates it
-
-- **Branch:** `fix/energy-balance-widget-refetch`
-- **Added:** 2026-08-18 · owner: *"noting the widget energy bar doesnt update natively; requires a
-  restart of the app."*
-- **Lane B.** One hook, `app/health/hooks/use-health-calcs.ts`. No schema, no route.
-
-**Confirmed cause — the hook fetches once and has nothing to make it fetch again.**
-`useEnergyBalanceToday()` seeds from cache in one effect and then:
-
-```ts
-useEffect(() => {
-  const today = todayInTz()
-  cachedFetch<EnergyBalanceResponse>(`energy-balance:${today}`, …, ENERGY_BALANCE_TTL, d => setData(d ?? null))
-}, [])          // ← empty deps: once per mount, never again
-```
-
-`HomeEnergyBalanceCard` lives in the persistent tab shell, so it does **not** unmount when you switch
-tabs — the effect never re-runs and `data` keeps whatever the first fetch returned. Killing the app is
-the only thing that remounts it. That is precisely the reported behaviour.
-
-**The invalidation is NOT the missing piece — that part already works.** `lib/cache-groups.ts` clears
-`energy-balance:` from **six** write groups. The entry is correctly evicted; nothing asks the hook to
-go and get a new one. This is the *other half* of the standing cache rule: invalidating a key and
-re-rendering the component that reads it are two different things, and the repo has no
-subscribe-to-invalidation mechanism at all (checked — no cache event, no listener; `TAB_NAV_EVENT`
-exists but is navigation only).
-
-**Why Nutrition looks fine and Home does not.** The Nutrition tab does not use this hook —
-`nutrition-content.tsx` fetches the payload itself and re-fetches on its own date and logging changes,
-then passes it down to `CalorieBalanceBar`. So the same number is live on one surface and frozen on
-the other, which is also why this reads as "the widget" rather than "energy balance".
-
-**What to fix.** Give the hook a reason to re-run, and prefer a mechanism the whole app can use over a
-one-off:
-1. **Preferred — a cache-invalidation signal.** Have `invalidateCache()` emit, and let a small
-   `useCachedValue(key, url, ttl)` hook resubscribe. This is the general fix; **every other
-   seed-and-fetch-once hook in the app has the same latent bug**, and finding them one owner report at
-   a time is the expensive path.
-2. **Minimum viable** — refetch on tab focus / on the shell's navigation event, plus after any local
-   write that queues a `body_metrics` or `food_logs` mutation.
-- **⚠ Do not "fix" this by lowering `ENERGY_BALANCE_TTL`.** A shorter TTL does not help: the effect
-  never runs again, so the TTL is never consulted. It would only add load and hide the real defect.
-- **Verification:** log food from Home without leaving the tab and watch the bar move. Then repeat on
-  the **APK**, since the persistent shell is what makes this reproduce and a browser reload masks it.
-- **Related:** **Q-401** replaces this widget's progress bar with the energy zone bar, which makes the
-  staleness more visible, not less — do this one first or alongside it.
+- **Branch:** `chore/adopt-use-cached-value`
+- **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
+- **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
+  + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
+  screens with no component-test route.
+- **What.** 37 `useEffect(() => { … cachedFetch … }, [])` blocks existed when `useCachedValue` was
+  written. All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
+  value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
+  them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
+  The persistent tab shell is the exception, and it is where the owner found it.
+- **Do the shell ones first, and identify them rather than assuming.** Anything rendered by Home /
+  the tab shell that is not behind a route change: `components/home-day-timeline.tsx` (two),
+  `components/calendar-widget.tsx`, `components/health/*-card.tsx` where Home renders them. The
+  full list, regenerated:
+  ```
+  grep -rn -A6 'useEffect(() => {' app components --include='*.tsx' --include='*.ts' | grep -B6 cachedFetch
+  ```
+  (the count above came from a small AST-free scan for `useEffect(…, [])` blocks containing
+  `cachedFetch`; it is a starting list, not a proof of completeness).
+- **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
+  data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
+  refetches with no reader waiting for them. Judge per site; this is not a codemod.
+- **Worth considering instead of a full sweep:** a Custom Rules check that fails a NEW
+  `useEffect(…, [])` containing `cachedFetch` outside an allowlist, with a shrink-only baseline of
+  the 36. That freezes the count and makes each conversion visible, which is the pattern that has
+  worked for hex literals and component size. Cheaper than the sweep and stops the growth, which is
+  the part that actually matters.
+- **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
+- **Not verified:** static scan. **No screen was observed going stale** — the 36 are inferred from
+  the shape, and the one confirmed instance is Q-402's, which is fixed.
+- **A guard needs a fixture that does not exist, and this is the reusable part.** Q-402's fix could
+  not be driven end to end because the seeded user has no `height_cm`/`date_of_birth`/`sex` (so the
+  energy card shows "add your details") **and** `DEFAULT_CARD_WIDGETS` is empty, so Home renders no
+  card widgets at all until one is turned on. Three probes measured zero
+  `/api/nutrition/energy-balance` requests. Whoever takes this should build that fixture first —
+  a seeded body plus `ta_ss_cards` via `page.addInitScript` — because every Home-card guard needs
+  it, and its absence is part of why a shell-only staleness bug reached a user report.
 
 ### [nutrition][app-shell] Q-401 — two calorie budgets on one screen, 274 apart, and the card that explains it is suppressed
 
@@ -548,9 +490,11 @@ Home's bar is the gradient fill in `home-card-widget.tsx` (`goalPct`, `scaleX`).
 training"*. Without it a number that changes during the day looks like a bug — which is exactly how
 this entry started.
 
-**5 — Both surfaces in the same PR.** Home and Nutrition, per the sibling-surface rule. And note
-**Q-402**: Home's energy card never refetches, so it will show a stale zone bar until that is fixed —
-swapping the bar in without it makes the staleness *more* visible.
+**5 — Both surfaces in the same PR.** Home and Nutrition, per the sibling-surface rule. The
+prerequisite this used to name — **Q-402**, Home's energy card never refetching — is **fixed**
+(v1.325.1): the card is on `useCachedValue` now and reacts to any group that clears
+`energy-balance:`, so the zone bar can be swapped in without making staleness more visible. Build the
+new bar on `useCachedValue` too rather than a fresh `useEffect(…, [])`.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
@@ -1027,74 +971,90 @@ directly — green on web, dead on the device, because the failing path is unrea
   button into a dead button that also lies in the log.
 - **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
   Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
-- **Related:** the label this saves is currently missing its ingredient list — **Q-399**. Fix that
-  first or the first file that lands in the gallery is the wrong artwork.
+- **Related:** the label this saves was missing its ingredient list — **Q-399, fixed 2026-08-19
+  (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
+  one the owner picked.
 
-### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
+### [workouts][platform] Q-405 — a Coach swap silently inherits the old exercise's role, and the role sets the loading
 
-- **⛔ RE-TAGGED TO LANE A 2026-08-18 — the "one call in one Lane B handler" shape below is not
-  buildable, and the obvious version of it is a silent no-op.** `lib/local-store` has **no
-  `deleteActivityLog`**; the `deleteActivityLog` that greps are `repo.deleteActivityLog`
-  (`lib/data/repository.ts:547`, `adapter.ts:2374`) — the *server* repository, which is what the
-  route already calls. The nearest local method is `upsertActivityLog`, and **its INSERT column list
-  and its `ON CONFLICT DO UPDATE SET` both omit `deleted_at` entirely** (27 columns, 27 placeholders,
-  `sqlite-backend.ts:2607`). So a read-merge upsert setting `deletedAt: now` compiles, type-checks,
-  passes lint, and **changes nothing** — `getActivityLogs` filters `deleted_at IS NULL`
-  (`sqlite-backend.ts:824`) against a column the write never touches. That was written and reverted
-  here before it shipped; it is the exact shape a future session will reach for first.
-- **What the fix actually needs:** a `deleteActivityLog(id)` on the local store —
-  `lib/local-store/index.ts` (interface) + `lib/local-store/sqlite-backend.ts` (soft-delete
-  statement, matching `deleteFoodLog`/`deleteInjury`) — **then** the one call in
-  `app/health/health-content.tsx`. Two of those three files are Lane A's by the ownership list, so
-  **Lane A takes the whole item**; splitting it leaves Lane B's call site pointing at a method that
-  does not exist. The Lane B half is four lines and is the last step, not the first.
-- **The `CLAUDE.md` rule this item asked for is already landed** (Lane B, same day) — the inverse of
-  the offline-first rule, in the Offline-First section. Do not re-add it.
-- **✅ SCOPE BOUNDED 2026-08-18 — the *audit* still holds: this is the ONLY instance.**
-  Every mutating write to a local-first domain was audited for a local-store call **inside the
-  handler**: `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE), `quick-edit-log-sheet`
-  (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet` (DELETE+PATCH),
-  `done-activity-screen` (PATCH) — **all eight write locally**. Only this handler does not.
-  [`docs/reviews/2026-08-18-local-first-write-coverage.md`](reviews/2026-08-18-local-first-write-coverage.md)
-- **Branch:** `fix/activity-delete-updates-local-store`
-- **Added:** 2026-08-18 · review sweep (staleness outside Q-262's test) ·
-  [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](reviews/2026-08-18-server-only-writes-to-local-first-domains.md)
-- **Placement:** mid. Visible inconsistency, **not data loss**, and it self-heals — but the fix is one
-  call and the shape is a rule the codebase implies and does not state.
-- **What.** `app/health/health-content.tsx:684-700` deletes via
-  `fetch("/api/activity-logs", { method: "DELETE" })`, toasts *"Deleted"*, calls
-  `invalidateActivityWrites()` and `refreshDayOverlay(...)`. **No `store.deleteActivityLog(...)`, no
-  `queueMutation`.**
-- **The screen the user is on is correct**, which is why this survived: `refreshDayOverlay` →
-  `fetchDayOverlay` reads `cachedFetch('day-log:<date>')`, which is **server-read by design** (a
-  cross-domain aggregate — the sanctioned exception). The activity vanishes there immediately.
-- **The local `activity_logs` row is untouched**, and three surfaces read it local-first:
-  - `app/session-select/session-select-content.tsx:500` — `store.getActivityLogs(weekStart)`
-  - `app/nutrition/nutrition-content.tsx:278` — today's calories burned
-  - `components/health/activity-history-card.tsx:91`
-- **How long:** `pullDelta` is throttled to `MIN_SYNC_INTERVAL_MS` = **5 minutes** unless forced
-  (`sync-engine.ts:77`), and `sync-provider.tsx:145,195` calls it **un-forced**. Nothing in the delete
-  path triggers a pull, so the floor is that window and the real duration is "until the next natural
-  sync".
-- **It self-heals — say so when triaging.** `applyDelta` applies the tombstone
-  (`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, `sqlite-backend.ts:1628`) with
-  the correct pull-clobber guard. The server delete is a **soft** delete with a `user_id`-scoped
-  tombstone (`adapter.ts:2374`). Nothing is lost; something wrong is shown for a while.
-- **Fix shape:** see the re-tag note at the top of this entry. The sibling paths cited here
-  (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`) are **upserts, not
-  deletes** — they are precedent for writing locally, not for a local-delete call that exists.
-  Queuing the delete so it works offline is a **separate, larger** question for this domain — do not
-  fold it in silently.
-- **The rule this breaks is now written down** — `CLAUDE.md`, Offline-First section, immediately
-  above the forward-direction rule it inverts: a domain the UI reads local-first must have *every*
-  write update the local store, deletes included, and including writes made from a screen that
-  itself reads server-side. That last clause is why nothing on the originating screen could reveal
-  it.
-- **Lane A owns this** (`lib/local-store/**` is the load-bearing half; `app/health/**` is four lines
-  at the end). Re-tagged from Lane B — see the top of this entry.
-- **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
-  readers fall through to their API fallbacks and the inconsistency cannot appear there. The 5-minute
-  floor is read from `MIN_SYNC_INTERVAL_MS`, not observed. On-device is the only real verification.
+- **Branch:** `feat/coach-swap-role-prompt`
+- **Added:** 2026-08-18 · owner, after swapping Barbell Romanian Deadlift → Barbell Jefferson Curl:
+  *"it should ask what role the exercise should be with a recommendation; this changed from RDL →
+  Jefferson; and it looks like it took the 'secondary' role rather than accessory."*
+- **Lane A** — `lib/coach/domains/session-exercise.ts` is the write path. The picker UI half is Lane B
+  if one is added; check before starting.
+
+**Confirmed: the swap never touches the role.** `session_exercises.exercise_role` is
+`'primary' | 'secondary' | 'accessory'` (`schema.ts:132`, default `'primary'`), and
+`lib/coach/domains/session-exercise.ts` contains **no reference to it** — grep returns nothing. The row
+keeps whatever the outgoing exercise had, so RDL's `secondary` carried straight onto Jefferson Curl.
+
+**This is not a badge problem.** Role selects the progression style —
+`resolveStyleForExercise(program, phase, { exerciseRole })` — so it decides the prescribed percentages
+and sets. In the owner's screenshot the inherited role prescribed **60 kg × 6 at 80%** for a
+Jefferson Curl: a heavy secondary loading pattern on a slow spinal-flexion movement that is normally
+loaded light. **A wrong role is a wrong prescription, on a movement where that carries injury risk.**
+
+**What to build.**
+1. **Ask, with a recommendation pre-selected** — the owner's words. Three options, the suggested one
+   already chosen, so the common case is one confirm rather than a decision.
+2. **Where the recommendation comes from, in order of preference:** the incoming exercise's own entry
+   in `exercise_library` if it carries a default role; otherwise its muscle groups and equipment
+   (a compound barbell lift on a primary mover → primary/secondary; an isolation or mobility movement
+   → accessory). **Do not ask the model to invent it** — a guessed role feeds a real prescription, and
+   CLAUDE.md is explicit that no LLM self-reported value may gate an automatic action.
+3. **Never silently inherit.** If no recommendation can be derived, ask without a pre-selection rather
+   than defaulting to the outgoing role — inheriting is what produced this.
+
+- **Sibling sweep:** the same silent inheritance applies to any other path that replaces an exercise in
+  a session. Grep for writers of `exercise_role` before calling this done; the Coach may not be the
+  only one.
+- **Related, and worth doing together:** **Q-403** — the same swap flow calls an applied change a
+  "proposal" and says so after the fact. Both are about the swap telling the user what it actually did.
+- **Verification:** swap a compound for an isolation movement and confirm the role prompt appears, the
+  recommendation is sensible, and the prescribed sets change to match the chosen role — the last part
+  is the one that proves the fix reached the thing that matters.
+
+### [platform] Q-404 — the Sentry SDK was deliberately deferred and never queued, so nothing was going to wire it
+
+- **Branch:** `feat/wire-sentry-sdk`
+- **Added:** 2026-08-18, after the owner got Sentry's *"no errors are coming through yet"* email and
+  asked whether it was set up. It is not — and the reason is documented, but **only in a handoff.**
+- **Lane A** (root config, `instrumentation.ts`, `next.config`, a new dependency).
+
+**The state, precisely.** `docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`
+lists under *Deliberately NOT done*: **"The Sentry SDK is not wired. DSN is in Railway, a read token is
+in a session env. Deferred on purpose so the session that wires it can verify events arrive rather
+than assume — a configured DSN and a silently-dropping one look identical."** Confirmed in the tree:
+no `@sentry/nextjs` dependency, no `sentry.*.config.ts`, no `SENTRY_*` reference in any source file.
+
+**Why this entry exists at all.** The deferral was a good call, and it was recorded in the right place
+for a narrative — but **there was no backlog entry**, so nothing in the queue was going to pick it up.
+A deferral that lives only in a handoff is an orphaned finding by the repo's own rule, and Sentry's own
+email is what surfaced it rather than anything in this repo.
+
+**⚠ The verification requirement is the whole point — do not skip it.** The deferring session's
+stated reason was that a wired-but-silent DSN is indistinguishable from a working one. So this item is
+not done when the SDK is installed; it is done when **a deliberately-thrown error is observed arriving
+in the Sentry project**. Throw one from a server route and one from the client, and record both in the
+PR.
+
+**What it adds that `error_events` does not.** Server errors are already captured — `instrumentation.ts`
+`onRequestError` → `lib/observability/request-error.ts` → `error_events` — and client errors too, via
+`components/error-reporter.tsx` (mounted at `app/layout.tsx:143`) and `app/error.tsx`. So Sentry is not
+filling a capture gap. It fills the **alerting** gap: `error_events` is pull-only, prunes at 30 days,
+and CLAUDE.md records that the first read found three faults of which two had already stopped before
+anyone looked. Nothing notifies. Wire it for that, and say so in the PR so the next reader does not
+think the home-grown path is now redundant — **it is not, and it should not be removed.**
+
+**⚠ PII, and this is a health app.** Sentry's defaults capture URLs, breadcrumbs and sometimes request
+bodies. Health values, user ids and food/weight data must not leave to a third party by accident. Ship
+the scrubbing config **in the same PR as the DSN**, not after — `beforeSend`, `sendDefaultPii: false`,
+and a denylist for the health routes. There is also a **prior decision against a vendor** on record
+(`docs/overview/history-latest.md:625`, *"Decision made against a Sentry-type vendor: single user, data
+stays in Railway, no CSP changes"*) — that decision has since been reversed by the owner, and the CSP
+note is a live consideration for the WebView, not a stale one.
+
 
 ### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
 
@@ -1452,6 +1412,49 @@ directly — green on web, dead on the device, because the failing path is unrea
 - **Not verified:** the mismatch was measured with `date-fns-tz` directly, not by driving the app with
   a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
   but not Postgres's). The consequence at each call site is read from source.
+
+### [nutrition] Q-358 — every meal-label QR is drawn on a fractional pixel grid, so every module edge is grey
+
+- **Branch:** `fix/label-code-pixel-snap`
+- **Added:** 2026-08-19 · Lane B, found while fixing Q-399 ·
+  [`journal`](overview/entries/2026-08-19-label-line-budget.md)
+- **Placement:** low-mid. **Mitigated, not fixed**, and the mitigation is what makes it low: Q-399
+  doubled the canvas to 600 dpi, which took the default's module from 4.7 device pixels to 9.5 and
+  made the E2E decode reliable again. The grid is still fractional; there is just enough resolution
+  now that it does not matter. That is a margin, not a fix.
+- **What.** `drawCode` sizes a module as `box / 33` in sheet units and the canvas is scaled by a
+  constant, so the module width in device pixels is `box × scale / 33` — **fractional for every
+  style that ships**, at every scale tried:
+  ```
+  scale 3.12 (300 dpi)   band 4.35 px   inlineCentred 4.73   plaque 5.67   square 6.62
+  scale 6.24 (600 dpi)   band 8.70 px   inlineCentred 9.45   plaque 11.35  square 13.24
+  ```
+  Every module edge therefore lands mid-pixel and antialiases to grey. **The `+0.04` bleed in
+  `drawCode` is an acknowledgement of exactly this** — it papers over the resulting hairline seams
+  instead of removing them, and its own comment says the seams "read as a lighter code and cost scan
+  margin".
+- **How it showed up.** At 300 dpi and 0.401 mm per module, `e2e/meal-label.spec.ts`'s decode of the
+  **rendered canvas** became a coin flip — the same geometry decoded on one run and failed the next,
+  with the label visibly correct in the screenshot. That is the signature: not a broken code, a
+  fuzzy one.
+- **Why it matters beyond the test.** The canvas **is** the printed artwork — share/save hands the
+  viewer these pixels. A grey-edged module is exactly what ink spread then merges, which is the
+  failure mode the owed print test is looking for, and it would present as "the scanner doesn't
+  work".
+- **Fix shape:** snap the cell to a whole number of device pixels (`floor(box × scale / 33)`), snap
+  the origin to a pixel boundary too, and drop the `+0.04` — adjacent modules then abut exactly.
+  **The catch, and why it was not folded into Q-399:** flooring shrinks the drawn box, and at
+  300 dpi it shrank it a lot (a 50-unit box snapped to 42.3, pitch 0.401 → 0.339). Every reported
+  figure would then be wrong — `codeMm`, the sheet's mm-per-module line, and
+  `mealLabelCodeMetrics`, which is the number `meal-label-code-size.test.ts` asserts and the number
+  the owner reads before printing. **At 600 dpi the loss is much smaller** (9.45 → 9 px, ~5%), which
+  is the version worth building: snap, then make `mealLabelCodeMetrics` report the SNAPPED size so
+  the figure and the artwork agree.
+- **Verification:** run the E2E decode several times, not once — the tell is flakiness, not failure.
+  Then the physical print, which is the only real check and is already owed.
+- **Lane B owns this** (`components/nutrition/**`).
+- **Not verified:** the pixel counts are arithmetic from `scale` and `codeUnits`, not measured off a
+  rendered canvas. No print.
 
 ### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
 
@@ -2317,16 +2320,21 @@ moving *beside* the calories rather than under them.
   owner's actual suggestion was an **inline wrapping run**, which spends width instead of height:
   five ingredients become three wrapped lines rather than five, and the height handed back goes to
   the code. The complete list now fits a **round** label with a code larger than the old default's.
-  **B2 — round-safe, inline, centred, complete list — is the new `DEFAULT_MEAL_LABEL_STYLE`**, at
-  0.529 mm per module against the old default's 0.369, both now asserted in
+  **B2 — round-safe, inline, centred — is the new `DEFAULT_MEAL_LABEL_STYLE`**, asserted in
   `components/nutrition/__tests__/meal-label-code-size.test.ts` per Q-397's verification note.
+  **Corrected 2026-08-19 (Q-399):** the "complete list at 0.529 mm per module" claimed here was
+  never printed. The shipped geometry left room for **zero** ingredient lines, and 0.529 was the
+  pitch of a code box the layout could not fit a list underneath. Retuned to **0.401 mm per module
+  with three wrapped lines** — still above the old default's 0.369, and now the *lines* are asserted
+  rather than only the code size.
   Option 2 as costed here is moot; the stacked square style stays in the picker.
 - **Still open:** **the stored default**, which stays blocked on **Q-392** exactly
   as this entry says — the style remains picked-at-print-time and nothing was persisted.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
   whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
   decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
-  now 0.529 and the old one measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
+  now **0.401** — 0.529 briefly, but that box left no room for the list, per Q-399 — and the old one
+  measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
   clear which labels are square-only rather than letting a round die silently crop the list.
 - **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
   layout and overflow need no device. **The two checks that matter are still physical** — print it and

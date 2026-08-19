@@ -752,12 +752,18 @@ const BASELINE = {
   // the today-envelope helpers were deliberately left alone. The row stays open because Q-477 — the
   // larger half, including the ratchet on bare todayInTz() — is untouched, and a reader needs to
   // know which half of a two-Q row shipped.
+  // Raised 2026-08-18 (Lane B, Q-399): 7893 -> 7901. Eight lines on the label row, and six of them
+  // are the failure mode rather than the fix: the default drew ZERO ingredient lines for a full
+  // release and every gate stayed quiet, because the sheet's report was gated on `> 0` and the only
+  // test on that style asserted the code's SIZE. A row that just said "fixed the label" would leave
+  // the next reader believing the tests covered it. The other two update the print-test gate, which
+  // now names a second pitch to scan.
 // Raised 2026-08-18 (Lane A, Q-479 owner-deferred): projectOverview 7893 -> 7920. An accepted-risk
 // row for a finding the owner chose not to fix — a revoked admin keeping catalogue write access for
 // up to 24h, which needs a revocation to open and there is only one permanent admin. It is longer
 // than a typical row on purpose: it has to stop the next session re-implementing a fix that already
 // exists and is green on an unmerged PR, and it has to record what would make the risk live again.
-  'projectOverview.md': 7920,
+  'projectOverview.md': 7928,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -788,11 +794,25 @@ const BASELINE = {
   // seven fewer, recomputed from the merged file on top of the raise above. Q-357 is the four
   // defeated memo call sites Q-490's review said did not exist ("no inline arrows exist
   // anywhere"); the new check freezes them rather than leaving them to be rediscovered.
+  // Raised 2026-08-19 (Lane B, Q-399 shipped): Q-399's entry removed, Q-358 filed in its place, net
+  // larger. Q-358 is the finding Q-399 surfaced rather than the one it set out to fix: every meal
+  // label's QR is drawn on a fractional device-pixel grid, so every module edge antialiases to grey.
+  // Its lines are the two pixel-per-module tables — the defect is invisible from the source (the
+  // arithmetic reads correct) and only the numbers show why a smaller code stopped decoding.
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-402 shipped): Q-402's entry out, Q-359 in, net fourteen
+  // fewer. Q-359 is the 36 sibling fetch-once effects Q-402's mechanism now covers — filed rather
+  // than swept, and its lines are the reason NOT to sweep: most are latent, some are deliberately
+  // fetch-once, and a shrink-only ratchet may beat the sweep outright.
+  // Raised again the same day (Q-402's fixture gap): the seven lines record WHY the fix could not
+  // be driven end to end — the seeded user has no body and Home renders no card widgets by default,
+  // so three probes measured zero requests. That is a reusable finding: every future Home-card guard
+  // needs the same fixture, and its absence is part of why a shell-only staleness bug reached a user
+  // report rather than a test.
 // Raised 2026-08-18 (Lane A, Q-479 owner-deferred): backlog 10124 -> 10139. The ⛔ annotation on the
 // Q-479 entry — the owner accepted the risk, so the entry stays in the queue rather than being
 // removed, and has to carry "do NOT implement, the fix is green on PR #124" plus what would make it
 // live again. An accepted risk that reads like an open item is how the decision gets re-litigated.
-  'docs/implementation-backlog.md': 10139,
+  'docs/implementation-backlog.md': 10147,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
@@ -801,7 +821,12 @@ const BASELINE = {
   // aggregate, while three local-first surfaces kept the row. It belongs beside the rule it
   // inverts, not in a journal entry, because the next person to write a delete handler reads this
   // section and not that entry.
-  'CLAUDE.md': 1077,
+  // Raised 2026-08-19 (Lane B, Q-402): 1077 -> 1078. One line, and it is the half of the cache rule
+  // that was missing rather than a restatement: every group evicted `energy-balance:` correctly and
+  // the owner still had to restart the app, because nothing told the component to look again. The
+  // rule sits in the cache-invalidation list because that is where someone writing a write path
+  // reads, and it names the wrong fix (a shorter TTL) because that is the one they would try.
+  'CLAUDE.md': 1078,
 
 };
 

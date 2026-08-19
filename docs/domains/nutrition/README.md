@@ -59,14 +59,25 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   correction worth reading before any print test: every module-pitch figure in Q-389/Q-393 is ~24%
   optimistic**, since the quiet zone is drawn *inside* the code box (band is 0.369 mm, not 0.487).
   The round trimmed variant was measured at 0.353 mm and deliberately **not** built.
+- [`docs/overview/entries/2026-08-19-label-line-budget.md`](../../overview/entries/2026-08-19-label-line-budget.md)
+  — **Q-399: the default label promised the ingredient breakdown and printed zero lines of it for a
+  release (v1.324.0–v1.324.6), and three separate gates stayed quiet.** The sheet's "Printing N
+  ingredients" copy was gated on `> 0`, so the one reading worth having removed itself; the picker
+  went on claiming "the full ingredient list"; and the only test on that style asserted the code's
+  **size**, which a bigger code scored better on. Read it before changing any label geometry: the
+  four vertical gaps are spec data now, `centredStackLineBudget` derives the line count from them,
+  and a test asserts the promise rather than a constant.
 - [`docs/overview/entries/2026-08-18-meal-label-inline-centred.md`](../../overview/entries/2026-08-18-meal-label-inline-centred.md)
   — **Q-397, the label that actually shipped to the agreed design (v1.324.0), and the reasoning
   worth keeping.** Q-393's "the list does not fit a round label" was true only for a **stacked**
   list; running the ingredients as one **wrapping** run spends width instead of height, so the
-  complete list fits a round die with a code *larger* than the old default (0.529 vs 0.369 mm per
-  module). **`inlineCentred` is the new default.** Process lesson recorded there and in Q-397: the
-  correction was made in chat and never written back into the queue entry, so the superseded
-  analysis shipped as a work order.
+  list fits a round die with a code *larger* than the old default. **`inlineCentred` is the new
+  default.** Process lesson recorded there and in Q-397: the correction was made in chat and never
+  written back into the queue entry, so the superseded analysis shipped as a work order.
+  **Corrected 2026-08-19 by Q-399** — the "0.529 vs 0.369" this line carried was the pitch of a code
+  box with **no room for the list underneath it**: the style drew zero ingredient lines for a full
+  release. Retuned to 0.401 with three wrapped lines, and the line count is asserted now, not just
+  the code size — [`journal`](../../overview/entries/2026-08-19-label-line-budget.md).
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.

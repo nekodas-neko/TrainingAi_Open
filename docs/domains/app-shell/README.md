@@ -28,6 +28,13 @@ split is "does it feel slow" vs "is it actually slow at the source".
   [`docs/reviews/2026-07-20-wiring-caching-perf-audit.md`](../../reviews/2026-07-20-wiring-caching-perf-audit.md)
 - [`docs/handoff-phase-3-bundled-shell.md`](../../handoff-phase-3-bundled-shell.md) — the live
   Phase 3 baton (bundling the shell into the APK). Task 4 is now **decided** (option B).
+- [`docs/overview/entries/2026-08-19-cache-invalidation-signal.md`](../../overview/entries/2026-08-19-cache-invalidation-signal.md)
+  — **Q-402: the shell has no unmount, so a fetch-once effect in it never fetches again.** All six
+  write groups evicted `energy-balance:` correctly and the owner still had to restart the app,
+  because invalidating a key and re-rendering the component reading it are two different things and
+  the repo had no mechanism for the second. `subscribeToInvalidation` + `useCachedValue` are that
+  mechanism. **Read before adding any self-fetching card to Home** — the shape that is fine on a
+  screen you navigate away from is a bug here. 36 sibling sites are latent, filed as Q-359.
 - **[`docs/offline-first-target-architecture.md`](../../offline-first-target-architecture.md)** —
   the destination (owner, 2026-07-30): the app works fully offline except AI calls and older data;
   Railway keeps the DB for calculated data. Reframes Phase 3 as step one of a migration rather than

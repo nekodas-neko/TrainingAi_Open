@@ -28,7 +28,13 @@ const BASELINE = {
   // server-stamped date to Brisbane's, and today's metrics and active energy stay blank for
   // 14 hours a day for a New York user. There is no smaller shape — a hook cannot be called
   // from inside the callback that needs its value.
-  'app/health/health-content.tsx': 912,
+  // Raised 2026-08-18 (Lane A, Q-488): 912 -> 915. Three lines — one call and two lines of
+  // comment pointing at where the reasoning lives. The item is *specifically* that this handler
+  // deletes server-side only, so three screens reading activity_logs local-first keep showing the
+  // deleted activity until the next sync; there is no zero-line shape for "also write locally".
+  // The full explanation deliberately lives on `deleteActivityLog` in sqlite-backend.ts rather
+  // than here, which is what kept this to three lines instead of nine.
+  'app/health/health-content.tsx': 915,
   'components/config/program-editor-sheet.tsx': 963,
 };
 
