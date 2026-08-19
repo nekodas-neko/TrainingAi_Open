@@ -157,3 +157,33 @@ export function goalToDailyKcal(goalKcal: number, goalType: 'daily' | 'weekly' |
 export function dailyKcalToGoal(dailyKcal: number, goalType: 'daily' | 'weekly' | null): number {
   return goalType === 'weekly' ? Math.round(dailyKcal * 7) : Math.round(dailyKcal)
 }
+
+/**
+ * Where today's calorie budget came from, split into the part that is always there and the part you
+ * earned by moving.
+ *
+ * Q-401. The owner's model, in their words: *"i want the lowest number that assumes no
+ * exercise/movement — and only has BMR essentially. then we adjust/increase that number [by]
+ * activity."* So `base` is the budget on a zero-movement day — resting burn plus the goal's delta,
+ * which is negative for a deficit and positive for a surplus — and `earned` is today's measured
+ * movement. Their sum is the budget the zone bar judges you against.
+ *
+ *
+ * **Lives here, beside `computeCalorieBalance` whose output it reads.** It spent a day in
+ * `components/nutrition/` only to avoid colliding with the Lane A half of Q-401 in this directory;
+ * that half has landed, so it has moved to its proper home.
+ *
+ * Kept as a `.ts` rather than folded into `calorie-zone-bar.tsx`, for one blunt reason: both vitest
+ * projects are `environment: 'node'` and cannot parse JSX, so arithmetic that sits in a `.tsx`
+ * cannot be asserted at all. Two surfaces render this number — the Nutrition tab and Home's
+ * nutrition card — and a second, unasserted copy of a calorie figure is exactly what produced
+ * Q-401: two budgets on one screen, 274 kcal apart, both labelled "left".
+ */
+export function budgetProvenance(
+  { restingBaseKcal, activeKcal, targetNetKcal }:
+  { restingBaseKcal: number; activeKcal: number; targetNetKcal: number },
+): { base: number; earned: number; total: number } {
+  const base = Math.round(restingBaseKcal + targetNetKcal)
+  const earned = Math.round(activeKcal)
+  return { base, earned, total: base + earned }
+}
