@@ -882,7 +882,11 @@ const BASELINE = {
   // the three sibling BLE listeners that should go the same way, the grouping error, and the one
   // test that will red when the next three files convert. An entry that only said "6 of 36 done"
   // would cost the next session all of that.
-  'docs/implementation-backlog.md': 10916,
+  // Raised 2026-08-19 (Tuning, Q-525 + Q-526): 10916 -> 10983. Two queue entries plus a sequencing
+  // constraint on Q-505. Q-526 has to carry WHY the missing trail already cost a measurement --
+  // "rebuild it from raw inputs" reads as cheap until you know the goals changed underneath, which
+  // is what makes the historical question unanswerable rather than merely inconvenient.
+  'docs/implementation-backlog.md': 10983,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

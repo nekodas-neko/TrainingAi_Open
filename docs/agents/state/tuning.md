@@ -3,11 +3,21 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/activity-contributor-audit` · **Q band:** 500–529 (next free: 525)
+**Updated:** 2026-08-19 · **By:** `tuning/score-audit-trail` · **Q band:** 500–529 (next free: 527)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Score-audit trail — MEASURED** (Q-525, Q-526). Whether each score leaves enough behind to be
+  calibrated retrospectively. Over 96 rows: **sleep, readiness and illness are fine** (readiness is
+  the reference — sub-scores *plus* `provisional` flags; illness's stored biomarkers are what let
+  Q-506 diagnose a poisoned baseline from history). **Activity stores the blend wrapper**
+  `{base, adjustment, trained}` instead of its six components, which are in memory on the same
+  request — that is why the contributor audit could only report a *predicted* sd ceiling, since the
+  goals changed underneath on 2026-08-11. **Q-526 is sequenced BEFORE Q-505** or the old model's
+  history is lost. **`chronic_stress_score` is NULL on all 96 rows** — third dormant score (Q-525);
+  its gate needs 21 granular nights **in one pass**, so an incremental rollup can never satisfy it.
+  [`review`](../../reviews/2026-08-19-score-audit-trail.md).
 - **Activity Score contributor audit — COMPLETE, and it ANSWERS Q-277** (Q-524 filed, Q-277 removed).
   All six contributors measured over 90 days. **Only `steps` (sd 33.4) and `strengthVolume` (sd 23.8)
   carry information.** `strengthFreq` is at 100 on **78%** of days; `moveHours`, `zoneMinutes` and
@@ -143,8 +153,8 @@ completed 2026-08-18, and the zone-minutes / movement-per-hour coverage check 20
 is measured except **cardio**, which is deliberately skipped for lack of data (~13 run/treadmill
 sessions, newest 2026-07-24), not for lack of time.
 
-**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Nineteen findings are open —
-Q-506…Q-524 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
+**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Twenty-one findings are open —
+Q-506…Q-526 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
 1. **Q-518** — the model-version stamp is erased within hours, which blocks the measurement
    infrastructure the rest depend on. One conflict-arm expression.
 2. **Q-517** — a maintenance below the owner's own BMR is one tap from becoming their calorie goal.
@@ -229,6 +239,12 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **`chronic_stress_score` (vendored cumulative model) is NOT Q-507's daytime stress.** Same word,
+  different mechanism — Q-507 is `STRESS_HIGH_DAY_THRESHOLD_MIN` in minutes, and it fires. Merging
+  them loses the fact that one has never produced a value at all (Q-525).
+- **Check the persist SITE, not the column name.** A `%contributor%` column grep said illness stored
+  no trail; it stores one as `illness_biomarkers`, on 46 of 46 scored rows. Caught before filing, and
+  it narrowed the finding from "two scores keep no trail" to "one keeps the wrong one".
 - **Do NOT propose raising `strengthFreqGoal` or extending `STRENGTH_FREQ_CURVE` past ratio 1.0.**
   It sits at 100 on 78% of days and looks like the obvious next calibration. `daily-goals.ts` sets
   the goal *at* the owner's typical deliberately — the ACWR taper handles over-reach, and *"a goal

@@ -5611,6 +5611,10 @@ session working from a temporarily restored copy.
   the 23 stored days are still scored under the old goals because history is not back-filled — the
   same trap the sleep recalibration hit. Reconstructing from contributors at effective weights
   predicts a ceiling of **sd ≈ 10.2** under current goals (steps ⟂ strengthVolume, r = −0.016).
+- **⛔ Do Q-526 FIRST.** `activity_contributors` currently stores the blend wrapper, not the six
+  components, so the old model's contributor history is not recorded anywhere. Land the redesign
+  first and that history is lost permanently — and the before/after comparison that would show
+  whether the redesign worked cannot be made. Q-526 is one line at an existing persist site.
 - **This entry absorbs Q-277**, whose investigation is complete (see the review's §1 and §4).
 - **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
   same-day steps **r = +0.417** — and **2026-08-12 scored 76 on 828 steps while 2026-08-16 scored 64
@@ -6429,6 +6433,69 @@ session working from a temporarily restored copy.
   unreconciled sources for the same metric.
 - **Caveats:** one user, one activity level. The map's other tiers (`sedentary` 7,000, `light` 8,500,
   `active`/`extra_active` 12,000) are unmeasured here — only `moderate` was exercised.
+
+### [platform][activity] Q-526 — the Activity Score stores the blend wrapper where its contributors should go
+
+- **Branch:** `fix/persist-activity-contributors` · **Lane:** A
+- **Plan:** none needed — **one line at an existing persist site.** Evidence:
+  [`docs/reviews/2026-08-19-score-audit-trail.md`](reviews/2026-08-19-score-audit-trail.md) §1.
+- **Added:** 2026-08-19 · Tuning agent, found while checking whether each score can be re-audited.
+- **What is stored.** `lib/health/readiness-payload.ts` writes
+  `{ base: activityBlend.base, adjustment: activityBlend.adjustment, trained: … }` into
+  `oura_daily_derived.activity_contributors`. That is the **blend wrapper**, not
+  `computeActivityScore`'s six components (`steps`, `activeEnergy`, `zoneMinutes`, `moveHours`,
+  `strengthFreq`, `strengthVolume`). **The components are already in memory on the same request** —
+  `activityResult.components`, which the same function serves to the client. They are simply not
+  written.
+- **Activity is the only score with this gap.** Over 96 rows: sleep stores 10 real sub-scores (36
+  rows), readiness stores its contributors **plus `provisional` flags** (35), illness stores all four
+  biomarker z-scores on **every** scored row (46). Activity stores the wrapper on all 23.
+- **It has already cost a measurement.** The 2026-08-19 contributor audit had to rebuild all six
+  contributors from raw inputs, and could only do so **at today's goals** — `strengthFreqGoal` went
+  3 → 5 and the volume target changed basis on **2026-08-11**. So *"what did `strengthFreq` score on
+  2026-08-02?"* is **unanswerable**, and the audit reported a *predicted* sd ceiling (≈ 10.2) instead
+  of the real historical spread. Sleep and readiness had no such problem on the same days.
+- **It compounds with the no-backfill trap.** Stored history is not rewritten after a model change,
+  so each recalibration adds a segment — and without a trail there is no way to tell later which
+  segment a day belongs to. `model_versions` is on 71 of 96 rows and Body Battery is still the only
+  score that stamps one (Q-273).
+- **Do this BEFORE Q-505 (the Activity redesign), not after.** The redesign changes the contributor
+  set; landing it first means the old model's contributor history is lost permanently, and the
+  before/after comparison that would show whether the redesign worked cannot be made.
+- **Pass test:** `activity_contributors` holds the six component keys, and a day's stored sub-scores
+  reproduce its stored `activity_score` under the weights in force that day.
+- **Caveats:** keep `base`/`adjustment`/`trained` — the blend wrapper is real information (it is how
+  a Cloud-era adjustment is distinguished from our own base) and something may read it. Merge, do not
+  replace.
+
+### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
+
+- **Branch:** `fix/chronic-stress-gate` · **Lane:** A
+- **Plan:** none yet — **the question is whether to trigger the wide pass or relax the gate**, and the
+  first is owner/device-gated. Evidence:
+  [`docs/reviews/2026-08-19-score-audit-trail.md`](reviews/2026-08-19-score-audit-trail.md) §2.
+- **Added:** 2026-08-19 · Tuning agent.
+- **Measured:** `chronic_stress_score` and `chronic_stress_contributors` are **NULL on all 96 rows**.
+  Never produced once. This is the **third dormant score**, after the illness radar (Q-506 — no
+  action-bearing flag in 46 days) and resilience (Q-508 — one value, level 5, on all 13 rows).
+- **Mechanism — the gate is stricter than it reads.** `adapter.ts`'s `chronic_stress` step returns
+  early below `CHRONIC_STRESS_MIN_DAYS`, then `computeChronicStress` runs the golden-verified
+  `cumulative_stress_1_2_2` port, which needs **21 complete nights of granular BLE signals in a
+  trailing 31-night window**. The step's own comment names the binding constraint: *"the intermediate
+  history is built from THIS pass's stashed signals, so the first score requires a wide/full rollup
+  pass covering ≥21 nights of real ring data (owner/device-gated)."* **It is not enough for 21 good
+  nights to exist — they must be present in ONE pass**, so a nightly incremental rollup can never
+  satisfy it however long it runs.
+- **First action:** confirm whether ≥21 qualifying nights exist in the data at all before touching the
+  gate. If they do, this is a *trigger* problem (run the wide pass) and needs no code. If they do not,
+  it is a coverage problem and belongs with Q-510, which found daytime-stress coverage is not
+  persisted anywhere.
+- **Do NOT merge with Q-507.** That is `STRESS_HIGH_DAY_THRESHOLD_MIN` — *daytime* stress minutes
+  driving the session override, which does fire, on the wrong days. This is the separate vendored
+  *cumulative* model. They share a word and nothing else.
+- **Caveats:** a dormant score is not a broken one — the gate may be correctly refusing to score on
+  insufficient data, which is what the first action distinguishes. Do not relax a gate before knowing
+  which.
 
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
