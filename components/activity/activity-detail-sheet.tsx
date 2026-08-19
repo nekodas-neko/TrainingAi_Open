@@ -2,6 +2,7 @@
 
 import { HR_PROFILE_TTL, HR_WINDOW_TTL } from '@trainingai/shared/cache-ttl'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { useEffect, useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -67,7 +68,10 @@ export function ActivityDetailSheet({ log, icon, onOpenChange }: ActivityDetailS
     [log?.routePolyline],
   )
   const [hrData, setHrData] = useState<HrData | null>(null)
-  const [hrProfile, setHrProfile] = useState<{ maxHr: number; restingHr: number } | null>(null)
+  // Zone profile for the time-in-zone breakdown (same source as /api/hr-profile).
+  const hrProfile = useCachedValue<{ maxHr: number; restingHr: number }>(
+    'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
+  )
   const [scrubPoint, setScrubPoint] = useState<{ lat: number; lng: number } | null>(null)
 
   const handleScrub = (tSec: number | null) => {
@@ -96,14 +100,6 @@ export function ActivityDetailSheet({ log, icon, onOpenChange }: ActivityDetailS
       data => { if (data) setHrData(data) },
     ).catch(() => {})
   }, [log?.id])
-
-  // Zone profile for the time-in-zone breakdown (same source as /api/hr-profile).
-  useEffect(() => {
-    cachedFetch<{ maxHr: number; restingHr: number }>(
-      'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
-      p => { if (p) setHrProfile({ maxHr: p.maxHr, restingHr: p.restingHr }) },
-    ).catch(() => {})
-  }, [])
 
   // Colors the map's route line by HR zone instead of one flat color, so you can see where you
   // were pushing harder. Falls back to null (flat line) whenever there isn't enough data to
