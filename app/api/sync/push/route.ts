@@ -5,6 +5,20 @@ import { z } from 'zod';
 import { MutationSchema } from '@trainingai/shared/sync/mutation-schema';
 import { rateLimit } from '@/lib/rate-limit';
 import { reportServerError } from '@/lib/observability';
+import { readJsonLimited } from '@trainingai/shared/http/request-guards';
+
+/**
+ * The envelope caps the batch at 100 mutations, and the largest bounded domain — `workout_log`,
+ * whose every array caps at 20 and every string at 200 — measures 6,010 bytes at its own limits, so
+ * a full batch of the worst case is 0.57 MB. 4 MB is seven times that.
+ *
+ * Stated honestly: 0.57 MB is measured for that one domain. `MutationSchema.payload` is
+ * `z.record(z.string(), z.unknown())`, so the envelope does not bound the other eighteen — their
+ * per-domain schemas do, inside `pushMutations`, after this parse. The headroom is what covers them.
+ * **Do not lower this without re-measuring**: this is the outbox, and a rejected batch is the
+ * worst-case data-loss path in the app.
+ */
+const MAX_BODY_BYTES = 4 * 1024 * 1024;
 
 // Validate the envelope loosely, then each mutation individually. A single
 // malformed mutation must NOT 400 the whole batch: the client pushes in chunks
@@ -24,8 +38,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
-  const body = await req.json().catch(() => null);
-  const parsed = EnvelopeSchema.safeParse(body);
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  }
+  const parsed = EnvelopeSchema.safeParse(read.body);
   if (!parsed.success) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
 
   const valid: z.infer<typeof MutationSchema>[] = [];
