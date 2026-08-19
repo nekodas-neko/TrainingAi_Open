@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One meal type, or a reorder of at most 50 ids (the route's own cap).
+const MAX_BODY_BYTES = 8 * 1024
 
 const MealTypeSchema = z.object({
   name:             z.string().min(1).max(100),
@@ -27,8 +31,13 @@ export async function PATCH(req: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const body = await req.json()
-  const { orderedIds } = body as { orderedIds?: unknown }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { orderedIds } = (read.body ?? {}) as { orderedIds?: unknown }
   if (!Array.isArray(orderedIds) || orderedIds.some(id => typeof id !== 'string')) {
     return NextResponse.json({ error: 'orderedIds must be an array of strings' }, { status: 400 })
   }
@@ -44,7 +53,13 @@ export async function POST(req: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const parsed = MealTypeSchema.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = MealTypeSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

@@ -3,6 +3,10 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { dailyKcalToGoal } from '@trainingai/shared/nutrition/calorie-balance'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Four macro numbers and a calorie total.
+const MAX_BODY_BYTES = 8 * 1024
 
 const TargetsSchema = z.object({
   calories: z.number().min(0).max(20000).optional().nullable(),
@@ -25,7 +29,13 @@ export async function PUT(req: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const parsed = TargetsSchema.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = TargetsSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
