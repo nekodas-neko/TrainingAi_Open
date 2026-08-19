@@ -4,6 +4,10 @@ import { FoodItemFieldsSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One food item: a name, a brand and a dozen macro numbers.
+const MAX_BODY_BYTES = 8 * 1024
 
 // Shared with the offline push branch so the two cannot drift (Q-24 §5).
 const FoodItemSchema = FoodItemFieldsSchema
@@ -22,7 +26,13 @@ export async function POST(req: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const parsed = FoodItemSchema.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = FoodItemSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

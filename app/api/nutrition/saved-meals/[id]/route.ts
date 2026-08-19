@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { SavedMealSchema } from '@trainingai/shared/validators/saved-meal'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Same shape as the create route.
+const MAX_BODY_BYTES = 32 * 1024
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -11,7 +15,13 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
   const { id } = await params
   const badId = invalidUuidResponse(id)
   if (badId) return badId
-  const parsed = SavedMealSchema.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = SavedMealSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

@@ -3,6 +3,10 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import type { DietaryRestriction, UserDietaryRestriction } from '@trainingai/shared/types/nutrition'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A short list of restrictions.
+const MAX_BODY_BYTES = 16 * 1024
 
 export interface DietaryRestrictionsResponse {
   /** The seeded catalogue, for the searchable picker. Global — no personal data. */
@@ -40,8 +44,12 @@ export async function PUT(req: Request) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
   const parsed = PutSchema.safeParse(raw)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
