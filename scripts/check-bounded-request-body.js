@@ -57,6 +57,8 @@ const BASELINE = {
   'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/transition/route.ts': 1,
   'app/api/body-metadata/route.ts': 1,
+  'app/api/daily-digest/route.ts': 1,
+  'app/api/day-checkin/route.ts': 1,
   'app/api/exercises/route.ts': 1,
   'app/api/food-logging-complete/route.ts': 1,
   'app/api/friends/[id]/route.ts': 1,
