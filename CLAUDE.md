@@ -968,6 +968,13 @@ Instead, a local Postgres 16 instance is set up automatically:
   first.** Re-run role-sensitive suites with the TCP form above.
 - Re-running `pnpm db:local` is safe — it's fully idempotent and won't re-seed if
   the `users` table is non-empty.
+- **So a database left alone for days holds history that ends days ago** — the seed dates everything
+  relative to the day it *ran* and nothing back-fills. A test asserting on "today" then fails locally
+  and passes in CI, which provisions a fresh Postgres every run. **A red local run that is green in
+  CI is at least as likely to be an aged fixture as a CI problem.** Check
+  `SELECT max(date) FROM body_metrics WHERE steps IS NOT NULL` first, and re-seed by dropping
+  `/var/lib/postgresql/local-dev` — `pnpm db:local` alone will not. (Cost Q-360, retired 2026-08-19:
+  read as a literal-dates seed, which had been relative since the first commit.)
 - **The Oura rollup tests were marginal by construction — fixed 2026-08-05, and the old advice is
   now narrower.** Those files (`oura-ble-*`, `oura-hrv-median-rollup`, `oura-illness-persist`,
   `sleep-oura-id-user-scope`) run a full `aggregateOuraRawSamples` pass. **Measured alone with zero
