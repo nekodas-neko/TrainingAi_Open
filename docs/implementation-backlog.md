@@ -418,6 +418,27 @@ hand-composed with a flex column and `justify-content: center`, which distribute
 automatically. The production renderer computes absolute offsets from both margins instead. The bug
 has always been in the renderer; the prototype simply used a layout engine that cannot express it.
 
+**A second, horizontal half of the same complaint — owner, 2026-08-19:** *"Id rather it look more
+like that with the number for calories centered with small text KCAL next to it."* The calorie
+figure is **off the label's axis**, and it is one expression:
+```js
+const startX = cx - (numW + 3 + unitW) / 2      // meal-label-render.ts:547
+```
+That centres **number + gap + unit as one run**, so the numeral's own midpoint sits left of `cx` by
+`(3 + unitW) / 2` — for `inlineCentred` (`macroSize 7.5`, `letterSpacing 0.12em`) roughly **3 mm
+left of centre on a 50 mm label**. Every other element on the label is symmetric about `cx`, which
+is what makes the number read as misaligned rather than merely offset.
+- **Fix: centre the numeral, let the unit overhang.** `startX = cx - numW / 2`, with `KCAL` drawn at
+  `startX + numW + 3` as it is now. Nothing else changes — same sizes, same gap, same tracking.
+- **State the trade rather than discovering it:** the composition stops being symmetric about the
+  axis, because `KCAL` hangs to the right. That is the right call for a figure whose whole job is to
+  be read at a glance, and it is what the reviewed prototype did.
+- **Bound the overhang.** Check the widest realistic figure — a four-digit batch total on a
+  multi-portion meal — so `startX + numW + 3 + unitW` never crosses the right margin. If it can,
+  fall back to the run-centred form for that case rather than letting the unit clip.
+- **`band` uses a different calorie path** (`:422`, `L + calW + 4`, left-aligned in the reversed
+  header) and is **not** affected. Do not "fix" it to match.
+
 - **⚠ Do NOT absorb the slack into the code.** It is the obvious alternative and it is wrong: the
   slack varies with the ingredient count (8.6 mm down to 2.2 mm), so a code sized to fill it would
   print at a **different physical size per meal** — and the sheet's *"Code is 18.5 mm at 0.56 mm per
