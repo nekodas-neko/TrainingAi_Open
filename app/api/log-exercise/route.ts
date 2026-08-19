@@ -6,6 +6,11 @@ import { rateLimit } from "@/lib/rate-limit";
 import { LogExercisePayloadSchema, logExerciseFromPayload } from "@trainingai/shared/workout/log-exercise";
 import { reportServerError } from "@/lib/observability";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
+import { readJsonLimited } from "@trainingai/shared/http/request-guards";
+
+// Measured against LogExercisePayloadSchema at its own limits — every array caps at 20 and every
+// string at 200 — a maximal payload is 6,010 bytes. 64 KB is ten times that.
+const MAX_BODY_BYTES = 64 * 1024;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -15,14 +20,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === "too_large"
+      ? NextResponse.json({ error: "Request too large" }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
 
-  const parsed = LogExercisePayloadSchema.safeParse(rawBody);
+  const parsed = LogExercisePayloadSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request", details: parsed.error.flatten() }, { status: 400 });
   }

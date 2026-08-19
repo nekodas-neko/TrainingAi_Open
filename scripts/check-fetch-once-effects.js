@@ -33,12 +33,12 @@ const DIRS = ['app', 'components', 'lib'];
 // errors happened to cancel to within one. The count here is from the pattern below, which has been
 // mutation-checked in both directions.
 const BASELINE = {
-  // ── CAN BITE: permanently mounted. 12 sites, down from 19 (Q-359 slice 1 converted six files).
+  // ── CAN BITE: permanently mounted. 8 sites, down from 19 (slice 1: six files; slice 2: four).
   //
-  // What is left is the four tab-screen orchestrators — `session-select-content` (4),
-  // `health-content` (2), `nutrition-content` (2), `workout-select-content` (1) — plus the two
-  // sheets the tab screens mount with a null prop. Slice 1 deliberately took the leaf cards first:
-  // they own one key each and convert without touching screen state, which the orchestrators do not.
+  // What is left is only the tab-screen orchestrators. They are the hard ones and were left for
+  // last on purpose: each seeds four to eight keys inside one shared `useLayoutEffect` and feeds
+  // screen state that other effects also write, so a conversion there is a state refactor rather
+  // than a swap.
   //
   // **⚠ This grouping has now been wrong twice, and the second one is the more instructive.** The
   // first correction was 14 → 19 (sheets do not unmount here). The second: `cardio/trends-section`
@@ -58,10 +58,6 @@ const BASELINE = {
   'app/session-select/session-select-content.tsx': 4,
   'app/health/health-content.tsx': 2,
   'app/nutrition/nutrition-content.tsx': 2,
-  'app/workout-select/workout-select-content.tsx': 1,
-  'components/activity/exercise-review-sheet.tsx': 1,        // Home, mounted with a null sessionId
-  'components/health/training-stress-line.tsx': 1,           // Health, via training-load-card
-  'components/activity/activity-detail-sheet.tsx': 1,        // Health, mounted with a null log
 
   // ── Deliberately fetch-once. 1 site.
   // `sync-provider` warms the cache on mount by design; it is not a reader, so converting it would
