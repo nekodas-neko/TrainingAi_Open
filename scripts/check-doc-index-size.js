@@ -826,7 +826,13 @@ const BASELINE = {
   // shapes, so a faithful extraction needs a variant-heavy wrapper, and unifying them properly is a
   // visual change the entry itself forbids. The lines are the per-site evidence; without it the
   // correction is an opinion and the entry gets attempted as written a second time.
-  'docs/implementation-backlog.md': 10422,
+  // Raised 2026-08-19 (Lane B, Q-359 ratchet), recomputed from the merged file: the entry stays —
+  // the ratchet ships, the sweep does not. The added lines are two corrections a struck entry would
+  // have destroyed: the count was one low (a scan that missed single-line effects), and the
+  // can-bite grouping was 14 when it is 19, because the tab screens mount their sheets
+  // unconditionally with a null prop. "Judge by mount site, not filename" is the reusable half, and
+  // the error ran in the reassuring direction.
+  'docs/implementation-backlog.md': 10436,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

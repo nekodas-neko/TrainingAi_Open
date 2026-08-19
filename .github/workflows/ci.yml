@@ -303,6 +303,9 @@ jobs:
       - name: memo() call sites pass stable props
         run: node scripts/check-memo-prop-stability.js
 
+      - name: No new fetch-once effects
+        run: node scripts/check-fetch-once-effects.js
+
       - name: Non-strict request schemas do not increase
         run: node scripts/check-strict-request-schemas.js
 
