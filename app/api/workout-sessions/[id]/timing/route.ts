@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { setWorkSec, transitionSecForEquipment } from '@trainingai/shared/workout/duration-model'
 import { errorLog } from '@trainingai/shared/logger'
 import { reportServerError } from '@/lib/observability'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export interface ExerciseTiming {
   name: string
@@ -60,6 +61,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     const { id: sessionId } = await params
+    const badId = invalidUuidResponse(sessionId)
+    if (badId) return badId
     const repo = await getRepository()
     const ws = await repo.getWorkoutSessionDetail(userId, sessionId)
     if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })

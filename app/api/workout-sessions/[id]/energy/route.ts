@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { errorLog } from '@trainingai/shared/logger'
 import { estWorkoutKcal, intensityFromRpe, metForActivity, isKnownActivity, DEFAULT_ACTIVITY_ID, type Sex } from '@trainingai/shared/health/workout-energy'
 import { reportServerError } from '@/lib/observability'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // Estimated per-workout active energy via Oura's MET fallback (Phase A). Deterministic —
 // duration + intensity (RPE) + the user's profile → kcal. `durationMin`/`rpe` come from the
@@ -21,6 +22,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     }
 
     const { id: sessionId } = await params
+    const badId = invalidUuidResponse(sessionId)
+    if (badId) return badId
     const repo = await getRepository()
 
     const ws = await repo.getWorkoutSessionDetail(userId, sessionId)

@@ -5,6 +5,7 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { generatePrescriptionForSession } from '@trainingai/shared/ai-periodization/generate-prescription'
 import { z } from 'zod'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export const maxDuration = 30
 
@@ -31,6 +32,8 @@ export async function POST(
   }
 
   const { sessionId: programSessionId } = await params
+  const badId = invalidUuidResponse(programSessionId)
+  if (badId) return badId
   // excludeSessionId: the just-completed workout session id, when this call is fired from
   // complete-workout's post-completion hook — excluded from the hoursSinceLastSession gap so
   // a fresh completion can't self-trigger the emergency deload (W5 §4.2). Absent for

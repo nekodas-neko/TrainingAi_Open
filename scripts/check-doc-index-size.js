@@ -859,13 +859,13 @@ const BASELINE = {
   // record, which one print could falsify. Q-358's entry goes with it: it was built rather than
   // deferred because Q-411 resized every code and the fractional-grid flake it describes came
   // straight back, and a decode E2E that passes on a coin flip cannot gate the change that caused it.
-  // Raised 2026-08-19 (Lane B, Q-359 slice 1 shipped): the entry stays in the queue — 29 of 36
-  // sites remain — and gains what the slice learned. Those lines are the reason the next slice does
-  // not repeat it: the `today` option and why the sweep needed it, the three sibling BLE listeners
-  // that should go the same way, the grouping error, and the one test that will red when the next
-  // three files convert. An entry that only said "6 of 36 done" would cost the next session all of
-  // that.
-  'docs/implementation-backlog.md': 10546,
+  // Raised 2026-08-19 (Lane B, Q-359 slice 1 shipped), recomputed from the merged file: the entry
+  // stays in the queue — 29 of 36 sites remain — and gains what the slice learned. Those lines are
+  // the reason the next slice does not repeat it: the `today` option and why the sweep needed it,
+  // the three sibling BLE listeners that should go the same way, the grouping error, and the one
+  // test that will red when the next three files convert. An entry that only said "6 of 36 done"
+  // would cost the next session all of that.
+  'docs/implementation-backlog.md': 10644,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

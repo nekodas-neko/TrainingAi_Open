@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
+import { refusalResponse, isRefusal, invalidUuidResponse } from '@/lib/api/route-errors'
 import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
@@ -15,6 +15,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const body = await req.json() as { name: string; phases: EditablePhase[] }
 
   const repo = await getRepository()
@@ -57,6 +59,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const repo = await getRepository()
   try {
     await repo.deletePhaseSet(id, userId)

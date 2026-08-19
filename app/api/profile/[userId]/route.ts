@@ -6,12 +6,15 @@ import { sql, eq } from 'drizzle-orm'
 import * as s from '@/lib/data/postgres/schema'
 import { computeAchievements } from '@/lib/achievements'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export async function GET(_req: Request, { params }: { params: Promise<{ userId: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { userId } = await params
+  const badId = invalidUuidResponse(userId)
+  if (badId) return badId
   const repo = await getRepositoryAsync()
 
   // Verify friendship (or self)

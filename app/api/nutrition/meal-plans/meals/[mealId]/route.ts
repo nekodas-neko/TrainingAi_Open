@@ -5,6 +5,7 @@ import { getRepository } from '@/lib/data'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // Whitelisted, same reasoning as the plan PATCH. The repository proves ownership by joining this
 // meal's variant back to its plan before writing — the meal id alone says nothing about who owns it.
@@ -35,6 +36,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { mealId } = await params
+  const badId = invalidUuidResponse(mealId)
+  if (badId) return badId
 
   let raw: unknown
   try { raw = await req.json() }

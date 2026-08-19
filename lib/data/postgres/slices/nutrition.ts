@@ -1,5 +1,5 @@
 import { eq, and, inArray, gte, lte, asc, desc, sql, isNull } from 'drizzle-orm'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { randomUUID } from 'node:crypto'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -75,6 +75,11 @@ export async function createMealType(db: Db, userId: string, data: Omit<MealType
 }
 
 export async function updateMealType(db: Db, id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType> {
+  // Every field of the PUT schema is optional, so `{}` parses — and Drizzle's `.set({})` throws
+  // "No values to set", which the route answered as a 500 on an otherwise valid request. Found by
+  // Q-482's probe, which sends `{}`; every sibling PATCH route already handled this, so it is the
+  // one route, not a class. Guarded here rather than at the route so a second caller cannot repeat it.
+  if (Object.keys(data).length === 0) throw new UserFacingError('No fields to update', 400)
   const [r] = await db.update(s.mealTypes)
     .set(data)
     .where(and(eq(s.mealTypes.id, id), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))

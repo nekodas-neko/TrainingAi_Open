@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { activityImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { z } from 'zod'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // Health-Connect backfill for logs saved without HR/distance/calories (lib/health-connect-sync.ts
 // enrichActivityLogs). The underlying UPDATE COALESCEs, so this can only ever FILL a null — but it
@@ -33,9 +34,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const { id } = await params
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
-  }
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   const repo = await getRepository()
   const existing = await repo.getActivityLogById(userId, id)

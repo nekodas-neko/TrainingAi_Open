@@ -435,6 +435,157 @@ in the same breath that the print test is now unblocked — all three answers co
 a ruler.
 
 
+### [nutrition] Q-413 — `logged_at` records when you pressed the button, not when you ate; resolve it against the meal window
+
+- **Branch:** `feat/resolve-eaten-at`
+- **Added:** 2026-08-19 · owner, specifying the rule while reviewing Q-412
+- **Owner's words:** *"for time 'eaten' lets use the same logic we have; if its logged within the
+  time bucket - then record that as the time. If its added outside the window; then choose the
+  midpoint of the window and record that as the time. This way we can also build up a calories x
+  time on a graph which will be nice."*
+- **Lane A** — a shared formula plus the write paths and a backfill. **Build it before Q-412's
+  reassign**, which has to call the same function; see the cross-reference at the end.
+
+**What is stored today.** `food_logs.logged_at` is `timestamp notNull().defaultNow()`
+(`schema.ts:579`), and nothing computes it — `createFoodLog` passes through a client-supplied value
+when one exists (offline replay) and otherwise takes the database default. So the column means
+**"when the row was created"**, which is only accidentally the same as when the food was eaten.
+- Log yesterday's dinner over breakfast the next morning and the row says 8 am, on yesterday's
+  `date`. The timestamp and the date disagree, and the timestamp is the wrong one.
+- That is not an edge case. Back-filling a missed day is the single most common way this app's food
+  log gets used after the fact.
+
+**The rule, stated precisely.** For a log on local date `D`, assigned to meal type `M` with window
+`[M.timeStartHour, M.timeEndHour)`, created at instant `T`:
+- If `T` falls on `D` **and** its hour is inside `M`'s window → **keep `T`**. The user logged it as
+  they ate it and the real time is better than any derived one.
+- Otherwise → **the midpoint of `M`'s window on date `D`**: `(start + end) / 2` hours, so Lunch
+  12–15h stamps 13:30 and Pre Workout 6–10h stamps 08:00.
+
+**Four details that decide whether this is right or subtly wrong.**
+1. **The midpoint is computed in the USER's timezone on `D`, never device-local and never UTC.**
+   This is the repo's most-repeated bug class and the exact shape it takes: `setHours` on a `Date`
+   resolves in the device's zone, so the same log stamps a different instant on a phone set to
+   another country. Use the `packages/shared/src/date-utils.ts` helpers and thread
+   `session.user.timezone` through. Note `lib/meal-reminders.ts:39-42` already does the
+   `setHours` thing — it is defensible there because a reminder fires on the device, but **do not
+   copy that pattern into this**, and do not "fix" it in the same PR either.
+2. **Anchor to the log's `date`, not to "today".** This is what makes back-dating work and is the
+   entire value of the change. Reading `todayInTz()` here would reproduce the bug in new clothes.
+3. **Define the wrapping window before writing the arithmetic.** If `timeEndHour <= timeStartHour`
+   the window crosses midnight (22→2) and the naive midpoint lands at noon — the opposite side of
+   the clock from the truth. Either compute it as `(start + (end + 24)) / 2 mod 24`, or reject
+   wrapping windows in the meal-type editor. **Say which**, and cover it with a test either way.
+   `timeEndHour = 24` is the ordinary end-of-day case and is not a wrap: 21–24 → 22:30.
+4. **One formula, one place.** This is called from the web route, the `pushMutations` branch, the
+   local write, and Q-412's reassign. It goes in `packages/shared` as something like
+   `resolveEatenAt({ date, window, at, tz })` and is imported everywhere, per the standing rule.
+   Four copies of a midpoint calculation is how the weekly-cadence formula ended up with two
+   different semantics.
+
+**Existing rows — recommendation, and it is deliberately conservative.** A calories-over-time graph
+is only interesting with history behind it, so the stored values matter. **Do not blanket-rewrite
+`logged_at`**: for rows where the user logged as they ate, the stored instant is the *better* datum
+and overwriting it with a midpoint destroys real information. Ship a one-off idempotent migration
+that recomputes **only rows whose stored `logged_at` falls on a different local date than the row's
+`date`** — those are unambiguously "logged later" and carry no information about when the food was
+eaten. Leave everything else untouched. If a broader backfill is wanted later it can be a separate,
+explicit decision.
+
+**What this unlocks, and what is NOT in this entry.** The calories × time graph the owner is after
+becomes possible once the column means what its name says — but it is a **new surface** and is not
+in scope here. File it separately once this lands; building the chart against today's column would
+plot when the user reached for their phone.
+
+**Cross-reference — Q-412 depends on this.** Reassigning a log to a different meal type has to
+re-run the same rule against the **new** window: if the stored time is inside it, keep it; if not,
+move it to the new midpoint. Otherwise a 3 pm snack reassigned to Lunch keeps a 15:00 stamp that
+sits outside Lunch's 12–15h window, and the graph inherits the inconsistency the reassign was
+supposed to tidy. **Land this first**, then Q-412 calls it.
+
+- **Verification.** Unit-test the resolver directly and cover: inside-window, outside-window,
+  back-dated (T on a different day than D), `timeEndHour = 24`, a wrapping window, and **a
+  fixed-offset timezone whose local time is currently near midnight** — per the standing rule, a
+  timezone regression test must not wait for the clock to reach the failing window, so pick an
+  `Etc/GMT±N` that is near 01:00 *now* and run the case there. Then confirm end to end that a log
+  created for yesterday from today's session stores yesterday's midpoint, not this morning.
+
+### [nutrition] Q-412 — "reassign them first" instructs the user to do something the app cannot do
+
+- **Branch:** `feat/meal-type-reassign`
+- **Added:** 2026-08-19 · owner, from Nutrition Settings on v1.325.x, with a screenshot
+- **Owner's words:** *"how would I delete meals? say I wanted to move back to 3 a day or so. it
+  seems I cant if there are meals assigned"*
+- **Lane A** — the fix is a new write path (`app/api/**` + repo slice + the sync chain). The dialog
+  that calls it is Lane B and is small; land the endpoint first.
+- **Placement:** medium-high. It is not a data-loss bug, but it is a **dead end with no exit**, and
+  the only way out a user can find on their own destroys history.
+
+**The trap, end to end.**
+1. `deleteMealType` (`lib/data/postgres/slices/nutrition.ts:100`) probes `food_logs` for any live row
+   pointing at the meal type and throws `MEAL_TYPE_HAS_LOGS` if one exists.
+2. The route turns that into a 409 reading **"Meal type has food log entries — reassign them
+   first"** (`app/api/nutrition/meal-types/[id]/route.ts:45`).
+3. **There is no reassign, anywhere.** `PATCH /api/nutrition/food-logs/[id]` accepts
+   `quantityMultiplier` and nothing else — `meal_type_id` is not a settable field on any route, and
+   no UI offers to move a logged item between meal types.
+
+So the message names the one action that would clear the block and the app has never implemented it.
+**The only escape a user can actually perform is deleting every food log ever recorded against that
+meal type**, which throws away nutrition history to change a setting. The owner's case — dropping
+from five meal types back to three — is the ordinary case, not an edge one.
+
+**What is NOT the problem, so nobody re-derives it.** This is not a foreign-key limitation and the
+guard is not protecting the database. `meal_types` already soft-deletes (`deleted_at`, Q-179), and
+that function's own docstring says so: *"Soft-deleting sidesteps the RESTRICT entirely: the
+soft-deleted logs keep pointing at a row that still exists."* The row survives, so historical logs
+would still resolve their meal type.
+
+**What the guard IS protecting is the day view, and this is the constraint the fix has to satisfy.**
+`listMealTypes` filters `deleted_at IS NULL` (`:65-70`) and `nutrition-content.tsx:591` renders
+`mealTypes.map(...)`. Soft-delete a type that has logs and **those logs stop being rendered at all** —
+they still exist, still count toward the day's totals, and have no section to appear under. An
+invisible-but-counted food log is worse than the dead end, which is presumably why the probe was
+written this way.
+
+**Recommendation — build the reassign the message already promises.**
+- **The delete flow becomes a choice, not an error.** Count the affected logs first and say so:
+  *"Afternoon Meal has 34 entries. Move them to…"* with a picker of the remaining live meal types,
+  and a secondary *"Delete them instead"*. A 409 that names a number and offers the fix is a
+  different product from one that names a number and stops.
+- **One new endpoint**: bulk `UPDATE food_logs SET meal_type_id = $new WHERE meal_type_id = $old AND
+  user_id = $user`, then the existing soft-delete, **in one transaction** — a partial reassign that
+  then fails the delete leaves the user halfway with no way back. Validate the target belongs to the
+  user and is not the type being deleted.
+- **It rewrites history and that is the intent, but say it in the dialog.** A 3 pm snack reassigned
+  to Lunch will read as Lunch on every past day. For "I want three meals a day from now on" that is
+  what the owner wants; it should still not be a surprise.
+- **⚠ The reassign must also re-resolve `logged_at` — see Q-413, which should land first.** A log
+  moved into Lunch keeps its old 15:00 stamp, which sits outside Lunch's 12–15h window and leaves
+  the very inconsistency the move was meant to tidy. Call Q-413's shared resolver against the
+  **new** window: inside it, keep the time; outside it, take the new window's midpoint.
+- **`food_logs` is an offline-first domain, so this is a full sync chain, not one UPDATE** — the
+  outbox mutation, the `pushMutations` branch, `getSyncDelta` and the `applyDelta` mapping all need
+  it, per the standing rule. A bulk row-rewrite is also the shape most likely to conflict with a
+  device that has unsynced edits: **gate the local upsert on `sync_status === 'synced'`** so a pull
+  cannot clobber a pending local edit, exactly as the other branches do.
+
+**The alternative, and why it loses.** Let the soft-delete through and render orphaned logs under
+their archived meal type on days that have them, labelled *Archived*. It preserves history perfectly
+and needs no data movement — but it leaves a ghost section on old days forever, complicates the day
+query, and does not give the owner what he asked for, which is a tidy three-meal day going forward.
+Worth reaching for only if the reassign proves harder than it looks.
+
+- **A smaller thing worth fixing in the same PR:** the manager's delete button gives no warning
+  before the attempt. It fires the DELETE, gets a 409, and shows a toast. Fetch the count when the
+  sheet opens and disable-with-explanation, or open the move dialog directly — a button that can
+  only fail is worse than one that explains itself.
+- **Verification.** Reassign a meal type with logs across several days, then confirm on the day view
+  that the entries appear under the new type with the same calories, that the day total is
+  unchanged, and that the old type is gone from the picker. Then **verify on the APK** — this is an
+  offline-first domain and the local mirror is where the sync half fails silently. Prove the reassign
+  survives an app restart with the network off.
+
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
 - **Branch:** `chore/adopt-use-cached-value`
@@ -1663,59 +1814,6 @@ the H10 at home — which is the walk in the screenshot that started this.
   because the payload was one repeated character and TOAST compressed it almost perfectly. Real text
   would not. The defensible statement is that the **transfer and parse** cost was unbounded.
 - **Lane A owns this** (`app/api/**`, `scripts/`).
-
-### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
-
-- **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events`. A
-  malformed id has not reached production, which matches how this was filed (*"not a security hole"*).
-- **Branch:** `fix/dynamic-route-uuid-guard`
-- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
-  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
-- **Placement:** mid. Not a security hole (see below) — an error-shape and input-validation gap, with
-  a cheap shared fix and an obvious ratchet.
-- **Method.** All 30 dynamic route files, every method, called twice: once with a
-  well-formed-but-nonexistent UUID (**the control**) and once with `not-a-uuid`. 39 pairs. **22
-  returned 5xx**; one of those (`PUT /api/nutrition/meal-types/[id]`) also 500s on the control and is
-  already **Q-463**, leaving **21 new pairs across 14 routes**:
-
-  | Route | Methods 500ing | Control answers |
-  |---|---|---|
-  | `/api/coach/apply/[id]/undo` | POST | 404 |
-  | `/api/friends/[id]` | DELETE | 204 |
-  | `/api/injuries/[id]` | PATCH, DELETE | 404 / 200 |
-  | `/api/nutrition/food-logs/[id]` | DELETE | 200 |
-  | `/api/nutrition/meal-plans/[id]` | GET, PATCH, DELETE | 404 |
-  | `/api/nutrition/meal-plans/[id]/review` | POST | 404 |
-  | `/api/nutrition/meal-plans/[id]/structure` | PATCH | 404 |
-  | `/api/nutrition/meal-plans/meals/[mealId]` | PATCH | 404 |
-  | `/api/nutrition/meal-types/[id]` | DELETE | 200 |
-  | `/api/nutrition/saved-meals/[id]` | DELETE | 200 |
-  | `/api/supplements/[id]` | PATCH, DELETE | 404 / 200 |
-  | `/api/supplements/[id]/log` | POST, DELETE | 404 / 200 |
-  | `/api/workout-review/session/[sessionId]` | POST | 400 |
-  | `/api/workout-sessions/[id]/{energy,recap,timing}` | GET ×3 | 404 |
-
-- **The control is what makes this a finding**: every one of these answers a well-formed missing id
-  correctly. Only the malformed id breaks them, so it is a missing input guard, not a broken route.
-  Postgres rejects the cast with `22P02 invalid_text_representation`.
-- **Only 2 of the 30 dynamic route files validate the id as a UUID at all.** The rest do
-  `const { id } = await params` and pass the string to the repository.
-- **⚠️ Reading the evidence:** a **500 is conclusive** (the request reached the database). A **400 is
-  not** — the probe sent `{}`, so a body-bearing method may have failed its body schema before the id
-  was used. The table above lists only 500s, so every row is conclusive; do **not** read the routes
-  absent from it as verified-correct unless they are GET or DELETE.
-- **Not a security hole.** A malformed id cannot read anyone's data — Postgres refuses the cast before
-  any row is touched and every route is `auth()`-scoped. It becomes a disclosure problem only where it
-  meets **Q-483**, which is why that one is placed above this.
-- **Fix shape:** a shared `parseUuidParam(id)` returning 400 on failure, applied at the top of each
-  dynamic route — the same shape as `normalizeDateParam` for date params, which is this repo's own
-  precedent for exactly this class. Add a Custom Rules step requiring it in any new
-  `app/api/**/[id]` route so the count cannot grow back; `CLAUDE.md` already argues that for date
-  params (*"new routes get the guard at creation"*).
-- **Lane A owns this** (`app/api/**`).
-- **Observability is fine and needs no work:** every one of these reached `error_events` tagged
-  `[pg 22P02]` — the caught ones via `reportServerError`, the bodiless
-  `GET /api/nutrition/meal-plans/[id]` via `onRequestError`.
 
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
