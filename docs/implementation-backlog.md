@@ -5573,11 +5573,14 @@ session working from a temporarily restored copy.
 - **`adaptive-tdee.ts` already anticipated this.** Its header warns an ungated estimate *"would tell
   the user their maintenance is 1200 kcal — actively harmful advice"*. This measures whether the gates
   hold. **They hold 75% of the time; the lowest value that gets through is 1,052 kcal.**
-- **Input condition (not a defect, nothing filed):** the food log captures **~45%** of actual intake —
+- **Input condition (not a defect, nothing filed):** the food log captures **~50%** of actual intake —
   44 logged days of 110, mean **1,223 kcal**, 43% of logged days under 1,200, 4.8 entries/day. Against
   75 weigh-ins over 109 days (slope **+8.0 g/day** = **+62 kcal/day** balance) and a Cunningham BMR of
-  **1,698** × 1.55 = predicted TDEE **2,632**, implied actual intake is **~2,694**. Taking the log at
+  **1,547** × 1.55 = predicted TDEE **2,397**, implied actual intake is **~2,459**. Taking the log at
   face value implies maintenance **1,161 — below BMR**, which is arithmetic proof of under-logging.
+  *(Corrected 2026-08-19: first filed as 1,698 / 2,632 / 2,694 / 45%, computed from the textbook
+  Cunningham `500 + 22×LBM` **from memory**. The app uses `cunninghamBmr = ffm×21.6 + 370`
+  (`body-composition.ts`), matched to Oura's `atlas`. Conclusion unchanged; magnitudes overstated.)*
 - **Replay of the shipped gates**, every rolling window:
 
   | outcome | 14-day (97) | 28-day (83) |
@@ -5593,17 +5596,19 @@ session working from a temporarily restored copy.
 - **The values are also unstable** — 1,052–2,219 for the same person within weeks (a 1,167 kcal range).
 - **Why the coverage gates cannot catch it:** `MIN_LOGGED_FRACTION` counts **days carrying a log**, not
   whether each day's log is **complete**. A day with only breakfast counts as fully logged — exactly
-  this owner's pattern — so a 45%-complete record sails through a 70%-coverage gate. **The gates
+  this owner's pattern — so a 50%-complete record sails through a 70%-coverage gate. **The gates
   measure the wrong kind of incompleteness.**
 - **It reaches the user's target.** `TdeeAdaptationCard` writes the accepted value through
   `PUT /api/nutrition/targets`, which its own docstring calls the source of truth for the daily target,
   mirroring into `users.calorie_goal`. A 1,052 maintenance is one tap from becoming the calorie goal of
-  someone whose BMR is 1,698.
+  someone whose BMR is 1,547.
 - **First action: replace `MIN_PLAUSIBLE_MAINTENANCE` with the user's own BMR.** Maintenance below BMR
   is impossible *by definition*, not implausible by taste, and `cunninghamBmr` is already imported in
-  the same package. Measured: 14-day passing 23 → **11**, range **1,902–2,219**; 28-day 22 → **10**,
-  range **1,707–1,889**. Every harmful value blocked.
-- **It makes the estimate SAFE, not CORRECT.** Survivors still sit ~500 kcal under the formula's 2,632
+  the same package. Measured **at the app's own BMR of 1,547**: 14-day passing 23 → **13**, range
+  **1,592–2,219**; 28-day 22 → **13**, range **1,565–1,889**. Every harmful value blocked.
+  *(Corrected 2026-08-19 from a 1,698 floor, which blocked more than the app's BMR would — 11 and 10
+  passing. The proposal is unaffected; it simply blocks fewer windows than first stated.)*
+- **It makes the estimate SAFE, not CORRECT.** Survivors still sit well under the formula's 2,397
   — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
 - **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of
   windows and structurally cannot see within-day incompleteness, so raising it drops good windows and
