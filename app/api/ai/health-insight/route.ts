@@ -17,6 +17,10 @@ import { getDailyGoals } from '@trainingai/shared/health/daily-goals'
 import { computeVolumeAcwr } from '@trainingai/shared/ai-periodization/acwr'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { metric, splitMeasured, buildPrompt, type MetricLine } from './prompt'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// An enum, a date and a boolean.
+const MAX_BODY_BYTES = 4 * 1024
 
 const bodySchema = z.object({
   section: z.enum(['readiness', 'sleep', 'heart-rate', 'activity']),
@@ -37,7 +41,13 @@ export async function POST(req: Request) {
 
   let body: z.infer<typeof bodySchema>
   try {
-    body = bodySchema.parse(await req.json())
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok) {
+      return read.reason === 'too_large'
+        ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+        : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    }
+    body = bodySchema.parse(read.body)
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 })
   }
