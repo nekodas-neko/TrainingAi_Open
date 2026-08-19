@@ -5641,6 +5641,15 @@ session working from a temporarily restored copy.
   **1,592–2,219**; 28-day 22 → **13**, range **1,565–1,889**. Every harmful value blocked.
   *(Corrected 2026-08-19 from a 1,698 floor, which blocked more than the app's BMR would — 11 and 10
   passing. The proposal is unaffected; it simply blocks fewer windows than first stated.)*
+- **✚ ADDENDUM 2026-08-19 — the BMR is already persisted, so read it rather than recompute.**
+  `body_comp.bmr_kcal` carries the day's own BMR on **71 of 96** rows, computed by the same
+  `cunninghamBmr`. Reading it makes the floor **the day's** BMR rather than a window mean (the stored
+  series moves with weight/body fat — 1,522 and 1,524 on consecutive days) and **cannot drift from what
+  the body-composition card renders**, because it is the same number. **Fallback matters:** 25 of 96
+  rows have no `body_comp` (no body-fat reading, and `bodyComposition()` returns null rather than
+  fabricating) — on those days fall back to the **most recent snapshot**, never to the universal 1,000.
+  A stale BMR is far closer to the truth than a number ~500 kcal below it.
+  [`docs/reviews/2026-08-19-body-derived-scores-closeout.md`](reviews/2026-08-19-body-derived-scores-closeout.md) §3
 - **It makes the estimate SAFE, not CORRECT.** Survivors still sit well under the formula's 2,397
   — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
 - **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of
