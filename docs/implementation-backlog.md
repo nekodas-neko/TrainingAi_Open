@@ -360,12 +360,23 @@ sequential.
 - **Branch:** `feat/combine-energy-and-macro-widgets`
 - **Added:** 2026-08-18 · owner, on the Nutrition tab: *"why are these values different? should it not
   match the nutrition goal? I was hopping we could combine these 2 widgets/displays"*
-- **⚠ SPLIT ACROSS LANES — check before starting.** The bar swap and the suppression rule in
-  finding 3 are **Lane B** (components only). Retiring `ACTIVITY_MULTIPLIERS` as a second TDEE
-  model touches `packages/shared/src/nutrition/goal-recommendation.ts`, which is **Lane A's**
-  under §3 — a Lane B session must hand that half over rather than reach into it. The two halves
-  are independent: the swap can land first, and the formula change does not need the UI.
-  No schema, no route, no migration either way.
+- **✅ THE LANE B HALF SHIPPED 2026-08-19 (v1.325.2). WHAT REMAINS IS LANE A'S, AND IT IS THE
+  LOAD-BEARING HALF.** Done: the zone bar replaces Home's gradient progress fill, both surfaces draw
+  it from **one** `CalorieZoneBar` component, each carries the "base + earned from movement" line,
+  and the Calorie Nudge's gate is split so the *explanation* shows on a formula-derived maintenance
+  while the *action* still waits for calibration.
+  [`Journal`](overview/entries/2026-08-19-calorie-zone-bar.md).
+  **Still open — Lane A:** points 1 and 2 below, retiring `ACTIVITY_MULTIPLIERS` in
+  `packages/shared/src/nutrition/goal-recommendation.ts` so there is one TDEE model. **Until that
+  lands the two numbers still disagree** — this PR makes the disagreement legible and says why, it
+  does not remove it. When Lane A is in that file, move `components/nutrition/budget-provenance.ts`
+  into `calorie-balance.ts` beside `computeCalorieBalance`; it is there only to avoid colliding with
+  this work.
+- **⚠ SPLIT ACROSS LANES.** The bar swap and the suppression rule in finding 3 were **Lane B**
+  (components only). Retiring `ACTIVITY_MULTIPLIERS` touches
+  `packages/shared/src/nutrition/goal-recommendation.ts`, which is **Lane A's** under §3 — a Lane B
+  session must hand that half over rather than reach into it. The two halves are independent, which
+  is why the swap landed first. No schema, no route, no migration either way.
 
 **Both numbers are correct and they measure different things.** Traced, not guessed
 (`lib/health/energy-balance-service.ts:180-181`):
@@ -618,6 +629,38 @@ assumed complete — the failure mode has to be "the estimate waits" rather than
 quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
 honest one, so the estimate starts from days marked after this ships and the counter shows that
 plainly.
+
+### [nutrition][app-shell] Q-406 — extract `food-row.tsx` first, so the rework has somewhere to land
+
+- **Branch:** `refactor/nutrition-food-row`
+- **Added:** 2026-08-18, split out of **Q-395** so it can start immediately and in parallel rather than
+  waiting for the rework's turn in the queue.
+- **Lane B.** Pure extraction — no behaviour change, no schema, no route.
+
+**Why this is its own entry.** Q-395 cannot start where it stands: both files it lands in are on the
+800-line ceiling (`app/nutrition/nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at
+**793**, neither grandfathered), so **one added line fails Custom Rules**. Every screen in the rework
+also needs the same row component. So the extraction is both the unblocker and the largest single
+chunk of shared work — and unlike the rest of Q-395 it needs no design decisions, which means it can
+run while the earlier queue items are still being worked.
+
+**What to build.** One component, `components/nutrition/food-row.tsx`, with the shape used by all six
+drawn screens: optional thumbnail · name · grey secondary line of *what and how much* · calories
+right-aligned in a fixed column · optional chevron. Props are **scalars**, not objects — the row
+renders inside `.map()` where hooks are unavailable, and an inline object literal at the call site
+silently defeats `React.memo` (`meal-macro-bars.tsx` is the reference this repo already keeps for
+exactly that reason).
+
+**Then convert the existing call sites, one per commit.** A food currently reads four different ways —
+diary, search, saved meal, builder. Converting them is what takes both landing files back under the
+line and makes the rest of Q-395 additive rather than blocked.
+
+- **⚠ Behaviour must not change in this entry.** It is an extraction. Any visual difference belongs to
+  Q-395, and mixing them makes the diff unreviewable and the regression unattributable.
+- **Done when:** `node scripts/check-component-size.js` reports both files under 800 with **no new
+  BASELINE rows** (the baseline is shrink-only — adding a row here would be the opposite of the point),
+  and the four call sites render identically to before.
+- **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
 
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
@@ -5617,6 +5660,15 @@ session working from a temporarily restored copy.
   **1,592–2,219**; 28-day 22 → **13**, range **1,565–1,889**. Every harmful value blocked.
   *(Corrected 2026-08-19 from a 1,698 floor, which blocked more than the app's BMR would — 11 and 10
   passing. The proposal is unaffected; it simply blocks fewer windows than first stated.)*
+- **✚ ADDENDUM 2026-08-19 — the BMR is already persisted, so read it rather than recompute.**
+  `body_comp.bmr_kcal` carries the day's own BMR on **71 of 96** rows, computed by the same
+  `cunninghamBmr`. Reading it makes the floor **the day's** BMR rather than a window mean (the stored
+  series moves with weight/body fat — 1,522 and 1,524 on consecutive days) and **cannot drift from what
+  the body-composition card renders**, because it is the same number. **Fallback matters:** 25 of 96
+  rows have no `body_comp` (no body-fat reading, and `bodyComposition()` returns null rather than
+  fabricating) — on those days fall back to the **most recent snapshot**, never to the universal 1,000.
+  A stale BMR is far closer to the truth than a number ~500 kcal below it.
+  [`docs/reviews/2026-08-19-body-derived-scores-closeout.md`](reviews/2026-08-19-body-derived-scores-closeout.md) §3
 - **It makes the estimate SAFE, not CORRECT.** Survivors still sit well under the formula's 2,397
   — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
 - **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of

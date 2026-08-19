@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.2",
+    date: "2026-08-19",
+    changes: [
+      "Home\u2019s nutrition card now shows the same on-target bar as the Nutrition tab, instead of a progress fill against a target that never moves. Under both bars is a line saying where today\u2019s budget came from \u2014 the amount you get before moving, plus what you earned by moving \u2014 so a number that grows during the day reads as intended rather than as a glitch.",
+      "The card explaining why your set goal and today\u2019s budget differ now appears while those two numbers actually differ. It was hidden until your maintenance had been measured from several days of logging \u2014 which is exactly the period when nothing else on the screen accounts for the gap. It still only offers to change your target once there is measured data behind the suggestion.",
+    ],
+  },
+  {
     version: "1.325.1",
     date: "2026-08-19",
     changes: [
