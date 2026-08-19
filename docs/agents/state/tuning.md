@@ -3,11 +3,32 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/score-audit-trail` · **Q band:** 500–529 (next free: 527)
+**Updated:** 2026-08-19 · **By:** `tuning/score-audit-trail` (2nd pass — owner decisions) · **Q band:** 500–529 (next free: 527)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **THREE OWNER DECISIONS ANSWERED 2026-08-19, and TWO of my asks withdrawn.** Read this before
+  asking the owner for anything.
+  - **Q-523 — no labels needed after all.** The owner's *"use current recorded high, % off it,
+    dynamic"* pointed at `targetAnchorMax`, which `resolveHrProfile` **already computes** (observed
+    **167** vs age-predicted **187**; `maxHr` deliberately refuses to drop below the age value). That
+    alone only moves zero-days 53→38 of 59. The real defect: **`activeMinutesFromZoneSeconds` is one
+    band off the WHO convention it documents** — it calls ≥60% reserve "moderate" when WHO moderate
+    is **40–59%**, so **moderate intensity maps to no zone and earns nothing.** Fixed rule takes the
+    contributor to **6/59 zero days, sub-score sd 38.7 — the highest-variance input in the score.**
+    [`review`](../../reviews/2026-08-19-active-minutes-who-threshold.md).
+  - **Q-524 — one goal: `users.steps_goal` wins**, `getDailyGoals()` reads it, derived value is the
+    fallback. The AI-recommend + manual-entry half **already exists** and needs no work.
+  - **Q-276 — Body Battery = "energy left"; Readiness = a morning starting number.** Different
+    questions, so **+0.12 is not a defect**. Readiness needs **no model change** — all nine weights
+    are overnight/previous-day, nothing reads today. **Presentation only → Lane B, unblocked now**;
+    the "wait for Q-272" instruction no longer applies.
+  - **Q-72 — the ask to spread the sleep ratings is WITHDRAWN.** `sleep_quality_feel` is the **most**
+    variable self-report in the app (`resting_soreness` is sd **0.00**, exactly 3 in 20 entries) and
+    tracks efficiency at **+0.316**. Volume (+0.03) and RPE (−0.02) are **structurally disqualified** —
+    volume is prescribed by the app, RPE has a 1.5 dead band. **Fix the yardstick, not the rating.**
+    [`review`](../../reviews/2026-08-19-sleep-validation-targets.md).
 - **Score-audit trail — MEASURED** (Q-525, Q-526). Whether each score leaves enough behind to be
   calibrated retrospectively. Over 96 rows: **sleep, readiness and illness are fine** (readiness is
   the reference — sub-scores *plus* `provisional` flags; illness's stored biomarkers are what let
@@ -239,6 +260,17 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **Before asking the owner for labels, check whether a PUBLISHED threshold answers it.** Q-523's
+  ask for "days you'd call active" was unnecessary: WHO/ACSM already defines moderate intensity, and
+  the code's own comment claimed to implement it. Asking the owner to hand-label data so a constant
+  could be fitted would have replaced a published number with a bespoke one — worse, and slower.
+- **Low self-report variance is not the same as no information, and asking for more spread is a
+  trap.** A rating consciously stretched to fill a scale stops measuring what it measured before and
+  invalidates the history already collected. Use a rank measure over the extreme entries instead.
+- **A target the app PRESCRIBES cannot validate a number the app produces.** Training volume looked
+  like the obvious outcome to predict from sleep; it is dictated by the program (adherence 73.6% vs
+  73.1% planned), so its ~0 correlation is structural, not evidence of no effect. Same for RPE
+  (`RPE_DEAD_BAND = 1.5`). Check whether a candidate yardstick is free to move before using it.
 - **`chronic_stress_score` (vendored cumulative model) is NOT Q-507's daytime stress.** Same word,
   different mechanism — Q-507 is `STRESS_HIGH_DAY_THRESHOLD_MIN` in minutes, and it fires. Merging
   them loses the fact that one has never produced a value at all (Q-525).

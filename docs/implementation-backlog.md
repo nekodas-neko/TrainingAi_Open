@@ -713,11 +713,22 @@ Worth reaching for only if the reassign proves harder than it looks.
      `sleep-content`) and should go the same way when those files are converted.
   3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
      19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
-- **⚠ Next slice: `lib/__tests__/q165-cache-seeded-reads.test.ts` will need updating.** It asserts
-  `readCacheSync<` and `cachedFetch<` appear literally in `activity/exercise-review-sheet.tsx`,
-  `activity/activity-detail-sheet.tsx` and `coach/coach-history.tsx` — all three of which are on the
-  remaining list. Converting them to the hook removes both strings and reds that test, which is the
-  test doing its job on a changed mechanism rather than a regression. Update it in the same PR.
+- **✅ SLICE 2 SHIPPED 2026-08-19 (v1.325.7) — four more files, 29 → 25.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-2.md). `health/training-stress-line`
+  (the first real use of slice 1's `today` option), `activity/exercise-review-sheet`,
+  `activity/activity-detail-sheet` (the shared `hr-profile` key in both) and
+  `workout-select-content` (`muscle-recovery`). **The can-bite group is down to 8, all of them in
+  the four tab-screen orchestrators** — `session-select-content` (4), `health-content` (2),
+  `nutrition-content` (2). Those were left for last on purpose: each seeds four to eight keys inside
+  one shared `useLayoutEffect` and feeds screen state other effects also write, so converting them
+  is a state refactor rather than a swap, and should be one file per PR.
+- **Correction to slice 1's note about `lib/__tests__/q165-cache-seeded-reads.test.ts`:** it said
+  that test would red when the two sheets converted. **It did not, and the reason is worth keeping.**
+  It asserts `readCacheSync<` and `cachedFetch<` appear literally in three files; each sheet has
+  *two* fetches, and only the `hr-profile` one is a fetch-once site. The keyed `hr-window:` fetch
+  stays (its key changes per session, and `useCachedValue` has no way to express "no key yet" for a
+  sheet mounted with a null prop), so both strings survive. `coach/coach-history.tsx` has a single
+  fetch and is the one that will actually red — it is in the unmount group, so not soon.
 - **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
 - **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
   are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's
@@ -6428,7 +6439,17 @@ session working from a temporarily restored copy.
   profile is empty is better calibrated than the personalised value that replaces it.**
 - **Measured:** 10,000 is reached on **16 of 90 days (18%)**; the owner's own 7,000 on **31 of 90
   (34%)**; mean 6,044 steps (sd 4,715, range 464–23,740).
-- **Owner decision, not a calculation.** Three coherent answers and they are mutually exclusive:
+- **✅ OWNER DECIDED 2026-08-19:** *"We need to use 1 number here. The AI should be able to define
+  the number and allow for manual entry."* → **`users.steps_goal` becomes the single source.**
+  `getDailyGoals()` reads that column instead of deriving from `activity_level`, falling back to the
+  derived value only when it is unset. **The AI half already exists and needs no new work** —
+  `/api/nutrition-goals/recommend` computes a recommended steps goal and
+  `components/profile/goal-recommendation-sheet.tsx` writes it to exactly that column, with manual
+  entry alongside it in `goals-section.tsx`. So this is a read-side change plus a fallback, not a new
+  feature. **Sequencing note:** once `getDailyGoals` reads the profile, the Activity Score's steps
+  contributor changes for every historical day it is recomputed on — expected, and worth stating in
+  the changelog because the owner reads that number daily.
+- **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   (1) the profile value wins everywhere — the owner set it, and it matches Paluch; (2) the derived
   value wins everywhere and the profile field becomes display-only or is removed — but then the
   activity-level map should be re-checked against Paluch, since 10,000 is above the cited plateau;
@@ -6578,9 +6599,39 @@ session working from a temporarily restored copy.
   `activeMinutesFromZoneSeconds` then doubles vigorous minutes, doubling the gap with it. Only 26 of
   59 days have strap data. **Fixing the floor without fixing this leaves zone minutes
   non-comparable across days** — derive the cap from the observed source cadence.
-- **Open question this entry deliberately does not answer:** what Zone 2 floor *would* carry signal
-  for this athlete. Fitting one needs days the owner would call "active" to fit against — owner
-  labels, not more SQL. Do not guess a number into the code.
+- **✅ ANSWERED 2026-08-19 — no owner labels were needed, and the ask for them was withdrawn.**
+  [`docs/reviews/2026-08-19-active-minutes-who-threshold.md`](reviews/2026-08-19-active-minutes-who-threshold.md).
+  **Two changes, and the second is the big one.**
+  1. **Anchor active-minutes on `targetAnchorMax`, not `maxHr`** (owner instruction: *"use current
+     recorded high and set a % off it… make it dynamic so as max HR increases the zones can too"*).
+     `resolveHrProfile` **already computes both**: `estimatedMax` = 187 (220 − 33), corroborated
+     `observedMax` = **167** (5th-highest of 72,519 readings over 90 days, so a spike cannot move it).
+     `maxHr` deliberately refuses to drop below the age prediction — correct for %-of-max effort math,
+     wrong for this. It is dynamic by construction: a rolling 90-day order statistic.
+  2. **`activeMinutesFromZoneSeconds`'s WHO mapping is shifted one band.** Its comment says Zone 2
+     (**≥60% reserve**) is *"WHO moderate"*. **WHO/ACSM moderate is 40–59% of reserve; 60% is where
+     *vigorous* begins.** So what the code counts once as moderate is actually vigorous, and
+     **moderate intensity — brisk walking, stairs, carrying things — maps to no zone at all and earns
+     nothing.** It has been scoring zero by construction.
+  - **Proposed rule:** moderate = **[0.40, 0.60) of reserve ×1**, vigorous = **≥0.60 ×2**, both off
+    `targetAnchorMax`. For this athlete today: **99–121 bpm ×1, ≥121 ×2.**
+
+  | contributor `zoneMinutes` (weight 10) | shipped | observed-max only | **proposed** |
+  |---|---|---|---|
+  | days reading **zero** | **53/59** | 38/59 | **6/59** |
+  | mean active minutes | 1.4 | 2.6 | **24.7** |
+  | days hitting the 22-min goal | ~2 | 2 | **23/59** |
+  | sub-score mean / sd | ~6 / ~0 | — | **63.8 / 38.7** |
+
+  **That makes it the highest-variance contributor in the Activity Score**, above `steps` (sd 33.4).
+  The published threshold is not a guess: the sweep is smooth around 0.40, so a small error in the max
+  estimate does not swing it.
+- **Do NOT re-cut `ZONE_DEFS`.** Zones 1–5 are *training* zones for cardio prescription and are not
+  wrong; the defect is in the roll-up that borrows them for a *public-health* question. Add the WHO
+  bands alongside. Likewise `maxHr` stays conservative — only the active-minutes path moves.
+- **Re-measure the strength-day suppression guard after this lands.** It exists because a lifting day
+  scored a structural zero; at a 99 bpm floor lifting days will not be zero, so the guard may become
+  unnecessary or actively wrong.
 - **Pass test:** zero-zone-minute days must fall from 53/59 to something that tracks the owner's own
   sense of an active day, and ring-only vs strap days must produce comparable minutes for comparable
   effort.
@@ -6664,15 +6715,38 @@ session working from a temporarily restored copy.
   same app, both read by a user as "how recovered am I", sharing no variance. Either one is wrong,
   or they answer different questions (readiness = *should I train today*; battery = *how much is
   left right now*) and no surface says so.
-- **Decide before building.** Three coherent outcomes, and they are mutually exclusive:
+- **✅ OWNER DECIDED 2026-08-19 — outcome (1): they are different questions, and both now have a
+  definition.** *"Body battery should be more like 'how much energy I have left'. Readiness should
+  just be a starting number based on your previous day + sleep, so you can see how your day is
+  typically based on data."*
+  - **Body Battery = energy remaining right now.** Intraday, depletes through the day, floors at 0.
+    This is consistent with — and now the stated purpose behind — Q-521's exertion-integrated drain.
+  - **Readiness = a morning starting number from the previous day and the night's sleep.** Set once,
+    static for the day.
+  - **Readiness needs NO model change to match that definition — checked, not assumed.** All nine
+    `READINESS_WEIGHTS` contributors are overnight or previous-day measures: `previousNight` 0.16,
+    `restingHeartRate` 0.15, `hrvBalance` 0.15, `temperature` 0.10, `sleepBalance` 0.10, `checkin`
+    0.10, `prevDayActivity` 0.09, `recoveryIndex` 0.09, `activityBalance` 0.06. **Nothing reads
+    today's activity.** It is already the number the owner described.
+  - **So this resolves to a presentation change, not a modelling one:** label the two so a reader
+    cannot mistake them for the same question, and stop placing them adjacent without that framing.
+    **That makes it Lane B's, not Lane A's**, and it unblocks now rather than after Q-272.
+  - **The +0.12 end-of-day correlation is no longer a defect.** Two numbers answering different
+    questions are not required to agree; the earlier framing assumed they should. What remains worth
+    watching is only that the anchor **starts** at readiness (+0.93) — i.e. the day begins where
+    readiness says and then diverges as energy is spent, which is exactly the intended behaviour.
+- **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   1. **They are different questions** → the UI must label them as such, and they should probably
      never be adjacent without that framing.
   2. **They should agree** → the intraday model needs to preserve the anchor's information (which
      overlaps heavily with Q-272's charge/drain rebalance).
   3. **One is redundant** → drop it and reclaim the screen space. §2.4 argues *against* adding a
      sixth score for exactly this reason; the same logic applies to keeping a fifth.
-- **Do not action this in isolation.** Q-272 changes the intraday curve and will move this
-  correlation on its own; re-measure after it lands before deciding.
+- ~~**Do not action this in isolation.** Q-272 changes the intraday curve and will move this
+  correlation on its own; re-measure after it lands before deciding.~~ **No longer applies** — the
+  owner decided the *question* each score answers, which does not depend on where the correlation
+  settles. The labelling work can proceed now; Q-272 and Q-521 change Body Battery's behaviour
+  underneath it without changing what it is for.
 
 ### [platform][devices] Q-280 — Q-214's duplicate-collapse fix reached one of three same-shaped batch upserts
 
@@ -8522,6 +8596,35 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   present on only **39 of 56** scored nights, so the score already means something different on the
   other 17. Down-weighting them changes that asymmetry rather than fixing it — decide and document
   what a night with neither contributor should score before shipping.
+
+- **⚑ 2026-08-19 — the yardstick question is answered, and the obvious next move was the wrong one.**
+  [`docs/reviews/2026-08-19-sleep-validation-targets.md`](reviews/2026-08-19-sleep-validation-targets.md).
+  This entry says *"whatever closes this needs a better yardstick first: more spread in the ratings, a
+  different outcome to predict, or a rank-based measure."* All three were tested.
+  - **More spread in the ratings: NO — and the ask was withdrawn.** The owner explains the flatness
+    (*"upon waking I don't feel instantly super rested or not rested… generally it's a mid"*), and
+    measurement backs them: `sleep_quality_feel` (sd ~0.8, 5 values used) is the **most** variable
+    self-report in the app. `perceived_recovery` sd 0.36 / 2 values; `motivation` 0.34; `wake_mood`
+    0.39; **`resting_soreness` sd 0.00 — exactly 3 in all 20 entries.** Asking for performative spread
+    would also invalidate the 46 nights already collected.
+  - **A different outcome: only one candidate, and it is weak.** Against raw sleep measures (not the
+    composite, per the Q-511 rule): **steps r = +0.210**; training volume **+0.028** and mean RPE
+    **−0.023**. The latter two are **structurally disqualified** — volume is *prescribed by the app*
+    (adherence 73.6% actual vs 73.1% planned, Q-514), so it cannot respond to sleep, and
+    `RPE_DEAD_BAND = 1.5` makes RPE deliberately insensitive.
+  - **The rating is better than any alternative anyway:** `sleep_quality_feel` (sign-corrected) vs
+    efficiency **+0.316**, vs duration +0.220 — against `mood_logs.energy_level`'s −0.114 and +0.107.
+    Low variance is not no information. `energy_level` still has the best *spread* (75 entries, ok 35 /
+    good 34 / low 4 / drained 2 — categorical labels get answered where abstract magnitudes get a 3)
+    and is worth adding as a **secondary** target.
+  - **So do the rank measure, and re-run after the recalibration.** Two groups — the 6 nights rated
+    1/4/5 against the 40 rated 2/3 — answers "do flagged-unusual nights score differently?", which 6
+    nights *can* support and a coefficient cannot. **And every correlation here predates v1.319.0**
+    (mean 84.1 → 69.5, sd 15.9 → 16.6): a rating cannot agree with a score that barely moved. Blocked
+    only on ~3 weeks of nights accumulating under the new model, since history is not back-filled.
+  - **⚠️ Do not quote `energy_level` ↔ HRV = −0.424 as a finding.** It is the largest coefficient in
+    that review and points the wrong way; Pearson on a 4-level ordinal with 92% of mass in two adjacent
+    levels manufactures exactly this. Needs a rank measure and a training-day confound check first.
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
