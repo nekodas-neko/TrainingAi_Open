@@ -13,6 +13,7 @@ import { buildReviewSystemPrompt, buildReviewUserPrompt } from '@trainingai/shar
 import { reconcileReview, type ReviewSignalExercise, type SetShape } from '@trainingai/shared/workout/review/reconcile'
 import type { ProgressionStyle } from '@trainingai/shared/types/progression'
 import type { ExerciseRole } from '@trainingai/shared/types/program'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export const maxDuration = 30
 
@@ -44,6 +45,8 @@ export async function POST(
   }
 
   const { sessionId: programSessionId } = await params
+  const badId = invalidUuidResponse(programSessionId)
+  if (badId) return badId
   const repo = await getRepository()
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const today = todayInTz(tz)

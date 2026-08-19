@@ -2,12 +2,14 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
-import { withRouteErrors } from '@/lib/api/route-errors'
+import { withRouteErrors, invalidUuidResponse } from '@/lib/api/route-errors'
 
 export async function POST(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const tz = session.user.timezone ?? DEFAULT_TZ
   const repo = await getRepository()
   // Q-463: logging a supplement that is not yours (or does not exist) answered 500 with an EMPTY
@@ -23,6 +25,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const tz = session.user.timezone ?? DEFAULT_TZ
   const repo = await getRepository()
   return withRouteErrors(async () => {

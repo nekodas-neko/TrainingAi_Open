@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 const BodySchema = z.object({
   action: z.enum(['accept', 'dismiss']),
@@ -23,6 +24,8 @@ export async function POST(
   }
 
   const { sessionId } = await params
+  const badId = invalidUuidResponse(sessionId)
+  if (badId) return badId
   const repo = await getRepository()
 
   const state = await repo.getSessionPeriodization(userId, sessionId)

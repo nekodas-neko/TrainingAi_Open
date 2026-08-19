@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 // One number. 4 KB is already two orders of magnitude of headroom.
 const MAX_BODY_BYTES = 4 * 1024
@@ -11,6 +12,10 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  // Q-482's id guard runs before Q-322's body read: refusing a malformed id costs nothing, and
+  // there is no reason to buffer a body for a request that cannot succeed.
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const read = await readJsonLimited(req, MAX_BODY_BYTES)
   if (!read.ok) {
     return read.reason === 'too_large'
@@ -31,6 +36,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const repo = await getRepository()
   await repo.deleteFoodLog(id, userId)
   return NextResponse.json({ success: true })

@@ -10,6 +10,7 @@ import {
 } from '@trainingai/shared/nutrition/meal-split'
 import type { MealPlanDayType } from '@trainingai/shared/types/nutrition'
 import type { MealPlanVariantInput } from '@/lib/data/postgres/slices/meal-plans'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 /**
  * Change a saved plan's shape: how many meals it splits into, when training sits, and whether it
@@ -46,6 +47,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   let raw: unknown
   try { raw = await req.json() }
