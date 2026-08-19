@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { X } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
 import { CaptureStep } from './capture-step'
@@ -74,6 +75,8 @@ interface Props {
 }
 
 export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, onLogged, userId, logDate }: Props) {
+  // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
+  const tz = useUserTimezone()
   useSheetBackDismiss(open, () => { reset(); onClose() })
   const [stepStack, setStepStack] = useState<Step[]>(['capture'])
   const step = stepStack[stepStack.length - 1]
@@ -166,7 +169,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
       }
 
       const today = logDate ?? todayInTz()
-      const logs = await logFoodEntries(entries, today, mealTypeId, userId)
+      const logs = await logFoodEntries(entries, today, mealTypeId, userId, tz)
 
       hapticLight()
       toast.success(entries.length > 1 ? `${entries.length} items logged` : `${form.name} logged`)
@@ -214,7 +217,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
       const bucket = preselectedMealTypeId ?? mealTypeForHour(mealTypes, new Date().getHours())
       if (!bucket) { toast.error('No meal type available'); return }
 
-      const logs = await logMealItems(meal, logDate ?? todayInTz(), bucket, userId)
+      const logs = await logMealItems(meal, logDate ?? todayInTz(tz), bucket, userId, tz)
       hapticLight()
       toast.success(`${meal.name} logged`)
       reset()

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useState } from 'react'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { ChevronLeft, Plus, Minus, Trash2, Search, X, Loader2, CheckSquare, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
@@ -46,6 +47,8 @@ interface Props {
 }
 
 export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId }: Props) {
+  // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
+  const tz = useUserTimezone()
   const [tab, setTab] = useState<SheetTab>('meals')
   const [meals, setMeals] = useState<SavedMeal[]>([])
   const [mealTypes, setMealTypes] = useState<MealType[]>([])
@@ -403,7 +406,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
     setLogging(meal.id)
     const targetDate = logDate ?? todayInTz()
     try {
-      const logs = await logMealItems(meal, targetDate, mealTypeId, userId)
+      const logs = await logMealItems(meal, targetDate, mealTypeId, userId, tz)
       toast.success(`${meal.name} logged`)
       for (const log of logs) onLogged(log)
     } catch (err) {
