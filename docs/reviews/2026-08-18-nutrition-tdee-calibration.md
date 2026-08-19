@@ -25,10 +25,18 @@ the time, and the lowest value that gets through is 1,052 kcal.**
 Against the weight record — 75 weigh-ins over 109 days, least-squares slope **+8.0 g/day**
 (+0.056 kg/week), i.e. an energy balance of **+62 kcal/day**:
 
-- Cunningham BMR at 71.2 kg and 23.5% body fat (LBM 54.5 kg) = **1,698 kcal**
-- × 1.55 (`activity_level: moderate`) → predicted TDEE **2,632**
-- Implied actual intake = 2,632 + 62 = **~2,694 kcal/day**
-- **So the log captures ~45% of actual intake.**
+- Cunningham BMR at 71.2 kg and 23.5% body fat (FFM 54.5 kg) = **1,547 kcal**
+- × 1.55 (`activity_level: moderate`) → predicted TDEE **2,397**
+- Implied actual intake = 2,397 + 62 = **~2,459 kcal/day**
+- **So the log captures ~50% of actual intake.**
+
+> **⚠️ CORRECTED 2026-08-19.** This section first published **1,698 / 2,632 / 2,694 / ~45%**, computed
+> from the textbook Cunningham equation (`500 + 22 × LBM`) **from memory**. The app does not use that
+> variant: `packages/shared/src/health/body-composition.ts` defines
+> `cunninghamBmr = ffm × 21.6 + 370`, deliberately matched to Oura's `atlas` postprocessor and shared
+> with the nutrition-goal baseline. Every figure above is now computed from **the formula the app
+> actually uses**. **The conclusion is unchanged** — the log-implied maintenance of 1,161 is still
+> below BMR — but the magnitudes were overstated.
 
 The cross-check is decisive: taking the log at face value implies a maintenance of
 **1,223 − 62 = 1,161 kcal**, which is **below this person's BMR**. That is not a slow metabolism; it
@@ -72,7 +80,7 @@ The same person, over a few weeks, gets estimates spanning **1,052 – 2,219** o
 
 `MIN_LOGGED_FRACTION` counts **days that carry a log**, not whether each day's log is **complete**. A
 day with breakfast logged and nothing else counts as fully logged. That is exactly this owner's
-pattern — 4.8 entries and 1,223 kcal per "logged" day — so a 45%-complete record sails through a
+pattern — 4.8 entries and 1,223 kcal per "logged" day — so a 50%-complete record sails through a
 70%-coverage gate.
 
 **The gates measure the wrong kind of incompleteness.**
@@ -84,7 +92,7 @@ pattern — 4.8 entries and 1,223 kcal per "logged" day — so a 45%-complete re
 `TdeeAdaptationCard` offers the calibrated maintenance and, on accept, writes it through
 `PUT /api/nutrition/targets`, which the component's own docstring notes *"is the source of truth for
 the daily target and mirrors into `users.calorie_goal`"*. So a 1,052 kcal maintenance is one tap from
-becoming the daily calorie goal of someone whose BMR is 1,698.
+becoming the daily calorie goal of someone whose BMR is 1,547.
 
 ---
 
@@ -98,15 +106,19 @@ in the same package (`goal-recommendation.ts` uses it), so the number is availab
 
 Measured effect on this owner's data:
 
-| | shipped floor (1,000) | BMR floor (1,698) |
+| | shipped floor (1,000) | BMR floor (**1,547**) |
 |---|---|---|
-| 14-day windows passing | 23, range **1,052–2,219** | **11**, range **1,902–2,219** |
-| 28-day windows passing | 22, range **1,246–1,889** | **10**, range **1,707–1,889** |
+| 14-day windows passing | 23, range **1,052–2,219** | **13**, range **1,592–2,219** |
+| 28-day windows passing | 22, range **1,246–1,889** | **13**, range **1,565–1,889** |
+
+*(Corrected 2026-08-19 — first published against a 1,698 floor, which blocked more than the app's own
+BMR would: 11 passing at 1,902–2,219 and 10 at 1,707–1,889. The proposal is unaffected; it blocks
+fewer windows than first stated.)*
 
 Every harmful value is blocked and the surviving range tightens sharply.
 
-**It makes the estimate safe, not correct.** The survivors (1,902–2,219) still sit ~500 kcal below the
-formula's 2,632, which is the residual under-logging showing through. A BMR floor stops the app giving
+**It makes the estimate safe, not correct.** The survivors (1,592–2,219) still sit well below the
+formula's 2,397, which is the residual under-logging showing through. A BMR floor stops the app giving
 dangerous advice; it does not make the calibrated maintenance right, and it should not be described as
 if it does.
 
@@ -137,7 +149,10 @@ a constant, and it is the real answer.
   `food_items.calories` value is accurate was not checked — an error there would bias the level,
   though not the under-logging conclusion, which rests on the weight trend.
 - **`activity_level: moderate` (×1.55) is taken from the profile as-is.** If the owner is more active
-  than that, predicted TDEE is understated and the under-logging is *worse* than 45%, not better.
+  than that, predicted TDEE is understated and the under-logging is *worse* than 50%, not better.
+- **The BMR formula was taken from memory on the first pass and corrected on 2026-08-19** by reading
+  `body-composition.ts`. The repo's rule about verifying field names against the pinned source rather
+  than memory applies to **formulas** too, and this is the worked example.
 - **The 7,700 kcal/kg constant** is a fat-mass approximation; during genuine recomp the true figure
   differs. Over 109 days at +8 g/day this affects the balance figure by tens of kcal, not hundreds.
 - **`tdeeAdjustment` in `tdee-adaptation.ts` is dead code** — referenced only by its tests and a
