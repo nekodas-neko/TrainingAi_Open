@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.332.1",
+    date: "2026-08-19",
+    changes: [
+      "Meal labels are composed properly again. The text block used to be pinned to the top of the label while the code was pinned to the bottom, so a meal with one or two ingredients left a band of empty space above the code \u2014 up to 8.6 mm, about an eighth of the label. The leftover space is now shared, and the calorie figure sits on the label's centre line with KCAL beside it, rather than the number and unit being centred as a pair.",
+    ],
+  },
+  {
     version: "1.332.0",
     date: "2026-08-19",
     changes: [

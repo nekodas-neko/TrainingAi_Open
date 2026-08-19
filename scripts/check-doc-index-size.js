@@ -991,7 +991,10 @@ const BASELINE = {
   // 2026-08-20 (Tuning): Q-529 scope correction -- the score DOES recompute; what survives is a
   // ~9-minute provisional-renders-as-final window. The refutation stays inline because the
   // original claim shipped and an implementer must not act on it.
-  'docs/implementation-backlog.md': 11359,
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-416 shipped): its entry out, nothing filed in its place.
+  // The pointer above it keeps four lines rather than being struck, because the print of the FIXED
+  // artwork is still owed — the complaint came from paper and only paper closes it.
+  'docs/implementation-backlog.md': 11244,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
