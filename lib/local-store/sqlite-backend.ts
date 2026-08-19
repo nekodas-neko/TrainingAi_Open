@@ -2381,7 +2381,7 @@ export class SQLiteLocalStore implements LocalStore {
   // per-item macro scaling is inlined here — same shape as getFoodLogsWithItems).
   async getSavedMeals(): Promise<SavedMeal[]> {
     const meals = await querySQL<Record<string, unknown>>(
-      `SELECT id, name, servings, created_at FROM saved_meals WHERE deleted_at IS NULL ORDER BY created_at DESC`,
+      `SELECT id, name, servings, image_data_uri, created_at FROM saved_meals WHERE deleted_at IS NULL ORDER BY created_at DESC`,
       [],
     );
     if (meals.length === 0) return [];
@@ -2432,6 +2432,7 @@ export class SQLiteLocalStore implements LocalStore {
         // A row written before v25 has no value; 1 is the only safe reading, and dividing by 0
         // would make one portion infinite.
         servings: Number(m.servings) > 0 ? Number(m.servings) : 1,
+        imageDataUri: m.image_data_uri ? String(m.image_data_uri) : null,
         createdAt: new Date(String(m.created_at)),
         items,
         totals: { calories: totals.calories, proteinG: r1(totals.proteinG), carbsG: r1(totals.carbsG), fatG: r1(totals.fatG) },
@@ -2442,13 +2443,20 @@ export class SQLiteLocalStore implements LocalStore {
   // Write a meal + replace its items in one shot (offline create/edit). The caller sets
   // syncStatus: 'pending' for a local edit or 'synced' when hydrating from the server.
   async upsertSavedMeal(meal: LocalSavedMeal, items: LocalSavedMealItem[]): Promise<void> {
+    // `imageDataUri` omitted means "this write is not about the image" and must NOT clear a stored
+    // one — the standing rule that a local upsert overwrites every column by default is exactly how
+    // a name edit would silently delete the photo. An explicit `null` still removes it, so the two
+    // cases stay distinguishable here the same way they are on the server (Q-396).
+    const keepImage = meal.imageDataUri === undefined
     await runSQL(
-      `INSERT INTO saved_meals (id, name, servings, created_at, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO saved_meals (id, name, servings, image_data_uri, created_at, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
-         name=excluded.name, servings=excluded.servings, updated_at=excluded.updated_at,
+         name=excluded.name, servings=excluded.servings,
+         image_data_uri=${keepImage ? 'COALESCE(excluded.image_data_uri, saved_meals.image_data_uri)' : 'excluded.image_data_uri'},
+         updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
-      [meal.id, meal.name, meal.servings ?? 1, meal.createdAt, meal.updatedAt, meal.deletedAt, meal.syncStatus],
+      [meal.id, meal.name, meal.servings ?? 1, meal.imageDataUri ?? null, meal.createdAt, meal.updatedAt, meal.deletedAt, meal.syncStatus],
     );
     await runSQL(`DELETE FROM saved_meal_items WHERE saved_meal_id=?`, [meal.id]);
     for (const it of items) {
@@ -2484,7 +2492,9 @@ export class SQLiteLocalStore implements LocalStore {
       );
       if (local.length > 0 && local[0].sync_status === 'pending') continue; // keep the local edit
       await this.upsertSavedMeal(
-        { id: m.id, name: m.name, servings: m.servings ?? 1, createdAt: (m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt)), updatedAt: now, deletedAt: null, syncStatus: 'synced' },
+        // `?? null`, not omitted: the server list IS authoritative here, so a meal whose image was
+        // removed on another device must lose it locally too (Q-396).
+        { id: m.id, name: m.name, servings: m.servings ?? 1, imageDataUri: m.imageDataUri ?? null, createdAt: (m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt)), updatedAt: now, deletedAt: null, syncStatus: 'synced' },
         m.items.map(it => ({ id: it.id, savedMealId: m.id, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
       );
     }

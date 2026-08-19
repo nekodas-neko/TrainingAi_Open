@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.332.0",
+    date: "2026-08-19",
+    changes: [
+      "Saved meals can now carry a small photo, so a meal you built weeks ago is recognisable from more than its name. The storage and sync are in; the picker itself lands next, and until then nothing changes on screen.",
+    ],
+  },
+  {
     version: "1.331.0",
     date: "2026-08-19",
     changes: [
