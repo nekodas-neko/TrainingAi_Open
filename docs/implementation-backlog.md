@@ -882,9 +882,12 @@ and this is the sixth.
   with the filled arc **split by macro** instead of a single `var(--brand)` sweep. Do not add a
   second ring component.
 - **Log Food is one screen.** The current capture step's six scattered entry points collapse to:
-  search across everything · tabs **Recent · Frequent · Saved meals** · a bottom row of
-  **Barcode · Photo · Describe**. Photo is kept because it exists today and the owner did not ask
-  to remove it.
+  search across everything · tabs · a bottom row of capture actions. **Both were revised by the
+  owner on 2026-08-19 and the revision wins over this line** — the tabs are **Recent · My Foods**
+  (see note 17), and the action row is ordered **Photo · Barcode · Describe or enter**, in that
+  order, not the Barcode-first order originally drawn. The order is the owner's; it is also the
+  right default, since photo is the fastest path for a plated meal and barcode only works on
+  packaged food.
 - **Describe and manual entry become one sheet.** Type what you ate and the fields fill in; skip the
   box and type them yourself. The fields are always visible, so neither path is a hidden mode.
 - **My Meals rows carry their macro split** (P/C/F beside the calorie column) so the list can be
@@ -905,10 +908,23 @@ MacroRing · **NutritionActionRow (three buttons — Saved Meals had been droppe
 and are now drawn. **Any implementation PR carries this list and checks it off** — a rework that
 quietly loses a section is the failure mode this entry exists to prevent.
 
-**17 — A section that has nowhere to go under the new tabs: `My Foods`.** The shipped capture step
-offers it (`onMyFoods` → `FoodLibrarySheet`) and the three agreed tabs are Recent, Frequent and
-Saved meals. Recommendation: make it a **fourth tab**, not a button — it is a list of foods like the
-other three, and a tab is where someone will look for it. Flagged rather than decided.
+**17 — DECIDED 2026-08-19, and it went further than the question asked. The tabs are `Recent` and
+`My Foods`. Two, not four.** The question here was where to put `My Foods`; the owner answered by
+collapsing the row: ***"I Think recent tab is fine; dont think we need frequent - saved and myfoods
+I dont think need to be seperated. Saved could contain foods made or saved. Maybe we just have 'my
+foods'"***.
+- **`Frequent` is dropped.** It was a second ordering of the same list Recent already shows.
+- **`Saved meals` and `My Foods` merge into one `My Foods` list** holding anything the user made or
+  saved. This is the right call for a reason worth writing down: a saved meal and a food you built
+  were always the same kind of row wearing two labels, which is exactly what finding 13's single
+  row component says. Two lists that render identically and differ only in provenance are one list
+  with a subtitle.
+- **Nothing is lost, and check that before building.** `FoodLibrarySheet` and `SavedMealsSheet` are
+  separate components today; merging the tabs must not silently drop a capability that only one of
+  them has (bulk delete, meal-plan linkage, the label path). Diff them first and carry every action
+  across, or say in the PR which was intentionally dropped.
+- Ordering within `My Foods`: most recently used first, so the merge does not bury saved meals under
+  one-off foods.
 
 **18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
 assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
@@ -1070,6 +1086,21 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
      the meals outlive it.
   3. Entering from the Nutrition tab starts you **inside the nutrition scope** — see Q-408, which is
      the general version of that and is deliberately not a blocker for this entry.
+
+- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
+  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
+  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
+  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
+  from one built by hand — loggable, editable, and with its own printable label.
+  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
+    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
+    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
+    plan is the same dead end the stepper already is.
+  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
+    whole reason this beats a plan document: the user keeps meals, not a plan.
+  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
+    meals under `My Foods` tagged *from your plan*) —
+    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
 
 - **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
   conversation as the path behind the same entry point and keep the stepped sheet reachable until
@@ -1427,6 +1458,79 @@ note is a live consideration for the WebView, not a stale one.
   standalone and are the owner's stated focus. If this plan later moves where scope lives, moving
   one conversation is a small change; waiting for the architecture before shipping any of it is how
   the nutrition work stalls.
+
+### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
+
+- **Branch:** `feat/walk-step-goal`
+- **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk
+- **Owner's words:** *"for the walking section I'd it to show the speed and total step count.
+  rather than a HR goal we should be looking at a step goal; we should enough data on how to do
+  this."*
+- **Placement:** medium, and **read the blocker below before scheduling it** — one third of this is
+  a display change that can ship next session, and two thirds depend on a measurement problem that
+  is open.
+
+**What the screen shows today.** `components/guided-walk/walk-active.tsx` (224 lines) renders the
+segment name, the countdown, live **bpm**, `distanceKm` when a route exists (`:189-190`), a cadence
+readout, and a verdict line built from HR targets: `In zone (target ≤99 bpm)` / `Push harder` /
+`Ease off` (`:201-204`). The owner's screenshot is a slow segment reading **96 bpm, in zone**, with
+cadence showing **`--`**.
+
+**Split this into three pieces, because they are not equally ready.**
+
+**1 — Speed. Ready now, small.** `useGuidedWalkStore` already holds `currentPaceSecPerKm`
+(`walk-active.tsx:35-36`) and the screen renders only `distanceKm`. The number the owner wants is
+in the store and simply is not on screen. **Decide the unit deliberately**: pace (`min/km`) is the
+convention for running and is what the summary already computes (`computeAvgPaceSecPerKm`), while
+speed (`km/h`) is the more natural reading for a walk and is what the owner asked for by name.
+Recommendation: show **km/h** on the live screen, keep min/km in the summary where it sits beside
+splits and best efforts, and derive both from the one pace series rather than adding a second
+computation — the One Formula rule applies.
+
+**2 — Total step count. Ready only when a strap is worn.** `stepsEstimate` exists and is already
+saved (`walk-summary.tsx:150,167`), and it comes from **integrating the strap's cadence series over
+the walk** (Q-230 replaced a hardcoded `null` with it). So a running total can be shown live from
+the same tracker with no new plumbing — but it is a strap-only number today, and it must be
+labelled as an estimate rather than a count, because it is integrated cadence and not counted
+steps.
+
+**3 — ⚠ Replacing the HR goal with a step goal. BLOCKED on a measurement problem, and this is the
+finding that matters.** The premise *"we should have enough data on how to do this"* is the part to
+check before building: **we do not, yet, and the screenshot is the evidence.**
+- Cadence is fused from two sources (`lib/activity/cadence-tracker.ts`): the **strap** at ~1
+  reading/second, and the **ring** at one gait window per ~30 s. The `--` in the screenshot means
+  neither was live — no H10 that walk, and the ring had delivered nothing usable.
+- The ring path is **explicitly gated**: `RING_CADENCE_VALIDATED = false`
+  (`packages/shared/src/health/cadence.ts:218`). Its docstring is worth reading in full before
+  planning this — the signal is not broken, it is **octave-ambiguous**. Three counted captures land
+  on opposite sides of an octave split (64 spm → 0.98 Hz reads as step rate; 114 spm → 1.02 Hz reads
+  as *stride* rate), and a metronome-referenced capture agreed with the strap to **0.4 spm**. The
+  comment is explicit that shipping it uncorrected gives a number **wrong by 2×**, which is worse
+  than showing none.
+- **So a step goal built on today's cadence would be paced by a signal that is absent without a
+  strap and can be double or half with one.** An HR goal, whatever its faults, is at least always
+  present — the ring gives HR continuously. **Do not swap the target over until the ring path is
+  octave-corrected and re-validated across counted cadences**, which is the concrete next step that
+  docstring already names.
+- **Recommendation:** ship pieces 1 and 2 now as *additional* readouts, keep the HR verdict as the
+  pacing target, and treat the swap as a follow-up gated on ring validation. That gives the owner
+  the two numbers asked for on the next deploy without keying the workout to a signal that reads
+  `--`.
+
+**One question the plan must answer.** *"Step goal"* has two readings and they build differently:
+a **cadence target** (walk at ≥120 spm through the fast segment — the direct analogue of the HR
+zone, and what the interval structure implies), or a **session/daily step total** (hit 8,000 steps,
+which is a goal the walk contributes to rather than a way to pace it). Both are reasonable; only
+the first replaces the verdict line. Ask before building — this is the difference between changing
+one line and adding a goal system.
+
+- **Lane.** `components/guided-walk/**` is Lane B. Any ring octave correction is
+  `packages/shared/src/health/cadence.ts` + the decoder, which is **Lane A**, and it is the harder
+  half by a distance.
+- **Verification.** Speed is checkable in `pnpm dev` against a mocked pace series. **Steps and
+  cadence are not** — they need a real walk with the H10 paired, and the ring half needs a counted
+  capture against a metronome, which is the procedure that produced the numbers in the docstring.
+  State plainly that no device pass was run if none was.
 
 ### [platform] Q-320 — `e.message` as a 500 body leaks the same SQL Q-483 just closed, at 14 sites
 
