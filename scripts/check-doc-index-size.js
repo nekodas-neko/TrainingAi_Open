@@ -945,7 +945,13 @@ const BASELINE = {
   // entry's own rules unsatisfiable together — the numbers are inline because the next session
   // would otherwise re-measure production to find that out, and because "check the granularity"
   // reads like a formality until you see 11 rows against 668,749 steps.
-  'docs/implementation-backlog.md': 11208,
+  // Raised 2026-08-19 (Lane A, Q-323 Lane A half): 11208 -> 11222. The annotation carries the API
+  // contract — `GET /api/nutrition/energy-balance` now returns `macroTargets: { base, scaled,
+  // earnedKcal }` — because without it Lane B's obvious move is to re-derive the split client-side,
+  // which is the second implementation the one-formula rule exists to prevent. It also restates
+  // what the split preserves (the carbs:fat ratio, not each macro's share), since the original
+  // wording reads as the other one.
+  'docs/implementation-backlog.md': 11222,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

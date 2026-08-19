@@ -9,7 +9,7 @@ import { type Sex } from '@trainingai/shared/health/workout-energy'
 import { mifflinStJeorBmr } from '@trainingai/shared/nutrition/goal-recommendation'
 import { cunninghamBmr } from '@trainingai/shared/health/body-composition'
 import {
-  computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA,
+  computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
 } from '@trainingai/shared/nutrition/calorie-balance'
 import {
   resolveMaintenance, maintenanceGapMessage, MAX_WINDOW_DAYS, type MaintenanceDay,
@@ -47,6 +47,20 @@ export interface EnergyBalanceResult {
     currentKcal: number | null
     driftsFromRecommendation: boolean
   }
+  /**
+   * The day's macro grams once today's movement has grown the budget (Q-323), or null when the user
+   * has no stored macro target to grow.
+   *
+   * **Computed here rather than on the client** — the client already has `activeKcal` and the stored
+   * targets, so it could do this itself, and that is exactly the second implementation the
+   * one-formula rule exists to prevent. `base` is what `nutrition_targets` stores (the rest-day
+   * floor); `scaled` is what the day actually calls for. They are equal when nothing was earned.
+   */
+  macroTargets: {
+    base:   { proteinG: number; carbsG: number; fatG: number }
+    scaled: { proteinG: number; carbsG: number; fatG: number }
+    earnedKcal: number
+  } | null
   activeBreakdown: { workoutKcal: number; activityKcal: number; stepsKcal: number }
   goal: FitnessGoal | null
   missingProfileFields: string[]
@@ -133,10 +147,24 @@ export async function computeEnergyBalance(
     sex == null ? 'sex' : null,
   ].filter((f): f is string => f != null)
 
+  /**
+   * Q-323. `earned` is today's measured movement — the same figure the budget on screen adds to the
+   * rest-day floor — so the grams and the calories move together instead of the card asking for
+   * 300 more kcal without saying of what. Null when there is no stored macro target to grow.
+   */
+  const macroTargetsFor = (earned: number) => {
+    if (targets?.proteinG == null || targets.carbsG == null || targets.fatG == null) return null
+    const base = { proteinG: targets.proteinG, carbsG: targets.carbsG, fatG: targets.fatG }
+    return { base, scaled: scaleMacrosForEarnedKcal(base, earned), earnedKcal: Math.round(earned) }
+  }
+
   if (missingProfileFields.length > 0) {
     return {
       date, balance: null, maintenance: null,
       target: { recommendedKcal: null, currentKcal: targets?.calories ?? null, driftsFromRecommendation: false },
+      // Still populated: a missing height does not stop the stored macros being real, and the
+      // measured movement is independent of the BMR formula that is blocked.
+      macroTargets: macroTargetsFor(activeEnergy.total),
       activeBreakdown, goal, missingProfileFields,
     }
   }
@@ -205,6 +233,7 @@ export async function computeEnergyBalance(
       currentKcal,
       driftsFromRecommendation: currentKcal != null && Math.abs(currentKcal - recommendedKcal) > 100,
     },
+    macroTargets: macroTargetsFor(activeEnergy.total),
     activeBreakdown,
     goal,
     missingProfileFields: [],
