@@ -16,8 +16,10 @@
  */
 import { estWorkoutKcal, type Sex } from '@trainingai/shared/health/workout-energy'
 
-/** Budget resting base = BMR × this. Sedentary Mifflin factor (BMR + TEF + incidental NEAT). */
-export const SEDENTARY_MULTIPLIER = 1.2
+// Defined in a dependency-free leaf module and re-exported here, so a caller that needs only the
+// number does not pull in this file's `workout-energy` → `oura-models` → `node:path` chain. Every
+// existing import of `SEDENTARY_MULTIPLIER` from this module keeps working.
+export { SEDENTARY_MULTIPLIER } from './energy-baseline'
 
 /** Steps assumed already covered by the sedentary base (a desk-job day's incidental stepping). Only
  *  steps above this count as extra movement, so we don't double-count the baseline against BMR×1.2. */

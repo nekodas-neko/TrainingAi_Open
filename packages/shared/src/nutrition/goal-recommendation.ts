@@ -1,6 +1,6 @@
 import { ACTIVITY_LEVELS, type ActivityLevel, type FitnessGoal } from '../types/user'
 import { cunninghamBmr } from '../health/body-composition'
-import { SEDENTARY_MULTIPLIER } from '../health/daily-energy'
+import { SEDENTARY_MULTIPLIER } from '../health/energy-baseline'
 
 // Q-401: `ACTIVITY_MULTIPLIERS` used to live here — sedentary 1.2 through extra_active 1.9 — and
 // `calculateBaseline` folded the user's *self-reported* level into the calorie target. That made

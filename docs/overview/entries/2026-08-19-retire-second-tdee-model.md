@@ -78,6 +78,26 @@ returns.
 
 Full suite 508 files / 4155 tests green.
 
+## The import that only `next build` could catch
+
+The first push failed CI. Importing `SEDENTARY_MULTIPLIER` from `daily-energy.ts` — the obvious
+place, and the file that owns the measured model — dragged **`node:path` into the client bundle**:
+
+```
+node:path → lib/oura-models/constants → health/workout-energy → health/daily-energy
+          → nutrition/goal-recommendation → nutrition/calorie-balance
+          → components/nutrition/calorie-zone-bar → app/nutrition
+```
+
+`tsc` passes, every test passes, and only `next build` fails, because the chain is legal TypeScript
+and legal in a node test environment. The constant now lives in `packages/shared/src/health/
+energy-baseline.ts`, a leaf module with **zero imports**, re-exported from `daily-energy` so every
+existing caller is untouched.
+
+Worth keeping in mind generally: making two modules share a constant is the standard One-Formula-One-
+Place move, and it silently couples their *dependency graphs*. Reaching for the leaf module first is
+cheaper than finding out from a red Build.
+
 ## Left open
 
 `Q-323` — the calorie budget now moves with activity but the macro grams beneath it do not. That is
