@@ -785,8 +785,99 @@ Worth reaching for only if the reassign proves harder than it looks.
   third answer nobody chose.
 - **Do not scale all three uniformly.** That reintroduces the Q-401 shape in a new place: the ring
   and the bars disagreeing, this time within one card.
+- **✅ THE PRODUCT CALL IS MADE — owner, 2026-08-19. Carbs and fat scale; protein holds.** The owner
+  asked for *"%'s to calculate the protein/fat/carbs so that when it increase due to excercise; the
+  macros increase as well"*, and after the arithmetic below was put in front of them, agreed to the
+  amended version. **This unblocks the entry — implement it.**
+  - **Protein is excluded, and the reason is arithmetic rather than taste.** It is dosed per kg of
+    bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`), so 150 g is ~2 g/kg. Express that as a share
+    (31.6% of a 1,900 kcal base) and apply it to a 2,447 kcal day and it becomes **193 g — 2.6 g/kg**:
+    a protein requirement that rises because the user went for a walk. Movement burns carbohydrate
+    and fat; it does not create protein demand.
+  - **Carbs take the majority and fat takes the rest, in their existing ratio.** Q-401's own answer
+    was *"the earned calories belong to carbs"*, and fat sitting at 25% of calories means a
+    carbs-only split makes fat's share drift downward as the day's movement grows. Splitting the
+    earned kcal between carbs and fat **in the proportion they already hold to each other** keeps
+    both percentages stable and needs no new constant.
+  - **This resolves the "do not scale all three uniformly" warning above rather than contradicting
+    it.** That warning was about the ring and the bars disagreeing inside one card. Here every
+    figure moves off the same budget, so the card stays internally consistent — which is the
+    property the warning was protecting.
 - **Lane A** for the arithmetic (`packages/shared/src/nutrition/calorie-balance.ts`), **Lane B** for
-  whatever renders it. Small, but it needs the product call on carbs-only first.
+  whatever renders it. **No longer blocked.**
+
+**Two display changes ride with this, from the same owner review, and they are the reason the entry
+is now worth doing as one piece.**
+
+**(1) The macro ring shows its remainder in grey.** *"I'd like the macro ring to show grey to
+indicate whats left."* Today the ring is a full 360° split by macro — it encodes *composition* and
+says nothing about progress. Sweep the coloured arc to `eaten / budget` of the circle and leave the
+remainder a neutral grey, so the same ring answers "what have I eaten" **and** "how much is left"
+without a number changing. At or past the budget there is no grey and the centre flips from
+`left` to `over`.
+
+**(2) The zone bar becomes a progress bar you finish.** *"more like Red/Orange/green; all the way
+like a progress bar with the green towards the end, and then a little orange/red bar after to depict
+going over. So it still looks like a progress bar where you want to go to the end."*
+  - The track runs **red → amber → green → amber → red** left to right, with the **green band
+    immediately before the goal notch** and only a short tail beyond it. The fill grows with intake
+    and takes the colour of the band it currently ends in.
+  - **The overshoot tail is deliberately short** — long enough to read, short enough that it does
+    not present itself as a second target to aim for.
+  - **This inverts what the bar means today**, and that is the point: it currently renders fixed
+    zones with a marker showing where you sit, which reads as a gauge. The owner wants something
+    with an end you walk toward.
+  - **Colour is not the only signal** — the remaining/over figure beside it carries the state in
+    words, per the standing rule.
+  - Drawn in three states (under, on target, over) during the 2026-08-19 review.
+
+**⚠ Do this in the same PR as the Q-415 budget fix below, or the bar will fill toward the wrong
+number.**
+
+### [nutrition][app-shell] Q-415 — Home shows two calorie budgets 271 apart; Q-401's sweep missed the donut
+
+- **Branch:** `fix/home-donut-budget-source`
+- **Added:** 2026-08-19 · owner, from a Home screenshot: *"explain this widget what ars those
+  nutrition numbers"*
+- **Lane B** (`components/home/home-card-widget.tsx`). One expression. No schema, no route.
+- **Placement: with Q-323**, whose bar and ring changes fill toward this number. Landing those
+  first would draw a progress bar pointing at the wrong total.
+
+**Measured from the owner's screenshot, and the arithmetic is the whole report.** The Home nutrition
+card reads **`1458 / 2447 kcal`** and prints **"1,629 base + 547 earned from movement"** directly
+underneath it. **1,629 + 547 = 2,176.** The card contradicts its own subtitle by **271 kcal**.
+
+**Two budgets are live on one screen:**
+
+| surface | expression | today |
+|---|---|---|
+| Home nutrition donut | `calorieGoal + activeEnergyKcalToday` (`home-card-widget.tsx:121-125`) | 1,900 + 547 = **2,447** |
+| zone bar · Home Energy Balance · Nutrition tab | `budgetProvenance()` → `restingBaseKcal + targetNetKcal + activeKcal` | 1,629 + 547 = **2,176** |
+
+The donut adds movement to the **stored** `calorieGoal`; everything else adds it to the **derived**
+baseline. That the Energy Balance card two rows below says **"718 kcal left"** — exactly
+`2,176 − 1,458` — is the confirmation: the two cards are visibly disagreeing on the same screen at
+the same moment.
+
+**This is Q-401's defect in a surface its sweep did not reach.** Q-401 retired the second TDEE model
+so one baseline feeds every calorie figure, and it shipped (#175). `home-card-widget.tsx` was not
+converted and still reads the stored goal. Grepped the backlog: **no entry mentions this widget**, so
+it was missed rather than deferred.
+
+**The fix.** Feed the donut the same `budgetProvenance()` total the zone bar and Energy Balance card
+already use, rather than `calorieGoal + activeEnergyKcalToday`. The stored goal keeps its job as the
+rest-day floor that the derived baseline is built from; it is simply not the number to render.
+
+- **Sibling sweep, per the standing rule — do not fix only the one surface the owner photographed.**
+  Grep for every other read of `calorieGoal` that renders a *displayed* budget, and convert or
+  justify each in this PR. The weekly branch in the same component (`isWeekly`, `boostedGoal * 7`)
+  multiplies the same wrong base by seven and needs the same treatment.
+- **Check the macro grams while you are there.** They come from the stored row too; Q-323 makes them
+  shares of the budget, so both entries must agree on which budget that is. **They are one PR.**
+- **Verification.** On one day with movement logged, the Home donut, the Home Energy Balance card and
+  the Nutrition tab must show the **same** total, and `donut total − eaten` must equal the Energy
+  Balance card's "left" figure exactly. That equality is the test — it is what failed here, and it
+  is checkable at a glance on the running app.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
