@@ -646,20 +646,17 @@ history; CI reseeds the same fixed window onto whatever today is.
 
 ### [platform] Q-324 — the first suite run against a freshly-migrated database times out two test files, which is exactly what CI does every run
 
-> **⚠️ PARTIALLY DONE 2026-08-19 — the mechanism is fixed, the symptom is unconfirmed.**
-> `scripts/local-db/migrate.js` now records what it applied, so `ensureSchema()` no longer re-applies
-> ~200 files in every worker; CI runs that script before `pnpm test`, so this was CI's state on every
-> run. Measured: `schema_migrations` did not exist at all beforehand, 3 migrations failed during local
-> setup because of it (now 1, an unrelated ordering artefact), and a first full-suite run on a fresh
-> database went 200.19 s → 183.18 s.
-> [`journal`](overview/entries/2026-08-19-local-migrate-bookkeeping.md).
+> **⚠️ PARTIALLY DONE 2026-08-19 — mechanism fixed, symptom unconfirmed**
+> ([`journal`](overview/entries/2026-08-19-local-migrate-bookkeeping.md)). `migrate.js` now records
+> what it applied, so `ensureSchema()` no longer re-applies ~200 files per worker; CI runs that
+> script before `pnpm test`, so this was CI's state every run. Measured: `schema_migrations` did not
+> exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
+> suite 200.19 s → 183.18 s.
 >
-> **What is still open, and why this entry stays:** the timeout this was filed for
-> (`complete-workout-increment-race` `beforeAll`, `admin/backfill-derived-scores`) **did not
-> reproduce** on a genuinely fresh unrecorded database today — 516 files / 4,232 tests green. So it is
-> load-dependent contention, and removing this load is not proof of a fix. Keep the entry until the
-> timeout is either seen again (and diagnosed with this ruled out) or has stayed absent long enough
-> to close on evidence. Everything below is the original entry.
+> **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
+> today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
+> Keep the entry until it is seen again with this ruled out, or stays absent long enough to close on
+> evidence. Everything below is the original entry.
 
 - **Branch:** `fix/ci-fresh-db-schema-contention`
 - **Added:** 2026-08-19 · Lane A, while diagnosing a red `Tests` job on PR #195
