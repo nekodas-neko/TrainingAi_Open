@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { computeDefaultVolumeTargets } from "@trainingai/shared/ai-periodization/volume-targets";
@@ -112,14 +113,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, program: saved });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Save failed'
-    if (message.includes('already exists')) {
-      return NextResponse.json({ error: message }, { status: 409 })
+    // Past a refusal only — a name clash is a user action, not a server fault.
+    if (!isRefusal(e)) {
+      reportServerError(e, { userId, url: '/api/workout-templates' })
+      console.error('[workout-templates POST]', e)
     }
-    // Past the 409 branch only — a name clash is a user action, not a server fault.
-    reportServerError(e, { userId, url: '/api/workout-templates' })
-    console.error('[workout-templates POST]', e)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return refusalResponse(e, 'Save failed')
   }
 }
 

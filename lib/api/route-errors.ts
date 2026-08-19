@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { isNotFoundError } from '@trainingai/shared/errors'
+import { isNotFoundError, isUserFacingError } from '@trainingai/shared/errors'
 
 /**
  * Q-463 — the single mapper at the route boundary.
@@ -31,4 +31,24 @@ export async function withRouteErrors(run: () => Promise<NextResponse>): Promise
   } catch (err) {
     return routeErrorResponse(err)
   }
+}
+
+/**
+ * The one answer to a caught error in a write route (Q-320).
+ *
+ * A `UserFacingError` carries a message someone wrote for the user and the status they chose, so it
+ * is echoed. Everything else is a fault: the client gets `fallback`, and the detail stays in the log
+ * and in `reportServerError`, which already have it. Callers report the fault themselves — this
+ * helper must not decide what is worth reporting.
+ */
+export function refusalResponse(err: unknown, fallback: string): NextResponse {
+  if (isNotFoundError(err)) return NextResponse.json({ error: err.message }, { status: 404 })
+  if (isUserFacingError(err)) return NextResponse.json({ error: err.message }, { status: err.status })
+  return NextResponse.json({ error: fallback }, { status: 500 })
+}
+
+/** True when `refusalResponse` will echo the error rather than hide it — for callers deciding
+ *  whether a fault is worth reporting. A refused request is not a fault. */
+export function isRefusal(err: unknown): boolean {
+  return isNotFoundError(err) || isUserFacingError(err)
 }

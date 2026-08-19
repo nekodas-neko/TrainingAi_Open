@@ -180,6 +180,7 @@ Injuries, Supplements, AI Periodization, Oura Ring, Body Battery.
 | NextAuth config | `auth.ts`, `auth.config.ts`, `app/api/auth/[...nextauth]/route.ts` |
 | Mobile token exchange | `lib/mobile-auth-tokens.ts` (`createMobileAuthToken`/`consumeMobileAuthToken`), `app/api/auth/exchange-mobile-token` |
 | Rate limiting | `lib/rate-limit.ts` → `rateLimit(key, limit, windowMs)` — every AI/expensive/write route gets one, match siblings |
+| A caught error in a route | `lib/api/route-errors.ts` → `refusalResponse(err, fallback)` + `isRefusal(err)`. **The one answer to a `catch` in a write route.** A `NotFoundError` or `UserFacingError` (`packages/shared/src/errors.ts`) is echoed with the status it carries; anything else gets `fallback` at 500 and keeps its detail in the log and `reportServerError`. Throw `UserFacingError(message, status)` for a refusal whose text was written for the user — that marker is what separates it from a Drizzle error, whose `.message` *is* the failing statement (Q-320). `scripts/check-no-raw-error-in-response.js` enforces it |
 | Request body guards | `lib/http/request-guards.ts` → `readJsonLimited(req, maxBytes)`, `isAllowedImageMime` |
 | PKCE (OAuth) | `lib/pkce.ts` → `computePkceChallenge`, `verifyPkce` |
 | ~~Oura webhook signature / OAuth state~~ | **Deleted 2026-08-13 with the Cloud integration (Q-224).** The fail-closed-verification and enumeration-oracle rules they demonstrated are in `CLAUDE.md` and still bind any new webhook. |

@@ -1567,33 +1567,6 @@ the H10 at home — which is the walk in the screenshot that started this.
   capture against a metronome, which is the procedure that produced the numbers in the docstring.
   State plainly that no device pass was run if none was.
 
-### [platform] Q-320 — `e.message` as a 500 body leaks the same SQL Q-483 just closed, at 14 sites
-
-- **Branch:** `fix/error-message-as-response-body`
-- **Added:** 2026-08-18 · Lane A, found while implementing Q-483 ·
-  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md) is
-  Q-483's source; this is the widening that entry's scope deliberately did not cover.
-- **How it was found.** The first draft of `scripts/check-no-raw-error-in-response.js` flagged these
-  as well as Q-483's four, and it was **right to**: `const msg = e instanceof Error ? e.message :
-  'Create failed'` followed by `NextResponse.json({ error: msg }, { status: 500 })` publishes a
-  Drizzle error's message, and a Drizzle error's message *is* `Failed query: select "id", "user_id",
-  …`. Same disclosure, different spelling.
-- **Why it is not folded into Q-483.** 14 sites across 8 files, and **several are deliberate**: the
-  same `msg` is returned on **4xx** paths where it is a real user-facing message ("An exercise with
-  that name already exists", "Not authorized"). Sorting the deliberate from the accidental is the
-  work here, and doing it inside Q-483 would have turned a three-line fix into an untested sweep.
-- **The sites** (`grep -n "error: msg\|error: message\|error: detail" app/api/**/route.ts`):
-  `admin/db-query`, `admin/exercises`, `admin/invites` (×3), `coach/apply/[id]/undo`, `exercises`
-  (×2), `friends`, `friends/[id]`, `phase-sets/[id]` (×2), `workout-templates` (×2).
-- **Fix shape:** at each site, split the two cases the single `msg` currently serves — a *chosen*
-  message on the 4xx branch (keep it) and a *caught* one on the 500 branch (replace with a fixed
-  string, as Q-483 did). Then widen `check-no-raw-error-in-response.js`, whose comment already
-  records why it is narrow and points here.
-- **Priced honestly, and low:** disclosure to an **authenticated** user, and Q-483's production check
-  found **zero** `22P02` rows, so the sibling shape has most likely never been served either.
-  Re-check that before pricing it upward.
-- **Lane A owns this** (`app/api/**`, `scripts/`).
-
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 
 - **Branch:** `fix/tier-a-enqueue-visibility`

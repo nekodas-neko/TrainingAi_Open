@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { refusalResponse, isRefusal } from "@/lib/api/route-errors";
+import { reportServerError } from "@/lib/observability";
 import { auth } from "@/auth";
 import { requireAdmin } from "@/lib/admin";
 import { getRepository } from "@/lib/data";
@@ -110,8 +112,11 @@ export async function PATCH(req: NextRequest) {
       exerciseType: body.data.exerciseType,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Update failed";
-    return NextResponse.json({ error: msg }, { status: 409 });
+    // Every error answered 409 with its own text as the body, so a missing row read as a name
+    // clash and a driver failure published its statement (Q-320). The status now comes from the
+    // thrown error: 404 missing, 409 clash, 500 anything unmarked.
+    if (!isRefusal(e)) reportServerError(e, { url: '/api/admin/exercises' });
+    return refusalResponse(e, "Update failed");
   }
   invalidateExerciseMuscleMap();
 
