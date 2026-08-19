@@ -12,6 +12,12 @@ import {
   TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD, TRANSITION_SEC_BODYWEIGHT,
 } from '@trainingai/shared/workout/duration-model'
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Thirteen mostly-scalar fields — but `equipment` and `musclesToFocus` are `z.array(z.string())`
+// with a `.min(1)` and **no `.max()`**, so the schema alone bounds neither their count nor their
+// length. Until those gain caps, this byte limit is the only thing bounding what reaches the model.
+const MAX_BODY_BYTES = 256 * 1024
 
 const RequestSchema = z.object({
   programName: z.string().min(1).max(100),
@@ -83,7 +89,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Rate limit exceeded. Try again in an hour.' }, { status: 429 })
   }
 
-  const body = await req.json().catch(() => null)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  }
+  const body = read.body
   const parsed = RequestSchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid input', issues: parsed.error.issues }, { status: 400 })
 

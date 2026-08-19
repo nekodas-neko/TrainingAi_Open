@@ -8,6 +8,10 @@ import { rateLimit } from '@/lib/rate-limit'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Same shape as the plan route plus one meal's ingredients. 256 KB is generous.
+const MAX_BODY_BYTES = 256 * 1024
 
 /**
  * Regenerate ONE meal against a target the caller already holds.
@@ -80,10 +84,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
   }
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const parsed = RequestSchema.safeParse(raw)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = RequestSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
