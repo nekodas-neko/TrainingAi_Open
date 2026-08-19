@@ -1088,47 +1088,32 @@ stays in Railway, no CSP changes"*) — that decision has since been reversed by
 note is a live consideration for the WebView, not a stale one.
 
 
-### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
+### [platform] Q-320 — `e.message` as a 500 body leaks the same SQL Q-483 just closed, at 14 sites
 
-- **✅ PRODUCTION-CHECKED 2026-08-18 — never triggered.** Zero `22P02` rows in `error_events` (owner's
-  rows, retained window), so the SQL-leaking response has, on this evidence, **never been served to
-  anyone**. Keep the fix — it is three lines and the disclosure is real — but do not re-price this
-  upward from the 500s alone.
-- **Branch:** `fix/no-raw-error-in-response-body`
-- **Added:** 2026-08-18 · review sweep (route-parameter validation) ·
-  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md)
-- **Placement:** upper-mid. Three files, a few lines each, and it is the only place in the app that
-  publishes table structure.
-- **Measured:**
-  ```
-  GET /api/workout-sessions/not-a-uuid/recap  →  500
-  {"error":"[ERROR]: Error: Failed query: select \"id\", \"user_id\", \"session_id\",
-   \"session_name\", \"started_at\", \"completed_at\", \"hr_synced_at\", \"warmup_ended_at\",
-   \"phase_id\", \"phase_type\", \"is_early_deload\", \"was_override\", \"intensity_mode\", …
-  ```
-  The control (a valid-but-missing UUID) returns `{"error":"Not found"}` 404, so this is specific to
-  the malformed id.
-- **It is the route's own catch, not a dev overlay — this ships in production:**
-  ```ts
-  const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/recap')
-  return NextResponse.json({ error: errMsg }, { status: 500 })
-  ```
-  `errorLog` (`packages/shared/src/logger.ts:1`) builds `` `${logPrefix} ${error}` `` and returns it.
-  **No environment check, no redaction.**
-- **Scope, measured:** four routes use `error: errMsg` / `error: errorLog(...)` as the response body —
-  `workout-sessions/[id]/{recap,energy,timing}` (all three leak) and `session-explain/insight`, which
-  **does not leak today** (a malformed `sessionId` is guarded upstream and returns a clean 404) but
-  carries the same pattern and would leak the moment an error reached its catch. Fix all four.
-- **What it is and is not.** Schema disclosure to an **authenticated** user, and this app's users are
-  its own account holders — not an anonymous-attacker hole. Worth fixing because it publishes table
-  structure nothing else exposes, into a JSON field a client may render, and because the fix costs
-  nothing: `reportServerError(error, …)` is already called on the line above, so redacting the
-  response loses no diagnostic information.
-- **Fix shape:** return a fixed string (`{ error: 'Internal error' }`) and keep `errorLog`'s output in
-  the server log only. Consider making `errorLog`'s return value unusable as a response body — or add
-  a Custom Rules step rejecting `error: errMsg` / `error: errorLog(` inside `NextResponse.json`, which
-  is the shape this repo already uses where prose would not hold.
-- **Lane A owns this** (`app/api/**`, `packages/shared/src/logger.ts`).
+- **Branch:** `fix/error-message-as-response-body`
+- **Added:** 2026-08-18 · Lane A, found while implementing Q-483 ·
+  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md) is
+  Q-483's source; this is the widening that entry's scope deliberately did not cover.
+- **How it was found.** The first draft of `scripts/check-no-raw-error-in-response.js` flagged these
+  as well as Q-483's four, and it was **right to**: `const msg = e instanceof Error ? e.message :
+  'Create failed'` followed by `NextResponse.json({ error: msg }, { status: 500 })` publishes a
+  Drizzle error's message, and a Drizzle error's message *is* `Failed query: select "id", "user_id",
+  …`. Same disclosure, different spelling.
+- **Why it is not folded into Q-483.** 14 sites across 8 files, and **several are deliberate**: the
+  same `msg` is returned on **4xx** paths where it is a real user-facing message ("An exercise with
+  that name already exists", "Not authorized"). Sorting the deliberate from the accidental is the
+  work here, and doing it inside Q-483 would have turned a three-line fix into an untested sweep.
+- **The sites** (`grep -n "error: msg\|error: message\|error: detail" app/api/**/route.ts`):
+  `admin/db-query`, `admin/exercises`, `admin/invites` (×3), `coach/apply/[id]/undo`, `exercises`
+  (×2), `friends`, `friends/[id]`, `phase-sets/[id]` (×2), `workout-templates` (×2).
+- **Fix shape:** at each site, split the two cases the single `msg` currently serves — a *chosen*
+  message on the 4xx branch (keep it) and a *caught* one on the 500 branch (replace with a fixed
+  string, as Q-483 did). Then widen `check-no-raw-error-in-response.js`, whose comment already
+  records why it is narrow and points here.
+- **Priced honestly, and low:** disclosure to an **authenticated** user, and Q-483's production check
+  found **zero** `22P02` rows, so the sibling shape has most likely never been served either.
+  Re-check that before pricing it upward.
+- **Lane A owns this** (`app/api/**`, `scripts/`).
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 
@@ -1336,6 +1321,21 @@ note is a live consideration for the WebView, not a stale one.
   `GET /api/nutrition/meal-plans/[id]` via `onRequestError`.
 
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
+
+- **⛔ OWNER-DEFERRED 2026-08-18 — accepted risk, do NOT implement. The fix already exists.**
+  The owner's call: *"leave that as a known issue for now — only admin will be me for a long time."*
+  The window opens only on **revocation**, and with a single permanent admin it never opens.
+  - **The work is done, tested and CI-green on `fix/exercises-route-admin-db-check` (PR #124)** —
+    the one-argument route change, the corrected `is-active-refresh.ts` docstring, four contract
+    tests, and `scripts/check-admin-claim-in-api.js`. Re-implementing it would duplicate that
+    branch, not add anything. If this becomes live, **merge #124**; do not start over.
+  - **What makes it live again:** a second admin granted and later revoked; the Play Store /
+    multi-user path advancing; or `isAdminUser` gaining another API-route caller (the CI check that
+    would catch that is on the branch, not on `main`).
+  - Full reasoning, and the caveat that `is-active-refresh.ts`'s docstring is currently **wrong**
+    until #124 lands, are in the `projectOverview.md` Known-Issues row.
+  - **Left in the queue rather than removed**, because the risk is accepted, not resolved — and a
+    removed entry is how a decision like this gets silently forgotten.
 
 - **Branch:** `fix/exercises-route-admin-db-check`
 - **Added:** 2026-08-18 · review sweep (auth/session boundaries) ·
@@ -5673,6 +5673,15 @@ session working from a temporarily restored copy.
   **1,592–2,219**; 28-day 22 → **13**, range **1,565–1,889**. Every harmful value blocked.
   *(Corrected 2026-08-19 from a 1,698 floor, which blocked more than the app's BMR would — 11 and 10
   passing. The proposal is unaffected; it simply blocks fewer windows than first stated.)*
+- **✚ ADDENDUM 2026-08-19 — the BMR is already persisted, so read it rather than recompute.**
+  `body_comp.bmr_kcal` carries the day's own BMR on **71 of 96** rows, computed by the same
+  `cunninghamBmr`. Reading it makes the floor **the day's** BMR rather than a window mean (the stored
+  series moves with weight/body fat — 1,522 and 1,524 on consecutive days) and **cannot drift from what
+  the body-composition card renders**, because it is the same number. **Fallback matters:** 25 of 96
+  rows have no `body_comp` (no body-fat reading, and `bodyComposition()` returns null rather than
+  fabricating) — on those days fall back to the **most recent snapshot**, never to the universal 1,000.
+  A stale BMR is far closer to the truth than a number ~500 kcal below it.
+  [`docs/reviews/2026-08-19-body-derived-scores-closeout.md`](reviews/2026-08-19-body-derived-scores-closeout.md) §3
 - **It makes the estimate SAFE, not CORRECT.** Survivors still sit well under the formula's 2,397
   — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
 - **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of

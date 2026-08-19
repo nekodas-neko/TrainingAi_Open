@@ -99,7 +99,7 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 | sleep | ✅ recalibrated (Q-503) + consumer audit (Q-511) |
 | readiness | ✅ Q-500 shipped, Q-504 refuted, threshold table completed (Q-511) |
 | activity | ✅ specified (Q-505) — build is Lane A's |
-| body | ✅ battery range clean; anchor measured (Q-511) |
+| body | ✅ battery range clean; anchor measured (Q-511). **Derived scores closed out 2026-08-19**: `bdi_derived` (46 rows, median 4.15, nothing ≥ 15, **no threshold exists** — only consumer is a debug console labelled *"observational, not a diagnosis"*) and `body_comp` (71 rows, deterministic, published formula matched to Oura's `atlas`). **Nothing to tune in either.** [`review`](../../reviews/2026-08-19-body-derived-scores-closeout.md) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
 | **workouts** | ✅ **swept 2026-08-18** — ACWR (Q-512/513), RPE autoregulation (Q-514). **Clean:** Foster monotony, and prescription adherence (actual 73.6% vs planned 73.1%, reps +0.25 — so `INTENSITY_ZONES` is realised, and calibrating those zones would be circular since the program was generated from them). Only Q-514 and the two ACWR call sites are open. **Foster monotony CLEAN** — mean 1.29, the 2.0 gate fires on 1 of 102 windows; rest days are properly seeded at 0, which is what makes it meaningful. 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
 | **heart-rate** | 🟡 **swept 2026-08-18** — `HR_REST_THRESHOLD` (**Q-515**: shrank 3× in a month because the owner got fitter; no fraction fixes it, the *anchoring* is the defect) and `PEAK_BANDS` (**Q-516**: observed set-peaks are 59–132, so 2 of 5 bands are **structurally unreachable** and 72% of episodes land in the band the spec de-emphasises — one usable bucket). **Karvonen zone boundaries checked and deliberately NOT filed** — they are consumed on *cardio* surfaces only, and the history holds ~13 run/treadmill sessions (newest 2026-07-24). Fitting five boundaries to that is fitting noise. **Do not re-open by measuring all-day HR** — that gives a 99% Zone 1 figure that reads like a finding and is the wrong denominator |
@@ -186,6 +186,12 @@ for this work:
   production"; **5h40m later a sibling writer had erased the key**. `COALESCE(excluded, existing)` on a
   `jsonb` column replaces the document whole, so the merge lives in each caller and only one of two
   does it. **When checking a shared field, the thing to observe is the NEXT write by someone else.**
+- **`bdi_derived` and `body_comp` are checked and have nothing to tune — do not re-measure them.**
+  BDI has **no threshold anywhere**; its only consumer is a debug console that labels it observational,
+  and `validation/oura-summary.ts` classes it an open-ended research metric. `body_comp` is a
+  deterministic derivation whose one formula is deliberately matched to Oura's `atlas` — same category
+  as cardio's Riegel/VDOT constants. If BDI ever gains a user-facing band, **that** is when it needs
+  calibrating, and not from 46 nights of one person.
 - **The app's BMR is `ffm × 21.6 + 370`, NOT the textbook Cunningham `500 + 22 × LBM`.**
   `body-composition.ts` deliberately matches Oura's `atlas` postprocessor, and the nutrition-goal
   baseline imports the same function. I used the textbook form from memory in Q-517 and published a
