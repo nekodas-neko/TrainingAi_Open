@@ -2401,33 +2401,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 - **Verification:** `shiftDateStr('0001-01-01', -1)` must give `0000-12-31`, and every existing
   `shiftDateStr` test must still pass unchanged.
 
-### [devices][platform] Q-493 — the ingest brute-force gate is bypassed by rotating one request header (7 sites)
-
-- **Branch:** `security/client-ip-from-trusted-hop`
-- **Added:** 2026-08-18 · review sweep (secret-gated ingest, driven for real) ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement: high.** It defeats a mitigation (SEC-I3) written specifically to stop this, on the
-  **only unauthenticated write into `body_metrics`**, and the same pattern guards the bearer path to
-  the owner's full health history.
-- **The defect.** Every limiter keys on `x-forwarded-for`'s **leftmost** hop — the value the *client*
-  supplied (a proxy appends its peer to the right). The caller therefore chooses the rate-limit key.
-- **Measured**, 30 wrong-secret attempts each way, limit 20/60 s. Both return 401 throughout (by
-  design), so the observable is `rate_limits`:
-  - **fixed** `X-Forwarded-For` → **1 key, count 20** — gate engaged, 10 attempts blocked.
-  - **rotating** → **30 keys, count 1 each** — **all 30 reached the secret compare.**
-- **Seven sites:** `health-connect/ingest`, `admin/day-review` (bearer → full health history),
-  `admin/db-query` ×2, `auth/register`, `auth/exchange-mobile-token`, `status`.
-- **Nothing in the docs records this, and the R1 security-hardening plan *propagated* it** — the
-  `status` route was added keyed by `x-forwarded-for` *"matching the existing pattern in
-  `auth/register` and `auth/exchange-mobile-token`"*.
-- **⚠️ Not verified:** whether Railway's edge proxy sanitises the header before the app sees it. Not
-  determinable from the sandbox, and probing production's limiter was not done unasked. The
-  code-level bypass is proven; production exploitability turns on that one unknown. **The fix does
-  not depend on it** — the leftmost hop is untrustworthy under the header's own semantics regardless.
-- **Fix:** one shared helper deriving the client IP from the **rightmost** hop or a configured
-  trusted-proxy count — the treatment `safeCompare` already has. Seven call sites should not each
-  re-decide this.
-
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
 - **Branch:** `fix/aria-expanded-collapsibles-ratchet`
