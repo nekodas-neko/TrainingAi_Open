@@ -74,8 +74,15 @@ and removing the try/catch around listeners reddens the throwing-subscriber case
   `@testing-library/react` is absent, so there is no route to rendering a hook. What is asserted is
   the signal it consumes; the wiring between them is read, not run.
 - **The owner's exact scenario is unconfirmed end to end** — log from Home and watch the bar move,
-  without leaving the tab. An E2E probe against the Home water path did not complete in this session
-  and was not committed half-working.
+  without leaving the tab. **Three E2E probes all measured zero `/api/nutrition/energy-balance`
+  requests**, so none of them ever reached the thing under test, and none was committed
+  half-working. Two fixture gaps found on the way, both worth knowing before the next attempt:
+  the seeded user has **no `height_cm` / `date_of_birth` / `sex`**, so the card sits in its
+  "add your details" state; and `HomeEnergyBalanceCard` is an **opt-in** Home widget —
+  `DEFAULT_CARD_WIDGETS` in `lib/home/home-prefs.ts` is an empty array, so nothing renders it by
+  default. Setting `ta_ss_cards` via `addInitScript` was not enough on its own. **A guard for this
+  needs a fixture that turns the widget on and gives the user a body, and that fixture does not
+  exist** — which is also why the bug survived to a user report.
 - **No device run**, and the persistent shell is what makes this reproduce: a browser reload masks
   it entirely. This is a JS-only change, so it reaches the APK on the next Railway deploy with no
   rebuild — but the check the entry asks for is still owed.

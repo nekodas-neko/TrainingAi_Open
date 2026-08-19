@@ -341,6 +341,13 @@ sequential.
 - **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
 - **Not verified:** static scan. **No screen was observed going stale** — the 36 are inferred from
   the shape, and the one confirmed instance is Q-402's, which is fixed.
+- **A guard needs a fixture that does not exist, and this is the reusable part.** Q-402's fix could
+  not be driven end to end because the seeded user has no `height_cm`/`date_of_birth`/`sex` (so the
+  energy card shows "add your details") **and** `DEFAULT_CARD_WIDGETS` is empty, so Home renders no
+  card widgets at all until one is turned on. Three probes measured zero
+  `/api/nutrition/energy-balance` requests. Whoever takes this should build that fixture first —
+  a seeded body plus `ta_ss_cards` via `page.addInitScript` — because every Home-card guard needs
+  it, and its absence is part of why a shell-only staleness bug reached a user report.
 
 ### [nutrition][app-shell] Q-401 — two calorie budgets on one screen, 274 apart, and the card that explains it is suppressed
 

@@ -798,7 +798,12 @@ const BASELINE = {
   // fewer. Q-359 is the 36 sibling fetch-once effects Q-402's mechanism now covers — filed rather
   // than swept, and its lines are the reason NOT to sweep: most are latent, some are deliberately
   // fetch-once, and a shrink-only ratchet may beat the sweep outright.
-  'docs/implementation-backlog.md': 10104,
+  // Raised again the same day (Q-402's fixture gap): the seven lines record WHY the fix could not
+  // be driven end to end — the seeded user has no body and Home renders no card widgets by default,
+  // so three probes measured zero requests. That is a reusable finding: every future Home-card guard
+  // needs the same fixture, and its absence is part of why a shell-only staleness bug reached a user
+  // report rather than a test.
+  'docs/implementation-backlog.md': 10111,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
