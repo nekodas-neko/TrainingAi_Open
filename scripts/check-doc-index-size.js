@@ -940,7 +940,12 @@ const BASELINE = {
   // Q-525 previously told an implementer the gate was unsatisfiable, which is a different
   // instruction from "the evidence is missing, rebuild first", and Q-522 was about to be fitted
   // against heart rate when the drift-proof anchor exists as an empty table.
-  'docs/implementation-backlog.md': 11236,
+  // Raised 2026-08-19 (Lane B, Q-414 measured): the entry told the implementer to check what the
+  // movement pipeline stores per interval. It stores 1.2% of counted steps, which makes two of the
+  // entry's own rules unsatisfiable together — the numbers are inline because the next session
+  // would otherwise re-measure production to find that out, and because "check the granularity"
+  // reads like a formality until you see 11 rows against 668,749 steps.
+  'docs/implementation-backlog.md': 11208,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
