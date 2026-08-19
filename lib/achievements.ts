@@ -1,6 +1,7 @@
 import { getDb } from '@/lib/data/postgres/client'
 import { sql } from 'drizzle-orm'
 import { formatInTimeZone } from 'date-fns-tz'
+import { shiftDateStr } from '@trainingai/shared/date-utils'
 import type { AchievementResult } from '@/components/profile/achievements-grid'
 import { calorieDayHitsGoal } from '@trainingai/shared/achievements-calc'
 import { reconcileUserStats } from '@/lib/data/postgres/slices/user-stats'
@@ -47,7 +48,9 @@ export function computeStreak(dates: string[], tz: string, maxRestGap = 0): { be
 
   // current streak: compare date strings in the user's timezone to avoid UTC-midnight drift
   const todayStr     = formatInTimeZone(new Date(), tz, 'yyyy-MM-dd')
-  const yesterdayStr = formatInTimeZone(new Date(Date.now() - 86_400_000), tz, 'yyyy-MM-dd')
+  // Q-489: shifted on the string, not by 86,400,000 ms — on a DST fall-back day the ms offset
+  // resolves to today, and a streak whose last entry was yesterday reads as broken.
+  const yesterdayStr = shiftDateStr(todayStr, -1)
   const mostRecentStr = sorted[sorted.length - 1]
 
   if (mostRecentStr !== todayStr && mostRecentStr !== yesterdayStr) return { best, current: 0 }
