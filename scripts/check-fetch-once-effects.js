@@ -33,7 +33,21 @@ const DIRS = ['app', 'components', 'lib'];
 // errors happened to cancel to within one. The count here is from the pattern below, which has been
 // mutation-checked in both directions.
 const BASELINE = {
-  // ── CAN BITE: permanently mounted. 19 sites.
+  // ── CAN BITE: permanently mounted. 12 sites, down from 19 (Q-359 slice 1 converted six files).
+  //
+  // What is left is the four tab-screen orchestrators — `session-select-content` (4),
+  // `health-content` (2), `nutrition-content` (2), `workout-select-content` (1) — plus the two
+  // sheets the tab screens mount with a null prop. Slice 1 deliberately took the leaf cards first:
+  // they own one key each and convert without touching screen state, which the orchestrators do not.
+  //
+  // **⚠ This grouping has now been wrong twice, and the second one is the more instructive.** The
+  // first correction was 14 → 19 (sheets do not unmount here). The second: `cardio/trends-section`
+  // was filed under "Health, via health-sections" and is not rendered there at all — its only
+  // renderer is `cardio/cardio-content.tsx`, and `/cardio` is NOT one of the five tabs in
+  // `components/shell/tabs.ts`, so it unmounts like any route. The can-bite group was 18, not 19.
+  // Converting it was still right, but the count was wrong. **Confirm a renderer by grepping for
+  // the component name and checking the result against `tabs.ts` — never by the directory a file
+  // sits in**, which is what produced both errors.
   //
   // `components/shell/tab-shell.tsx` keeps all five tab contents mounted once visited, and **the tab
   // screens mount their sheets unconditionally** — `<ActivityDetailSheet log={selectedActivity} />`
@@ -45,14 +59,8 @@ const BASELINE = {
   'app/health/health-content.tsx': 2,
   'app/nutrition/nutrition-content.tsx': 2,
   'app/workout-select/workout-select-content.tsx': 1,
-  'components/home-day-timeline.tsx': 2,                     // Home
-  'components/activity/exercise-detected-card.tsx': 1,       // Home
   'components/activity/exercise-review-sheet.tsx': 1,        // Home, mounted with a null sessionId
-  'components/calendar-widget.tsx': 1,                       // Health, via health-sections
-  'components/health/hr-recovery-profile-card.tsx': 1,       // Health, via health-sections
-  'components/health/strength-progress-card.tsx': 1,         // Health, via health-sections
   'components/health/training-stress-line.tsx': 1,           // Health, via training-load-card
-  'components/cardio/trends-section.tsx': 1,                 // Health, via health-sections
   'components/activity/activity-detail-sheet.tsx': 1,        // Health, mounted with a null log
 
   // ── Deliberately fetch-once. 1 site.

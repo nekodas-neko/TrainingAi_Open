@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import { useAutoDetectionStore } from '@/lib/stores/auto-detection-store'
-import { cachedFetch } from '@/lib/sqlite/cache'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { invalidateOuraWorkoutReview } from '@/lib/cache-groups'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 
@@ -23,45 +23,34 @@ export function ExerciseDetectedCard({ onReview }: Props) {
   const dismissSession = useAutoDetectionStore(s => s.dismissSession)
   const addOuraSession = useAutoDetectionStore(s => s.addOuraSession)
 
+  const detected = useCachedValue<Array<{
+    id: string; activity: string; startDatetime: string; endDatetime: string;
+    distanceM: number | null;
+  }>>('oura-unreviewed-workouts', '/api/oura/workouts?unreviewed=true', TTL_MEDIUM)
+
   useEffect(() => {
-    function ingestWorkouts(workoutsData: Array<{
-      id: string; activity: string; startDatetime: string; endDatetime: string;
-      distanceM: number | null;
-    }>) {
-      const currentSessions = useAutoDetectionStore.getState().pendingSessions
-      for (const w of workoutsData) {
-        const startMs = new Date(w.startDatetime).getTime()
-        const endMs = new Date(w.endDatetime).getTime()
-        const alreadyCovered = currentSessions.some(
-          p => (p.source === 'oura' && p.ouraWorkoutId === w.id)
-            || (p.source === 'phone' && p.startMs < endMs && p.endMs > startMs)
-        )
-        if (alreadyCovered) continue
-        addOuraSession({
-          startMs,
-          endMs,
-          routePolyline: '',
-          distanceKm: w.distanceM ? w.distanceM / 1000 : 0,
-          durationMin: (endMs - startMs) / 60000,
-          activityType: w.activity.toLowerCase().includes('run') ? 'run' : 'walk',
-          source: 'oura',
-          ouraWorkoutId: w.id,
-        })
-      }
+    if (!detected) return
+    const currentSessions = useAutoDetectionStore.getState().pendingSessions
+    for (const w of detected) {
+      const startMs = new Date(w.startDatetime).getTime()
+      const endMs = new Date(w.endDatetime).getTime()
+      const alreadyCovered = currentSessions.some(
+        p => (p.source === 'oura' && p.ouraWorkoutId === w.id)
+          || (p.source === 'phone' && p.startMs < endMs && p.endMs > startMs)
+      )
+      if (alreadyCovered) continue
+      addOuraSession({
+        startMs,
+        endMs,
+        routePolyline: '',
+        distanceKm: w.distanceM ? w.distanceM / 1000 : 0,
+        durationMin: (endMs - startMs) / 60000,
+        activityType: w.activity.toLowerCase().includes('run') ? 'run' : 'walk',
+        source: 'oura',
+        ouraWorkoutId: w.id,
+      })
     }
-
-    function fetchWorkouts() {
-      return cachedFetch<Array<{
-        id: string; activity: string; startDatetime: string; endDatetime: string;
-        distanceM: number | null;
-      }>>(
-        'oura-unreviewed-workouts', '/api/oura/workouts?unreviewed=true', TTL_MEDIUM,
-        ingestWorkouts,
-      ).catch(() => {})
-    }
-
-    fetchWorkouts()
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [detected, addOuraSession])
 
   if (!pendingSessions.length) return null
 

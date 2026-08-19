@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.6",
+    date: "2026-08-19",
+    changes: [
+      "Six more cards \u2014 the day timeline, the calendar, strength progress, HR recovery, cardio trends and the detected-exercise card \u2014 now update themselves when their data changes, instead of showing whatever they loaded when the app started. This is the same fix as the heart-rate card got, applied to the next batch; the remaining screens follow.",
+    ],
+  },
+  {
     version: "1.325.5",
     date: "2026-08-19",
     changes: [
