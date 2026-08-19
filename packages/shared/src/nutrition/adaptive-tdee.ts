@@ -49,6 +49,25 @@ export interface MaintenanceDay {
   intakeKcal: number | null
   /** Body weight that day; null when not weighed. */
   weightKg: number | null
+  /**
+   * Q-387 — did the user say this day's food log was finished?
+   *
+   * A day the user abandoned halfway is byte-for-byte identical to a completed light day, and the
+   * mean cannot tell them apart. Measured with this module: 14 days at a true 2,600 maintenance,
+   * six of them stopping after lunch at 1,400, gave **2,086** — 514 kcal low, `confidence: 'medium'`,
+   * `excludedReason: null`. Linear at 86 kcal per partial day, and every row passed every gate.
+   *
+   * Two partial-day protections already existed and neither covered it: a day with *nothing* logged
+   * is `intakeKcal: null` and excluded from the mean, and *today* is excluded outright — the comment
+   * at `energy-balance-service` describes this exact trap while solving only the in-progress half.
+   * The author saw the version that self-corrects by evening and left the one that never does.
+   *
+   * **Absent means excluded, not assumed complete.** The failure mode has to be "the estimate waits"
+   * rather than "the estimate is quietly wrong": it feeds `targetFromMaintenance`, so the error lands
+   * on the recommended daily target with a cut's deficit on top — the app telling an under-logger to
+   * eat hundreds of kcal below real maintenance.
+   */
+  loggingComplete?: boolean
 }
 
 export type MaintenanceExclusion =
@@ -86,7 +105,12 @@ export function estimateMaintenance(
 ): MaintenanceEstimate {
   const sorted = [...days].sort((a, b) => a.date.localeCompare(b.date)).slice(-windowDays)
 
-  const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
+  // Q-387: `intakeKcal > 0` alone counted a day carrying one 200 kcal apple as a logged day, at
+  // 200 kcal. The user's own "I have finished logging today" is the only signal that separates a
+  // half-logged day from a light one — inference from logging shape was considered and rejected as
+  // uncorrectable by the person who knows the answer, and a "% below expected" threshold as
+  // circular (the expectation derives from the number being estimated).
+  const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0 && d.loggingComplete === true)
   const weighed = sorted.filter(d => d.weightKg != null && d.weightKg > 0)
 
   const meanIntakeKcal = logged.length > 0

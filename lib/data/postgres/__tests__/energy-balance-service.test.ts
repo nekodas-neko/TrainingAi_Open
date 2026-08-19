@@ -53,12 +53,14 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
   beforeEach(async () => {
     await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
   })
 
   afterAll(async () => {
     if (!canRun) return
     await pool.query(`DELETE FROM food_logs WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM body_metrics WHERE user_id = $1`, [TEST_USER_ID])
+    await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM food_items WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM meal_types WHERE user_id = $1`, [TEST_USER_ID])
     await pool.query(`DELETE FROM users WHERE id = $1`, [TEST_USER_ID])
@@ -73,12 +75,28 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     )
   }
 
-  /** 28 completed days ending yesterday: 2000 kcal/day, weight falling 1 kg linearly. */
+  /** Mark a day's food log finished (Q-387) — only marked days may enter the calibration. */
+  async function markLoggingComplete(date: string) {
+    await pool.query(
+      `INSERT INTO day_checkins (user_id, log_date, phase, food_logging_completed_at)
+       VALUES ($1, $2::date, 'evening', now())
+       ON CONFLICT (user_id, log_date, phase) DO UPDATE SET food_logging_completed_at = now()`,
+      [TEST_USER_ID, date],
+    )
+  }
+
+  /** 28 completed days ending yesterday: 2000 kcal/day, weight falling 1 kg linearly.
+   *
+   *  Q-387: every day is also MARKED complete. Before that flag existed, "logged" meant any non-zero
+   *  intake, so a day abandoned after lunch counted at its partial total and dragged the mean down
+   *  86 kcal per partial day with nothing flagged. Marking is now what makes a day usable, and this
+   *  helper marks them because the scenario it describes is a fully-logged history. */
   async function seedCalibratableHistory() {
     const start = shiftDateStr(TODAY, -28)
     for (let i = 0; i < 28; i++) {
       const d = shiftDateStr(start, i)
       await logFood(d, 2000)
+      await markLoggingComplete(d)
       await pool.query(
         `INSERT INTO body_metrics (user_id, date, weight_kg, steps) VALUES ($1, $2, $3, 0)
          ON CONFLICT (user_id, date) DO UPDATE SET weight_kg = EXCLUDED.weight_kg, steps = 0`,
@@ -94,6 +112,33 @@ describe.skipIf(!canRun)('energy balance — calibration window', () => {
     // Ate 2000/day while losing ~1 kg over the window — real burn exceeds intake.
     expect(r.maintenance!.kcal).toBeGreaterThan(2000)
     expect(r.maintenance!.weightRateKgPerWeek).toBeLessThan(0)
+  })
+
+  // Q-387, driven through the whole service rather than the shared module: an unmarked history is
+  // not a calibration input, however much food it contains. This is the end-to-end proof that the
+  // flag reaches `estimateMaintenance` — the day key is a plain 'YYYY-MM-DD' string on both sides,
+  // and a mismatch there would silently exclude everything and look exactly like correct behaviour.
+  it('falls back to formula when the days are logged but never marked complete (Q-387)', async () => {
+    const start = shiftDateStr(TODAY, -28)
+    for (let i = 0; i < 28; i++) {
+      const d = shiftDateStr(start, i)
+      await logFood(d, 2000)
+      await pool.query(
+        `INSERT INTO body_metrics (user_id, date, weight_kg, steps) VALUES ($1, $2, $3, 0)
+         ON CONFLICT (user_id, date) DO UPDATE SET weight_kg = EXCLUDED.weight_kg, steps = 0`,
+        [TEST_USER_ID, d, 80 - (1 * i) / 27],
+      )
+    }
+
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+
+    expect(r.maintenance?.source).toBe('formula')
+  })
+
+  it('calibrates once those same days ARE marked complete', async () => {
+    await seedCalibratableHistory()
+    const r = await computeEnergyBalance(repo, TEST_USER_ID, TZ, TODAY)
+    expect(r.maintenance?.source).toBe('calibrated')
   })
 
   it('does NOT move the maintenance estimate as the current day is logged', async () => {

@@ -684,7 +684,10 @@ export interface WorkoutRepository {
   // ── Day check-in (End of Day review) ────────────────────────────────────────
   getDayCheckin(userId: string, logDate: string, phase: string): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin | null>
   listDayCheckins(userId: string, from: string, to: string, phase: string): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin[]>
-  saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin>
+  /** Q-387 — `foodLoggingCompletedAt` is optional and LEFT ALONE when omitted: finishing a food log
+   *  and filling in the evening check-in are separate acts on the same row, and this upsert
+   *  overwrites every column it names. Pass `null` to undo; omit to preserve. */
+  saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'foodLoggingCompletedAt'> & { foodLoggingCompletedAt?: Date | null }): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin>
 
   countWorkoutSessions(userId: string): Promise<number>
 
