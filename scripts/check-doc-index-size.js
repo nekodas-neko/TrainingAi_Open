@@ -920,7 +920,11 @@ const BASELINE = {
   // and the second hook (`useInvalidationRefetch`) needs its existence and its reason recorded
   // where the next session looks, or the next read that cannot use `useCachedValue` gets a fourth
   // hand-rolled event listener.
-  'docs/implementation-backlog.md': 11289,
+  // Raised 2026-08-19 (Lane B): Q-360 filed — `goal-invalidation.spec.ts` asserts a goal reaches
+  // Health by reading a line that only renders when today has a step count, and the local seed's
+  // steps stop three days back. Filed rather than fixed in the same PR because the durable fix is
+  // in the seed, which no lane lists.
+  'docs/implementation-backlog.md': 11326,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

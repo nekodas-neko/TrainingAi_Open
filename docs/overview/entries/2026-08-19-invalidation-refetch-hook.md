@@ -68,3 +68,18 @@ issues three requests and a local-store read.
 - **No device run.** JS-only; reaches the APK on the next Railway deploy with no rebuild. The BLE
   drain path itself is device-only and was not exercised — but it is the path that already worked,
   and it is unchanged for `refreshTick`.
+
+## One unrelated failure found while verifying, and filed rather than absorbed
+
+The full local E2E run turned up `goal-invalidation.spec.ts` failing — *"a steps-goal edit reaches
+Health without a reload"*. It is **not this change**: it fails identically on an unmodified
+`origin/main` checkout at `968516f`. The panel renders `steps / goal` and the local seed's most
+recent `steps` value is 2026-08-17, with today's `body_metrics` row carrying NULL — so there is no
+step count to draw the goal into and the locator never appears. Filed as **Q-360**; the durable fix
+is a seed generated relative to the run date rather than from literal dates.
+
+Worth stating plainly because the tempting reading was the wrong one twice over: first that a
+neighbouring change had broken it, then — once it reproduced on `main` — that it was safe to ignore
+because CI is green. Neither is a finding. The finding is that a static seed and an assertion against
+*today* drift apart by one day per day, which is the rolling-window class CLAUDE.md already names one
+layer down.
