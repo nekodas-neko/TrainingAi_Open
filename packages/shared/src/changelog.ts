@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.331.0",
+    date: "2026-08-19",
+    changes: [
+      "Day detail now shows calories in against calories out across the day, so you can see when you refuelled against when you burned it. Meals appear as bars at the time you ate them; the burn line's shape comes from your heart rate. The day's totals are unchanged \u2014 only their timing is new, and the chart says so, because heart rate rises for reasons other than movement.",
+    ],
+  },
+  {
     version: "1.330.0",
     date: "2026-08-19",
     changes: [

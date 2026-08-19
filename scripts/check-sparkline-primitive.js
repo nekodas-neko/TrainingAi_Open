@@ -27,6 +27,11 @@ const EXEMPT = new Set([
   'components/activity/exercise-review-sheet.tsx',
   // x = (t - t0) / span, plus a 50% guide line and wall-clock end labels.
   'components/body-battery-card.tsx',
+  // Q-414. A fixed 0–1440 time axis with its own hour labels, TWO series (cumulative intake and
+  // cumulative burn) and bars for the discrete meals underneath them. The primitive projects x by
+  // index and draws one line, so it cannot express any of that — this is the same reason the three
+  // time-axis entries above are exempt rather than converted.
+  'components/health/energy-timeline-chart.tsx',
 ]);
 
 // Inline copies that predate this check. Shrink-only: replace with the primitive and delete the row.
