@@ -27,6 +27,7 @@
 // re-adding a bare read to any of them fails immediately.  2: the offline-first hot paths.
 // 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths.
 // 6: the workout and activity write routes.
+// 7: the nutrition CRUD routes.
 'use strict';
 const fs = require('fs');
 const path = require('path');
