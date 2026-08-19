@@ -18,7 +18,7 @@ const LIMIT = 800;
 // growth in the diff where a reviewer sees it, instead of letting these files drift upward one
 // unremarked commit at a time (which is how they reached these sizes).
 const BASELINE = {
-  'components/workout-screen.tsx': 1850,
+  'components/workout-screen.tsx': 1833,
   // Raised 2026-08-19 (Lane B, Q-359): 1456 -> 1458. The screen's `sleep-sessions` refetch moved
   // off the `ta:oura-ble-synced` event onto `useInvalidationRefetch`, which covers every writer of
   // that key rather than the one event that thought to dispatch — `invalidateBiometrics` clears it
