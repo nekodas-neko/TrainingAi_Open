@@ -69,6 +69,33 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform] 🟡 ACCEPTED RISK: a revoked admin keeps catalogue write access for ≤24h (Q-479, 2026-08-18)
+
+- **Owner decision, 2026-08-18: not fixing now — "only admin will be me for a long time."** The fix
+  is written, tested and CI-green; it is deliberately unmerged. Do **not** re-implement it: the
+  branch is `fix/exercises-route-admin-db-check` and the PR is #124.
+- **What it is.** `app/api/exercises` authorises from the session's `isAdmin` JWT claim rather than
+  reading the row, because it calls `isAdminUser(userId, isAdmin)` — which *returns the passed flag*
+  when given one. Its 61 sibling API routes call `requireAdmin`, which reads the row every call and
+  refuses to trust the claim. The claim refreshes at most once a day (`ISACTIVE_RECHECK_MS`).
+- **Measured**, admin granted → fresh login → token warmed → admin revoked in the DB, no re-login,
+  cookie rotation persisted: `POST /api/exercises` **201** (row created in `exercise_library`)
+  against `GET /api/admin/errors` **403**, same cookie, same instant, database already saying no.
+- **Why accepting it is reasonable, stated so it can be re-checked rather than re-argued.** The
+  window opens only on **revocation**. With a single permanent admin, admin is never revoked, so the
+  window never opens. The blast radius is also rows in a shared catalogue, not user data.
+- **What makes it live again** — any of these, and #124 should merge:
+  - a second admin is granted and later revoked;
+  - the Play Store / multi-user path in Canonical Runtime advances, since that is where non-owner
+    accounts and a real admin/non-admin boundary arrive;
+  - `isAdminUser` gains another API-route caller. `scripts/check-admin-claim-in-api.js` on that
+    branch would catch it — but that check is **not on `main`**, because it ships with #124.
+- **Also unmerged with it:** the correction to `lib/auth/is-active-refresh.ts`, whose docstring
+  currently claims *"This governs the UI only: `requireAdmin` reads the row from the database on
+  every call and never trusts this claim."* **That sentence is false for this one route**, and it is
+  why the gap went unseen — a reviewer who reads it stops looking. Until #124 lands, treat that
+  comment as wrong.
+
 ### [activity][platform] 🟢 Cross-user isolation holds; one route reports a success it did not perform (Q-556, 2026-08-18)
 
 - **The last reachable "structurally untested" item — a second account — driven for real.** The local

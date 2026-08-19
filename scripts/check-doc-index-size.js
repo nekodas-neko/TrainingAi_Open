@@ -758,7 +758,12 @@ const BASELINE = {
   // test on that style asserted the code's SIZE. A row that just said "fixed the label" would leave
   // the next reader believing the tests covered it. The other two update the print-test gate, which
   // now names a second pitch to scan.
-  'projectOverview.md': 7901,
+// Raised 2026-08-18 (Lane A, Q-479 owner-deferred): projectOverview 7893 -> 7920. An accepted-risk
+// row for a finding the owner chose not to fix — a revoked admin keeping catalogue write access for
+// up to 24h, which needs a revocation to open and there is only one permanent admin. It is longer
+// than a typical row on purpose: it has to stop the next session re-implementing a fix that already
+// exists and is green on an unmerged PR, and it has to record what would make the risk live again.
+  'projectOverview.md': 7928,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -803,7 +808,11 @@ const BASELINE = {
   // so three probes measured zero requests. That is a reusable finding: every future Home-card guard
   // needs the same fixture, and its absence is part of why a shell-only staleness bug reached a user
   // report rather than a test.
-  'docs/implementation-backlog.md': 10197,
+// Raised 2026-08-18 (Lane A, Q-479 owner-deferred): backlog 10124 -> 10139. The ⛔ annotation on the
+// Q-479 entry — the owner accepted the risk, so the entry stays in the queue rather than being
+// removed, and has to carry "do NOT implement, the fix is green on PR #124" plus what would make it
+// live again. An accepted risk that reads like an open item is how the decision gets re-litigated.
+  'docs/implementation-backlog.md': 10147,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

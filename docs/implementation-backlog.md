@@ -1290,6 +1290,21 @@ note is a live consideration for the WebView, not a stale one.
 
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
+- **⛔ OWNER-DEFERRED 2026-08-18 — accepted risk, do NOT implement. The fix already exists.**
+  The owner's call: *"leave that as a known issue for now — only admin will be me for a long time."*
+  The window opens only on **revocation**, and with a single permanent admin it never opens.
+  - **The work is done, tested and CI-green on `fix/exercises-route-admin-db-check` (PR #124)** —
+    the one-argument route change, the corrected `is-active-refresh.ts` docstring, four contract
+    tests, and `scripts/check-admin-claim-in-api.js`. Re-implementing it would duplicate that
+    branch, not add anything. If this becomes live, **merge #124**; do not start over.
+  - **What makes it live again:** a second admin granted and later revoked; the Play Store /
+    multi-user path advancing; or `isAdminUser` gaining another API-route caller (the CI check that
+    would catch that is on the branch, not on `main`).
+  - Full reasoning, and the caveat that `is-active-refresh.ts`'s docstring is currently **wrong**
+    until #124 lands, are in the `projectOverview.md` Known-Issues row.
+  - **Left in the queue rather than removed**, because the risk is accepted, not resolved — and a
+    removed entry is how a decision like this gets silently forgotten.
+
 - **Branch:** `fix/exercises-route-admin-db-check`
 - **Added:** 2026-08-18 · review sweep (auth/session boundaries) ·
   [`docs/reviews/2026-08-18-auth-session-boundaries.md`](reviews/2026-08-18-auth-session-boundaries.md)
