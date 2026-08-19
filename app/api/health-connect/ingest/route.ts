@@ -5,6 +5,7 @@ import { getRepositoryAsync } from "@/lib/data";
 import { formatInTimeZone } from "date-fns-tz";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { rateLimit } from "@/lib/rate-limit";
+import { readJsonLimited } from "@trainingai/shared/http/request-guards";
 import { reportServerError } from '@/lib/observability'
 
 // Called by Tasker on Android — no session cookie, auth via shared secret.
@@ -29,20 +30,11 @@ const IngestBodySchema = z.object({
   distanceKm: z.coerce.number().min(0).max(500).nullable().optional(),
 });
 
+// Ten small numbers, a date and a secret. 16 KB is two orders of magnitude of headroom over the
+// largest real Tasker payload, which is the point of a cap being generous but finite.
+const MAX_INGEST_BODY_BYTES = 16 * 1024;
+
 export async function POST(req: NextRequest) {
-  let rawBody: unknown;
-  try {
-    rawBody = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
-  }
-
-  const parsed = IngestBodySchema.safeParse(rawBody);
-  if (!parsed.success) {
-    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
-  }
-  const body = parsed.data;
-
   const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
 
   // SEC-I3: the success-side limiter below only bounds valid Tasker calls, so a
@@ -50,9 +42,30 @@ export async function POST(req: NextRequest) {
   // write into body_metrics). Gate ALL attempts per IP before the constant-time
   // compare — legit Tasker volume is ~1/min, far under this — and return the same
   // 401 body on trip so it stays indistinguishable from a bad secret.
+  //
+  // Q-498 moved this ABOVE the body read, which is the larger half of that finding: the read and
+  // the Zod parse used to happen before any gate, so an unauthenticated caller holding no secret
+  // made the server buffer and fully parse an arbitrary body — measured at 20,000,048 bytes — and
+  // the limiter could not throttle it because it ran afterwards. The limiter is keyed on the IP
+  // from the headers, so it needs nothing out of the body; the entry's suggestion of moving the
+  // secret to a header to achieve this turned out not to be necessary, and would have broken the
+  // owner's Tasker profile for no extra benefit.
   if (!rateLimit(`hc-ingest-fail:${ip}`, 20, 60_000)) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+
+  const read = await readJsonLimited(req, MAX_INGEST_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === "too_large"
+      ? NextResponse.json({ error: "Request too large" }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
+
+  const parsed = IngestBodySchema.safeParse(read.body);
+  if (!parsed.success) {
+    return NextResponse.json({ error: "Invalid body" }, { status: 400 });
+  }
+  const body = parsed.data;
 
   const expectedSecret = process.env.HEALTH_CONNECT_INGEST_SECRET;
   if (!expectedSecret || !safeCompare(body.secret, expectedSecret)) {
