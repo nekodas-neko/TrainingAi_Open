@@ -44,6 +44,16 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 - [`docs/reviews/2026-08-19-body-battery-drain-and-roadmap.md`](../../reviews/2026-08-19-body-battery-drain-and-roadmap.md) — **why Body Battery doesn't feel right, from an owner brief, 2026-08-19** (Q-521 — drain tracks **ring wear time, not exertion**: `corr(hr_sample_count, total_drained)` **+0.518** against `corr(steps, total_drained)` **−0.153**, and a workout moves `end_value` by **0.6 points**. The four days ending at 0 had 828–4,152 steps. Includes the exertion-integrated design brief, the roadmap showing sleep is already delivered and Activity already specified, and the constraint that `active_calories` covers only 8 of 51 days).
 
+- [`docs/reviews/2026-08-19-body-battery-drain-model.md`](../../reviews/2026-08-19-body-battery-drain-model.md) — **the Body Battery drain model, fitted 2026-08-19 — read before implementing
+  Q-521.** Owner confirmed **goal-normalised** drain plus a **BMR-proportional baseline**
+  (*"the fitter we get, the more workout stimulus we should need for draining, outside of BMR
+  draining which should naturally go up too"*). Parameters: `baseline 25 × (bmrToday/bmrReference)`,
+  activity `c^2.0` over a 50/50 workout-and-steps completion. **A linear split cannot satisfy the
+  brief** — every allocation tried lands mean 26–34 / sd 16–22, because a typical day is ~58% of a
+  full one. Expect **less** spread than today (sd ~22.6 vs 30.1) and that is correct: today's spread
+  is largely ring wear time. Also found **one corrupt `body_comp` row** (2026-07-29: 3% body fat,
+  BMR 1,890) which is inert today and becomes load-bearing the moment BMR drives drain — **Q-527**.
+
 ## Open issues
 
 ```bash
