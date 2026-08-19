@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.329.0",
+    date: "2026-08-19",
+    changes: [
+      "Your macro targets now grow with the day like your calorie budget does. Earn 500 calories from movement and the carbs and fat you are aiming for go up to match; protein stays where it is, because it is set from your bodyweight and a walk does not change how much you need.",
+    ],
+  },
+  {
     version: "1.328.0",
     date: "2026-08-19",
     changes: [

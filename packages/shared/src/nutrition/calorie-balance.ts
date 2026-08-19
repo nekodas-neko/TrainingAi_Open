@@ -110,6 +110,55 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
   }
 }
 
+export interface MacroTargets {
+  proteinG: number
+  carbsG: number
+  fatG: number
+}
+
+/** kcal per gram. Not configurable — these are the Atwater factors the rest of the app uses. */
+const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const
+
+/**
+ * The day's macro targets once movement has grown the calorie budget (Q-323).
+ *
+ * `nutrition_targets` stores the **rest-day** macros, derived from the rest-day calorie floor. The
+ * budget on screen is `floor + earned from movement`, so the calorie figure moves through the day
+ * and the grams beneath it did not — the card told the user to eat 300 more kcal without saying of
+ * what.
+ *
+ * **Protein holds, and the reason is arithmetic rather than taste** (owner decision, 2026-08-19).
+ * It is dosed per kg of bodyweight, so 150 g is ~2 g/kg. Re-express that as a share of calories and
+ * apply it to a bigger day and it becomes ~2.6 g/kg — a protein requirement that rises because the
+ * user went for a walk. Movement burns carbohydrate and fat; it does not create protein demand.
+ *
+ * **Carbs and fat absorb the earned kcal in the proportion they already hold to each other.** What
+ * that preserves precisely is the **carbs:fat energy ratio** — not each macro's share of the day's
+ * total, which cannot stay fixed while protein is held constant and the total grows. Splitting into
+ * carbs alone (Q-401's first answer) would instead drift fat's share downward as the day's movement
+ * grows.
+ *
+ * Returns the input unchanged when nothing was earned. A budget only ever grows with movement, so a
+ * negative `earnedKcal` is meaningless here rather than a shrink to model.
+ */
+export function scaleMacrosForEarnedKcal(base: MacroTargets, earnedKcal: number): MacroTargets {
+  if (!Number.isFinite(earnedKcal) || earnedKcal <= 0) return base
+
+  const carbKcal = base.carbsG * KCAL_PER_G.carbs
+  const fatKcal = base.fatG * KCAL_PER_G.fat
+  const splittable = carbKcal + fatKcal
+
+  // A target with no carbs and no fat has no ratio to preserve. Everything goes to carbs, which is
+  // the answer Q-401 reached before the ratio refinement, and the case is degenerate anyway.
+  const carbShare = splittable > 0 ? carbKcal / splittable : 1
+
+  return {
+    proteinG: base.proteinG,
+    carbsG: Math.round(base.carbsG + (earnedKcal * carbShare) / KCAL_PER_G.carbs),
+    fatG: Math.round(base.fatG + (earnedKcal * (1 - carbShare)) / KCAL_PER_G.fat),
+  }
+}
+
 /**
  * Marker position for the bar, 0..1 across the five bands. The bar is drawn on a fixed
  * deviation scale of ±(OUTER + ON_TARGET) so the green band always occupies the same middle
