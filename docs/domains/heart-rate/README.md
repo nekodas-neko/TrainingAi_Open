@@ -48,6 +48,14 @@ second copy. Same for zone thresholds.
   the ring's sampling cadence — an exact **300 s**, against a `DEFAULT_MAX_GAP_SEC` of 120 whose own
   comment says a ring samples ~1/min — which truncates **80.1%** of ring intervals.)
 
+- [`docs/reviews/2026-08-19-active-minutes-who-threshold.md`](../../reviews/2026-08-19-active-minutes-who-threshold.md) — **`maxHr` vs `targetAnchorMax`, and the WHO band mismatch, 2026-08-19.**
+  `resolveHrProfile` resolves **two** ceilings on purpose: `maxHr` uses the observed max only when it
+  is ≥ age-predicted (so a soft month cannot make ordinary efforts read as maximal), while
+  `targetAnchorMax` uses the corroborated observed max for *reachable* targets. Measured:
+  `estimatedMax` **187**, `observedMax` **167** (5th-highest of 72,519 readings, `CORROBORATION = 5`).
+  **Active-minutes must anchor on `targetAnchorMax`; %-of-max effort math keeps `maxHr`.** Third
+  consumer of the Q-515/Q-516 banding problem.
+
 ## Open issues
 
 ```bash

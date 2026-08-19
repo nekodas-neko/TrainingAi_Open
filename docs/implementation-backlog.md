@@ -1395,8 +1395,31 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
      item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
      the meals outlive it.
-  3. Entering from the Nutrition tab starts you **inside the nutrition scope** — see Q-408, which is
-     the general version of that and is deliberately not a blocker for this entry.
+  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
+     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
+     data" is a request the model will occasionally ignore, while a tool it never receives is a
+     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
+     patch domains + widget sources) rather than an inline filter, so a second coach can have one
+     without a refactor. That one line is all that survives of Q-408 — see the note below.
+
+- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
+  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
+  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
+  nobody re-files it unexamined:**
+  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
+     between coaches, and every decision in that design would have been made against imagined
+     requirements until a real second coach exists.
+  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
+     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
+     architecture's central question was never how to separate the coaches but how to let them talk
+     anyway, which is a harder problem than the one that motivated it.
+  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
+     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
+     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
+     The real saving — naming a `source` and letting the server fill the list — already exists as
+     `CHOICE_SOURCES` and is already in this entry.
+  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
+  real requirements. The named-record shape above is what keeps that cheap.
 
 - **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
   optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
@@ -1663,77 +1686,6 @@ and a denylist for the health routes. There is also a **prior decision against a
 stays in Railway, no CSP changes"*) — that decision has since been reversed by the owner, and the CSP
 note is a live consideration for the WebView, not a stale one.
 
-
-### [platform] Q-408 — scope the Coach into per-section specialists; today one prompt carries every domain and every tool
-
-- **Branch:** `docs/scoped-coach-architecture`
-- **Added:** 2026-08-19 · BugFix Intake, from the owner · **plan-first: PR 1 is a design doc, not code**
-- **Placement:** low, and deliberately so. The owner said *"For now lets focus on nutrtion. but
-  please scope this for later."* Q-407 delivers the nutrition conversation without waiting on this;
-  this entry is what stops Q-407 from becoming a one-off that the workout and goal flows later
-  copy-paste.
-- **Owner's words:** *"the workout building/ meal builder/ goals wtc. Shoudl all follow the same AI
-  coach chat stye with widgets etc in it. … Ideally we want it scoped more narrowly based on where
-  you opened it from - i.e nutrition should be related to nutition queries and shouldnt realy be
-  able to touch workout data. So maybe we should do it like this — Home is called AI Coach; it has
-  access to all coaches - Then Ai Workout Couch, Ai Nutrition Coach, Ai Goal coach etc. … I want a
-  heavy focus on the widgets/UI conversation ability etc. We should try reduce AI tokens; so
-  hardcode as much detail as possible before sending."*
-
-- **What exists today, so the plan starts from fact not from a blank page.** `app/api/coach/route.ts`
-  (191 lines) builds **one** turn: one `SYSTEM` prompt, `buildChatTools(...)` + `buildWidgetTools(...)`
-  + `google_search`, `stopWhen: stepCountIs(6)`. Write authority is already domain-scoped and already
-  enforced server-side — `COACH_PATCH_DOMAINS` is six domains, `DOMAIN_FIELDS` bounds which fields
-  each may set (*"a model that mixes domains cannot write a calorie goal onto an exercise row"*),
-  and `DOMAIN_TIER` decides how heavy the confirmation is (`program_phase` is the only tier 3).
-  **So the write side is scoped and the read side is not.** A nutrition conversation can call every
-  workout read tool and the whole workout system prompt is paid for on every turn regardless.
-
-- **The three questions the plan has to answer.** Do not start writing code until these are decided:
-  1. **What is a scope, mechanically?** The cheapest honest answer is a named bundle of
-     (system-prompt section, tool subset, patch-domain subset, widget-source subset) — a record
-     keyed by scope, not a new route per coach. Say outright whether a scope is a *filter over one
-     route* or *separate routes*, and why. A filter keeps `dangling-widgets`, threads, the apply
-     path and the confirm screen written once.
-  2. **What does "cannot touch workout data" mean — refusal, or absence?** These are different and
-     only one is a boundary. If the nutrition scope simply does not receive the workout tools, it
-     *cannot* read them; if it receives them and is told not to, it is a polite instruction and the
-     model will occasionally ignore it. Prefer absence, and say what the coach does when the user
-     asks anyway — `HandoffSchema` already routes to real screens
-     (`'program_builder' | 'log_activity' | 'profile' | 'nutrition'`) and is the natural exit, but
-     its destination enum will need the other coaches added to it.
-  3. **What is Home?** The owner's model is that Home has access to all coaches and routes to them.
-     Decide whether Home is (a) the unscoped coach as it is today, with routing added, or (b) a thin
-     router that holds no tools and only dispatches. (b) is the one that makes the token argument
-     true; (a) is the one that does not regress anyone who uses Home for a cross-domain question
-     like *"what should I eat before tomorrow's legs session?"* — which is the exact case the mockup
-     draws, and which a strict scope would break. **Cross-domain reads are the hard part of this
-     design; a plan that does not name how they work is not finished.**
-
-- **The token argument, with the measurement that supports it.** Q-170 measured Coach's latency as
-  almost entirely output-token generation (~1.8 s fixed + ~270 tokens/sec), and found that a picker
-  turn emitted **2,204 output tokens to render a ~400-token widget**; dropping the thinking level
-  took it to **554 tokens and 10.0 s → 3.5 s**. That is the lever that worked. **Two others were
-  measured and both made it worse — inlining the program into the system prompt, and forcing a
-  sentence before every tool call.** So "hardcode as much detail as possible before sending" must
-  be read as *"name a `source` and let the server fill the list"* (the `CHOICE_SOURCES` pattern),
-  **not** as *"put more into the prompt"* — the second is the thing already proven to backfire, and
-  the plan must say so or someone will try it a third time.
-- A shorter per-scope system prompt is an **input**-token saving, and input tokens are not what
-  Q-170 found to dominate. Do not promise a latency win from scoping alone; the honest claim is
-  narrower answers, a real boundary, and fewer tools for the model to choose wrongly among.
-
-- **Deliverable of PR 1.** A design doc in `docs/superpowers/plans/` plus backlog entries for the
-  implementation, per the backlog protocol. It should carry: the scope record's shape; the
-  per-scope tool/domain/source table for nutrition, workout and goals; the Home routing decision
-  with the cross-domain case answered; what `HandoffSchema` grows; and which parts are Lane A
-  (`app/api/coach/**`, and `lib/coach/**` once a lane claims it) versus Lane B
-  (`components/coach/**`, the entry points).
-
-- **Do not let this block Q-407.** Q-407's multi-select and its nutrition conversation are useful
-  standalone and are the owner's stated focus. If this plan later moves where scope lives, moving
-  one conversation is a small change; waiting for the architecture before shipping any of it is how
-  the nutrition work stalls.
 
 ### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
 
@@ -5677,6 +5629,10 @@ session working from a temporarily restored copy.
   the 23 stored days are still scored under the old goals because history is not back-filled — the
   same trap the sleep recalibration hit. Reconstructing from contributors at effective weights
   predicts a ceiling of **sd ≈ 10.2** under current goals (steps ⟂ strengthVolume, r = −0.016).
+- **⛔ Do Q-526 FIRST.** `activity_contributors` currently stores the blend wrapper, not the six
+  components, so the old model's contributor history is not recorded anywhere. Land the redesign
+  first and that history is lost permanently — and the before/after comparison that would show
+  whether the redesign worked cannot be made. Q-526 is one line at an existing persist site.
 - **This entry absorbs Q-277**, whose investigation is complete (see the review's §1 and §4).
 - **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
   same-day steps **r = +0.417** — and **2026-08-12 scored 76 on 828 steps while 2026-08-16 scored 64
@@ -6483,7 +6439,17 @@ session working from a temporarily restored copy.
   profile is empty is better calibrated than the personalised value that replaces it.**
 - **Measured:** 10,000 is reached on **16 of 90 days (18%)**; the owner's own 7,000 on **31 of 90
   (34%)**; mean 6,044 steps (sd 4,715, range 464–23,740).
-- **Owner decision, not a calculation.** Three coherent answers and they are mutually exclusive:
+- **✅ OWNER DECIDED 2026-08-19:** *"We need to use 1 number here. The AI should be able to define
+  the number and allow for manual entry."* → **`users.steps_goal` becomes the single source.**
+  `getDailyGoals()` reads that column instead of deriving from `activity_level`, falling back to the
+  derived value only when it is unset. **The AI half already exists and needs no new work** —
+  `/api/nutrition-goals/recommend` computes a recommended steps goal and
+  `components/profile/goal-recommendation-sheet.tsx` writes it to exactly that column, with manual
+  entry alongside it in `goals-section.tsx`. So this is a read-side change plus a fallback, not a new
+  feature. **Sequencing note:** once `getDailyGoals` reads the profile, the Activity Score's steps
+  contributor changes for every historical day it is recomputed on — expected, and worth stating in
+  the changelog because the owner reads that number daily.
+- **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   (1) the profile value wins everywhere — the owner set it, and it matches Paluch; (2) the derived
   value wins everywhere and the profile field becomes display-only or is removed — but then the
   activity-level map should be re-checked against Paluch, since 10,000 is above the cited plateau;
@@ -6495,6 +6461,69 @@ session working from a temporarily restored copy.
   unreconciled sources for the same metric.
 - **Caveats:** one user, one activity level. The map's other tiers (`sedentary` 7,000, `light` 8,500,
   `active`/`extra_active` 12,000) are unmeasured here — only `moderate` was exercised.
+
+### [platform][activity] Q-526 — the Activity Score stores the blend wrapper where its contributors should go
+
+- **Branch:** `fix/persist-activity-contributors` · **Lane:** A
+- **Plan:** none needed — **one line at an existing persist site.** Evidence:
+  [`docs/reviews/2026-08-19-score-audit-trail.md`](reviews/2026-08-19-score-audit-trail.md) §1.
+- **Added:** 2026-08-19 · Tuning agent, found while checking whether each score can be re-audited.
+- **What is stored.** `lib/health/readiness-payload.ts` writes
+  `{ base: activityBlend.base, adjustment: activityBlend.adjustment, trained: … }` into
+  `oura_daily_derived.activity_contributors`. That is the **blend wrapper**, not
+  `computeActivityScore`'s six components (`steps`, `activeEnergy`, `zoneMinutes`, `moveHours`,
+  `strengthFreq`, `strengthVolume`). **The components are already in memory on the same request** —
+  `activityResult.components`, which the same function serves to the client. They are simply not
+  written.
+- **Activity is the only score with this gap.** Over 96 rows: sleep stores 10 real sub-scores (36
+  rows), readiness stores its contributors **plus `provisional` flags** (35), illness stores all four
+  biomarker z-scores on **every** scored row (46). Activity stores the wrapper on all 23.
+- **It has already cost a measurement.** The 2026-08-19 contributor audit had to rebuild all six
+  contributors from raw inputs, and could only do so **at today's goals** — `strengthFreqGoal` went
+  3 → 5 and the volume target changed basis on **2026-08-11**. So *"what did `strengthFreq` score on
+  2026-08-02?"* is **unanswerable**, and the audit reported a *predicted* sd ceiling (≈ 10.2) instead
+  of the real historical spread. Sleep and readiness had no such problem on the same days.
+- **It compounds with the no-backfill trap.** Stored history is not rewritten after a model change,
+  so each recalibration adds a segment — and without a trail there is no way to tell later which
+  segment a day belongs to. `model_versions` is on 71 of 96 rows and Body Battery is still the only
+  score that stamps one (Q-273).
+- **Do this BEFORE Q-505 (the Activity redesign), not after.** The redesign changes the contributor
+  set; landing it first means the old model's contributor history is lost permanently, and the
+  before/after comparison that would show whether the redesign worked cannot be made.
+- **Pass test:** `activity_contributors` holds the six component keys, and a day's stored sub-scores
+  reproduce its stored `activity_score` under the weights in force that day.
+- **Caveats:** keep `base`/`adjustment`/`trained` — the blend wrapper is real information (it is how
+  a Cloud-era adjustment is distinguished from our own base) and something may read it. Merge, do not
+  replace.
+
+### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
+
+- **Branch:** `fix/chronic-stress-gate` · **Lane:** A
+- **Plan:** none yet — **the question is whether to trigger the wide pass or relax the gate**, and the
+  first is owner/device-gated. Evidence:
+  [`docs/reviews/2026-08-19-score-audit-trail.md`](reviews/2026-08-19-score-audit-trail.md) §2.
+- **Added:** 2026-08-19 · Tuning agent.
+- **Measured:** `chronic_stress_score` and `chronic_stress_contributors` are **NULL on all 96 rows**.
+  Never produced once. This is the **third dormant score**, after the illness radar (Q-506 — no
+  action-bearing flag in 46 days) and resilience (Q-508 — one value, level 5, on all 13 rows).
+- **Mechanism — the gate is stricter than it reads.** `adapter.ts`'s `chronic_stress` step returns
+  early below `CHRONIC_STRESS_MIN_DAYS`, then `computeChronicStress` runs the golden-verified
+  `cumulative_stress_1_2_2` port, which needs **21 complete nights of granular BLE signals in a
+  trailing 31-night window**. The step's own comment names the binding constraint: *"the intermediate
+  history is built from THIS pass's stashed signals, so the first score requires a wide/full rollup
+  pass covering ≥21 nights of real ring data (owner/device-gated)."* **It is not enough for 21 good
+  nights to exist — they must be present in ONE pass**, so a nightly incremental rollup can never
+  satisfy it however long it runs.
+- **First action:** confirm whether ≥21 qualifying nights exist in the data at all before touching the
+  gate. If they do, this is a *trigger* problem (run the wide pass) and needs no code. If they do not,
+  it is a coverage problem and belongs with Q-510, which found daytime-stress coverage is not
+  persisted anywhere.
+- **Do NOT merge with Q-507.** That is `STRESS_HIGH_DAY_THRESHOLD_MIN` — *daytime* stress minutes
+  driving the session override, which does fire, on the wrong days. This is the separate vendored
+  *cumulative* model. They share a word and nothing else.
+- **Caveats:** a dormant score is not a broken one — the gate may be correctly refusing to score on
+  insufficient data, which is what the first action distinguishes. Do not relax a gate before knowing
+  which.
 
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
@@ -6570,9 +6599,39 @@ session working from a temporarily restored copy.
   `activeMinutesFromZoneSeconds` then doubles vigorous minutes, doubling the gap with it. Only 26 of
   59 days have strap data. **Fixing the floor without fixing this leaves zone minutes
   non-comparable across days** — derive the cap from the observed source cadence.
-- **Open question this entry deliberately does not answer:** what Zone 2 floor *would* carry signal
-  for this athlete. Fitting one needs days the owner would call "active" to fit against — owner
-  labels, not more SQL. Do not guess a number into the code.
+- **✅ ANSWERED 2026-08-19 — no owner labels were needed, and the ask for them was withdrawn.**
+  [`docs/reviews/2026-08-19-active-minutes-who-threshold.md`](reviews/2026-08-19-active-minutes-who-threshold.md).
+  **Two changes, and the second is the big one.**
+  1. **Anchor active-minutes on `targetAnchorMax`, not `maxHr`** (owner instruction: *"use current
+     recorded high and set a % off it… make it dynamic so as max HR increases the zones can too"*).
+     `resolveHrProfile` **already computes both**: `estimatedMax` = 187 (220 − 33), corroborated
+     `observedMax` = **167** (5th-highest of 72,519 readings over 90 days, so a spike cannot move it).
+     `maxHr` deliberately refuses to drop below the age prediction — correct for %-of-max effort math,
+     wrong for this. It is dynamic by construction: a rolling 90-day order statistic.
+  2. **`activeMinutesFromZoneSeconds`'s WHO mapping is shifted one band.** Its comment says Zone 2
+     (**≥60% reserve**) is *"WHO moderate"*. **WHO/ACSM moderate is 40–59% of reserve; 60% is where
+     *vigorous* begins.** So what the code counts once as moderate is actually vigorous, and
+     **moderate intensity — brisk walking, stairs, carrying things — maps to no zone at all and earns
+     nothing.** It has been scoring zero by construction.
+  - **Proposed rule:** moderate = **[0.40, 0.60) of reserve ×1**, vigorous = **≥0.60 ×2**, both off
+    `targetAnchorMax`. For this athlete today: **99–121 bpm ×1, ≥121 ×2.**
+
+  | contributor `zoneMinutes` (weight 10) | shipped | observed-max only | **proposed** |
+  |---|---|---|---|
+  | days reading **zero** | **53/59** | 38/59 | **6/59** |
+  | mean active minutes | 1.4 | 2.6 | **24.7** |
+  | days hitting the 22-min goal | ~2 | 2 | **23/59** |
+  | sub-score mean / sd | ~6 / ~0 | — | **63.8 / 38.7** |
+
+  **That makes it the highest-variance contributor in the Activity Score**, above `steps` (sd 33.4).
+  The published threshold is not a guess: the sweep is smooth around 0.40, so a small error in the max
+  estimate does not swing it.
+- **Do NOT re-cut `ZONE_DEFS`.** Zones 1–5 are *training* zones for cardio prescription and are not
+  wrong; the defect is in the roll-up that borrows them for a *public-health* question. Add the WHO
+  bands alongside. Likewise `maxHr` stays conservative — only the active-minutes path moves.
+- **Re-measure the strength-day suppression guard after this lands.** It exists because a lifting day
+  scored a structural zero; at a 99 bpm floor lifting days will not be zero, so the guard may become
+  unnecessary or actively wrong.
 - **Pass test:** zero-zone-minute days must fall from 53/59 to something that tracks the owner's own
   sense of an active day, and ring-only vs strap days must produce comparable minutes for comparable
   effort.
@@ -6656,15 +6715,38 @@ session working from a temporarily restored copy.
   same app, both read by a user as "how recovered am I", sharing no variance. Either one is wrong,
   or they answer different questions (readiness = *should I train today*; battery = *how much is
   left right now*) and no surface says so.
-- **Decide before building.** Three coherent outcomes, and they are mutually exclusive:
+- **✅ OWNER DECIDED 2026-08-19 — outcome (1): they are different questions, and both now have a
+  definition.** *"Body battery should be more like 'how much energy I have left'. Readiness should
+  just be a starting number based on your previous day + sleep, so you can see how your day is
+  typically based on data."*
+  - **Body Battery = energy remaining right now.** Intraday, depletes through the day, floors at 0.
+    This is consistent with — and now the stated purpose behind — Q-521's exertion-integrated drain.
+  - **Readiness = a morning starting number from the previous day and the night's sleep.** Set once,
+    static for the day.
+  - **Readiness needs NO model change to match that definition — checked, not assumed.** All nine
+    `READINESS_WEIGHTS` contributors are overnight or previous-day measures: `previousNight` 0.16,
+    `restingHeartRate` 0.15, `hrvBalance` 0.15, `temperature` 0.10, `sleepBalance` 0.10, `checkin`
+    0.10, `prevDayActivity` 0.09, `recoveryIndex` 0.09, `activityBalance` 0.06. **Nothing reads
+    today's activity.** It is already the number the owner described.
+  - **So this resolves to a presentation change, not a modelling one:** label the two so a reader
+    cannot mistake them for the same question, and stop placing them adjacent without that framing.
+    **That makes it Lane B's, not Lane A's**, and it unblocks now rather than after Q-272.
+  - **The +0.12 end-of-day correlation is no longer a defect.** Two numbers answering different
+    questions are not required to agree; the earlier framing assumed they should. What remains worth
+    watching is only that the anchor **starts** at readiness (+0.93) — i.e. the day begins where
+    readiness says and then diverges as energy is spent, which is exactly the intended behaviour.
+- **Superseded — the three options as originally posed.** Kept for the reasoning, not the choice:
   1. **They are different questions** → the UI must label them as such, and they should probably
      never be adjacent without that framing.
   2. **They should agree** → the intraday model needs to preserve the anchor's information (which
      overlaps heavily with Q-272's charge/drain rebalance).
   3. **One is redundant** → drop it and reclaim the screen space. §2.4 argues *against* adding a
      sixth score for exactly this reason; the same logic applies to keeping a fifth.
-- **Do not action this in isolation.** Q-272 changes the intraday curve and will move this
-  correlation on its own; re-measure after it lands before deciding.
+- ~~**Do not action this in isolation.** Q-272 changes the intraday curve and will move this
+  correlation on its own; re-measure after it lands before deciding.~~ **No longer applies** — the
+  owner decided the *question* each score answers, which does not depend on where the correlation
+  settles. The labelling work can proceed now; Q-272 and Q-521 change Body Battery's behaviour
+  underneath it without changing what it is for.
 
 ### [platform][devices] Q-280 — Q-214's duplicate-collapse fix reached one of three same-shaped batch upserts
 
@@ -8514,6 +8596,35 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   present on only **39 of 56** scored nights, so the score already means something different on the
   other 17. Down-weighting them changes that asymmetry rather than fixing it — decide and document
   what a night with neither contributor should score before shipping.
+
+- **⚑ 2026-08-19 — the yardstick question is answered, and the obvious next move was the wrong one.**
+  [`docs/reviews/2026-08-19-sleep-validation-targets.md`](reviews/2026-08-19-sleep-validation-targets.md).
+  This entry says *"whatever closes this needs a better yardstick first: more spread in the ratings, a
+  different outcome to predict, or a rank-based measure."* All three were tested.
+  - **More spread in the ratings: NO — and the ask was withdrawn.** The owner explains the flatness
+    (*"upon waking I don't feel instantly super rested or not rested… generally it's a mid"*), and
+    measurement backs them: `sleep_quality_feel` (sd ~0.8, 5 values used) is the **most** variable
+    self-report in the app. `perceived_recovery` sd 0.36 / 2 values; `motivation` 0.34; `wake_mood`
+    0.39; **`resting_soreness` sd 0.00 — exactly 3 in all 20 entries.** Asking for performative spread
+    would also invalidate the 46 nights already collected.
+  - **A different outcome: only one candidate, and it is weak.** Against raw sleep measures (not the
+    composite, per the Q-511 rule): **steps r = +0.210**; training volume **+0.028** and mean RPE
+    **−0.023**. The latter two are **structurally disqualified** — volume is *prescribed by the app*
+    (adherence 73.6% actual vs 73.1% planned, Q-514), so it cannot respond to sleep, and
+    `RPE_DEAD_BAND = 1.5` makes RPE deliberately insensitive.
+  - **The rating is better than any alternative anyway:** `sleep_quality_feel` (sign-corrected) vs
+    efficiency **+0.316**, vs duration +0.220 — against `mood_logs.energy_level`'s −0.114 and +0.107.
+    Low variance is not no information. `energy_level` still has the best *spread* (75 entries, ok 35 /
+    good 34 / low 4 / drained 2 — categorical labels get answered where abstract magnitudes get a 3)
+    and is worth adding as a **secondary** target.
+  - **So do the rank measure, and re-run after the recalibration.** Two groups — the 6 nights rated
+    1/4/5 against the 40 rated 2/3 — answers "do flagged-unusual nights score differently?", which 6
+    nights *can* support and a coefficient cannot. **And every correlation here predates v1.319.0**
+    (mean 84.1 → 69.5, sd 15.9 → 16.6): a rating cannot agree with a score that barely moved. Blocked
+    only on ~3 weeks of nights accumulating under the new model, since history is not back-filled.
+  - **⚠️ Do not quote `energy_level` ↔ HRV = −0.424 as a finding.** It is the largest coefficient in
+    that review and points the wrong way; Pearson on a 4-level ordinal with 92% of mass in two adjacent
+    levels manufactures exactly this. Needs a rank measure and a training-day confound check first.
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
