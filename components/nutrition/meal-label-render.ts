@@ -82,7 +82,7 @@ export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: st
   { value: 'plaque', label: 'Plaque', note: 'Double ring, no write-on line — the second-largest code.' },
   // Q-393, and since Q-411 it is no longer a special case — every style draws square, so this one is
   // simply the layout that puts the code beside the calories rather than under them.
-  { value: 'square', label: 'Big code', note: 'The code sits beside the calories rather than under them, which makes it the largest of the six.' },
+  { value: 'square', label: 'Big code', note: 'The code sits beside the calories rather than under them, so it stays large while the label still prints the ingredient list.' },
 ]
 
 // B2, per the owner's decision (Q-397): "Yes have B2 as the default". It is not merely a nicer
@@ -222,12 +222,21 @@ const SPECS: Record<MealLabelStyle, StyleSpec> = {
     reversedHeader: false, rule: 'ring', nameSize: 13, caloriesSize: 27, macroSize: 8.5,
     nameTracking: 0.02, uppercaseName: false,
   },
-  // codeUnits 70 is chosen from the TRUE pitch, not the documented one: the quiet zone is drawn
-  // inside this box, so a 25-module symbol occupies 70/33 units per module = 0.56 mm. Every round
-  // style is between 0.37 and 0.48 mm by the same measure, so this is the most scannable code the
-  // feature has — which is the point of spending the corners.
+  // **76 is the largest code that still leaves three ingredient lines, and that bound is the point.**
+  // Q-411 first set this to 90 — reflexively, because it was resizing every style — and 90 is wrong
+  // for a reason worth writing down: `square` was ALREADY drawing on a square canvas before Q-411
+  // (it carried the retired `squareOnly` flag), so it is the one style that gained no area from that
+  // change and had nothing to spend. The 20 extra units came straight out of the list: 3 of the
+  // fixture's 8 ingredients became 1, on the style whose own picker note promises the breakdown.
+  // That is the Q-399 failure shape — a layout that claims a list and prints almost none — and
+  // `e2e/meal-label.spec.ts` caught it only because the sheet's copy went singular.
+  //
+  // The list room is `168 − (56 + codeUnits)` against a 9-unit line, so three lines need
+  // `codeUnits ≤ 76`. At 76 the module is (76/189)*50/33 = 0.609 mm: still ahead of every style but
+  // `plaque`, and ahead of main's own 70 (0.561) — so this remains a gain on both axes, which 90
+  // was not.
   square: {
-    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 90, writeOnLine: true,
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 76, writeOnLine: true,
     reversedHeader: true, rule: 'solid', nameSize: 12, caloriesSize: 24, macroSize: 8,
     nameTracking: 0.04, uppercaseName: true, ingredients: true, layout: 'beside',
   },
@@ -297,15 +306,20 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, family: string, we
  * this arithmetic inline until Q-399, which is the "One Formula, One Place" bug class and is how a
  * defect can sit in one copy and not the other.
  *
- * `scale` is the canvas scale, and it is here because the module grid is FRACTIONAL in device
- * pixels for every style that ships — `box × scale / 33` is 4.35 px per module for `band`, 6.24 for
- * the old default, none of them whole. Every module edge therefore lands mid-pixel and antialiases
- * to grey; the `+0.04` bleed below papers over the resulting seams rather than removing them. That
- * is tolerable when a module is 6 px and marginal when it is 4.7: at 0.401 mm per module the same
- * label decoded on one run of `e2e/meal-label.spec.ts` and not the next. Raising the canvas scale
- * is what fixed it here — see `DEFAULT_RENDER_SCALE`. Snapping the grid to whole device pixels is
- * the better fix and is **Q-358**, deliberately not done in the same change because it shrinks the
- * drawn box and every reported figure with it.
+ * **The module grid is snapped to whole device pixels (Q-358).** Sized in sheet units the cell is
+ * `box / 33`, so its width in device pixels is `box × scale / 33` — fractional for every style at
+ * every scale tried. Every module edge then lands mid-pixel and antialiases to grey, by a different
+ * sub-pixel amount per module, and a decoder reading the render sees a grid whose boundaries do not
+ * agree with each other. That is why the same label decoded on one run of `e2e/meal-label.spec.ts`
+ * and not the next. Q-399 raised `DEFAULT_RENDER_SCALE` to buy margin and the flake went quiet;
+ * Q-411 then resized every code and it came straight back, on `plaque` (14.94 px/module) and
+ * `square` (17.02) in consecutive runs — which is the proof that margin was never the fix.
+ *
+ * So this paints in DEVICE space: reset the transform, floor the cell to a whole pixel, and centre
+ * the snapped grid inside the box the layout allotted. Every module is then pixel-identical and the
+ * render is deterministic. The cost is at most one device pixel per module row — 561 px against
+ * 561.6 for `square`, under 0.2% — which is why the reported millimetre figures still derive from
+ * `codeUnits` rather than from the snapped size.
  */
 function drawCode(
   ctx: CanvasRenderingContext2D,
@@ -314,20 +328,31 @@ function drawCode(
 ) {
   const n = qr.modules.size
   const quiet = 4
-  const cell = box / (n + quiet * 2)
+  const grid = n + quiet * 2
+
+  const t = ctx.getTransform()
+  const cellPx = Math.max(1, Math.floor((box * Math.min(t.a, t.d)) / grid))
+  const sizePx = cellPx * grid
+  const originX = Math.round(t.e + x * t.a + (box * t.a - sizePx) / 2)
+  const originY = Math.round(t.f + y * t.d + (box * t.d - sizePx) / 2)
+
+  ctx.save()
+  ctx.setTransform(1, 0, 0, 1, 0, 0)
+  // The quiet zone is part of the symbol, so it is painted from the snapped origin too — a paper
+  // rect drawn in sheet units would leave a fractional border the binarizer has to guess at.
   ctx.fillStyle = paper
-  ctx.fillRect(x, y, box, box)
+  ctx.fillRect(originX, originY, sizePx, sizePx)
   ctx.fillStyle = ink
   for (let r = 0; r < n; r++) {
     for (let c = 0; c < n; c++) {
       if (qr.modules.data[r * n + c]) {
-        // +0.04 closes the hairline antialiasing seams between adjacent modules, which read as a
-        // lighter code and cost scan margin.
-        ctx.fillRect(x + (c + quiet) * cell, y + (r + quiet) * cell, cell + 0.04, cell + 0.04)
+        // No antialiasing bleed here any more: whole-pixel rects on a whole-pixel grid abut exactly,
+        // so the `+0.04` seam patch this replaced has nothing left to cover.
+        ctx.fillRect(originX + (c + quiet) * cellPx, originY + (r + quiet) * cellPx, cellPx, cellPx)
       }
     }
   }
-
+  ctx.restore()
 }
 
 /**

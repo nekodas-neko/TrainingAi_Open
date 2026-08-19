@@ -803,6 +803,10 @@ const BASELINE = {
   // fewer. Q-359 is the 36 sibling fetch-once effects Q-402's mechanism now covers — filed rather
   // than swept, and its lines are the reason NOT to sweep: most are latent, some are deliberately
   // fetch-once, and a shrink-only ratchet may beat the sweep outright.
+  // Ratchets DOWN 2026-08-19 (Lane B, Q-411 shipped): Q-358's entry out, nothing filed in its
+  // place, 43 fewer. Q-358 was built rather than deferred because Q-411 resized every code and the
+  // fractional-grid flake it describes came straight back — a decode E2E that passes on a coin flip
+  // cannot gate the change that caused it, so the two had to land together.
   // Raised again the same day (Q-402's fixture gap): the seven lines record WHY the fix could not
   // be driven end to end — the seeded user has no body and Home renders no card widgets by default,
   // so three probes measured zero requests. That is a reusable finding: every future Home-card guard
@@ -838,7 +842,7 @@ const BASELINE = {
   // if it SCALES, the default module goes to 0.397, fractionally WORSE than the 0.401 it replaced.
   // A struck entry with no caveat would leave "the codes got bigger" as the record, which one print
   // could falsify.
-  'docs/implementation-backlog.md': 10528,
+  'docs/implementation-backlog.md': 10485,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

@@ -30,12 +30,26 @@ Every style's code grew, and the default gained a line at the same time:
 | `editorial` | 0.481 | 0.513 |
 | `ticket` | 0.417 | 0.537 |
 | `plaque` | 0.520 | 0.633 |
-| `square` | 0.561 | 0.722 |
+| `square` | 0.561 | **0.609** |
 
 The centred stack's header drops from 86.5 units to **69.5** (the margin falls from 26 to 9), so the
 default now draws **four** ingredient lines where it drew three — *and* a code 40% larger. The
 budget was re-derived rather than left at its round-era numbers, which is what the entry asked for:
 leaving them would have reserved the extra area and never used it.
+
+`square` is the exception in that table and the exception is the interesting part. It was **already**
+drawing on a square canvas before this change — it carried the `squareOnly` flag the change retires —
+so it is the one style that gained no area here and had nothing to spend. The first draft raised it
+from 70 to 90 anyway, reflexively, because every other style was being raised; the 20 units came
+straight out of its ingredient list, taking three of the fixture's eight ingredients down to **one**
+on the style whose own picker note promises the breakdown. That is the Q-399 failure shape exactly.
+It is capped at 76 now — the largest code that still leaves three lines — which is 0.609 mm, ahead of
+main's 0.561 on both axes rather than trading one for the other.
+
+The E2E caught it by accident and now catches it on purpose. The assertion read
+`/Printing \d+ ingredients — …/` and failed only because the sheet's copy pluralises: it saw
+"1 ingredient", not "1 ingredients". Had the count been two the regression would have shipped. The
+regex now carries an explicit `[2-9]` floor with the reason written beside it.
 
 ## ⚠ The gain is expected, not proven, and one print decides it
 
@@ -117,4 +131,9 @@ of the surface reports a third of the problem.
   styles have their rendered code decoded from canvas pixels, which fails if something overruns it.
   But a collision landing on the **ingredient text** rather than the code would not be caught, the
   other two styles are only checked for ink, and nobody has looked at all six at the new sizes.
-- The module grid is still fractional in device pixels (**Q-358**), unchanged here.
+- **The module grid is no longer fractional** — Q-358 landed here rather than waiting its turn, and
+  the reason is that it had to. Resizing every code changed every module width, and the decode flake
+  Q-399 thought it had bought margin against came straight back: `plaque` failed one run at 14.94
+  device pixels per module, `square` the next at 17.02. A decode E2E that passes on a coin flip
+  cannot gate the change that caused it. `drawCode` now paints in device space with a whole-pixel
+  cell, and all four decoded styles passed on the first run afterwards.

@@ -1780,49 +1780,6 @@ the H10 at home — which is the walk in the screenshot that started this.
   a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
   but not Postgres's). The consequence at each call site is read from source.
 
-### [nutrition] Q-358 — every meal-label QR is drawn on a fractional pixel grid, so every module edge is grey
-
-- **Branch:** `fix/label-code-pixel-snap`
-- **Added:** 2026-08-19 · Lane B, found while fixing Q-399 ·
-  [`journal`](overview/entries/2026-08-19-label-line-budget.md)
-- **Placement:** low-mid. **Mitigated, not fixed**, and the mitigation is what makes it low: Q-399
-  doubled the canvas to 600 dpi, which took the default's module from 4.7 device pixels to 9.5 and
-  made the E2E decode reliable again. The grid is still fractional; there is just enough resolution
-  now that it does not matter. That is a margin, not a fix.
-- **What.** `drawCode` sizes a module as `box / 33` in sheet units and the canvas is scaled by a
-  constant, so the module width in device pixels is `box × scale / 33` — **fractional for every
-  style that ships**, at every scale tried:
-  ```
-  scale 3.12 (300 dpi)   band 4.35 px   inlineCentred 4.73   plaque 5.67   square 6.62
-  scale 6.24 (600 dpi)   band 8.70 px   inlineCentred 9.45   plaque 11.35  square 13.24
-  ```
-  Every module edge therefore lands mid-pixel and antialiases to grey. **The `+0.04` bleed in
-  `drawCode` is an acknowledgement of exactly this** — it papers over the resulting hairline seams
-  instead of removing them, and its own comment says the seams "read as a lighter code and cost scan
-  margin".
-- **How it showed up.** At 300 dpi and 0.401 mm per module, `e2e/meal-label.spec.ts`'s decode of the
-  **rendered canvas** became a coin flip — the same geometry decoded on one run and failed the next,
-  with the label visibly correct in the screenshot. That is the signature: not a broken code, a
-  fuzzy one.
-- **Why it matters beyond the test.** The canvas **is** the printed artwork — share/save hands the
-  viewer these pixels. A grey-edged module is exactly what ink spread then merges, which is the
-  failure mode the owed print test is looking for, and it would present as "the scanner doesn't
-  work".
-- **Fix shape:** snap the cell to a whole number of device pixels (`floor(box × scale / 33)`), snap
-  the origin to a pixel boundary too, and drop the `+0.04` — adjacent modules then abut exactly.
-  **The catch, and why it was not folded into Q-399:** flooring shrinks the drawn box, and at
-  300 dpi it shrank it a lot (a 50-unit box snapped to 42.3, pitch 0.401 → 0.339). Every reported
-  figure would then be wrong — `codeMm`, the sheet's mm-per-module line, and
-  `mealLabelCodeMetrics`, which is the number `meal-label-code-size.test.ts` asserts and the number
-  the owner reads before printing. **At 600 dpi the loss is much smaller** (9.45 → 9 px, ~5%), which
-  is the version worth building: snap, then make `mealLabelCodeMetrics` report the SNAPPED size so
-  the figure and the artwork agree.
-- **Verification:** run the E2E decode several times, not once — the tell is flakiness, not failure.
-  Then the physical print, which is the only real check and is already owed.
-- **Lane B owns this** (`components/nutrition/**`).
-- **Not verified:** the pixel counts are arithmetic from `scale` and `codeUnits`, not measured off a
-  rendered canvas. No print.
-
 ### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
 
 - **Branch:** `fix/memo-call-sites-stable-props`

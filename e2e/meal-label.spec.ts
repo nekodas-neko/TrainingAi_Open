@@ -190,9 +190,16 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // switched off, because the style then fell through to the round painter. Mutation-checked.
   // Eight ingredients against a layout that fits fewer, so this also asserts the overflow is
   // SUMMARISED rather than dropped — and that the count reported matches what was drawn.
+  //
+  // **The `[2-9]` lower bound is deliberate, and it earned its place.** It was `\d+` and passed only
+  // because the sheet's copy is pluralised: Q-411 raised this style's `codeUnits` from 70 to 90,
+  // which took the list from three of the eight to ONE, and the assertion failed on the singular
+  // "1 ingredient" rather than on the count. That was luck. A style whose picker note promises the
+  // breakdown printing one line of eight is the Q-399 failure this file exists to catch, so the
+  // floor is now stated rather than left to English grammar.
   await expect(
-    page.getByText(/Printing \d+ ingredients — \d+ more (is|are) summarised/),
-    'the square style must report what it drew and what it could not fit',
+    page.getByText(/Printing [2-9]\d* ingredients — \d+ more (is|are) summarised/),
+    'the square style must print several ingredients and report what it could not fit',
   ).toBeVisible({ timeout: 20_000 })
 
   // Q-411 retired the round constraint: every style draws square now, so there is no longer a
