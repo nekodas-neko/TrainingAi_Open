@@ -142,6 +142,15 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - [`docs/reviews/2026-08-18-ble-era-input-drift.md`](../../reviews/2026-08-18-ble-era-input-drift.md) — **the BLE-only Recovery Index refit, run on 42 nights, 2026-08-18** (Q-509 — the refit lands at 3.31 h against a shipped anchor of 5, and the anchor must **not** move: it and the input shrank by the same factor, so the hours estimator carries a multiplicative bias from the ~2× noisier BLE series. Q-510 — resilience is starved by the daytime-stress coverage check, which is persisted nowhere, and `worn_hours_ble` is NULL on all 96 rows).
 
+- [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](../../reviews/2026-08-19-daily-summary-replace-wipe.md) — **`oura_daily_summary` holds 1 row against 198,223 raw samples, 2026-08-19**
+  (Q-528). `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
+  the guard sits on the INSERT, not the DELETE — so a full-history pass over a narrow input wipes
+  the history and returns successfully, with no error and no log. The windowed path is safe, which
+  is why it survived: only the rarely-taken `fullHistory` branch can do it. **Illness scores from
+  the same array survived** because they write through a COALESCE upsert to a different table.
+  Also records `oura_bucket` and `step_live_windows` at **0 rows system-wide** — the first carries
+  `met_mean`/`motion_mad`, the drift-proof anchor Q-522 needs. **Corrects Q-525's diagnosis.**
+
 ## Open issues
 
 ```bash

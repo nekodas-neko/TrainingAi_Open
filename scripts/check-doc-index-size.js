@@ -933,7 +933,14 @@ const BASELINE = {
   // Health by reading a line that only renders when today has a step count, and the local seed's
   // steps stop three days back. Filed rather than fixed in the same PR because the durable fix is
   // in the seed, which no lane lists.
-  'docs/implementation-backlog.md': 11374,
+  // RATCHETS DOWN 2026-08-19 (Tuning, Q-528): 11374 -> 11236, even though an entry was added — a
+  // parallel compaction landed more than this adds, and shrink-only means the reclaimed space is
+  // locked in rather than left free to refill silently. A destructive-replace finding, plus corrections
+  // to Q-525's diagnosis and Q-522's open question. The corrections had to land IN those entries:
+  // Q-525 previously told an implementer the gate was unsatisfiable, which is a different
+  // instruction from "the evidence is missing, rebuild first", and Q-522 was about to be fitted
+  // against heart rate when the drift-proof anchor exists as an empty table.
+  'docs/implementation-backlog.md': 11236,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
