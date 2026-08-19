@@ -1617,47 +1617,6 @@ silently breaks upgraded devices while every test and fresh install passes.
 - **Not in scope:** photos on individual food items or on logged entries. One image per *saved
   meal*, which is the surface the owner asked about and the only one where the row is durable.
 
-### [platform] Q-404 — the Sentry SDK was deliberately deferred and never queued, so nothing was going to wire it
-
-- **Branch:** `feat/wire-sentry-sdk`
-- **Added:** 2026-08-18, after the owner got Sentry's *"no errors are coming through yet"* email and
-  asked whether it was set up. It is not — and the reason is documented, but **only in a handoff.**
-- **Lane A** (root config, `instrumentation.ts`, `next.config`, a new dependency).
-
-**The state, precisely.** `docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`
-lists under *Deliberately NOT done*: **"The Sentry SDK is not wired. DSN is in Railway, a read token is
-in a session env. Deferred on purpose so the session that wires it can verify events arrive rather
-than assume — a configured DSN and a silently-dropping one look identical."** Confirmed in the tree:
-no `@sentry/nextjs` dependency, no `sentry.*.config.ts`, no `SENTRY_*` reference in any source file.
-
-**Why this entry exists at all.** The deferral was a good call, and it was recorded in the right place
-for a narrative — but **there was no backlog entry**, so nothing in the queue was going to pick it up.
-A deferral that lives only in a handoff is an orphaned finding by the repo's own rule, and Sentry's own
-email is what surfaced it rather than anything in this repo.
-
-**⚠ The verification requirement is the whole point — do not skip it.** The deferring session's
-stated reason was that a wired-but-silent DSN is indistinguishable from a working one. So this item is
-not done when the SDK is installed; it is done when **a deliberately-thrown error is observed arriving
-in the Sentry project**. Throw one from a server route and one from the client, and record both in the
-PR.
-
-**What it adds that `error_events` does not.** Server errors are already captured — `instrumentation.ts`
-`onRequestError` → `lib/observability/request-error.ts` → `error_events` — and client errors too, via
-`components/error-reporter.tsx` (mounted at `app/layout.tsx:143`) and `app/error.tsx`. So Sentry is not
-filling a capture gap. It fills the **alerting** gap: `error_events` is pull-only, prunes at 30 days,
-and CLAUDE.md records that the first read found three faults of which two had already stopped before
-anyone looked. Nothing notifies. Wire it for that, and say so in the PR so the next reader does not
-think the home-grown path is now redundant — **it is not, and it should not be removed.**
-
-**⚠ PII, and this is a health app.** Sentry's defaults capture URLs, breadcrumbs and sometimes request
-bodies. Health values, user ids and food/weight data must not leave to a third party by accident. Ship
-the scrubbing config **in the same PR as the DSN**, not after — `beforeSend`, `sendDefaultPii: false`,
-and a denylist for the health routes. There is also a **prior decision against a vendor** on record
-(`docs/overview/history-latest.md:625`, *"Decision made against a Sentry-type vendor: single user, data
-stays in Railway, no CSP changes"*) — that decision has since been reversed by the owner, and the CSP
-note is a live consideration for the WebView, not a stale one.
-
-
 ### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
 
 - **Branch:** `feat/walk-step-goal`
