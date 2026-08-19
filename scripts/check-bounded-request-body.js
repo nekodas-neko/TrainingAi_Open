@@ -20,14 +20,14 @@
 // **What is left is printed by this script on every run and is deliberately NOT written down here.**
 // A hand-maintained running total is one more thing to re-edit per slice and get wrong, and it
 // conflicts on every parallel merge. The BASELINE below is the worklist; the summary line is the
-// score.  Q-322 tracks the sweep, and this check is what makes doing it slowly safe.
+// score.
 //
 // Slices so far — 1: the three routes reachable **without a session** (`auth/register`,
 // `auth/exchange-mobile-token`, `health-connect/ingest`), deliberately absent from the baseline so
-// re-adding a bare read to any of them fails immediately.  2: the offline-first hot paths
-// (`nutrition/food-logs` ×2, `log-exercise`, `complete-workout`, `sync/push`, `water-log`).
-// 3: the credential and admin-write ones (`user/password`, `user/profile`, `user/goals`,
-// `admin/users`, `admin/vacuum`).
+// re-adding a bare read to any of them fails immediately.  2: the offline-first hot paths.
+// 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths
+// (`oura-ble/accel-chunks`, `live-steps`, `rekey`, both sample backfills, `samples/pack`,
+// `hr-ingest`, `sync-health`).
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -69,7 +69,6 @@ const BASELINE = {
   'app/api/food-logging-complete/route.ts': 1,
   'app/api/friends/[id]/route.ts': 1,
   'app/api/friends/route.ts': 1,
-  'app/api/hr-ingest/route.ts': 1,
   'app/api/injuries/[id]/route.ts': 1,
   'app/api/injuries/route.ts': 1,
   'app/api/log-calendar-event/route.ts': 1,
@@ -88,12 +87,6 @@ const BASELINE = {
   'app/api/nutrition/saved-meals/[id]/route.ts': 1,
   'app/api/nutrition/saved-meals/route.ts': 1,
   'app/api/nutrition/targets/route.ts': 1,
-  'app/api/oura-ble/accel-chunks/route.ts': 1,
-  'app/api/oura-ble/backfill-hr-stats/route.ts': 1,
-  'app/api/oura-ble/live-steps/route.ts': 1,
-  'app/api/oura-ble/rekey/route.ts': 1,
-  'app/api/oura-ble/samples/backfill-null-decoded/route.ts': 1,
-  'app/api/oura-ble/samples/pack/route.ts': 1,
   'app/api/oura/hr-sync/route.ts': 1,
   'app/api/oura/workouts/route.ts': 1,
   'app/api/phase-sets/[id]/route.ts': 1,
@@ -107,7 +100,6 @@ const BASELINE = {
   'app/api/running-plan/runs/[id]/route.ts': 1,
   'app/api/supplements/[id]/route.ts': 1,
   'app/api/supplements/route.ts': 1,
-  'app/api/sync-health/route.ts': 1,
   'app/api/user/equipped-title/route.ts': 1,
   'app/api/weekly-digest/route.ts': 1,
   'app/api/workout-entry/route.ts': 2,

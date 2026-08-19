@@ -6,6 +6,11 @@ import { rateLimit } from '@/lib/rate-limit'
 import { dsFromMeasuredAtMs } from '@/lib/oura-ble/decode'
 import { countGaitGatedSteps } from '@/lib/oura-ble/gait-step-count'
 import { isPlausibleStepWindow } from '@trainingai/shared/health/step-estimate'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// 20,000 magnitudes of up to seven digits is ~160 KB of JSON. 512 KB matches the `samples` sibling,
+// which is the highest-volume ingest on the same pipeline.
+const MAX_BODY_BYTES = 512 * 1024
 
 // Continuous-capture ingest (ring-only accurate step counter, Chunk 1). The phone streams
 // the ring's realtime 0x33 accel and posts raw magnitude chunks (~2 min each); this route
@@ -33,7 +38,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const parsed = AccelChunkSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = AccelChunkSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
