@@ -526,19 +526,49 @@ eaten entirely after 7 pm reads differently from the same total spread across it
    whole table's history**, against 668,749 steps counted in `body_metrics`. That is **1.2%
    coverage**. Everything else arrives as one number per day with no distribution.
 
-   **So the two rules collide.** This entry requires *"the expenditure curve must end exactly on the
-   day's burn"* and separately forbids *"a chart smoother than its data"*. Step energy is roughly
-   five times the logged-activity energy and cannot be placed in time — so a curve that reconciles
-   with the day's total **must** smear it, and a curve that does not smear it **cannot** reconcile.
-   There is no encoding that satisfies both as written. This is not a build problem to solve in
-   code; it is a decision about what the chart is allowed to claim, and it is the owner's.
+   **⚠ THE ABOVE WAS THE WRONG QUESTION — corrected the same day, by the owner.** The measurement
+   is right; the conclusion drawn from it was not. It asked *"is there intra-day **step** data"*,
+   found none, and concluded a burn curve could not be drawn honestly. The owner's reply: *"We use
+   increased heart rate, and exercise and steps etc to determine calories out right? Can't we time
+   stamp each activity so we know when it was? Isn't that already being done in the daily HR
+   chart?"*
 
-   **Recommendation, if it helps whoever picks it up:** draw the part whose timing is known — BMR
-   plus timed workouts and activities — and state the remainder rather than distributing it
-   (*"plus 240 kcal from 6,000 steps, time not recorded"*). Nothing is smeared, the totals still
-   reconcile because the unplaced part is named, and the chart claims exactly what the data
-   supports. The cost is that the headline "when did you burn it" answer is partial on the ~2 days
-   in 3 that carry no timed activity.
+   **Two things in that are worth separating, because one is a misconception and the other is the
+   answer.**
+   - **HR is not an input to calories-out today.** `computeActiveEnergy`
+     (`packages/shared/src/health/daily-energy.ts`) is **MET × duration** — strength sessions at
+     activity 8, logged activities by type, and passive steps above a sedentary baseline. Heart
+     rate appears nowhere in it. So "we use increased heart rate to determine calories out" is not
+     what the code does.
+   - **But the timing data absolutely exists, and it is HR.** `oura_heartrate` is timestamped and
+     dense, measured 2026-08-19 over the owner's account:
+
+   | source | samples, last 14 days | covers |
+   |---|---|---|
+   | `ble` (the ring) | 3,810 | **all 24 hours**, on 11–14 of 14 days per hour — one sample every 3–7 minutes around the clock |
+   | `chest_strap` | 26,034 | workouts only, very dense while worn |
+
+   Over 59 days the table holds 72,530 samples, ~1,229/day, current to today. **No hour of the day
+   is dark.** The ring power-gates when worn-idle, which thins the quiet hours — it does not empty
+   them.
+
+   **So the rules do not collide after all, and the resolution is the owner's idea.** Use HR to
+   **distribute** the day's expenditure, not to **recompute** it:
+   - the day's total active energy stays exactly what `computeActiveEnergy` already returns — one
+     model, unchanged, so the chart cannot disagree with the number above it (this is the whole
+     point of **Q-401**, which exists because there were two TDEE models);
+   - the *shape* comes from measured HR — allocate each hour a share weighted by Σ(bpm − restingHr)
+     over that hour, floored at zero, with BMR spread flat;
+   - **both of this entry's rules are then satisfied**: the curve ends exactly on the day's burn
+     because it is a partition of it, and it is not smoother than its data because its shape is
+     measured rather than assumed.
+
+   `restingHr` is already available from `/api/hr-profile`, which two activity sheets read.
+
+   **The honest caveat to carry into the build:** HR rises for reasons that are not metabolic —
+   stress, caffeine, standing up — so the allocation is a good proxy, not a measurement of when
+   energy was spent. Say so under the chart. That is a far smaller claim than smearing a daily step
+   total evenly across sixteen hours, which was the alternative.
 
    **The intake half has no such problem** and is ready: 222 food logs across 45 days already carry
    a resolved `logged_at` after Q-413.
