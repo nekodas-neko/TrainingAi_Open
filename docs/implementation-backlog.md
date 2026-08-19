@@ -316,6 +316,96 @@ below threshold and left in place for next time.
      entries below are ordered by dependency, not by Q number. Do not re-sort them into numeric
      order; the sequence is the point. -->
 
+## Filed 2026-08-19 — the workflow review that produced the ID scheme
+
+*These four came out of reviewing the multi-agent setup itself. They are filed rather than fixed
+because none of them is the change that review was for, and per **No orphaned findings** a finding
+without a queue entry is a dropped finding.*
+
+### [platform] PS-1 — `docs/agents/README.md` §3 lists `lib/coach/` as Lane A while a queue entry says it belongs to neither lane
+
+- **Branch:** `docs/lane-coach-contradiction`
+- **Added:** 2026-08-19 · found while replacing the lane path lists with a rule
+- **Lane: B** — a docs-only reconciliation, no code.
+
+`docs/agents/README.md:124` lists `lib/coach/` under Lane A. Q-407's `Lane.` paragraph tells whoever
+takes it that **`lib/coach/**` belongs to neither lane's declared paths** and to claim it in a baton
+first. Both cannot be true, and the entry is the one an implementer reads.
+
+The path rule added in this branch settles it — `lib/coach/` is reached by `app/api/coach/route.ts`,
+so it is Lane A — but **Q-407's paragraph still says otherwise** and will be read before the README
+is. Correct the entry to match, or say explicitly why the rule does not apply to it.
+
+**Why this is worth an entry rather than a drive-by edit:** the same shape may exist on other
+entries written while the enumeration was the authority. Grep the queue for `neither lane` and
+`belongs to neither` before closing this.
+
+### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
+
+- **Branch:** `docs/baseline-history-dedupe`
+- **Added:** 2026-08-19 · found while extracting the baselines out of the check script
+- **Lane: B** — docs only.
+
+`docs/doc-size-baseline-history.md` is the 955 comment lines lifted verbatim out of
+`scripts/check-doc-index-size.js`. It was extracted unedited **on purpose**, so the extraction is
+reviewable as a pure move — but it carries known corruption from the conflict-splicing that motivated
+the move in the first place:
+
+- The **Q-553** block appears **twice, byte-identical** (it was at lines 30 and 35 of the old script).
+- Two blocks record the same change with different figures: one says `projectOverview -> 7785`, the
+  other `7805 -> 7785`.
+
+Dedupe the exact repeats and reconcile the contradictory pair against `git log` for the commits that
+raised them. **Do not summarise or prune the rest** — Q-543 was explicit that several of those notes
+are the only record of why a number moved, and one documents a near-miss where a splice would have
+reverted another lane's raise.
+
+### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
+
+- **Branch:** `fix/non-idempotent-migrations`
+- **Added:** 2026-08-19 · observed in this session's own start-up hook output
+- **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.
+
+`scripts/local-db/migrate.js` reports `applied 0, skipped 200 already recorded, 4 failed` on every
+run of an already-migrated database. The four never reach the recorded set, so they are retried
+forever:
+
+```
+054_users_email_unique.sql        relation "users_email_unique" already exists
+055_friends_and_titles.sql        relation "users_friend_code_unique" already exists
+082_exercise_library_expand_2.sql duplicate key value violates unique constraint "exercise_library_name_key"
+157_scale_ble.sql                 relation "scale_raw_samples" already exists
+```
+
+**These are distinct from the three (`038`, `040`, `041`) Lane A's baton records as known and
+ignorable** — do not assume the baton already covers them.
+
+Locally this is noise: the objects exist, so nothing is broken. **What needs establishing before any
+fix is whether the same four are unrecorded in production**, because `ensureSchema` tracks by
+filename and an unrecorded migration is one that re-runs on every cold start. Answer that first via
+the admin query endpoint; the fix (make each idempotent — `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`)
+is small and uninteresting by comparison, and per this repo's own rule a seed that never corrects a
+drifted production row is the trap to check for.
+
+### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
+
+- **Branch:** `docs/baton-compaction`
+- **Added:** 2026-08-19 · measured while adding batons to the size ratchet
+- **Lane: ?** — whichever role is doing its own handoff next; this is not one job.
+
+`docs/agents/state/README.md` says a baton is *"state, not narrative"* and *"if it is over a screen,
+the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
+**412** (its `Now` section alone is 200), Tuning **562**, Review **1,280**.
+
+This matters more than tidiness. With the lane path lists replaced by a rule, a baton's **Claimed
+paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
+412-line file before starting an item, which means the mechanism is not doing its job.
+
+All five are now in `docs/doc-size-baseline.json`, shrink-only, so they cannot grow further. The
+work is to bring them down, and **it is not a separate task**: a baton is rewritten in full at every
+handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
+Close this when all five are under ~150 lines.
+
 ## Nutrition focus — the owner's priority, 2026-08-18
 
 *"lets focus on the nutrition changes now. id like to get this perfected today"*

@@ -16,6 +16,28 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-19 — the extraction itself (`claude/agent-setup-task-numbering-5gojd9`)
+
+**projectOverview.md 8009 → 8018 · docs/implementation-backlog.md 11177 → 11290 · CLAUDE.md 1085 → 1100.**
+
+The first raise recorded here rather than in the script, which is the point of the change.
+
+- **CLAUDE.md +15.** The standing-instruction block on entry numbering was replaced: reserved bands
+  out, per-agent prefixes in, plus the lane rule that supersedes the path enumeration, the readiness
+  query as an implementer's first command, and the `Needs:`/`Gate:` field definitions. It is longer
+  than what it replaced because the old text was one rule and the new text is four, each of which a
+  session has to follow without reading `docs/agents/README.md` first.
+- **implementation-backlog.md +113.** Four new entries (`PS-1`…`PS-4`) at ~25 lines each, the
+  rewritten header documenting the three fields, and 17 added `Needs:`/`Gate:` lines — **against
+  Q-543's 38-line entry removed as complete**, so the net is smaller than the gross.
+- **projectOverview.md +9.** One Current Status paragraph naming the new prefixes and the query
+  command, since that is the thing every session needs to know before it can file anything.
+
+Five files were added to the ratchet in the same change — the agent batons, at their measured sizes
+(BugFix 136, Lane A 163, Lane B 413, Tuning 563, Review 1,281). Those are entry rows, not raises.
+
+---
+
 ## Extracted history (verbatim, oldest at the bottom as it was written)
 
 ```
