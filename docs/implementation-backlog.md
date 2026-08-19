@@ -2067,6 +2067,25 @@ this fits without an extraction.
 
 ### [activity][platform] Q-328 — deleting an activity is the one activity-log write with no outbox domain, so offline it just fails
 
+> **⚠️ The Lane A half SHIPPED. What is left is Lane B only** — switching
+> `app/health/health-content.tsx:687` from its bare `fetch` to
+> `store.softDeleteActivityLogPending(id)` + `queueMutation({ domain: 'activity_logs', payload: { id, deleted: true } })`,
+> following `saved-meals-sheet.tsx:459`. The old `store.deleteActivityLog(id)` becomes dead in that
+> same PR and should be removed with it.
+>
+> **One correction to the plan below, and it is the part that would have broken things.** The entry
+> said to flip `sqlite-backend.ts`'s local soft-delete from `synced` to `pending`. **Do not** — that
+> `synced` is load-bearing, not a mistake: `applyDelta` reaps an activity-log tombstone with
+> `DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, so a row left `pending` blocks
+> its own tombstone forever. A pre-existing test already pinned that (Q-488). Both states are
+> correct at different moments, so the offline delete is a **second** method
+> (`softDeleteActivityLogPending`) plus a `markActivityLogSynced` that moves the row across on push
+> confirmation — which also keeps the existing bare-`fetch` caller working unchanged until Lane B
+> switches it. See [`entries/2026-08-19-activity-log-delete-outbox.md`](overview/entries/2026-08-19-activity-log-delete-outbox.md).
+>
+> **After Lane B lands, Q-556's 404 half is unblocked.**
+
+
 - **Branch:** `feat/activity-log-delete-outbox`
 - **Added:** 2026-08-19 · Lane A, found while reconciling Q-556 · [`journal`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md)
 - **Placement:** immediately above Q-556, which it gates. Small on its own; it is the prerequisite

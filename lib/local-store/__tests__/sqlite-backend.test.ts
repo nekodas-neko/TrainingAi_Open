@@ -465,6 +465,35 @@ describe('deleteExerciseLogLocally / updateExerciseLogLocally sync_status (SYN-4
     expect(params[0]).toBe(params[1])
   })
 
+  // Q-328: the offline-capable sibling. The pairing with the test above is the point — 'synced' and
+  // 'pending' are BOTH correct, at different moments, and which one a row carries decides whether
+  // applyDelta's tombstone reaper can ever touch it.
+  it('softDeleteActivityLogPending marks it pending, so a queued delete is not pull-clobbered', async () => {
+    await store.softDeleteActivityLogPending('al-1')
+    const stmt = sqlCalls().find(s => s.includes('UPDATE activity_logs'))!
+    expect(stmt).toContain('deleted_at=?')
+    expect(stmt).toContain(`sync_status='pending'`)
+    expect(stmt).not.toContain(`sync_status='synced'`)
+  })
+
+  it('softDeleteActivityLogPending scopes to the one id and stamps both timestamps together', async () => {
+    await store.softDeleteActivityLogPending('al-1')
+    const call = runSQL.mock.calls.find(c => String(c[0]).includes('UPDATE activity_logs'))!
+    expect(String(call[0])).toContain('WHERE id=?')
+    const params = call[1] as unknown[]
+    expect(params[2]).toBe('al-1')
+    expect(params[0]).toBe(params[1])
+  })
+
+  // The other half: without this the pending tombstone above is stuck forever, because the reaper
+  // only removes rows already marked synced.
+  it('markActivityLogSynced flips the row without touching deleted_at', async () => {
+    await store.markActivityLogSynced('al-1')
+    const stmt = sqlCalls().find(s => s.includes('UPDATE activity_logs'))!
+    expect(stmt).toContain(`sync_status='synced'`)
+    expect(stmt).not.toContain('deleted_at')
+  })
+
   // Q-488 recorded that the first thing a session reaches for is a read-merge `upsertActivityLog`
   // with `deletedAt: now`. It compiles, type-checks, passes lint — and changes nothing, because that
   // method's INSERT column list and its ON CONFLICT DO UPDATE both omit deleted_at. This pins the

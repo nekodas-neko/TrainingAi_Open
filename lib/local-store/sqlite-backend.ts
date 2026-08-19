@@ -2659,6 +2659,42 @@ export class SQLiteLocalStore implements LocalStore {
     );
   }
 
+  /**
+   * The offline-capable delete the method above is not (Q-328) — pair it with a
+   * `queueMutation({ domain: 'activity_logs', payload: { id, deleted: true } })`.
+   *
+   * **The only difference is `sync_status`, and it is the whole point.** `'synced'` above is
+   * load-bearing rather than incidental: `applyDelta` prunes an activity-log tombstone with
+   * `DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, so a row left `'pending'`
+   * is skipped by that prune forever. A row awaiting a push MUST be `'pending'` anyway — that is
+   * what stops the pull-clobber gate overwriting a delete that has not reached the server — so the
+   * two states are both correct, at different moments. `markActivityLogSynced` is what moves the
+   * row from one to the other, and it runs on push confirmation.
+   *
+   * Kept as a second method rather than a flag on the first so the existing bare-`fetch` caller
+   * (`app/health/health-content.tsx`) keeps its exact behaviour until it is switched over; a row
+   * marked `'pending'` with no mutation queued behind it would never be pruned.
+   */
+  async softDeleteActivityLogPending(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await runSQL(
+      `UPDATE activity_logs SET deleted_at=?, sync_status='pending', updated_at=? WHERE id=?`,
+      [now, now, id],
+    );
+  }
+
+  /**
+   * Flip a queued activity-log row to synced once its push is confirmed (Q-328).
+   *
+   * Deliberately its own method rather than the `upsertActivityLog` round-trip the confirm path
+   * uses for an upsert, because that route cannot work for a delete on two counts: `getActivityLogs`
+   * filters `deleted_at IS NULL` so the row is never found, and `upsertActivityLog`'s column list
+   * omits `deleted_at` entirely. Same shape and same reason as `markSavedMealSynced`.
+   */
+  async markActivityLogSynced(id: string): Promise<void> {
+    await runSQL(`UPDATE activity_logs SET sync_status='synced' WHERE id=?`, [id]);
+  }
+
   async upsertActivityLog(record: LocalActivityLog): Promise<void> {
     await runSQL(
       `INSERT INTO activity_logs
