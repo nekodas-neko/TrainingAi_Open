@@ -1182,57 +1182,33 @@ note is a live consideration for the WebView, not a stale one.
   from `sync-engine.ts` rather than induced here. Domain branches outside the `body_metrics` block were
   not enumerated for the same pattern.
 
-### [platform][body][nutrition] Q-484 — `POST /api/injuries` stores a 10 MB note; its own PATCH sibling caps the same field at 1,000 characters
+### [platform] Q-322 — 31 `req.json()` routes are unaudited, and nothing bounds a request body before it is parsed
 
-- **✅ PRODUCTION-CHECKED 2026-08-18 — latent confirmed.** `claude_ro.injuries` is **empty** (0 rows)
-  and `claude_ro.supplements` holds 2 rows with a max name of 9 chars. Nothing oversized exists; the
-  low-severity filing is right.
-- **Branch:** `fix/create-route-body-schemas`
-- **Added:** 2026-08-18 · review sweep (oversized/unvalidated bodies) ·
-  [`docs/reviews/2026-08-18-unvalidated-create-bodies.md`](reviews/2026-08-18-unvalidated-create-bodies.md)
-- **Placement:** mid-low. **Low severity today** and the reason to fix it is not attack — see below.
-  The fix is a few lines because the schema already exists.
-- **Measured:**
-  ```
-  POST /api/injuries     muscleName 200,002 chars + notes 500,000  →  201, both stored in full
-  POST /api/supplements  name 300,002 chars + dose 100,000         →  201, both stored in full
-  POST /api/injuries     notes 10,000,000 chars (a 10 MB body)     →  201, 10,000,000 stored
-  ```
-  No ceiling below 10 MB; the server parsed a 10 MB JSON body into memory and wrote the row.
-- **⚠️ Do NOT quote 10 MB as a storage figure.** `pg_column_size` read ~120 kB for those rows because
-  the payload was one repeated character and TOAST compressed it almost perfectly. Real text would
-  not. The defensible statements: the **transfer and parse** cost is unbounded, and the stored size is
-  bounded only by what the content happens to compress to.
-- **The asymmetry is the finding** — same table, same fields:
-
-  | | `POST /api/injuries` | `PATCH /api/injuries/[id]` |
-  |---|---|---|
-  | Body | `const body = await req.json()` + destructure | `InjuryPatchSchema.safeParse(...)` |
-  | `muscleName` | non-empty check only | `z.string().min(1).max(100)` |
-  | `notes` | none | `z.string().max(1000).nullable()` |
-  | `startedDate` | none — used as-is | `z.string().regex(/^\d{4}-\d{2}-\d{2}$/)` |
-  | `severity` | hand-rolled `includes()` | `z.enum([...])` |
-
-  `CLAUDE.md` names **`updateInjury` as the reference** for Zod-whitelisting a PATCH body. It is a good
-  reference — and the create path beside it has no schema at all, which is probably why: the rule was
-  written about edit paths after an edit-path bug, and create was never revisited.
-- **The unvalidated `startedDate` also 500s** (same class as Q-482, same root cause — no schema):
-  `{"startedDate":"not-a-date"}` → **500**; `{"startedDate":"0001-01-01"}` → **201, accepted**.
-  Fixing this entry fixes that too.
-- **Scope — read carefully:** **33** body-bearing routes call `req.json()` with no `safeParse`/
-  `.parse`. That is a **candidate** count, **not** a defect count: several do hand-rolled checks
-  (injuries validates `severity`) and several are admin-gated, which limits reach without adding
-  validation. **Two** were confirmed by probe; the other 31 are unaudited — do not treat them as
-  broken *or* as fine.
-- **Why it is worth an entry despite low severity.** Not attack: this app's users are its own account
-  holders. But `CLAUDE.md` runs a **session-start database-size ritual** and records a real
-  `disk_full` production outage (2026-08-17), and an unbounded user-writable text column is exactly
-  the shape that ritual exists to catch. The stated direction is multi-user + Play Store, at which
-  point "nobody is attacking it" stops being an argument. And **`InjuryPatchSchema` already encodes
-  the intended bounds** — the create route can reuse it.
-- **Fix shape:** (1) give both POSTs a schema reusing the PATCH bounds; (2) consider a shared
-  body-size guard for `req.json()` so the remaining 31 are bounded before they are individually
-  audited; (3) audit those 31 as a follow-up.
+- **Branch:** `fix/bounded-request-bodies`
+- **Added:** 2026-08-19 · Lane A, the deferred halves (2) and (3) of Q-484.
+- **What Q-484 closed and what it did not.** It gave the two *measured* create routes
+  (`injuries`, `supplements`) schemas sharing one definition with their PATCH siblings, so the pair
+  cannot drift again. A 10 MB body is now **400** instead of 201 — **but it is still parsed into
+  memory first**, because the rejection happens in Zod, after `req.json()`. The transfer-and-parse
+  cost is unchanged; only the storage is bounded.
+- **Two pieces of work, in this order:**
+  1. **A shared bounded reader.** `readJsonBounded(req, maxBytes)` (or equivalent), so a body is
+     capped *before* parse rather than after. This bounds all 33 routes at once, including the 31
+     nobody has looked at — which is the point: it makes the audit safe to do slowly.
+  2. **Audit the 31.** `grep` for `req.json()` with no `safeParse`/`.parse` in `app/api/**`. **This
+     is a candidate count, not a defect count** — several do hand-rolled checks and several are
+     admin-gated, which limits reach without adding validation. Do not treat them as broken *or* as
+     fine until each is read.
+- **Priced honestly.** Not attack — this app's users are its own account holders, `claude_ro.injuries`
+  is empty and `supplements` holds 2 rows with a 9-character max name. It is worth doing because
+  `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full` outage
+  (2026-08-17), and an unbounded user-writable text column is exactly the shape that ritual exists to
+  catch — and because the stated direction is multi-user + Play Store, at which point "nobody is
+  attacking it" stops being an argument.
+- **⚠️ Do NOT quote 10 MB as a storage figure.** `pg_column_size` read ~120 kB for the probe rows
+  because the payload was one repeated character and TOAST compressed it almost perfectly. Real text
+  would not. The defensible statements are that the **transfer and parse** cost is unbounded, and the
+  stored size is bounded only by what the content happens to compress to.
 - **Lane A owns this** (`app/api/**`).
 
 ### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
