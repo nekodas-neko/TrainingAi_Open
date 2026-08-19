@@ -1781,7 +1781,64 @@ the H10 at home — which is the walk in the screenshot that started this.
   being paced by HR will not understand why the prompt is late. The unit on the line is the tell,
   and it is already there.
 
-**Drawn 2026-08-19 — four states, and the layout follows from the fallback rule above.** Speed
+**REVISED 2026-08-19 after the owner reviewed the drawing — three changes, all of them load-bearing.**
+
+**(a) The bar is banded, and "the right direction" is never an error.** *"color code the bar based on
+whether its in the right direction of the pacer; i.e slower than expected = green … green for in
+range: orange for slightly out; and red for way off."* So the band is chosen by **signed** distance
+from the target, not absolute:
+- **Fast** segment, floor `F` — `spm ≥ F` **green** (and it stays green however far above; on a fast
+  set, faster is the point) · `F − 10% ≤ spm < F` **amber** · below that **red**.
+- **Slow** segment, ceiling `C` — `spm ≤ C` **green** · `C < spm ≤ C + 10%` **amber** · above that
+  **red**.
+- **10% of the target is the proposed band width**, not a measured one. It is a starting value and
+  should be a named constant next to the thresholds so it can be tuned after a few real walks — do
+  not scatter it inline.
+- **Colour never travels alone** — CLAUDE.md forbids it, and the drawn version pairs each band with
+  a mark and a sentence (`✓ On pace`, `▲ Walk faster — aim ≥120`, `▼ Way over — ease off to ≤95`).
+  A red bar with no words is a rule violation, not a style choice.
+- **⚠ One consequence worth deciding rather than discovering: standing still scores green.** On a
+  slow set, "slower is always better" means stopping is perfect. Recommend a **stopped** state below
+  roughly 40 spm that renders **neutral rather than green** — not scolding, but not congratulating a
+  walk that has stopped being a walk. Flagged, not decided.
+
+**(b) When cadence is absent the pacer falls to SPEED, not heart rate.** *"when no source detected
+for cadence it still shouldn't be BPM; probably speed would be good there."* That gives a precedence
+ladder of **cadence → speed → heart rate**, and it is consistent with the decision already recorded
+in `walk-active.tsx`'s own comment (*"pace is the real fast/slow signal, HR drifts set-over-set and
+is only a secondary confirmation"*). HR becomes the last resort, reached only when GPS is out too —
+which is the treadmill case.
+- **This needs a speed target pair**, the same way cadence does. **Do not add a third manual config
+  block**: `walk-config.tsx` would then ask for HR, cadence *and* speed targets for one walk, which
+  is three ways to say the same intent. Recommend **deriving the speed pair from the user's own
+  recent fast/slow segments** — `segments` already stores `avgPaceSecPerKm` per segment, so the data
+  to seed it is in the table today — and letting the cadence pair stay the thing the user sets.
+
+**(c) Storage — mostly already done, and the entry should say so rather than asking for "store
+everything".** *"make sure all these values get stored so we can do data analysis on it later like
+steps x distance x time."* Measured against `schema.ts` and `walk-summary.tsx`:
+- **Already persisted per walk:** `steps` (Q-230, integrated from strap cadence), `distanceKm`,
+  `durationMin`, `paceSeries`, `avgPaceSecPerKm`, `splits`, `bestEfforts`, elevation gain/loss/profile,
+  `cadenceSpm`, `cadenceSeries`, `cadenceSource`, `avgHr`/`maxHr`.
+- **Already persisted per segment** (`activity_logs.segments` JSONB): `index`, `setNumber`, `kind`,
+  `startSec`, `endSec`, `avgHr`, `maxHr`, `hrAtStart`, `avgPaceSecPerKm`, `distanceKm`,
+  `avgCadenceSpm`.
+- **So steps × distance × time is already answerable at the walk level.** What is genuinely missing
+  is small and specific, and all three are additions to the existing `segments` object rather than
+  new columns:
+  1. **`steps` per segment** — derivable from `avgCadenceSpm × duration`, but derived-at-read-time
+     means every consumer re-derives it differently. Store it.
+  2. **Adherence per segment** — the fraction of the segment spent in each band. This is the number
+     the pacer *creates* and the most interesting thing to analyse later ("did I actually hit the
+     targets, or just see the prompt"). Nothing records it today because nothing computed it before.
+  3. **Which signal paced the segment** (`cadence` | `speed` | `hr`). With the ladder in (b) an
+     adherence figure is uninterpretable without it — 60% in-range against a cadence target and
+     against an HR target are not the same measurement.
+- **Adding a key to the `segments` JSONB type is a schema edit** (`lib/data/postgres/schema.ts:344`)
+  and therefore **Lane A**, and per the offline-sync rule the local SQLite mirror, the outbox
+  payload, `getSyncDelta` and `applyDelta` all move in the same PR.
+
+**Drawn 2026-08-19, redrawn after the review — five states, and the layout follows from the fallback rule above.** Speed
 leads at 40 px; cadence and HR sit beneath it as a pair; the step total joins distance on one grey
 line; and the verdict gains a **progress bar against the cadence target**, so *"walk faster"* is a
 reading rather than a sentence. The slow panel shows the bar reading against a

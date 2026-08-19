@@ -882,7 +882,7 @@ const BASELINE = {
   // the three sibling BLE listeners that should go the same way, the grouping error, and the one
   // test that will red when the next three files convert. An entry that only said "6 of 36 done"
   // would cost the next session all of that.
-  'docs/implementation-backlog.md': 10859,
+  'docs/implementation-backlog.md': 10916,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
