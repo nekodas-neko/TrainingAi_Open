@@ -826,6 +826,75 @@ going over. So it still looks like a progress bar where you want to go to the en
 **⚠ Do this in the same PR as the Q-415 budget fix below, or the bar will fill toward the wrong
 number.**
 
+### [nutrition][app-shell] Q-417 — a THIRD calorie budget, 179 low, because the Nutrition ring keeps its optimistic local paint
+
+- **Branch:** `fix/nutrition-ring-active-energy`
+- **Added:** 2026-08-19 · owner, from three screenshots taken at 9:57: *"these nutrition values dont
+  look like they are lining up"*
+- **Lane B** (`app/nutrition/nutrition-content.tsx`). No schema, no route.
+- **Ship with Q-415.** That entry fixes the Home donut's base; this fixes the Nutrition ring's
+  *earned*. Fixing one and not the other leaves the screens disagreeing, just differently.
+
+**Three budgets were on screen at the same moment, from the same data.**
+
+| surface | expression | value |
+|---|---|---|
+| zone bar · both Energy Balance cards | `restingBase + targetNet + activeKcal` | 1,629 + 551 = **2,180** ✅ |
+| Home nutrition donut | `calorieGoal + activeEnergyKcalToday` | 1,900 + 551 = **2,451** (Q-415, +271) |
+| **Nutrition tab ring** | `targets.calories + burnedForSelectedDate` | 1,900 + **101** = **2,001** (−179) |
+
+The ring is **179 kcal low**, and the visible consequence is on the same card: it printed
+**"Goal reached"** against 2,014 eaten, because 2,014 clears its 2,001. The real budget is 2,180 and
+the Energy Balance card two rows above said *"166 kcal left today · Under so far"*. **One screen,
+both "you are done" and "you are under", 179 apart.**
+
+**Where the 101 comes from, and why it wins.** `nutrition-content.tsx:200-214` paints
+`activeEnergyKcalToday` optimistically from the local store — `activity_logs.caloriesBurned` summed
+— and its own comment says this is *"still narrower than that fetch"* and is expected to be
+corrected by the mount-scoped `body-metadata` network call *"moments later"*. **Nothing sequences the
+two.** The local read is `await store.getActivityLogs(today)`; the network read is a separate
+`cachedFetch` (`:273`). Whichever resolves last wins, and here the local one did — the ring still
+read 101 while the Energy Balance card on the same screen had the server's 551.
+- **The server figure is `computeActiveEnergy`** (`app/api/body-metadata/route.ts:148-156`): strength
+  sessions **+** logged activities **+** pedometer steps. The local sum has none of the first, none
+  of the third, **and a Guided Walk writes `caloriesBurned: null`** — the Q-96 root cause, called out
+  in that same comment. So 101 is not "cardio" either; it is "whatever activity rows happened to
+  carry a non-null number".
+- **Fix: never let the optimistic value overwrite a server value that has already arrived.** Track
+  which source last wrote — a ref, a discriminated state, or simply only applying the local paint
+  when the current value is still `null`. Do **not** "fix" it by deleting the optimistic paint: it
+  exists so the ring is not blank on a cold offline open, which is the instant-paint rule.
+
+**The label is wrong even when the number is right.** `macro-ring.tsx:51` renders
+`+${calsBurnedToday} from cardio`. Strength sessions and steps are both in the server figure, so at
+551 the card would claim 551 kcal "from cardio" on a day whose largest contributor was a leg
+session. **Say "from movement"** — the wording the zone bar already uses for the same quantity.
+
+**Two more mismatches in the same three screenshots, both worth fixing here.**
+
+**(a) Home's Energy Balance card was 42 kcal stale.** It read **"208 kcal left"** while the Nutrition
+tab's identical card read **"166"**, with both printing the same *"1,629 base + 551 earned"* line.
+Same budget, so the difference is entirely in *eaten*: 2,180 − 208 implies **1,972**, against the
+2,014 the Nutrition tab showed. **The Home donut on that same screen had 2,014 correct**, so this is
+not a screen-wide staleness — it is the `energy-balance:` payload specifically, while
+`body-metadata` was current. `useEnergyBalanceToday` already uses `useCachedValue` (Q-402), so the
+subscription exists; **check that the write which logged those 42 kcal actually invalidates
+`energy-balance:`**, per the cache-groups rule. This is the "which half of the rule is protecting
+you" case from CLAUDE.md — the hook is fine, the eviction is the suspect.
+
+**(b) Q-323's scaled macros are computed and not rendered.** #218 shipped
+`scaleMacrosForEarnedKcal` and `energy-balance-service` now returns `macroTargets.scaled` — but the
+ring still shows the stored base: **Protein 161/150, Carbs 179/190, Fat 68/60**. With 551 earned the
+scaled targets are **carbs 271 g and fat 85 g**, so the card reports fat *over* when it is well
+under, and carbs near-complete when they are two-thirds done. **This is Q-323's remaining Lane B
+half** — it is not a new defect, but it is now visibly wrong on the owner's screen and belongs in
+the same PR as the ring's budget fix, since both are the same card telling the user the wrong thing
+about the same day.
+
+- **Verification.** On a day with a logged strength session and steps, the Nutrition ring, the Home
+  donut, the Home Energy Balance card and the Nutrition Energy Balance card must show **one** budget.
+  Then log a food item and confirm all four move together — that second step is what (a) failed.
+
 ### [nutrition][app-shell] Q-415 — Home shows two calorie budgets 271 apart; Q-401's sweep missed the donut
 
 - **Branch:** `fix/home-donut-budget-source`
