@@ -965,7 +965,13 @@ const BASELINE = {
   // the owner still had to restart the app, because nothing told the component to look again. The
   // rule sits in the cache-invalidation list because that is where someone writing a write path
   // reads, and it names the wrong fix (a shorter TTL) because that is the one they would try.
-  'CLAUDE.md': 1078,
+  // Raised 2026-08-19 (Lane A, Q-360 retired): 1078 -> 1085. The idempotent-seed note said the
+  // seed will not re-run and stopped there; the consequence — a database left alone for days holds
+  // history that ends days ago, so a "today" assertion fails locally and passes in CI — was the
+  // part that cost a backlog entry. It names the check to run first, because the reflex it trains
+  // otherwise is "CI is flaky", and it belongs beside the behaviour it follows from rather than in
+  // a journal entry nobody reads before debugging.
+  'CLAUDE.md': 1085,
 
 };
 

@@ -475,43 +475,6 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
   total is unchanged, and that it survives an app restart.
 
 
-### [platform] Q-360 — `goal-invalidation.spec.ts` depends on the seed's step data reaching today, and it does not
-
-- **Branch:** `fix/goal-invalidation-spec-seed`
-- **Added:** 2026-08-19 · Lane B, found while running the full E2E suite before merging Q-359 slice 4
-- **Placement:** low-mid. It is a **test-harness** fragility, not a product bug — but it is the shape
-  CLAUDE.md already has a rule about, and it costs a session's confidence every time it fires.
-
-**What happens.** `e2e/goal-invalidation.spec.ts:57` — *"a steps-goal edit reaches Health without a
-reload"* — writes the goal successfully (the PATCH is asserted `r.ok()`), then fails waiting for
-`/ 7,000` on Health's Progress panel. Measured 2026-08-19 against `origin/main` at `968516f` with an
-**unmodified checkout**, so it is not any open branch's doing.
-
-**Why.** The panel renders `steps / goal`, and the local database's most recent row carrying a
-`steps` value is **2026-08-17**; today's `body_metrics` row exists with `steps` NULL. With no steps
-figure there is nothing to draw the `/ 7,000` into, so the locator never appears. The test asserts a
-*goal* propagates but reads it off a line that only renders when there is a *step count*.
-
-**This is the rolling-window class CLAUDE.md already names**, one layer out: the rule there is *"a
-test may hardcode a timestamp only when BOTH sides of the comparison are fixed"*. Here neither side is
-hardcoded — but the fixture is a **static seed** and the assertion is against **today**, so the gap
-widens by one day per day until it breaks. `scripts/local-db/seed.sql` seeds a fixed window of
-history; CI reseeds the same fixed window onto whatever today is.
-
-**Two fixes, and the second is the one to take.**
-- Make the spec seed its own steps row for today before asserting. Local and cheap, but every
-  future Health-panel spec needs the same and they will each invent it.
-- **Make the seed relative to the run date** — generate `body_metrics`/`sleep_sessions` dates as
-  offsets from `current_date` rather than as literals. That fixes this spec and every other one that
-  quietly assumes recent data, and it is the same reasoning as deriving a fixture from the clock
-  instead of pinning it.
-- **Lane B owns the spec; the seed is `scripts/local-db/` and unlisted in §3** — claim it in the
-  baton before touching it, or hand the seed half to Lane A.
-- **Not verified:** whether this also fails in CI. CI has been green on `main`, which suggests the
-  hosted run either seeds differently or the panel renders for another reason there — **that
-  difference is the first thing to establish**, because "green in CI, red locally" is exactly the
-  shape that trains sessions to ignore a real failure.
-
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
 - **Branch:** `chore/adopt-use-cached-value`
