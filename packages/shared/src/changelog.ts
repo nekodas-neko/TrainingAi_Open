@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.9",
+    date: "2026-08-19",
+    changes: [
+      "Sleep data on Home, Health and the Sleep screen now refreshes after any change to it, not just after a ring sync. Editing a sleep record by hand used to leave those screens showing the old numbers until you navigated away and back.",
+    ],
+  },
+  {
     version: "1.325.8",
     date: "2026-08-19",
     changes: [

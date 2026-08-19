@@ -10,6 +10,7 @@ import { TTL_MEDIUM } from "@trainingai/shared/cache-ttl";
 import { computeSleepStartConsistency } from "@trainingai/shared/health/sleep-consistency";
 import { getLocalStore } from "@/lib/local-store";
 import { todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils";
+import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 
 interface SleepSessionRow {
   date: string;
@@ -54,15 +55,11 @@ export function SleepContent({ userId }: { userId?: string }) {
   // cache entry (invalidateOuraSync) but this screen, once mounted, never learned to
   // refetch it — the hypnogram looked "stuck missing" until the next navigate-away/remount.
   // Mirrors session-select-content.tsx's existing listener for the same event.
-  useEffect(() => {
-    const onBleSynced = () => {
-      cachedFetch<SleepSessionRow[]>("sleep-sessions", "/api/sleep-sessions", TTL_MEDIUM, rows => {
-        if (rows) setSleepRows(rows);
-      });
-    };
-    window.addEventListener("ta:oura-ble-synced", onBleSynced);
-    return () => window.removeEventListener("ta:oura-ble-synced", onBleSynced);
-  }, []);
+  useInvalidationRefetch("sleep-sessions", () => {
+    cachedFetch<SleepSessionRow[]>("sleep-sessions", "/api/sleep-sessions", TTL_MEDIUM, rows => {
+      if (rows) setSleepRows(rows);
+    });
+  });
 
   // Rows are ordered most-recent-first — the latest logged night.
   const latest = sleepRows[0];
