@@ -339,24 +339,87 @@ and the answers live in the entries rather than here:
 | Meal photo uploads from **Edit Meal**, 64 px tile left of the name | Q-396 | independent |
 | The coach must **write every plan meal into My Foods** | Q-407, and it makes Q-398 a prerequisite | after Q-398 |
 
-**Two things carry a caveat rather than a blocker, and both resolve on the same physical print:**
-Q-411 shipped the square canvas and every module grew (the default 0.401 → **0.561 mm**), **but that
-gain is only real if the owner's circle template CROPS rather than SCALES.** If it scales, the square
-lands at 50 ÷ √2 = 35.4 mm and the default falls to **0.397** — fractionally worse than what it
-replaced. Q-400's saved PNG **used to** declare no physical size, so it printed at 312 mm.
+**✅ THE PRINT TEST IS DONE — 2026-08-19, and it passed on all three counts.** The owner printed a
+`Ninja Creami Protein Ice Cream` label from the APK carrying Q-400 and reported: *"at this size; it
+still scans fine after being printed."* That single print closed everything that had been stacked
+behind it:
+1. **The export path works** — Q-400's save-to-gallery reached a printer.
+2. **The physical size is right** — it printed as a label, not at 312 mm, so the dpi the PNG now
+   declares is being honoured.
+3. **Q-411's gain is real, and the crop-vs-scale question is moot** — the owner printed **square on
+   square stock**, so the artwork keeps its full 50 mm width and the default module holds at
+   **0.561 mm** rather than falling to 0.397. The scaling branch of that fork never applies.
 
-**Q-400 shipped 2026-08-19**, so both halves are fixed in source: there is an export path, and the
-PNG now declares 600 dpi. What is left is entirely physical. The owner, 2026-08-19: *"I can only do a
-print once the option to save to gallery exists"* — so **install the APK carrying Q-400, then one
-print with a ruler answers three questions at once**: does the file reach the gallery, does it
-measure 50 mm rather than 312, and does the circle template crop or scale. Until that print happens,
-**describe Q-411 as a simplification, not a scannability improvement.**
+**So Q-411 may now be described as a scannability improvement rather than a simplification** — the
+caveat that stood all day is discharged by evidence, not by argument. `band` remains the tightest of
+the six and is still the one to re-test if a printer or label stock ever changes.
+
+**One defect the print made visible, now filed as Q-416** — the vertical dead space above the code
+is plain on paper as well as on screen.
 
 **Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
 `saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
 already stale when written. What remains of Q-406 is the row component itself, and it now waits on
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
+
+### [nutrition] Q-416 — the label leaves up to 8.6 mm of dead space above the code; the block is pinned to both edges at once
+
+- **Branch:** `fix/label-vertical-centring`
+- **Added:** 2026-08-19 · owner, comparing the shipped label to the reviewed mockup: *"that looks
+  different to what we decided on - our one looked much better more gap between the text etc"* —
+  then confirmed on a physical print.
+- **Lane B** (`components/nutrition/meal-label-render.ts`). Pure geometry: no schema, no route, no
+  APK. Ships on a Railway deploy.
+- **Placement: high within the label work.** It is small, it is arithmetic, and it is the difference
+  between the artwork the owner approved and the one now printing.
+
+**The cause, from the renderer's own numbers.** `centredStackLineBudget()` lays the header out
+**downward from the top margin** and places the code **upward from the bottom**:
+```
+y       = SQUARE_MARGIN + 4, then + nameSize + gap + caloriesSize + gap + macroSize + gap + ruleGap
+codeTop = (SHEET - SQUARE_MARGIN) - (writeOnLine ? 9 : 0) - codeUnits
+```
+Ingredient lines then fill downward from `y`. **Whatever the list does not use becomes a void
+immediately above the code** — the two anchors do not meet in the middle, they leave the remainder
+wherever it falls.
+
+For the shipped default (`inlineCentred`: `nameSize 12`, `caloriesSize 18`, `macroSize 7.5`,
+`stackGaps [5,4,4,6]`, `codeUnits 70`) the header ends at **69.5 units** and the code starts at
+**110**, so with `STACK_LINE_H = 8`:
+
+| ingredient lines | content ends | slack | void at 50 mm |
+|---|---|---|---|
+| 1 | 77.5 | 32.5 | **8.6 mm** |
+| 2 | 85.5 | 24.5 | **6.5 mm** |
+| 3 | 93.5 | 16.5 | 4.4 mm |
+| 4 (the budget) | 101.5 | 8.5 | 2.2 mm |
+
+The owner's `Protein Shake` prints **two** lines, so it carries **6.5 mm of nothing** — about an
+eighth of the label's height — and their printed `Ninja Creami` label shows the same band.
+**A four-ingredient meal looks fine and a one-ingredient meal looks broken**, which is why this
+survived review: the mockups were drawn with fuller lists.
+
+**The fix — shift the whole composed block down by half the slack.** Every gap the style specifies is
+preserved exactly; only the leftover is shared between top and bottom, which is what the approved
+mockup did. One offset applied to the header, rule and ingredient block; `codeTop` does not move.
+
+- **⚠ Do NOT absorb the slack into the code.** It is the obvious alternative and it is wrong: the
+  slack varies with the ingredient count (8.6 mm down to 2.2 mm), so a code sized to fill it would
+  print at a **different physical size per meal** — and the sheet's *"Code is 18.5 mm at 0.56 mm per
+  module"* readout, plus every scannability claim resting on it, would stop being true. The code's
+  size is a promise; the whitespace is not.
+- **Check the other five styles in the same PR**, per the sibling-surface rule. `band`, `editorial`,
+  `ticket` and `plaque` share `centredStackLineBudget` and differ only in their gaps and
+  `codeUnits`, so they have the same defect at different magnitudes. `square`/`Big code` uses
+  `layout: 'beside'` and needs its own look rather than an assumption either way.
+- **Verification.** Render one meal at **1, 2, 3 and 4** ingredient lines and confirm the gap above
+  the code and the gap below the top margin are within a unit of each other in every case. The
+  existing `centredStackLineBudget` tests already assert `maxLines`; **add one asserting the residual
+  slack is split**, so a future gap change cannot silently re-pin the block to one edge.
+- **What must NOT change:** `maxLines`, `codeUnits`, and the reported mm figures. This moves pixels
+  down the sheet and nothing else — if any of those three shift, the change has gone further than it
+  should.
 
 ### [nutrition][health] Q-414 — energy in against energy out, on one timeline
 
