@@ -3,11 +3,21 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/zone-minutes-move-hours-coverage` · **Q band:** 500–529 (next free: 524)
+**Updated:** 2026-08-19 · **By:** `tuning/activity-contributor-audit` · **Q band:** 500–529 (next free: 525)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Activity Score contributor audit — COMPLETE, and it ANSWERS Q-277** (Q-524 filed, Q-277 removed).
+  All six contributors measured over 90 days. **Only `steps` (sd 33.4) and `strengthVolume` (sd 23.8)
+  carry information.** `strengthFreq` is at 100 on **78%** of days; `moveHours`, `zoneMinutes` and
+  `activeEnergy` carry none. After renormalisation **51% of effective weight is informative, 49% is
+  not**, and the largest effective weight (strengthFreq, 33%) is one of the inert ones. Q-137/Q-190
+  **did** work — stored sd **5.0 → 7.4** across 2026-08-11 — but history is not back-filled.
+  **Q-524:** the Goals Progress card and daily digest grade steps against **7,000** while the Activity
+  Score and its own progress bar use **10,000**; the derived 10,000 contradicts the Paluch 7–8k
+  plateau `daily-goals.ts` cites, while the 8,000 fallback matches it. Owner decision.
+  [`review`](../../reviews/2026-08-19-activity-contributor-audit.md).
 - **Zone minutes + movement-per-hour coverage — MEASURED, propose-only** (Q-522, Q-523). The check
   Q-521 deferred, asked for directly by the owner. **Both inputs are unusable, failing in opposite
   directions.** `moveHours` is **saturated** — 856 of 857 waking hours with data count as "moved",
@@ -119,7 +129,7 @@ answer was **no**, and the previous baton wrongly said the lane was drained. It 
 |---|---|
 | sleep | ✅ recalibrated (Q-503) + consumer audit (Q-511) |
 | readiness | ✅ Q-500 shipped, Q-504 refuted, threshold table completed (Q-511) |
-| activity | ✅ specified (Q-505) — build is Lane A's. **Contributor inputs coverage-checked 2026-08-19**: `moveHours` saturated (Q-522), `zoneMinutes` floored (Q-523) — 22 of the score's 100 weight carries no information, on top of `activeEnergy`'s 15 being absent most days |
+| activity | ✅ **fully audited 2026-08-19 — nothing left to measure here.** All six contributors: only `steps` (sd 33.4) and `strengthVolume` (sd 23.8) carry information; `strengthFreq` 78% at ceiling **by design**; `moveHours` saturated (Q-522), `zoneMinutes` floored (Q-523), `activeEnergy` absent (Q-521). **49% of effective weight cannot vary.** Q-277 answered and removed; Q-524 filed (two step goals). Build (Q-505) is Lane A's |
 | body | ✅ battery range clean; anchor measured (Q-511). **Derived scores closed out 2026-08-19**: `bdi_derived` (46 rows, median 4.15, nothing ≥ 15, **no threshold exists** — only consumer is a debug console labelled *"observational, not a diagnosis"*) and `body_comp` (71 rows, deterministic, published formula matched to Oura's `atlas`). **Nothing to tune in either.** [`review`](../../reviews/2026-08-19-body-derived-scores-closeout.md) |
 | devices | ✅ illness (Q-506), stress + resilience (Q-507/508), BLE drift (Q-509/510) |
 | **workouts** | ✅ **swept 2026-08-18** — ACWR (Q-512/513), RPE autoregulation (Q-514). **Clean:** Foster monotony, and prescription adherence (actual 73.6% vs planned 73.1%, reps +0.25 — so `INTENSITY_ZONES` is realised, and calibrating those zones would be circular since the program was generated from them). Only Q-514 and the two ACWR call sites are open. **Foster monotony CLEAN** — mean 1.29, the 2.0 gate fires on 1 of 102 windows; rest days are properly seeded at 0, which is what makes it meaningful. 1RM's `amrapScaleFactor` is **unreachable from production** (tests only) — do not spend time on it |
@@ -133,8 +143,8 @@ completed 2026-08-18, and the zone-minutes / movement-per-hour coverage check 20
 is measured except **cardio**, which is deliberately skipped for lack of data (~13 run/treadmill
 sessions, newest 2026-07-24), not for lack of time.
 
-**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Eighteen findings are open —
-Q-506…Q-523 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
+**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Nineteen findings are open —
+Q-506…Q-524 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
 1. **Q-518** — the model-version stamp is erased within hours, which blocks the measurement
    infrastructure the rest depend on. One conflict-arm expression.
 2. **Q-517** — a maintenance below the owner's own BMR is one tap from becoming their calorie goal.
@@ -219,6 +229,16 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **Do NOT propose raising `strengthFreqGoal` or extending `STRENGTH_FREQ_CURVE` past ratio 1.0.**
+  It sits at 100 on 78% of days and looks like the obvious next calibration. `daily-goals.ts` sets
+  the goal *at* the owner's typical deliberately — the ACWR taper handles over-reach, and *"a goal
+  of 6 would have one part of the model rewarding what another punishes."* That reasoning holds.
+  **Measured-and-deliberately-not-filed is a valid outcome**; filing it would be manufacturing a
+  finding.
+- **The per-contributor breakdown is NOT persisted.** `oura_daily_derived.activity_contributors`
+  holds `{base, adjustment, trained}` — the blend wrapper, not `computeActivityScore`'s six
+  components. Any contributor-level question must be **reconstructed** from stored inputs with the
+  shipped formulas. Budget for that; do not go looking for a column that holds it.
 - **A contributor fix can be undone from the other half of its own fraction.** Q-188 fixed
   `moveHours` for being pinned at 100 by correcting the **denominator**; the **numerator** now
   saturates for an unrelated reason and the contributor is pinned at 100 again. `hourly-movement.ts`

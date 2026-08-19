@@ -1713,7 +1713,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (program.phaseMode === 'ai_dynamic') {
       const todayIso = todayInTz(timezone)
       const from7d = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000)
-      const from14dStr = toAestDay(new Date(Date.now() - 14 * 86_400_000), timezone)
+      // Q-489: a calendar day is derived by shifting the date STRING, never by subtracting
+      // milliseconds. On a 25-hour DST fall-back day `now − 24h` lands back on today, so the
+      // "yesterday" below silently became "today" and dropped a real row from the range.
+      const from14dStr = shiftDateStr(todayIso, -14)
 
       const [muscleAssignmentsMap, ouraRows, moodLog, recentWorkouts, exerciseLibrary, sleepSessions, bodyMetrics, derivedRows, summaryRows, morningCheckin] = await Promise.all([
         this.getExerciseMuscleAssignments(
@@ -1725,7 +1728,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         this.listExerciseLibrary(),
         this.listSleepSessions(userId, from14dStr, todayIso),
         this.listBodyMetrics(userId, from14dStr, todayIso),
-        this.getOuraDailyDerived(userId, toAestDay(new Date(Date.now() - 86_400_000), timezone), todayIso),
+        this.getOuraDailyDerived(userId, shiftDateStr(todayIso, -1), todayIso),
         this.getOuraDailySummary(userId, todayIso, todayIso),
         this.getDayCheckin(userId, todayIso, 'morning'),
       ])
