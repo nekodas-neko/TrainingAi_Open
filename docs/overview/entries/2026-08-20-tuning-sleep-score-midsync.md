@@ -72,3 +72,35 @@ filing anything. Recorded at the top of the baton.
 Docs-only; no code path changed. The 23-second ordering is **exact** — both timestamps are stored
 columns, not inferred. Everything else is `claude_ro`, row-scoped, one night, one athlete. No device
 check: the report came with screenshots and the server state answered it.
+
+---
+
+# Follow-up the same morning: "it changed again… and it's still wrong"
+
+At 06:51 the app had caught up to the server — 7.8 h, 9:52 pm – 6:44 am — and the owner replied that
+it had changed again and was still wrong. Both halves have an answer, and the second is a **different
+defect** from the stale score above.
+
+**"It changed again"** — sync was still landing. Across three reads the session end moved
+**4:52 → 6:44 → 6:47 am** and `awake_hours` **1.17 → 1.25 h**. Converging, not malfunctioning. It
+*reads* as instability only because nothing marks a still-syncing night as provisional.
+
+**"Still wrong"** — the numbers are right; the label is not. Decoding `sleep_phase_5_min`
+(`'1'=deep '2'=light '3'=REM '4'=awake`), the night's last **8 epochs are `4`** — 40 minutes awake at
+the end. Session end 06:47 − 40 min = **last sleep epoch ≈ 06:07**, which is *"around 6am"* almost
+exactly.
+
+**So the ring is right and the app already knows the answer.** The row renders the **in-bed span**
+(8.92 h) where a reader expects the sleeping window, while the figure beside it is time **asleep**
+(7.75 h) and 1.25 h of the span is awake — 0.5 h onset latency plus ~40 min lying awake at the end.
+**The wake moment the owner recognises is in the stored hypnogram and shown nowhere.**
+
+Filed as a **`projectOverview.md` Known Issue, not a queue entry** — the Tuning band (500–529) is
+exhausted at Q-529 and taking a number from another agent's band would collide. It needs a number
+once the band question is settled. It is Lane B's (presentation), unlike Q-529 which is Lane A's
+(recompute).
+
+**Method note worth keeping:** the answer came from decoding the stored hypnogram, not from the
+summary columns. `duration_hours`, `awake_hours` and `sleep_end` cannot distinguish "woke at 6:07 and
+lay in bed" from "slept until 6:47" — **the per-epoch string can, and it was already stored.** Reach
+for it before concluding a timestamp is wrong.

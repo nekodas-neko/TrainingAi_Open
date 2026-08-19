@@ -785,7 +785,9 @@ const BASELINE = {
   // offline path carries all of them and one session on the device settles them together. It also
   // records the migration's deliberately-narrow scope, which leaves a few historical rows outside
   // their meal's window — a stated cost is not a bug report, and it is the kind that gets rediscovered.
-  'projectOverview.md': 7982,
+  // 2026-08-20 (Tuning): Known-Issues row for the sleep row's time-in-bed range reading as
+  // time-asleep. A Known Issue rather than a queue entry because the Tuning Q band is exhausted.
+  'projectOverview.md': 8006,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that

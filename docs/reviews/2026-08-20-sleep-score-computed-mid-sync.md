@@ -102,3 +102,38 @@ sits exactly where the user is looking.
 thing to check before building anything, and it is cheap: re-read `computed_at` for 2026-08-20
 tomorrow. If it has moved, this is a latency problem and not a correctness one, and the fix shrinks
 to surfacing provisionality.
+
+---
+
+## 5. Follow-up the same morning: the row's time range is time-*in-bed*, read as time-*asleep*
+
+At 06:51 the app had caught up to the server — 7.8 h, 9:52 pm – 6:44 am — and the owner replied
+*"it changed again… and it's still wrong."* Both halves have an answer, and the second is a separate
+defect from §2.
+
+**"It changed again"** — sync was still landing. Across three reads the session end moved
+**4:52 → 6:44 → 6:47 am** and `awake_hours` **1.17 → 1.25 h**. It was converging, not malfunctioning.
+
+**"Still wrong"** — the numbers are right; **the label is not.** Decoding
+`sleep_phase_5_min` (`'1'=deep '2'=light '3'=REM '4'=awake`, per
+`packages/shared/src/health/hypnogram.ts`), the night is 107 five-minute epochs and ends:
+
+```
+… 2 2 2 2 2 2 2 1 1 1 2 2 4 4 4 4 4 4 4 4
+                        └── 8 epochs × 5 min = 40 min awake
+```
+
+Session end **06:47** minus 40 minutes puts the **last sleep epoch at ≈ 06:07** — which is the owner's
+*"I woke up around 6am"*, essentially exactly.
+
+**So the ring is right and the app knows it.** The row renders `9:52 pm – 6:47 am`, which reads as the
+sleeping window, while it is actually the **in-bed span**: 8.92 h in bed, 7.75 h asleep, 1.25 h awake
+(0.5 h of it the onset latency, ~40 min of it lying awake at the end). The wake moment the owner
+recognises — 06:07 — is present in the stored hypnogram and shown nowhere.
+
+**This is a presentation defect, not a data one, and it belongs to a different lane than §2.**
+Recorded as a `projectOverview.md` Known Issue rather than a queue entry, because the Tuning Q band
+(500–529) is exhausted at Q-529 and a number from another agent's band must not be taken.
+
+**Suggested shape, not a spec:** label the range as time in bed, or show the wake moment alongside it
+(*"asleep until 6:07, up at 6:47"*). The data for both is already stored.
