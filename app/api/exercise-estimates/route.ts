@@ -2,6 +2,10 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// 400 entries of a 200-char name plus a number is ~90 KB at the schema's own limit.
+const MAX_BODY_BYTES = 256 * 1024
 
 // The starting 1RMs a user types in the program builder. Formerly
 // `POST /api/personal-records/seed`, which wrote `personal_records` — conflating a typed
@@ -19,7 +23,13 @@ export async function POST(req: Request) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const parsed = BodySchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = BodySchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 })
 
   const { entries } = parsed.data

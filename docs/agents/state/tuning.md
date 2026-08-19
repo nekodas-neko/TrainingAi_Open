@@ -3,11 +3,38 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/score-audit-trail` (2nd pass — owner decisions) · **Q band:** 500–529 (next free: 527)
+**Updated:** 2026-08-19 · **By:** `tuning/body-battery-drain-model` · **Q band:** 500–529 (next free: 528)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Daily vs weekly windows — MEASURED, reshapes Q-505** (owner question, 2026-08-19). *"The goal
+  being x heart minutes per day… but you also gotta count for weekly targets. How handle this?"* —
+  correct, and bigger than it looks. `DEFAULT_ZONE_MINUTES_GOAL = 22` is **WHO 150/week ÷ 7**.
+  **Rule: match each contributor's window to its guideline's unit** — applied across all six, exactly
+  one is wrong (`zoneMinutes`). **Recommendation: split the Activity Score into Today and This Week.**
+  - **This RETIRES the `strengthFreq`-ceiling framing I added the same morning.** 100 on 78% of days
+    is a defect in a daily score and *correct* in a weekly compliance number. **Its scorecard was the
+    problem, not its ceiling** — do not re-file it as a constraint.
+  - **Q-522 rises in priority** — under the split, `moveHours` becomes half the daily number.
+  - **Do NOT claim "the score is really a weekly number" from the 60%-rolling-weight figure.** I
+    nearly did. The rolling terms saturate, so they set the LEVEL and carry almost no variance:
+    score ↔ same-day steps **+0.324**, ↔ sessions7d +0.186, ↔ volume7d **+0.026** (n = 23).
+  [`review`](../../reviews/2026-08-19-daily-vs-weekly-windows.md).
+- **Body Battery drain model — FITTED, propose-only** (Q-521 closed out, **Q-527** filed). The owner
+  resolved the contradiction between their two answers and added a term: *"the fitter we get, the more
+  workout stimulus we should need for draining, outside of BMR draining which should naturally go up
+  too."* → **goal-normalised + a BMR-proportional baseline.**
+  `endValue = max(0, 100 − b − (100 − b) × c^2.0)`, `b = 25 × bmrToday/bmrReference`,
+  `c = 0.5×workoutFrac + 0.5×stepsFrac`. Everything-hit **0** · workout-only **~30** · nothing **75** ·
+  typical **~44**.
+  - **A LINEAR split cannot satisfy the brief — do not let an implementer try it first.** Every
+    allocation swept lands mean 26–34 / sd 16–22, because a typical day is ~58% of a full one. Not
+    saturation: workout completion sd **0.403**, steps sd **0.346** — both vary well.
+  - **Expect LESS spread than shipped and say so up front**: sd **~22.6** vs **30.1**, range 0–75 vs
+    0–100. Today's spread is ring wear time. The 75 ceiling is inherent to having a baseline term.
+  - **BMR is flat (r = +0.080 over 3.5 months)** — build for it, don't promise it in UI copy.
+  [`review`](../../reviews/2026-08-19-body-battery-drain-model.md).
 - **THREE OWNER DECISIONS ANSWERED 2026-08-19, and TWO of my asks withdrawn.** Read this before
   asking the owner for anything.
   - **Q-523 — no labels needed after all.** The owner's *"use current recorded high, % off it,
@@ -174,8 +201,8 @@ completed 2026-08-18, and the zone-minutes / movement-per-hour coverage check 20
 is measured except **cardio**, which is deliberately skipped for lack of data (~13 run/treadmill
 sessions, newest 2026-07-24), not for lack of time.
 
-**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Twenty-one findings are open —
-Q-506…Q-526 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
+**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Twenty-two findings are open —
+Q-506…Q-527 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
 1. **Q-518** — the model-version stamp is erased within hours, which blocks the measurement
    infrastructure the rest depend on. One conflict-arm expression.
 2. **Q-517** — a maintenance below the owner's own BMR is one tap from becoming their calorie goal.
@@ -260,6 +287,19 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **Check a goal's WINDOW against its source, not just its value.** A weekly guideline divided by
+  seven is a different guideline. `zoneMinutesGoal = 22` is WHO 150/week ÷ 7 and had been read as a
+  daily target for months. The strength lane in the same file already does this correctly, which is
+  what made the inconsistency findable.
+- **A saturated contributor is not automatically broken — check which scorecard it belongs in.**
+  `strengthFreq` at 78% ceiling was filed as an unremovable constraint in the morning and turned out
+  to be correct behaviour in the wrong place by the afternoon. Ask what question the number answers
+  before concluding it cannot discriminate.
+- **A dormant data-quality bug becomes live the moment a new model reads that column.** One
+  `body_comp` row (2026-07-29: 3% body fat, BMR 1,890 against ~1,520 around it) has sat harmless for
+  weeks because nothing keys a visible number off stored BMR. Q-521 makes BMR drive baseline drain, so
+  it turns into a day that drains a quarter faster (Q-527). **When proposing a model, check the input
+  column's data quality — not just its coverage and spread.**
 - **Before asking the owner for labels, check whether a PUBLISHED threshold answers it.** Q-523's
   ask for "days you'd call active" was unnecessary: WHO/ACSM already defines moderate intensity, and
   the code's own comment claimed to implement it. Asking the owner to hand-label data so a constant

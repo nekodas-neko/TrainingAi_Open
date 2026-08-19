@@ -904,12 +904,23 @@ const BASELINE = {
   // by ten of twenty-five, so two sessions planned work around sites that did not exist — the entry
   // has to say WHICH files were phantom and why, or the next session re-derives it from the same
   // bad numbers.
+  // Raised 2026-08-19 (Tuning, Q-527 + the fitted Body Battery drain model): 11160 -> 11234. Q-521's
+  // sketch is replaced by concrete parameters, and the entry now carries the LINEAR-split failure
+  // inline -- without it an implementer reaches for the obvious allocation first, and every linear
+  // split lands the typical day next to empty. Recording what does NOT work is the expensive half.
+  // Rebuilt from origin/main after a parallel PR raised the same baseline -- splicing the conflict
+  // hunks would have produced two baselines for one number.
+  // Raised 2026-08-19 (Tuning, daily-vs-weekly windows): -> 11273. The owner asked how a daily
+  // heart-minutes goal squares with a weekly target; the answer reshapes Q-505 and had to go
+  // INTO Q-505 rather than sit in a review nobody opens before building. It also retires the
+  // strengthFreq-ceiling framing added earlier the same day, and a superseded framing left
+  // standing beside its replacement is worse than the extra lines.
   // Raised 2026-08-19 (Lane B, Q-359 slice 4): the can-bite group reached zero, and the added lines
   // are what stops the entry reading as finished when it is not — twelve latent sites stay queued,
   // and the second hook (`useInvalidationRefetch`) needs its existence and its reason recorded
   // where the next session looks, or the next read that cannot use `useCachedValue` gets a fourth
   // hand-rolled event listener.
-  'docs/implementation-backlog.md': 11176,
+  'docs/implementation-backlog.md': 11289,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

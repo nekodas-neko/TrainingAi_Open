@@ -4,6 +4,10 @@ import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { deleteWorkoutSession } from "@/lib/workout/delete-session";
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One workout-session id.
+const MAX_BODY_BYTES = 4 * 1024;
 
 // DELETE — remove a whole workout session and its exercise/set logs (cascade).
 export async function DELETE(req: NextRequest) {
@@ -11,7 +15,13 @@ export async function DELETE(req: NextRequest) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const parsed = z.object({ workoutSessionId: z.string().uuid() }).safeParse(await req.json().catch(() => null));
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+  const parsed = z.object({ workoutSessionId: z.string().uuid() }).safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
