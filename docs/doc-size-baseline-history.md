@@ -18,7 +18,12 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ## 2026-08-19 — the extraction itself (`claude/agent-setup-task-numbering-5gojd9`)
 
-**projectOverview.md 8009 → 8018 · docs/implementation-backlog.md 11177 → 11290 · CLAUDE.md 1085 → 1100.**
+**projectOverview.md 8009 → 8018 · docs/implementation-backlog.md 11177 → 11338 · CLAUDE.md 1085 → 1100.**
+
+*(The backlog figure was recomputed after merging `main`, which had itself raised that number to
+11225 inside the old script — the conflict this change exists to remove, hit once more on its own
+branch. Resolved by taking the rewritten script whole and re-measuring the merged file, never by
+splicing either side's number.)*
 
 The first raise recorded here rather than in the script, which is the point of the change.
 

@@ -3,12 +3,13 @@ import { consumeMobileAuthToken } from "@/lib/mobile-auth-tokens";
 import { verifyPkce } from "@/lib/pkce";
 import { rateLimit } from "@/lib/rate-limit";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
+import { clientIp } from '@trainingai/shared/http/client-ip'
 
 // A one-time token and a PKCE verifier — both short fixed-length strings. 8 KB is generous.
 const MAX_EXCHANGE_BODY_BYTES = 8 * 1024;
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim() ?? 'unknown'
+  const ip = clientIp(req)
   if (!rateLimit(`mobile-token:${ip}`, 10, 5 * 60 * 1000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }

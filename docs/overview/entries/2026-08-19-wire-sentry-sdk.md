@@ -103,3 +103,23 @@ scrubbed.
 **To go live it needs, in Railway:** `SENTRY_DSN` and `NEXT_PUBLIC_SENTRY_DSN`, both the project's
 existing public DSN. Until they are set the SDK initialises to a no-op, so **merging is safe and
 inert on its own** — which is also the argument for merging before setting them rather than after.
+
+**Update, later the same day — the owner had already set them, and one half is confirmed from
+production.** `NEXT_PUBLIC_SENTRY_DSN` is inlined into the deployed client bundle
+(`o4511924403044352.ingest.us.sentry.io`), which is direct evidence rather than inference: a
+build-time `NEXT_PUBLIC_*` var cannot appear there unless it was set.
+
+`SENTRY_DSN` is **not** confirmed, and cannot be by observation alone. It is server-only so it never
+reaches the bundle, and **`tracesSampleRate: 0` means the server SDK transmits nothing until
+something throws** — so "zero events received in 24 h" is precisely what a correctly-wired,
+error-free deploy looks like. Absence of evidence, and the config makes it so by design.
+
+Project state at the time of writing: **1 issue in 14 days**, the pre-merge `Q404WiringProbe`
+(platform `node`, 11:33 UTC — *before* #227 merged at ~12:20), and **1 event received in 24 h**,
+that same one. So nothing has yet travelled the deployed server path.
+
+**The only proof is a deliberate server error in production**, which creates a real Sentry issue and
+an `error_events` row. Left undone rather than done quietly: it is an outward-facing action on the
+owner's live app, and the client half needs the device anyway (the APK is a WebView, and a
+`connect-src` omitting the ingest host would drop every client event silently). Both belong in one
+deliberate check, not a drive-by.

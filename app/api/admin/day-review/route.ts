@@ -8,6 +8,7 @@ import { DEFAULT_TZ, todayInTz, normalizeDateParamIso, shiftDateStr, daysBetween
 import { buildDayAudit } from '@trainingai/shared/health/score-audit/build-day-audit'
 import type { DayAudit } from '@trainingai/shared/health/score-audit/types'
 import { reportServerError } from '@/lib/observability'
+import { clientIp } from '@trainingai/shared/http/client-ip'
 
 /**
  * Admin day-review: everything that fed each scored pillar on a day, in one payload — the raw
@@ -36,7 +37,7 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
     // Rate-limit every attempt per IP BEFORE the compare, so a token brute-force can't run at
     // unbounded throughput, and return the same 401 either way so a trip is indistinguishable
     // from a bad token.
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const ip = clientIp(req)
     if (!rateLimit(`day-review-token:${ip}`, 20, 60_000)) {
       return { ok: false, status: 401, error: 'Unauthorized' }
     }

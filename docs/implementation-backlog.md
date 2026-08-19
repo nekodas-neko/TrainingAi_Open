@@ -564,6 +564,66 @@ blocker and the intended shape were both already named, so **do not re-derive th
   note says the server half is the correct home, so **route it to Lane A** with the display change
   riding along.
 
+### [workouts][nutrition] Q-419 — the done screen and the day's energy budget disagree about the same workout, because only one of them reads your RPE
+
+- **Branch:** `fix/day-energy-ignores-session-rpe`
+- **Added:** 2026-08-19 · found while answering the owner's question *"how can we make energy usage/burned
+  from excercuse more accurate, what type of data can we feed to calibrate it over time"*. Not a report —
+  this is the first rung of that answer, and it is a straight defect rather than a calibration change.
+
+**Two live paths call the same estimator with different intensities for the same session.**
+
+| path | intensity | file |
+|---|---|---|
+| done screen → `GET /api/workout-sessions/[id]/energy` | `intensityFromRpe(rpe)` — easy / moderate / hard | `app/api/workout-sessions/[id]/energy/route.ts:64` |
+| day ENERGY row, Nutrition earned-kcal, Home budget | **hardcoded `'moderate'`** | `packages/shared/src/health/daily-energy.ts:103` |
+
+`computeActiveEnergy` never receives an RPE — `ActiveEnergyInput.strengthSessions` is
+`{ durationMin }[]` and nothing else (`daily-energy.ts:66-67`), so the tier cannot be threaded without
+widening that type.
+
+- **The user watches the number change and then watches it not apply.** `done-screen.tsx:130-152`
+  re-fetches on every RPE tap, keyed by `workout-energy:<id>:<activityId>:<rpe>` precisely so a different
+  rating re-estimates. So on the done screen an RPE 9 session reads higher than an RPE 3 one — and the
+  moment that session lands in the day's ENERGY section, in Nutrition's earned calories, and in the Home
+  budget, it reverts to the moderate figure. The tap looks load-bearing and is not.
+- **Magnitude is exact in form even though the tiers are not readable here.** `estWorkoutKcal` is
+  `durationMin × (MET − 1.5) × bmrPerMinute` (`workout-energy.ts:113`), so the ratio between tiers is
+  `(met_hard − 1.5) / (met_moderate − 1.5)` — nothing else in the expression changes. The **real** MET
+  table cannot be quoted from the sandbox: `lib/oura-models/constants/` is runtime-only (absent here) and
+  the committed fixture is deliberately scrubbed — it lists strength as `met_easy: 1, met_moderate: 0.6,
+  met_hard: 3`, which is not a MET table (that scrubbing is Q-312). **Measure against the runtime table
+  before quoting a kcal delta anywhere user-facing.**
+- **`sessionRpe` is already stored and already synced.** `workout_sessions.session_rpe`
+  (`schema.ts:169`), written through the `session_rpe` outbox domain by `handleRpeTap` (`done-screen.tsx:154-170`). This
+  needs no new capture, no migration, no schema change — only for the day-level path to read a column it
+  already has.
+- **Where it has to be plumbed.** `energy-balance-service.ts:122-126` and `app/api/body-metadata/route.ts:148`
+  both build `strengthSessions` from workout rows they have already fetched, so `ws.sessionRpe` is in hand
+  at both sites. Widen `ActiveEnergyInput.strengthSessions` to `{ durationMin; rpe?: number | null }` and
+  call `intensityFromRpe(s.rpe)` instead of the literal. `intensityFromRpe` already defaults to
+  `'moderate'` on null (`workout-energy.ts:87`), so an unrated session is unchanged — which is what keeps
+  this from re-scoring history that has no RPE.
+- **⚠ It DOES re-score history that has one, and that is the thing to size before shipping.** Every past
+  day carrying a rated session moves. Per the Tuning rule, state how many days change and by how much
+  before this lands — and note it moves *maintenance* too, since `adaptive-tdee`'s calibration window
+  reads the same active-energy figures. A silent re-score of the number the app eats against is worse
+  than the disagreement it fixes.
+- **Fixes a stated invariant, not just an oddity.** `energy-summary.ts`'s own header says the day screen
+  disagreeing with Nutrition about how much was burned is worse than either being slightly off. This is
+  that disagreement, one layer up — the done screen against both of them.
+- **Relationship to Q-391:** same file, same function, adjacent change. Q-391 needs
+  `computeActiveEnergy` to return its per-session breakdown instead of discarding it; this needs the same
+  loop to read an intensity per session. **Do them in one visit** — and if Q-391 ships first, its
+  per-session figures must carry the tier, or the Training card inherits this same contradiction.
+- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — complete a workout, tap
+  an RPE, compare the done screen's kcal with the same day's ENERGY row. No device, no production data.
+  Spans `packages/shared/**`, `lib/health/**` and `app/api/**` — all Lane A.
+- **What would count as done:** the kcal the done screen shows for a session is the kcal that session
+  contributes to the day's ENERGY row, Nutrition's earned calories and the Home budget, for every RPE
+  value; an unrated session is unchanged; and a test pins the three surfaces to one number.
+
+
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`
@@ -2460,33 +2520,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 - **Verification:** `shiftDateStr('0001-01-01', -1)` must give `0000-12-31`, and every existing
   `shiftDateStr` test must still pass unchanged.
 
-### [devices][platform] Q-493 — the ingest brute-force gate is bypassed by rotating one request header (7 sites)
-
-- **Branch:** `security/client-ip-from-trusted-hop`
-- **Added:** 2026-08-18 · review sweep (secret-gated ingest, driven for real) ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement: high.** It defeats a mitigation (SEC-I3) written specifically to stop this, on the
-  **only unauthenticated write into `body_metrics`**, and the same pattern guards the bearer path to
-  the owner's full health history.
-- **The defect.** Every limiter keys on `x-forwarded-for`'s **leftmost** hop — the value the *client*
-  supplied (a proxy appends its peer to the right). The caller therefore chooses the rate-limit key.
-- **Measured**, 30 wrong-secret attempts each way, limit 20/60 s. Both return 401 throughout (by
-  design), so the observable is `rate_limits`:
-  - **fixed** `X-Forwarded-For` → **1 key, count 20** — gate engaged, 10 attempts blocked.
-  - **rotating** → **30 keys, count 1 each** — **all 30 reached the secret compare.**
-- **Seven sites:** `health-connect/ingest`, `admin/day-review` (bearer → full health history),
-  `admin/db-query` ×2, `auth/register`, `auth/exchange-mobile-token`, `status`.
-- **Nothing in the docs records this, and the R1 security-hardening plan *propagated* it** — the
-  `status` route was added keyed by `x-forwarded-for` *"matching the existing pattern in
-  `auth/register` and `auth/exchange-mobile-token`"*.
-- **⚠️ Not verified:** whether Railway's edge proxy sanitises the header before the app sees it. Not
-  determinable from the sandbox, and probing production's limiter was not done unasked. The
-  code-level bypass is proven; production exploitability turns on that one unknown. **The fix does
-  not depend on it** — the leftmost hop is untrustworthy under the header's own semantics regardless.
-- **Fix:** one shared helper deriving the client IP from the **rightmost** hop or a configured
-  trusted-proxy count — the treatment `safeCompare` already has. Seven call sites should not each
-  re-decide this.
-
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
 - **Branch:** `fix/aria-expanded-collapsibles-ratchet`
@@ -2531,6 +2564,21 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
   `app/coach/coach-content.tsx` was examined and **excluded** — its chevron is a back button.
 
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
+
+> **⚠️ Step 1 (the CI ratchet) is DONE — 2026-08-19, Lane A. What is left is step 2, the sweep, which
+> is Lane B's.** `scripts/check-client-today-timezone.js` is step 50 of 50 in Custom Rules, with a
+> shrink-only per-file baseline. A new bare call in any client file now fails CI, and a file that
+> improves must lower its baseline in the same PR.
+>
+> **Re-measured, and the headline count does not reproduce.** The script finds **78 bare calls across
+> 38 files** over **522 client files** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`,
+> `lib/stores/**`), not 100 of 125. The difference is the file set, not a fix — which is the entry's
+> own argument for a script: **do not hand-count this, run
+> `node scripts/check-client-today-timezone.js --print`**, which is the maintained list.
+>
+> The sweep order in the entry still stands (calendar today-marker → write paths → display), and so
+> does the warning not to make `todayInTz()`'s default throw or read a global.
+
 
 - **Branch:** `fix/client-today-uses-user-timezone`
 - **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
