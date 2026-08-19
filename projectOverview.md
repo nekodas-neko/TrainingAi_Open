@@ -2129,8 +2129,11 @@ other four (Q-273 — do this one **before** the calibration items, or each crea
 incomparable segment).
 
 **The rest, in brief:** Activity Score still occupies a quarter of its range (sd 5.9 over 19 days)
-even though v2 fixed the mechanism Q-137 blamed — Q-137 should be re-scoped or closed in its favour
-(Q-277). Scores are absent on 20–52% of days with nothing distinguishing "no data" from a real value
+even though v2 fixed the mechanism Q-137 blamed. **Answered 2026-08-19 and folded into Q-505**
+(Q-277 removed from the queue): all six contributors were measured, and **49% of the score's
+effective weight cannot vary** — `moveHours` saturated, `zoneMinutes` floored, `activeEnergy` absent,
+`strengthFreq` 78% at ceiling by design. The goal fixes did work (stored sd **5.0 → 7.4** across
+2026-08-11) but stored history is not back-filled, so most days still show the old model. Scores are absent on 20–52% of days with nothing distinguishing "no data" from a real value
 (Q-278). Q-214's duplicate-collapse fix — which stopped a **5,771-hit** `[pg 21000]` fault that was
 discarding 5,000-point HR chunks — reached **one of three** same-shaped batch upserts; `upsertOuraBucket`
 and `upsertSetHrStats` are still exposed (Q-280). ACWR drives the early-deload card and the activity
