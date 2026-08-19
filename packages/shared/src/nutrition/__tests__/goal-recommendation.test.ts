@@ -1,11 +1,38 @@
 import { describe, it, expect } from 'vitest'
-import { calculateBaseline, ACTIVITY_MULTIPLIERS, clampRecommendation, carbsFromRemainder, reconcileDailyMacros, type RawRecommendation, type BaselineResult } from '../goal-recommendation'
+import { calculateBaseline, clampRecommendation, carbsFromRemainder, reconcileDailyMacros, type RawRecommendation, type BaselineResult } from '../goal-recommendation'
 
-describe('ACTIVITY_MULTIPLIERS', () => {
-  it('has all five activity levels', () => {
-    expect(ACTIVITY_MULTIPLIERS).toEqual({
-      sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, extra_active: 1.9,
-    })
+// Q-401: `ACTIVITY_MULTIPLIERS` is gone, and this is the test that used to pin it. The app ran two
+// TDEE models — this one folded a *self-reported* activity level into the calorie target while
+// `daily-energy.ts` measured movement and added it — so a `light` user saw 1,892 here against 1,626
+// there, 274 kcal apart on one screen, both labelled "left".
+//
+// The contract now: baseline = BMR × sedentary, everywhere, and activity is only ever ADDED.
+describe('calculateBaseline is activity-independent (Q-401)', () => {
+  const person = { weightKg: 80, heightCm: 180, ageYears: 30, sex: 'male' as const, fitnessGoal: 'maintain' as const }
+
+  it('returns the SAME calories for every activity level — that is the whole point', () => {
+    const levels = ['sedentary', 'light', 'moderate', 'active', 'extra_active'] as const
+    const results = levels.map(activityLevel => calculateBaseline({ ...person, activityLevel }))
+    const calories = new Set(results.map(r => r.calories))
+
+    expect(calories.size).toBe(1)
+    // BMR 1780 × 1.2 sedentary, maintain adds 0. Previously 'moderate' gave 2759 (× 1.55).
+    expect([...calories][0]).toBe(2136)
+  })
+
+  it('still varies step goal and water by activity — those are not double-counted', () => {
+    const sedentary = calculateBaseline({ ...person, activityLevel: 'sedentary' })
+    const active = calculateBaseline({ ...person, activityLevel: 'active' })
+
+    expect(active.stepsGoal).toBeGreaterThan(sedentary.stepsGoal)
+    expect(active.waterMl).toBeGreaterThan(sedentary.waterMl)
+  })
+
+  it('agrees with the measured model it used to contradict', () => {
+    // `energy-balance-service` computes its formula baseline as `bmr * SEDENTARY_MULTIPLIER`. After
+    // this change the two are the same expression, which is what "one TDEE model" means.
+    const { bmr, tdee } = calculateBaseline({ ...person, activityLevel: 'light' })
+    expect(tdee).toBe(Math.round(bmr * 1.2))
   })
 })
 
@@ -16,8 +43,8 @@ describe('calculateBaseline', () => {
       activityLevel: 'moderate', fitnessGoal: 'maintain',
     })
     expect(result).toEqual({
-      bmr: 1780, tdee: 2759, calories: 2759,
-      proteinG: 128, carbsG: 389, fatG: 77,
+      bmr: 1780, tdee: 2136, calories: 2136,
+      proteinG: 128, carbsG: 273, fatG: 59,
       waterMl: 2890, stepsGoal: 10000,
     })
   })
@@ -27,10 +54,11 @@ describe('calculateBaseline', () => {
       weightKg: 80, heightCm: 180, ageYears: 30, sex: 'male',
       activityLevel: 'moderate', fitnessGoal: 'lose_weight',
     })
-    expect(result.calories).toBe(2259)
+    // 2136 sedentary tdee − 500. Was 2259 (× 1.55 moderate).
+    expect(result.calories).toBe(1636)
     expect(result.proteinG).toBe(144)
-    expect(result.fatG).toBe(63)
-    expect(result.carbsG).toBe(279)
+    expect(result.fatG).toBe(45)
+    expect(result.carbsG).toBe(164)
   })
 
   it('applies the build_muscle calorie surplus and protein target', () => {
@@ -38,10 +66,10 @@ describe('calculateBaseline', () => {
       weightKg: 80, heightCm: 180, ageYears: 30, sex: 'male',
       activityLevel: 'moderate', fitnessGoal: 'build_muscle',
     })
-    expect(result.calories).toBe(3059)
+    expect(result.calories).toBe(2436)
     expect(result.proteinG).toBe(160)
-    expect(result.fatG).toBe(85)
-    expect(result.carbsG).toBe(414)
+    expect(result.fatG).toBe(68)
+    expect(result.carbsG).toBe(296)
   })
 
   it('applies the recomp deficit with the highest protein target', () => {
@@ -49,10 +77,10 @@ describe('calculateBaseline', () => {
       weightKg: 80, heightCm: 180, ageYears: 30, sex: 'male',
       activityLevel: 'moderate', fitnessGoal: 'recomp',
     })
-    expect(result.calories).toBe(2559)
+    expect(result.calories).toBe(1936)
     expect(result.proteinG).toBe(176)
-    expect(result.fatG).toBe(71)
-    expect(result.carbsG).toBe(304)
+    expect(result.fatG).toBe(54)
+    expect(result.carbsG).toBe(187)
   })
 
   it('computes baseline for a female at light activity (no water bump)', () => {
@@ -61,8 +89,8 @@ describe('calculateBaseline', () => {
       activityLevel: 'light', fitnessGoal: 'maintain',
     })
     expect(result).toEqual({
-      bmr: 1380, tdee: 1898, calories: 1898,
-      proteinG: 104, carbsG: 251, fatG: 53,
+      bmr: 1380, tdee: 1656, calories: 1656,
+      proteinG: 104, carbsG: 207, fatG: 46,
       waterMl: 2145, stepsGoal: 8500,
     })
   })
@@ -82,7 +110,9 @@ describe('calculateBaseline', () => {
   it('uses Katch-McArdle BMR and lean-mass protein when bodyFatPct is provided', () => {
     // 80kg at 20% BF → leanMassKg = 64
     // BMR = 370 + 21.6 × 64 = 1752
-    // TDEE (moderate 1.55) = 2716; protein (maintain 1.6g/kg lean) = 102
+    // TDEE = 1752 × 1.2 sedentary = 2102; protein (maintain 1.6g/kg lean) = 102.
+    // The activity level is 'moderate' and deliberately does NOT change the TDEE (Q-401) — it is
+    // left set here precisely so this test would fail if the multiplier ever came back.
     const result = calculateBaseline({
       weightKg: 80, heightCm: 180, ageYears: 30, sex: 'male',
       activityLevel: 'moderate', fitnessGoal: 'maintain',
@@ -90,7 +120,7 @@ describe('calculateBaseline', () => {
     })
     expect(result.leanMassKg).toBe(64)
     expect(result.bmr).toBe(1752)
-    expect(result.tdee).toBe(2716)
+    expect(result.tdee).toBe(2102)
     expect(result.proteinG).toBe(102)
   })
 

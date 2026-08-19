@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { budgetProvenance } from '../budget-provenance'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
 
 /**
  * **Q-401.** Two calorie budgets sat on the Nutrition tab 274 kcal apart, both labelled "left",

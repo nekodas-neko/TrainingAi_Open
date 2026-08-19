@@ -1,9 +1,27 @@
 import { ACTIVITY_LEVELS, type ActivityLevel, type FitnessGoal } from '../types/user'
 import { cunninghamBmr } from '../health/body-composition'
+import { SEDENTARY_MULTIPLIER } from '../health/energy-baseline'
 
-export const ACTIVITY_MULTIPLIERS: Record<ActivityLevel, number> = {
-  sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, extra_active: 1.9,
-}
+// Q-401: `ACTIVITY_MULTIPLIERS` used to live here — sedentary 1.2 through extra_active 1.9 — and
+// `calculateBaseline` folded the user's *self-reported* level into the calorie target. That made
+// this a second TDEE model, and the app ran both:
+//
+//   goal wizard      BMR × 1.375 (light)      − 200  =  1,892  ≈ the stored 1,900
+//   energy balance   BMR × 1.2  (sedentary)   − 200  =  1,626
+//
+// Gap = BMR × (1.375 − 1.2) = 266 kcal; observed on device: 274, the rest being rounding and weight
+// drift. Two budgets on one screen, both labelled "left", with nothing reconciling them.
+//
+// Neither was wrong — they were different contracts. This one *assumed* your activity and never
+// moved; `daily-energy.ts` *measures* it and deliberately starts from sedentary, its comment saying
+// exactly why: "measured movement is added explicitly, so a higher activity multiplier here would
+// double-count it."
+//
+// Owner decision (2026-08-18): *"i want the lowest number that assumes no exercise/movement — and
+// only has BMR essentially. then we adjust/increase that number [by] activity."* So the baseline is
+// BMR × sedentary **everywhere**, and activity is only ever ADDED — one place turns a BMR into a
+// daily target, one place adds today's movement. The activity level is still asked for and still
+// used, but only where it is not double-counted: step goals and water.
 
 export const STEP_GOAL_BY_ACTIVITY: Record<ActivityLevel, number> = {
   sedentary: 7000, light: 8500, moderate: 10000, active: 12000, extra_active: 12000,
@@ -149,7 +167,10 @@ export function calculateBaseline(input: BaselineInput): BaselineResult {
     ? Math.round(cunninghamBmr(leanMassKg))
     : Math.round(mifflinStJeorBmr(input.weightKg, input.heightCm, input.ageYears, input.sex))
 
-  const tdee = Math.round(bmr * ACTIVITY_MULTIPLIERS[input.activityLevel])
+  // The rest-day floor, not "what you burn on an average day". Today's measured movement is added
+  // on top of this by `computeCalorieBalance`; folding an activity multiplier in here as well is
+  // the double-count that produced Q-401.
+  const tdee = Math.round(bmr * SEDENTARY_MULTIPLIER)
   const calories = tdee + CALORIE_ADJUSTMENT_BY_GOAL[input.fitnessGoal]
 
   // Protein dosed per kg of lean mass when available; total weight otherwise
