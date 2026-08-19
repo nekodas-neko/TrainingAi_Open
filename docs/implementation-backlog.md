@@ -6501,6 +6501,34 @@ session working from a temporarily restored copy.
   insufficient data, which is what the first action distinguishes. Do not relax a gate before knowing
   which.
 
+### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
+
+- **Branch:** `fix/body-comp-plausibility-guard` · **Lane:** A
+- **Plan:** none needed — a plausibility guard at the write site. Evidence:
+  [`docs/reviews/2026-08-19-body-battery-drain-model.md`](reviews/2026-08-19-body-battery-drain-model.md) §2.
+- **Added:** 2026-08-19 · Tuning agent, found while checking the owner's *"BMR draining should
+  naturally go up too"* premise against the data.
+- **Measured.** `body_comp` holds 71 daily snapshots. **One is impossible: 2026-07-29 records body fat
+  **3.0%**, fat-free mass **70.4 kg of 72.6 kg** bodyweight, and BMR **1,890** — against ~24% body fat
+  and ~1,520 BMR on the surrounding days.** Three per cent is below the essential-fat floor for a male;
+  this is a bad scale reading propagated through `cunninghamBmr` into a stored BMR **24% above
+  baseline**. One row of 71, so ~1.4% — rare, not impossible.
+- **Why it matters now and did not before.** Nothing currently keys a user-visible number off stored
+  BMR. **Q-521's drain model makes baseline drain proportional to it** (`baseline = 25 × bmrToday /
+  bmrReference`), so this single row becomes a day that drains a quarter faster for no reason the
+  owner can see or explain.
+- **First action:** a plausibility guard at the `body_comp` write site — reject or clamp a snapshot
+  whose body fat falls outside a physiologically possible band, or whose fat-free mass exceeds a
+  plausible share of bodyweight. **Guard the input, not the output**: BMR is derived, so a BMR range
+  check would catch this case and miss the next one.
+- **Also decide what a rejected snapshot does.** Dropping the row leaves a gap; carrying the previous
+  day forward hides that the scale misread. Prefer storing it flagged over storing it silently, so a
+  future audit can see the reading happened — the same reasoning behind readiness's `provisional`
+  flags, which are the reference for this (Q-526).
+- **Do this BEFORE Q-521.** A guard added afterwards leaves already-stored bad rows driving drain.
+- **Caveats:** one athlete, one bad row, 71 snapshots — the *rate* here is not a population estimate.
+  The band itself is a published physiological range, not a fit to this data.
+
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
 - **Branch:** `fix/move-hours-rest-boundary`
@@ -6644,7 +6672,48 @@ session working from a temporarily restored copy.
   fallen to ~60 bpm, nearly every waking sample drains, and `(hrr − threshold)` varies far less than
   wear duration — so **drain ≈ rate × time worn**, which is what +0.518 says. **Q-521 is downstream of
   Q-515**: fixing the boundary does not fix this, but leaving it broken re-poisons any replacement.
-- **First action — exertion-integrated drain** (§3): keep the morning anchor; replace time-integrated
+- **✅ OWNER CONFIRMED + MODEL FITTED 2026-08-19 — this supersedes the sketch below.**
+  [`docs/reviews/2026-08-19-body-battery-drain-model.md`](reviews/2026-08-19-body-battery-drain-model.md).
+  Owner: *"the fitter we get, the more workout stimulus we should need for draining, outside of BMR
+  draining which should naturally go up too."* → **goal-normalised, plus a BMR-proportional baseline.**
+
+  ```
+  c = 0.5 × min(1, workoutVolume / sessionVolumeGoal) + 0.5 × min(1, steps / stepGoal)
+  endValue = max(0, 100 − baseline − (100 − baseline) × c^2.0)
+  baseline = 25 × (bmrToday / bmrReference)          // rolling median of own BMR
+  ```
+
+  | day | end value | brief it satisfies |
+  |---|---|---|
+  | everything hit (`c = 1`) | **0** | *"a day where I have done everything — I'd expect to see 0"* |
+  | workout only, no walking | **~30** | *"a bit of reserve battery at the end of the day"* |
+  | nothing done (`c = 0`) | **75** | depleted by being awake, but only a little |
+  | typical day | **~44** | readable, rather than always empty |
+
+- **⚠️ A LINEAR split cannot satisfy the brief — do not try it first.** Every linear allocation lands
+  mean 26–34 / sd 16–22 with a max of 58–77, because a *typical* day is ~58% of a *full* day, so
+  putting a full day at 0 puts a typical day next to it. **Not a saturation problem** — both inputs
+  vary well (workout completion sd **0.403**, 16 days at ceiling and 29 at zero; steps sd **0.346**).
+  The concave exponent is what reconciles everything-hit → 0 with typical → mid-range.
+- **Expect LESS spread than today, and that is correct.** Shipped: mean 50.3, sd **30.1**, range
+  0–100. Proposed: mean ~44, sd **~22.6**, range 0–75. Today's spread is largely ring **wear time**
+  (`corr(hr_sample_count, drained) = +0.518`). Twenty-two points driven by what the owner did beats
+  thirty driven by an artefact. The 75 ceiling is inherent to having a baseline term: remove it and a
+  sedentary day ends at 100, which contradicts the term the owner asked for.
+- **Sequencing: do Q-515 AND Q-527 first.** Q-515 because a rest boundary that moves with fitness
+  re-poisons anything built over it. **Q-527 because BMR becomes load-bearing the moment this lands**,
+  and there is already one corrupt `body_comp` row (2026-07-29: 3% body fat, BMR 1,890 vs ~1,520
+  around it) that would silently drain a quarter faster.
+- **Pass tests:** `corr(steps, drained)` clearly positive; `corr(hr_sample_count, drained)` toward
+  zero; workout vs non-workout `end_value` separating by far more than 0.6 points; a 90-day replay
+  landing mean **40–48**, sd **≥ 20**, and **≤ ~15%** of days under 5 — a model that empties most days
+  is as uninformative as one that never does.
+- **BMR is flat so far — build for it, don't promise it.** 71 snapshots over 3.5 months: monthly BMR
+  1,529 / 1,514 / 1,582 / 1,522, trend **r = +0.080**. The baseline term *should* scale with BMR as
+  the owner asked; it will not move much soon, and UI copy should not imply otherwise.
+
+- ~~**First action — exertion-integrated drain**~~ *(superseded by the fitted model above; kept for
+  the reasoning)* (§3): keep the morning anchor; replace time-integrated
   HR drain with exertion combining steps/movement, HR above rest, workout load and zone minutes;
   **normalise against that day's `getDailyGoals`** so "everything hit" lands near empty; **floor at 0
   and route the overshoot to an overreach signal** rather than below empty (the same resolution the
@@ -6707,6 +6776,11 @@ session working from a temporarily restored copy.
   - **So this resolves to a presentation change, not a modelling one:** label the two so a reader
     cannot mistake them for the same question, and stop placing them adjacent without that framing.
     **That makes it Lane B's, not Lane A's**, and it unblocks now rather than after Q-272.
+  - **The drain model implementing this is fitted** —
+    [`2026-08-19-body-battery-drain-model.md`](reviews/2026-08-19-body-battery-drain-model.md), folded
+    into Q-521. Owner added a **BMR-proportional baseline** on top of goal-normalised activity drain:
+    *"the fitter we get, the more workout stimulus we should need for draining, outside of BMR draining
+    which should naturally go up too."*
   - **The +0.12 end-of-day correlation is no longer a defect.** Two numbers answering different
     questions are not required to agree; the earlier framing assumed they should. What remains worth
     watching is only that the anchor **starts** at readiness (+0.93) — i.e. the day begins where
