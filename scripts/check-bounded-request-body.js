@@ -11,9 +11,9 @@
 // path and then streams with a real byte counter, cancelling on overflow. Measured against the same
 // 20 MB body on a route with a 16 KB cap: cut off at 2,949,120 bytes.
 //
-// **This is a ratchet, not a sweep.** 104 bare reads across 92 route files remain after the three
-// unauthenticated ones were converted, and converting all 92 at once is how a mistake hides in a
-// diff nobody can read. So: every file below is baselined at the number of bare reads it has, the
+// **This is a ratchet, not a sweep.** 104 bare reads across 92 route files remained after the three
+// unauthenticated ones were converted (slice 1); slice 2 took the six offline-first hot paths, so 98
+// across 86 remain. Converting them all at once is how a mistake hides in a diff nobody can read. So: every file below is baselined at the number of bare reads it has, the
 // number may only go DOWN, and a file that is not listed must have none. A route converted to
 // `readJsonLimited` lowers its own number in the same PR; a file that reaches zero is removed from
 // the list. Q-322 tracks the remaining sweep, and this check is what makes doing it slowly safe.
@@ -55,7 +55,6 @@ const BASELINE = {
   'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/transition/route.ts': 1,
   'app/api/body-metadata/route.ts': 1,
-  'app/api/complete-workout/route.ts': 1,
   'app/api/confirm-early-deload/route.ts': 1,
   'app/api/daily-digest/route.ts': 1,
   'app/api/day-checkin/route.ts': 1,
@@ -69,14 +68,11 @@ const BASELINE = {
   'app/api/injuries/[id]/route.ts': 1,
   'app/api/injuries/route.ts': 1,
   'app/api/log-calendar-event/route.ts': 1,
-  'app/api/log-exercise/route.ts': 1,
   'app/api/mood/route.ts': 1,
   'app/api/nutrition-goals/[id]/route.ts': 1,
   'app/api/nutrition-goals/recommend/route.ts': 1,
   'app/api/nutrition/dietary-restrictions/route.ts': 1,
   'app/api/nutrition/food-items/route.ts': 1,
-  'app/api/nutrition/food-logs/[id]/route.ts': 1,
-  'app/api/nutrition/food-logs/route.ts': 1,
   'app/api/nutrition/meal-plans/[id]/route.ts': 1,
   'app/api/nutrition/meal-plans/[id]/structure/route.ts': 1,
   'app/api/nutrition/meal-plans/meals/[mealId]/route.ts': 1,
@@ -107,12 +103,10 @@ const BASELINE = {
   'app/api/supplements/[id]/route.ts': 1,
   'app/api/supplements/route.ts': 1,
   'app/api/sync-health/route.ts': 1,
-  'app/api/sync/push/route.ts': 1,
   'app/api/user/equipped-title/route.ts': 1,
   'app/api/user/goals/route.ts': 1,
   'app/api/user/password/route.ts': 1,
   'app/api/user/profile/route.ts': 1,
-  'app/api/water-log/route.ts': 1,
   'app/api/weekly-digest/route.ts': 1,
   'app/api/workout-entry/route.ts': 2,
   'app/api/workout-review/session/[sessionId]/apply/route.ts': 1,

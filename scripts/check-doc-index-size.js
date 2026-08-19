@@ -882,7 +882,12 @@ const BASELINE = {
   // the three sibling BLE listeners that should go the same way, the grouping error, and the one
   // test that will red when the next three files convert. An entry that only said "6 of 36 done"
   // would cost the next session all of that.
-  'docs/implementation-backlog.md': 10916,
+  // Raised 2026-08-19 (Lane A, Q-322 slice 2): 10519 -> 10526. Seven lines recording what the slice
+  // actually did — above all that `sync/push`'s 4 MB cap is MEASURED (a worst-case 100-mutation
+  // batch is 0.57 MB) and must not be lowered without re-measuring, because that route is the
+  // outbox and a rejected batch is the app's worst-case data-loss path. A cap with no stated
+  // derivation is one someone tightens later on a hunch.
+  'docs/implementation-backlog.md': 10923,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
