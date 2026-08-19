@@ -1336,8 +1336,31 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
      item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
      the meals outlive it.
-  3. Entering from the Nutrition tab starts you **inside the nutrition scope** — see Q-408, which is
-     the general version of that and is deliberately not a blocker for this entry.
+  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
+     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
+     data" is a request the model will occasionally ignore, while a tool it never receives is a
+     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
+     patch domains + widget sources) rather than an inline filter, so a second coach can have one
+     without a refactor. That one line is all that survives of Q-408 — see the note below.
+
+- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
+  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
+  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
+  nobody re-files it unexamined:**
+  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
+     between coaches, and every decision in that design would have been made against imagined
+     requirements until a real second coach exists.
+  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
+     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
+     architecture's central question was never how to separate the coaches but how to let them talk
+     anyway, which is a harder problem than the one that motivated it.
+  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
+     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
+     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
+     The real saving — naming a `source` and letting the server fill the list — already exists as
+     `CHOICE_SOURCES` and is already in this entry.
+  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
+  real requirements. The named-record shape above is what keeps that cheap.
 
 - **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
   optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
@@ -1604,77 +1627,6 @@ and a denylist for the health routes. There is also a **prior decision against a
 stays in Railway, no CSP changes"*) — that decision has since been reversed by the owner, and the CSP
 note is a live consideration for the WebView, not a stale one.
 
-
-### [platform] Q-408 — scope the Coach into per-section specialists; today one prompt carries every domain and every tool
-
-- **Branch:** `docs/scoped-coach-architecture`
-- **Added:** 2026-08-19 · BugFix Intake, from the owner · **plan-first: PR 1 is a design doc, not code**
-- **Placement:** low, and deliberately so. The owner said *"For now lets focus on nutrtion. but
-  please scope this for later."* Q-407 delivers the nutrition conversation without waiting on this;
-  this entry is what stops Q-407 from becoming a one-off that the workout and goal flows later
-  copy-paste.
-- **Owner's words:** *"the workout building/ meal builder/ goals wtc. Shoudl all follow the same AI
-  coach chat stye with widgets etc in it. … Ideally we want it scoped more narrowly based on where
-  you opened it from - i.e nutrition should be related to nutition queries and shouldnt realy be
-  able to touch workout data. So maybe we should do it like this — Home is called AI Coach; it has
-  access to all coaches - Then Ai Workout Couch, Ai Nutrition Coach, Ai Goal coach etc. … I want a
-  heavy focus on the widgets/UI conversation ability etc. We should try reduce AI tokens; so
-  hardcode as much detail as possible before sending."*
-
-- **What exists today, so the plan starts from fact not from a blank page.** `app/api/coach/route.ts`
-  (191 lines) builds **one** turn: one `SYSTEM` prompt, `buildChatTools(...)` + `buildWidgetTools(...)`
-  + `google_search`, `stopWhen: stepCountIs(6)`. Write authority is already domain-scoped and already
-  enforced server-side — `COACH_PATCH_DOMAINS` is six domains, `DOMAIN_FIELDS` bounds which fields
-  each may set (*"a model that mixes domains cannot write a calorie goal onto an exercise row"*),
-  and `DOMAIN_TIER` decides how heavy the confirmation is (`program_phase` is the only tier 3).
-  **So the write side is scoped and the read side is not.** A nutrition conversation can call every
-  workout read tool and the whole workout system prompt is paid for on every turn regardless.
-
-- **The three questions the plan has to answer.** Do not start writing code until these are decided:
-  1. **What is a scope, mechanically?** The cheapest honest answer is a named bundle of
-     (system-prompt section, tool subset, patch-domain subset, widget-source subset) — a record
-     keyed by scope, not a new route per coach. Say outright whether a scope is a *filter over one
-     route* or *separate routes*, and why. A filter keeps `dangling-widgets`, threads, the apply
-     path and the confirm screen written once.
-  2. **What does "cannot touch workout data" mean — refusal, or absence?** These are different and
-     only one is a boundary. If the nutrition scope simply does not receive the workout tools, it
-     *cannot* read them; if it receives them and is told not to, it is a polite instruction and the
-     model will occasionally ignore it. Prefer absence, and say what the coach does when the user
-     asks anyway — `HandoffSchema` already routes to real screens
-     (`'program_builder' | 'log_activity' | 'profile' | 'nutrition'`) and is the natural exit, but
-     its destination enum will need the other coaches added to it.
-  3. **What is Home?** The owner's model is that Home has access to all coaches and routes to them.
-     Decide whether Home is (a) the unscoped coach as it is today, with routing added, or (b) a thin
-     router that holds no tools and only dispatches. (b) is the one that makes the token argument
-     true; (a) is the one that does not regress anyone who uses Home for a cross-domain question
-     like *"what should I eat before tomorrow's legs session?"* — which is the exact case the mockup
-     draws, and which a strict scope would break. **Cross-domain reads are the hard part of this
-     design; a plan that does not name how they work is not finished.**
-
-- **The token argument, with the measurement that supports it.** Q-170 measured Coach's latency as
-  almost entirely output-token generation (~1.8 s fixed + ~270 tokens/sec), and found that a picker
-  turn emitted **2,204 output tokens to render a ~400-token widget**; dropping the thinking level
-  took it to **554 tokens and 10.0 s → 3.5 s**. That is the lever that worked. **Two others were
-  measured and both made it worse — inlining the program into the system prompt, and forcing a
-  sentence before every tool call.** So "hardcode as much detail as possible before sending" must
-  be read as *"name a `source` and let the server fill the list"* (the `CHOICE_SOURCES` pattern),
-  **not** as *"put more into the prompt"* — the second is the thing already proven to backfire, and
-  the plan must say so or someone will try it a third time.
-- A shorter per-scope system prompt is an **input**-token saving, and input tokens are not what
-  Q-170 found to dominate. Do not promise a latency win from scoping alone; the honest claim is
-  narrower answers, a real boundary, and fewer tools for the model to choose wrongly among.
-
-- **Deliverable of PR 1.** A design doc in `docs/superpowers/plans/` plus backlog entries for the
-  implementation, per the backlog protocol. It should carry: the scope record's shape; the
-  per-scope tool/domain/source table for nutrition, workout and goals; the Home routing decision
-  with the cross-domain case answered; what `HandoffSchema` grows; and which parts are Lane A
-  (`app/api/coach/**`, and `lib/coach/**` once a lane claims it) versus Lane B
-  (`components/coach/**`, the entry points).
-
-- **Do not let this block Q-407.** Q-407's multi-select and its nutrition conversation are useful
-  standalone and are the owner's stated focus. If this plan later moves where scope lives, moving
-  one conversation is a small change; waiting for the architecture before shipping any of it is how
-  the nutrition work stalls.
 
 ### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
 
