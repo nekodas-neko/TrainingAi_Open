@@ -892,7 +892,14 @@ const BASELINE = {
   // survivors are ALL tab-screen orchestrators and want one file per PR, not another batch. The
   // other is a correction: slice 1 predicted a named test would red on this slice and it did not,
   // and a wrong prediction left in the queue costs more than the lines it takes to fix.
-  'docs/implementation-backlog.md': 10934,
+  // Raised 2026-08-19 (Tuning, Q-525/Q-526 + three owner decisions): 10934 -> 11093. Two queue
+  // entries, plus Q-523/Q-524/Q-276 recording owner decisions and Q-72 recording the yardstick
+  // answer. The decisions carry their measured tables inline because each REVERSES what the entry
+  // previously told an implementer to do -- Q-523 no longer needs owner labels, Q-276 is no longer
+  // blocked behind Q-272, and Q-72's "get more spread in the ratings" is now explicitly withdrawn.
+  // A stale instruction is worse than a long one. Rebuilt from origin/main after a parallel PR
+  // raised the same baseline -- splicing the conflict hunks would produce two baselines for one number.
+  'docs/implementation-backlog.md': 11093,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
