@@ -915,7 +915,11 @@ const BASELINE = {
   // INTO Q-505 rather than sit in a review nobody opens before building. It also retires the
   // strengthFreq-ceiling framing added earlier the same day, and a superseded framing left
   // standing beside its replacement is worse than the extra lines.
-  'docs/implementation-backlog.md': 11273,
+  // Raised 2026-08-19 (Lane A, Q-324): 10934 -> 10982. A new entry for the fresh-database test
+  // contention that reds CI intermittently. It is long for an entry because the reproduction is the
+  // valuable part — the failure cannot be reproduced by running `pnpm test` locally, so an entry
+  // that only named the symptom would send the next reader down the same dead end this one took.
+  'docs/implementation-backlog.md': 11321,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
