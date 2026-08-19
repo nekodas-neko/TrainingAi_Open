@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.328.0",
+    date: "2026-08-19",
+    changes: [
+      "You can now delete a meal type that has entries against it. Deleting one asks you to move its entries to another meal type, and does the move and the delete together — until now the refusal told you to reassign them first, which was something the app had never let you do, so the only way out was deleting the entries themselves.",
+      "Moved entries are re-timed to their new meal's window, so a 3pm snack moved to Lunch does not sit outside Lunch on the day view.",
+    ],
+  },
+  {
     version: "1.327.0",
     date: "2026-08-19",
     changes: [
