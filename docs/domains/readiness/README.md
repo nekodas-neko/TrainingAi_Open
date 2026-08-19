@@ -130,6 +130,13 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 
 - [`docs/reviews/2026-08-18-model-version-clobber.md`](../../reviews/2026-08-18-model-version-clobber.md) — **the readiness model stamp is erased within hours, 2026-08-18** (Q-518 — same row read at 04:38:27 carries `{"bodyComp","readiness"}` and at 10:18:40 carries `{"bodyComp"}` alone; stamped rows table-wide go 1 → 0. `upsertOuraDailyDerived` sets every column with `COALESCE(excluded, existing)`, which for a `jsonb` column replaces the document **whole**, so the merge is left to each caller and only `readiness-payload.ts` does it. **Retracts PR #85's claim that the merge "held in production"** and defeats Q-501's purpose. Fix belongs in the upsert (`existing || excluded`), the same shape as Q-280).
 
+- [`docs/reviews/2026-08-19-score-audit-trail.md`](../../reviews/2026-08-19-score-audit-trail.md) — **the score-audit trail, 2026-08-19** (Q-525 — **`chronic_stress_score` is NULL on
+  all 96 rows and has never produced a value**, the third dormant score after the illness radar
+  (Q-506) and resilience (Q-508). Its gate needs 21 complete nights of granular BLE signals **in one
+  pass**, so a nightly incremental rollup can never satisfy it. Distinct from Q-507, which is
+  *daytime* stress minutes — same word, different model. Readiness itself comes out **clean**: it is
+  the reference for a good trail, storing sub-scores **plus `provisional` flags`**.)
+
 ## Open issues
 
 ```bash

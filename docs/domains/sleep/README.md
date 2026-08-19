@@ -61,6 +61,16 @@ canonical-display-source table in the same section).
   points** (sd 10.2, worst −51), and found the recalibration removed ~82% of it as a side effect
   (**Q-511**). **The sleep and readiness scales being comparable is now load-bearing** — do not lift
   sleep back toward its old mean.
+- [`docs/reviews/2026-08-19-sleep-validation-targets.md`](../../reviews/2026-08-19-sleep-validation-targets.md) — **what the Sleep Score can be validated against, 2026-08-19** (Q-72's yardstick
+  question). **The owner's 1–5 morning rating is the MOST variable self-report in the app** (sd ~0.8,
+  5 values) — `perceived_recovery` sd 0.36, **`resting_soreness` sd 0.00, exactly 3 in all 20
+  entries** — and it tracks sleep better than anything else (vs efficiency **+0.316**). **The ask to
+  spread the ratings was withdrawn**: honest low-variance data beats performative spread, and
+  stretching the scale would invalidate the 46 nights already collected. Objective outcomes: steps
+  **+0.210**, while **training volume and RPE are structurally disqualified** (volume is prescribed by
+  the app; `RPE_DEAD_BAND = 1.5`). **Fix the yardstick, not the rating** — a rank measure over the 6
+  extreme nights, re-run after ~3 weeks of history under v1.319.0.
+
 ## Open issues
 
 - [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](../../reviews/2026-08-19-partial-night-manual-bedtime.md) — **an owner report: the ring was not worn until 4 am, 2026-08-19** (Q-519/Q-520 — the night holds *wrong* duration data and *right* physiology, so neither deleting it nor keeping it as-is is correct. A 4:23 start drags the 14-day bedtime estimate **~23 minutes later**. Fix: manual bedtime writing **only `sleep_start`** at source `manual`, which the **per-field** health-source merge leaves the ring's duration/HRV/HR untouched by — safe *only* because `duration_hours`/`efficiency` are stored columns, not derived from the span).
