@@ -2381,10 +2381,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId)))
   }
 
-  async deleteActivityLog(userId: string, id: string): Promise<void> {
-    await this.db.update(s.activityLogs)
+  // Returns whether the (id, user) pair matched anything, so the route can stop reporting success
+  // for a delete that touched nothing (Q-556). The WHERE deliberately does NOT filter
+  // `deleted_at IS NULL`: a re-delete of a row you already deleted still matches and still reports
+  // `true`, which is what keeps the operation idempotent for a double-tap or a row already deleted
+  // on another device. `false` means genuinely absent or not yours — and those two stay
+  // indistinguishable, which is the enumeration property the review's control pass verified.
+  async deleteActivityLog(userId: string, id: string): Promise<boolean> {
+    const rows = await this.db.update(s.activityLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId)))
+      .returning({ id: s.activityLogs.id })
+    return rows.length > 0
   }
 
   async saveFitnessTest(userId: string, test: Omit<FitnessTest, 'userId'>): Promise<FitnessTest> {

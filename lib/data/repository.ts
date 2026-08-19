@@ -551,7 +551,8 @@ export interface WorkoutRepository {
   /** Ownership-checked single row; the metrics PATCH needs the stored duration to rate-check a patch. */
   getActivityLogById(userId: string, id: string): Promise<ActivityLog | null>
   updateActivityLogMetrics(userId: string, id: string, patch: { distanceKm?: number; caloriesBurned?: number; avgHr?: number; maxHr?: number }): Promise<void>
-  deleteActivityLog(userId: string, id: string): Promise<void>
+  /** `false` when the (id, user) pair matched no row — absent or not yours (Q-556). */
+  deleteActivityLog(userId: string, id: string): Promise<boolean>
   saveFitnessTest(userId: string, test: Omit<FitnessTest, 'userId'>): Promise<FitnessTest>
   listFitnessTests(userId: string, from: string, to: string): Promise<FitnessTest[]>
   deleteFitnessTest(userId: string, id: string): Promise<void>
