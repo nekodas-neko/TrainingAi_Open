@@ -7,6 +7,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
 import { reportServerError } from '@/lib/observability'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { clientIp } from '@trainingai/shared/http/client-ip'
 
 // One SQL statement. The audit log truncates it at 20,000 characters, so 64 KB is generous past
 // anything that is meaningfully recorded.
@@ -40,7 +41,7 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
   const bearer = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]
 
   if (bearer) {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const ip = clientIp(req)
     // Bound every attempt per IP BEFORE the compare so a brute-force can't run at full throughput,
     // and return the same 401 on trip as for a bad token.
     if (!rateLimit(`db-query-token:${ip}`, 10, 60_000)) {
@@ -113,7 +114,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Only a single statement per request' }, { status: 400 })
   }
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const ip = clientIp(req)
   const started = Date.now()
 
   try {
