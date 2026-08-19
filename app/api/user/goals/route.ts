@@ -4,6 +4,10 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { goalToDailyKcal } from '@trainingai/shared/nutrition/calorie-balance'
 import type { UserGoals } from '@/lib/data/repository'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Nine numbers and enums. 8 KB is generous.
+const MAX_BODY_BYTES = 8 * 1024
 
 const GoalsSchema = z.object({
   stepsGoal:       z.number().int().min(0).max(200000).optional().nullable(),
@@ -32,11 +36,14 @@ export async function PATCH(req: NextRequest) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
-  const parsed = GoalsSchema.safeParse(raw)
+  const parsed = GoalsSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
