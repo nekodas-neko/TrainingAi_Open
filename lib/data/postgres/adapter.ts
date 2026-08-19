@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
 import { getDb } from './client'
@@ -2297,7 +2297,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return await this.db.transaction(async tx => {
       const [existing] = await tx.select().from(s.exerciseLibrary).where(eq(s.exerciseLibrary.id, id))
       if (!existing) throw new NotFoundError('Exercise')
-      if (existing.createdBy !== userId) throw new Error('Not authorized to rename this exercise')
+      if (existing.createdBy !== userId) throw new UserFacingError('Not authorized to rename this exercise', 403)
       const oldName = existing.name
       await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
       await tx.update(s.exerciseLogs).set({ exerciseName: newName }).where(eq(s.exerciseLogs.exerciseName, oldName))
@@ -2318,7 +2318,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (newName !== oldName) {
         const [conflict] = await tx.select({ id: s.exerciseLibrary.id }).from(s.exerciseLibrary)
           .where(and(eq(s.exerciseLibrary.name, newName), ne(s.exerciseLibrary.id, entry.id)))
-        if (conflict) throw new Error(`An exercise named "${newName}" already exists`)
+        if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
 
         await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
         await tx.update(s.exerciseLogs).set({ exerciseName: newName }).where(eq(s.exerciseLogs.exerciseName, oldName))

@@ -1,4 +1,6 @@
 import { NextResponse } from 'next/server'
+import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
+import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
@@ -31,7 +33,7 @@ export async function POST(req: Request) {
     const friendship = await repo.sendFriendRequest(session.user.id, emailOrCode.trim())
     return NextResponse.json({ friendship }, { status: 201 })
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 400 })
+    if (!isRefusal(e)) reportServerError(e, { userId: session.user.id, url: '/api/friends' })
+    return refusalResponse(e, 'Could not send that request')
   }
 }
