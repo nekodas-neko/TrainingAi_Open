@@ -1,0 +1,139 @@
+# 2026-08-19 — every label draws square, and the round constraint was costing 64% of the area (Q-411)
+
+Lane B. v1.325.5. Canvas geometry only — no schema, no route, no APK.
+
+## The owner's call
+
+> *"could we just have this as a generic square? it will auto fit in the circle template when I need
+> to print it - so they could all start as squares."*
+
+## What the round assumption cost
+
+The renderer reserved a centred **130 × 137** usable box — what survives a round crop once the
+corners are given up — against a square **171 × 171**. That is 17,810 square units against 29,241:
+the assumption was costing **64% of the area**, and three prior entries (Q-393, Q-397, Q-399) each
+spent their effort designing around it. Q-399 in particular had to trim the header's type and gaps
+just to get three ingredient lines onto the default.
+
+`squareOnly` is gone as a concept — the type, the spec field, the picker's amber badge and the
+"Square dies only" warning all with it. Nothing draws a circle, a die guide or a vignette; the round
+die is a print-time consideration now.
+
+## What the area bought
+
+Every style's code grew, and the default gained a line at the same time:
+
+| style | before | after |
+|---|---|---|
+| `band` — the tightest | 0.369 mm/module | **0.497** |
+| `inlineCentred` — the default | 0.401 | **0.561** |
+| `editorial` | 0.481 | 0.513 |
+| `ticket` | 0.417 | 0.537 |
+| `plaque` | 0.520 | 0.633 |
+| `square` | 0.561 | **0.609** |
+
+The centred stack's header drops from 86.5 units to **69.5** (the margin falls from 26 to 9), so the
+default now draws **four** ingredient lines where it drew three — *and* a code 40% larger. The
+budget was re-derived rather than left at its round-era numbers, which is what the entry asked for:
+leaving them would have reserved the extra area and never used it.
+
+`square` is the exception in that table and the exception is the interesting part. It was **already**
+drawing on a square canvas before this change — it carried the `squareOnly` flag the change retires —
+so it is the one style that gained no area here and had nothing to spend. The first draft raised it
+from 70 to 90 anyway, reflexively, because every other style was being raised; the 20 units came
+straight out of its ingredient list, taking three of the fixture's eight ingredients down to **one**
+on the style whose own picker note promises the breakdown. That is the Q-399 failure shape exactly.
+It is capped at 76 now — the largest code that still leaves three lines — which is 0.609 mm, ahead of
+main's 0.561 on both axes rather than trading one for the other.
+
+The E2E caught it by accident and now catches it on purpose. The assertion read
+`/Printing \d+ ingredients — …/` and failed only because the sheet's copy pluralises: it saw
+"1 ingredient", not "1 ingredients". Had the count been two the regression would have shipped. The
+regex now carries an explicit `[2-9]` floor with the reason written beside it.
+
+## ⚠ The gain is expected, not proven, and one print decides it
+
+*"It will auto fit in the circle template"* has two readings that point opposite ways:
+
+- **The template CROPS the corners** (circle inscribed in a 50 mm square) → the artwork keeps its
+  50 mm width and the table above holds.
+- **The template SCALES the square to fit inside the circle** → it lands at 50 ÷ √2 = **35.4 mm**,
+  every module shrinks by 29%, and the default falls to **0.397** — *fractionally worse than the
+  0.401 it replaces.*
+
+So this ships described as **a simplification that is expected to improve scannability**, not as a
+scannability improvement. If the template turns out to scale, the follow-up is to keep the square
+canvas anyway — it is simpler and the content still benefits — but design the critical content
+(name, calories, code) to sit inside the inscribed circle. The print is the same one Q-400 already
+owes, and Q-400's delivery fix should land first since its saved PNG currently declares no physical
+size at all.
+
+## Two test thresholds raised, because they had stopped being tests
+
+The entry asked for this and it was right: on a square canvas the old assertions could no longer
+fail for any style.
+
+- *"no style's module is smaller than the tightest shipped one"* — **0.36 → 0.52**. The tightest
+  moved from 0.369 to 0.521, so the old floor was clear by 45%.
+- *"the default draws the lines its picker copy promises"* — **3 → 4**, matching what it now draws.
+
+The picker copy stays *"as much of the ingredient list as fits"*, and the overflow summary stays.
+A bigger canvas does not make the list finite, and Q-399's lesson was that a style silently printing
+**none** of it went unnoticed for a release.
+
+### These are smaller than the entry predicted, and the reason matters
+
+Q-411's entry derived a per-style table straight from the 64% area gain — `band` 0.52, `ticket` 0.61,
+`plaque` 0.68. **Taking those figures directly does not fit.** `codeUnits` is bounded by where the
+content stops, not by the area freed: the code is bottom-anchored while the name, calories, macros
+and rule flow down from the top, so the binding constraint is vertical clearance.
+
+Measured with the entry's numbers in place:
+
+```
+band       content ends 100.0   code starts 103.0   clearance   3.0
+editorial  content ends  98.0   code starts  94.0   clearance  -4.0   ← code drawn OVER the text
+ticket     content ends  95.0   code starts  92.0   clearance  -3.0   ← code drawn OVER the text
+plaque     content ends  95.0   code starts  95.0   clearance   0.0
+```
+
+**Two styles were drawing the code straight through the macro line.** Each value is now the largest
+that leaves 6 units of clearance, and a note above `StyleSpec` says to re-derive them if
+`caloriesSize`, `macroSize`, `rule` or `writeOnLine` changes, since those four decide where content
+ends. The gains are smaller than advertised and they are real.
+
+## Plaque's rings broke, and the E2E caught it
+
+Growing every code was not free. `plaque`'s "double ring" was two concentric **circles** at radius
+`SHEET/2 − 6` and `− 9`, which cleared its 60-unit code and did **not** clear its 85-unit one: the
+outer circle crossed the code's bottom edge at x ± 22.8 against a code spanning ± 42.5. The E2E's
+decode of the rendered canvas failed on plaque alone — the one style whose framing is drawn *over*
+the content area.
+
+Circles were coherent while the inscribed circle was the binding constraint and are arbitrary on a
+square canvas, so they became **two inset rounded rectangles**. They frame the same way, clear the
+content by construction (the content box is inset 9; the frames sit at 5 and 8, outside it), and
+match the shape the label now is.
+
+Worth naming because it is the failure mode this change invites: enlarging every code moves content
+into space something else already occupied. **And the E2E only caught one of the three collisions** —
+it decodes four of the six styles, and `editorial` and `ticket`, both overlapping, are not among
+them. Those were found by modelling the vertical flow, not by a test. A guard that covers two thirds
+of the surface reports a third of the problem.
+
+## What was NOT exercised
+
+- **No print, which is the acceptance criterion.** Everything above is arithmetic and a browser
+  render. The crop-versus-scale question is unanswered and it is the one that decides whether this
+  helped or very slightly hurt.
+- **No device run.** JS-only; reaches the APK on the next Railway deploy with no rebuild.
+- **Overlap was checked by the E2E's decode, not by eye** — and it caught one (plaque, above). Four
+  styles have their rendered code decoded from canvas pixels, which fails if something overruns it.
+  But a collision landing on the **ingredient text** rather than the code would not be caught, the
+  other two styles are only checked for ink, and nobody has looked at all six at the new sizes.
+- **The module grid is no longer fractional** — Q-358 landed here rather than waiting its turn, and
+  the reason is that it had to. Resizing every code changed every module width, and the decode flake
+  Q-399 thought it had bought margin against came straight back: `plaque` failed one run at 14.94
+  device pixels per module, `square` the next at 17.02. A decode E2E that passes on a coin flip
+  cannot gate the change that caused it. `drawCode` now paints in device space with a whole-pixel
+  cell, and all four decoded styles passed on the first run afterwards.
