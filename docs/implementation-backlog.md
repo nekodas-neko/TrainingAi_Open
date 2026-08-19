@@ -6552,6 +6552,58 @@ session working from a temporarily restored copy.
   a Cloud-era adjustment is distinguished from our own base) and something may read it. Merge, do not
   replace.
 
+### [sleep][devices] Q-529 — the sleep score is stamped 23 seconds before the night finishes arriving, and never revisited
+
+- **Branch:** `fix/recompute-derived-on-session-update` · **Lane:** A
+- **Plan:** none yet — **first confirm whether a slower pass corrects it** (see caveat). Evidence:
+  [`docs/reviews/2026-08-20-sleep-score-computed-mid-sync.md`](reviews/2026-08-20-sleep-score-computed-mid-sync.md).
+- **Added:** 2026-08-20 · Tuning agent, from an **owner report** (*"that wake up time is way off, I
+  woke up around 6am"*) — screenshot at 06:46 Brisbane.
+- **The session healed itself; the score did not.** The app showed 9:52 pm – **4:52 am / 6.5 h**;
+  `sleep_sessions` now stores 9:52 pm – **6:44 am / 7.75 h**, `updated_at` **06:46:19** — matching the
+  owner's account. Deep 0.8 → **1.08 h**, light 4.3 → **5.25 h**, awake 0.5 → **1.17 h**.
+- **Measured ordering, exact — both timestamps are stored:**
+
+  | field | value |
+  |---|---|
+  | `oura_daily_derived.sleep_score` | **47** |
+  | `computed_at` | **06:45:56** |
+  | `sleep_sessions.updated_at` | **06:46:19** |
+
+  **The score predates its own input by 23 seconds.** Re-checked at 06:49:04 — still 47, still stamped
+  06:45:56. Stored contributors show what it read: `total_sleep 54` is a 6.5-hour value, and
+  truncation depresses `total_sleep`, `deep_sleep`, `rem_sleep` and `efficiency` **together**, which is
+  why the composite falls so far rather than a point or two.
+- **The comparison that settles it:**
+
+  | date | duration | eff | onset | score |
+  |---|---|---|---|---|
+  | **2026-08-20** | **7.75 h** | 87% | 30 m | **47** |
+  | 2026-08-17 | 7.58 h | 90% | 35 m | **78** |
+  | 2026-08-14 | 7.42 h | 90% | 10 m | **88** |
+  | 2026-08-19 *(ring fitted 4 am)* | 3.5 h | 86% | 15 m | 39 |
+
+  **A near-twin night scores 31 points higher**, and this one sits 8 points from a night the ring
+  spent mostly off the finger. **A reader cannot tell "bad night" from "stamped mid-sync".**
+- **NOT a duplicate of Q-520.** That covers a night that is *genuinely* incomplete, where a low score
+  is arguably right. **This is a complete night scored against a partial copy of itself.** They share
+  one remedy worth building once: readiness already stores a **`provisional`** flag per contributor
+  (the reference named in Q-526's review); sleep stores no equivalent, so partial and finished scores
+  are indistinguishable.
+- **First action:** recompute derived scores when the session they read is updated, instead of
+  stamping once on first ingest. Failing that, mark the score provisional until the session stops
+  growing, so a low number carries its reason.
+- **How often it bites:** every morning the app is opened while the ring is still uploading — which is
+  the normal way to check last night's sleep. Small window, sitting exactly where the user looks.
+- **Pass test:** extend a session after its score is written and confirm the score changes.
+  Concretely, **2026-08-20 should re-score well above 47** — the 08-17 twin suggests the high 70s.
+- **⚠️ Caveat that must be checked FIRST, and it is cheap.** The failure to recompute is confirmed
+  over **3 minutes**, not hours. A slower nightly pass may still correct it. **Re-read `computed_at`
+  for 2026-08-20 the next day**: if it has moved, this is a latency problem rather than a correctness
+  one, and the fix shrinks to surfacing provisionality. Do not build the recompute path before that
+  read.
+- **Caveats:** one night, one athlete, `claude_ro` row-scoped.
+
 ### [devices][platform] Q-528 — a full-history rollup can wipe every stored daily summary, and the guard is on the wrong side of the delete
 
 - **Branch:** `fix/daily-summary-replace-guard` · **Lane:** A

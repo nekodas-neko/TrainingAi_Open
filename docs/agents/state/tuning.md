@@ -3,11 +3,22 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/correct-retired-scales` · **Q band:** 500–529 (next free: 529 — band nearly exhausted, agree a new one with the owner)
+**Updated:** 2026-08-19 · **By:** `tuning/stale-sleep-score-midsync` · **Q band:** 500–529 (**BAND EXHAUSTED — 529 was the last. Agree a new band with the owner before filing anything.**)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **Owner report 2026-08-20 — sleep score stamped mid-sync** (Q-529). *"That wake up time is way
+  off, I woke up around 6am."* **The session was already right and the score was not.** `computed_at`
+  **06:45:56** vs `sleep_sessions.updated_at` **06:46:19** — the score predates its input by 23
+  seconds, and had not recomputed 3 minutes later. Session healed 4:52 am → **6:44 am**, 6.5 →
+  **7.75 h**; score stuck at **47** while the 08-17 near-twin (7.58 h, 90%, 35 m) scores **78**.
+  - **Check the cheap thing FIRST before anyone builds a recompute path:** re-read `computed_at` for
+    2026-08-20 the next day. Confirmed over 3 minutes, **not** hours — a slower nightly pass may fix
+    it, which would shrink this to surfacing provisionality.
+  - **Not a duplicate of Q-520.** That is a genuinely incomplete night; this is a complete night
+    scored against a partial copy of itself.
+  [`review`](../../reviews/2026-08-20-sleep-score-computed-mid-sync.md).
 - **`oura_daily_summary` holds 1 row against 198,223 raw samples** (Q-528). Found running Q-525's own
   first action. `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
   the guard is on the INSERT — so a full-history pass over a narrow input wipes the history and
@@ -298,6 +309,10 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **When a score looks wrong, compare `computed_at` against the input row's `updated_at` BEFORE
+  reaching for calibration.** Q-529 looked like a sleep-score tuning problem and was a 23-second
+  ordering bug. A near-twin day from the same week is the fastest sanity check — 7.58 h scoring 78
+  against 7.75 h scoring 47 settled it in one query.
 - **A column with rows is not a live field — check the last write date AND the write site.** I asked
   the owner to reword or drop `resting_soreness` because it read exactly 3 in all 20 entries. It had
   been **retired on 2026-07-23**, and `morning-checkin-sheet.tsx` says so in a comment two lines long:
