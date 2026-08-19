@@ -945,12 +945,23 @@ const BASELINE = {
   // entry's own rules unsatisfiable together — the numbers are inline because the next session
   // would otherwise re-measure production to find that out, and because "check the granularity"
   // reads like a formality until you see 11 rows against 668,749 steps.
+  // Raised 2026-08-19 (Lane A, Q-324 partially done): 11208 -> 11220. A partial-completion
+  // annotation, which is what this file's own protocol asks for when a plan only half lands. It
+  // carries the measured numbers because the point of the note is the DIFFERENCE between what was
+  // fixed (the mechanism, with figures) and what was not (the timeout, which did not reproduce) —
+  // an entry saying only "partially done" is the one a later session re-implements from scratch.
+  // Raised 2026-08-19 (Lane A, Q-323 Lane A half): 11208 -> 11222. The annotation carries the API
+  // contract — `GET /api/nutrition/energy-balance` now returns `macroTargets: { base, scaled,
+  // earnedKcal }` — because without it Lane B's obvious move is to re-derive the split client-side,
+  // which is the second implementation the one-formula rule exists to prevent. It also restates
+  // what the split preserves (the carbs:fat ratio, not each macro's share), since the original
+  // wording reads as the other one.
   // Raised 2026-08-19 (Lane B, Q-414 corrected): the previous raise recorded a measurement and the
   // wrong conclusion from it — that no honest burn curve could be drawn. The owner pointed at the
   // daily HR chart, and HR is timestamped, all-day and dense. The correction stays inline with the
   // numbers because the wrong conclusion is the more quotable one, and a session reading only the
   // table would re-derive it.
-  'docs/implementation-backlog.md': 11201,
+  'docs/implementation-backlog.md': 11227,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
