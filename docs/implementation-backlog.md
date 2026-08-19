@@ -322,8 +322,9 @@ sequential.
 - **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
   + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
   screens with no component-test route.
-- **What.** 37 `useEffect(() => { … cachedFetch … }, [])` blocks existed when `useCachedValue` was
-  written. All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
+- **What.** **36** `useEffect(() => { … cachedFetch … }, [])` blocks remain — 37 on `main` before
+  the one conversion below (see the counting correction above; this entry originally said 36, from a
+  scan that missed single-line effects). All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
   value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
   them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
   The persistent tab shell is the exception, and it is where the owner found it.
@@ -339,11 +340,24 @@ sequential.
 - **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
   data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
   refetches with no reader waiting for them. Judge per site; this is not a codemod.
-- **Worth considering instead of a full sweep:** a Custom Rules check that fails a NEW
-  `useEffect(…, [])` containing `cachedFetch` outside an allowlist, with a shrink-only baseline of
-  the 36. That freezes the count and makes each conversion visible, which is the pattern that has
-  worked for hex literals and component size. Cheaper than the sweep and stops the growth, which is
-  the part that actually matters.
+- **✅ THE RATCHET SHIPPED 2026-08-19 (v1.325.4). The sweep is what remains.**
+  `scripts/check-fetch-once-effects.js` freezes all 36 with a shrink-only per-file baseline: a file
+  not listed must have zero, a listed file may only shrink, and a file that reaches zero must have
+  its row deleted. Growth is stopped; each conversion is now visible in a diff.
+  [`Journal`](overview/entries/2026-08-19-fetch-once-ratchet.md).
+  **The baseline is grouped by whether the site can actually bite: 19 / 1 / 16.** Work the first
+  group. **⚠ The grouping was wrong the first time and the correction is the reusable part:** sheets
+  do NOT unmount here — the tab screens render them unconditionally with a null prop
+  (`<ActivityDetailSheet log={selectedActivity} />`), so they are permanently mounted too. Re-checked
+  by tracing each renderer up to a tab screen, the "can bite" group went from 14 to **19**. Judge a
+  site by where it is mounted, never by its filename.
+  **⚠ The count in this entry was one low, found by mutation-checking the new rule.** The scan
+  behind it required a newline before the effect's closing brace, so it **missed single-line
+  effects entirely**. Measured on `main`: **37** with the correct pattern against 36 with the old
+  one, and `nutrition-content.tsx` has **two**, not one. One conversion below leaves **36**.
+  **`useCachedValue` gained an `onError` callback** in the same change, because the first real
+  conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
+  card without it cannot tell "no data" from "the request failed".
 - **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
 - **Not verified:** static scan. **No screen was observed going stale** — the 36 are inferred from
   the shape, and the one confirmed instance is Q-402's, which is fixed.
