@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.330.0",
+    date: "2026-08-19",
+    changes: [
+      "When the Coach swaps an exercise, it now sets the new exercise's role instead of silently keeping the old one's. The role decides the sets and percentages you get prescribed, so a light movement swapped in for a heavy one no longer inherits the heavy loading — and the Coach tells you what the role will be before you accept the change.",
+    ],
+  },
+  {
     version: "1.329.0",
     date: "2026-08-19",
     changes: [
