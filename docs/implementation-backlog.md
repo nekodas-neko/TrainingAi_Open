@@ -293,8 +293,14 @@ below threshold and left in place for next time.
 
 *"lets focus on the nutrition changes now. id like to get this perfected today"*
 
-The nutrition cluster is **six entries**, ordered by dependency rather than Q number, starting at
-Q-401 below. Two have shipped since this block was written: **Q-399** (#163, the centred label now has
+The nutrition cluster is **eight entries**, ordered by dependency rather than Q number, starting at
+Q-401 below. **Q-407** (the meal-plan wizard as a coach conversation) and **Q-409** (paste a recipe
+URL, get a meal) were added on 2026-08-19 from the owner. Q-407 sits after Q-398 because a
+conversational plan needs somewhere to land — plan meals becoming ordinary saved meals is its exit
+route. Q-409 sits after Q-407 because it extends the same step, but it depends on nothing and can be
+built into the existing stepper at any time.
+
+Two have shipped since this block was written: **Q-399** (#163, the centred label now has
 room for its ingredient list) and **Q-402** (#165, a component is told when its cache key is
 invalidated). Their entries were correctly removed on merge.
 
@@ -322,8 +328,9 @@ sequential.
 - **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
   + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
   screens with no component-test route.
-- **What.** 37 `useEffect(() => { … cachedFetch … }, [])` blocks existed when `useCachedValue` was
-  written. All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
+- **What.** **36** `useEffect(() => { … cachedFetch … }, [])` blocks remain — 37 on `main` before
+  the one conversion below (see the counting correction above; this entry originally said 36, from a
+  scan that missed single-line effects). All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
   value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
   them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
   The persistent tab shell is the exception, and it is where the owner found it.
@@ -339,11 +346,24 @@ sequential.
 - **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
   data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
   refetches with no reader waiting for them. Judge per site; this is not a codemod.
-- **Worth considering instead of a full sweep:** a Custom Rules check that fails a NEW
-  `useEffect(…, [])` containing `cachedFetch` outside an allowlist, with a shrink-only baseline of
-  the 36. That freezes the count and makes each conversion visible, which is the pattern that has
-  worked for hex literals and component size. Cheaper than the sweep and stops the growth, which is
-  the part that actually matters.
+- **✅ THE RATCHET SHIPPED 2026-08-19 (v1.325.4). The sweep is what remains.**
+  `scripts/check-fetch-once-effects.js` freezes all 36 with a shrink-only per-file baseline: a file
+  not listed must have zero, a listed file may only shrink, and a file that reaches zero must have
+  its row deleted. Growth is stopped; each conversion is now visible in a diff.
+  [`Journal`](overview/entries/2026-08-19-fetch-once-ratchet.md).
+  **The baseline is grouped by whether the site can actually bite: 19 / 1 / 16.** Work the first
+  group. **⚠ The grouping was wrong the first time and the correction is the reusable part:** sheets
+  do NOT unmount here — the tab screens render them unconditionally with a null prop
+  (`<ActivityDetailSheet log={selectedActivity} />`), so they are permanently mounted too. Re-checked
+  by tracing each renderer up to a tab screen, the "can bite" group went from 14 to **19**. Judge a
+  site by where it is mounted, never by its filename.
+  **⚠ The count in this entry was one low, found by mutation-checking the new rule.** The scan
+  behind it required a newline before the effect's closing brace, so it **missed single-line
+  effects entirely**. Measured on `main`: **37** with the correct pattern against 36 with the old
+  one, and `nutrition-content.tsx` has **two**, not one. One conversion below leaves **36**.
+  **`useCachedValue` gained an `onError` callback** in the same change, because the first real
+  conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
+  card without it cannot tell "no data" from "the request failed".
 - **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
 - **Not verified:** static scan. **No screen was observed going stale** — the 36 are inferred from
   the shape, and the one confirmed instance is Q-402's, which is fixed.
@@ -923,10 +943,29 @@ whether or not anyone draws them first.
   colour-only-state rule, and an inline delete confirmation (`:172+`). A visual pass keeps all three.
 - No new dependencies — `motion` v12, `@use-gesture/react` and shadcn primitives are installed.
 
-- **First step is done — the drawings exist** (finding 6). What is still open is the owner's pick
-  between srv/g options A, B and C, and whether the collapse-when-not-editing row in the proposed
-  Edit Meal artboard is wanted. Do not start coding the ingredient row before that answer; findings
-  1, 2, 3, 7 and 8 do not depend on it and can go first.
+- **DECIDED BY THE OWNER, 2026-08-19 — the ingredient row is unblocked.** Both open questions were
+  answered in one reply: ***"go with A, and yes collapse the row when not editing"***.
+  1. **Option A wins** — the unit rides on the number as a chip inside the field, `60 g` ⇄ `2 srv`
+     on one tap. B and C are dead; do not revisit them. The control comes from
+     `components/ui/segmented-tabs`, not a fourth hand-rolled segmented control (finding 8).
+  2. **Rows collapse when not being edited**, one expanded at a time. The collapsed shape is
+     finding 13's single row component — name · grey secondary line · calories right-aligned ·
+     chevron — so this is not a second component, it is `food-row.tsx` with an expanded state.
+  **Read this together with finding 12, which is not contradicted by it.** Finding 12 retired A/B/C
+  *as a fork over what sits on a list row*, because the answer there is **nothing** — a diary or
+  search row carries no editor and never expands. What the owner has now chosen is the shape of the
+  quantity control **wherever it does appear**: the quantity sheet, and the expanded row in Edit
+  Meal, which is a builder rather than a list. Finding 12 already anticipated this
+  (*"Option A's shape (unit chip on the number) is what that sheet uses"*), so the decision confirms
+  it rather than reopening it. **A row in the diary that expands to edit would be a
+  misreading of both.**
+- **The drawings exist** (finding 6); `unit-options.png`'s column A is the reference for the
+  expanded row, and its `Full Cream Milk` row is the reference for the collapsed one. Findings 1, 2,
+  3, 7 and 8 never depended on this answer and can still go first — but nothing is blocked now.
+- **Still open, and deliberately not blocking: where `My Foods` lives** (note 17). Recommendation
+  stands — a **fourth tab** beside Recent, Frequent and Saved meals, because it is a list of foods
+  like the other three and a tab is where someone looks for it. Build it that way unless the owner
+  says otherwise; it is one line to move later.
 - **Lane B** — `components/nutrition/**` and `app/nutrition/**` are both Lane B's under §3, and
   nothing here touches an engine path.
 - **Read first:** [`docs/domains/nutrition/README.md`](domains/nutrition/README.md), then the
@@ -979,6 +1018,168 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 - **Verification:** save one plan meal, then prove the resulting row logs, prints a label, and that
   the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
   indistinguishable from a hand-built one, so the label path is the test that proves it.
+
+### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
+
+- **Branch:** `feat/nutrition-coach-meal-plan`
+- **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
+- **Placement:** in the nutrition cluster, after Q-398. It **depends on Q-398**: the plan's exit
+  route in this design is "Save all as meals", and until plan meals can become ordinary saved
+  meals, a conversational plan has nowhere to land and is only a nicer-looking dead end.
+- **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
+  work - its too step by step - Could we try implement this into an AI coach/meal builder type
+  thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I
+  keep clicking each grocery store."* and, on the mockup, *"This looks really good - I'd like to
+  see that in prod"*.
+
+- **What it is today.** `components/nutrition/meal-plan-setup-sheet.tsx` (445 lines) is a linear
+  stepper: `const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review']`
+  (line 28), seven screens holding thirteen `useState` fields, with a fixed footer per step. It
+  works, and the docstring's reason for the stepped shape is sound (a fixed action row that never
+  scrolls away, and `SheetFooter` owning the bottom inset — this repo's most repeated on-device
+  regression). **Keep that property.** The problem is not the footer, it is that six of the seven
+  screens ask a question the app can mostly answer itself, and none of them can be skipped.
+
+- **Three of the four pieces already exist, which is why this is smaller than it sounds.**
+  - `lib/coach/widgets.ts` is a **union of client-side tool schemas**, explicitly documented as the
+    extension point: *"Adding a widget means adding a member here and a row in
+    `components/coach/widget-registry.tsx`. The union is the extension point; the protocol does not
+    change."*
+  - `CHOICE_SOURCES` (`['sessions','exercises','swap_candidates']`) is the **server-fills-the-list**
+    mechanism, and its docstring is already the token argument the owner is asking for: a
+    nine-option picker the model typed out cost **~554 output tokens**, and *"having a language
+    model re-type it is paying to transcribe your own database"*. `app/api/coach/options/route.ts`
+    is where a source is resolved.
+  - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
+    'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
+
+- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
+  `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
+  multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
+  option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
+  grocery store" is not a missing convenience on top of a multi-select; the widget has never had
+  one. **Extend the schema rather than adding a second widget:**
+  - add `multi?: boolean` and `selectAll?: boolean` to `ChoiceListSchema`, defaulting false so
+    every existing call site is unchanged;
+  - `ChoiceList` gains checkbox rows, a "Select all" row (with an `n of m` count) and a Continue
+    button, resolving to a **list** of options;
+  - **flat, not a discriminated union** — the schema's own comment says why: *"Gemini's
+    function-declaration schema is fussy about unions, and this feature has already lost a day to
+    one (`z.literal(false)`)."* Do not model this as a union of single/multi variants.
+  - `MAX_VISIBLE_ROWS = 6` already scrolls the list; six stores fit, so no change needed there, but
+    check the Continue button is inside the widget and not below the scroll region.
+
+- **The stores list is the reference case for the token saving.** `STORES` is a hardcoded curated
+  six-item AU list in the component (line 21) with a docstring saying it is deliberate. The coach
+  must **never type those six names** — add a `grocery_stores` source to `CHOICE_SOURCES` and serve
+  it from `app/api/coach/options/route.ts` alongside the existing three. Same for the ingredient
+  lists (`PROTEINS`, `CARBS`, `FATS`, `VEG` — 32 more strings) and the dietary-restriction
+  catalogue, which is already an API (`/api/nutrition/dietary-restrictions`). **Every one of those
+  is a string the model would otherwise generate and the app already holds.**
+
+- **The conversation shape (from the mockup).** Three things, in order:
+  1. **Answers are widgets.** Stores as the new multi-select with Select all; restrictions as chips.
+     The coach **states what it already knows instead of asking** — *"I already know you log dairy
+     most days, so I have left it in"* — which is both the token saving and the better manner. The
+     seven steps become at most three exchanges, and any of them can be typed past instead of
+     tapped.
+  2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
+     item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
+     the meals outlive it.
+  3. Entering from the Nutrition tab starts you **inside the nutrition scope** — see Q-408, which is
+     the general version of that and is deliberately not a blocker for this entry.
+
+- **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
+  conversation as the path behind the same entry point and keep the stepped sheet reachable until
+  the conversation has been used on-device for a plan the owner actually keeps. A conversational
+  flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
+
+- **Lane.** Split, and **`lib/coach/**` belongs to neither lane's declared paths** — whoever takes
+  it claims that path in their baton first (`docs/agents/README.md` §"A path neither lane lists").
+  `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
+  prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
+  `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
+  **Lane B**. The schema change lands first — the component cannot render a flag the schema does
+  not carry.
+
+- **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
+  `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
+  call site still resolves to one option (that regression is the actual risk). The **conversation
+  half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
+  say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
+  thread) was not exercised unless it was.
+
+### [nutrition][platform] Q-409 — paste a recipe URL and get a meal; the fetch is the whole security surface
+
+- **Branch:** `feat/recipe-url-to-meal`
+- **Added:** 2026-08-19 · BugFix Intake, from the owner
+- **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
+  in the conversational shape it is one more thing you can hand the coach. It does **not** depend on
+  Q-407: the stepper's "Yours" step can take a URL today, and shipping it there first is fine.
+- **Owner's words:** *"when making the meal plan; I should be able to link recipe websites/urls and
+  it create a meal from it. So in the section where it asks any meals you want to add - I'd like
+  that ability too."*
+
+- **Where it goes.** `components/nutrition/my-meals-picker.tsx` — the "Meals you already eat" step
+  (`STEPS[4] = 'Yours'`). It already takes free text, POSTs it to `/api/nutrition/scan` (line 95),
+  and stores the result as a `TypedMeal { text, name, ingredients, looking, failed, keep }`. **A
+  URL is a third input mode alongside image and text, resolving to the same shape**, so the widget,
+  the `keep` semantics and the downstream plan payload need no change at all. That is why this is a
+  small feature and not a new subsystem.
+
+- **`/api/nutrition/scan` is the route to extend, not a new one.** It already runs
+  `generateObject` against `ScanSchema` (`identified` + `ingredients[]`), is rate-limited
+  (`rateLimit(\`${userId}:nutrition-scan\`, 10, 60_000)`), caps its text input at 500 chars with a
+  control-character strip, and sets `maxRetries: 0`. Add a `url` branch beside `image` and `text`.
+  **Match the existing branches' discipline** — a new branch that skips the cap or the rate limit
+  reintroduces what the other two already handle.
+
+- **The fetch is the part that can go wrong, and it is not a detail.** This is the app's first
+  server-side fetch of a **user-supplied URL**, which is a server-side request forgery surface: the
+  server sits on Railway's private network with the database on it. CLAUDE.md's rule is that
+  security checks **fail closed**. Concretely:
+  - **Allow `https:` only.** Reject `http:`, and reject every other scheme outright — `file:`,
+    `gopher:`, `data:`. Scheme-checking by prefix string is not enough; parse with `new URL()` and
+    compare `protocol`.
+  - **Resolve the host and reject private/loopback/link-local ranges before connecting** —
+    `127.0.0.0/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16` (cloud metadata), `::1`, and the
+    IPv6 unique-local range. Rejecting on the *hostname* is not sufficient: a public name can
+    resolve to a private address.
+  - **Do not follow redirects blindly.** A permitted URL that 302s to `169.254.169.254` defeats
+    every check above. Either set `redirect: 'manual'` and re-validate each hop, or cap at zero
+    hops and tell the user.
+  - **Bound the response**: a timeout (a few seconds), a byte cap, and a content-type check for
+    HTML. An unbounded read of an attacker-chosen URL is Q-322/Q-498's class in a new place.
+  - **Never surface the fetch error verbatim** — Q-320 is exactly this leak (`e.message` as a 500
+    body). "Could not read that page" is the whole message.
+
+- **Parse before you prompt, because most recipe sites hand you the answer.** Recipe pages very
+  commonly carry schema.org `Recipe` JSON-LD (`<script type="application/ld+json">`) with
+  `recipeIngredient[]`, `recipeYield` and sometimes `nutrition`. **Read that first and only fall
+  back to the model when it is absent** — it is free, exact, and it gives real serving counts,
+  which the owner has already asked for elsewhere (Q-395's "how many serves" note). When falling
+  back, send the extracted **text**, never the raw HTML: page markup is both enormous and
+  attacker-controlled, and the existing text branch's 500-char cap exists for that reason. Treat
+  page content as untrusted input to the prompt, not as instructions.
+
+- **`recipeYield` is the field that makes this useful.** A recipe is *n* servings; a meal is one.
+  Divide the ingredient quantities by the yield and say so in the UI ("from a 4-serve recipe"),
+  because silently importing a whole tray as one meal is a 4× calorie error that looks plausible.
+  If the yield is missing, ask rather than assume 1.
+
+- **Attribution.** Store the source URL on the resulting meal and show it. It tells the owner where
+  a meal came from six months later, and it is the honest thing to do with someone else's recipe.
+
+- **Lane.** `app/api/nutrition/scan/route.ts` and any shared parser are **Lane A**;
+  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first.
+
+- **Verification.** Paste three real recipe URLs — one with JSON-LD, one without, one that 404s —
+  and confirm: ingredients and yield resolve from the structured path; the fallback produces a
+  sane estimate; and the failure shows a message rather than a stack. **Then prove the SSRF
+  guards by test, not by reading the code**: `http://`, `file:///etc/passwd`,
+  `https://127.0.0.1`, a URL that redirects to a private address, and an oversized response must
+  each be rejected. Those five cases are the acceptance criteria for this entry — the feature is
+  the easy half.
 
 ### [nutrition][platform] Q-396 — a photo per saved meal, and the size cap is the whole design
 
@@ -1148,6 +1349,77 @@ and a denylist for the health routes. There is also a **prior decision against a
 stays in Railway, no CSP changes"*) — that decision has since been reversed by the owner, and the CSP
 note is a live consideration for the WebView, not a stale one.
 
+
+### [platform] Q-408 — scope the Coach into per-section specialists; today one prompt carries every domain and every tool
+
+- **Branch:** `docs/scoped-coach-architecture`
+- **Added:** 2026-08-19 · BugFix Intake, from the owner · **plan-first: PR 1 is a design doc, not code**
+- **Placement:** low, and deliberately so. The owner said *"For now lets focus on nutrtion. but
+  please scope this for later."* Q-407 delivers the nutrition conversation without waiting on this;
+  this entry is what stops Q-407 from becoming a one-off that the workout and goal flows later
+  copy-paste.
+- **Owner's words:** *"the workout building/ meal builder/ goals wtc. Shoudl all follow the same AI
+  coach chat stye with widgets etc in it. … Ideally we want it scoped more narrowly based on where
+  you opened it from - i.e nutrition should be related to nutition queries and shouldnt realy be
+  able to touch workout data. So maybe we should do it like this — Home is called AI Coach; it has
+  access to all coaches - Then Ai Workout Couch, Ai Nutrition Coach, Ai Goal coach etc. … I want a
+  heavy focus on the widgets/UI conversation ability etc. We should try reduce AI tokens; so
+  hardcode as much detail as possible before sending."*
+
+- **What exists today, so the plan starts from fact not from a blank page.** `app/api/coach/route.ts`
+  (191 lines) builds **one** turn: one `SYSTEM` prompt, `buildChatTools(...)` + `buildWidgetTools(...)`
+  + `google_search`, `stopWhen: stepCountIs(6)`. Write authority is already domain-scoped and already
+  enforced server-side — `COACH_PATCH_DOMAINS` is six domains, `DOMAIN_FIELDS` bounds which fields
+  each may set (*"a model that mixes domains cannot write a calorie goal onto an exercise row"*),
+  and `DOMAIN_TIER` decides how heavy the confirmation is (`program_phase` is the only tier 3).
+  **So the write side is scoped and the read side is not.** A nutrition conversation can call every
+  workout read tool and the whole workout system prompt is paid for on every turn regardless.
+
+- **The three questions the plan has to answer.** Do not start writing code until these are decided:
+  1. **What is a scope, mechanically?** The cheapest honest answer is a named bundle of
+     (system-prompt section, tool subset, patch-domain subset, widget-source subset) — a record
+     keyed by scope, not a new route per coach. Say outright whether a scope is a *filter over one
+     route* or *separate routes*, and why. A filter keeps `dangling-widgets`, threads, the apply
+     path and the confirm screen written once.
+  2. **What does "cannot touch workout data" mean — refusal, or absence?** These are different and
+     only one is a boundary. If the nutrition scope simply does not receive the workout tools, it
+     *cannot* read them; if it receives them and is told not to, it is a polite instruction and the
+     model will occasionally ignore it. Prefer absence, and say what the coach does when the user
+     asks anyway — `HandoffSchema` already routes to real screens
+     (`'program_builder' | 'log_activity' | 'profile' | 'nutrition'`) and is the natural exit, but
+     its destination enum will need the other coaches added to it.
+  3. **What is Home?** The owner's model is that Home has access to all coaches and routes to them.
+     Decide whether Home is (a) the unscoped coach as it is today, with routing added, or (b) a thin
+     router that holds no tools and only dispatches. (b) is the one that makes the token argument
+     true; (a) is the one that does not regress anyone who uses Home for a cross-domain question
+     like *"what should I eat before tomorrow's legs session?"* — which is the exact case the mockup
+     draws, and which a strict scope would break. **Cross-domain reads are the hard part of this
+     design; a plan that does not name how they work is not finished.**
+
+- **The token argument, with the measurement that supports it.** Q-170 measured Coach's latency as
+  almost entirely output-token generation (~1.8 s fixed + ~270 tokens/sec), and found that a picker
+  turn emitted **2,204 output tokens to render a ~400-token widget**; dropping the thinking level
+  took it to **554 tokens and 10.0 s → 3.5 s**. That is the lever that worked. **Two others were
+  measured and both made it worse — inlining the program into the system prompt, and forcing a
+  sentence before every tool call.** So "hardcode as much detail as possible before sending" must
+  be read as *"name a `source` and let the server fill the list"* (the `CHOICE_SOURCES` pattern),
+  **not** as *"put more into the prompt"* — the second is the thing already proven to backfire, and
+  the plan must say so or someone will try it a third time.
+- A shorter per-scope system prompt is an **input**-token saving, and input tokens are not what
+  Q-170 found to dominate. Do not promise a latency win from scoping alone; the honest claim is
+  narrower answers, a real boundary, and fewer tools for the model to choose wrongly among.
+
+- **Deliverable of PR 1.** A design doc in `docs/superpowers/plans/` plus backlog entries for the
+  implementation, per the backlog protocol. It should carry: the scope record's shape; the
+  per-scope tool/domain/source table for nutrition, workout and goals; the Home routing decision
+  with the cross-domain case answered; what `HandoffSchema` grows; and which parts are Lane A
+  (`app/api/coach/**`, and `lib/coach/**` once a lane claims it) versus Lane B
+  (`components/coach/**`, the entry points).
+
+- **Do not let this block Q-407.** Q-407's multi-select and its nutrition conversation are useful
+  standalone and are the owner's stated focus. If this plan later moves where scope lives, moving
+  one conversation is a small change; waiting for the architecture before shipping any of it is how
+  the nutrition work stalls.
 
 ### [platform] Q-320 — `e.message` as a 500 body leaks the same SQL Q-483 just closed, at 14 sites
 

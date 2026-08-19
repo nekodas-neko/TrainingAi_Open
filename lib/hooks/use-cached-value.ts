@@ -29,8 +29,21 @@ export function useCachedValue<T>(
   key: string,
   url: string,
   ttlSeconds: number,
+  opts?: {
+    /**
+     * Called when the fetch fails. `cachedFetch` swallows `!res.ok` — including this app's own rate
+     * limit — so a card without this has no way to tell "no data" from "the request failed", and
+     * the standing rule is that it must show an error state rather than vanishing.
+     */
+     onError?: () => void
+  },
 ): T | null {
   const [data, setData] = useState<T | null>(null)
+
+  // Held in a ref so a caller passing an inline arrow — which is every caller — does not re-run the
+  // fetch effect on each render.
+  const onErrorRef = useRef(opts?.onError)
+  onErrorRef.current = opts?.onError
 
   // Seed in an effect, never a useState initializer — a cache read in an initializer causes a
   // hydration mismatch (session 165).
@@ -48,7 +61,7 @@ export function useCachedValue<T>(
     const load = () => {
       void cachedFetch<T>(key, url, ttlSeconds, d => {
         if (alive && keyRef.current === key) setData(d ?? null)
-      })
+      }, { onError: () => { if (alive && keyRef.current === key) onErrorRef.current?.() } })
     }
     load()
 

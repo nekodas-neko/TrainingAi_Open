@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { HeartPulse, TriangleAlert } from "lucide-react";
-import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
 import type { HrProfileResponse } from "@/app/api/hr-profile/route";
 
@@ -13,17 +13,16 @@ const URL = "/api/hr-profile";
 // stray-spike rejection), shown next to the age-estimated max, plus which one anchors
 // your effort %. See lib/health/observed-hr.ts.
 export function ObservedHrCard() {
-  const [data, setData] = useState<HrProfileResponse | null>(null);
   const [error, setError] = useState(false);
 
-  // Seed in the effect, never in a useState initializer — the server has no cache to read, so an
-  // initializer makes the first client render disagree with the server's.
-  useEffect(() => {
-    setData(readCacheSync<HrProfileResponse>(KEY) ?? null);
-    cachedFetch<HrProfileResponse>(KEY, URL, HR_PROFILE_TTL, (d) => setData(d), {
-      onError: () => setError(true),
-    });
-  }, []);
+  // `useCachedValue`, not a hand-rolled seed-and-fetch effect (Q-359). This card renders inside the
+  // Health tab, and the shell keeps every tab mounted once visited — so a `useEffect(…, [])` here
+  // would hold its first payload until the app was killed, however correctly the key was evicted.
+  // It also keeps the seed in an effect rather than a `useState` initializer: the server has no
+  // cache to read, so an initializer makes the first client render disagree with the server's.
+  const data = useCachedValue<HrProfileResponse>(KEY, URL, HR_PROFILE_TTL, {
+    onError: () => setError(true),
+  });
 
   if (error && !data) {
     return (

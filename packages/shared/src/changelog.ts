@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.4",
+    date: "2026-08-19",
+    changes: [
+      "The heart-rate profile card on Health now updates when its data changes, instead of showing whatever it had when the app started. A project-wide check was added at the same time so no new screen can be built the old way \u2014 19 screens still are, and they will be converted one at a time.",
+    ],
+  },
+  {
     version: "1.325.3",
     date: "2026-08-19",
     changes: [
