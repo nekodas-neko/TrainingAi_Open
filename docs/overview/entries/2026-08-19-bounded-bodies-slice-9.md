@@ -32,8 +32,7 @@ after. The genuinely optional ones — bodyless call → normal 200 — are `dai
 
 ## Verification
 
-`npx tsc --noEmit` clean · `pnpm check:rules` **Ran 49 of 49** · `npx next lint --dir app` warnings
-only, all pre-existing in Lane B files · full suite against the local DB **511 files / 4,185 tests
+`npx tsc --noEmit` clean · `pnpm check:rules` **Ran 49 of 49** · `pnpm lint` clean · full suite against the local DB **511 files / 4,185 tests
 passed, 3 files + 75 tests skipped**.
 
 Live-probed against `pnpm dev` with a real credentials session, every converted handler:
@@ -51,3 +50,11 @@ its guard cannot be reached with a credentials session — verified by reading t
 probe. `friends/[id]` and `injuries/[id]` DELETE take no body at all (the id is in the path); they
 appear here only for their PATCH siblings. Nothing in this slice touches native, safe-area, gesture
 or notification paths, so no device check is owed.
+
+## `npx next lint --dir app` is not the lint CI runs
+
+It reported warnings only and this slice was pushed on that basis; CI's `pnpm lint` — which is bare
+`eslint` over the whole repo — then failed on a **`prefer-const`** error in `log-calendar-event`,
+where the rewrite filled a pre-declared `let` that nothing reassigns. Two different runners with
+two different rulesets, and only one of them is the gate. The pre-push command is **`pnpm ci:local`**
+(`pnpm lint && pnpm check:rules && pnpm typecheck && pnpm test`), not a hand-assembled subset of it.
