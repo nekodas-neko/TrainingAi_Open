@@ -4,6 +4,10 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A list of exercise names and a date.
+const MAX_BODY_BYTES = 32 * 1024
 
 export async function GET() {
   const session = await auth()
@@ -36,14 +40,14 @@ export async function POST(req: NextRequest) {
     return adminErrorResponse(err)
   }
 
-  let rawBody: unknown
-  try {
-    rawBody = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const parsed = BodySchema.safeParse(rawBody)
+  const parsed = BodySchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid request', details: parsed.error.flatten() }, { status: 400 })
   }

@@ -767,6 +767,54 @@ Worth reaching for only if the reassign proves harder than it looks.
   a seeded body plus `ta_ss_cards` via `page.addInitScript` — because every Home-card guard needs
   it, and its absence is part of why a shell-only staleness bug reached a user report.
 
+### [platform] Q-324 — the first suite run against a freshly-migrated database times out two test files, which is exactly what CI does every run
+
+- **Branch:** `fix/ci-fresh-db-schema-contention`
+- **Added:** 2026-08-19 · Lane A, while diagnosing a red `Tests` job on PR #195
+- **Placement:** medium. It is **not** a product defect — it is intermittent CI red on changes that
+  are fine, which costs a diagnosis every time it fires and trains people to re-run rather than read.
+
+- **Reproduced on `main`, with no change of any kind applied.** Create an empty database, run
+  `node scripts/local-db/migrate.js`, then run the suite **once**:
+  ```
+  FAIL  lib/data/postgres/__tests__/complete-workout-increment-race.test.ts
+        Error: Hook timed out in 10000ms.   (beforeAll — getPool / getRepository)
+  FAIL  app/api/admin/backfill-derived-scores/__tests__/backfill.test.ts
+        Error: Test timed out in 5000ms.
+  Test Files  2 failed | 487 passed      Tests  1 failed | 4133 passed
+  ```
+  **Run the suite a second time against the same database and it is 489/489 green.** Both files also
+  pass in isolation on the fresh database. So it is neither test's own logic.
+
+- **The mechanism.** On the first run each vitest worker calls `ensureSchema`, and against a database
+  where `migrate.js` has not recorded anything in `schema_migrations`, every worker re-applies the
+  whole migration set concurrently. The Postgres server log fills with `relation … already exists`
+  and `deadlock detected` — the noise `CLAUDE.md` already tells sessions to ignore — and while that
+  is happening the shared instance is saturated, so a `beforeAll` that only opens a pool exceeds its
+  10 s hook timeout. On the second run `ensureSchema` is a no-op and nothing is slow.
+
+- **Why it hits CI and never a local session.** CI creates a fresh `postgres:16` service for every
+  run, so **CI is always in the first-run state**. A local session's `trainingai_dev` is warm and has
+  been through this once, months ago. That asymmetry is the whole reason the failure looks
+  unreproducible from a session — running `pnpm test` locally cannot reproduce it, and re-running CI
+  usually cannot either, because it is a race rather than a determinism.
+- **Evidence it is a race, not a rule:** PR #197's `Tests` job passed at 06:53 on the same base where
+  #195's failed at 06:52.
+
+- **Fix direction — pick one, do not do all three:**
+  1. **Make `migrate.js` record what it applied** so the workers' `ensureSchema` is a no-op on the
+     first run too. Cheapest, addresses the cause rather than the symptom, and makes CI's first run
+     look like a session's warm one. **Recommended.**
+  2. Serialise `ensureSchema` across workers with the advisory lock the migration tests already use.
+     Correct but slower, and `migration-test-lock.test.ts` shows that lock has its own hazards.
+  3. Raise the two timeouts. Rejected — it hides the contention and the next slow file just moves the
+     goalposts.
+
+- **Do NOT "fix" this by re-running the job.** That is what it currently costs, and it is why the
+  entry exists. `CLAUDE.md` is explicit that a re-run is the fix only when the job died before any
+  test body ran; here the bodies run and time out.
+- **Lane A owns this** (`scripts/local-db/`, `vitest.config.ts`).
+
 ### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
 
 - **Branch:** `feat/macros-follow-earned-calories`
@@ -2034,54 +2082,6 @@ this fits without an extraction.
   `components/**` (Lane B). With the decision above it is **lower value than it looked** — the
   warnings that remain are all device-sourced and unactionable, so a badge would report noise the
   user cannot clear. Worth doing only as a diagnostic surface, not a user-facing alert.
-
-### [platform] Q-322 — 92 route files still read their body with bare `req.json()`; the ratchet holds the line
-
-- **Branch:** `fix/bounded-request-bodies`
-- **Added:** 2026-08-19 · Lane A, the deferred halves (2) and (3) of Q-484. **Rewritten 2026-08-19
-  after the first slice shipped (PR #182), which also closed Q-498.**
-
-- **What is already done, so it is not re-done.**
-  - **The shared bounded reader exists** — `readJsonLimited(req, maxBytes)` in
-    `packages/shared/src/http/request-guards.ts`. Piece 1 of the original entry is complete; it
-    shipped with Q-498's sibling work and is measured: against a 20 MB body on a 16 KB cap it cuts
-    off at 2,949,120 bytes.
-  - **The three routes reachable without a session are converted** — `auth/register`,
-    `auth/exchange-mobile-token`, `health-connect/ingest` (Q-498, now removed from this queue). All
-    three used to accept the full 20,000,048 bytes and then answer 400; all three now answer 413.
-  - **`health-connect/ingest`'s ordering is fixed**, which was the larger half of Q-498: the
-    per-IP brute-force limiter now runs **above** the body read. Q-498 said this needed the secret
-    moved to a header; it did not — the limiter is keyed on the IP from the request headers, so
-    nothing had to come out of the body and the owner's Tasker profile was not touched.
-  - **`scripts/check-bounded-request-body.js` is in the Custom Rules job**, shrink-only per file.
-    The three converted routes are at zero, so re-adding a bare read to any of them fails
-    immediately. Verified by reverting one and watching it go red.
-
-- **Slice 2 shipped (PR #184): the six offline-first hot paths.** `nutrition/food-logs` (+ `[id]`),
-  `log-exercise`, `complete-workout`, `sync/push`, `water-log`. Two of them threw on malformed JSON —
-  a bare `req.json()` with no `.catch()`, which Next turned into a **500** rather than the 400 it is —
-  so those now answer 400 as well. `sync/push`'s cap was **measured**, not guessed: the envelope caps
-  the batch at 100 and the largest bounded domain (`workout_log`, arrays capped at 20, strings at 200)
-  is 6,010 bytes at its own limits, so a full worst-case batch is 0.57 MB against a 4 MB cap. **Do not
-  lower that one without re-measuring** — it is the outbox, and a rejected batch is the app's
-  worst-case data-loss path.
-- **What is left: 98 bare reads across 86 route files.** The baseline in that script is the list.
-  The number may only go down; a file that reaches zero is removed from it in the same PR.
-- **Do this in slices, not one sweep** — that is what the ratchet is for. Converting 92 files at
-  once is how a mistake hides in a diff nobody can read.
-- **This is a candidate count, not a defect count.** All 92 require a session, several do
-  hand-rolled checks, several are admin-gated. Read each before calling it broken *or* fine. The
-  suggested next slice, by exposure: `user/password`, `profile`, `user/goals`, then the admin and
-  AI routes, then the rest.
-- **Priced honestly.** Not attack — this app's users are its own account holders. It is worth doing
-  because `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full`
-  outage (2026-08-17), and an unbounded user-writable body is the shape that ritual exists to
-  catch — and because the stated direction is multi-user + Play Store, at which point "nobody is
-  attacking it" stops being an argument.
-- **⚠️ Do NOT quote 20 MB as a storage figure.** `pg_column_size` read ~120 kB for the probe rows
-  because the payload was one repeated character and TOAST compressed it almost perfectly. Real text
-  would not. The defensible statement is that the **transfer and parse** cost was unbounded.
-- **Lane A owns this** (`app/api/**`, `scripts/`).
 
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 

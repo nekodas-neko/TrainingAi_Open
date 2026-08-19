@@ -18,9 +18,17 @@ bodies that carry a whole program). 33 read sites in four shapes:
 The optional ones keep their fallback exactly: only `too_large` short-circuits to 413, and an
 invalid or absent body still falls through to whatever the route did before.
 
-**This empties the worklist.** Every entry left in `BASELINE` after this PR is covered by an open
-slice PR (#205 slice 7, #208 slice 8; #201 slice 6 merged while this was in flight), so once those
-land the map is empty and the check becomes "no route reads a bare body" rather than a ratchet.
+**The worklist is empty, and the ratchet is retired in this same PR.** Slices 6, 7 and 8 landed
+while this was in flight, so after the last re-merge `check-bounded-request-body` reports **210 API
+route files, 0 bare `req.json()` reads**. The per-file `BASELINE` and its shrink-only bookkeeping are
+gone with the debt they tracked: the script is now a flat rule, so re-introducing a bare read fails
+on the first one rather than against an allowance. Verified by reverting `mood`'s read and watching
+it go red, then restoring it. An `EXEMPT` map replaces the baseline for a route that genuinely
+cannot be bounded — it is empty, and an entry in it has to carry its reason, because a number with
+no reason attached is what lets a count drift back up.
+
+Q-322 is removed from `docs/implementation-backlog.md` in this PR. It began at **104 bare reads
+across 92 route files**.
 
 ## A correction carried over from slice 8
 

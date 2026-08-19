@@ -11,16 +11,15 @@
 // path and then streams with a real byte counter, cancelling on overflow. Measured against the same
 // 20 MB body on a route with a 16 KB cap: cut off at 2,949,120 bytes.
 //
-// **This is a ratchet, not a sweep.** 104 bare reads across 92 route files remained after slice 1
-// converted the three session-less routes, and converting the rest at once is how a mistake hides in
-// a diff nobody can read. So: every file below is baselined at the number of bare reads it has, the
-// number may only go DOWN, and a file not listed must have none. A route converted to
-// `readJsonLimited` lowers its own number in the same PR; a file that reaches zero leaves the list.
+// **It was a ratchet; the sweep finished, so it is now a flat rule: no route file may contain a bare
+// read at all.** It began at 104 bare reads across 92 route files and came down in nine slices, the
+// last of which emptied the list — converting all 104 at once is how a mistake hides in a diff
+// nobody can read. The per-file BASELINE and its shrink-only bookkeeping are gone with the debt they
+// tracked; re-introducing a bare read now fails on the first one rather than against an allowance.
 //
-// **What is left is printed by this script on every run and is deliberately NOT written down here.**
-// A hand-maintained running total is one more thing to re-edit per slice and get wrong, and it
-// conflicts on every parallel merge. The BASELINE below is the worklist; the summary line is the
-// score.
+// If a future route genuinely cannot use `readJsonLimited`, do not add a baseline back — say why in
+// an EXEMPT entry beside the reason, the way the sibling checks do. A number with no reason attached
+// is what lets the count drift back up.
 //
 // Slices so far — 1: the three routes reachable **without a session** (`auth/register`,
 // `auth/exchange-mobile-token`, `health-connect/ingest`), deliberately absent from the baseline so
@@ -28,6 +27,7 @@
 // 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths.
 // 6: the workout and activity write routes.
 // 7: the nutrition CRUD routes.
+// 8: every remaining admin route.
 // 9: everything the numbered slices left over — the periodization, running-plan, phase-set,
 // progression-style, friends, injuries, supplements, digest, mood and calendar routes.
 'use strict';
@@ -45,17 +45,10 @@ function stripComments(src) {
     .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
 }
 
-// Shrink-only. Each number is how many bare reads that file still has.
-const BASELINE = {
-  'app/api/admin/activity-types/route.ts': 2,
-  'app/api/admin/db-query/route.ts': 1,
-  'app/api/admin/exercises/route.ts': 2,
-  'app/api/admin/fix-exercise-units/route.ts': 1,
-  'app/api/admin/generate-exercise-media/route.ts': 1,
-  'app/api/admin/invites/route.ts': 2,
-  'app/api/admin/mirror-dataset-gifs/route.ts': 1,
-  'app/api/admin/timing-baseline/route.ts': 1,
-};
+// Route files allowed a bare read, each with the reason. Empty, and it should stay that way — an
+// entry here is a route whose body cannot be bounded, which is a claim that needs defending.
+const EXEMPT = new Map([
+]);
 
 const counts = new Map();
 let scanned = 0;
@@ -80,30 +73,25 @@ function walk(dir) {
 
 walk(path.join(root, 'app', 'api'));
 
-const over = [];
-for (const [rel, n] of counts) {
-  const limit = BASELINE[rel] ?? 0;
-  if (n > limit) over.push({ rel, n, limit });
-}
-const stale = Object.keys(BASELINE).filter(rel => !counts.has(rel));
+const offenders = [...counts].filter(([rel]) => !EXEMPT.has(rel));
+const staleExempt = [...EXEMPT.keys()].filter(rel => !counts.has(rel));
 
-if (over.length > 0) {
+if (offenders.length > 0) {
   console.error('A route reads its request body with bare `req.json()` (Q-322 / Q-498).');
   console.error('That buffers the whole body before anything can refuse it — a Zod schema after the');
   console.error('read bounds what is STORED, not what is transferred and parsed. Use');
   console.error('`readJsonLimited(req, maxBytes)` from @trainingai/shared/http/request-guards and');
-  console.error('answer 413 on `too_large`, 400 on `invalid_json`.');
-  for (const o of over) console.error(`  ${o.rel}  ${o.n} bare read(s), baseline ${o.limit}`);
+  console.error('answer 413 on `too_large`, 400 on `invalid_json`. Every one of the 210 route files');
+  console.error('already does; this one would be the first back.');
+  for (const [rel, n] of offenders) console.error(`  ${rel}  ${n} bare read(s)`);
   process.exit(1);
 }
 
-if (stale.length > 0) {
-  console.error('BASELINE lists files that no longer have a bare `req.json()`. The baseline is');
-  console.error('shrink-only: remove these entries in the same PR that converted them, or the next');
-  console.error('author gets a free allowance they did not earn.');
-  for (const rel of stale) console.error(`  ${rel}`);
+if (staleExempt.length > 0) {
+  console.error('EXEMPT names files that no longer have a bare `req.json()` — drop the entry in the');
+  console.error('same PR that converted them, so the exemption cannot outlive its reason.');
+  for (const rel of staleExempt) console.error(`  ${rel}`);
   process.exit(1);
 }
 
-const remaining = [...counts.values()].reduce((a, b) => a + b, 0);
-console.log(`check-bounded-request-body: ${scanned} API route file(s); ${remaining} bare req.json() read(s) left across ${counts.size} file(s), none above baseline.`);
+console.log(`check-bounded-request-body: ${scanned} API route file(s); no bare req.json() reads${EXEMPT.size ? `, ${EXEMPT.size} exempt` : ''}.`);
