@@ -1,8 +1,8 @@
 'use client'
 
-import { memo, useEffect, useState } from 'react'
+import { memo, useState } from 'react'
 import dynamic from 'next/dynamic'
-import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { CARDIO_TRENDS_TTL } from '@trainingai/shared/cache-ttl'
 import type { WeeklyZoneStack, EfficiencyPoint, CadenceTrendPoint } from '@trainingai/shared/health/cardio-trends'
 
@@ -34,13 +34,7 @@ type ViewKey = (typeof VIEWS)[number]['key']
 
 export const CardioTrendsSection = memo(function CardioTrendsSection() {
   const [view, setView] = useState<ViewKey>('zones')
-  const [data, setData] = useState<CardioTrendsResponse | null>(null)
-
-  useEffect(() => {
-    const seeded = readCacheSync<CardioTrendsResponse>(CACHE_KEY)
-    setData(seeded)
-    cachedFetch<CardioTrendsResponse>(CACHE_KEY, '/api/cardio-trends', CARDIO_TRENDS_TTL, setData)
-  }, [])
+  const data = useCachedValue<CardioTrendsResponse>(CACHE_KEY, '/api/cardio-trends', CARDIO_TRENDS_TTL)
 
   return (
     <div className="rounded-2xl border border-[color:var(--border)] bg-[color:var(--card)] p-3.5">

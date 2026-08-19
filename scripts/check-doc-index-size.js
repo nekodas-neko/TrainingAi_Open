@@ -769,7 +769,11 @@ const BASELINE = {
   // cannot run it. A stale count on a live issue reads as "contained" and it is not. Paid for in
   // part by moving the `claude_ro` row-scoping lesson out of this entry: it is a standing rule in
   // CLAUDE.md's ritual, not a paragraph inside one device issue.
-  'projectOverview.md': 7930,
+  // Raised 2026-08-19 (Tuning, Activity contributor audit): 7930 -> 7933. The comprehensive
+  // review's "the rest, in brief" line said Q-137 should be closed in Q-277's favour; Q-277 is
+  // now itself answered and removed, so the line had to say what the answer WAS (49% of effective
+  // weight cannot vary) rather than point at a queue entry that no longer exists.
+  'projectOverview.md': 7933,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -866,7 +870,19 @@ const BASELINE = {
   // implementer must not have to re-derive before deciding whether to use them.
   // Rebuilt from origin/main after a parallel PR raised the same baseline -- splicing the
   // conflict hunks would have produced two baselines for one number.
-  'docs/implementation-backlog.md': 10889,
+  // Raised 2026-08-19 (Tuning, Q-524 + the Activity contributor audit): 10832 -> 10878. Q-524 is
+  // added and Q-277 is REMOVED -- its "first action" was to dump the per-component parts and count
+  // each lane's realised range, which the audit did, and its untested hypothesis is now tested, so
+  // the investigation is finished and the remedy lives in Q-505. Net +46 rather than +70 because of
+  // that removal. Rebuilt from origin/main after a parallel PR raised the same baseline -- splicing
+  // the conflict hunks would have produced two baselines for one number.
+  // Raised 2026-08-19 (Lane B, Q-359 slice 1 shipped), recomputed from the merged file: the entry
+  // stays in the queue — 29 of 36 sites remain — and gains what the slice learned. Those lines are
+  // the reason the next slice does not repeat it: the `today` option and why the sweep needed it,
+  // the three sibling BLE listeners that should go the same way, the grouping error, and the one
+  // test that will red when the next three files convert. An entry that only said "6 of 36 done"
+  // would cost the next session all of that.
+  'docs/implementation-backlog.md': 10916,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
