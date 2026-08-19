@@ -933,7 +933,12 @@ const BASELINE = {
   // Health by reading a line that only renders when today has a step count, and the local seed's
   // steps stop three days back. Filed rather than fixed in the same PR because the durable fix is
   // in the seed, which no lane lists.
-  'docs/implementation-backlog.md': 11374,
+  // Raised 2026-08-19 (Lane B, Q-414 measured): the entry told the implementer to check what the
+  // movement pipeline stores per interval. It stores 1.2% of counted steps, which makes two of the
+  // entry's own rules unsatisfiable together — the numbers are inline because the next session
+  // would otherwise re-measure production to find that out, and because "check the granularity"
+  // reads like a formality until you see 11 rows against 668,749 steps.
+  'docs/implementation-backlog.md': 11212,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
