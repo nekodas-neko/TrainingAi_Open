@@ -7,6 +7,7 @@ import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { rateLimit } from "@/lib/rate-limit";
 import { readJsonLimited } from "@trainingai/shared/http/request-guards";
 import { reportServerError } from '@/lib/observability'
+import { clientIp } from '@trainingai/shared/http/client-ip'
 
 // Called by Tasker on Android — no session cookie, auth via shared secret.
 // Set HEALTH_CONNECT_INGEST_SECRET in Railway env vars.
@@ -35,7 +36,7 @@ const IngestBodySchema = z.object({
 const MAX_INGEST_BODY_BYTES = 16 * 1024;
 
 export async function POST(req: NextRequest) {
-  const ip = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+  const ip = clientIp(req);
 
   // SEC-I3: the success-side limiter below only bounds valid Tasker calls, so a
   // brute-force of the secret ran at unbounded throughput (the only unauthenticated
