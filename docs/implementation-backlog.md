@@ -6160,6 +6160,57 @@ session working from a temporarily restored copy.
   HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
 - **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
 
+### [body] Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did
+
+- **Branch:** `feat/exertion-integrated-battery-drain`
+- **Plan:** the design brief is
+  [`docs/reviews/2026-08-19-body-battery-drain-and-roadmap.md`](reviews/2026-08-19-body-battery-drain-and-roadmap.md) §3.
+  **Do Q-515 first** (see sequencing). Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, from an **owner brief** (*"body battery still doesn't seem
+  that good… id like that type of granular drain"*)
+- **Measured** over 51 days, joined to steps and completed workouts:
+
+  | relationship | measured | should be |
+  |---|---|---|
+  | `corr(hr_sample_count, total_drained)` | **+0.518** | — |
+  | `corr(steps, total_drained)` | **−0.153** | strongly **positive** |
+  | `corr(steps, end_value)` | **+0.112** | strongly **negative** |
+  | `corr(total_drained, end_value)` | −0.674 | negative ✓ |
+
+  **The strongest predictor of ending low is how many HR samples were recorded — i.e. ring wear time.**
+  Steps are *negatively* associated with drain.
+- **A workout barely registers:** `end_value` averages **50.6** on 37 workout days vs **50.0** on 14
+  non-workout days — a **0.6-point** difference.
+- **The days that hit 0 are the quiet ones.** Four days ended at exactly 0 on **828–4,152 steps**
+  (median 3,020), while **16 of 51 days cleared the 8,000-step goal** and did *not* end lower. So `0`
+  currently means *"you wore the ring a long time"* and the owner wants it to mean *"you did
+  everything"* — close to opposites.
+- **Mechanism.** Drain is `-DRAIN_RATE × (hrr − REST_THRESHOLD) × dt`, purely HR-driven; steps,
+  workouts, zone minutes and calories enter only via their HR effect. With **Q-515**'s boundary having
+  fallen to ~60 bpm, nearly every waking sample drains, and `(hrr − threshold)` varies far less than
+  wear duration — so **drain ≈ rate × time worn**, which is what +0.518 says. **Q-521 is downstream of
+  Q-515**: fixing the boundary does not fix this, but leaving it broken re-poisons any replacement.
+- **First action — exertion-integrated drain** (§3): keep the morning anchor; replace time-integrated
+  HR drain with exertion combining steps/movement, HR above rest, workout load and zone minutes;
+  **normalise against that day's `getDailyGoals`** so "everything hit" lands near empty; **floor at 0
+  and route the overshoot to an overreach signal** rather than below empty (the same resolution the
+  owner chose for Activity).
+- **⚠️ Two constraints the data imposes.** (1) **`active_calories` is unusable as a load-bearing
+  input — present on 8 of 51 days**; steps are on all 51, and any design needing calories silently
+  degrades to the HR-only model being replaced. (2) Normalising to targets means **a fitter person
+  drains less for the same absolute work** — correct for "did I do my day", wrong for "how depleted am
+  I". The owner's brief chooses the former; **write that into the model's comment so it is not
+  silently reversed.**
+- **This model must NOT be asked to detect overreaching.** On a target-hitting day a well-recovered and
+  an overreached athlete both read 0. Overreach lives in ACWR/readiness/illness. This arguably resolves
+  **Q-276** by making Body Battery explicitly *not* a recovery number.
+- **Pass test:** re-run the four correlations above. `corr(steps, total_drained)` must become clearly
+  positive, and workout vs non-workout `end_value` must separate by far more than 0.6 points.
+- **Caveats:** n = 51, one athlete, Pearson on daily aggregates — the weak values (+0.112, −0.153) mean
+  *"no relationship"* rather than a precise signed effect. **Zone minutes and movement-per-hour were
+  not pulled or coverage-checked** — they are named because the owner named them, and checking their
+  coverage is the first implementation step, given what `active_calories` shows.
+
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
 - **Branch:** `docs/reconcile-recovery-scores` (may become a UI change, not code)

@@ -42,6 +42,8 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 - [`docs/reviews/2026-08-19-body-derived-scores-closeout.md`](../../reviews/2026-08-19-body-derived-scores-closeout.md) — **the pillar's two unexamined derived scores, closed out 2026-08-19.** `bdi_derived` (46 rows, median 4.15, nothing ≥ 15) has **no threshold to calibrate** — its only consumer is a debug console labelling it *"observational, not a diagnosis"*. `body_comp` (71 rows) is a deterministic derivation whose one formula is deliberately matched to Oura's `atlas`. **Nothing to tune in either.** Useful byproduct: `body_comp.bmr_kcal` already persists the day's BMR, so **Q-517's proposed floor should read it rather than recompute** — with a fallback to the most recent snapshot on the 25 rows that lack one, never to the universal 1,000.
 
+- [`docs/reviews/2026-08-19-body-battery-drain-and-roadmap.md`](../../reviews/2026-08-19-body-battery-drain-and-roadmap.md) — **why Body Battery doesn't feel right, from an owner brief, 2026-08-19** (Q-521 — drain tracks **ring wear time, not exertion**: `corr(hr_sample_count, total_drained)` **+0.518** against `corr(steps, total_drained)` **−0.153**, and a workout moves `end_value` by **0.6 points**. The four days ending at 0 had 828–4,152 steps. Includes the exertion-integrated design brief, the roadmap showing sleep is already delivered and Activity already specified, and the constraint that `active_calories` covers only 8 of 51 days).
+
 ## Open issues
 
 ```bash
