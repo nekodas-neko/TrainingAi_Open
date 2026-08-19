@@ -1112,11 +1112,13 @@ order.
 
 - **⚠️ Owed 1 — the print test, and it is a real gate not a formality.** The code is **25×25
   modules**. **Re-measured 2026-08-18 and finer than first recorded**: the quiet zone is drawn
-  *inside* the code box, so the printed pitch divides by 33, not 25 — band, the default, is
-  **0.369 mm**, not 0.487. **Print black band and scan it**: if the default scans, every style does. Ink spread on a home printer merging fine modules
-  is the expected failure, and it will present as "the scanner doesn't work" rather than as a print
-  problem. The preview sheet prints the measured mm-per-module under the label so the number is
-  visible rather than assumed.
+  *inside* the code box, so the printed pitch divides by 33, not 25 — `band` is **0.369 mm**, not
+  0.487. **The default is now `inlineCentred` at 0.401 mm** (Q-399, v1.325.0 — retuned down from a
+  briefly-shipped 0.529 that left no room for the ingredient list it promised). **Print the default
+  and `band` and scan both**: `band` is the tightest, and the default is what every label uses. Ink
+  spread on a home printer merging fine modules is the expected failure, and it will present as "the
+  scanner doesn't work" rather than as a print problem. The preview sheet prints the measured
+  mm-per-module under the label so the number is visible rather than assumed.
 - **⚠️ Owed 2 — the scan-back on device.** QR decoding runs through the Capacitor plugin, which is
   inert in the sandbox, so **the scan branch has never executed against a real camera.** The decode,
   the meal lookup and the logging are unit-tested and the label half is E2E-guarded; the camera path
@@ -1126,6 +1128,12 @@ order.
   lives); `<a download>` is the browser fallback. **The share path is also device-unverified.**
 - The label prints **per-serving** figures and scanning logs **one serving** — asserted against each
   other in one unit test, because that is the pair that would otherwise drift.
+- **⚠️ The default drew ZERO ingredient lines for a release** (v1.324.0–v1.324.6) and nothing failed:
+  the sheet's "Printing N ingredients" copy was gated on `> 0`, so the one reading worth having
+  removed itself, and the only test on that style asserted the code's *size*. Fixed in Q-399
+  (v1.325.0) — three wrapped lines, the budget derived from the gaps the painter draws, the line
+  count asserted in CI, and a zero now reported loudly instead of silently.
+  [`Journal`](docs/overview/entries/2026-08-19-label-line-budget.md).
 
 ### [readiness][sleep][heart-rate][body][devices] 🟢 The ingest surface reviewed — auth model and value validation both sound; two schema gaps (Q-464, Q-465, 2026-08-18)
 
