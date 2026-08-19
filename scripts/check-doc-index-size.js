@@ -870,12 +870,13 @@ const BASELINE = {
   // implementer must not have to re-derive before deciding whether to use them.
   // Rebuilt from origin/main after a parallel PR raised the same baseline -- splicing the
   // conflict hunks would have produced two baselines for one number.
-  // Ratchets DOWN 2026-08-19 (Tuning, Q-524 + the Activity contributor audit): 10759 -> 10752,
-  // even though Q-524 was added. Q-277 was removed: its "first action" was to dump the
-  // per-component parts and count each lane's realised range, which the audit did, and its
-  // untested hypothesis is now tested -- so the investigation is finished and the remedy lives in
-  // Q-505. Shrink-only means the reclaimed space cannot quietly refill.
-  'docs/implementation-backlog.md': 10752,
+  // Raised 2026-08-19 (Tuning, Q-524 + the Activity contributor audit): 10832 -> 10878. Q-524 is
+  // added and Q-277 is REMOVED -- its "first action" was to dump the per-component parts and count
+  // each lane's realised range, which the audit did, and its untested hypothesis is now tested, so
+  // the investigation is finished and the remedy lives in Q-505. Net +46 rather than +70 because of
+  // that removal. Rebuilt from origin/main after a parallel PR raised the same baseline -- splicing
+  // the conflict hunks would have produced two baselines for one number.
+  'docs/implementation-backlog.md': 10878,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
