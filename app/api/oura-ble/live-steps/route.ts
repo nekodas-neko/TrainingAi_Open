@@ -5,6 +5,10 @@ import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { dsFromMeasuredAtMs } from '@/lib/oura-ble/decode'
 import { isPlausibleStepWindow } from '@trainingai/shared/health/step-estimate'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One step window: two timestamps and a count.
+const MAX_BODY_BYTES = 4 * 1024
 
 // Product write (not admin-gated, unlike the spike-ingest routes under app/api/oura-ble/samples/) —
 // stores an accurate live-counted step window (Tier 2 of the step-orchestration plan). The rollup
@@ -40,7 +44,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const parsed = LiveStepsSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = LiveStepsSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }

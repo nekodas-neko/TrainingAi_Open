@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A single tuning number (or a short note). The body is optional on all of these.
+const MAX_BODY_BYTES = 4 * 1024
 
 // Culling Lever 1b — DATA-DROPPING, admin-triggered only (never auto-run on deploy/migration).
 // Nulls the `decoded` JSONB on oura_raw_samples rows written before Lever 1a (which stops writing
@@ -27,8 +31,11 @@ export async function POST(req: Request) {
 
   let maxRows: number | undefined
   try {
-    const body = await req.json().catch(() => null)
-    const n = body?.maxRows
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok && read.reason === 'too_large') {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+    }
+    const n = read.ok ? (read.body as { maxRows?: unknown } | null)?.maxRows : undefined
     if (typeof n === 'number' && Number.isFinite(n) && n > 0) maxRows = Math.min(n, 1_000_000)
   } catch {
     // no/invalid body — use the repo's default
