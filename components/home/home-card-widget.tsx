@@ -8,6 +8,7 @@ import { cn, accentCardStyle } from '@trainingai/shared/utils'
 import { CARD_DEFAULT_COLORS } from '@/app/session-select/constants'
 import { Sparkline } from '@/components/ui/sparkline'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
+import { HomeNutritionZoneBar } from '@/components/home/home-nutrition-zone-bar'
 import dynamic from 'next/dynamic'
 import type { BodyMetaRow } from '@/app/api/body-metadata/route'
 import type { TrainingLoadResponse } from '@/app/api/training-load/route'
@@ -123,7 +124,6 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
       const isWeekly = calorieType === "weekly"
       const goalDisplay = isWeekly && boostedGoal ? boostedGoal * 7 : boostedGoal
       const consumedDisplay = isWeekly ? (weekToDate?.calories ?? 0) : nutrCalories
-      const goalPct = goalDisplay && consumedDisplay != null ? Math.min((consumedDisplay / goalDisplay) * 100, 100) : null
       const _nColor = cardColors['nutritionDonut'] ?? CARD_DEFAULT_COLORS.nutritionDonut
       return (
         <div className="px-4 pb-3 relative">
@@ -151,11 +151,11 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
                 <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Nutrition{isWeekly ? " (week)" : ""}</p>
                 {goalDisplay && <p className="text-xs text-muted-foreground">{consumedDisplay ?? 0} / {goalDisplay} kcal</p>}
               </div>
-              {goalPct !== null && (
-                <div className="h-1 rounded-full bg-muted overflow-hidden mb-1.5">
-                  <div className="h-full w-full rounded-full origin-left transition-transform duration-300 motion-reduce:transition-none" style={{ transform: `scaleX(${goalPct / 100})`, background: goalPct >= 100 ? MACRO_COLORS.fat : `linear-gradient(90deg, ${MACRO_COLORS.protein}, ${MACRO_COLORS.carbs})` }} />
-                </div>
-              )}
+              {/* Q-401: the gradient progress fill that used to be here measured "how full is the
+                  tank" against a fixed target. The zone bar measures "am I on target" against a
+                  budget that rises with what you burned, which is the number the rest of the app
+                  now uses. Same component as the Nutrition tab's, so the two cannot drift. */}
+              <HomeNutritionZoneBar />
               <div className="space-y-0.5">
                 {[{ color: MACRO_COLORS.protein, label: "Protein", value: nutrProtein }, { color: MACRO_COLORS.carbs, label: "Carbs", value: nutrCarbs }, { color: MACRO_COLORS.fat, label: "Fat", value: nutrFat }].map(m => (
                   <div key={m.label} className="flex items-center gap-2">
