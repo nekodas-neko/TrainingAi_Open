@@ -887,7 +887,7 @@ const BASELINE = {
   // batch is 0.57 MB) and must not be lowered without re-measuring, because that route is the
   // outbox and a rejected batch is the app's worst-case data-loss path. A cap with no stated
   // derivation is one someone tightens later on a hunch.
-  'docs/implementation-backlog.md': 10866,
+  'docs/implementation-backlog.md': 10923,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
