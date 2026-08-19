@@ -26,6 +26,20 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
   — §1.2 measured the Activity Score in production after v2: sd 5.9 over 19 days, range 66–91, 10
   distinct values. **v2 fixed the mechanism Q-137 blamed and the outcome did not move** (Q-277),
   and the score exists on only 19 of 40 days (Q-278).
+- [`docs/reviews/2026-08-19-active-minutes-who-threshold.md`](../../reviews/2026-08-19-active-minutes-who-threshold.md) — **the active-minutes threshold, fitted 2026-08-19 — read before touching
+  `activeMinutesFromZoneSeconds`** (Q-523 answered). Its comment claims the WHO convention and is
+  **one band off it**: it treats Zone 2 (**≥60% reserve**) as *moderate*, but WHO/ACSM moderate is
+  **40–59%** and 60% is where *vigorous* begins — so **moderate intensity maps to no zone at all and
+  has been scoring zero by construction.** Fixing that, plus anchoring on `targetAnchorMax` (observed
+  **167**) rather than `maxHr` (age-predicted **187**), takes the contributor from **0 on 53 of 59
+  days** to sub-score **mean 63.8, sd 38.7** — **the highest-variance input in the Activity Score.**
+  **Do not re-cut `ZONE_DEFS`** — training zones are not the defect; the roll-up that borrows them is.
+- [`docs/reviews/2026-08-19-score-audit-trail.md`](../../reviews/2026-08-19-score-audit-trail.md) — **whether each score can be re-audited later, 2026-08-19** (Q-526 — **activity is
+  the only score that stores the wrong thing**: `activity_contributors` holds the blend wrapper
+  `{base, adjustment, trained}`, not `computeActivityScore`'s six components, which are already in
+  memory on the same request. Sleep stores 10 real sub-scores, readiness stores its contributors plus
+  `provisional` flags, illness stores all four biomarker z-scores on every scored row. **Do Q-526
+  before Q-505** or the old model's contributor history is lost permanently.)
 - [`docs/reviews/2026-08-19-activity-contributor-audit.md`](../../reviews/2026-08-19-activity-contributor-audit.md) — **every Activity Score contributor measured, 2026-08-19 — read before touching
   the model** (the audit Q-277 asked for and never got). Over 90 days: **steps** (sd **33.4**) and
   **strengthVolume** (sd 23.8) carry real information; **strengthFreq** sits at 100 on **78%** of days;
