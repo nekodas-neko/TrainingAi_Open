@@ -445,14 +445,23 @@ is the part worth knowing before someone reaches for the obvious edit:
 - `KCAL` is drawn at **`spec.macroSize`** (`:544`, `:552`) — **the same constant that sets the P/C/F
   line** (`:561`). Shrinking the unit by editing `macroSize` shrinks the macros with it. There is no
   way to satisfy this request through the existing fields.
-- **Add a `unitSize` to `StyleSpec`, defaulting to the list size (`listSize = 7`, `:583`)** — the
-  smallest type on the label and the "nutritional text" the owner is matching to. That is 7.5 → 7:
-  a real reduction, and the unit stays comfortably legible at 600 dpi.
+- **Add a `unitSize` to `StyleSpec` and set it to `6`.** Three sizes were drawn — 7.5 (today), 7
+  (the list size, which was the recommendation) and 6 — and the owner's read decided it:
+  ***"looks the same to me so go 6 then."*** 7.5 → 7 is a **6.7%** change, and if the intended
+  reduction is not perceptible at true size then it is not a change; 6 is **20%** down and visibly
+  subordinate to the numeral. Take 6.
 - Six styles get one new field. `band` reads `macroSize` for its unit too (`:420`, `:424`) and should
   take the same `unitSize`, since its calorie path differs in *position* rather than in type scale.
-- **Do not go below the list size without asking.** Drawn at 6 for comparison during the review: the
-  unit stops reading as a word and becomes a mark on the numeral. That may be desirable, but it is a
-  different decision from "match the nutritional text" and the owner has not made it.
+- **6 is below the list size, which was flagged as a real trade and accepted.** At that size the unit
+  stops reading as a word and becomes a mark attached to the numeral — which is the intent, since its
+  job is to label the figure rather than be read. **It does mean `unitSize` is no longer derived from
+  `listSize`**: set it as its own value rather than a fraction of another, or a later change to the
+  ingredient type will drag the unit with it — the exact coupling this field exists to break.
+- **⚠ Verify 6 on paper, not on screen.** 6 units is ~1.6 mm of cap height on a 50 mm label. The
+  renderer's own header already warns that *"ink spread merges fine modules"*, and letterforms suffer
+  before QR modules do. The owner has a working print path and has run one test print, so this is
+  cheap: print one label at 6 and confirm `KCAL` is still crisp. **If it fills in, 7 is the fallback**
+  and this entry records why.
 
 - **⚠ Do NOT absorb the slack into the code.** It is the obvious alternative and it is wrong: the
   slack varies with the ingredient count (8.6 mm down to 2.2 mm), so a code sized to fill it would
