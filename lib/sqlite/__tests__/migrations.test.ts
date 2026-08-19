@@ -3,7 +3,7 @@ import { MIGRATIONS, RECONCILE_COLUMNS } from '../migrations'
 
 describe('local schema v25', () => {
   it('tops out at version 25', () => {
-    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(26)
+    expect(Math.max(...MIGRATIONS.map(m => m.toVersion))).toBe(27)
   })
 
   it('v23 creates the meal-plan tables without any ALTER', () => {
