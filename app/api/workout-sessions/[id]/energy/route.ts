@@ -75,8 +75,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     )
   } catch (error) {
     reportServerError(error, { url: '/api/workout-sessions/[id]/energy' })
-    const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/energy')
-    return NextResponse.json({ error: errMsg }, { status: 500 })
+    // Q-483: `errorLog` returns `[ERROR]: ${error}`, and returning that as the body published the
+    // whole failing statement — every column of `workout_sessions` — to the client. Measured on a
+    // malformed id, which reaches the driver as 22P02. The log line above keeps the full detail and
+    // `reportServerError` already banked it, so redacting the response costs no diagnostics.
+    errorLog(error, 'GET /api/workout-sessions/[id]/energy')
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }
 
