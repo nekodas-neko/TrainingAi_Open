@@ -6402,6 +6402,50 @@ session working from a temporarily restored copy.
   a Cloud-era adjustment is distinguished from our own base) and something may read it. Merge, do not
   replace.
 
+### [devices][platform] Q-528 — a full-history rollup can wipe every stored daily summary, and the guard is on the wrong side of the delete
+
+- **Branch:** `fix/daily-summary-replace-guard` · **Lane:** A
+- **Plan:** none needed for the guard — it is one reordering. **The rebuild after it is the real work.**
+  Evidence: [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](reviews/2026-08-19-daily-summary-replace-wipe.md).
+- **Added:** 2026-08-19 · Tuning agent, found while running Q-525's first action.
+- **Measured via `pg_stat_user_tables` — whole-database counts, not row-scoped:**
+
+  | table | live rows |
+  |---|---|
+  | `oura_raw_samples` | **198,223** |
+  | **`oura_daily_summary`** | **1** |
+  | `oura_bucket` | **0** |
+  | `step_live_windows` | **0** |
+
+  For contrast `oura_daily_derived` holds 96 rows, **46 with illness scores computed from the very
+  `summaryRows` array `oura_daily_summary` is the persisted copy of.**
+- **Mechanism.** `replaceOuraDailySummary` deletes unconditionally and *then* checks for emptiness:
+
+  ```ts
+  await db.delete(s.ouraDailySummary).where(eq(s.ouraDailySummary.userId, userId))
+  if (rows.length === 0) return          // guards the INSERT, not the DELETE
+  await db.insert(...)
+  ```
+
+  A full-history pass producing few or zero rows replaces the whole history and **returns
+  successfully** — no error, no log. The windowed path (`upsertOuraDailySummary`, per-day
+  `onConflictDoUpdate`) is safe, which is why this survived: **only the rarely-taken `fullHistory`
+  branch can do it.** Illness scores survived the same pass because they write to
+  `oura_daily_derived` through a COALESCE upsert — same input, different durability, and that
+  asymmetry is the evidence the input existed.
+- **First action:** move the guard above the delete, or make it a transactional
+  delete-and-insert so an empty computation cannot commit a wipe. **Then rebuild the summaries from
+  `oura_raw_samples`**, which still holds 198,223 rows and is the archival source of truth
+  (`CLAUDE.md`: never prune or mutate the server copy of `body_hex` — this is why).
+- **Do the guard BEFORE the rebuild.** Rebuilding into a function that can wipe on the next
+  full-history pass buys nothing.
+- **Pass test:** a full-history pass over a deliberately narrow input leaves prior rows intact; a
+  pass over the full archive produces a summary row per night with raw data.
+- **Caveats:** the mechanism is **read from source and matches the observed state; it is not
+  reproduced.** A dev-DB repro — populate, run full-history over one night, count rows — would settle
+  it. The alternative, that a full-history pass has simply never run over more than one night, is not
+  excluded.
+
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
 
 - **Branch:** `fix/chronic-stress-gate` · **Lane:** A
@@ -6420,6 +6464,13 @@ session working from a temporarily restored copy.
   pass covering ≥21 nights of real ring data (owner/device-gated)."* **It is not enough for 21 good
   nights to exist — they must be present in ONE pass**, so a nightly incremental rollup can never
   satisfy it however long it runs.
+- **⚠️ DIAGNOSIS CORRECTED 2026-08-19 — do not check the summary table to answer this.**
+  `oura_daily_summary` holds **1 row** system-wide against 198,223 raw samples (**Q-528** — a
+  full-history pass deletes unconditionally before checking for emptiness). So **nothing can be
+  concluded from stored data about whether 21 qualifying nights exist**: the gate may be fine and the
+  history adequate, and the evidence was destroyed rather than never created. The "21 nights in one
+  pass" reading below still describes the gate accurately, but it was too confident as a *cause*.
+  **Do Q-528 first, rebuild the summaries, then ask this question again.**
 - **First action:** confirm whether ≥21 qualifying nights exist in the data at all before touching the
   gate. If they do, this is a *trigger* problem (run the wide pass) and needs no code. If they do not,
   it is a coverage problem and belongs with Q-510, which found daytime-stress coverage is not
@@ -6485,6 +6536,13 @@ session working from a temporarily restored copy.
   information"* — that fix corrected the **denominator** (the goal window). The **numerator** now
   saturates for an unrelated reason, so the earlier fix could not have prevented this. Same symptom,
   different half.
+- **⚠️ The drift-proof anchor exists as a table and is EMPTY (2026-08-19).** `oura_bucket` — source
+  comment: *"the durable server backup of the on-device `oura_bucket`"* — carries `met_mean`,
+  `met_minutes` and `motion_mad`. **MET and motion do not drift with fitness**: they measure the
+  effort rather than the body's response to it, so a MET of 3.0 is 3.0 at any training age. That is
+  the principled answer to the difficulty below. **It has 0 rows system-wide** (as does
+  `step_live_windows`), so it is unavailable — see Q-528 §4. Until that sync path delivers, this fix
+  must come from heart rate or steps, and will inherit the drift.
 - **Open question for the fix — this is the whole difficulty.** A boundary that is a fixed fraction
   of reserve re-saturates as soon as the owner's resting HR drops again (which is exactly what Q-515
   measured happening). Candidates, none yet fitted: a **personal EMA of waking HR** rather than

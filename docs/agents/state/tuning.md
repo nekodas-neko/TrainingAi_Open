@@ -3,11 +3,22 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/body-battery-drain-model` · **Q band:** 500–529 (next free: 528)
+**Updated:** 2026-08-19 · **By:** `tuning/empty-backup-tables` · **Q band:** 500–529 (next free: 529 — band nearly exhausted, agree a new one with the owner)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **`oura_daily_summary` holds 1 row against 198,223 raw samples** (Q-528). Found running Q-525's own
+  first action. `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
+  the guard is on the INSERT — so a full-history pass over a narrow input wipes the history and
+  returns successfully. Illness scores from the same array survived because they write through a
+  COALESCE upsert to a different table.
+  - **CORRECTS Q-525, which I filed the same day.** "The gate is unsatisfiable" was too confident;
+    with the table at one row, **nothing can be concluded from stored data**. Rebuild first, then judge.
+  - **CHANGES Q-522's fix.** `oura_bucket` carries `met_mean`/`motion_mad` — **MET and motion do not
+    drift with fitness**, which is the principled answer to Q-515's whole problem. **It has 0 rows**,
+    so an HR-based fit inherits the drift. Do not fit one without recording that.
+  [`review`](../../reviews/2026-08-19-daily-summary-replace-wipe.md).
 - **Daily vs weekly windows — MEASURED, reshapes Q-505** (owner question, 2026-08-19). *"The goal
   being x heart minutes per day… but you also gotta count for weekly targets. How handle this?"* —
   correct, and bigger than it looks. `DEFAULT_ZONE_MINUTES_GOAL = 22` is **WHO 150/week ÷ 7**.
@@ -201,8 +212,8 @@ completed 2026-08-18, and the zone-minutes / movement-per-hour coverage check 20
 is measured except **cardio**, which is deliberately skipped for lack of data (~13 run/treadmill
 sessions, newest 2026-07-24), not for lack of time.
 
-**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Twenty-two findings are open —
-Q-506…Q-527 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
+**Measured is not fixed.** Two changes have shipped (Q-500, Q-503). **Twenty-three findings are open —
+Q-506…Q-528 — all propose-only, none built.** They are Lane A's queue. Ranked by consequence:
 1. **Q-518** — the model-version stamp is erased within hours, which blocks the measurement
    infrastructure the rest depend on. One conflict-arm expression.
 2. **Q-517** — a maintenance below the owner's own BMR is one tap from becoming their calorie goal.
@@ -287,6 +298,9 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **`pg_stat_user_tables` is the one read here that is NOT row-scoped — use it to check whether a
+  table is empty.** Every `claude_ro` view shows the owner's rows only, so "0 rows" from one is
+  ambiguous. The system-wide counter is what turned an ambiguous empty view into Q-528.
 - **Check a goal's WINDOW against its source, not just its value.** A weekly guideline divided by
   seven is a different guideline. `zoneMinutesGoal = 22` is WHO 150/week ÷ 7 and had been read as a
   daily target for months. The strength lane in the same file already does this correctly, which is
