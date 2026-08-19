@@ -10,7 +10,7 @@ import { mealLabelFigures } from '@trainingai/shared/nutrition/label-payload'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { useRovingRadioGroup } from '@/lib/hooks/use-roving-radio-group'
 import {
-  renderMealLabel, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, type MealLabelStyle,
+  renderMealLabel, MEAL_LABEL_STYLES, DEFAULT_MEAL_LABEL_STYLE, mealLabelStyleSpec, type MealLabelStyle,
 } from './meal-label-render'
 
 interface Props {
@@ -41,6 +41,7 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
   const [canvas, setCanvas] = useState<HTMLCanvasElement | null>(null)
   const [style, setStyle] = useState<MealLabelStyle>(DEFAULT_MEAL_LABEL_STYLE)
   const [metrics, setMetrics] = useState<{ moduleCount: number; codeMm: number; ingredientLines: number; ingredientOverflow: number } | null>(null)
+  const styleClaimsIngredients = mealLabelStyleSpec(style).ingredients === true
   const [busy, setBusy] = useState(false)
   const { groupProps, getRadioProps } = useRovingRadioGroup(true)
 
@@ -137,12 +138,24 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
             </p>
           )}
 
-          {metrics && metrics.ingredientLines > 0 && (
-            <p className="text-center text-[11px] leading-snug text-muted-foreground">
-              Printing <span className="font-semibold text-foreground">{metrics.ingredientLines} ingredient{metrics.ingredientLines === 1 ? '' : 's'}</span>
-              {metrics.ingredientOverflow > 0
-                ? <> — {metrics.ingredientOverflow} more {metrics.ingredientOverflow === 1 ? 'is' : 'are'} summarised on the label as “scan for the full list”.</>
-                : <> — the whole breakdown fits.</>}
+          {/* Gated on the STYLE claiming a breakdown, not on the count being above zero (Q-399).
+              The old `ingredientLines > 0` gate meant the one state worth reporting — a style that
+              promises the list and draws none — removed the line that would have said so, and the
+              default shipped that way for a release. Zero is now the loudest reading, not a silent
+              one. */}
+          {metrics && styleClaimsIngredients && (
+            <p
+              className={`text-center text-[11px] leading-snug ${metrics.ingredientLines === 0 ? 'font-semibold text-destructive' : 'text-muted-foreground'}`}
+              role={metrics.ingredientLines === 0 ? 'status' : undefined}
+            >
+              {metrics.ingredientLines === 0
+                ? <>No ingredients fit on this label — the layout has no room for the breakdown it promises. Pick another style, or report it.</>
+                : <>
+                    Printing <span className="font-semibold text-foreground">{metrics.ingredientLines} ingredient{metrics.ingredientLines === 1 ? '' : 's'}</span>
+                    {metrics.ingredientOverflow > 0
+                      ? <> — {metrics.ingredientOverflow} more {metrics.ingredientOverflow === 1 ? 'is' : 'are'} summarised on the label as “scan for the full list”.</>
+                      : <> — the whole breakdown fits.</>}
+                  </>}
             </p>
           )}
 

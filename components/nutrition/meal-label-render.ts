@@ -17,6 +17,22 @@ import { encodeMealLabelToken, fitIngredientLines, wrapIngredientRun, type MealL
 
 /** The sheet is 50 mm; these are its design units, not pixels. */
 const SHEET = 189
+/** Ingredient line height in the centred stack. Shared so the budget and the painter agree. */
+const STACK_LINE_H = 8
+/**
+ * Canvas scale. 6.24 makes a 50 mm label 1,179 px — **600 dpi**, doubled from the 3.12 (300 dpi)
+ * that shipped through v1.324.6.
+ *
+ * This is not a preview-quality tweak: the canvas IS the printed artwork, since the share/save path
+ * hands the viewer these exact pixels. At 300 dpi the default's module was **4.7 device pixels**
+ * with fractional, antialiased edges (see `drawCode`), and the E2E's decode of the rendered label
+ * became a coin flip — the same geometry decoded on one run and not the next. Doubling takes the
+ * module to 9.5 px, which is what made it decode reliably again, and it costs a 1.4 MP canvas.
+ *
+ * `band`, the tightest style, was already at 4.35 px per module before this and was never checked
+ * at 300 dpi against a real printer, so this is likely to have helped the owed print test too.
+ */
+const DEFAULT_RENDER_SCALE = 6.24
 /** Centred usable box — what fits inside the inscribed circle once the corners are given up. */
 const USABLE_W = 130
 const USABLE_H = 137
@@ -24,14 +40,22 @@ const USABLE_H = 137
 export type MealLabelStyle = 'inlineCentred' | 'band' | 'editorial' | 'ticket' | 'plaque' | 'square'
 
 export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: string; squareOnly?: boolean }[] = [
-  // B2 (Q-397), and the DEFAULT. Round-safe *and* carries the whole ingredient list, because the
-  // run wraps inline instead of stacking: five ingredients are three wrapped lines rather than five,
-  // and the height that gives back goes to the code. Its code is larger than the previous default's.
-  { value: 'inlineCentred', label: 'Ingredients · centred', note: 'The default. Name, calories, macros, the full ingredient list and the code, all centred. Fits a round or a square die.' },
-  { value: 'band', label: 'Black band', note: 'Reversed header. The default — and the tightest code.' },
-  { value: 'editorial', label: 'Editorial', note: 'The quietest of the four.' },
+  // B2 (Q-397), and the DEFAULT. Round-safe *and* carries the ingredient list, because the run wraps
+  // inline instead of stacking: five ingredients are three wrapped lines rather than five, and the
+  // height that gives back goes to the code, which is still larger than the previous default's.
+  //
+  // The copy says "as much of the ingredient list as fits", not "the full list" (Q-399). It draws
+  // three wrapped lines; anything past them is summarised on the label as "scan for the full list",
+  // and the sheet reports the exact split for the meal in hand. Promising the whole list is how a
+  // style that printed NONE of it went unnoticed for a release.
+  { value: 'inlineCentred', label: 'Ingredients · centred', note: 'The default. Name, calories, macros, as much of the ingredient list as fits, and the code — all centred. Fits a round or a square die.' },
+  // "The default" until v1.324.0 and still said so here through Q-397 and Q-399. It is not, and a
+  // picker that calls two styles the default is worse than one that names neither. Still the
+  // tightest code of the six at 0.369 mm per module, which is why it is the one to test-print first.
+  { value: 'band', label: 'Black band', note: 'Reversed header. The tightest code of the six — print this one first if you are checking a printer.' },
+  { value: 'editorial', label: 'Editorial', note: 'The quietest of the six.' },
   { value: 'ticket', label: 'Deli ticket', note: 'Monospaced, dashed rules.' },
-  { value: 'plaque', label: 'Plaque', note: 'Double ring, no write-on line — the largest code.' },
+  { value: 'plaque', label: 'Plaque', note: 'Double ring, no write-on line — the largest code that still fits a round die.' },
   // Q-393. Square-only, and the picker says so: this artwork uses the corners, so a round die crops
   // the ingredient list. That is the trade the owner accepted to get the breakdown printed.
   { value: 'square', label: 'Square · big code', note: 'Same list, but the code sits beside the calories, which makes it the largest and most scannable code of any style. SQUARE dies only.', squareOnly: true },
@@ -61,6 +85,47 @@ export function mealLabelCodeMetrics(style: MealLabelStyle): {
 
 export const DEFAULT_MEAL_LABEL_STYLE: MealLabelStyle = 'inlineCentred'
 
+/** Read-only view of a style's geometry, so tests can ask what a style claims without a canvas. */
+export function mealLabelStyleSpec(style: MealLabelStyle): Readonly<StyleSpec> {
+  return SPECS[style]
+}
+
+/**
+ * How many ingredient lines the centred stack can actually draw, from the geometry it actually
+ * draws — the one number Q-399 was wrong about.
+ *
+ * v1.324.6's `codeUnits` was reasoned against gaps the painter did not use, so the style promised
+ * the full breakdown and printed **zero lines**, silently, at every name length. Nothing failed:
+ * the renderer reported 0, the sheet's "Printing N ingredients" copy is gated on `> 0` so it simply
+ * vanished, and the picker went on claiming the list. The fix is not a better constant — it is that
+ * the constant and the painter now read the same four gaps, and a test asserts the promise.
+ *
+ * Pure and canvas-free on purpose: the painter needs a `CanvasRenderingContext2D` and both vitest
+ * projects are `environment: 'node'`, so arithmetic left inside the painter cannot be asserted at
+ * all. Same split as `fitIngredientLines`/`wrapIngredientRun`, for the same reason.
+ *
+ * `fitText` shrinking a long name only ever makes this larger, so the figure here is the floor.
+ */
+export function centredStackLineBudget(style: MealLabelStyle): {
+  headerUnits: number; codeTop: number; maxLines: number
+} {
+  const spec = SPECS[style]
+  const round = !spec.squareOnly
+  const L = round ? (SHEET - USABLE_H) / 2 : SQUARE_MARGIN
+  const bottom = round ? SHEET - (SHEET - USABLE_H) / 2 : SHEET - SQUARE_MARGIN
+  const [afterName, afterCalories, afterMacros, afterRule] = spec.stackGaps ?? [7, 6, 5, 8]
+
+  let y = L + 4
+  y += spec.nameSize + afterName
+  y += spec.caloriesSize + afterCalories
+  y += spec.macroSize + afterMacros
+  y += afterRule
+
+  const codeTop = bottom - (spec.writeOnLine ? 9 : 0) - spec.codeUnits
+  return { headerUnits: y, codeTop, maxLines: Math.max(0, Math.floor((codeTop - y - 2) / STACK_LINE_H)) }
+}
+
+
 /**
  * Per-style geometry. `codeUnits` is the code's drawn width in sheet units; at 50 mm a unit is
  * 50/189 mm, so band's 46 units is 12.2 mm — the tightest, which is why it is the one to test-print
@@ -79,6 +144,14 @@ interface StyleSpec {
   macroSize: number
   nameTracking: number
   uppercaseName: boolean
+  /**
+   * The four vertical gaps the `stack` painter draws, in sheet units: after the name, after the
+   * calories, after the macros, and after the rule. **These live here rather than as literals in
+   * the painter so `centredStackLineBudget` can see the same numbers**, which is the whole fix for
+   * Q-399: the shipped `codeUnits` was computed against a different set of gaps than the ones drawn,
+   * so it promised an ingredient list the layout had no room for and silently printed none.
+   */
+  stackGaps?: [number, number, number, number]
   /** Uses the corners — only safe on a square die, and the picker must say so. */
   squareOnly?: boolean
   /** Print the per-serving ingredient breakdown (Q-393). Needs the corners; square only. */
@@ -128,14 +201,30 @@ const SPECS: Record<MealLabelStyle, StyleSpec> = {
   // 58 units is what the stack can spare once name, calories, macros and five ingredient lines have
   // taken their height: (58/189)*50 / 33 = 0.465 mm per module. Smaller than `square`'s 0.561, and
   // still larger than every round style — the cost of reading top-to-bottom down the centre line.
-  // Round-safe: everything sits inside the 130 × 137 inscribed box. `codeUnits` is the whole drawn
-  // box including the quiet zone, so the SYMBOL is 66 × 25/33 = 50 units = 13.2 mm, i.e. 0.529 mm
-  // per module — against `band`'s 12.2 mm box, whose symbol is 9.2 mm at 0.369. No black band: it
-  // costs ~10 units over a plain centred name, and spending them here would put the code under what
-  // already ships (Q-397 measured that variant at 0.392 and says not to build it).
+  // Round-safe: everything sits inside the 130 × 137 inscribed box.
+  //
+  // **Q-399 rewrote these numbers, and the reason is the point.** v1.324.6 shipped codeUnits 66 with
+  // a taller header (calories 21, gaps 7/6/5/8), which consumed 96.5 of the 137 units before the
+  // list started and left `floor((97 − 96.5 − 2) / 8)` = **zero** ingredient lines — a style whose
+  // entire premise is the breakdown printed none, at any name length, and the picker still claimed
+  // "the full ingredient list". The budget had been computed against a different set of gaps than
+  // the painter drew.
+  //
+  // Q-399 concluded the stack could not carry the list AND a better code than `band`'s 0.369. At the
+  // shipped type sizes that is right: three lines forces codeUnits 42.5, i.e. 0.341. It is wrong at
+  // the type the mockup was actually drawn at. Giving back 3 units of calories height and 7 of gap
+  // takes the header from 96.5 units to 86.5 and buys **three lines at codeUnits 50, 0.401 mm per
+  // module** — above `band`'s 0.369, and ~7 ingredients once the run wraps inline. That is the trade
+  // resolved rather than dodged, and it is the whole margin: 52 units gives two lines, not three.
+  //
+  // The 50 is not a guess and not a second guess. `centredStackLineBudget` derives the line count
+  // from `stackGaps` — the same array the painter draws — and a test asserts the style draws the
+  // three lines its picker copy promises. Raising any of these five numbers without lowering
+  // `codeUnits` fails that test, which is exactly what did not happen in v1.324.6.
   inlineCentred: {
-    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 66, writeOnLine: false,
-    reversedHeader: false, rule: 'solid', nameSize: 12, caloriesSize: 21, macroSize: 7.5,
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 50, writeOnLine: false,
+    reversedHeader: false, rule: 'solid', nameSize: 12, caloriesSize: 18, macroSize: 7.5,
+    stackGaps: [5, 4, 4, 6],
     nameTracking: 0.02, uppercaseName: false, ingredients: true, layout: 'stack',
   },
 }
@@ -171,6 +260,23 @@ const SQUARE_MARGIN = 9
 const SQUARE_W = SHEET - SQUARE_MARGIN * 2   // 171
 
 /** Draw the code's modules into a box, quiet zone included inside it. */
+/**
+ * Draw the code, quiet zone included.
+ *
+ * **This is the only place a code is drawn.** The round painter carried a byte-identical copy of
+ * this arithmetic inline until Q-399, which is the "One Formula, One Place" bug class and is how a
+ * defect can sit in one copy and not the other.
+ *
+ * `scale` is the canvas scale, and it is here because the module grid is FRACTIONAL in device
+ * pixels for every style that ships — `box × scale / 33` is 4.35 px per module for `band`, 6.24 for
+ * the old default, none of them whole. Every module edge therefore lands mid-pixel and antialiases
+ * to grey; the `+0.04` bleed below papers over the resulting seams rather than removing them. That
+ * is tolerable when a module is 6 px and marginal when it is 4.7: at 0.401 mm per module the same
+ * label decoded on one run of `e2e/meal-label.spec.ts` and not the next. Raising the canvas scale
+ * is what fixed it here — see `DEFAULT_RENDER_SCALE`. Snapping the grid to whole device pixels is
+ * the better fix and is **Q-358**, deliberately not done in the same change because it shrinks the
+ * drawn box and every reported figure with it.
+ */
 function drawCode(
   ctx: CanvasRenderingContext2D,
   qr: { modules: { size: number; data: ArrayLike<number> } },
@@ -191,6 +297,7 @@ function drawCode(
       }
     }
   }
+
 }
 
 /**
@@ -341,6 +448,11 @@ function drawSquareCentredLabel(
   ctx.textAlign = 'center'
   ctx.fillStyle = INK
 
+  // The four gaps come from the spec, NOT from literals here — `centredStackLineBudget` reads the
+  // same array, and Q-399 is what happens when the two disagree (a style that promised the
+  // ingredient list and drew zero lines).
+  const [afterName, afterCalories, afterMacros, afterRule] = spec.stackGaps ?? [7, 6, 5, 8]
+
   let y = L + 4
 
   // --- name -------------------------------------------------------------------------------------
@@ -351,7 +463,7 @@ function drawSquareCentredLabel(
   y += nameSize
   ctx.fillText(name, cx, y)
   ctx.letterSpacing = '0em'
-  y += 7
+  y += afterName
 
   // --- calories, with KCAL on the same line so the number reads as one figure -------------------
   y += spec.caloriesSize
@@ -371,7 +483,7 @@ function drawSquareCentredLabel(
   ctx.fillText('KCAL', startX + numW + 3, y)
   ctx.letterSpacing = '0em'
   ctx.textAlign = 'center'
-  y += 6
+  y += afterCalories
 
   // --- macros -----------------------------------------------------------------------------------
   y += spec.macroSize
@@ -379,7 +491,7 @@ function drawSquareCentredLabel(
   ctx.letterSpacing = '0.06em'
   ctx.fillText(`P ${figures.proteinG}   C ${figures.carbsG}   F ${figures.fatG}`, cx, y)
   ctx.letterSpacing = '0em'
-  y += 5
+  y += afterMacros
 
   // --- rule + ingredients -----------------------------------------------------------------------
   ctx.strokeStyle = INK
@@ -388,7 +500,7 @@ function drawSquareCentredLabel(
   ctx.moveTo(cx - colWidth / 2 + 14, y)
   ctx.lineTo(cx + colWidth / 2 - 14, y)
   ctx.stroke()
-  y += 8
+  y += afterRule
 
   // The run wraps INLINE rather than stacking one ingredient per line (Q-397). That spends width,
   // which the label has going spare, instead of height, which the code needs — five ingredients
@@ -406,7 +518,7 @@ function drawSquareCentredLabel(
 
   const code = spec.codeUnits
   const codeTop = bottom - (spec.writeOnLine ? 9 : 0) - code
-  const lineH = 8
+  const lineH = STACK_LINE_H
   const maxLines = Math.max(0, Math.floor((codeTop - y - 2) / lineH))
 
   const run = wrapIngredientRun({ items: ingredients, charsPerLine, maxLines })
@@ -449,7 +561,7 @@ export interface RenderMealLabelOptions {
    * `oneServingItems`, so "200 g mince" is the amount in the calories printed beside it.
    */
   ingredients?: { name: string; weightG: number }[]
-  /** Sheet pixels per design unit. 3.12 ≈ 590 px ≈ 50 mm at 300 dpi. */
+  /** Sheet pixels per design unit. Defaults to `DEFAULT_RENDER_SCALE` — 6.24 ≈ 1,179 px ≈ 50 mm at 600 dpi. */
   scale?: number
 }
 
@@ -460,7 +572,7 @@ export interface RenderMealLabelOptions {
  */
 export async function renderMealLabel(
   canvas: HTMLCanvasElement,
-  { mealId, figures, style, ingredients, scale = 3.12 }: RenderMealLabelOptions,
+  { mealId, figures, style, ingredients, scale = DEFAULT_RENDER_SCALE }: RenderMealLabelOptions,
 ): Promise<{ moduleCount: number; codeMm: number; ingredientLines: number; ingredientOverflow: number }> {
   const spec = SPECS[style]
 
@@ -567,32 +679,13 @@ export async function renderMealLabel(
 
   // --- code -----------------------------------------------------------------------------------
   // The quiet zone is drawn, not assumed: the spec is 4 modules of clear white on every side, and a
-  // code butted against artwork is a code that will not scan.
+  // code butted against artwork is a code that will not scan. `drawCode` owns both that and the
+  // device-pixel snapping — this block used to be a byte-identical copy of it (Q-399).
   const codeW = spec.codeUnits
-  const quiet = 4
-  const cell = codeW / (moduleCount + quiet * 2)
   const codeX = cx - codeW / 2
   const bottomBlock = spec.writeOnLine ? codeW + 12 : codeW
   const codeY = top + USABLE_H - bottomBlock
-
-  ctx.fillStyle = PAPER
-  ctx.fillRect(codeX, codeY, codeW, codeW)
-  ctx.fillStyle = INK
-  const data = qr.modules.data
-  for (let r = 0; r < moduleCount; r++) {
-    for (let c = 0; c < moduleCount; c++) {
-      if (data[r * moduleCount + c]) {
-        ctx.fillRect(
-          codeX + (c + quiet) * cell,
-          codeY + (r + quiet) * cell,
-          // +0.04 closes the hairline seams antialiasing leaves between adjacent modules, which read
-          // as a lighter code and cost scan margin the design does not have.
-          cell + 0.04,
-          cell + 0.04,
-        )
-      }
-    }
-  }
+  drawCode(ctx, qr, codeX, codeY, codeW, INK, PAPER)
 
   // --- write-on line ---------------------------------------------------------------------------
   // A bare rule, no "MADE" label beside it (owner, 2026-08-17). Plaque has none, which is what buys

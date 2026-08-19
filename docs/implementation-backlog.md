@@ -297,73 +297,18 @@ The next eight entries are the nutrition cluster, **ordered by dependency rather
 Do not re-sort them numerically; the sequence is the point, and two of them block others.
 
 **Realistically today, and this is the honest split:**
-- **Achievable** — Q-399, Q-402 and Q-401 are small, self-contained and independent of the rework.
-  Together they fix the label, stop the Home widget freezing, and unify the two calorie budgets.
+- **Achievable** — Q-402 and Q-401 are small, self-contained and independent of the rework.
+  Together they stop the Home widget freezing and unify the two calorie budgets. (**Q-399 is done**,
+  v1.325.0 — the default label draws three ingredient lines at 0.401 mm per module, and the line
+  count is asserted rather than the code size alone.)
   Q-387's wiring is a shared-module change and can run in parallel in the other lane.
 - **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
   `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
   first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
   whatever else happens.
 
-**Parallel-safe:** Q-399, Q-402 and the Lane B half of Q-401 touch different files and can land in any
+**Parallel-safe:** Q-402 and the Lane B half of Q-401 touch different files and can land in any
 order. Everything else is sequential.
-
-### [nutrition] Q-399 — the new default label style can never print an ingredient line, at any name length
-
-- **Branch:** `fix/inline-centred-line-budget`
-- **Added:** 2026-08-18 · owner, on v1.324.6 with the style selected: *"I dont see the B2 default we
-  wanted... where is my b2 default? should of shipped?"* It **did** ship (Q-397, #105) and is
-  correctly the default and correctly selected. It just draws no ingredients.
-- **Lane B.** One constant in `components/nutrition/meal-label-render.ts`. No schema, no route.
-
-**Proven arithmetic, not a data problem.** `drawSquareCentredLabel` walks the column top-down and
-then asks how many 8-unit lines fit above the code:
-
-```
-L = (189 − 137) / 2 = 26        bottom = 189 − 26 = 163
-y  = 30 (L+4)
-  + nameSize(12) + 7            →  49
-  + caloriesSize(21) + 6        →  76
-  + macroSize(7.5) + 5          →  88.5
-  + rule gap(8)                 →  96.5
-codeTop  = 163 − 0 − codeUnits(66) = 97
-maxLines = floor((97 − 96.5 − 2) / 8) = floor(−0.19) → clamped to 0
-```
-
-**Zero lines, and it is not marginal — it is negative.** `fitText` shrinking a long name does not
-rescue it: at nameSize 12/10/8/6/**4** the answer is 0 every time, because the name contributes at
-most 12 of the 66.5 units consumed. For **one** line the code box must be **≤ 56.5 units**; it ships
-at **66**.
-
-**The tell was in the spec's own comment.** It reasons *"58 units is what the stack can spare once
-name, calories, macros and five ingredient lines have taken their height"* — and the value shipped is
-66. But 58 does not fit either (it yields 0 lines as well); the budget was computed against a
-different set of gaps than the ones drawn. **Do not simply set it to 58.**
-
-**Confirming symptom, visible in the owner's screenshot:** the sheet's *"Printing N ingredients"* line
-is absent. That copy is gated on `metrics.ingredientLines > 0`, so the renderer is already reporting
-0 — the plumbing works and is telling the truth. `savedMealToIngredients` is **not** the fault; the
-local store joins `food_items` and populates `foodItem`, and the per-portion calories on the label
-(208 kcal, P 32 C 8 F 5) prove the items resolved.
-
-**What to fix, in order of preference.**
-1. **Recompute the budget from the drawn gaps rather than guessing a constant.** Derive `codeUnits`
-   from the space actually left (`bottom − y − reserved lines × 8`) so the code takes what remains
-   after N lines, instead of a hardcoded box the layout cannot honour.
-2. If a fixed constant is kept, it must be **≤ 56.5 for one line, ≤ 40.5 for three** — and three is
-   what the style promises. 40.5 units is a 10.7 mm box, symbol ~8.1 mm, **~0.32 mm per module**,
-   which is *below* the 0.487 that `band` shipped with. **That is the real finding:** the centred
-   stack cannot carry the full list *and* a better code than the old default, so one of the two has
-   to give. The mockup that promised both was drawn at tighter type (6.5 px list, smaller headline,
-   smaller gaps) than the spec that shipped.
-3. **Whatever is chosen, the picker copy must match it.** "The full ingredient list" is currently
-   false, and a style that quietly prints fewer lines than it claims is how this was missed.
-
-- **Regression test, and it is cheap:** `meal-label-code-size.test.ts` already exists. Add a case
-  asserting `ingredientLines >= 1` for a two-ingredient meal in every style whose spec sets
-  `ingredients: true`. A style that claims a list and draws none should fail CI, not a test print.
-- **Verification:** the preview must show the ingredient run **and** the "Printing N ingredients"
-  line, then a physical print at 50 mm.
 
 ### [nutrition][app-shell] Q-402 — Home's energy-balance widget never refetches; only an app restart updates it
 
@@ -1027,8 +972,9 @@ directly — green on web, dead on the device, because the failing path is unrea
   button into a dead button that also lies in the log.
 - **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
   Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
-- **Related:** the label this saves is currently missing its ingredient list — **Q-399**. Fix that
-  first or the first file that lands in the gallery is the wrong artwork.
+- **Related:** the label this saves was missing its ingredient list — **Q-399, fixed 2026-08-19
+  (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
+  one the owner picked.
 
 ### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
 
@@ -1437,6 +1383,49 @@ directly — green on web, dead on the device, because the failing path is unrea
 - **Not verified:** the mismatch was measured with `date-fns-tz` directly, not by driving the app with
   a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
   but not Postgres's). The consequence at each call site is read from source.
+
+### [nutrition] Q-358 — every meal-label QR is drawn on a fractional pixel grid, so every module edge is grey
+
+- **Branch:** `fix/label-code-pixel-snap`
+- **Added:** 2026-08-19 · Lane B, found while fixing Q-399 ·
+  [`journal`](overview/entries/2026-08-19-label-line-budget.md)
+- **Placement:** low-mid. **Mitigated, not fixed**, and the mitigation is what makes it low: Q-399
+  doubled the canvas to 600 dpi, which took the default's module from 4.7 device pixels to 9.5 and
+  made the E2E decode reliable again. The grid is still fractional; there is just enough resolution
+  now that it does not matter. That is a margin, not a fix.
+- **What.** `drawCode` sizes a module as `box / 33` in sheet units and the canvas is scaled by a
+  constant, so the module width in device pixels is `box × scale / 33` — **fractional for every
+  style that ships**, at every scale tried:
+  ```
+  scale 3.12 (300 dpi)   band 4.35 px   inlineCentred 4.73   plaque 5.67   square 6.62
+  scale 6.24 (600 dpi)   band 8.70 px   inlineCentred 9.45   plaque 11.35  square 13.24
+  ```
+  Every module edge therefore lands mid-pixel and antialiases to grey. **The `+0.04` bleed in
+  `drawCode` is an acknowledgement of exactly this** — it papers over the resulting hairline seams
+  instead of removing them, and its own comment says the seams "read as a lighter code and cost scan
+  margin".
+- **How it showed up.** At 300 dpi and 0.401 mm per module, `e2e/meal-label.spec.ts`'s decode of the
+  **rendered canvas** became a coin flip — the same geometry decoded on one run and failed the next,
+  with the label visibly correct in the screenshot. That is the signature: not a broken code, a
+  fuzzy one.
+- **Why it matters beyond the test.** The canvas **is** the printed artwork — share/save hands the
+  viewer these pixels. A grey-edged module is exactly what ink spread then merges, which is the
+  failure mode the owed print test is looking for, and it would present as "the scanner doesn't
+  work".
+- **Fix shape:** snap the cell to a whole number of device pixels (`floor(box × scale / 33)`), snap
+  the origin to a pixel boundary too, and drop the `+0.04` — adjacent modules then abut exactly.
+  **The catch, and why it was not folded into Q-399:** flooring shrinks the drawn box, and at
+  300 dpi it shrank it a lot (a 50-unit box snapped to 42.3, pitch 0.401 → 0.339). Every reported
+  figure would then be wrong — `codeMm`, the sheet's mm-per-module line, and
+  `mealLabelCodeMetrics`, which is the number `meal-label-code-size.test.ts` asserts and the number
+  the owner reads before printing. **At 600 dpi the loss is much smaller** (9.45 → 9 px, ~5%), which
+  is the version worth building: snap, then make `mealLabelCodeMetrics` report the SNAPPED size so
+  the figure and the artwork agree.
+- **Verification:** run the E2E decode several times, not once — the tell is flakiness, not failure.
+  Then the physical print, which is the only real check and is already owed.
+- **Lane B owns this** (`components/nutrition/**`).
+- **Not verified:** the pixel counts are arithmetic from `scale` and `codeUnits`, not measured off a
+  rendered canvas. No print.
 
 ### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
 
@@ -2302,16 +2291,21 @@ moving *beside* the calories rather than under them.
   owner's actual suggestion was an **inline wrapping run**, which spends width instead of height:
   five ingredients become three wrapped lines rather than five, and the height handed back goes to
   the code. The complete list now fits a **round** label with a code larger than the old default's.
-  **B2 — round-safe, inline, centred, complete list — is the new `DEFAULT_MEAL_LABEL_STYLE`**, at
-  0.529 mm per module against the old default's 0.369, both now asserted in
+  **B2 — round-safe, inline, centred — is the new `DEFAULT_MEAL_LABEL_STYLE`**, asserted in
   `components/nutrition/__tests__/meal-label-code-size.test.ts` per Q-397's verification note.
+  **Corrected 2026-08-19 (Q-399):** the "complete list at 0.529 mm per module" claimed here was
+  never printed. The shipped geometry left room for **zero** ingredient lines, and 0.529 was the
+  pitch of a code box the layout could not fit a list underneath. Retuned to **0.401 mm per module
+  with three wrapped lines** — still above the old default's 0.369, and now the *lines* are asserted
+  rather than only the code size.
   Option 2 as costed here is moot; the stacked square style stays in the picker.
 - **Still open:** **the stored default**, which stays blocked on **Q-392** exactly
   as this entry says — the style remains picked-at-print-time and nothing was persisted.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
   whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
   decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
-  now 0.529 and the old one measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
+  now **0.401** — 0.529 briefly, but that box left no room for the list, per Q-399 — and the old one
+  measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
   clear which labels are square-only rather than letting a round die silently crop the list.
 - **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
