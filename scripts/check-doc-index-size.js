@@ -838,7 +838,7 @@ const BASELINE = {
   // if it SCALES, the default module goes to 0.397, fractionally WORSE than the 0.401 it replaced.
   // A struck entry with no caveat would leave "the codes got bigger" as the record, which one print
   // could falsify.
-  'docs/implementation-backlog.md': 10619,
+  'docs/implementation-backlog.md': 10528,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

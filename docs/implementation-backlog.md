@@ -331,12 +331,8 @@ and the answers live in the entries rather than here:
 
 | decided | where it is written | build order |
 |---|---|---|
-<<<<<<< HEAD
 | Label styles all draw **square** | **✅ Q-411 SHIPPED 2026-08-19 (v1.325.5)** — [`journal`](overview/entries/2026-08-19-square-label-canvas.md) | done |
-=======
-| Label styles all draw **square** | **Q-411**, filed at the top of the queue | **1st — small, self-contained, retires a constraint** |
-| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **2nd — it is the gate on every print test** |
->>>>>>> origin/main
+| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **now 1st — it is the gate on every print test** |
 | Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
 | Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
 | Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
@@ -344,108 +340,21 @@ and the answers live in the entries rather than here:
 | The coach must **write every plan meal into My Foods** | Q-407, and it makes Q-398 a prerequisite | after Q-398 |
 
 **Two things carry a caveat rather than a blocker, and both resolve on the same physical print:**
-<<<<<<< HEAD
 Q-411 shipped the square canvas and every module grew (the default 0.401 → **0.561 mm**), **but that
 gain is only real if the owner's circle template CROPS rather than SCALES.** If it scales, the square
 lands at 50 ÷ √2 = 35.4 mm and the default falls to **0.397** — fractionally worse than what it
-replaced. Q-400's saved PNG also declares no physical size, so it prints at 312 mm. One print with a
-ruler answers both — **do Q-400's delivery fix first, then print once.** Until that print,
-**describe Q-411 as a simplification, not a scannability improvement.**
+replaced. Q-400's saved PNG also declares no physical size, so it prints at 312 mm.
+
+**That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19: *"I can only do a
+print once the option to save to gallery exists"*. There is no export path on the APK, so **Q-400 is
+the gate on three separate answers** and is now first in this queue. Until it lands, **describe
+Q-411 as a simplification, not a scannability improvement.**
 
 **Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
 `saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
 already stale when written. What remains of Q-406 is the row component itself, and it now waits on
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
-=======
-Q-411's area gain is real only if the owner's circle template *crops* rather than *scales* (the
-arithmetic is in that entry), and Q-400's saved PNG currently declares no physical size at all, so
-it prints at 312 mm. **That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19:
-*"I can only do a print once the option to save to gallery exists"*. There is no export path on the
-APK, so **Q-400 moved to 2nd in this queue** and is the gate on three separate answers. Ship Q-411
-anyway without waiting for it, and leave the scannability claim unverified rather than asserted.
-
-**Q-406 (`food-row.tsx`) is still the gate for the visual work** and has not moved: both landing
-files sit on the 800-line limit, and Q-395, Q-398 and the tab merge all want that component.
-
-### [nutrition] Q-411 — every label style draws on a square canvas; the round constraint was costing 64% of the area
-
-- **Branch:** `feat/square-label-canvas`
-- **Added:** 2026-08-19 · owner, reviewing the interactive prototype · **top of the queue at the
-  owner's instruction**
-- **Owner's words:** *"could we just have this as a generic square? it will auto fit in the circle
-  template when I need to print it - so they could all start as squares."*
-- **Lane B** (`components/nutrition/meal-label-render.ts` + `meal-label-sheet.tsx`). No schema, no
-  migration, no APK — this is canvas geometry and ships on a Railway deploy.
-- **Do this before Q-395's row work if both are in flight**, not because it is bigger but because it
-  is small, self-contained, and it retires a constraint that three prior entries (Q-393, Q-397,
-  Q-399) each spent effort designing around.
-
-**The decision.** All six styles draw square. `squareOnly` disappears as a concept, the picker loses
-its `Square` badge, and the round die becomes a *print-time* consideration rather than a design
-constraint the renderer has to satisfy. **Draw no circle** — the owner saw a dashed round-die guide
-on the artwork and asked for it gone (*"dont have the circle background. Leave it for now"*). The
-label is a square with no circular framing, guide, or vignette; where the round die matters is at
-the printer, not on the canvas.
-
-**Why this is worth doing rather than merely allowed.** The renderer currently reserves a **centred
-usable box of 130 × 137** sheet units — *"what fits inside the inscribed circle once the corners are
-given up"* (`meal-label-render.ts:36-38`) — against a square box of **171 × 171**
-(`SQUARE_W`, `:260`). That is **17,810 against 29,241 square units, a 64% increase in usable area**,
-and the height it gives back goes to the code. Measured from the shipped `codeUnits` at 50 mm:
-
-| style | today | square | |
-|---|---|---|---|
-| `band` | 0.369 mm/module | 0.52 | the tightest, and the one that fails first |
-| `inlineCentred` (default) | 0.401 | **0.56** | **+40%** |
-| `ticket` | 0.417 | 0.61 | |
-| `editorial` | 0.481 | 0.59 | |
-| `plaque` | 0.520 | 0.68 | |
-| `square` | 0.561 | 0.72 | |
-
-Module size is the number that decides whether a printed code scans — at 300 dpi the E2E's decode of
-the default was *"a coin flip"* until the canvas scale was doubled. This buys the same kind of
-headroom a second time, for free, and `square`'s own code comment already made the argument:
-*"the most scannable code the feature has — which is the point of spending the corners."* The
-owner's message is that the corners were never actually being spent.
-
-**⚠ One measurement decides whether the gain is real, and it must be taken before anyone trusts the
-table above.** *"It will auto fit in the circle template"* has two possible meanings and they point
-opposite ways:
-- **The template CROPS the corners** (circle inscribed in a 50 mm square) → the artwork keeps 50 mm
-  of width and the module holds at **0.56 mm**. The table stands.
-- **The template SCALES the whole square to fit inside the circle** → the square lands at
-  50 ÷ √2 = **35.4 mm**, and the module falls to **0.397 mm** — *fractionally worse than the 0.401
-  it replaces.* Every gain above evaporates and the change is a small regression.
-
-**Resolve it with one test print — but that print is BLOCKED until Q-400 ships**, because there is
-no way to get the PNG off the device at all today (*"I can only do a print once the option to save
-to gallery exists"*). **This entry can and should still ship without it**: the square canvas is a
-simplification worth having either way, and holding a small self-contained change behind another
-lane's APK work helps nobody. Ship it, and leave the scannability claim unverified in the PR rather
-than asserting it. **It is the same print Q-400 already owes** (save the PNG,
-measure the code with a ruler against the `metrics.codeMm` figure the sheet displays). Until that
-print is done, **do not describe this entry as a scannability improvement** — describe it as a
-simplification that is *expected* to improve scannability. If the template turns out to scale rather
-than crop, the follow-up is to keep the square canvas anyway (it is simpler and the content still
-benefits) but design the critical content — name, calories, code — to sit inside the inscribed
-circle.
-
-**What it lets the other entries stop doing.** `centredStackLineBudget()` exists to clamp the
-ingredient stack into the inscribed circle, and Q-399 had to widen it to get three lines onto the
-default. On a square canvas that budget relaxes considerably — **re-derive it rather than leaving
-the round-era numbers in place**, or the extra area is reserved and never used. Keep the
-"as much of the ingredient list as fits" copy and the overflow summary: the list can still exceed
-the label, and Q-399's lesson was that a style silently printing *none* of it went unnoticed for a
-release.
-
-- **Verification.** `pnpm test` covers the geometry (`centredStackLineBudget` has regression tests
-  asserting `maxLines >= 3` for the default and `mmPerModule >= 0.36` — **both thresholds should be
-  raised** in this PR, since square makes them trivially true and a test that cannot fail is not a
-  test). Then re-run `e2e/meal-label.spec.ts`, which decodes the rendered code. **Neither proves the
-  print**, so the test print above is the acceptance criterion, and the PR should say plainly that
-  it was or was not done.
->>>>>>> origin/main
 
 ### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
 
