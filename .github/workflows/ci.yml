@@ -306,6 +306,9 @@ jobs:
       - name: Cache today-guards take the user's timezone
         run: node scripts/check-tz-aware-cache-guards.js
 
+      - name: Client "today" uses the user's timezone
+        run: node scripts/check-client-today-timezone.js
+
       - name: memo() call sites pass stable props
         run: node scripts/check-memo-prop-stability.js
 

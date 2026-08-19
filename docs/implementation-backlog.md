@@ -2386,6 +2386,21 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
 
+> **⚠️ Step 1 (the CI ratchet) is DONE — 2026-08-19, Lane A. What is left is step 2, the sweep, which
+> is Lane B's.** `scripts/check-client-today-timezone.js` is step 50 of 50 in Custom Rules, with a
+> shrink-only per-file baseline. A new bare call in any client file now fails CI, and a file that
+> improves must lower its baseline in the same PR.
+>
+> **Re-measured, and the headline count does not reproduce.** The script finds **78 bare calls across
+> 38 files** over **522 client files** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`,
+> `lib/stores/**`), not 100 of 125. The difference is the file set, not a fix — which is the entry's
+> own argument for a script: **do not hand-count this, run
+> `node scripts/check-client-today-timezone.js --print`**, which is the maintained list.
+>
+> The sweep order in the entry still stands (calendar today-marker → write paths → display), and so
+> does the warning not to make `todayInTz()`'s default throw or read a global.
+
+
 - **Branch:** `fix/client-today-uses-user-timezone`
 - **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
   [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
