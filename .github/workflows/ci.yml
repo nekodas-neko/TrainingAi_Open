@@ -297,6 +297,9 @@ jobs:
       - name: Request bodies are bounded before they are parsed
         run: node scripts/check-bounded-request-body.js
 
+      - name: Dynamic route path params are validated as UUIDs
+        run: node scripts/check-dynamic-route-uuid-guard.js
+
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 

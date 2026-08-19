@@ -39,11 +39,20 @@ second copy. Same for zone thresholds.
 
 - [`docs/reviews/2026-08-18-hr-rest-threshold-calibration.md`](../../reviews/2026-08-18-hr-rest-threshold-calibration.md) — **first calibration review of this pillar, 2026-08-18** (Q-515 — `HR_REST_THRESHOLD` is the rest/active boundary shared by Body Battery and the Activity Score, and its charge window collapsed **26.5% → 8.2%** of waking samples in one month. **Every input was correct**: a genuine fitness gain plus `resolveHrProfile` maturing `hr_max` from the age formula to an observed ceiling. The trap is a rate difference — resting HR fell 8.5 bpm while waking HR fell 4.2 — so a boundary pinned to resting moves twice as fast as the distribution it classifies. Sweeping the constant narrows the gap 3.2× → 1.4× but never closes it: **the anchoring is the defect, not the number**). **Part 2 / Q-516** — `PEAK_BANDS` is calibrated for a range strength training never reaches: observed set-peaks are **59–132**, so `150–169` and `170+` are **structurally unreachable**, `130–149` holds 2 episodes, and **72%** land in the `<110` band the spec de-emphasises — leaving **one usable bucket**. The de-emphasis is correct (`drop_60s` 3.0 below 110 vs 14.9 above), so re-banding recovers no hidden signal.
 
+- [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](../../reviews/2026-08-19-zone-minutes-move-hours-coverage.md) — **the two HR-derived Activity contributors, coverage-checked 2026-08-19**
+  (Q-522/Q-523 — the direct continuation of Q-515 and Q-516 above. Q-515's boundary problem, seen
+  from the Activity Score: at `HR_REST_THRESHOLD = 0.05` the rest boundary is **59.7 bpm** while the
+  owner's waking HR runs p50 **69** / p90 **88**, so **856 of 857 waking hours** count as "moved".
+  Q-516's banding problem, in a second consumer: `ZONE_DEFS` puts Zone 2 at **133 bpm** and only
+  **0.29%** of chest-strap samples reach it, so zone minutes are **0 on 53 of 59 days**. Also measures
+  the ring's sampling cadence — an exact **300 s**, against a `DEFAULT_MAX_GAP_SEC` of 120 whose own
+  comment says a ring samples ~1/min — which truncates **80.1%** of ring intervals.)
+
 ## Open issues
 
 ```bash
 grep -n '^### .*\[heart-rate\]' projectOverview.md   # 12 entries today
-grep -n '\[heart-rate\]' docs/implementation-backlog.md   # 2 queue items today
+grep -n '\[heart-rate\]' docs/implementation-backlog.md   # 4 queue items today (Q-522, Q-523 added)
 ```
 
 Live at the time of writing (2026-08-05):

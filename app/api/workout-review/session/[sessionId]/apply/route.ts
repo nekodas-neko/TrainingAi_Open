@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/types/ai-periodization'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 const ApplySchema = z.object({
   adjustments: z.array(z.object({
@@ -29,6 +30,8 @@ export async function POST(
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { sessionId: programSessionId } = await params
+  const badId = invalidUuidResponse(programSessionId)
+  if (badId) return badId
 
   let body: z.infer<typeof ApplySchema>
   try {

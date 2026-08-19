@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 /**
  * Record that the user has looked at the ~4-week check-in for this plan.
@@ -14,6 +15,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   const repo = await getRepository()
   const ok = await repo.markMealPlanReviewed(id, userId)
