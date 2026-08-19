@@ -14,14 +14,17 @@ import {
  */
 describe('meal label code size', () => {
   /**
-   * Raised 0.36 → 0.52 with Q-411's square canvas. A floor the whole set clears by a wide margin is
+   * Raised 0.36 → 0.49 with Q-411's square canvas. A floor the whole set clears by a wide margin is
    * not a floor: after the round constraint was retired the tightest style moved from 0.369 to
-   * 0.521, so the old number could no longer fail for any style and stopped being a test.
+   * 0.497, so the old number could no longer fail for any style and stopped being a test.
+   *
+   * 0.49 and not the 0.52 an area calculation suggests, because `codeUnits` is bounded by VERTICAL
+   * fit rather than by the area freed — see the note above `StyleSpec`.
    */
   it('every style has a code, and none is smaller than the tightest shipped one', () => {
     for (const s of MEAL_LABEL_STYLES) {
       const { mmPerModule } = mealLabelCodeMetrics(s.value)
-      expect(mmPerModule, `${s.value}`).toBeGreaterThanOrEqual(0.52)
+      expect(mmPerModule, `${s.value}`).toBeGreaterThanOrEqual(0.49)
     }
   })
 
@@ -36,7 +39,7 @@ describe('meal label code size', () => {
     expect(DEFAULT_MEAL_LABEL_STYLE).toBe('inlineCentred')
     expect(now).toBeGreaterThan(before)
     expect(now).toBeCloseTo(0.561, 3)
-    expect(before).toBeCloseTo(0.521, 3)
+    expect(before).toBeCloseTo(0.497, 3)
   })
 
   it('reports the symbol as 25/33 of the drawn box, since the quiet zone sits inside it', () => {

@@ -156,6 +156,17 @@ export function centredStackLineBudget(style: MealLabelStyle): {
  * first. `writeOnLine` is a bare rule the owner writes the date on: no label beside it, and plaque
  * carries none at all, which is what buys plaque the largest code.
  */
+/**
+ * ⚠ **`codeUnits` is bounded by VERTICAL fit, not by the area the square canvas freed.** Q-411's
+ * entry predicted a per-style table from the 64% area gain; taking those figures directly gave
+ * `editorial` and `ticket` **negative** clearance — the code drawn straight over the macro line —
+ * and put `plaque`'s code exactly on it. Only `plaque` failed CI, because it is one of the four
+ * styles whose rendered code the E2E decodes; the other two would have shipped broken.
+ *
+ * Each value below is the largest that leaves **6 units** between where the content stops and where
+ * the bottom-anchored code starts. Re-derive it if any of `caloriesSize`, `macroSize`, `rule` or
+ * `writeOnLine` changes — those four decide where the content ends.
+ */
 interface StyleSpec {
   fontVar: string
   fallback: string
@@ -192,22 +203,22 @@ interface StyleSpec {
 
 const SPECS: Record<MealLabelStyle, StyleSpec> = {
   band: {
-    fontVar: '--font-archivo', fallback: 'sans-serif', codeUnits: 65, writeOnLine: true,
+    fontVar: '--font-archivo', fallback: 'sans-serif', codeUnits: 62, writeOnLine: true,
     reversedHeader: true, rule: 'solid', nameSize: 11, caloriesSize: 25, macroSize: 8.5,
     nameTracking: 0.06, uppercaseName: true,
   },
   editorial: {
-    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 74, writeOnLine: true,
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 64, writeOnLine: true,
     reversedHeader: false, rule: 'solid', nameSize: 12, caloriesSize: 26, macroSize: 8.5,
     nameTracking: 0, uppercaseName: false,
   },
   ticket: {
-    fontVar: '--font-geist-mono', fallback: 'monospace', codeUnits: 76, writeOnLine: true,
+    fontVar: '--font-geist-mono', fallback: 'monospace', codeUnits: 67, writeOnLine: true,
     reversedHeader: false, rule: 'dashed', nameSize: 10.5, caloriesSize: 24, macroSize: 8,
     nameTracking: 0.04, uppercaseName: true,
   },
   plaque: {
-    fontVar: '--font-instrument-serif', fallback: 'serif', codeUnits: 85, writeOnLine: false,
+    fontVar: '--font-instrument-serif', fallback: 'serif', codeUnits: 79, writeOnLine: false,
     reversedHeader: false, rule: 'ring', nameSize: 13, caloriesSize: 27, macroSize: 8.5,
     nameTracking: 0.02, uppercaseName: false,
   },

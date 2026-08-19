@@ -25,11 +25,11 @@ Every style's code grew, and the default gained a line at the same time:
 
 | style | before | after |
 |---|---|---|
-| `band` — the tightest | 0.369 mm/module | **0.521** |
+| `band` — the tightest | 0.369 mm/module | **0.497** |
 | `inlineCentred` — the default | 0.401 | **0.561** |
-| `editorial` | 0.481 | 0.593 |
-| `ticket` | 0.417 | 0.609 |
-| `plaque` | 0.520 | 0.681 |
+| `editorial` | 0.481 | 0.513 |
+| `ticket` | 0.417 | 0.537 |
+| `plaque` | 0.520 | 0.633 |
 | `square` | 0.561 | 0.722 |
 
 The centred stack's header drops from 86.5 units to **69.5** (the margin falls from 26 to 9), so the
@@ -67,6 +67,27 @@ The picker copy stays *"as much of the ingredient list as fits"*, and the overfl
 A bigger canvas does not make the list finite, and Q-399's lesson was that a style silently printing
 **none** of it went unnoticed for a release.
 
+### These are smaller than the entry predicted, and the reason matters
+
+Q-411's entry derived a per-style table straight from the 64% area gain — `band` 0.52, `ticket` 0.61,
+`plaque` 0.68. **Taking those figures directly does not fit.** `codeUnits` is bounded by where the
+content stops, not by the area freed: the code is bottom-anchored while the name, calories, macros
+and rule flow down from the top, so the binding constraint is vertical clearance.
+
+Measured with the entry's numbers in place:
+
+```
+band       content ends 100.0   code starts 103.0   clearance   3.0
+editorial  content ends  98.0   code starts  94.0   clearance  -4.0   ← code drawn OVER the text
+ticket     content ends  95.0   code starts  92.0   clearance  -3.0   ← code drawn OVER the text
+plaque     content ends  95.0   code starts  95.0   clearance   0.0
+```
+
+**Two styles were drawing the code straight through the macro line.** Each value is now the largest
+that leaves 6 units of clearance, and a note above `StyleSpec` says to re-derive them if
+`caloriesSize`, `macroSize`, `rule` or `writeOnLine` changes, since those four decide where content
+ends. The gains are smaller than advertised and they are real.
+
 ## Plaque's rings broke, and the E2E caught it
 
 Growing every code was not free. `plaque`'s "double ring" was two concentric **circles** at radius
@@ -81,7 +102,10 @@ content by construction (the content box is inset 9; the frames sit at 5 and 8, 
 match the shape the label now is.
 
 Worth naming because it is the failure mode this change invites: enlarging every code moves content
-into space that decoration already occupied, and only one of the six styles draws decoration there.
+into space something else already occupied. **And the E2E only caught one of the three collisions** —
+it decodes four of the six styles, and `editorial` and `ticket`, both overlapping, are not among
+them. Those were found by modelling the vertical flow, not by a test. A guard that covers two thirds
+of the surface reports a third of the problem.
 
 ## What was NOT exercised
 
