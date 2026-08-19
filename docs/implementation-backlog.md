@@ -651,6 +651,43 @@ Worth reaching for only if the reassign proves harder than it looks.
   offline-first domain and the local mirror is where the sync half fails silently. Prove the reassign
   survives an app restart with the network off.
 
+### [platform] Q-360 — `goal-invalidation.spec.ts` depends on the seed's step data reaching today, and it does not
+
+- **Branch:** `fix/goal-invalidation-spec-seed`
+- **Added:** 2026-08-19 · Lane B, found while running the full E2E suite before merging Q-359 slice 4
+- **Placement:** low-mid. It is a **test-harness** fragility, not a product bug — but it is the shape
+  CLAUDE.md already has a rule about, and it costs a session's confidence every time it fires.
+
+**What happens.** `e2e/goal-invalidation.spec.ts:57` — *"a steps-goal edit reaches Health without a
+reload"* — writes the goal successfully (the PATCH is asserted `r.ok()`), then fails waiting for
+`/ 7,000` on Health's Progress panel. Measured 2026-08-19 against `origin/main` at `968516f` with an
+**unmodified checkout**, so it is not any open branch's doing.
+
+**Why.** The panel renders `steps / goal`, and the local database's most recent row carrying a
+`steps` value is **2026-08-17**; today's `body_metrics` row exists with `steps` NULL. With no steps
+figure there is nothing to draw the `/ 7,000` into, so the locator never appears. The test asserts a
+*goal* propagates but reads it off a line that only renders when there is a *step count*.
+
+**This is the rolling-window class CLAUDE.md already names**, one layer out: the rule there is *"a
+test may hardcode a timestamp only when BOTH sides of the comparison are fixed"*. Here neither side is
+hardcoded — but the fixture is a **static seed** and the assertion is against **today**, so the gap
+widens by one day per day until it breaks. `scripts/local-db/seed.sql` seeds a fixed window of
+history; CI reseeds the same fixed window onto whatever today is.
+
+**Two fixes, and the second is the one to take.**
+- Make the spec seed its own steps row for today before asserting. Local and cheap, but every
+  future Health-panel spec needs the same and they will each invent it.
+- **Make the seed relative to the run date** — generate `body_metrics`/`sleep_sessions` dates as
+  offsets from `current_date` rather than as literals. That fixes this spec and every other one that
+  quietly assumes recent data, and it is the same reasoning as deriving a fixture from the clock
+  instead of pinning it.
+- **Lane B owns the spec; the seed is `scripts/local-db/` and unlisted in §3** — claim it in the
+  baton before touching it, or hand the seed half to Lane A.
+- **Not verified:** whether this also fails in CI. CI has been green on `main`, which suggests the
+  hosted run either seeds differently or the panel renders for another reason there — **that
+  difference is the first thing to establish**, because "green in CI, red locally" is exactly the
+  shape that trains sessions to ignore a real failure.
+
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
 - **Branch:** `chore/adopt-use-cached-value`
@@ -737,12 +774,28 @@ Worth reaching for only if the reassign proves harder than it looks.
   - **So the can-bite group was two sites, not eight.** This slice converts one —
     `session-select-content`'s `more-user-profile`, which is load-bearing: two paths invalidate that
     key, so changing a display name or avatar left Home's greeting stale until an app restart.
-  - **One can-bite site remains**: session-select's `ta:oura-ble-synced` listener, which refetches
-    `sleep-sessions` on one event because nothing refetches it on invalidation. Same workaround
-    `home-day-timeline` carried, but it cannot be deleted the same way — that screen's sleep read is
-    a `[userId]` effect with a local-first store seed and a `fetchWithRetry` wrapper, so moving it to
-    `useCachedValue` is a genuine state refactor. **That is the one remaining shell-level item, and
-    it wants its own PR.** The other 13 sites unmount and are latent.
+  - ~~One can-bite site remains.~~ **Done in slice 4.**
+- **✅ SLICE 4 SHIPPED 2026-08-19 (v1.325.9) — the can-bite group is now ZERO.**
+  [`Journal`](overview/entries/2026-08-19-invalidation-refetch-hook.md). **12 sites across 10 files
+  remain and every one of them unmounts on navigate**, so what is left is latent by definition. The
+  shell-level half of this entry is finished.
+  - **A second hook was needed and is the reusable part**: `lib/hooks/use-invalidation-refetch.ts`.
+    `useCachedValue` replaces a read outright — it holds, seeds and fetches the value — which does
+    not fit a read that also seeds from the local SQLite store, wraps its fetch in `fetchWithRetry`,
+    or sets several pieces of state. `useInvalidationRefetch(keys, fn)` gives such a read the half it
+    does need: something asks for a new value when a write clears the old one.
+  - **The real bug it fixed, beyond the ratchet**: three screens listened for `ta:oura-ble-synced`
+    and refetched. `sleep-sessions` is also cleared by `invalidateBiometrics`, so a manually-edited
+    sleep row or a Health Connect ingest left all three stale until a remount — only the BLE path
+    self-healed, because it was the only writer that dispatched an event. All three converted
+    together per the sibling-surface rule.
+  - **It coalesces, and the three-key call site needs that**: `invalidateCache` fires once per key,
+    so a group clearing all of health-content's three would otherwise run its whole meta load three
+    times.
+- **What is left of Q-359, for whoever takes it next.** Twelve latent sites, none urgent, and the
+  entry stays queued only for them. Judge any future addition by where the component is **mounted** —
+  grep for its name and check the renderer against `components/shell/tabs.ts`. That rule has been got
+  wrong three times in this Q's own history.
   - **The lesson is about the check, not the sweep:** a scanner's own baseline is evidence, and this
     one had never been checked against a hand count. The mutation check it shipped with proved it
     caught a *new* site; nothing proved the sites it already listed were real.

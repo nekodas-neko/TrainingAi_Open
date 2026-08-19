@@ -47,28 +47,25 @@ const BASELINE = {
   //     "deliberately fetch-once" category it justified had no members and is gone.
   //   · `workout-screen` (2) is `[userId]`-deps; `running-plan-content` was 3, not 4.
   //   · So the CAN-BITE group — the only one that is a live bug — was **two** sites, not the eight
-  //     the previous revision claimed, and this change converts one of them (`more-user-profile`),
-  //     leaving one. Totals here are therefore 14 across 12: the correction found 15, minus that.
+  //     the previous revision claimed. Both are now converted (`more-user-profile`, then the
+  //     `sleep-sessions` listener), which is why that group is empty below. Totals are 12 across 10:
+  //     the correction found 15, minus those two and sleep-content's, which went with them.
 
-  // ── CAN BITE: permanently mounted, so nothing ever remounts them to refetch. 1 site.
+  // ── CAN BITE: permanently mounted, so nothing ever remounts them to refetch. **0 sites.**
   //
-  // `components/shell/tab-shell.tsx` keeps all five tab contents mounted once visited, and the tab
-  // screens mount their sheets unconditionally (`<ActivityDetailSheet log={selectedActivity} />`),
-  // so "it's a sheet, it unmounts" is false here. Judge a site by where it is MOUNTED — grep for
-  // the component name and check the renderer against `components/shell/tabs.ts`, never by the
-  // directory the file sits in. That mistake produced two wrong groupings before this one.
+  // Emptied 2026-08-19. The last one was session-select's `ta:oura-ble-synced` listener refetching
+  // 'sleep-sessions'; it moved to `useInvalidationRefetch`, which subscribes to the invalidation
+  // rather than to one event, and so covers `invalidateBiometrics` as well.
   //
-  // The survivor is session-select's `ta:oura-ble-synced` listener, which refetches
-  // 'sleep-sessions' on one event because nothing refetches it on invalidation. It is the same
-  // workaround `home-day-timeline` carried, but it cannot be deleted the same way: that screen's
-  // sleep read is a `[userId]` effect with a local-first store seed and a retry wrapper, so moving
-  // it to `useCachedValue` is a state refactor and wants its own PR.
-  'app/session-select/session-select-content.tsx': 1,
+  // **Keep this group here even at zero** — it is where a new entry has to be justified, and the
+  // rule for judging one has been got wrong three times: judge a site by where it is MOUNTED, by
+  // grepping for the component name and checking its renderer against `components/shell/tabs.ts`.
+  // Not by the directory the file sits in, and not by whether it is called a sheet — the tab
+  // screens mount their sheets unconditionally with a null prop, so sheets do not unmount here.
 
   // ── Unmount on navigate or on a conditional render, so their next mount refetches. 13 sites
   // across 11 files.
   // Latent rather than broken, and some may never be worth converting.
-  'app/health/sleep/sleep-content.tsx': 1,                   // route
   'app/session-explain/session-explain-client.tsx': 1,       // route
   'components/coach/coach-history.tsx': 1,                   // route
   'components/activity/run-active-screen.tsx': 1,            // conditional inside its route

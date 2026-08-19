@@ -19,7 +19,13 @@ const LIMIT = 800;
 // unremarked commit at a time (which is how they reached these sizes).
 const BASELINE = {
   'components/workout-screen.tsx': 1850,
-  'app/session-select/session-select-content.tsx': 1456,
+  // Raised 2026-08-19 (Lane B, Q-359): 1456 -> 1458. The screen's `sleep-sessions` refetch moved
+  // off the `ta:oura-ble-synced` event onto `useInvalidationRefetch`, which covers every writer of
+  // that key rather than the one event that thought to dispatch — `invalidateBiometrics` clears it
+  // too, so an edited sleep row used to leave this screen stale until a remount. Two lines is the
+  // wrapper the hook call needs; the event listener it replaced is already down to its minimum
+  // (it still bumps `refreshTick` for the four gated effects, which are not cache reads).
+  'app/session-select/session-select-content.tsx': 1458,
   'components/config-screen.tsx': 997,
   // Raised 2026-08-18 (Lane B, Q-478): 911 -> 912. Net +1 after paying for what could be paid
   // for — the file's two `@/app/api/body-metadata/route` type imports were merged, reclaiming a
