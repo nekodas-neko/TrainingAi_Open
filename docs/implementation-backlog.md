@@ -396,6 +396,17 @@ directly — green on web, dead on the device, because the failing path is unrea
   (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
   one the owner picked.
 
+**A small one alongside it, and the owner has set the priority: the chosen label style does not
+persist.** `meal-label-sheet.tsx` holds it in `useState(DEFAULT_MEAL_LABEL_STYLE)` and never stores
+it, so every open resets to the default. The docstring calls that deliberate (*"picked at print time
+… cycling is the point anyway"*), which was right when there were four styles and no settled
+favourite. **The owner's own read, 2026-08-19:** *"I would make the image very rarely; happy for it
+to default to the default and I can change it whenever I want. Keep in mind I just save the image
+and reuse that. Happy for it to persist if its easy."* So: **do it only if it is genuinely a few
+lines** — a `localStorage`-backed initial value, no schema, no settings surface — and drop it
+otherwise. It is a papercut on a flow used a handful of times, and the label PNG is saved and reused
+externally, so the cost of re-picking is near zero. **Do not spend a migration on this.**
+
 **A second defect on the same button, found 2026-08-19 — the PNG has no physical size, so it prints
 at the wrong size even once it reaches the gallery.** The owner's ask is *"download in full res to
 print onto a label"*, and **the resolution half is already done**: `DEFAULT_RENDER_SCALE = 6.24`
@@ -509,6 +520,60 @@ supposed to tidy. **Land this first**, then Q-412 calls it.
   timezone regression test must not wait for the clock to reach the failing window, so pick an
   `Etc/GMT±N` that is near 01:00 *now* and run the case there. Then confirm end to end that a log
   created for yesterday from today's session stores yesterday's midpoint, not this morning.
+
+### [nutrition][health] Q-414 — energy in against energy out, on one timeline
+
+- **Branch:** `feat/energy-timeline-chart`
+- **Added:** 2026-08-19 · owner, once Q-413 made the timestamp mean something
+- **Owner's words:** *"This would just be a display of calorie intake over time? would be nice on a
+  graph like widget; could be superset with calorie out too; so can see what times energy is
+  expended vs refueled."*
+- **Lane B** (`components/**` + an aggregate GET, which is Lane A if a new route is needed — check
+  whether `day-timeline` can carry it before adding one).
+- **⚠ BLOCKED ON Q-413, and this is not a soft dependency.** `food_logs.logged_at` currently records
+  when the row was created, so a chart built today would plot **when the user reached for their
+  phone**, not when they ate. Every back-filled day would spike at whatever hour it was logged.
+  Q-413 makes the column mean what its name says; do that first or this graph is confidently wrong.
+
+**What it is.** One chart, x = time of day, two series:
+- **In** — calories eaten, from `food_logs` bucketed by the resolved `logged_at`.
+- **Out** — calories expended across the day.
+The point is the *relationship*: where refuelling sits against expenditure, so a 2,000 kcal day
+eaten entirely after 7 pm reads differently from the same total spread across it.
+
+**Design decisions to make before building — these are the real content of this entry.**
+1. **Which shape.** Intake is **discrete events** (four meals), expenditure is **continuous**. Do
+   not draw both as lines: a line through four meal points implies the user was eating at 10:30
+   because the segment passes through it. Recommendation: **bars for intake, a filled area or line
+   for expenditure**, same axis. That is the honest encoding of "events against a flow".
+2. **Cumulative or per-hour?** Both are defensible and they answer different questions. Per-hour
+   shows *when*; cumulative (two rising curves, the gap between them being the running balance) shows
+   *whether you are ahead or behind*, which is closer to what the owner already sees on the energy
+   bar. Recommendation: **cumulative**, because the gap between the curves is the day's energy
+   balance and this app already frames nutrition that way (Q-401 retired the second budget precisely
+   to have one number). Per-hour bars can be the intake series drawn against it.
+3. **Where "out" comes from, and it is not one source.** BMR accrues continuously (~1 kcal/min and
+   flat), movement is bursty. Decide whether the curve is BMR + measured movement (honest, and
+   already the app's model since Q-401) or measured only (misleading — it implies you burn nothing
+   sitting still). Recommendation: **BMR + movement**, drawn as one curve, with the method stated
+   under the chart. Do not invent a third TDEE model — Q-401 exists because there were two.
+4. **Resolution.** Movement data granularity decides this, not taste. Check what the step/activity
+   pipeline actually stores per interval before picking an hourly or 15-minute bucket; a chart
+   smoother than its data is a lie with a nice curve.
+
+**Where it lives.** The owner said *"graph like widget"*. Two candidates: the Nutrition tab under the
+existing energy bar, or the day-detail screen. Recommendation: **day detail**, and link to it from
+the energy bar — the Nutrition tab is already the densest screen in the app and Q-395 is trying to
+make it lighter, not heavier. A widget on the tab that opens the full chart is the compromise if the
+owner wants it visible.
+
+- **Per the repo's own rules:** chart colours resolve through `resolveColor`, never a `var(--x)`
+  string handed to canvas (that renders black and has shipped twice); the intake series uses the
+  shared `MACRO_COLORS` only if it is split by macro, otherwise a single accent; and the card seeds
+  from cache and uses `useCachedValue`, never a fetch-once effect (Q-402/Q-359).
+- **Verification.** Compare the chart's totals against the day's existing figures — the intake curve
+  must end exactly on the day's logged calories and the expenditure curve on the day's burn. A chart
+  that disagrees with the number above it is worse than no chart.
 
 ### [nutrition] Q-412 — "reassign them first" instructs the user to do something the app cannot do
 
@@ -1603,9 +1668,16 @@ cadence showing **`--`**.
 
 **Split this into three pieces, because they are not equally ready.**
 
-**1 — Speed. Ready now, small.** `useGuidedWalkStore` already holds `currentPaceSecPerKm`
-(`walk-active.tsx:35-36`) and the screen renders only `distanceKm`. The number the owner wants is
-in the store and simply is not on screen. **Decide the unit deliberately**: pace (`min/km`) is the
+**1 — Speed. ⚠ CORRECTED 2026-08-19 — pace IS already rendered, and the earlier wording here was
+misleading.** `walk-active.tsx:167-176` renders pace as **min/km** whenever `currentPaceSecPerKm`
+is non-null, and drops to an HR-primary layout when it is null (no GPS lock — indoor or treadmill).
+**The owner's screenshot was that fallback**, which is why no pace appeared; it is a GPS-lock
+situation, not a missing feature. An implementer reading the old sentence would have gone looking
+for an absent line and found it already there.
+**What is genuinely missing is the unit the owner asked for — km/h — and a step total.** That
+layout also carries a prior owner decision, recorded in its own comment: *"pace is the real
+fast/slow signal, HR drifts set-over-set and is only a secondary confirmation."* So the screen
+already has a primary-metric hierarchy, and cadence slots into it rather than replacing it. **Decide the unit deliberately**: pace (`min/km`) is the
 convention for running and is what the summary already computes (`computeAvgPaceSecPerKm`), while
 speed (`km/h`) is the more natural reading for a walk and is what the owner asked for by name.
 Recommendation: show **km/h** on the live screen, keep min/km in the summary where it sits beside
@@ -1672,6 +1744,15 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Do not silently fall back.** A user who thinks they are being paced by cadence and is actually
   being paced by HR will not understand why the prompt is late. The unit on the line is the tell,
   and it is already there.
+
+**Drawn 2026-08-19 — three states, and the layout follows from the fallback rule above.** Speed
+leads at 40 px; cadence and HR sit beneath it as a pair; the step total joins distance on one grey
+line; and the verdict gains a **progress bar against the cadence target**, so *"walk faster"* is a
+reading rather than a sentence. The degraded panel is the important one: cadence dims to `--`, HR
+takes the verdict back, and a single line says which signal is pacing and how to change it —
+*"No cadence source — pacing by heart rate. Wear the strap for step pacing."* Without that line the
+screen silently changes what it means. **`walk-active.tsx` is 224 lines**, so this fits without an
+extraction.
 
 - **Lane.** `components/guided-walk/**` is Lane B. Any ring octave correction is
   `packages/shared/src/health/cadence.ts` + the decoder, which is **Lane A**, and it is the harder
@@ -1743,9 +1824,44 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Why it cannot just be "throw everywhere":** a throw quarantines the mutation, and the poison-pill
   rule forbids retrying a validation failure forever. Twelve new dead-letter paths would trade an
   invisible failure for a queue of red badges over values the user cannot correct from a badge.
-- **Blocked on the owner** for the per-field call. The mechanism is built; only the policy is missing.
+- **✅ UNBLOCKED 2026-08-19 — the owner delegated the call** (*"Unsure how to continue on this. I
+  dont understand enough - happy for you to make the best guess on how to proceed"*), and the answer
+  is **none of the twelve should quarantine.** The two that throw are the two that should, and the
+  principle behind them is real rather than a coin flip:
+  - **Quarantine when the value IS the mutation.** `waterMlDelta` is an *increment* — drop it and
+    the user's add is gone with nothing left behind. A malformed `sleep_session` is meaningless
+    rather than incomplete. Both are "the payload has no residual value".
+  - **Coerce when the field is one independent observation among many.** Every `body_metrics`
+    column is a separate daily figure on a shared row; dropping an implausible HRV still leaves a
+    valid weight, step count and macro set on the same day. Twelve new dead-letter paths would
+    trade one invisible failure for a queue of red badges over values the user cannot correct from
+    a badge — which the entry above already argues, and which holds field by field.
+- **But the framing hid the better fix, and this is the part worth building.** Coerce-vs-quarantine
+  is the wrong axis. The one that matters is **whether the person can act on it**:
+  - **Device-sourced** (`hrvMs`, `spo2Pct`, `restingHr`, `steps`, `distanceKm` from the ring or
+    Health Connect) — the user cannot fix a bad reading. Silent coercion plus the `warnings[]` entry
+    Q-485 already emits is exactly right. **No change.**
+  - **User-typed** (`weightKg`, `bodyFatPct`, the six `measurementCm` fields, macros and calories
+    entered by hand) — the user *can* fix it, and dropping it three layers later is the actual
+    defect. **Measured 2026-08-19: `components/health/metric-log-sheet.tsx:60-96` writes to the
+    local store and queues the mutation with no bounds check at all**, and
+    `packages/shared/src/validation/body-metrics.ts` — which holds every threshold already — is
+    imported by nothing under `components/` or `app/`. A 5,000 kg weight is accepted by the sheet,
+    stored locally, queued, pushed, silently dropped server-side, and the number the user typed
+    never appears anywhere.
+  - **So the work is: import the existing validators into the log sheet, reject at the keyboard with
+    an inline message, and never queue the value.** No new thresholds, no new policy, no schema — the
+    bounds are already written and shared. That is a smaller change than twelve quarantine paths and
+    it fixes the case the user can actually do something about.
+- **One bug found while deciding this, worth fixing in the same PR:** `validStepsOrNull` uses
+  `Number.isInteger`, so a **fractional** step count is rejected outright rather than rounded. Any
+  decoder or estimator that produces `8000.5` loses the whole day's steps. Every sibling validator
+  takes `Number.isFinite` and rounds where it matters (`validRestingHrOrNull` does exactly that).
+  Round it.
 - **Related, and the natural client half:** nothing renders `warnings[]` yet. Surfacing it is
-  `components/**` (Lane B) and should follow whatever this decides, not precede it.
+  `components/**` (Lane B). With the decision above it is **lower value than it looked** — the
+  warnings that remain are all device-sourced and unactionable, so a badge would report noise the
+  user cannot clear. Worth doing only as a diagnostic surface, not a user-facing alert.
 
 ### [platform] Q-322 — 92 route files still read their body with bare `req.json()`; the ratchet holds the line
 

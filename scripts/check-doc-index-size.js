@@ -859,7 +859,7 @@ const BASELINE = {
   // record, which one print could falsify. Q-358's entry goes with it: it was built rather than
   // deferred because Q-411 resized every code and the fractional-grid flake it describes came
   // straight back, and a decode E2E that passes on a coin flip cannot gate the change that caused it.
-  'docs/implementation-backlog.md': 10670,
+  'docs/implementation-backlog.md': 10786,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
