@@ -619,6 +619,38 @@ quietly wrong". Backfill is deliberately **not** attempted: past days have no fl
 honest one, so the estimate starts from days marked after this ships and the counter shows that
 plainly.
 
+### [nutrition][app-shell] Q-406 — extract `food-row.tsx` first, so the rework has somewhere to land
+
+- **Branch:** `refactor/nutrition-food-row`
+- **Added:** 2026-08-18, split out of **Q-395** so it can start immediately and in parallel rather than
+  waiting for the rework's turn in the queue.
+- **Lane B.** Pure extraction — no behaviour change, no schema, no route.
+
+**Why this is its own entry.** Q-395 cannot start where it stands: both files it lands in are on the
+800-line ceiling (`app/nutrition/nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at
+**793**, neither grandfathered), so **one added line fails Custom Rules**. Every screen in the rework
+also needs the same row component. So the extraction is both the unblocker and the largest single
+chunk of shared work — and unlike the rest of Q-395 it needs no design decisions, which means it can
+run while the earlier queue items are still being worked.
+
+**What to build.** One component, `components/nutrition/food-row.tsx`, with the shape used by all six
+drawn screens: optional thumbnail · name · grey secondary line of *what and how much* · calories
+right-aligned in a fixed column · optional chevron. Props are **scalars**, not objects — the row
+renders inside `.map()` where hooks are unavailable, and an inline object literal at the call site
+silently defeats `React.memo` (`meal-macro-bars.tsx` is the reference this repo already keeps for
+exactly that reason).
+
+**Then convert the existing call sites, one per commit.** A food currently reads four different ways —
+diary, search, saved meal, builder. Converting them is what takes both landing files back under the
+line and makes the rest of Q-395 additive rather than blocked.
+
+- **⚠ Behaviour must not change in this entry.** It is an extraction. Any visual difference belongs to
+  Q-395, and mixing them makes the diff unreviewable and the regression unattributable.
+- **Done when:** `node scripts/check-component-size.js` reports both files under 800 with **no new
+  BASELINE rows** (the baseline is shrink-only — adding a row here would be the opposite of the point),
+  and the four call sites render identically to before.
+- **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
+
 ### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
 
 - **Branch:** `feat/nutrition-visual-uplift`
