@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.5",
+    date: "2026-08-19",
+    changes: [
+      "Meal labels are drawn as squares now, so the artwork uses the corners it was leaving empty for a round die \u2014 64% more room. Every style\u2019s scannable code is larger as a result, and the default style fits four lines of ingredients where it fitted three. The \u201csquare dies only\u201d warning is gone, since there is no longer a style that a round die treats differently.",
+    ],
+  },
+  {
     version: "1.325.4",
     date: "2026-08-19",
     changes: [

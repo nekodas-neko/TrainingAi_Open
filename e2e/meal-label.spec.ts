@@ -154,7 +154,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // one whose code is tightest, so a regression there matters most. "Square" is Q-393's ingredient
   // layout, which takes a different draw path entirely — it would be the easiest one to break
   // silently, since it is the only style that renders from a second data source.
-  for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Square · big code']) {
+  for (const style of ['Ingredients · centred', 'Black band', 'Editorial', 'Deli ticket', 'Plaque', 'Big code']) {
     await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
     await expect
       .poll(inkFraction, { message: `${style} should paint ink onto the canvas`, timeout: 20_000 })
@@ -168,7 +168,7 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
   // layout. It matters most for the two square styles, whose ingredient list is drawn directly above
   // the code — an earlier version of the centred layout ran the list into it, and a covered code
   // still looks like a code.
-  for (const style of ['Ingredients · centred', 'Black band', 'Plaque', 'Square · big code']) {
+  for (const style of ['Ingredients · centred', 'Black band', 'Plaque', 'Big code']) {
     await page.getByRole('radio', { name: new RegExp(escapeRe(style), 'i') }).click()
     await expect.poll(inkFraction, { timeout: 20_000 }).toBeGreaterThan(0.01)
 
@@ -195,12 +195,14 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
     'the square style must report what it drew and what it could not fit',
   ).toBeVisible({ timeout: 20_000 })
 
-  // The square style spends the corners, so a round die crops the list. The app has to say so
-  // rather than let that happen silently, and this is the assertion that keeps it saying so.
+  // Q-411 retired the round constraint: every style draws square now, so there is no longer a
+  // layout a round die would crop differently from the others and no warning to assert. The check
+  // that replaced it is the inverse — the warning must be GONE, or the app is telling the user
+  // about a distinction that no longer exists.
   await expect(
-    page.getByRole('status').filter({ hasText: /Square dies only/i }),
-    'a square-only layout must warn that a round die crops it',
-  ).toBeVisible()
+    page.getByText(/Square dies only/i),
+    'the square-only warning must not survive Q-411',
+  ).toHaveCount(0)
 
   // Q-399. The DEFAULT style promises the breakdown and, for one release, drew zero lines of it at
   // every name length — the arithmetic left no room. Nothing failed: the renderer returned 0 and the

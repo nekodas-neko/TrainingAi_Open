@@ -10,13 +10,17 @@ import { encodeMealLabelToken, fitIngredientLines, wrapIngredientRun, type MealL
  * absorb the metric change. Drawing with `ctx.fillText` uses the real document faces, which is what
  * makes the `next/font` self-hosting in `app/layout.tsx` actually do anything.
  *
- * **The die rotates between square and circular, so the inscribed circle is the binding
- * constraint** — the corners are unusable and everything is composed centred. All geometry below is
- * expressed against a 189 × 189 unit sheet with a centred 130 × 137 usable box, then scaled.
+ * **Every style draws SQUARE** (Q-411, owner's call). The round die is handled at the printer, not
+ * here: the artwork is a square with no circular framing, guide or vignette. All geometry below is
+ * expressed against a 189 × 189 unit sheet with a 171 × 171 usable box inset by a 9-unit margin,
+ * then scaled. The old 130 × 137 inscribed box — what survives a round crop — cost 64% of the area
+ * and is what Q-393, Q-397 and Q-399 each spent their effort designing around.
  */
 
 /** The sheet is 50 mm; these are its design units, not pixels. */
 const SHEET = 189
+const SQUARE_MARGIN = 9
+const SQUARE_W = SHEET - SQUARE_MARGIN * 2   // 171
 /** Ingredient line height in the centred stack. Shared so the budget and the painter agree. */
 const STACK_LINE_H = 8
 /**
@@ -33,32 +37,52 @@ const STACK_LINE_H = 8
  * at 300 dpi against a real printer, so this is likely to have helped the owed print test too.
  */
 const DEFAULT_RENDER_SCALE = 6.24
-/** Centred usable box — what fits inside the inscribed circle once the corners are given up. */
-const USABLE_W = 130
-const USABLE_H = 137
+/**
+ * The usable box. **Square, as of Q-411** — the owner's instruction, in their words: *"could we just
+ * have this as a generic square? it will auto fit in the circle template when I need to print it -
+ * so they could all start as squares."*
+ *
+ * It used to be a centred 130 × 137 — what fits inside the *inscribed circle* once the corners are
+ * given up — and that constraint is what Q-393, Q-397 and Q-399 each spent their effort designing
+ * around. 130 × 137 is 17,810 square units against 171 × 171's 29,241: the round assumption was
+ * costing **64% of the area**, and the height it gives back goes to the code.
+ *
+ * **The round die is now a print-time consideration, not a renderer constraint.** Nothing here
+ * draws a circle, a die guide or a vignette.
+ *
+ * ⚠ **The gain is expected, not proven.** *"It will auto fit in the circle template"* has two
+ * readings: if the template CROPS the corners the artwork keeps its 50 mm width and the numbers
+ * below hold; if it SCALES the square to fit inside the circle it lands at 50 ÷ √2 = 35.4 mm and
+ * every module shrinks by 29%. One test print settles it. Until then do not call this a
+ * scannability improvement.
+ */
+const USABLE_W = SQUARE_W
+const USABLE_H = SQUARE_W
 
 export type MealLabelStyle = 'inlineCentred' | 'band' | 'editorial' | 'ticket' | 'plaque' | 'square'
 
-export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: string; squareOnly?: boolean }[] = [
-  // B2 (Q-397), and the DEFAULT. Round-safe *and* carries the ingredient list, because the run wraps
-  // inline instead of stacking: five ingredients are three wrapped lines rather than five, and the
-  // height that gives back goes to the code, which is still larger than the previous default's.
+export const MEAL_LABEL_STYLES: { value: MealLabelStyle; label: string; note: string }[] = [
+  // B2 (Q-397), and the DEFAULT. Carries the ingredient list because the run wraps inline instead of
+  // stacking, which spends width — the label has it going spare — rather than height, which the code
+  // needs. On the square canvas it draws FOUR lines at a larger code than the three it managed on
+  // the inscribed box (Q-411).
   //
-  // The copy says "as much of the ingredient list as fits", not "the full list" (Q-399). It draws
-  // three wrapped lines; anything past them is summarised on the label as "scan for the full list",
-  // and the sheet reports the exact split for the meal in hand. Promising the whole list is how a
-  // style that printed NONE of it went unnoticed for a release.
-  { value: 'inlineCentred', label: 'Ingredients · centred', note: 'The default. Name, calories, macros, as much of the ingredient list as fits, and the code — all centred. Fits a round or a square die.' },
+  // The copy still says "as much of the ingredient list as fits", not "the full list" (Q-399), and
+  // that stays true on a bigger canvas: anything past the lines drawn is summarised on the label as
+  // "scan for the full list", and the sheet reports the exact split for the meal in hand. Promising
+  // the whole list is how a style that printed NONE of it went unnoticed for a release.
+  { value: 'inlineCentred', label: 'Ingredients · centred', note: 'The default. Name, calories, macros, as much of the ingredient list as fits, and the code — all centred.' },
   // "The default" until v1.324.0 and still said so here through Q-397 and Q-399. It is not, and a
   // picker that calls two styles the default is worse than one that names neither. Still the
-  // tightest code of the six at 0.369 mm per module, which is why it is the one to test-print first.
+  // tightest code of the six — 0.521 mm per module since Q-411 — which is why it is the one to
+  // test-print first.
   { value: 'band', label: 'Black band', note: 'Reversed header. The tightest code of the six — print this one first if you are checking a printer.' },
   { value: 'editorial', label: 'Editorial', note: 'The quietest of the six.' },
   { value: 'ticket', label: 'Deli ticket', note: 'Monospaced, dashed rules.' },
-  { value: 'plaque', label: 'Plaque', note: 'Double ring, no write-on line — the largest code that still fits a round die.' },
-  // Q-393. Square-only, and the picker says so: this artwork uses the corners, so a round die crops
-  // the ingredient list. That is the trade the owner accepted to get the breakdown printed.
-  { value: 'square', label: 'Square · big code', note: 'Same list, but the code sits beside the calories, which makes it the largest and most scannable code of any style. SQUARE dies only.', squareOnly: true },
+  { value: 'plaque', label: 'Plaque', note: 'Double ring, no write-on line — the second-largest code.' },
+  // Q-393, and since Q-411 it is no longer a special case — every style draws square, so this one is
+  // simply the layout that puts the code beside the calories rather than under them.
+  { value: 'square', label: 'Big code', note: 'The code sits beside the calories rather than under them, which makes it the largest of the six.' },
 ]
 
 // B2, per the owner's decision (Q-397): "Yes have B2 as the default". It is not merely a nicer
@@ -110,9 +134,9 @@ export function centredStackLineBudget(style: MealLabelStyle): {
   headerUnits: number; codeTop: number; maxLines: number
 } {
   const spec = SPECS[style]
-  const round = !spec.squareOnly
-  const L = round ? (SHEET - USABLE_H) / 2 : SQUARE_MARGIN
-  const bottom = round ? SHEET - (SHEET - USABLE_H) / 2 : SHEET - SQUARE_MARGIN
+  // Square for every style since Q-411; `squareOnly` no longer exists.
+  const L = SQUARE_MARGIN
+  const bottom = SHEET - SQUARE_MARGIN
   const [afterName, afterCalories, afterMacros, afterRule] = spec.stackGaps ?? [7, 6, 5, 8]
 
   let y = L + 4
@@ -152,9 +176,7 @@ interface StyleSpec {
    * so it promised an ingredient list the layout had no room for and silently printed none.
    */
   stackGaps?: [number, number, number, number]
-  /** Uses the corners — only safe on a square die, and the picker must say so. */
-  squareOnly?: boolean
-  /** Print the per-serving ingredient breakdown (Q-393). Needs the corners; square only. */
+  /** Print the per-serving ingredient breakdown (Q-393). */
   ingredients?: boolean
   /**
    * How the square layouts arrange themselves.
@@ -170,22 +192,22 @@ interface StyleSpec {
 
 const SPECS: Record<MealLabelStyle, StyleSpec> = {
   band: {
-    fontVar: '--font-archivo', fallback: 'sans-serif', codeUnits: 46, writeOnLine: true,
+    fontVar: '--font-archivo', fallback: 'sans-serif', codeUnits: 65, writeOnLine: true,
     reversedHeader: true, rule: 'solid', nameSize: 11, caloriesSize: 25, macroSize: 8.5,
     nameTracking: 0.06, uppercaseName: true,
   },
   editorial: {
-    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 50, writeOnLine: true,
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 74, writeOnLine: true,
     reversedHeader: false, rule: 'solid', nameSize: 12, caloriesSize: 26, macroSize: 8.5,
     nameTracking: 0, uppercaseName: false,
   },
   ticket: {
-    fontVar: '--font-geist-mono', fallback: 'monospace', codeUnits: 52, writeOnLine: true,
+    fontVar: '--font-geist-mono', fallback: 'monospace', codeUnits: 76, writeOnLine: true,
     reversedHeader: false, rule: 'dashed', nameSize: 10.5, caloriesSize: 24, macroSize: 8,
     nameTracking: 0.04, uppercaseName: true,
   },
   plaque: {
-    fontVar: '--font-instrument-serif', fallback: 'serif', codeUnits: 60, writeOnLine: false,
+    fontVar: '--font-instrument-serif', fallback: 'serif', codeUnits: 85, writeOnLine: false,
     reversedHeader: false, rule: 'ring', nameSize: 13, caloriesSize: 27, macroSize: 8.5,
     nameTracking: 0.02, uppercaseName: false,
   },
@@ -194,14 +216,13 @@ const SPECS: Record<MealLabelStyle, StyleSpec> = {
   // style is between 0.37 and 0.48 mm by the same measure, so this is the most scannable code the
   // feature has — which is the point of spending the corners.
   square: {
-    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 70, writeOnLine: true,
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 90, writeOnLine: true,
     reversedHeader: true, rule: 'solid', nameSize: 12, caloriesSize: 24, macroSize: 8,
-    nameTracking: 0.04, uppercaseName: true, squareOnly: true, ingredients: true, layout: 'beside',
+    nameTracking: 0.04, uppercaseName: true, ingredients: true, layout: 'beside',
   },
   // 58 units is what the stack can spare once name, calories, macros and five ingredient lines have
   // taken their height: (58/189)*50 / 33 = 0.465 mm per module. Smaller than `square`'s 0.561, and
   // still larger than every round style — the cost of reading top-to-bottom down the centre line.
-  // Round-safe: everything sits inside the 130 × 137 inscribed box.
   //
   // **Q-399 rewrote these numbers, and the reason is the point.** v1.324.6 shipped codeUnits 66 with
   // a taller header (calories 21, gaps 7/6/5/8), which consumed 96.5 of the 137 units before the
@@ -222,7 +243,7 @@ const SPECS: Record<MealLabelStyle, StyleSpec> = {
   // three lines its picker copy promises. Raising any of these five numbers without lowering
   // `codeUnits` fails that test, which is exactly what did not happen in v1.324.6.
   inlineCentred: {
-    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 50, writeOnLine: false,
+    fontVar: '--font-geist-sans', fallback: 'sans-serif', codeUnits: 70, writeOnLine: false,
     reversedHeader: false, rule: 'solid', nameSize: 12, caloriesSize: 18, macroSize: 7.5,
     stackGaps: [5, 4, 4, 6],
     nameTracking: 0.02, uppercaseName: false, ingredients: true, layout: 'stack',
@@ -255,9 +276,7 @@ function fitText(ctx: CanvasRenderingContext2D, text: string, family: string, we
 }
 
 
-/** Square usable box — the corners a round die would crop, which is what pays for the list. */
-const SQUARE_MARGIN = 9
-const SQUARE_W = SHEET - SQUARE_MARGIN * 2   // 171
+/** The usable box: the sheet inset by a uniform margin. Square for every style (Q-411). */
 
 /** Draw the code's modules into a box, quiet zone included inside it. */
 /**
@@ -440,11 +459,11 @@ function drawSquareCentredLabel(
 ): { ingredientLines: number; ingredientOverflow: number } {
   // Round-safe styles compose inside the inscribed 130 × 137 box; square-only ones may use the
   // corners. Same painter, different column — which is what lets B2 print on either die.
-  const round = !spec.squareOnly
-  const colWidth = round ? USABLE_W : SQUARE_W
-  const L = round ? (SHEET - USABLE_H) / 2 : SQUARE_MARGIN
+  // Square for every style since Q-411; `squareOnly` no longer exists.
+  const colWidth = SQUARE_W
+  const L = SQUARE_MARGIN
   const cx = SHEET / 2
-  const bottom = round ? SHEET - (SHEET - USABLE_H) / 2 : SHEET - SQUARE_MARGIN
+  const bottom = SHEET - SQUARE_MARGIN
   ctx.textAlign = 'center'
   ctx.fillStyle = INK
 
@@ -667,11 +686,17 @@ export async function renderMealLabel(
     ctx.setLineDash([])
     y += 7
   } else if (spec.rule === 'ring') {
+    // Plaque's double frame. It was two concentric CIRCLES until Q-411, which was coherent while the
+    // inscribed circle was the binding constraint and is not on a square canvas — and worse, it
+    // broke: with the code grown to 85 units the outer circle passed straight through the code's
+    // bottom edge (crossing at x ± 22.8 against a code spanning ± 42.5), and the E2E's decode of the
+    // rendered label failed on plaque alone. Two inset rounded rectangles frame the same way, clear
+    // the content by construction, and match the shape the label now is.
     ctx.strokeStyle = INK
     ctx.lineWidth = 0.6
-    for (const r of [SHEET / 2 - 6, SHEET / 2 - 9]) {
+    for (const inset of [5, 8]) {
       ctx.beginPath()
-      ctx.arc(cx, SHEET / 2, r, 0, Math.PI * 2)
+      ctx.roundRect(inset, inset, SHEET - inset * 2, SHEET - inset * 2, 6)
       ctx.stroke()
     }
     y += 3
