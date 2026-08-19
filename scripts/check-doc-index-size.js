@@ -915,6 +915,10 @@ const BASELINE = {
   // INTO Q-505 rather than sit in a review nobody opens before building. It also retires the
   // strengthFreq-ceiling framing added earlier the same day, and a superseded framing left
   // standing beside its replacement is worse than the extra lines.
+  // Raised 2026-08-19 (Lane A, Q-324): 10934 -> 10982. A new entry for the fresh-database test
+  // contention that reds CI intermittently. It is long for an entry because the reproduction is the
+  // valuable part — the failure cannot be reproduced by running `pnpm test` locally, so an entry
+  // that only named the symptom would send the next reader down the same dead end this one took.
   // Raised 2026-08-19 (Lane B, Q-359 slice 4): the can-bite group reached zero, and the added lines
   // are what stops the entry reading as finished when it is not — twelve latent sites stay queued,
   // and the second hook (`useInvalidationRefetch`) needs its existence and its reason recorded
@@ -924,7 +928,7 @@ const BASELINE = {
   // Health by reading a line that only renders when today has a step count, and the local seed's
   // steps stop three days back. Filed rather than fixed in the same PR because the durable fix is
   // in the seed, which no lane lists.
-  'docs/implementation-backlog.md': 11326,
+  'docs/implementation-backlog.md': 11374,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

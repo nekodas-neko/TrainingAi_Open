@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One activity type.
+const MAX_BODY_BYTES = 8 * 1024
 
 const ActivityTypeBody = z.object({
   label:           z.string().min(1).max(40),
@@ -36,7 +40,13 @@ export async function POST(req: NextRequest) {
     return adminErrorResponse(err)
   }
 
-  const body = ActivityTypeBody.safeParse(await req.json())
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const body = ActivityTypeBody.safeParse(read.body)
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const repo = await getRepository()
@@ -54,9 +64,18 @@ export async function PATCH(req: NextRequest) {
     return adminErrorResponse(err)
   }
 
-  const { id, ...rest } = await req.json()
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { id, ...rest } = (read.body ?? {}) as Record<string, unknown>
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
+  // Typed explicitly now the body is `unknown` rather than `any` — `id` went into the repository
+  // on a destructure alone.
+  if (typeof id !== 'string') return NextResponse.json({ error: 'id required' }, { status: 400 })
   const body = ActivityTypeBody.partial().safeParse(rest)
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
