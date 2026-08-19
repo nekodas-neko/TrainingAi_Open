@@ -19,7 +19,7 @@ const LIMIT = 800;
 // unremarked commit at a time (which is how they reached these sizes).
 const BASELINE = {
   'components/workout-screen.tsx': 1850,
-  'app/session-select/session-select-content.tsx': 1457,
+  'app/session-select/session-select-content.tsx': 1456,
   'components/config-screen.tsx': 997,
   // Raised 2026-08-18 (Lane B, Q-478): 911 -> 912. Net +1 after paying for what could be paid
   // for — the file's two `@/app/api/body-metadata/route` type imports were merged, reclaiming a
