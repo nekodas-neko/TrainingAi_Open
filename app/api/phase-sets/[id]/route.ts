@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { isNotFoundError } from '@trainingai/shared/errors'
-import { routeErrorResponse } from '@/lib/api/route-errors'
+import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
+import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import type { EditablePhase } from '@/components/config/phase-editor'
@@ -47,9 +47,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   } catch (e: unknown) {
     // Q-463: "Phase set not found" is a 404, not a 400. This verb and DELETE below answered the
     // SAME condition with two different wrong statuses — 400 here, 500 there.
-    if (isNotFoundError(e)) return routeErrorResponse(e)
-    const msg = e instanceof Error ? e.message : 'Unknown error'
-    return NextResponse.json({ error: msg }, { status: 400 })
+    if (!isRefusal(e)) reportServerError(e, { userId, url: '/api/phase-sets/[id]' })
+    return refusalResponse(e, 'Could not save that phase set')
   }
 }
 
@@ -63,11 +62,9 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
     await repo.deletePhaseSet(id, userId)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
-    // Checked BEFORE the substring mapping below, which is why this was a 500: "Phase set not found"
-    // matches neither 'default' nor 'In use', so it fell through to the else branch.
-    if (isNotFoundError(e)) return routeErrorResponse(e)
-    const msg = e instanceof Error ? e.message : 'Unknown error'
-    const status = msg.includes('default') ? 403 : msg.includes('In use') ? 400 : 500
-    return NextResponse.json({ error: msg }, { status })
+    // The status used to be matched out of the message text — `msg.includes('default')` fired on
+    // any error carrying the word. It now travels on the thrown UserFacingError (Q-320).
+    if (!isRefusal(e)) reportServerError(e, { userId, url: '/api/phase-sets/[id]' })
+    return refusalResponse(e, 'Could not delete that phase set')
   }
 }

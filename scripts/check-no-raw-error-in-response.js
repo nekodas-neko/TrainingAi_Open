@@ -18,13 +18,19 @@
 // This check bans the shape rather than the instance, because the instance was four copies of one
 // habit and the fifth would have been written the same way.
 //
-// **Deliberately narrow: `errorLog(...)` output only.** The first draft also flagged
-// `{ error: msg }` where `msg = e instanceof Error ? e.message : 'fallback'`, and it was RIGHT to —
-// a Drizzle error's `.message` *is* "Failed query: select …", so those 500s leak the same way. But
-// that is 14 sites across 8 files, several of which return a deliberate user-facing message on a
-// 4xx, and untangling which is which is a separate item, not a widening of this one. Filed as
-// **Q-320**. Do not broaden this check without doing that work — a check that fires on correct code
-// gets deleted rather than obeyed.
+// **Widened by Q-320 to the `e.message` shape as well.** A caught error's `.message` *is* "Failed
+// query: select …" for a Drizzle error, so `{ error: msg }` where `msg = e instanceof Error ?
+// e.message : 'fallback'` leaks identically. The reason this waited for its own item is that the
+// same variable served two habits: some sites echoed a message someone had **written for the user**
+// ("An exercise with that name already exists"), and untangling those from the accidental ones was
+// the work. It is done — the deliberate ones now throw `UserFacingError`
+// (`packages/shared/src/errors.ts`), which carries its own status, and every route answers with
+// `refusalResponse(err, fallback)` from `lib/api/route-errors.ts`. So this check can be strict
+// without firing on correct code, which is the only reason a check survives.
+//
+// Two of Q-320's 14 listed sites turned out not to be leaks at all. `admin/db-query` is exempt below
+// with its reason; `coach/apply/[id]/undo` needed nothing — its `detail` is an author-written literal
+// off a structured result, never a caught error, so the shape this check bans was never there.
 'use strict';
 const fs = require('fs');
 const path = require('path');
@@ -37,6 +43,18 @@ const RAW_IN_BODY = [
   // { error: errorLog(...) } — inlined
   /NextResponse\.json\(\s*\{[^}]*\berror:\s*errorLog\s*\(/g,
 ];
+
+// `const msg = e instanceof Error ? e.message : '…'` — the Q-320 shape. Any binding whose value is
+// a caught error's `.message`, however it is spelled.
+const MESSAGE_BINDING = /(?:const|let|var)\s+([A-Za-z_$][\w$]*)\s*=\s*[^\n;]*\binstanceof\s+Error\s*\?[^\n;]*\.message/g;
+
+// Routes where echoing the raw error is the product, not a leak. Each needs a written reason, the
+// same shape as check-api-no-store.js's one exemption. Do not add to this without one.
+const EXEMPT = new Map([
+  ['app/api/admin/db-query/route.ts',
+   'the admin SQL console — the DB error text (permission denied, syntax, timeout) IS the answer ' +
+   'the operator asked for, the route is admin-gated, and it already says so in a comment'],
+]);
 
 // The four-site shape was two statements, not one: `const errMsg = errorLog(...)` then
 // `{ error: errMsg }`. Catch the binding too, so re-adding it via a variable does not slip past.
@@ -69,11 +87,14 @@ function walk(dir) {
         failures.push({ rel, line: src.slice(0, m.index).split('\n').length, snippet: m[0].replace(/\s+/g, ' ').slice(0, 70) });
       }
     }
-    ERRORLOG_BINDING.lastIndex = 0;
-    for (const b of src.matchAll(ERRORLOG_BINDING)) {
-      const used = new RegExp(`NextResponse\\.json\\(\\s*\\{[^}]*\\berror:\\s*${b[1]}\\s*[,}]`);
-      const m = used.exec(src);
-      if (m) failures.push({ rel, line: src.slice(0, m.index).split('\n').length, snippet: `error: ${b[1]}  (bound from errorLog)` });
+    if (EXEMPT.has(rel)) continue;
+    for (const [re, label] of [[ERRORLOG_BINDING, 'errorLog'], [MESSAGE_BINDING, "a caught error's .message"]]) {
+      re.lastIndex = 0;
+      for (const b of src.matchAll(re)) {
+        const used = new RegExp(`NextResponse\\.json\\(\\s*\\{[^}]*\\berror:\\s*${b[1]}\\s*[,}]`);
+        const m = used.exec(src);
+        if (m) failures.push({ rel, line: src.slice(0, m.index).split('\n').length, snippet: `error: ${b[1]}  (bound from ${label})` });
+      }
     }
   }
 }
@@ -81,10 +102,12 @@ function walk(dir) {
 walk(path.join(root, 'app', 'api'));
 
 if (failures.length > 0) {
-  console.error('A route puts a raw error into its response body (Q-483).');
+  console.error('A route puts a raw error into its response body (Q-483, widened by Q-320).');
   console.error('With a Drizzle error that string is the whole failing statement, including every');
   console.error('column name. Return a fixed string — `{ error: \'Internal error\' }` — and keep the');
   console.error('detail in the log line and reportServerError, which already have it.');
+  console.error('If the message was WRITTEN for the user, throw UserFacingError instead and answer');
+  console.error('with refusalResponse(err, fallback) — it echoes that one and hides everything else.');
   for (const f of failures) console.error(`  ${f.rel}:${f.line}  ${f.snippet}`);
   process.exit(1);
 }

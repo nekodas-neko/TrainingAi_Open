@@ -1,5 +1,5 @@
 import { eq, and, or, desc } from 'drizzle-orm'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import type { Friendship, Season } from '@trainingai/shared/types/friends'
@@ -50,12 +50,12 @@ export async function sendFriendRequest(db: Db, requesterId: string, emailOrCode
     .where(or(eq(s.users.email, emailOrCode), eq(s.users.friendCode, upper)))
     .limit(1)
   if (!target) throw new NotFoundError('User')
-  if (target.id === requesterId) throw new Error('Cannot add yourself')
+  if (target.id === requesterId) throw new UserFacingError('Cannot add yourself')
   const [f] = await db.insert(s.friendships)
     .values({ requesterId, addresseeId: target.id, status: 'pending' })
     .onConflictDoNothing()
     .returning()
-  if (!f) throw new Error('Friend request already exists')
+  if (!f) throw new UserFacingError('Friend request already exists', 409)
   return rowToFriendship(f, target)
 }
 

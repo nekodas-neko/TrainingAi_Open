@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, inArray, gte, lt, asc, desc, sql, isNull } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -161,7 +161,7 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
         program.id ? sql`${s.programs.id} != ${program.id}` : undefined,
       ))
     if (nameClash) {
-      throw new Error(`A program named "${program.name}" already exists. Use a different name.`)
+      throw new UserFacingError(`A program named "${program.name}" already exists. Use a different name.`, 409)
     }
 
     let pRow: typeof s.programs.$inferSelect
@@ -512,7 +512,7 @@ export async function updatePhaseSet(
     .where(and(eq(s.phaseSets.id, phaseSetId), eq(s.phaseSets.userId, userId)))
     .limit(1)
   if (!existing) throw new NotFoundError('Phase set')
-  if (existing.isDefault) throw new Error('Default phase set cannot be modified')
+  if (existing.isDefault) throw new UserFacingError('Default phase set cannot be modified', 403)
 
   return db.transaction(async tx => {
     await tx.update(s.phaseSets).set({ name }).where(eq(s.phaseSets.id, phaseSetId))
@@ -538,7 +538,7 @@ export async function deletePhaseSet(db: Db, phaseSetId: string, userId: string)
     .where(and(eq(s.phaseSets.id, phaseSetId), eq(s.phaseSets.userId, userId)))
     .limit(1)
   if (!existing) throw new NotFoundError('Phase set')
-  if (existing.isDefault) throw new Error('Cannot delete the default phase set')
+  if (existing.isDefault) throw new UserFacingError('Cannot delete the default phase set', 403)
 
   // Scoped to the caller: an unscoped probe both blocked this user's delete on a stranger's
   // program and named that program in an error surfaced verbatim to the client (Q-129).
@@ -547,7 +547,7 @@ export async function deletePhaseSet(db: Db, phaseSetId: string, userId: string)
     .from(s.programs)
     .where(and(eq(s.programs.phaseSetId, phaseSetId), eq(s.programs.userId, userId)))
   if (using.length > 0) {
-    throw new Error(`In use by: ${using.map(p => p.name).join(', ')}`)
+    throw new UserFacingError(`In use by: ${using.map(p => p.name).join(', ')}`, 400)
   }
   await db.delete(s.phaseSets).where(eq(s.phaseSets.id, phaseSetId))
 }
