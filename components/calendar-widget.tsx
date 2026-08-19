@@ -1,16 +1,19 @@
 "use client";
 
-import { useEffect, useLayoutEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useDrag } from "@use-gesture/react";
 import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react";
 import { cn, localDateString, shortSessionName } from "@trainingai/shared/utils";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import type { ProgramSession } from "@trainingai/shared/types/program";
-import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { readLocalCalendarOverlay, mergeCalendarOverlay, EMPTY_OVERLAY, type CalendarData } from "@/lib/calendar/local-overlay";
 import { TTL_LONG, TTL_MEDIUM } from '@trainingai/shared/cache-ttl';
 
 const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+
+// Module-level so the no-program fallback keeps one identity across renders.
+const EMPTY_SESSIONS: ProgramSession[] = [];
 
 // Stable color index for sessions not found in the active program (e.g. old ad-hoc entries)
 function stableIndex(name: string): number {
@@ -28,37 +31,25 @@ interface CalendarWidgetProps {
 export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
   const [viewYear, setViewYear] = useState(() => new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(() => new Date().getMonth() + 1);
-  const [data, setData] = useState<{ trainedDays: Record<string, string[]>; activityDays: Record<string, string[]> } | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [programSessions, setProgramSessions] = useState<ProgramSession[]>([]);
+  const mm = String(viewMonth).padStart(2, '0');
 
-  useLayoutEffect(() => {
-    const cached = readCacheSync<{ program?: { sessions?: ProgramSession[] } }>('workout-data:meta');
-    if (cached?.program?.sessions?.length) setProgramSessions(cached.program.sessions);
-  }, []);
+  const meta = useCachedValue<{ program?: { sessions?: ProgramSession[] } }>(
+    'workout-data:meta', '/api/workout-data?tab=meta', TTL_LONG,
+  );
+  const programSessions = meta?.program?.sessions ?? EMPTY_SESSIONS;
 
-  useEffect(() => {
-    cachedFetch<{ program?: { sessions?: ProgramSession[] } }>(
-      'workout-data:meta', '/api/workout-data?tab=meta', TTL_LONG,
-      (d) => { if (d?.program?.sessions?.length) setProgramSessions(d.program.sessions); },
-    ).catch(() => {});
-  }, []);
-
-  useLayoutEffect(() => {
-    const mm = String(viewMonth).padStart(2, '0');
-    const cached = readCacheSync<{ trainedDays: Record<string, string[]>; activityDays: Record<string, string[]> }>(`calendar-data:${viewYear}-${mm}`);
-    if (cached) { setData(cached); setLoading(false); }
-  }, [viewYear, viewMonth]);
-
-  useEffect(() => {
-    const mm = String(viewMonth).padStart(2, '0');
-    cachedFetch<{ trainedDays: Record<string, string[]>; activityDays: Record<string, string[]> }>(
-      `calendar-data:${viewYear}-${mm}`,
-      `/api/calendar-data?year=${viewYear}&month=${viewMonth}`,
-      TTL_MEDIUM,
-      (d) => { setData(d); setLoading(false); },
-    ).catch(() => {}).finally(() => setLoading(false));
-  }, [viewYear, viewMonth]);
+  // `settled` is what `loading` always meant here: it was set false on success AND on failure and
+  // never set back to true, so it only ever dimmed the first paint. Kept rather than replaced with
+  // `data === null`, which would leave the grid dimmed forever after a failed fetch.
+  const [settled, setSettled] = useState(false);
+  const data = useCachedValue<{ trainedDays: Record<string, string[]>; activityDays: Record<string, string[]> }>(
+    `calendar-data:${viewYear}-${mm}`,
+    `/api/calendar-data?year=${viewYear}&month=${viewMonth}`,
+    TTL_MEDIUM,
+    { onError: () => setSettled(true) },
+  );
+  useEffect(() => { if (data) setSettled(true); }, [data]);
+  const loading = !settled;
 
   // Days the device knows about but the server does not yet — an activity or workout saved while
   // offline, or one whose push has not landed. Cached separately from the server payload so a
@@ -112,7 +103,6 @@ export function CalendarWidget({ onDayClick, userId }: CalendarWidgetProps) {
   const daysInMonth = new Date(viewYear, viewMonth, 0).getDate();
   const startOffset = (firstDayOfWeek + 6) % 7;
   const totalCells = Math.ceil((startOffset + daysInMonth) / 7) * 7;
-  const mm = String(viewMonth).padStart(2, "0");
   const monthLabel = new Date(viewYear, viewMonth - 1, 1).toLocaleDateString("en-AU", {
     month: "long",
     year: "numeric",

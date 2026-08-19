@@ -694,9 +694,36 @@ Worth reaching for only if the reassign proves harder than it looks.
   **`useCachedValue` gained an `onError` callback** in the same change, because the first real
   conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
   card without it cannot tell "no data" from "the request failed".
+- **✅ SLICE 1 SHIPPED 2026-08-19 (v1.325.6) — six leaf-card files, 36 → 29.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-1.md). Converted: `home-day-timeline`
+  (2), `calendar-widget` (its keyed `calendar-data:` effect too, which the ratchet does not count
+  because its deps are not `[]` but which goes stale the same way), `activity/exercise-detected-card`,
+  `health/hr-recovery-profile-card`, `health/strength-progress-card`, `cardio/trends-section`.
+  Three results worth carrying:
+  1. **`useCachedValue` gained a `today` option.** Without it the hook could only ever convert the
+     plain-`cachedFetch` half of the sweep, and the `cachedFetchToday` half would have had to
+     *switch variant* to adopt it — the exact drift the one-variant rule forbids.
+     `lib/hooks/__tests__/use-cached-value-today-agreement.test.ts` cross-checks every literal-key
+     hook call against `sync-provider`'s warm list, and is mutation-checked both ways.
+  2. **`home-day-timeline`'s bespoke `ta:oura-ble-synced` listener is gone.** Q-91 added it because
+     that widget never refetched after a BLE drain invalidated its key — Q-402's bug with a
+     hand-built workaround for one event. The invalidation signal covers every writer instead.
+     Safe because `cache-groups.test.ts` already asserts `invalidateOuraSync` clears that key.
+     **Three sibling listeners remain** (`session-select-content`, `health-content`,
+     `sleep-content`) and should go the same way when those files are converted.
+  3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
+     19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
+- **⚠ Next slice: `lib/__tests__/q165-cache-seeded-reads.test.ts` will need updating.** It asserts
+  `readCacheSync<` and `cachedFetch<` appear literally in `activity/exercise-review-sheet.tsx`,
+  `activity/activity-detail-sheet.tsx` and `coach/coach-history.tsx` — all three of which are on the
+  remaining list. Converting them to the hook removes both strings and reds that test, which is the
+  test doing its job on a changed mechanism rather than a regression. Update it in the same PR.
 - **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
-- **Not verified:** static scan. **No screen was observed going stale** — the 36 are inferred from
-  the shape, and the one confirmed instance is Q-402's, which is fixed.
+- **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
+  are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's
+  six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
+  routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
+  fixture below, which still does not exist.
 - **A guard needs a fixture that does not exist, and this is the reusable part.** Q-402's fix could
   not be driven end to end because the seeded user has no `height_cm`/`date_of_birth`/`sex` (so the
   energy card shows "add your details") **and** `DEFAULT_CARD_WIDGETS` is empty, so Home renders no
