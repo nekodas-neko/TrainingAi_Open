@@ -61,8 +61,10 @@ const BASELINE = {
   'app/api/exercises/route.ts': 1,
   'app/api/fitness-tests/route.ts': 1,
   'app/api/generate-program/route.ts': 3,
-  'app/api/health-connect/ingest/route.ts': 1,
   'app/api/hr-ingest/route.ts': 1,
+  // Q-495 moved this schema out of the route so it could be unit-tested; the exemption moves with
+  // it, for the same reason as before — the Tasker payload's exact shape is not in this repo.
+  'packages/shared/src/validation/health-connect-ingest.ts': 1,
   'app/api/nutrition-goals/recommend/route.ts': 1,
   'app/api/nutrition/barcode/route.ts': 1,
   'app/api/nutrition/dietary-restrictions/route.ts': 1,

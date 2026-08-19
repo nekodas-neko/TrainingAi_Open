@@ -2108,6 +2108,33 @@ finding is **one lifter's 569 sets**. Only 8 of 117 AI insights were read closel
 requirements in Q-287/Q-288 are asserted from knowledge and should be re-checked against Google's
 current policy before building.
 
+### [sleep] 🔴 The sleep row's time range is time-in-bed but reads as time-asleep — the wake moment is stored and never shown (owner report, 2026-08-20)
+
+- **Owner report.** *"That wake up time is way off, I woke up around 6am"* — the row read
+  `9:52 pm – 6:44 am`. Then, once sync settled: *"it changed again… and it's still wrong."*
+- **The ring is right and the app already knows it.** Decoding the stored `sleep_phase_5_min`
+  (`'1'=deep '2'=light '3'=REM '4'=awake`, `packages/shared/src/health/hypnogram.ts`), the night's
+  last 8 epochs are `4` — **40 minutes awake at the end**. Session end **06:47** − 40 min puts the
+  **last sleep epoch at ≈ 06:07**, which is the owner's *"around 6am"* almost exactly.
+- **The defect is the label.** The row renders the **in-bed span** (8.92 h) in a position that reads
+  as the sleeping window, while the adjacent figure is time **asleep** (7.75 h) and 1.25 h is awake
+  (0.5 h onset latency, ~40 min lying awake at the end). **The wake moment the owner recognises is in
+  the stored hypnogram and surfaced nowhere.**
+- **Same root as Q-529, which was re-scoped to match (2026-08-20).** Q-529 originally read as a
+  missing recompute path; the score **does** recompute (47 → 55 at 06:54:41, after the session settled
+  at 06:51:03), so what remains there is a **~9-minute window where a provisional score renders as
+  final**. Both are the same defect wearing two hats: **a still-syncing night is displayed identically
+  to a settled one.** Both are Lane B.
+- **Suggested shape, not a spec:** label the range as time in bed, or show both (*"asleep until 6:07,
+  up at 6:47"*). Both numbers are already stored.
+- **Why a Known Issue and not a queue entry:** the Tuning Q band (500–529) is **exhausted** at Q-529,
+  and a number from another agent's band must not be taken. Give this one a number when the band
+  question is settled.
+- **Evidence:** [`docs/reviews/2026-08-20-sleep-score-computed-mid-sync.md`](docs/reviews/2026-08-20-sleep-score-computed-mid-sync.md) §5.
+- **Also observed, and benign:** the session grew across three reads that morning
+  (**4:52 → 6:44 → 6:47 am**, awake 1.17 → 1.25 h) — sync converging, not malfunctioning. It reads as
+  instability only because nothing marks a still-syncing night as provisional (see Q-529, Q-520).
+
 ### [sleep] ⚠️ Sleep Score recalibrated to use its range — the trend chart has an unmarked step (Q-503, v1.319.0, 2026-08-18)
 
 Sleep averaged **87.4 with 27 of 35 days ≥ 85** and no night between 40 and 69. Recalibrated

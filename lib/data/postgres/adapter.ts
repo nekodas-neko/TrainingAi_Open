@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { rejectMealImage, mealImageRejectionMessage } from '@trainingai/shared/nutrition/meal-image'
 import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
@@ -2380,10 +2381,18 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId)))
   }
 
-  async deleteActivityLog(userId: string, id: string): Promise<void> {
-    await this.db.update(s.activityLogs)
+  // Returns whether the (id, user) pair matched anything, so the route can stop reporting success
+  // for a delete that touched nothing (Q-556). The WHERE deliberately does NOT filter
+  // `deleted_at IS NULL`: a re-delete of a row you already deleted still matches and still reports
+  // `true`, which is what keeps the operation idempotent for a double-tap or a row already deleted
+  // on another device. `false` means genuinely absent or not yours — and those two stay
+  // indistinguishable, which is the enumeration property the review's control pass verified.
+  async deleteActivityLog(userId: string, id: string): Promise<boolean> {
+    const rows = await this.db.update(s.activityLogs)
       .set({ deletedAt: new Date(), updatedAt: new Date() })
       .where(and(eq(s.activityLogs.id, id), eq(s.activityLogs.userId, userId)))
+      .returning({ id: s.activityLogs.id })
+    return rows.length > 0
   }
 
   async saveFitnessTest(userId: string, test: Omit<FitnessTest, 'userId'>): Promise<FitnessTest> {
@@ -3361,8 +3370,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async listLatestMealTimes(userId: string, from: string, to: string) { return n.listLatestMealTimes(this.db, userId, from, to) }
   async listRecentFoodItemsForMealType(userId: string, mealTypeId: string, limit: number) { return n.listRecentFoodItemsForMealType(this.db, userId, mealTypeId, limit) }
   async listSavedMeals(userId: string) { return n.listSavedMeals(this.db, userId) }
-  async createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number) { return n.createSavedMeal(this.db, userId, name, items, id, servings) }
-  async updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number) { return n.updateSavedMeal(this.db, id, userId, name, items, servings) }
+  async createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null) { return n.createSavedMeal(this.db, userId, name, items, id, servings, imageDataUri) }
+  async updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null) { return n.updateSavedMeal(this.db, id, userId, name, items, servings, imageDataUri) }
   async deleteSavedMeal(id: string, userId: string) { return n.deleteSavedMeal(this.db, id, userId) }
   async getNutritionTargets(userId: string) { return n.getNutritionTargets(this.db, userId) }
   async upsertNutritionTargets(userId: string, data: Omit<NutritionTargets, 'id' | 'userId' | 'updatedAt'>) { return n.upsertNutritionTargets(this.db, userId, data) }
@@ -4173,13 +4182,42 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             // Mirrors the web route's default: an older client that predates `servings` sends
             // nothing, which must read as a single-portion meal rather than zero.
             const servings = typeof p.servings === 'number' && p.servings > 0 ? p.servings : 1
-            await this.createSavedMeal(userId, name, items, p.id, servings)
+            // Same cap as the web route, re-checked here rather than trusted: this is the offline
+            // replay path, and a client-side cap is not a cap (Q-396). `undefined` leaves a stored
+            // image alone; an explicit null removes it; anything oversized quarantines the mutation
+            // rather than wedging the queue behind it.
+            const rawImage = p.imageDataUri
+            let imageDataUri: string | null | undefined
+            if (rawImage === null) imageDataUri = null
+            else if (typeof rawImage === 'string') {
+              const reject = rejectMealImage(rawImage)
+              if (reject) {
+                errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: mealImageRejectionMessage(reject) })
+                continue
+              }
+              imageDataUri = rawImage
+            }
+            await this.createSavedMeal(userId, name, items, p.id, servings, imageDataUri)
           }
           processed++
         } else if (mut.domain === 'activity_logs') {
           const p = clean as Record<string, unknown>
           if (typeof p.id !== 'string') {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid activity_logs payload: missing id' })
+            continue
+          }
+          // Q-328. Delete was the one activity-log write with no outbox path, so it could not be
+          // made offline at all — the client bare-`fetch`ed and simply failed. Same `deleted` flag
+          // convention as `supplements` and `saved_meals` above, and the same repo function the web
+          // route calls, so the two write paths cannot drift.
+          //
+          // A miss is NOT an error here. `deleteActivityLog` returns false for a row that is absent
+          // or not yours, and quarantining on that would dead-letter the commonest benign replay —
+          // a delete re-sent because its confirmation never landed. The row is gone either way,
+          // which is what the mutation asked for.
+          if (p.deleted) {
+            await this.deleteActivityLog(userId, p.id)
+            processed++
             continue
           }
           // Validate against the same schema as the web route (SYNC-P3) — without

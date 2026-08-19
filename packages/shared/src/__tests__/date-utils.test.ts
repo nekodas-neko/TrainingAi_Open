@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { formatInTimeZone } from 'date-fns-tz'
-import { shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
+import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
 
 describe('ageFromDob', () => {
   const today = new Date('2026-07-22T00:00:00Z')
@@ -11,6 +11,34 @@ describe('ageFromDob', () => {
   it('returns null for a missing or invalid DOB', () => {
     expect(ageFromDob(null, today)).toBeNull()
     expect(ageFromDob('not-a-date', today)).toBeNull()
+  })
+})
+
+describe('isCalendarDate (Q-496)', () => {
+  // The shape regexes in the route schemas accept all three of these, and Postgres then refuses
+  // them as `[pg 22008]` — a client input error recorded as a server fault. Measured:
+  // `POST /api/day-checkin {"date":"2026-13-45"}` answered 500 and wrote an `error_events` row.
+  it('rejects a date-shaped string that is not a real day', () => {
+    expect(isCalendarDate('2026-13-45')).toBe(false)
+    expect(isCalendarDate('2026-02-31')).toBe(false)
+    expect(isCalendarDate('0000-00-00')).toBe(false)
+    expect(isCalendarDate('2026-00-10')).toBe(false)
+  })
+
+  it('accepts a real day in either separator, because the client emits slashes', () => {
+    expect(isCalendarDate('2026-08-17')).toBe(true)
+    expect(isCalendarDate('2026/08/17')).toBe(true)
+    expect(isCalendarDate('2024-02-29')).toBe(true)   // a real leap day
+  })
+
+  it('rejects the non-leap Feb 29 that Date would silently roll to March 1', () => {
+    expect(isCalendarDate('2026-02-29')).toBe(false)
+  })
+
+  it('rejects anything that is not date-shaped at all', () => {
+    expect(isCalendarDate('')).toBe(false)
+    expect(isCalendarDate('not-a-date')).toBe(false)
+    expect(isCalendarDate('2026-8-1')).toBe(false)
   })
 })
 
@@ -28,6 +56,23 @@ describe('shiftDateStr', () => {
   it('handles month boundaries', () => {
     expect(shiftDateStr('2026-01-31', 1)).toBe('2026-02-01')
     expect(shiftDateStr('2026-03-01', -1)).toBe('2026-02-28')
+  })
+
+  // Q-497. The year was the one field without width padding, so a year under 1000 emitted three
+  // digits — and '999-01-01' sorts BEFORE '1000-01-01', silently reordering any string comparison.
+  it('pads the year to four digits, so a low year still sorts correctly', () => {
+    expect(shiftDateStr('1000-01-01', -1)).toBe('0999-12-31')
+    expect(shiftDateStr('0999-12-31', 1)).toBe('1000-01-01')
+    expect(shiftDateStr('0999-12-31', 1) > shiftDateStr('1000-01-01', -1)).toBe(true)
+  })
+
+  // The other half of Q-497, pinned so nobody reads the padding above as making string comparison
+  // safe. It does not, and cannot: a 'YYYY-MM-DD' contract has no room for a five-digit year, and
+  // padStart is a no-op on one. This is why the two admin range loops iterate a validated day COUNT
+  // instead of `for (d = start; d <= end; …)` — that comparison ran ~29M times.
+  it('cannot keep a five-digit year orderable — the reason range loops must not compare strings', () => {
+    expect(shiftDateStr('9999-12-31', 1)).toBe('10000-01-01')
+    expect('10000-01-01' <= '9999-12-31').toBe(true)
   })
 
   it('handles year boundaries', () => {

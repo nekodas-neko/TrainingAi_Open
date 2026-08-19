@@ -74,6 +74,14 @@ canonical-display-source table in the same section).
   the app; `RPE_DEAD_BAND = 1.5`). **Fix the yardstick, not the rating** — a rank measure over the 6
   extreme nights, re-run after ~3 weeks of history under v1.319.0.
 
+- [`docs/reviews/2026-08-20-sleep-score-computed-mid-sync.md`](../../reviews/2026-08-20-sleep-score-computed-mid-sync.md) — **the sleep score is stamped before the night finishes arriving, 2026-08-20**
+  (Q-529, from an owner report). `computed_at` **06:45:56** against `sleep_sessions.updated_at`
+  **06:46:19** — the score predates its own input by **23 seconds** and did not recompute in the
+  following three minutes. The session self-healed (4:52 am → **6:44 am**, 6.5 h → **7.75 h**); the
+  score did not. **A near-twin night (08-17: 7.58 h, 90%, 35 m) scores 78 against this one's 47.**
+  Not a duplicate of Q-520 — that is a genuinely incomplete night, this is a complete night scored
+  against a partial copy of itself.
+
 ## Open issues
 
 - [`docs/reviews/2026-08-19-partial-night-manual-bedtime.md`](../../reviews/2026-08-19-partial-night-manual-bedtime.md) — **an owner report: the ring was not worn until 4 am, 2026-08-19** (Q-519/Q-520 — the night holds *wrong* duration data and *right* physiology, so neither deleting it nor keeping it as-is is correct. A 4:23 start drags the 14-day bedtime estimate **~23 minutes later**. Fix: manual bedtime writing **only `sleep_start`** at source `manual`, which the **per-field** health-source merge leaves the ring's duration/HRV/HR untouched by — safe *only* because `duration_hours`/`efficiency` are stored columns, not derived from the span).
