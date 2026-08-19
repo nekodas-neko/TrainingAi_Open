@@ -4,6 +4,10 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { computeWorkoutHr } from '@trainingai/shared/workout/compute-workout-hr'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A single tuning number (or a short note). The body is optional on all of these.
+const MAX_BODY_BYTES = 4 * 1024
 
 // Lever W backfill (review H-3) — admin-triggered, bounded, resumable. Materialises the durable
 // per-workout HR snapshot for completed sessions still inside the 180d oura_heartrate retention
@@ -28,8 +32,11 @@ export async function POST(req: Request) {
   }
 
   let maxRows = 200
-  const body = await req.json().catch(() => null)
-  const n = body?.maxRows
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+  }
+  const n = read.ok ? (read.body as { maxRows?: unknown } | null)?.maxRows : undefined
   if (typeof n === 'number' && Number.isFinite(n) && n > 0) maxRows = Math.min(Math.round(n), 2000)
 
   const repo = await getRepositoryAsync()
