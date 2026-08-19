@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A single tuning number (or a short note). The body is optional on all of these.
+const MAX_BODY_BYTES = 4 * 1024
 
 // Q-541 Task 4 — admin-triggered frame packing. Moves sealed buckets of raw BLE frames out of
 // `oura_raw_samples` and into one blob each in `oura_raw_packed`, deleting a hot row only after
@@ -47,7 +51,11 @@ export async function POST(req: Request) {
 
   let maxBuckets = DEFAULT_MAX_BUCKETS
   try {
-    const body = await req.json() as { maxBuckets?: unknown }
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok && read.reason === 'too_large') {
+      return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+    }
+    const body = read.ok ? (read.body as { maxBuckets?: unknown } | null) : null
     if (typeof body?.maxBuckets === 'number' && Number.isFinite(body.maxBuckets)) {
       maxBuckets = Math.min(Math.max(Math.floor(body.maxBuckets), 1), MAX_BUCKETS_CAP)
     }
