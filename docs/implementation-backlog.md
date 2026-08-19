@@ -2382,6 +2382,37 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
+> **⚠️ MEASURED against production 2026-08-19 — both named candidates are falsified. Read this before
+> starting; the entry below sends you at two dead ends.**
+>
+> Read through `POST /api/admin/db-query` (`pg_settings`, `pg_stat_activity`, `pg_stat_database`):
+>
+> | reading | value | what it means |
+> |---|---|---|
+> | `shared_buffers` | **128 MB** (16384 × 8 kB) | the Postgres **default**, not "sized for the container" — **candidate 1 is wrong** |
+> | cache hit ratio | **99.866%** (10,063,661 hits vs 13,485 disk reads) | 128 MB is *comfortably sufficient*; shrinking it is the wrong direction and growing it buys nothing |
+> | live backends on `railway` | **3** (2 app, 1 `claude_readonly` — mine) | not the "up to 12 backend processes" of **candidate 2** |
+> | `work_mem` | 4 MB | per-backend private memory is single-digit MB at this backend count |
+> | `max_connections` | **500** | against a ceiling of ~12 (`max: 10` + `PG_POOL_MAX=2`) |
+> | database size | **188 MB** | up from the entry's 171 MB, consistent with the ~0.4 MB/day trend |
+> | version | PostgreSQL **18.6** | |
+>
+> **The one over-provision visible from inside is `max_connections = 500`.** Postgres pre-allocates
+> per-connection shared structures at startup, so that is fixed cost paid at boot whether or not the
+> connections are used. Whether Railway's managed Postgres exposes it is an owner/console question,
+> not a code one.
+>
+> **⚠️ And the premise may not hold at all.** Most of a Postgres container's RSS on a ~190 MB database
+> is `shared_buffers` plus OS page cache — **reclaimable, not a leak**. The entry's own observation
+> that memory "grows as caches warm" describes exactly that. 0.79 GB may be near the floor for this
+> container rather than $7.87/month of waste, in which case there is nothing here to reclaim.
+>
+> **What this measurement cannot settle:** container RSS attribution. Railway's metric is the
+> authority and a sandbox cannot see it. **Before spending a session here, get the owner to confirm
+> the 0.79 GB steady state is still real** — the figure is from 2026-08-18, immediately after a volume
+> incident and restart, which the entry itself flags as the wrong moment to measure.
+
+
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1
 - **Branch:** `perf/postgres-memory-footprint`
 - **Added:** 2026-08-18 · **Lane A.** Largest single line item on the bill and near-zero risk.
