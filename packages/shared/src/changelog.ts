@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.8",
+    date: "2026-08-19",
+    changes: [
+      "Changing your display name or profile picture now updates the greeting and avatar on Home straight away, instead of waiting for the next app restart.",
+    ],
+  },
+  {
     version: "1.325.7",
     date: "2026-08-19",
     changes: [

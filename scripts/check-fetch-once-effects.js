@@ -33,38 +33,40 @@ const DIRS = ['app', 'components', 'lib'];
 // errors happened to cancel to within one. The count here is from the pattern below, which has been
 // mutation-checked in both directions.
 const BASELINE = {
-  // ── CAN BITE: permanently mounted. 8 sites, down from 19 (slice 1: six files; slice 2: four).
+  // **⚠ These numbers were rewritten on 2026-08-19 because the scanner above was over-counting,
+  // and the size of the error is the point: 25 sites across 16 files were really 15 across 12.**
+  // TEN of the twenty-five never existed — session-select 2, health-content 2, nutrition-content 2,
+  // workout-screen 2, sync-provider 1, running-plan-content 1. See the brace-matching loop for the
+  // mechanism; the consequence is recorded here because this list is what a session reads first.
   //
-  // What is left is only the tab-screen orchestrators. They are the hard ones and were left for
-  // last on purpose: each seeds four to eight keys inside one shared `useLayoutEffect` and feeds
-  // screen state that other effects also write, so a conversion there is a state refactor rather
-  // than a swap.
-  //
-  // **⚠ This grouping has now been wrong twice, and the second one is the more instructive.** The
-  // first correction was 14 → 19 (sheets do not unmount here). The second: `cardio/trends-section`
-  // was filed under "Health, via health-sections" and is not rendered there at all — its only
-  // renderer is `cardio/cardio-content.tsx`, and `/cardio` is NOT one of the five tabs in
-  // `components/shell/tabs.ts`, so it unmounts like any route. The can-bite group was 18, not 19.
-  // Converting it was still right, but the count was wrong. **Confirm a renderer by grepping for
-  // the component name and checking the result against `tabs.ts` — never by the directory a file
-  // sits in**, which is what produced both errors.
-  //
-  // `components/shell/tab-shell.tsx` keeps all five tab contents mounted once visited, and **the tab
-  // screens mount their sheets unconditionally** — `<ActivityDetailSheet log={selectedActivity} />`
-  // and `<ExerciseReviewSheet sessionId={reviewingSessionId} />` are rendered with a null prop, not
-  // behind a boolean. So "it's a sheet, it unmounts" is false here, and an earlier draft of this
-  // grouping got both of those wrong. Every entry below was checked by tracing its renderer up to a
-  // tab screen, not by where the file sits.
-  'app/session-select/session-select-content.tsx': 4,
-  'app/health/health-content.tsx': 2,
-  'app/nutrition/nutrition-content.tsx': 2,
+  // What the correction changed about the WORK, not just the count:
+  //   · `health-content` (2) and `nutrition-content` (2) had **no** fetch-once effect at all. Their
+  //     fetches live in tab-group `useCallback`s re-run on `tabEpoch` — which is the shape this rule
+  //     exists to steer people toward. They were on the "hard, do them last" list for nothing.
+  //   · `sync-provider` (1) likewise: its warm pass is a plain function, not an effect. The
+  //     "deliberately fetch-once" category it justified had no members and is gone.
+  //   · `workout-screen` (2) is `[userId]`-deps; `running-plan-content` was 3, not 4.
+  //   · So the CAN-BITE group — the only one that is a live bug — was **two** sites, not the eight
+  //     the previous revision claimed, and this change converts one of them (`more-user-profile`),
+  //     leaving one. Totals here are therefore 14 across 12: the correction found 15, minus that.
 
-  // ── Deliberately fetch-once. 1 site.
-  // `sync-provider` warms the cache on mount by design; it is not a reader, so converting it would
-  // add refetches nothing is waiting for.
-  'components/sync-provider.tsx': 1,
+  // ── CAN BITE: permanently mounted, so nothing ever remounts them to refetch. 1 site.
+  //
+  // `components/shell/tab-shell.tsx` keeps all five tab contents mounted once visited, and the tab
+  // screens mount their sheets unconditionally (`<ActivityDetailSheet log={selectedActivity} />`),
+  // so "it's a sheet, it unmounts" is false here. Judge a site by where it is MOUNTED — grep for
+  // the component name and check the renderer against `components/shell/tabs.ts`, never by the
+  // directory the file sits in. That mistake produced two wrong groupings before this one.
+  //
+  // The survivor is session-select's `ta:oura-ble-synced` listener, which refetches
+  // 'sleep-sessions' on one event because nothing refetches it on invalidation. It is the same
+  // workaround `home-day-timeline` carried, but it cannot be deleted the same way: that screen's
+  // sleep read is a `[userId]` effect with a local-first store seed and a retry wrapper, so moving
+  // it to `useCachedValue` is a state refactor and wants its own PR.
+  'app/session-select/session-select-content.tsx': 1,
 
-  // ── Unmount on navigate or on a conditional render, so their next mount refetches. 16 sites.
+  // ── Unmount on navigate or on a conditional render, so their next mount refetches. 13 sites
+  // across 11 files.
   // Latent rather than broken, and some may never be worth converting.
   'app/health/sleep/sleep-content.tsx': 1,                   // route
   'app/session-explain/session-explain-client.tsx': 1,       // route
@@ -74,8 +76,7 @@ const BASELINE = {
   'components/guided-walk/walk-config.tsx': 1,               // conditional
   'components/guided-walk/walk-summary.tsx': 1,              // conditional
   'components/nutrition/my-meals-picker.tsx': 1,             // conditional, inside a sheet
-  'components/running/running-plan-content.tsx': 4,
-  'components/workout-screen.tsx': 2,
+  'components/running/running-plan-content.tsx': 3,
   'components/workout/done-screen.tsx': 1,
   'components/workout/live-hr-chart.tsx': 1,                 // inside exercise-summary-screen
 };
@@ -104,12 +105,33 @@ for (const abs of files) {
   // `useEffect(() => { … }, [])` — an empty dependency array is the whole signal. A non-empty one
   // re-runs when its deps change, which is a different (and usually correct) shape.
   //
-  // `[\s\S]*?` with no required newline before the close, deliberately: an earlier version demanded
-  // one and therefore missed a SINGLE-LINE `useEffect(() => { cachedFetch(…) }, [])` entirely. That
-  // slipped through the first mutation check of this very rule, which is the whole argument for
-  // running one.
-  for (const m of src.matchAll(/useEffect\(\(\)\s*=>\s*\{([\s\S]*?)\}\s*,\s*\[\s*\]\s*\)/g)) {
-    if (!m[1].includes('cachedFetch')) continue;
+  // **The effect body is found by BRACE MATCHING, not by a regex, and the first version of this
+  // check got that wrong in a way that inflated its own baseline by 11 of 25.** A non-greedy
+  // `useEffect\(\(\) => \{([\s\S]*?)\}\s*,\s*\[\s*\]\)` starts at some `useEffect(() => {` and
+  // runs to the FIRST `}, [])` anywhere after it. When the effect it started on has real
+  // dependencies, that close belongs to a different effect further down, and everything in between
+  // — other effects, `useCallback` bodies, plain functions — is swallowed into the "body" and
+  // searched for `cachedFetch`. Five lines reproduce it:
+  //
+  //   useEffect(() => { setThing(1) }, [dep])
+  //   const load = useCallback(() => { cachedFetch(…) }, [])
+  //   useEffect(() => { load() }, [load])
+  //   useEffect(() => { doSomethingElse() }, [])   // ← the regex's match ends here
+  //
+  // The regex reports one fetch-once effect; the correct answer is zero, because the fetch is in a
+  // `useCallback` that an effect with real deps invokes. That is exactly the shape of
+  // `health-content.tsx`, which was carrying a baseline of 2 with **no** fetch-once effect at all —
+  // its fetches live in tab-group `useCallback`s re-run on `tabEpoch`, which is the correct shape
+  // the rule is supposed to be steering people toward.
+  for (const m of src.matchAll(/useEffect\(\(\)\s*=>\s*\{/g)) {
+    const bodyStart = m.index + m[0].length - 1;
+    let depth = 0, j = bodyStart;
+    for (; j < src.length; j++) {
+      if (src[j] === '{') depth++;
+      else if (src[j] === '}' && --depth === 0) break;
+    }
+    if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(src.slice(j, j + 30))) continue;
+    if (!src.slice(bodyStart, j).includes('cachedFetch')) continue;
     perFile.set(rel, (perFile.get(rel) ?? 0) + 1);
     detail.push(`${rel}:${src.slice(0, m.index).split('\n').length}`);
   }
