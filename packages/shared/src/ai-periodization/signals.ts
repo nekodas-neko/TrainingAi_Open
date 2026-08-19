@@ -194,7 +194,9 @@ export async function aggregateSignals(
 
   const volumeTargets = await repo.listVolumeTargets(userId, program.id)
   const exerciseNames = programSession.exercises.map(e => e.exerciseName)
-  const yesterday = toAestDay(new Date(Date.now() - 24 * 3_600_000), tz)
+  // Q-489: shifted on the date string. The `from7d` line below was already correct — it anchors on
+  // `todayMid`, the user's local midnight — and this one was the outlier.
+  const yesterday = shiftDateStr(toAestDay(todayMid, tz), -1)
   const from7d = toAestDay(new Date(todayMid.getTime() - 7 * 86_400_000), tz)
 
   const [recentSessions, timingRows, muscleAssignmentsMap, equipmentMap, exerciseTypeMap, todayMoodLog, yesterdayMoodLog, allRecentSessions, morningCheckinRow, rm1Histories, timingAudit, derivedRows, dailySummaries] = await Promise.all([

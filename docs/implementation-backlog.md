@@ -1985,52 +1985,6 @@ this fits without an extraction.
   `-c` on the same file.
 
 
-### [platform][readiness] Q-489 — five sites turn an ms offset into a calendar day; in a DST zone, three of them compute "today" when they mean "yesterday"
-
-- **Branch:** `fix/ms-offset-calendar-day`
-- **Added:** 2026-08-18 · review sweep (the AI/stats time-window rule) ·
-  [`docs/reviews/2026-08-18-ms-offset-to-calendar-day.md`](reviews/2026-08-18-ms-offset-to-calendar-day.md)
-- **Placement:** low. **Unreachable today** (every user is `Australia/Brisbane`, no DST) and, when
-  reachable, **one hour per year per DST-zone user**. Filed because it is measured, it is the exact
-  hand-rolled date arithmetic `CLAUDE.md` bans, and the fix is a one-line swap to a helper that
-  already exists and is already used elsewhere.
-- **⚠️ Do NOT file the other seven instances of the banned pattern — most are correct.** The rule's
-  harm is *"ms-offset windows straddle two AEST days and merge them"*, which is about **day-bucketed**
-  aggregation. `muscle-recovery`, `workout-load-history` and `friends/feed` use a **rolling instant**
-  filter feeding consumers that work in hours (`computeMuscleRecovery` reads
-  `ws.startedAt.getTime()`), and for a physiological window that is *more* correct than a calendar
-  day. A sweep that greps the pattern and files all 12 files mostly false positives.
-- **The five that produce a calendar day:**
-  ```
-  lib/data/postgres/adapter.ts:1710   toAestDay(new Date(Date.now() - 14 * 86_400_000), timezone)
-  lib/data/postgres/adapter.ts:1722   toAestDay(new Date(Date.now() - 86_400_000), timezone)
-  lib/achievements.ts:50              formatInTimeZone(new Date(Date.now() - 86_400_000), tz, 'yyyy-MM-dd')
-  packages/shared/src/ai-periodization/signals.ts:197
-                                      toAestDay(new Date(Date.now() - 24 * 3_600_000), tz)
-  app/api/progress-summary/route.ts:31
-                                      formatInTimeZone(new Date(Date.now() - 7*24*60*60*1000), tz, 'yyyy-MM-dd')
-  ```
-- **Measured in `America/New_York` across the 2026 transitions:**
-  ```
-  ok             local 2026-03-08 00:30   now-24h → 2026-03-07   true yesterday 2026-03-07
-  ok             local 2026-11-01 00:30   now-24h → 2026-10-31   true yesterday 2026-10-31
-  ** MISMATCH ** local 2026-11-01 23:30   now-24h → 2026-11-01   true yesterday 2026-10-31
-  ```
-  On the **25-hour fall-back day**, in its last hour, `now − 24h` lands on **today**.
-- **What the three "yesterday" sites then do:** `adapter.ts:1722` drops yesterday's row from
-  `getOuraDailyDerived`'s range (an AI-dynamic prescription input); `achievements.ts:50` breaks a
-  streak-continuity comparison; `signals.ts:197` feeds the periodization signal chain.
-- **Fix shape:** `shiftDateStr(todayInTz(tz), -1)` for the three, `-14` and `-7` for the other two.
-  `shiftDateStr` (`packages/shared/src/date-utils.ts:154`) does the arithmetic on the date string with
-  `Date.UTC` overflow normalisation — what the rule asks for — and
-  `lib/data/postgres/slices/oura.ts:1182` **already uses exactly this shape**. Nothing new is needed.
-- **Q-477 is what makes this reachable at all** — the Profile timezone setting and its auto-detect
-  button are how a user ends up in a DST zone. Same family; neither is urgent.
-- **Lane A owns this** (`lib/data/**`, `packages/shared/**`, `app/api/**`).
-- **Not verified:** the mismatch was measured with `date-fns-tz` directly, not by driving the app with
-  a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
-  but not Postgres's). The consequence at each call site is read from source.
-
 ### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
 
 - **Branch:** `fix/memo-call-sites-stable-props`
@@ -5482,7 +5436,7 @@ session working from a temporarily restored copy.
      pattern is the closest existing analogue.
   3. A rule, in `CLAUDE.md` alongside *One Formula, One Place*: a correlation computed across a
      model change is not evidence.
-- **Do this before the calibration items (Q-500, Q-272, Q-277).** Each of those creates another
+- **Do this before the calibration items (Q-500, Q-272, Q-505).** Each of those creates another
   incomparable segment otherwise, and the next review re-learns §1.6 the same way this one did.
 
 ### [readiness][body] Q-272 — Body Battery v5 drains 5× faster than it charges and ends at its daily low on 10 of 12 days
@@ -5552,6 +5506,35 @@ session working from a temporarily restored copy.
   proof"*). The reasoning is kept in the plan so it can be argued with, not just followed.
 - **Added:** 2026-08-18 · Tuning ·
   [`docs/reviews/2026-08-18-activity-score-calibration.md`](reviews/2026-08-18-activity-score-calibration.md)
+- **⚠️ Contributor-by-contributor audit added 2026-08-19 — read this before designing the replacement.**
+  [`docs/reviews/2026-08-19-activity-contributor-audit.md`](reviews/2026-08-19-activity-contributor-audit.md).
+  All six contributors measured over 90 days:
+
+  | contributor | weight | mean | sd | at ceiling | verdict |
+  |---|---|---|---|---|---|
+  | steps | 18 | 53.6 | **33.4** | 16/90 | ✅ best in the score |
+  | strengthVolume | 20 | 81.4 | **23.8** | 32/88 | ✅ Q-190's fix delivered |
+  | strengthFreq | 25 | 95.0 | 13.1 | **69/88 (78%)** | 🟡 compressed **by design** |
+  | moveHours | 12 | ~97 | — | **48/59** | ❌ saturated (Q-522) |
+  | zoneMinutes | 10 | ~6 | — | **53/59 at zero** | ❌ floored (Q-523) |
+  | activeEnergy | 15 | — | — | — | ❌ absent 43/51 days (Q-521) |
+
+  With `activeEnergy` absent and `zoneMinutes` suppressed on strength days, the model renormalises
+  over 75 → effective weights strengthFreq **33%**, strengthVolume **27%**, steps **24%**, moveHours
+  **16%**. **51% of effective weight carries information; 49% does not, and the largest single
+  effective weight is one of the inert ones.**
+- **Do NOT "fix" `strengthFreq` by raising the goal or extending the curve.** `daily-goals.ts` sets
+  the goal *at* the owner's typical deliberately — more sessions is not monotonically better, the
+  ACWR taper already handles over-reach, and *"a goal of 6 would have one part of the model rewarding
+  what another punishes."* That reasoning holds. **Treat the 33% as a constraint the redesign must
+  work around, not a defect it can remove** — if the new model wants range, it has to come from
+  elsewhere.
+- **Q-137/Q-190 did work, and stored history hides it.** Stored `activity_score` sd **5.0 → 7.4**
+  across the 2026-08-11 goal change (range 66–81 → 64–91). n = 8 post-fix, so directional; and 15 of
+  the 23 stored days are still scored under the old goals because history is not back-filled — the
+  same trap the sleep recalibration hit. Reconstructing from contributors at effective weights
+  predicts a ceiling of **sd ≈ 10.2** under current goals (steps ⟂ strengthVolume, r = −0.016).
+- **This entry absorbs Q-277**, whose investigation is complete (see the review's §1 and §4).
 - **Measured.** n=22: range 56–91, mean 74.6, **sd 7.2**, with 11 of 22 days in the 70s. Against
   same-day steps **r = +0.417** — and **2026-08-12 scored 76 on 828 steps while 2026-08-16 scored 64
   on 8,935**. Steps span 29x across the window; the score moves 25 points.
@@ -5597,7 +5580,8 @@ session working from a temporarily restored copy.
   if still compressed — and re-anchor any threshold on the activity scale in the same PR (Q-503's §5
   is the worked example).
 - **Related, not fixed by this:** Q-278 (the score is absent on more than half of days and the UI does
-  not distinguish that from a real score) and Q-277 (the original discrimination finding). Also worth
+  not distinguish that from a real score) and Q-505 (which absorbed Q-277's discrimination finding,
+  now answered by the 2026-08-19 contributor audit). Also worth
   doing regardless: **persist the contributor sub-scores** — `activity_contributors` carries only
   `base`/`trained`/`adjustment`, so the weight arithmetic above had to be derived rather than read.
 
@@ -6329,6 +6313,46 @@ session working from a temporarily restored copy.
   HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
 - **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
 
+### [activity][nutrition] Q-524 — two different step goals, and the personalised one contradicts the evidence its own file cites
+
+- **Branch:** `fix/reconcile-step-goals`
+- **Plan:** none — **this needs an owner decision first** (which number wins), then a one-line change.
+  Evidence: [`docs/reviews/2026-08-19-activity-contributor-audit.md`](reviews/2026-08-19-activity-contributor-audit.md) §3.
+- **Added:** 2026-08-19 · Tuning agent, found while auditing the Activity Score's `steps` contributor.
+- **The app shows the owner's step progress against two targets at once.** `users.steps_goal` is
+  **7,000** (the owner set it); `getDailyGoals()` ignores that column and derives **10,000** from
+  `activity_level = 'moderate'` via `STEP_GOAL_BY_ACTIVITY`.
+
+  | surface | goal used |
+  |---|---|
+  | `components/health/goals-progress-card.tsx` | **7,000** (profile) |
+  | `app/api/daily-digest/route.ts` — *"Steps: N/7000 today"* | **7,000** (profile) |
+  | Activity Score `steps` contributor (weight 18) | **10,000** (derived) |
+  | `app/health/activity/activity-content.tsx` progress bar `max` | **10,000** (derived) |
+  | `app/api/cardio-week` weekly target | **70,000** (derived × 7) |
+  | AI `health-insight` prompt — *"goal 10000"* | **10,000** (derived) |
+
+  On a 7,200-step day the Goals Progress card and the daily digest say the goal is met while the
+  Activity screen's own bar reads 72%.
+- **The sharper half: the derived value disagrees with its own evidence base.** `daily-goals.ts`
+  cites Paluch 2022 (step benefit plateaus ~7–8k/day) and sets `DEFAULT_STEP_GOAL = 8000` accordingly
+  — but the *personalised* path returns **10,000** for `moderate`. **The fallback used when the
+  profile is empty is better calibrated than the personalised value that replaces it.**
+- **Measured:** 10,000 is reached on **16 of 90 days (18%)**; the owner's own 7,000 on **31 of 90
+  (34%)**; mean 6,044 steps (sd 4,715, range 464–23,740).
+- **Owner decision, not a calculation.** Three coherent answers and they are mutually exclusive:
+  (1) the profile value wins everywhere — the owner set it, and it matches Paluch; (2) the derived
+  value wins everywhere and the profile field becomes display-only or is removed — but then the
+  activity-level map should be re-checked against Paluch, since 10,000 is above the cited plateau;
+  (3) they are different things (a personal target vs an evidence-based benchmark) and every surface
+  must label which it is showing. **Do not silently pick one** — whichever wins changes a number the
+  owner sees daily.
+- **Pass test:** one step goal reaches every surface, or each surface states which of the two it is
+  showing. `grep -rn 'stepGoal\|stepsGoal' app components lib packages` should not turn up two
+  unreconciled sources for the same metric.
+- **Caveats:** one user, one activity level. The map's other tiers (`sedentary` 7,000, `light` 8,500,
+  `active`/`extra_active` 12,000) are unmeasured here — only `moderate` was exercised.
+
 ### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
 
 - **Branch:** `fix/move-hours-rest-boundary`
@@ -6531,30 +6555,6 @@ session working from a temporarily restored copy.
 - **Test:** the existing `hr-ingest-poison-pill.test.ts` is the pattern — a batch containing a
   deliberate duplicate must persist, not 500.
 
-### [activity] Q-277 — the Activity Score still occupies a quarter of its range, after v2 fixed the mechanism Q-137 blamed
-
-- **Branch:** `fix/activity-score-discrimination`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the comprehensive review §1.2
-- **Measured** over post-re-key production days: **n = 19, range 66 – 91, mean 76.1, sd 5.9, 10
-  distinct values.** For comparison on the same days: Readiness sd 13.4 (19 distinct over 29–87),
-  Sleep sd 11.7 (16 distinct over 31–97).
-- **Why this is not just a restatement of Q-137.** Q-137 diagnosed the Activity Score as
-  "effectively a step counter: 57 of 100 weight is constant". Activity Score **v2** fixed that
-  mechanism — `computeActivityScore` now carries real strength lanes (movement ≈ 55, strength ≈ 45,
-  `W_STRENGTH_FREQ = 25`) and an ACWR over-exertion taper. **The mechanism changed and the outcome
-  did not.** Q-137 should be re-scoped or closed in favour of this; do not work both.
-- **Leading hypothesis, untested:** the score renormalises over whichever components have data
-  (`totalWeight` is summed from present parts only). With `steps`, `activeCalories`, `zoneMinutes`
-  and `moveHours` frequently null — the score exists on only **19 of 40** days at all, see Q-278 —
-  the strength lanes carry most days alone, and they saturate: `STRENGTH_FREQ_CURVE` reaches 100 at
-  1.0 and stays there through 1.5.
-- **First action:** for each of the 19 scored days, dump the per-component `parts` array
-  (`key`, `weight`, `sub`) and count how often each lane is present and what its realised range is.
-  That distinguishes "renormalisation collapses the score onto two saturating lanes" from "the
-  owner's activity genuinely varies this little".
-- **Sequencing:** Q-278 (coverage) shares the same root and should be investigated in the same pass.
-
 ### [platform][readiness] Q-278 — a score that could not be computed is rendered identically to a score of 76
 
 - **Branch:** `feat/score-coverage-surfacing`
@@ -6648,7 +6648,7 @@ session working from a temporarily restored copy.
   shows (a) contributors, (b) trend, (c) an action. Then fix the ones failing the repo's own
   colour-only-state rule as a first pass, since `scoreBand()` colour without `scoreBand()` label is
   already a `CLAUDE.md` violation and is the cheapest subset.
-- **Sequencing:** this is presentation over numbers that Q-500/Q-272/Q-275/Q-277 are all about to
+- **Sequencing:** this is presentation over numbers that Q-500/Q-272/Q-275/Q-505 are all about to
   change. Do the **audit** now (it is cheap and its output is durable); hold the **UI work** until
   the model changes settle, or it gets done twice.
 - **✅ The audit is DONE (2026-08-17, Lane B) —

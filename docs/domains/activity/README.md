@@ -26,6 +26,17 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
   — §1.2 measured the Activity Score in production after v2: sd 5.9 over 19 days, range 66–91, 10
   distinct values. **v2 fixed the mechanism Q-137 blamed and the outcome did not move** (Q-277),
   and the score exists on only 19 of 40 days (Q-278).
+- [`docs/reviews/2026-08-19-activity-contributor-audit.md`](../../reviews/2026-08-19-activity-contributor-audit.md) — **every Activity Score contributor measured, 2026-08-19 — read before touching
+  the model** (the audit Q-277 asked for and never got). Over 90 days: **steps** (sd **33.4**) and
+  **strengthVolume** (sd 23.8) carry real information; **strengthFreq** sits at 100 on **78%** of days;
+  `moveHours`, `zoneMinutes` and `activeEnergy` carry none (Q-521/522/523). After renormalisation
+  **51% of effective weight is informative and 49% is not** — and `strengthFreq`'s ceiling is a
+  **documented design choice, not a defect**, so the redesign has to find range elsewhere. Q-137/Q-190
+  *did* work — stored sd **5.0 → 7.4** across 2026-08-11 — but history is not back-filled, so most
+  stored days still show the old model. **Q-277 answered and removed; folded into Q-505.** Also filed
+  **Q-524** — the Goals Progress card and the daily digest grade steps against **7,000** while the
+  Activity Score and its own progress bar use **10,000**, and the derived 10,000 contradicts the
+  Paluch 7–8k plateau that `daily-goals.ts` cites as its evidence base.
 - [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](../../reviews/2026-08-19-zone-minutes-move-hours-coverage.md) — **the Activity Score's two heart-rate contributors, coverage-checked 2026-08-19**
   (Q-522 — `moveHours` is **saturated**: 856 of 857 waking hours with HR data count as "moved" and
   **48 of 59 days score exactly 100**, so its only source of variance is hours the ring was off. This
@@ -59,7 +70,7 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
 
 ```bash
 grep -n '^### .*\[activity\]' projectOverview.md   # 14 entries today
-grep -n '\[activity\]' docs/implementation-backlog.md   # 2 queue items today (Q-522, Q-523)
+grep -n '\[activity\]' docs/implementation-backlog.md   # 3 queue items today (Q-522, Q-523, Q-524)
 ```
 
 Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):

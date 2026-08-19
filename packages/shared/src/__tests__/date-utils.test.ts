@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { formatInTimeZone } from 'date-fns-tz'
 import { shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
 
 describe('ageFromDob', () => {
@@ -211,5 +212,48 @@ describe('dayKeyInTz (Q-163)', () => {
 
   it('crosses a month boundary correctly', () => {
     expect(dayKeyInTz('Australia/Brisbane', 1, new Date('2026-08-01T02:00:00Z'))).toBe('2026/07/31')
+  })
+})
+
+// Q-489 — "yesterday" derived by subtracting 86,400,000 ms is wrong on a DST fall-back day.
+//
+// This is a **class** test, not a call-site test. Five sites built a calendar day from an ms offset
+// (`toAestDay(new Date(Date.now() - 86_400_000), tz)` and friends); all five now shift the date
+// string instead. Pinning the divergence itself means the test cannot go stale when a call site
+// moves, and — the part that matters — **it needs no clock**. Both instants are passed in
+// explicitly, so it fires on every CI run rather than for one hour, once a year, in one timezone.
+// The repo has been bitten twice by tests that only fire inside a window (Q-356 and the
+// `scale-ble-day-keying` fixture), which is the reason for building it this way.
+describe('Q-489 — a calendar day comes from the date string, never from an ms offset', () => {
+  const NY = 'America/New_York'
+  const msOffsetYesterday = (now: Date, tz: string) =>
+    formatInTimeZone(new Date(now.getTime() - 86_400_000), tz, 'yyyy-MM-dd')
+  const stringShiftYesterday = (now: Date, tz: string) =>
+    shiftDateStr(formatInTimeZone(now, tz, 'yyyy-MM-dd'), -1)
+
+  it('agree on an ordinary day, and on the 23-hour spring-forward day', () => {
+    for (const iso of ['2026-06-15T14:00:00Z', '2026-03-08T05:30:00Z', '2026-11-01T04:30:00Z']) {
+      const now = new Date(iso)
+      expect(stringShiftYesterday(now, NY), iso).toBe(msOffsetYesterday(now, NY))
+    }
+  })
+
+  it('diverge in the last hour of the 25-hour fall-back day — the ms offset returns TODAY', () => {
+    // 04:30 UTC on 2026-11-02 is 23:30 local on 2026-11-01 in New York — the last hour of a day
+    // that ran 25 hours. Subtracting 24 hours from it lands back inside the same local day.
+    // The hour matters: at 03:30 UTC (22:30 local) the offset is still correct, which is why this
+    // is a one-hour-per-year defect rather than a one-day one.
+    const now = new Date('2026-11-02T04:30:00Z')
+    expect(formatInTimeZone(now, NY, 'yyyy-MM-dd')).toBe('2026-11-01')
+
+    expect(msOffsetYesterday(now, NY)).toBe('2026-11-01')   // the bug: "yesterday" is today
+    expect(stringShiftYesterday(now, NY)).toBe('2026-10-31') // the fix: the true previous day
+  })
+
+  it('shifts across a month and a year boundary without hand-rolled arithmetic', () => {
+    expect(shiftDateStr('2026-03-01', -1)).toBe('2026-02-28')
+    expect(shiftDateStr('2024-03-01', -1)).toBe('2024-02-29')
+    expect(shiftDateStr('2026-01-01', -1)).toBe('2025-12-31')
+    expect(shiftDateStr('2026-11-01', -7)).toBe('2026-10-25')
   })
 })
