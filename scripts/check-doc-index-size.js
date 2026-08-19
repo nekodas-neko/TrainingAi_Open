@@ -787,7 +787,10 @@ const BASELINE = {
   // their meal's window — a stated cost is not a bug report, and it is the kind that gets rediscovered.
   // 2026-08-20 (Tuning): Known-Issues row for the sleep row's time-in-bed range reading as
   // time-asleep. A Known Issue rather than a queue entry because the Tuning Q band is exhausted.
-  'projectOverview.md': 8006,
+  // 2026-08-20 (Tuning): Q-529 scope correction -- the score DOES recompute; what survives is a
+  // ~9-minute provisional-renders-as-final window. The refutation stays inline because the
+  // original claim shipped and an implementer must not act on it.
+  'projectOverview.md': 8009,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -985,7 +988,10 @@ const BASELINE = {
   // 2026-08-20 (Tuning, Q-529): owner-reported sleep score stamped 23s before its session
   // finished arriving. The ordering timestamps and the near-twin comparison live in the entry
   // because they are what distinguish this from Q-520 rather than a duplicate of it.
-  'docs/implementation-backlog.md': 11342,
+  // 2026-08-20 (Tuning): Q-529 scope correction -- the score DOES recompute; what survives is a
+  // ~9-minute provisional-renders-as-final window. The refutation stays inline because the
+  // original claim shipped and an implementer must not act on it.
+  'docs/implementation-backlog.md': 11359,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads

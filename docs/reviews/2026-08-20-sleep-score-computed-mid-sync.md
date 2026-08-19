@@ -137,3 +137,57 @@ Recorded as a `projectOverview.md` Known Issue rather than a queue entry, becaus
 
 **Suggested shape, not a spec:** label the range as time in bed, or show the wake moment alongside it
 (*"asleep until 6:07, up at 6:47"*). The data for both is already stored.
+
+---
+
+## 6. ⚠️ CORRECTION, same morning — the score DOES recompute, and the comparison was not a twin
+
+The caveat in §4 asked for one cheap check before anyone built a recompute path. It was run at
+**06:59:32**, and it refutes the central claim of this review.
+
+| | at 06:49 | at 06:59 |
+|---|---|---|
+| `sleep_score` | 47 | **55** |
+| `computed_at` | 06:45:56 | **06:54:41** |
+| `sleep_sessions.updated_at` | 06:46:19 | **06:51:03** |
+
+**The score recomputed**, at 06:54:41 — *after* the session settled at 06:51:03. The ordering that
+looked broken was a snapshot of a pipeline mid-run, not a missing code path. **"Nothing recomputes it"
+was wrong**, and the three-minute re-check that produced it was too short a window to support the
+claim. It is stated in §2 as confirmed over three minutes and not over hours; that hedge was doing
+real work and the conclusion should have matched it.
+
+### The near-twin was not a twin
+
+The 31-point gap in §2 also does not survive. Comparing the **corrected** score against 2026-08-17:
+
+| contributor | 08-20 (55) | 08-17 (78) | Δ |
+|---|---|---|---|
+| `rem_sleep` | 63 | **99** | **−36** |
+| `efficiency` | 57 | **82** | **−25** |
+| `total_sleep` | 74 | 85 | −11 |
+| `latency` | 59 | 70 | −11 |
+| `deep_sleep` | **76** | 62 | +14 |
+| `hrv` | **67** | 52 | +15 |
+
+Underlying: **REM 1.42 h against 2.08 h**, efficiency **86% against 90%**, awake **1.25 h against
+0.83 h**. The two nights matched on *duration and onset* — the columns I compared — and differed
+substantially on REM and wake fragmentation, which is most of the sleep model. **The remaining 23
+points are the score working, not failing.**
+
+### What actually survives
+
+**A ~9-minute window (06:45:56 → 06:54:41) in which a provisional score is displayed as final**, with
+nothing marking it as such — and it lands exactly when someone checks last night's sleep. That is the
+same root as §5's range label and as Q-520: **a still-syncing night renders identically to a settled
+one.**
+
+So Q-529 is **downgraded**: from a Lane A correctness bug (recompute path missing) to a Lane B
+presentation gap (provisionality unmarked), and it merges with the Known Issue from §5 rather than
+standing beside it.
+
+**The method lesson, which is the durable part.** Two mistakes compounded: a **three-minute**
+observation window used to assert a permanent absence, and a "near-twin" chosen on **the two columns
+that happened to be adjacent in the query** rather than on the contributors the model actually reads.
+Both would have been caught by the same discipline — **compare the contributor vector, not the
+summary columns**, which is what §5's hypnogram decode did correctly an hour later.

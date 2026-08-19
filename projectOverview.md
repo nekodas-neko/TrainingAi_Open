@@ -2120,8 +2120,11 @@ current policy before building.
   as the sleeping window, while the adjacent figure is time **asleep** (7.75 h) and 1.25 h is awake
   (0.5 h onset latency, ~40 min lying awake at the end). **The wake moment the owner recognises is in
   the stored hypnogram and surfaced nowhere.**
-- **Not a data problem, and not the same as Q-529.** Q-529 is the *score* being stamped 23 seconds
-  before the session finished arriving (Lane A, recompute). **This is presentation — Lane B.**
+- **Same root as Q-529, which was re-scoped to match (2026-08-20).** Q-529 originally read as a
+  missing recompute path; the score **does** recompute (47 → 55 at 06:54:41, after the session settled
+  at 06:51:03), so what remains there is a **~9-minute window where a provisional score renders as
+  final**. Both are the same defect wearing two hats: **a still-syncing night is displayed identically
+  to a settled one.** Both are Lane B.
 - **Suggested shape, not a spec:** label the range as time in bed, or show both (*"asleep until 6:07,
   up at 6:47"*). Both numbers are already stored.
 - **Why a Known Issue and not a queue entry:** the Tuning Q band (500–529) is **exhausted** at Q-529,

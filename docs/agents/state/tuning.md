@@ -3,11 +3,22 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/stale-sleep-score-midsync` · **Q band:** 500–529 (**BAND EXHAUSTED — 529 was the last. Agree a new band with the owner before filing anything.**)
+**Updated:** 2026-08-19 · **By:** `tuning/correct-q529` · **Q band:** 500–529 (**BAND EXHAUSTED — 529 was the last. Agree a new band with the owner before filing anything.**)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **⚠️ Q-529 was OVERCLAIMED and corrected hours later — read before touching it.** I filed "the
+  score is never recomputed". **It is** (47 → 55, `computed_at` 06:45:56 → **06:54:41**, after the
+  session settled 06:51:03). The "near-twin" also failed: 08-17 matched on *duration and onset* and
+  differs on **REM 1.42 vs 2.08 h** (contributor 63 vs **99**) and efficiency 86 vs 90 (**57 vs 82**) —
+  the remaining 23 points are the score **working**. What survives is a **~9-minute window where a
+  provisional score renders as final**; re-scoped Lane A → **Lane B** and merged with the range-label
+  Known Issue.
+  - **Two mistakes compounded, both avoidable:** a **three-minute** observation used to assert a
+    *permanent* absence, and a twin chosen on the summary columns that happened to be in the query
+    rather than on the contributor vector. **Compare contributors, not summary columns** — the
+    hypnogram decode an hour later did it right and got the answer first time.
 - **Owner report 2026-08-20 — sleep score stamped mid-sync** (Q-529). *"That wake up time is way
   off, I woke up around 6am."* **The session was already right and the score was not.** `computed_at`
   **06:45:56** vs `sleep_sessions.updated_at` **06:46:19** — the score predates its input by 23
@@ -309,6 +320,10 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **Do not assert a PERMANENT absence from a THREE-MINUTE observation.** Q-529 shipped saying a score
+  is never recomputed; it recomputed nine minutes after the read. If a claim is "X never happens",
+  the observation window has to be long enough for X to have happened. Where it is not, say what was
+  actually observed — the hedge was written and the conclusion ignored it.
 - **When a score looks wrong, compare `computed_at` against the input row's `updated_at` BEFORE
   reaching for calibration.** Q-529 looked like a sleep-score tuning problem and was a 23-second
   ordering bug. A near-twin day from the same week is the fastest sanity check — 7.58 h scoring 78
