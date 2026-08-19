@@ -778,7 +778,14 @@ const BASELINE = {
   // observable from the sandbox. It carries the measured figures (600.0 dpi, 49.9 mm vs 311.9 mm)
   // because "the PNG now declares its size" is a claim and those are the evidence, and it names the
   // one physical print that also settles Q-411, so the owner does not do two.
-  'projectOverview.md': 7951,
+  // Raised 2026-08-19 (Lane A, the food_logs device checks): 7951 -> 7982. Three changes landed on
+  // one offline-first domain in a day (Q-413, Q-325, Q-412) and none is device-verified; the
+  // standing rule says that is a row here, not a line in a lane's private baton, because this file
+  // is what every session reads before it can start. One row rather than three, because the same
+  // offline path carries all of them and one session on the device settles them together. It also
+  // records the migration's deliberately-narrow scope, which leaves a few historical rows outside
+  // their meal's window — a stated cost is not a bug report, and it is the kind that gets rediscovered.
+  'projectOverview.md': 7982,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
