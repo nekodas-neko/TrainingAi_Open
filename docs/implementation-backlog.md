@@ -507,6 +507,78 @@ in the same breath that the print test is now unblocked — all three answers co
 a ruler.
 
 
+### [nutrition] Q-412 — "reassign them first" instructs the user to do something the app cannot do
+
+- **Branch:** `feat/meal-type-reassign`
+- **Added:** 2026-08-19 · owner, from Nutrition Settings on v1.325.x, with a screenshot
+- **Owner's words:** *"how would I delete meals? say I wanted to move back to 3 a day or so. it
+  seems I cant if there are meals assigned"*
+- **Lane A** — the fix is a new write path (`app/api/**` + repo slice + the sync chain). The dialog
+  that calls it is Lane B and is small; land the endpoint first.
+- **Placement:** medium-high. It is not a data-loss bug, but it is a **dead end with no exit**, and
+  the only way out a user can find on their own destroys history.
+
+**The trap, end to end.**
+1. `deleteMealType` (`lib/data/postgres/slices/nutrition.ts:100`) probes `food_logs` for any live row
+   pointing at the meal type and throws `MEAL_TYPE_HAS_LOGS` if one exists.
+2. The route turns that into a 409 reading **"Meal type has food log entries — reassign them
+   first"** (`app/api/nutrition/meal-types/[id]/route.ts:45`).
+3. **There is no reassign, anywhere.** `PATCH /api/nutrition/food-logs/[id]` accepts
+   `quantityMultiplier` and nothing else — `meal_type_id` is not a settable field on any route, and
+   no UI offers to move a logged item between meal types.
+
+So the message names the one action that would clear the block and the app has never implemented it.
+**The only escape a user can actually perform is deleting every food log ever recorded against that
+meal type**, which throws away nutrition history to change a setting. The owner's case — dropping
+from five meal types back to three — is the ordinary case, not an edge one.
+
+**What is NOT the problem, so nobody re-derives it.** This is not a foreign-key limitation and the
+guard is not protecting the database. `meal_types` already soft-deletes (`deleted_at`, Q-179), and
+that function's own docstring says so: *"Soft-deleting sidesteps the RESTRICT entirely: the
+soft-deleted logs keep pointing at a row that still exists."* The row survives, so historical logs
+would still resolve their meal type.
+
+**What the guard IS protecting is the day view, and this is the constraint the fix has to satisfy.**
+`listMealTypes` filters `deleted_at IS NULL` (`:65-70`) and `nutrition-content.tsx:591` renders
+`mealTypes.map(...)`. Soft-delete a type that has logs and **those logs stop being rendered at all** —
+they still exist, still count toward the day's totals, and have no section to appear under. An
+invisible-but-counted food log is worse than the dead end, which is presumably why the probe was
+written this way.
+
+**Recommendation — build the reassign the message already promises.**
+- **The delete flow becomes a choice, not an error.** Count the affected logs first and say so:
+  *"Afternoon Meal has 34 entries. Move them to…"* with a picker of the remaining live meal types,
+  and a secondary *"Delete them instead"*. A 409 that names a number and offers the fix is a
+  different product from one that names a number and stops.
+- **One new endpoint**: bulk `UPDATE food_logs SET meal_type_id = $new WHERE meal_type_id = $old AND
+  user_id = $user`, then the existing soft-delete, **in one transaction** — a partial reassign that
+  then fails the delete leaves the user halfway with no way back. Validate the target belongs to the
+  user and is not the type being deleted.
+- **It rewrites history and that is the intent, but say it in the dialog.** A 3 pm snack reassigned
+  to Lunch will read as Lunch on every past day. For "I want three meals a day from now on" that is
+  what the owner wants; it should still not be a surprise.
+- **`food_logs` is an offline-first domain, so this is a full sync chain, not one UPDATE** — the
+  outbox mutation, the `pushMutations` branch, `getSyncDelta` and the `applyDelta` mapping all need
+  it, per the standing rule. A bulk row-rewrite is also the shape most likely to conflict with a
+  device that has unsynced edits: **gate the local upsert on `sync_status === 'synced'`** so a pull
+  cannot clobber a pending local edit, exactly as the other branches do.
+
+**The alternative, and why it loses.** Let the soft-delete through and render orphaned logs under
+their archived meal type on days that have them, labelled *Archived*. It preserves history perfectly
+and needs no data movement — but it leaves a ghost section on old days forever, complicates the day
+query, and does not give the owner what he asked for, which is a tidy three-meal day going forward.
+Worth reaching for only if the reassign proves harder than it looks.
+
+- **A smaller thing worth fixing in the same PR:** the manager's delete button gives no warning
+  before the attempt. It fires the DELETE, gets a 409, and shows a toast. Fetch the count when the
+  sheet opens and disable-with-explanation, or open the move dialog directly — a button that can
+  only fail is worse than one that explains itself.
+- **Verification.** Reassign a meal type with logs across several days, then confirm on the day view
+  that the entries appear under the new type with the same calories, that the day total is
+  unchanged, and that the old type is gone from the picker. Then **verify on the APK** — this is an
+  offline-first domain and the local mirror is where the sync half fails silently. Prove the reassign
+  survives an app restart with the network off.
+
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
 - **Branch:** `chore/adopt-use-cached-value`
