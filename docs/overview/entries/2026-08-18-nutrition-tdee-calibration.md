@@ -10,12 +10,12 @@ advice"*. So the real question became: do the gates it added actually hold?
 
 ## The input condition
 
-The food log captures about **45%** of what the owner eats. 44 logged days of 110, mean **1,223
+The food log captures about **50%** of what the owner eats. 44 logged days of 110, mean **1,223
 kcal**, 43% of logged days under 1,200, 4.8 entries per day. Against 75 weigh-ins showing a slope of
-+8 g/day — an energy balance of **+62 kcal/day** — and a Cunningham BMR of **1,698** giving a
-predicted TDEE of **2,632**, implied actual intake is **~2,694**.
++8 g/day — an energy balance of **+62 kcal/day** — and a Cunningham BMR of **1,547** giving a
+predicted TDEE of **2,397**, implied actual intake is **~2,459**.
 
-Taking the log at face value implies a maintenance of **1,161 kcal, below the owner's own BMR**. That
+Taking the log at face value implies a maintenance of **1,161 kcal, below the owner's own BMR of 1,547**. That
 is not a slow metabolism; it is arithmetic proof of under-logging. **Nothing is filed for it** —
 people log partially, and that is the condition everything else has to survive.
 
@@ -42,11 +42,11 @@ docstring calls the source of truth for the daily calorie target.
 
 Replace the universal 1,000 floor with **the user's own BMR**. Maintenance below BMR is impossible by
 definition rather than implausible by taste, and `cunninghamBmr` is already imported in the same
-package. Measured: 14-day passing windows 23 → **11**, range tightening to **1,902–2,219**; 28-day
-22 → **10**, range **1,707–1,889**. Every harmful value blocked.
+package. Measured: 14-day passing windows 23 → **13**, range tightening to **1,592–2,219**; 28-day
+22 → **13**, range **1,565–1,889**. Every harmful value blocked.
 
 **It makes the estimate safe, not correct.** The survivors still sit ~500 kcal under the formula's
-2,632 — residual under-logging showing through — and that should not be described as a fix for
+2,397 — residual under-logging showing through — and that should not be described as a fix for
 accuracy.
 
 Two tempting wrong turns, both recorded: **raising `MIN_LOGGED_FRACTION`** drops good windows while
@@ -65,3 +65,18 @@ coverage counts, which don't depend on it. `activity_level: moderate` is taken f
 
 Also recorded, not filed: **`tdeeAdjustment` is dead code**, referenced only by its tests and by the
 comment explaining it was replaced. Same trap as `amrapScaleFactor` in Q-514.
+
+## Corrected 2026-08-19
+
+Every BMR-derived figure above was first published from the **textbook** Cunningham equation
+(`500 + 22 × LBM`), taken from memory. The app uses `cunninghamBmr = ffm × 21.6 + 370`
+(`body-composition.ts`), deliberately matched to Oura's `atlas` postprocessor and shared with the
+nutrition-goal baseline — so the published BMR was **152 kcal too high**, and that propagated into the
+TDEE, the under-logging percentage and the floor test.
+
+**The conclusion is unchanged**: the log-implied maintenance of 1,161 is still below BMR, so
+under-logging is still proven, and the BMR floor still blocks every harmful value. Only the magnitudes
+moved.
+
+The lesson is the repo's own: *verify against the pinned source, not memory*. That rule is written
+about external API field names, and it applies just as directly to a formula the codebase defines.
