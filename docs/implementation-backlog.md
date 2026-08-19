@@ -6196,6 +6196,89 @@ session working from a temporarily restored copy.
   HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
 - **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
 
+### [activity][heart-rate] Q-522 — the movement-per-hour contributor is saturated: it measures ring wear, not movement
+
+- **Branch:** `fix/move-hours-rest-boundary`
+- **Plan:** none yet — needs a candidate boundary, not just a code change. Evidence:
+  [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md) §2.
+  **Do Q-515 first** — same boundary, same root cause. Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, from the owner's direct ask (*"check zone minutes and
+  movement per hour coverage"*), deferred by Q-521's closing caveat.
+- **Measured** over 59 days with waking-hour HR (07:00–21:59 Brisbane), `claude_ro` row-scoped to the owner:
+
+  | | |
+  |---|---|
+  | waking hours with any HR data | 857 |
+  | of those, counted as "moved" | **856** (99.9%) |
+  | days scoring exactly 100 | **48 of 59** |
+  | days scoring ≥ 93 | 55 of 59 |
+
+  The only source of variance is **hours the ring was off the finger**. `W_MOVE_HOURS = 12`.
+- **Mechanism.** `computeMovedHours` counts an hour if any sample exceeds `HR_REST_THRESHOLD = 0.05`
+  of reserve — **59.7 bpm** at `hrMaxFromAge(33) = 187` / resting 53. The owner's waking HR is ring
+  p50 **69**, p90 **88**; it is essentially never below the boundary while awake.
+- **This is Q-188 returning through the other half of the fraction.** `hourly-movement.ts`'s own
+  comment records Q-188 fixing this same contributor for being *"pinned at 100… it could never carry
+  information"* — that fix corrected the **denominator** (the goal window). The **numerator** now
+  saturates for an unrelated reason, so the earlier fix could not have prevented this. Same symptom,
+  different half.
+- **Open question for the fix — this is the whole difficulty.** A boundary that is a fixed fraction
+  of reserve re-saturates as soon as the owner's resting HR drops again (which is exactly what Q-515
+  measured happening). Candidates, none yet fitted: a **personal EMA of waking HR** rather than
+  resting HR; a **per-hour delta** against that day's own quiet hours; or dropping HR entirely and
+  keeping the hour if it carries steps. The last is the only one immune to fitness drift, and steps
+  have full coverage (Q-521).
+- **Pass test:** the "moved" fraction of waking hours with data must fall well below 1.0, and the
+  contributor's day-to-day spread must survive when days with full ring wear are considered alone —
+  i.e. the variance must stop coming from missing data.
+- **Caveats:** n = 59 days, one athlete. A boundary fitted here is fitted to one person's HR profile
+  and must be re-checked before any second user relies on the Activity Score.
+
+### [activity][heart-rate] Q-523 — zone minutes read 0 on 90% of days: the Zone 2 floor sits above where strength training lives
+
+- **Branch:** `fix/zone-minutes-floor-and-gap-cap`
+- **Plan:** none yet — the threshold question needs the owner's labels (below). Evidence:
+  [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md) §3–4.
+  Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, same ask as Q-522.
+- **Measured** over the same 59 days, computed as the runtime computes it (Z2 min + 2 × Z3+ min):
+
+  | active minutes | days |
+  |---|---|
+  | **0** | **53** |
+  | 1–4 | 3 |
+  | 5–14 | 1 |
+  | ≥ 15 | 2 |
+
+  Mean **1.39 min/day** against `DEFAULT_ZONE_MINUTES_GOAL = 22` → a contributor pinned at **~6/100**.
+  `W_ZONE_MINUTES = 10`.
+- **It is not a sampling artefact — the training does not reach the floor.** The chest strap is worn
+  for workouts and samples at ~1 Hz; its **p99 is 121 bpm** against a Zone 2 floor of **133** (60% of
+  reserve). Only **0.29%** of strap samples reach Z2, 0.11% reach Z3. **This is Q-516 (`PEAK_BANDS`
+  is calibrated for a heart-rate range strength training never reaches) in a second consumer of the
+  same banding** — resolve them together or the two will drift apart.
+- **The existing guard covers the wrong half of the calendar.** `activity-score.ts:144` suppresses
+  the contributor when `zoneMinutes === 0 && strengthSessionToday`. It fires on 40 of 44 strength
+  days — but **13 of 15 non-strength days score a hard 0**, costing 10 points of weight on the days
+  the metric has nothing to say about. (Both group means are indistinguishable from zero at n = 15;
+  do not read non-strength 2.80 vs strength 0.91 as an inversion.)
+- **Second, separable defect — the gap cap does not match the ring's cadence.**
+  `DEFAULT_MAX_GAP_SEC = 120`, and its comment says a ring "samples ~1/min". **This ring samples on
+  an exact 300 s cadence** (p50 = p90 = 300.0 s), so **80.1% of its intervals are truncated** and it
+  keeps **35%** of elapsed time against the strap's **84%**. The same minute of the same effort is
+  worth **0.4 min on a ring-only day and 0.84 min on a strap day**, and
+  `activeMinutesFromZoneSeconds` then doubles vigorous minutes, doubling the gap with it. Only 26 of
+  59 days have strap data. **Fixing the floor without fixing this leaves zone minutes
+  non-comparable across days** — derive the cap from the observed source cadence.
+- **Open question this entry deliberately does not answer:** what Zone 2 floor *would* carry signal
+  for this athlete. Fitting one needs days the owner would call "active" to fit against — owner
+  labels, not more SQL. Do not guess a number into the code.
+- **Pass test:** zero-zone-minute days must fall from 53/59 to something that tracks the owner's own
+  sense of an active day, and ring-only vs strap days must produce comparable minutes for comparable
+  effort.
+- **Caveats:** n = 59, one athlete, and zone floors are the single most person-specific constant in
+  the app.
+
 ### [body] Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did
 
 - **Branch:** `feat/exertion-integrated-battery-drain`
@@ -6242,10 +6325,16 @@ session working from a temporarily restored copy.
   **Q-276** by making Body Battery explicitly *not* a recovery number.
 - **Pass test:** re-run the four correlations above. `corr(steps, total_drained)` must become clearly
   positive, and workout vs non-workout `end_value` must separate by far more than 0.6 points.
+- **⚠️ Coverage check done 2026-08-19 — two of the four proposed inputs are unusable (Q-522, Q-523).**
+  `moveHours` is **saturated**: 856 of 857 waking hours with data qualify as "moved", 48 of 59 days
+  score exactly 100. `zoneMinutes` is **floored**: 0 on 53 of 59 days, because the Zone 2 boundary
+  (133 bpm) sits above where the owner's strength training reaches (strap p99 **121 bpm**). Put into
+  a drain model as they stand, they would enter as a constant ≈ 1.0 and a constant ≈ 0 while reading,
+  in review, as working movement and intensity terms. **Build the first slice on steps + workout load
+  only**, and add the other two once Q-522/Q-523 land. Evidence:
+  [`docs/reviews/2026-08-19-zone-minutes-move-hours-coverage.md`](reviews/2026-08-19-zone-minutes-move-hours-coverage.md).
 - **Caveats:** n = 51, one athlete, Pearson on daily aggregates — the weak values (+0.112, −0.153) mean
-  *"no relationship"* rather than a precise signed effect. **Zone minutes and movement-per-hour were
-  not pulled or coverage-checked** — they are named because the owner named them, and checking their
-  coverage is the first implementation step, given what `active_calories` shows.
+  *"no relationship"* rather than a precise signed effect.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 
