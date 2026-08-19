@@ -201,4 +201,22 @@ test('a saved meal renders a printable label in every style', async ({ page }) =
     page.getByRole('status').filter({ hasText: /Square dies only/i }),
     'a square-only layout must warn that a round die crops it',
   ).toBeVisible()
+
+  // Q-399. The DEFAULT style promises the breakdown and, for one release, drew zero lines of it at
+  // every name length — the arithmetic left no room. Nothing failed: the renderer returned 0 and the
+  // sheet's report was gated on `> 0`, so the line that would have said so simply vanished. The
+  // owner found it by looking at a printed label.
+  //
+  // This is the guard that makes that impossible to ship again through the real renderer. The unit
+  // test asserts the budget arithmetic; this asserts the pixels-and-copy path the owner actually
+  // sees, which is where the gate lived.
+  await page.getByRole('radio', { name: /Ingredients · centred/i }).click()
+  await expect(
+    page.getByText(/Printing [1-9]\d* ingredients?/),
+    'the default style must print at least one ingredient and say how many',
+  ).toBeVisible({ timeout: 20_000 })
+  await expect(
+    page.getByText(/No ingredients fit on this label/),
+    'the default must not be in the no-room state',
+  ).toHaveCount(0)
 })

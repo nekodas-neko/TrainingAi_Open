@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { cachedFetch, cachedFetchToday, readTodayCacheSync, invalidateCache, isBodyMetadataFresh, isWorkoutDataToday } from '../sqlite/cache'
+import { cachedFetch, cachedFetchToday, readTodayCacheSync, invalidateCache, isBodyMetadataFresh, isWorkoutDataToday, subscribeToInvalidation } from '../sqlite/cache'
 import { todayInTz } from '@trainingai/shared/date-utils'
 
 // Proxy-backed so Object.keys(localStorage) enumerates stored keys the same way
@@ -245,5 +245,77 @@ describe('isWorkoutDataToday', () => {
       .toBe(isWorkoutDataToday({ dataDate: '2026-07-03' }))
     expect(isBodyMetadataFresh({ today: { date: '2026-07-03' } }, 'Australia/Brisbane'))
       .toBe(isBodyMetadataFresh({ today: { date: '2026-07-03' } }))
+  })
+})
+
+/**
+ * **Q-402.** The owner reported Home's energy-balance widget never updating without an app restart.
+ * The eviction was never broken — `lib/cache-groups.ts` clears `energy-balance:` from six write
+ * groups and always did. What was missing is that nothing told the component reading it to go and
+ * look again, so a `useEffect(…, [])` in the persistent tab shell held its first payload forever.
+ *
+ * These assert the signal that closes that gap. `useCachedValue` is the consumer and cannot be
+ * asserted here — both vitest projects are `environment: 'node'` with no `@testing-library/react` —
+ * so this covers the half that is testable, and the E2E-less half is stated in the journal.
+ */
+describe('invalidation subscribers', () => {
+  it('tells subscribers which prefix was invalidated', async () => {
+    const seen: string[] = []
+    const off = subscribeToInvalidation(p => { seen.push(p) })
+    await invalidateCache('energy-balance:')
+    off()
+    expect(seen).toEqual(['energy-balance:'])
+  })
+
+  it('stops telling a subscriber that has unsubscribed', async () => {
+    const seen: string[] = []
+    const off = subscribeToInvalidation(p => { seen.push(p) })
+    off()
+    await invalidateCache('energy-balance:')
+    expect(seen).toEqual([])
+  })
+
+  /**
+   * A group clears a PREFIX, and the key a component holds is longer than it
+   * (`energy-balance:` vs `energy-balance:2026-08-19`). If this direction were not covered, the
+   * signal would fire and the one hook it exists for would ignore it — which is the original bug
+   * with an extra step.
+   */
+  it('fires for a prefix broader than the key a reader holds', async () => {
+    const key = `energy-balance:${todayInTz()}`
+    let matched = false
+    const off = subscribeToInvalidation(prefix => {
+      if (key.startsWith(prefix) || prefix.startsWith(key)) matched = true
+    })
+    await invalidateCache('energy-balance:')
+    off()
+    expect(matched).toBe(true)
+  })
+
+  it('does not fire a reader whose key is unrelated', async () => {
+    let matched = false
+    const off = subscribeToInvalidation(prefix => {
+      const key = 'readiness-score'
+      if (key.startsWith(prefix) || prefix.startsWith(key)) matched = true
+    })
+    await invalidateCache('energy-balance:')
+    off()
+    expect(matched).toBe(false)
+  })
+
+  /**
+   * This runs on every write path in the app, so one bad listener must not turn a mutation into a
+   * failed one. Without the try/catch the loop would abort and every later subscriber would go
+   * unnotified — a silent, partial version of the bug being fixed.
+   */
+  it('a throwing subscriber does not stop the others or the invalidation', async () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const seen: string[] = []
+    const offBad = subscribeToInvalidation(() => { throw new Error('listener blew up') })
+    const offGood = subscribeToInvalidation(p => { seen.push(p) })
+    await expect(invalidateCache('energy-balance:')).resolves.toBeUndefined()
+    offBad(); offGood()
+    errorSpy.mockRestore()
+    expect(seen).toEqual(['energy-balance:'])
   })
 })
