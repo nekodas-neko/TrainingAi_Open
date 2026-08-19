@@ -50,7 +50,11 @@ export function TdeeAdaptationCard({ energyBalance, onApplied }: Props) {
   // the two numbers disagree, and by how much, costs nothing and needs no calibration.
   const drifts = target?.recommendedKcal != null && target.driftsFromRecommendation;
   const canSuggest = !dismissed && maintenance?.source === "calibrated" && drifts;
-  const shouldExplain = !dismissed && maintenance?.source === "formula" && drifts;
+  // NOT gated on `dismissed`: that flag records "I answered the nudge this week", and the
+  // explanation has no dismiss affordance to have been answered. Sharing it would let a dismissal
+  // made against the *action*, in a week when maintenance was calibrated, silently hide the
+  // *explanation* if calibration is later lost — which is the state the explanation exists for.
+  const shouldExplain = maintenance?.source === "formula" && drifts;
 
   if (!canSuggest && !shouldExplain) return null;
   const recommended = target!.recommendedKcal!;

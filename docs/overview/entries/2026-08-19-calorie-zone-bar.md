@@ -71,13 +71,28 @@ move happens when that lands.
 
 Four tests, mutation-checked: flipping the goal delta's sign reddens three.
 
+## Verified in a browser, both surfaces
+
+Against `pnpm dev` on the local DB, with the seeded user given a height, date of birth and sex — the
+fixture gap Q-402 hit and recorded:
+
+- **Nutrition tab:** *"2,497 base — nothing earned from movement yet today"* under the zone bar,
+  with the Eaten / Burned / Net row intact beneath it.
+- **Home:** the nutrition card reads *"NUTRITION / 2,497 base — nothing earned from movement yet
+  today / Protein — Carbs — Fat —"*. The ring and macro rows are untouched; the gradient fill is
+  gone. Exactly **one** `/api/nutrition/energy-balance` request came from Home, so the self-fetching
+  wrapper mounts and `cachedFetch` is not duplicating work.
+
+Four unit tests on `budgetProvenance`, mutation-checked: flipping the goal delta's sign reddens
+three.
+
 ## What was NOT exercised
 
-- **Nothing about this was seen in a browser at the time of writing** beyond a probe that was still
-  running — see the PR for the outcome. `tsc`, lint, 45/45 Custom Rules and the unit tests are what
-  is confirmed.
 - **No device run.** JS-only; reaches the APK on the next Railway deploy with no rebuild.
-- **The explain variant needs `source === 'formula'` AND a drifting goal** to appear. The seeded
-  local user reaches `formula`, but whether the drift condition holds for them was not confirmed —
-  it depends on their stored target against a computed recommendation.
+- **The explain variant was never rendered.** It needs `source === 'formula'` **and** a drifting
+  goal; the seeded user reaches `formula` but has no stored calorie goal, so `driftsFromRecommendation`
+  is false and the card correctly stays hidden. The branch is read, not run — and it is the half of
+  this change that answers the owner's actual question.
+- **No E2E guard was committed.** Every probe here was a throwaway; the assertions live in the unit
+  test on the arithmetic, not on the rendering.
 - **The disagreement itself is still there.** This says why; it does not fix it.
