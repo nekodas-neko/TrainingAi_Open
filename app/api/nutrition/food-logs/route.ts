@@ -4,6 +4,10 @@ import { getRepository } from '@/lib/data'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A date, two ids and a multiplier. 8 KB is generous for four fields.
+const MAX_BODY_BYTES = 8 * 1024
 
 export async function GET(req: Request) {
   const session = await auth()
@@ -26,9 +30,19 @@ export async function POST(req: Request) {
   if (!rateLimit(`food-logs:${userId}`, 60, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const body = await req.json()
+  // Bare `req.json()` here also threw on malformed JSON, which Next turned into a 500 rather than
+  // the 400 it is. `readJsonLimited` answers both cases.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const body = read.body as Record<string, unknown>
   const { date: rawBodyDate, mealTypeId, foodItemId, quantityMultiplier } = body
-  if (!rawBodyDate || !mealTypeId || !foodItemId) {
+  // Typed explicitly now the body is `unknown` rather than `any`. Both ids went straight into
+  // `foodLogRefsValid` and `createFoodLog` with only a truthiness check before this.
+  if (!rawBodyDate || typeof mealTypeId !== 'string' || typeof foodItemId !== 'string') {
     return NextResponse.json({ error: 'date, mealTypeId, foodItemId required' }, { status: 400 })
   }
   // The written row's key — an unvalidated one files the log under a day nothing can recover.
@@ -44,7 +58,7 @@ export async function POST(req: Request) {
   }
   const log = await repo.createFoodLog(userId, {
     date, mealTypeId, foodItemId,
-    quantityMultiplier: quantityMultiplier ?? 1.0,
+    quantityMultiplier: qm,
   })
   return NextResponse.json(log, { status: 201 })
 }
