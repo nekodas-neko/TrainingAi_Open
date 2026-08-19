@@ -104,14 +104,96 @@ export async function updateMealType(db: Db, id: string, userId: string, data: P
  * Soft-deleting sidesteps the RESTRICT entirely: the soft-deleted logs keep pointing at a row that
  * still exists, so their sync tombstones survive and no unsynced device can resurrect them.
  */
-export async function deleteMealType(db: Db, id: string, userId: string): Promise<void> {
-  const logs = await db.select({ id: s.foodLogs.id }).from(s.foodLogs)
+export async function countLiveFoodLogsForMealType(db: Db, userId: string, mealTypeId: string): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(s.foodLogs)
     .where(and(
-      eq(s.foodLogs.mealTypeId, id),
+      eq(s.foodLogs.mealTypeId, mealTypeId),
       eq(s.foodLogs.userId, userId),
       isNull(s.foodLogs.deletedAt),
-    )).limit(1)
-  if (logs.length > 0) throw new Error('MEAL_TYPE_HAS_LOGS')
+    ))
+  return row?.n ?? 0
+}
+
+/**
+ * Thrown when a delete is refused because logs point at the meal type. Carries the count, so the
+ * caller can say *"Afternoon Meal has 34 entries"* rather than *"reassign them first"* — a 409 that
+ * names a number and offers the fix is a different product from one that names a number and stops
+ * (Q-412).
+ */
+export class MealTypeHasLogsError extends Error {
+  constructor(readonly logCount: number) {
+    super('MEAL_TYPE_HAS_LOGS')
+    this.name = 'MealTypeHasLogsError'
+  }
+}
+
+/**
+ * Move every live log off `fromId` and onto `toId`, then soft-delete `fromId` — **one transaction**,
+ * because a reassign that succeeds and a delete that then fails leaves the user halfway with no way
+ * back (Q-412).
+ *
+ * **The moved rows are re-stamped through `resolveEatenAt` against the NEW window**, per Q-413. A
+ * 3 pm snack reassigned to Lunch would otherwise keep a 15:00 stamp sitting outside Lunch's 12–15h
+ * window — the exact inconsistency the move was meant to tidy. This is done in TypeScript rather
+ * than a second SQL copy of the midpoint arithmetic: the SQL in migration 203 is a one-off
+ * historical correction, and every *live* path goes through the one implementation.
+ *
+ * One UPDATE regardless of how many rows moved, and it is scoped to `user_id` like every other
+ * write here.
+ */
+export async function reassignAndDeleteMealType(
+  db: Db, userId: string, fromId: string, toId: string,
+): Promise<{ moved: number }> {
+  if (fromId === toId) throw new UserFacingError('Pick a different meal type to move the entries to')
+
+  const [target] = await db.select({
+    timeStartHour: s.mealTypes.timeStartHour,
+    timeEndHour:   s.mealTypes.timeEndHour,
+  }).from(s.mealTypes)
+    .where(and(eq(s.mealTypes.id, toId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
+    .limit(1)
+  if (!target) throw new NotFoundError('Meal type')
+
+  const [{ timezone } = { timezone: DEFAULT_TZ }] = await db
+    .select({ timezone: s.users.timezone }).from(s.users).where(eq(s.users.id, userId)).limit(1)
+  const tz = timezone ?? DEFAULT_TZ
+  const window = { timeStartHour: target.timeStartHour, timeEndHour: target.timeEndHour }
+
+  return db.transaction(async tx => {
+    const rows = await tx.select({ id: s.foodLogs.id, date: s.foodLogs.date, loggedAt: s.foodLogs.loggedAt })
+      .from(s.foodLogs)
+      .where(and(
+        eq(s.foodLogs.mealTypeId, fromId),
+        eq(s.foodLogs.userId, userId),
+        isNull(s.foodLogs.deletedAt),
+      ))
+
+    // One statement per row, on purpose: each row resolves against its own `date`, so there is no
+    // single timestamp to set. This is a settings action bounded by one meal type's history, not a
+    // hot path, and a row-count-shaped optimisation here would trade clarity for nothing measurable.
+    // `updated_at` is the sync cursor — bumping it is what carries the move out to every device on
+    // the next pull, so it is not incidental.
+    for (const r of rows) {
+      await tx.update(s.foodLogs)
+        .set({
+          mealTypeId: toId,
+          loggedAt:   resolveEatenAt({ date: r.date, window, at: r.loggedAt, tz }),
+          updatedAt:  new Date(),
+        })
+        .where(and(eq(s.foodLogs.id, r.id), eq(s.foodLogs.userId, userId)))
+    }
+
+    await tx.update(s.mealTypes)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(s.mealTypes.id, fromId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
+
+    return { moved: rows.length }
+  })
+}
+
+export async function deleteMealType(db: Db, id: string, userId: string): Promise<void> {
+  const logCount = await countLiveFoodLogsForMealType(db, userId, id)
+  if (logCount > 0) throw new MealTypeHasLogsError(logCount)
   await db.update(s.mealTypes)
     .set({ deletedAt: new Date() })
     .where(and(eq(s.mealTypes.id, id), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
