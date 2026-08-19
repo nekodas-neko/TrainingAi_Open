@@ -4206,6 +4206,20 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid activity_logs payload: missing id' })
             continue
           }
+          // Q-328. Delete was the one activity-log write with no outbox path, so it could not be
+          // made offline at all — the client bare-`fetch`ed and simply failed. Same `deleted` flag
+          // convention as `supplements` and `saved_meals` above, and the same repo function the web
+          // route calls, so the two write paths cannot drift.
+          //
+          // A miss is NOT an error here. `deleteActivityLog` returns false for a row that is absent
+          // or not yours, and quarantining on that would dead-letter the commonest benign replay —
+          // a delete re-sent because its confirmation never landed. The row is gone either way,
+          // which is what the mutation asked for.
+          if (p.deleted) {
+            await this.deleteActivityLog(userId, p.id)
+            processed++
+            continue
+          }
           // Validate against the same schema as the web route (SYNC-P3) — without
           // this, a title-less/type-less local payload minted `String(undefined)`
           // ("undefined") straight into the DB instead of being rejected.

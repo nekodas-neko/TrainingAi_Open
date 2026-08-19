@@ -899,9 +899,18 @@ export async function pushMutations(userId: string): Promise<{ pushed: number } 
       const rec = await store.getDayCheckin(m.date, String(m.payload.phase ?? 'evening'));
       if (rec) await store.upsertDayCheckin({ ...rec, syncStatus: 'synced' });
     } else if (m.domain === 'activity_logs') {
-      const recs = await store.getActivityLogs(m.date);
-      const rec = recs.find(r => r.id === (m.payload.id as string));
-      if (rec) await store.upsertActivityLog({ ...rec, syncStatus: 'synced' });
+      // A delete cannot confirm through the upsert round-trip below (Q-328): `getActivityLogs`
+      // filters `deleted_at IS NULL`, so the row is never found, and `upsertActivityLog` omits
+      // `deleted_at` from its columns anyway. Flipping it to synced is also what makes the
+      // tombstone prunable by the next pull, which checks `sync_status='synced'`.
+      if (m.payload.deleted) {
+        const id = m.payload.id as string | undefined;
+        if (id) await store.markActivityLogSynced(id);
+      } else {
+        const recs = await store.getActivityLogs(m.date);
+        const rec = recs.find(r => r.id === (m.payload.id as string));
+        if (rec) await store.upsertActivityLog({ ...rec, syncStatus: 'synced' });
+      }
     } else if (m.domain === 'fitness_tests') {
       const recs = await store.getFitnessTests(m.date);
       const rec = recs.find(r => r.id === (m.payload.id as string));
