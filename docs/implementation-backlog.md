@@ -713,11 +713,22 @@ Worth reaching for only if the reassign proves harder than it looks.
      `sleep-content`) and should go the same way when those files are converted.
   3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
      19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
-- **⚠ Next slice: `lib/__tests__/q165-cache-seeded-reads.test.ts` will need updating.** It asserts
-  `readCacheSync<` and `cachedFetch<` appear literally in `activity/exercise-review-sheet.tsx`,
-  `activity/activity-detail-sheet.tsx` and `coach/coach-history.tsx` — all three of which are on the
-  remaining list. Converting them to the hook removes both strings and reds that test, which is the
-  test doing its job on a changed mechanism rather than a regression. Update it in the same PR.
+- **✅ SLICE 2 SHIPPED 2026-08-19 (v1.325.7) — four more files, 29 → 25.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-2.md). `health/training-stress-line`
+  (the first real use of slice 1's `today` option), `activity/exercise-review-sheet`,
+  `activity/activity-detail-sheet` (the shared `hr-profile` key in both) and
+  `workout-select-content` (`muscle-recovery`). **The can-bite group is down to 8, all of them in
+  the four tab-screen orchestrators** — `session-select-content` (4), `health-content` (2),
+  `nutrition-content` (2). Those were left for last on purpose: each seeds four to eight keys inside
+  one shared `useLayoutEffect` and feeds screen state other effects also write, so converting them
+  is a state refactor rather than a swap, and should be one file per PR.
+- **Correction to slice 1's note about `lib/__tests__/q165-cache-seeded-reads.test.ts`:** it said
+  that test would red when the two sheets converted. **It did not, and the reason is worth keeping.**
+  It asserts `readCacheSync<` and `cachedFetch<` appear literally in three files; each sheet has
+  *two* fetches, and only the `hr-profile` one is a fetch-once site. The keyed `hr-window:` fetch
+  stays (its key changes per session, and `useCachedValue` has no way to express "no key yet" for a
+  sheet mounted with a null prop), so both strings survive. `coach/coach-history.tsx` has a single
+  fetch and is the one that will actually red — it is in the unmount group, so not soon.
 - **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
 - **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
   are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's

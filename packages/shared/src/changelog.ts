@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.325.7",
+    date: "2026-08-19",
+    changes: [
+      "Four more places keep themselves up to date instead of holding what they loaded at app start: the training-stress line on Health, the heart-rate zone profile behind both activity detail sheets, and the muscle-recovery card on the workout picker.",
+    ],
+  },
+  {
     version: "1.325.6",
     date: "2026-08-19",
     changes: [

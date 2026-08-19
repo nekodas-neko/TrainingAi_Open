@@ -19,7 +19,12 @@ import { cachedFetch, cachedFetchToday, readCacheSync, readTodayCacheSync, isWor
 import { TTL_LONG, MUSCLE_RECOVERY_TTL, NEXT_SESSION_TTL } from '@trainingai/shared/cache-ttl';
 import { MuscleRecoveryCard } from "@/components/workout/muscle-recovery-card";
 import type { MuscleRecoveryEntry } from "@/app/api/muscle-recovery/route";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import type { NextSessionRecommendation } from "@trainingai/shared/types/program";
+
+// Module-level so the no-data fallback keeps one identity across renders — `recoveryMuscles`
+// feeds a useMemo dependency list.
+const EMPTY_RECOVERY: MuscleRecoveryEntry[] = [];
 
 
 function getLastTrainedLabel(session: ProgramSession, tz: string): string {
@@ -82,7 +87,10 @@ export default function WorkoutSelectContent() {
   const [hasSeeded, setHasSeeded] = useState(false);
   const [recommendedId, setRecommendedId] = useState<string | null>(null);
   const [direction, setDirection] = useState(0); // -1 = swiped up (next), 1 = swiped down (prev)
-  const [recoveryMuscles, setRecoveryMuscles] = useState<MuscleRecoveryEntry[]>([]);
+  const recovery = useCachedValue<{ muscles: MuscleRecoveryEntry[] }>(
+    'muscle-recovery', '/api/muscle-recovery', MUSCLE_RECOVERY_TTL,
+  );
+  const recoveryMuscles = recovery?.muscles ?? EMPTY_RECOVERY;
   const [phaseStatus, setPhaseStatus] = useState<import('@/app/api/workout-data/route').PhaseStatus | null>(null);
   const [perSessionPhaseStatus, setPerSessionPhaseStatus] = useState<import('@/app/api/workout-data/route').PerSessionPhaseStatus[]>([]);
 
@@ -140,8 +148,6 @@ export default function WorkoutSelectContent() {
     if (meta?.perSessionPhaseStatus) setPerSessionPhaseStatus(meta.perSessionPhaseStatus);
     const lib = readCacheSync<{ exercises: ExerciseLibraryEntry[] }>("exercise-library");
     if (lib?.exercises?.length) setLibrary(lib.exercises);
-    const recovery = readCacheSync<{ muscles: MuscleRecoveryEntry[] }>("muscle-recovery");
-    if (recovery?.muscles?.length) setRecoveryMuscles(recovery.muscles);
   }, []);
 
   const fetchData = useCallback(async () => {
@@ -198,13 +204,6 @@ export default function WorkoutSelectContent() {
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData, tabEpoch]);
-
-  useEffect(() => {
-    cachedFetch<{ muscles: MuscleRecoveryEntry[] }>(
-      'muscle-recovery', '/api/muscle-recovery', MUSCLE_RECOVERY_TTL,
-      (d) => { if (d?.muscles?.length) setRecoveryMuscles(d.muscles); },
-    ).catch(() => {});
-  }, []);
 
   // ── Touch gesture ─────────────────────────────────────────────────────────
 

@@ -882,7 +882,12 @@ const BASELINE = {
   // the three sibling BLE listeners that should go the same way, the grouping error, and the one
   // test that will red when the next three files convert. An entry that only said "6 of 36 done"
   // would cost the next session all of that.
-  'docs/implementation-backlog.md': 10916,
+  // Raised 2026-08-19 (Lane B, Q-359 slice 2 shipped): the entry still stays in the queue — 25 of
+  // 36 remain — and the added lines are two things the next session needs. One is that the eight
+  // survivors are ALL tab-screen orchestrators and want one file per PR, not another batch. The
+  // other is a correction: slice 1 predicted a named test would red on this slice and it did not,
+  // and a wrong prediction left in the queue costs more than the lines it takes to fix.
+  'docs/implementation-backlog.md': 10927,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
