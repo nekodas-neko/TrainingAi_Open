@@ -77,7 +77,12 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   **Corrected 2026-08-19 by Q-399** — the "0.529 vs 0.369" this line carried was the pitch of a code
   box with **no room for the list underneath it**: the style drew zero ingredient lines for a full
   release. Retuned to 0.401 with three wrapped lines, and the line count is asserted now, not just
-  the code size — [`journal`](../../overview/entries/2026-08-19-label-line-budget.md).
+  the code size. **Superseded again 2026-08-19 by Q-411**, which retired the round constraint
+  entirely — every style draws square, the default is **0.561 with four lines**, and both test
+  thresholds were raised because the square canvas made the old ones unable to fail
+  ([`journal`](../../overview/entries/2026-08-19-square-label-canvas.md)). ⚠ That gain holds only if
+  the owner's circle template **crops**; if it **scales**, the default lands at 0.397 — worse than
+  what it replaced. Unresolved until one test print — [`journal`](../../overview/entries/2026-08-19-label-line-budget.md).
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.
