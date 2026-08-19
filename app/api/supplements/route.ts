@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { SupplementCreateSchema } from '@trainingai/shared/validation/supplement'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One supplement.
+const MAX_BODY_BYTES = 16 * 1024
 
 export async function GET() {
   const session = await auth()
@@ -19,7 +23,13 @@ export async function POST(req: NextRequest) {
 
   // Q-484: unbounded before — a 300,002-character name and a 100,000-character dose were stored in
   // full, while the PATCH sibling capped both at 200. Same bounds now, from one definition.
-  const parsed = SupplementCreateSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = SupplementCreateSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const body = parsed.data
 

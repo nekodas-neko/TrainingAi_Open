@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { google } from "googleapis";
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One calendar event.
+const MAX_BODY_BYTES = 16 * 1024
 
 function makeOAuth2(refreshToken: string) {
   const oauth2 = new google.auth.OAuth2(
@@ -24,11 +28,13 @@ export async function POST(req: NextRequest) {
     endMs: number;
     exercises: { name: string; setWeights: number[]; reps: number[] }[];
   };
-  try {
-    body = await req.json();
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
+  body = read.body as typeof body;
 
   const { sessionType, startMs, endMs } = body;
   if (!sessionType || !startMs || !endMs) {

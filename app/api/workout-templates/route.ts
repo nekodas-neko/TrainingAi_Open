@@ -5,6 +5,10 @@ import { getRepository } from "@/lib/data";
 import { computeDefaultVolumeTargets } from "@trainingai/shared/ai-periodization/volume-targets";
 import type { Program } from "@trainingai/shared/types";
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A whole program with its sessions and exercises.
+const MAX_BODY_BYTES = 256 * 1024
 
 async function getUserId() {
   const session = await auth();
@@ -23,7 +27,13 @@ export async function POST(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json() as { program?: Program; linkPhaseSetOwnership?: boolean; recalibrateCycleAnchor?: boolean; programId?: string };
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const body = (read.body ?? {}) as { program?: Program; linkPhaseSetOwnership?: boolean; recalibrateCycleAnchor?: boolean; programId?: string };
 
   const repo = await getRepository();
 
@@ -126,7 +136,13 @@ export async function DELETE(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json() as { id?: string; name?: string };
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const body = (read.body ?? {}) as { id?: string; name?: string };
   if (!body.id && !body.name) return NextResponse.json({ error: "Missing id or name" }, { status: 400 });
 
   const repo = await getRepository();

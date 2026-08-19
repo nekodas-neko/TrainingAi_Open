@@ -10,6 +10,10 @@ import { weeklyZoneTargets } from '@trainingai/shared/running/zone-targets'
 import { CARDIO_GOALS } from '@trainingai/shared/running/cardio-goals'
 import type { GoalKind, Prescription, RunType } from '@trainingai/shared/running/types'
 import { assembleInputs, resolveSnapshot } from '@trainingai/shared/running/assemble-plan-context'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One override.
+const MAX_BODY_BYTES = 16 * 1024
 
 // POST responses aren't browser-cached regardless, but explicit no-store keeps this consistent
 // with GET /api/running-plan — see the comment there on why max-age is wrong for this data.
@@ -34,7 +38,13 @@ export async function POST(req: Request) {
   if (!rateLimit(`${userId}:running-plan`, 20, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const parsed = OverrideBody.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = OverrideBody.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
