@@ -546,6 +546,12 @@ export interface LocalDayCheckin {
   sleepQualityFeelTouched:   boolean;
   soreMuscles:       string[];
   journal:           string | null;
+  /** Q-387 — ISO timestamp of "I have finished logging today"; null or absent means not marked.
+   *  Both read as EXCLUDED by the maintenance calibration, never as assumed-complete.
+   *  **Optional on purpose**: rows written by the check-in sheets predate this field and say
+   *  nothing about food logging, so requiring it would force every unrelated caller to state a
+   *  value it has no opinion on. */
+  foodLoggingCompletedAt?: string | null;
   updatedAt:         string;
   deletedAt:         string | null;
   syncStatus:        'pending' | 'synced';

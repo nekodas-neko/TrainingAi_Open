@@ -487,6 +487,10 @@ export const dayCheckins = pgTable('day_checkins', {
   sleepQualityFeelTouched:   boolean('sleep_quality_feel_touched').notNull().default(false),
   soreMuscles:       text('sore_muscles').array().notNull().default([]),
   journal:           text('journal'),
+  /** Q-387 — "I have finished logging today". NULL means not marked, which the maintenance
+   *  calibration reads as EXCLUDED rather than as assumed-complete: the failure mode has to be
+   *  "the estimate waits", not "the estimate is quietly wrong". Undo sets it back to NULL. */
+  foodLoggingCompletedAt: timestamp('food_logging_completed_at', { withTimezone: true }),
   createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
