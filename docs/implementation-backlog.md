@@ -1066,71 +1066,6 @@ and a denylist for the health routes. There is also a **prior decision against a
 stays in Railway, no CSP changes"*) — that decision has since been reversed by the owner, and the CSP
 note is a live consideration for the WebView, not a stale one.
 
-### [activity][app-shell] Q-488 — deleting an activity leaves it in the local store, so three other screens keep showing it
-
-- **⛔ RE-TAGGED TO LANE A 2026-08-18 — the "one call in one Lane B handler" shape below is not
-  buildable, and the obvious version of it is a silent no-op.** `lib/local-store` has **no
-  `deleteActivityLog`**; the `deleteActivityLog` that greps are `repo.deleteActivityLog`
-  (`lib/data/repository.ts:547`, `adapter.ts:2374`) — the *server* repository, which is what the
-  route already calls. The nearest local method is `upsertActivityLog`, and **its INSERT column list
-  and its `ON CONFLICT DO UPDATE SET` both omit `deleted_at` entirely** (27 columns, 27 placeholders,
-  `sqlite-backend.ts:2607`). So a read-merge upsert setting `deletedAt: now` compiles, type-checks,
-  passes lint, and **changes nothing** — `getActivityLogs` filters `deleted_at IS NULL`
-  (`sqlite-backend.ts:824`) against a column the write never touches. That was written and reverted
-  here before it shipped; it is the exact shape a future session will reach for first.
-- **What the fix actually needs:** a `deleteActivityLog(id)` on the local store —
-  `lib/local-store/index.ts` (interface) + `lib/local-store/sqlite-backend.ts` (soft-delete
-  statement, matching `deleteFoodLog`/`deleteInjury`) — **then** the one call in
-  `app/health/health-content.tsx`. Two of those three files are Lane A's by the ownership list, so
-  **Lane A takes the whole item**; splitting it leaves Lane B's call site pointing at a method that
-  does not exist. The Lane B half is four lines and is the last step, not the first.
-- **The `CLAUDE.md` rule this item asked for is already landed** (Lane B, same day) — the inverse of
-  the offline-first rule, in the Offline-First section. Do not re-add it.
-- **✅ SCOPE BOUNDED 2026-08-18 — the *audit* still holds: this is the ONLY instance.**
-  Every mutating write to a local-first domain was audited for a local-store call **inside the
-  handler**: `injury-sheet` (PATCH+DELETE), `nutrition-content` (DELETE), `quick-edit-log-sheet`
-  (PATCH), `saved-meals-sheet` (DELETE), `manage-supplements-sheet` (DELETE+PATCH),
-  `done-activity-screen` (PATCH) — **all eight write locally**. Only this handler does not.
-  [`docs/reviews/2026-08-18-local-first-write-coverage.md`](reviews/2026-08-18-local-first-write-coverage.md)
-- **Branch:** `fix/activity-delete-updates-local-store`
-- **Added:** 2026-08-18 · review sweep (staleness outside Q-262's test) ·
-  [`docs/reviews/2026-08-18-server-only-writes-to-local-first-domains.md`](reviews/2026-08-18-server-only-writes-to-local-first-domains.md)
-- **Placement:** mid. Visible inconsistency, **not data loss**, and it self-heals — but the fix is one
-  call and the shape is a rule the codebase implies and does not state.
-- **What.** `app/health/health-content.tsx:684-700` deletes via
-  `fetch("/api/activity-logs", { method: "DELETE" })`, toasts *"Deleted"*, calls
-  `invalidateActivityWrites()` and `refreshDayOverlay(...)`. **No `store.deleteActivityLog(...)`, no
-  `queueMutation`.**
-- **The screen the user is on is correct**, which is why this survived: `refreshDayOverlay` →
-  `fetchDayOverlay` reads `cachedFetch('day-log:<date>')`, which is **server-read by design** (a
-  cross-domain aggregate — the sanctioned exception). The activity vanishes there immediately.
-- **The local `activity_logs` row is untouched**, and three surfaces read it local-first:
-  - `app/session-select/session-select-content.tsx:500` — `store.getActivityLogs(weekStart)`
-  - `app/nutrition/nutrition-content.tsx:278` — today's calories burned
-  - `components/health/activity-history-card.tsx:91`
-- **How long:** `pullDelta` is throttled to `MIN_SYNC_INTERVAL_MS` = **5 minutes** unless forced
-  (`sync-engine.ts:77`), and `sync-provider.tsx:145,195` calls it **un-forced**. Nothing in the delete
-  path triggers a pull, so the floor is that window and the real duration is "until the next natural
-  sync".
-- **It self-heals — say so when triaging.** `applyDelta` applies the tombstone
-  (`DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, `sqlite-backend.ts:1628`) with
-  the correct pull-clobber guard. The server delete is a **soft** delete with a `user_id`-scoped
-  tombstone (`adapter.ts:2374`). Nothing is lost; something wrong is shown for a while.
-- **Fix shape:** see the re-tag note at the top of this entry. The sibling paths cited here
-  (`done-activity-screen.tsx`, `exercise-review-sheet.tsx`, `walk-summary.tsx`) are **upserts, not
-  deletes** — they are precedent for writing locally, not for a local-delete call that exists.
-  Queuing the delete so it works offline is a **separate, larger** question for this domain — do not
-  fold it in silently.
-- **The rule this breaks is now written down** — `CLAUDE.md`, Offline-First section, immediately
-  above the forward-direction rule it inverts: a domain the UI reads local-first must have *every*
-  write update the local store, deletes included, and including writes made from a screen that
-  itself reads server-side. That last clause is why nothing on the originating screen could reveal
-  it.
-- **Lane A owns this** (`lib/local-store/**` is the load-bearing half; `app/health/**` is four lines
-  at the end). Re-tagged from Lane B — see the top of this entry.
-- **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
-  readers fall through to their API fallbacks and the inconsistency cannot appear there. The 5-minute
-  floor is read from `MIN_SYNC_INTERVAL_MS`, not observed. On-device is the only real verification.
 
 ### [platform] Q-483 — three routes return the raw driver error to the client, including the full SQL and every column name
 
@@ -5682,11 +5617,14 @@ session working from a temporarily restored copy.
 - **`adaptive-tdee.ts` already anticipated this.** Its header warns an ungated estimate *"would tell
   the user their maintenance is 1200 kcal — actively harmful advice"*. This measures whether the gates
   hold. **They hold 75% of the time; the lowest value that gets through is 1,052 kcal.**
-- **Input condition (not a defect, nothing filed):** the food log captures **~45%** of actual intake —
+- **Input condition (not a defect, nothing filed):** the food log captures **~50%** of actual intake —
   44 logged days of 110, mean **1,223 kcal**, 43% of logged days under 1,200, 4.8 entries/day. Against
   75 weigh-ins over 109 days (slope **+8.0 g/day** = **+62 kcal/day** balance) and a Cunningham BMR of
-  **1,698** × 1.55 = predicted TDEE **2,632**, implied actual intake is **~2,694**. Taking the log at
+  **1,547** × 1.55 = predicted TDEE **2,397**, implied actual intake is **~2,459**. Taking the log at
   face value implies maintenance **1,161 — below BMR**, which is arithmetic proof of under-logging.
+  *(Corrected 2026-08-19: first filed as 1,698 / 2,632 / 2,694 / 45%, computed from the textbook
+  Cunningham `500 + 22×LBM` **from memory**. The app uses `cunninghamBmr = ffm×21.6 + 370`
+  (`body-composition.ts`), matched to Oura's `atlas`. Conclusion unchanged; magnitudes overstated.)*
 - **Replay of the shipped gates**, every rolling window:
 
   | outcome | 14-day (97) | 28-day (83) |
@@ -5702,17 +5640,19 @@ session working from a temporarily restored copy.
 - **The values are also unstable** — 1,052–2,219 for the same person within weeks (a 1,167 kcal range).
 - **Why the coverage gates cannot catch it:** `MIN_LOGGED_FRACTION` counts **days carrying a log**, not
   whether each day's log is **complete**. A day with only breakfast counts as fully logged — exactly
-  this owner's pattern — so a 45%-complete record sails through a 70%-coverage gate. **The gates
+  this owner's pattern — so a 50%-complete record sails through a 70%-coverage gate. **The gates
   measure the wrong kind of incompleteness.**
 - **It reaches the user's target.** `TdeeAdaptationCard` writes the accepted value through
   `PUT /api/nutrition/targets`, which its own docstring calls the source of truth for the daily target,
   mirroring into `users.calorie_goal`. A 1,052 maintenance is one tap from becoming the calorie goal of
-  someone whose BMR is 1,698.
+  someone whose BMR is 1,547.
 - **First action: replace `MIN_PLAUSIBLE_MAINTENANCE` with the user's own BMR.** Maintenance below BMR
   is impossible *by definition*, not implausible by taste, and `cunninghamBmr` is already imported in
-  the same package. Measured: 14-day passing 23 → **11**, range **1,902–2,219**; 28-day 22 → **10**,
-  range **1,707–1,889**. Every harmful value blocked.
-- **It makes the estimate SAFE, not CORRECT.** Survivors still sit ~500 kcal under the formula's 2,632
+  the same package. Measured **at the app's own BMR of 1,547**: 14-day passing 23 → **13**, range
+  **1,592–2,219**; 28-day 22 → **13**, range **1,565–1,889**. Every harmful value blocked.
+  *(Corrected 2026-08-19 from a 1,698 floor, which blocked more than the app's BMR would — 11 and 10
+  passing. The proposal is unaffected; it simply blocks fewer windows than first stated.)*
+- **It makes the estimate SAFE, not CORRECT.** Survivors still sit well under the formula's 2,397
   — residual under-logging showing through. Do not describe the floor as a fix for accuracy.
 - **Two things NOT to do:** (1) **do not raise `MIN_LOGGED_FRACTION`** — it already refuses 75% of
   windows and structurally cannot see within-day incompleteness, so raising it drops good windows and

@@ -692,13 +692,16 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         body: JSON.stringify({ id: deleteActivity.id }),
       });
       if (!res.ok) throw new Error();
+      // Q-488: three other screens read activity_logs local-first, so a server-only delete left it
+      // visible there until the next sync. See deleteActivityLog in sqlite-backend for the why.
+      if (userId) await getLocalStore(userId)?.deleteActivityLog(deleteActivity.id).catch(() => {});
       toast.success("Deleted");
       setDeleteActivity(null);
       await invalidateActivityWrites();
       refreshDayOverlay(dayOverlay.date);
     } catch { toast.error("Failed to delete"); }
     finally { setMutating(false); }
-  }, [deleteActivity, dayOverlay, refreshDayOverlay]);
+  }, [deleteActivity, dayOverlay, refreshDayOverlay, userId]);
 
   const lastSleep = sleepRows[0] ?? null;
   // Only treat sleep as "recent" if it's from last night or today — prevents
