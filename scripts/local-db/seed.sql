@@ -29,8 +29,15 @@ DECLARE
 BEGIN
   -- ── User ────────────────────────────────────────────────────────────────
   -- password is "testpass123"
-  INSERT INTO users (email, name, display_name, is_active, timezone, sex, height_cm, weight_goal_kg, password_hash)
-  VALUES ('test@local.dev', 'Test User', 'Test User', true, 'Australia/Brisbane', 'male', 180, 80, '$2b$10$ccKSMzFRkJGPfCkKKOhCGuv8c8kbYJnUbszPj55iS3VGyG0ih.KmS')
+  --
+  -- `date_of_birth` is here because `computeEnergyBalance` needs an age (Q-361): without it the
+  -- Energy card on day detail and the energy bar on Nutrition render blank locally even once the
+  -- model constants are readable, so a session verifying either screen would see nothing and have
+  -- no way to tell that apart from a bug. Fixed rather than derived from `now()` — the value only
+  -- has to produce a plausible adult age, and a moving one would make any energy figure computed
+  -- from it drift between sessions for no reason.
+  INSERT INTO users (email, name, display_name, is_active, timezone, sex, height_cm, date_of_birth, weight_goal_kg, password_hash)
+  VALUES ('test@local.dev', 'Test User', 'Test User', true, 'Australia/Brisbane', 'male', 180, DATE '1993-06-15', 80, '$2b$10$ccKSMzFRkJGPfCkKKOhCGuv8c8kbYJnUbszPj55iS3VGyG0ih.KmS')
   RETURNING id INTO uid;
 
   -- ── Progression style ──────────────────────────────────────────────────
