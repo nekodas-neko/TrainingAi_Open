@@ -17,6 +17,11 @@ import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// The schema's own caps total well under 100 KB (200 excluded foods x 80 chars is the largest
+// array). 256 KB is generous past that.
+const MAX_BODY_BYTES = 256 * 1024
 
 /**
  * Generate a meal-plan DRAFT. Persists nothing — the client reviews and then POSTs to
@@ -91,10 +96,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
   }
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const parsed = RequestSchema.safeParse(raw)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = RequestSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

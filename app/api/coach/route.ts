@@ -11,6 +11,20 @@ import { buildChatTools } from '@/lib/ai-chat/tools'
 import { buildWidgetTools } from '@/lib/coach/tools'
 import { resolveDanglingWidgetCalls } from '@/lib/coach/dangling-widgets'
 import { errorLog } from '@trainingai/shared/logger'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+/**
+ * Sized from production, not guessed. The schema caps a conversation at 60 messages but each is
+ * `z.unknown()`, so it bounds the count and nothing else. Measured against the real
+ * `coach_messages` table: **max 52,571 bytes, mean 9,463** over the 20 messages that exist. Sixty of
+ * the observed maximum is 3.1 MB, so 8 MB is ~2.5x a already-pessimistic construction while still
+ * refusing the 20 MB body this sweep exists to stop.
+ *
+ * Stated honestly: 52 KB is the **owner's** observed maximum — `claude_ro` is row-scoped to one
+ * user — so it is a floor on the true maximum, which is why the headroom is generous rather than
+ * tight. Do not lower it without re-measuring; a rejected body here loses a live conversation.
+ */
+const MAX_BODY_BYTES = 8 * 1024 * 1024
 
 const BodySchema = z.object({
   messages: z.array(z.unknown()).min(1).max(60),
@@ -131,7 +145,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
     }
 
-    const parsed = BodySchema.safeParse(await req.json().catch(() => null))
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok) {
+      return read.reason === 'too_large'
+        ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+        : NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+    }
+    const parsed = BodySchema.safeParse(read.body)
     if (!parsed.success) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
 
     const tz = session.user?.timezone ?? DEFAULT_TZ
