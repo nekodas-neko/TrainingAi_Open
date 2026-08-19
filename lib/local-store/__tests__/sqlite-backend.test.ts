@@ -425,6 +425,37 @@ describe('deleteExerciseLogLocally / updateExerciseLogLocally sync_status (SYN-4
     expect(setStmt).toContain(`sync_status='synced'`)
   })
 
+  // Q-488: the same instant-match reasoning, on the delete that was missing entirely. Here 'pending'
+  // would be worse than merely wrong — applyDelta reaps the row with
+  // `DELETE … WHERE id = ? AND sync_status='synced'`, so a pending row blocks its own tombstone.
+  it('deleteActivityLog soft-deletes and marks it synced, not pending', async () => {
+    await store.deleteActivityLog('al-1')
+    const stmt = sqlCalls().find(s => s.includes('UPDATE activity_logs'))!
+    expect(stmt).toContain('deleted_at=?')
+    expect(stmt).toContain(`sync_status='synced'`)
+    expect(stmt).not.toContain(`sync_status='pending'`)
+  })
+
+  it('deleteActivityLog scopes the write to the one id and stamps updated_at', async () => {
+    await store.deleteActivityLog('al-1')
+    const call = runSQL.mock.calls.find(c => String(c[0]).includes('UPDATE activity_logs'))!
+    expect(String(call[0])).toContain('WHERE id=?')
+    const params = call[1] as unknown[]
+    expect(params[2]).toBe('al-1')
+    // deleted_at and updated_at both stamped, and with the same instant.
+    expect(params[0]).toBe(params[1])
+  })
+
+  // Q-488 recorded that the first thing a session reaches for is a read-merge `upsertActivityLog`
+  // with `deletedAt: now`. It compiles, type-checks, passes lint — and changes nothing, because that
+  // method's INSERT column list and its ON CONFLICT DO UPDATE both omit deleted_at. This pins the
+  // trap: if someone adds deleted_at to the upsert, this test fails and points at deleteActivityLog.
+  it('upsertActivityLog does NOT touch deleted_at — a "soft delete via upsert" is a silent no-op', async () => {
+    await store.upsertActivityLog(activityLog)
+    const stmt = sqlCalls().find(s => s.includes('INSERT INTO activity_logs'))!
+    expect(stmt).not.toContain('deleted_at')
+  })
+
   it('updateExerciseLogLocally marks the exercise_log and each set synced, not pending', async () => {
     await store.updateExerciseLogLocally('el-1', [
       { setNumber: 1, weightKg: 100, reps: 5, intensityPct: 80 },
