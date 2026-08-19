@@ -25,9 +25,8 @@
 // Slices so far — 1: the three routes reachable **without a session** (`auth/register`,
 // `auth/exchange-mobile-token`, `health-connect/ingest`), deliberately absent from the baseline so
 // re-adding a bare read to any of them fails immediately.  2: the offline-first hot paths.
-// 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths
-// (`oura-ble/accel-chunks`, `live-steps`, `rekey`, both sample backfills, `samples/pack`,
-// `hr-ingest`, `sync-health`).
+// 3: the credential and admin-write ones.  4: the AI/expensive ones.  5: the device ingest paths.
+// 6: the workout and activity write routes.
 // 9: everything the numbered slices left over — the periodization, running-plan, phase-set,
 // progression-style, friends, injuries, supplements, digest, mood and calendar routes.
 'use strict';
@@ -47,8 +46,6 @@ function stripComments(src) {
 
 // Shrink-only. Each number is how many bare reads that file still has.
 const BASELINE = {
-  'app/api/activity-logs/[id]/metrics/route.ts': 1,
-  'app/api/activity-logs/route.ts': 2,
   'app/api/admin/activity-types/route.ts': 2,
   'app/api/admin/db-query/route.ts': 1,
   'app/api/admin/exercises/route.ts': 2,
@@ -57,9 +54,6 @@ const BASELINE = {
   'app/api/admin/invites/route.ts': 2,
   'app/api/admin/mirror-dataset-gifs/route.ts': 1,
   'app/api/admin/timing-baseline/route.ts': 1,
-  'app/api/confirm-early-deload/route.ts': 1,
-  'app/api/exercise-estimates/route.ts': 1,
-  'app/api/fitness-tests/route.ts': 2,
   'app/api/nutrition-goals/[id]/route.ts': 1,
   'app/api/nutrition-goals/recommend/route.ts': 1,
   'app/api/nutrition/dietary-restrictions/route.ts': 1,
@@ -74,11 +68,6 @@ const BASELINE = {
   'app/api/nutrition/saved-meals/[id]/route.ts': 1,
   'app/api/nutrition/saved-meals/route.ts': 1,
   'app/api/nutrition/targets/route.ts': 1,
-  'app/api/workout-entry/route.ts': 2,
-  'app/api/workout-review/session/[sessionId]/apply/route.ts': 1,
-  'app/api/workout-sessions/route.ts': 1,
-  'app/api/workout-sessions/rpe/route.ts': 1,
-  'app/api/workout/backfill-set-hr-stats/route.ts': 1,
 };
 
 const counts = new Map();

@@ -4,6 +4,10 @@ import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { computeWorkoutHr } from '@trainingai/shared/workout/compute-workout-hr'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One tuning number; the body is optional.
+const MAX_BODY_BYTES = 4 * 1024
 
 // Per-set HR snapshot backfill (plan 2026-07-21-per-set-hr-metrics) — admin-triggered, bounded,
 // resumable. Materialises set_hr_stats (migration 139) for completed sessions still inside the 180d
@@ -27,8 +31,12 @@ export async function POST(req: Request) {
   }
 
   let maxRows = 100
-  const body = await req.json().catch(() => null)
-  const n = body?.maxRows
+  // Optional body: only an oversized one is refused, an absent or unreadable one uses the default.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+  }
+  const n = read.ok ? (read.body as { maxRows?: unknown } | null)?.maxRows : undefined
   if (typeof n === 'number' && Number.isFinite(n) && n > 0) maxRows = Math.min(Math.round(n), 1000)
 
   const repo = await getRepositoryAsync()

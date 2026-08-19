@@ -26,6 +26,14 @@ totals and hourly movement, and activity auto-detection (the "activity detected"
   — §1.2 measured the Activity Score in production after v2: sd 5.9 over 19 days, range 66–91, 10
   distinct values. **v2 fixed the mechanism Q-137 blamed and the outcome did not move** (Q-277),
   and the score exists on only 19 of 40 days (Q-278).
+- [`docs/reviews/2026-08-19-daily-vs-weekly-windows.md`](../../reviews/2026-08-19-daily-vs-weekly-windows.md) — **daily goal vs weekly target, 2026-08-19 — reshapes Q-505.**
+  `DEFAULT_ZONE_MINUTES_GOAL = 22` is **WHO's 150 min/week ÷ 7**, and that division loses the
+  guideline: 150 minutes in three sessions satisfies WHO and fails the daily goal four days in seven.
+  **Rule — match each contributor's window to its guideline's own unit**; applied across all six,
+  exactly one is wrong. **Recommendation: split into a daily number** (`steps`, `moveHours`,
+  session-happened) **and a weekly one** (active minutes vs WHO 150, strength frequency, tonnage).
+  **This retires `strengthFreq`'s ceiling as a defect** — 100 on 78% of days is correct behaviour for
+  a weekly compliance metric; its scorecard was the problem, not its ceiling.
 - [`docs/reviews/2026-08-19-active-minutes-who-threshold.md`](../../reviews/2026-08-19-active-minutes-who-threshold.md) — **the active-minutes threshold, fitted 2026-08-19 — read before touching
   `activeMinutesFromZoneSeconds`** (Q-523 answered). Its comment claims the WHO convention and is
   **one band off it**: it treats Zone 2 (**≥60% reserve**) as *moderate*, but WHO/ACSM moderate is
