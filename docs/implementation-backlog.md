@@ -925,6 +925,14 @@ foods'"***.
   across, or say in the PR which was intentionally dropped.
 - Ordering within `My Foods`: most recently used first, so the merge does not bury saved meals under
   one-off foods.
+- **⚠ The merge is a RENAME as well as a merge, and the rename has to be swept.** The owner spotted
+  the half-done version immediately — *"So im picking up a discrepancy between My Meals and My
+  foods? Whats the difference"* — against a prototype that still had a `My Meals` screen beside a
+  `My Foods` tab. There is no difference, and that is the point: **two names for one list is the
+  defect**. Grep for every user-facing occurrence of *Saved meals*, *My Meals* and *My Foods* —
+  sheet titles, tab labels, empty states, toasts, the `+ Add food` destinations, the nav copy — and
+  land on the single name in one pass. A surface left on the old name reads as a second list that
+  is missing rows.
 
 **18 — Sheets not yet drawn, listed so they are not assumed done.** `FoodLoggerSheet` review and
 assign steps (only capture is drawn) · `QuickEditLogSheet` · `WaterLogSheet` · `FoodLibrarySheet` ·
@@ -1223,6 +1231,19 @@ Copying the 5 MB cap here would be the largest single regression the sync engine
 - **What it costs if the cap slips:** nothing fails loudly. The outbox gets slower, the local DB
   grows, and the first symptom is a sync that times out on a bad connection. Put the byte cap in a
   named constant next to the column, not inline in the route.
+
+**Where the upload lives — unspecified until now, and asked for on 2026-08-19.** The owner, looking
+at the prototype: *"Edit meal doesnt contain an image upload seciton; did we agree on this? with a
+base64 small DB? Ideally stored locally"*. The storage answer is yes and it is above — base64 data
+URI, on the device, which is what "stored locally" means here and is the whole reason it is not a
+URL. What this entry never said is **which screen uploads it**. Recommendation: a **64 px tile to
+the left of the meal-name field in Edit Meal**, tapping to camera/gallery, long-press or a clear
+action to remove. Reasons: Edit Meal already owns the meal and already saves it, so the image rides
+the existing write rather than needing its own; and the tile doubles as the preview, so there is no
+separate "current photo" row. Drawn in the prototype at
+<https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6> (screen 4, tap the tile).
+**Show the byte size on the tile after a pick** — this entry's whole risk is the cap slipping, and a
+number the user can see is the cheapest possible tripwire.
 
 **The zero-cost alternative, worth shipping first if this slips.** No photo at all: a Lucide glyph
 on a tinted tile, keyed off the meal's dominant macro or its meal type. No migration, no sync
