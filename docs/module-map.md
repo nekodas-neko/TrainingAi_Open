@@ -92,6 +92,7 @@ cache-invalidation rules in `CLAUDE.md`.
 | Concern | Use |
 |---|---|
 | Fetch + cache (background revalidate) | `cachedFetch<T>(key, url, ttl)`; today-scoped: `cachedFetchToday` |
+| **A component that reads a cached key** | **`useCachedValue(key, url, ttl)`** (`lib/hooks/use-cached-value.ts`) — seeds, fetches, and **refetches when the key is invalidated**. Use this instead of a hand-rolled `useEffect(() => { cachedFetch(…) }, [])`: that shape never re-runs, so a component in the persistent tab shell holds its first payload until the app is killed (Q-402, the owner's report). Built on `subscribeToInvalidation` in `lib/sqlite/cache.ts`, which `invalidateCache` fires after the delete lands |
 | Synchronous seed for instant paint | `readCacheSync<T>(key)`, `readTodayCacheSync<T>(key)` |
 | Direct read/write/update | `getCached`, `setCached`, `updateCache` |
 | Invalidate after a write | **A named group in `lib/cache-groups.ts`** — never a hand-rolled key list |
