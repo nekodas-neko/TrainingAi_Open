@@ -332,6 +332,7 @@ and the answers live in the entries rather than here:
 | decided | where it is written | build order |
 |---|---|---|
 | Label styles all draw **square** | **Q-411**, filed at the top of the queue | **1st — small, self-contained, retires a constraint** |
+| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **2nd — it is the gate on every print test** |
 | Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
 | Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
 | Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
@@ -341,8 +342,10 @@ and the answers live in the entries rather than here:
 **Two things carry a caveat rather than a blocker, and both resolve on the same physical print:**
 Q-411's area gain is real only if the owner's circle template *crops* rather than *scales* (the
 arithmetic is in that entry), and Q-400's saved PNG currently declares no physical size at all, so
-it prints at 312 mm. One print with a ruler answers both — **do Q-400's delivery fix first, then
-print once.**
+it prints at 312 mm. **That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19:
+*"I can only do a print once the option to save to gallery exists"*. There is no export path on the
+APK, so **Q-400 moved to 2nd in this queue** and is the gate on three separate answers. Ship Q-411
+anyway without waiting for it, and leave the scannability claim unverified rather than asserted.
 
 **Q-406 (`food-row.tsx`) is still the gate for the visual work** and has not moved: both landing
 files sit on the 800-line limit, and Q-395, Q-398 and the tab merge all want that component.
@@ -397,7 +400,12 @@ opposite ways:
   50 ÷ √2 = **35.4 mm**, and the module falls to **0.397 mm** — *fractionally worse than the 0.401
   it replaces.* Every gain above evaporates and the change is a small regression.
 
-**Resolve it with one test print, and it is the same print Q-400 already owes** (save the PNG,
+**Resolve it with one test print — but that print is BLOCKED until Q-400 ships**, because there is
+no way to get the PNG off the device at all today (*"I can only do a print once the option to save
+to gallery exists"*). **This entry can and should still ship without it**: the square canvas is a
+simplification worth having either way, and holding a small self-contained change behind another
+lane's APK work helps nobody. Ship it, and leave the scannability claim unverified in the PR rather
+than asserting it. **It is the same print Q-400 already owes** (save the PNG,
 measure the code with a ruler against the `metrics.codeMm` figure the sheet displays). Until that
 print is done, **do not describe this entry as a scannability improvement** — describe it as a
 simplification that is *expected* to improve scannability. If the template turns out to scale rather
@@ -419,6 +427,85 @@ release.
   test). Then re-run `e2e/meal-label.spec.ts`, which decodes the rendered code. **Neither proves the
   print**, so the test print above is the acceptance criterion, and the PR should say plainly that
   it was or was not done.
+
+### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
+
+- **Branch:** `fix/label-save-to-gallery`
+- **Added:** 2026-08-18 · owner, on v1.324.6: *"the share button doesnt do anything - it should give
+  a download to gallery/images when clicking it."*
+- **Lane A** if it needs a Capacitor plugin or a Kotlin bridge (it does — see below), which also
+  means **a new APK**. State that in the PR: this half does not reach the device through a Railway
+  deploy.
+
+**Why it does nothing.** `meal-label-sheet.tsx` has two paths and both miss on the canonical runtime:
+1. `navigator.canShare?.({ files: [file] })` — share-*with-files* is narrower than share-with-text
+   and is not reliably available in the Samsung WebView, so the guard correctly returns false and
+   falls through. The guard is right; there is just nothing behind it.
+2. The fallback is `<a download>` on a blob URL — and **the code's own comment says this is
+   unreliable inside the WebView**, which is why it was written as the fallback. It is a silent
+   no-op there: no error, no file, no toast. Exactly what the owner reports.
+
+So the feature has only ever worked in `pnpm dev`. This is the failure class CLAUDE.md names
+directly — green on web, dead on the device, because the failing path is unreachable in the sandbox.
+
+**What to build.** A native save, not a better guess at a web API.
+- Write the PNG with **`@capacitor/filesystem`**, then make it visible to the gallery. On Android a
+  file written to app storage is invisible to the Photos app until it is registered with
+  **MediaStore** — writing to `Directory.Documents` and hoping is the trap here. Either use a
+  community MediaStore plugin or add a small Kotlin bridge beside `OuraBlePlugin`.
+- Keep the **share sheet** as a second, explicitly-labelled action: saving to the gallery and handing
+  the PNG to a label-printer app are different intents, and the owner asked for the first. One button
+  doing whichever happens to be available is what produced this bug.
+- **Fail loudly.** Every branch ends in a toast — saved, shared, or failed. A silent path is what made
+  this invisible for a release.
+
+- **⚠ Do not "fix" this by removing the `canShare` guard.** Calling `navigator.share` with files where
+  it is unsupported rejects, and the existing catch swallows `AbortError` — which would turn a dead
+  button into a dead button that also lies in the log.
+- **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
+  Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
+- **Related:** the label this saves was missing its ingredient list — **Q-399, fixed 2026-08-19
+  (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
+  one the owner picked.
+
+**A second defect on the same button, found 2026-08-19 — the PNG has no physical size, so it prints
+at the wrong size even once it reaches the gallery.** The owner's ask is *"download in full res to
+print onto a label"*, and **the resolution half is already done**: `DEFAULT_RENDER_SCALE = 6.24`
+makes a 50 mm label **1,179 px, which is 600 dpi** (`meal-label-render.ts:23`), and the docstring is
+explicit that *"the canvas IS the printed artwork"*. Nothing needs to be raised. **What is missing is
+the metadata that tells a printer what those pixels are worth.**
+- `canvas.toBlob(res, 'image/png')` (`meal-label-sheet.tsx:73`) writes a PNG with **no `pHYs`
+  chunk** — the canvas API has no way to set one. A PNG without `pHYs` has no declared physical
+  size, so every print path falls back to its own default, which is **96 dpi** almost everywhere.
+- The arithmetic is the whole bug: **1,179 px ÷ 96 dpi = 12.3 inches ≈ 312 mm**. A label drawn to be
+  50 mm arrives as a third of a metre. On a label printer with fixed media it will not fit at all;
+  in a print dialog the user has to notice and hand-set the scale to ~16%, every time.
+- **Fix:** inject a `pHYs` chunk declaring 600 dpi (23,622 pixels/metre, unit = 1) into the blob
+  before it is saved or shared. It is a 21-byte chunk spliced after `IHDR` with its own CRC — a
+  small pure function, so it gets a unit test that reads the chunk back rather than a visual check.
+  Write it in `packages/shared` beside the renderer so both the save and the share path use it; two
+  copies of this would drift and only one of them is easy to notice.
+- **This is invisible in every check we run.** The PNG is valid, the pixels are correct, the E2E
+  decodes the QR fine — the defect only appears on paper, which is also why it survived the 300→600
+  dpi change that was made specifically for print quality. **Verification is a physical print**: send
+  the saved file to the label printer and measure the code with a ruler. `metrics.codeMm` in the
+  sheet says what it should measure, so the check is exact rather than a judgement call.
+- **Order matters:** there is no point testing this before the save path exists. Fix the delivery
+  first, then the metadata, then print once and measure — one print proves both halves.
+
+**⚠ THIS ENTRY IS NOW A GATE ON Q-411 TOO, and the owner has said so outright:** *"I can only do a
+print once the option to save to gallery exists"*. Nothing reaches a printer until this ships —
+there is no export path at all on the APK. That makes one PR the blocker for **three** separate
+verifications:
+1. this entry's own delivery fix (does the file reach the gallery),
+2. the `pHYs` metadata above (does it print at 50 mm rather than 312), and
+3. **Q-411's central claim** — whether the owner's circle template crops the corners (module holds
+   at 0.56 mm) or scales the square inside the circle (module falls to 0.397, and the change is a
+   small regression instead of a 40% gain).
+**Treat it as higher priority than its queue position suggests**, and when it ships, tell the owner
+in the same breath that the print test is now unblocked — all three answers come from one print with
+a ruler.
+
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
@@ -1231,71 +1318,6 @@ silently breaks upgraded devices while every test and fresh install passes.
 - **Not in scope:** photos on individual food items or on logged entries. One image per *saved
   meal*, which is the surface the owner asked about and the only one where the row is durable.
 
-### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
-
-- **Branch:** `fix/label-save-to-gallery`
-- **Added:** 2026-08-18 · owner, on v1.324.6: *"the share button doesnt do anything - it should give
-  a download to gallery/images when clicking it."*
-- **Lane A** if it needs a Capacitor plugin or a Kotlin bridge (it does — see below), which also
-  means **a new APK**. State that in the PR: this half does not reach the device through a Railway
-  deploy.
-
-**Why it does nothing.** `meal-label-sheet.tsx` has two paths and both miss on the canonical runtime:
-1. `navigator.canShare?.({ files: [file] })` — share-*with-files* is narrower than share-with-text
-   and is not reliably available in the Samsung WebView, so the guard correctly returns false and
-   falls through. The guard is right; there is just nothing behind it.
-2. The fallback is `<a download>` on a blob URL — and **the code's own comment says this is
-   unreliable inside the WebView**, which is why it was written as the fallback. It is a silent
-   no-op there: no error, no file, no toast. Exactly what the owner reports.
-
-So the feature has only ever worked in `pnpm dev`. This is the failure class CLAUDE.md names
-directly — green on web, dead on the device, because the failing path is unreachable in the sandbox.
-
-**What to build.** A native save, not a better guess at a web API.
-- Write the PNG with **`@capacitor/filesystem`**, then make it visible to the gallery. On Android a
-  file written to app storage is invisible to the Photos app until it is registered with
-  **MediaStore** — writing to `Directory.Documents` and hoping is the trap here. Either use a
-  community MediaStore plugin or add a small Kotlin bridge beside `OuraBlePlugin`.
-- Keep the **share sheet** as a second, explicitly-labelled action: saving to the gallery and handing
-  the PNG to a label-printer app are different intents, and the owner asked for the first. One button
-  doing whichever happens to be available is what produced this bug.
-- **Fail loudly.** Every branch ends in a toast — saved, shared, or failed. A silent path is what made
-  this invisible for a release.
-
-- **⚠ Do not "fix" this by removing the `canShare` guard.** Calling `navigator.share` with files where
-  it is unsupported rejects, and the existing catch swallows `AbortError` — which would turn a dead
-  button into a dead button that also lies in the log.
-- **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
-  Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
-- **Related:** the label this saves was missing its ingredient list — **Q-399, fixed 2026-08-19
-  (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
-  one the owner picked.
-
-**A second defect on the same button, found 2026-08-19 — the PNG has no physical size, so it prints
-at the wrong size even once it reaches the gallery.** The owner's ask is *"download in full res to
-print onto a label"*, and **the resolution half is already done**: `DEFAULT_RENDER_SCALE = 6.24`
-makes a 50 mm label **1,179 px, which is 600 dpi** (`meal-label-render.ts:23`), and the docstring is
-explicit that *"the canvas IS the printed artwork"*. Nothing needs to be raised. **What is missing is
-the metadata that tells a printer what those pixels are worth.**
-- `canvas.toBlob(res, 'image/png')` (`meal-label-sheet.tsx:73`) writes a PNG with **no `pHYs`
-  chunk** — the canvas API has no way to set one. A PNG without `pHYs` has no declared physical
-  size, so every print path falls back to its own default, which is **96 dpi** almost everywhere.
-- The arithmetic is the whole bug: **1,179 px ÷ 96 dpi = 12.3 inches ≈ 312 mm**. A label drawn to be
-  50 mm arrives as a third of a metre. On a label printer with fixed media it will not fit at all;
-  in a print dialog the user has to notice and hand-set the scale to ~16%, every time.
-- **Fix:** inject a `pHYs` chunk declaring 600 dpi (23,622 pixels/metre, unit = 1) into the blob
-  before it is saved or shared. It is a 21-byte chunk spliced after `IHDR` with its own CRC — a
-  small pure function, so it gets a unit test that reads the chunk back rather than a visual check.
-  Write it in `packages/shared` beside the renderer so both the save and the share path use it; two
-  copies of this would drift and only one of them is easy to notice.
-- **This is invisible in every check we run.** The PNG is valid, the pixels are correct, the E2E
-  decodes the QR fine — the defect only appears on paper, which is also why it survived the 300→600
-  dpi change that was made specifically for print quality. **Verification is a physical print**: send
-  the saved file to the label printer and measure the code with a ruler. `metrics.codeMm` in the
-  sheet says what it should measure, so the check is exact rather than a judgement call.
-- **Order matters:** there is no point testing this before the save path exists. Fix the delivery
-  first, then the metadata, then print once and measure — one print proves both halves.
-
 ### [workouts][platform] Q-405 — a Coach swap silently inherits the old exercise's role, and the role sets the loading
 
 - **Branch:** `feat/coach-swap-role-prompt`
@@ -1506,12 +1528,36 @@ check before building: **we do not, yet, and the screenshot is the evidence.**
   the two numbers asked for on the next deploy without keying the workout to a signal that reads
   `--`.
 
-**One question the plan must answer.** *"Step goal"* has two readings and they build differently:
-a **cadence target** (walk at ≥120 spm through the fast segment — the direct analogue of the HR
-zone, and what the interval structure implies), or a **session/daily step total** (hit 8,000 steps,
-which is a goal the walk contributes to rather than a way to pace it). Both are reasonable; only
-the first replaces the verdict line. Ask before building — this is the difference between changing
-one line and adding a goal system.
+**ANSWERED BY THE OWNER, 2026-08-19 — it is a cadence target.** *"Yes a cadence target- like a SPM
+to indicate a 'walk faster' option to get the most out of the work screen"*. So the verdict line
+becomes an **spm** target, not a step total: `Walk faster (aim ≥120 spm)` where it currently reads
+`Push harder (aim ≥140 bpm)`. The daily/session step-total reading is **not** what was wanted and
+should not be built.
+- **This is the right instinct for a reason worth stating: cadence responds and heart rate lags.**
+  HR takes 30–60 s to catch up with a pace change, so a prompt driven by it arrives after the
+  moment it is about. Cadence changes the instant the legs do — which is exactly what makes it
+  useful as a *"walk faster"* cue rather than a report.
+- Keep `classifyZone`'s three-state shape (`push` / `in` / `ease`) and swap what it reads. The
+  copy and the thresholds change; the structure does not.
+- **The fast/slow interval targets become cadence numbers**, so `walk-config.tsx`'s target model
+  needs a cadence pair beside the HR pair rather than in place of it — see the fallback below,
+  which needs both.
+
+**⚠ It still cannot be the ONLY target, and this is the part to design rather than discover.**
+The blocker above has not moved: cadence is **absent** without a strap and **octave-ambiguous** from
+the ring. A verdict line keyed solely to cadence shows nothing at all on a walk where the owner left
+the H10 at home — which is the walk in the screenshot that started this.
+- **Recommendation: the verdict follows whichever source is live, and says which.** Cadence when a
+  cadence source is live (strap, or the ring once validated); the existing HR verdict when it is
+  not. One line, two possible drivers, labelled — `Walk faster (aim ≥120 spm)` or
+  `Push harder (aim ≥140 bpm)`. That ships the owner's decision **today** for strap walks without
+  regressing strapless ones to a blank line, and it needs no ring work to be useful.
+- The alternative — cadence-only, gated on finishing the ring octave correction first — is cleaner
+  but delivers nothing until Lane A lands a decoder fix, and leaves strapless walks unpaced
+  forever. Not recommended.
+- **Do not silently fall back.** A user who thinks they are being paced by cadence and is actually
+  being paced by HR will not understand why the prompt is late. The unit on the line is the tell,
+  and it is already there.
 
 - **Lane.** `components/guided-walk/**` is Lane B. Any ring octave correction is
   `packages/shared/src/health/cadence.ts` + the decoder, which is **Lane A**, and it is the harder
