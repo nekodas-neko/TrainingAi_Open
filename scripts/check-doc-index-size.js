@@ -892,7 +892,11 @@ const BASELINE = {
   // survivors are ALL tab-screen orchestrators and want one file per PR, not another batch. The
   // other is a correction: slice 1 predicted a named test would red on this slice and it did not,
   // and a wrong prediction left in the queue costs more than the lines it takes to fix.
-  'docs/implementation-backlog.md': 10934,
+  // Raised 2026-08-19 (Lane A, Q-324): 10934 -> 10982. A new entry for the fresh-database test
+  // contention that reds CI intermittently. It is long for an entry because the reproduction is the
+  // valuable part — the failure cannot be reproduced by running `pnpm test` locally, so an entry
+  // that only named the symptom would send the next reader down the same dead end this one took.
+  'docs/implementation-backlog.md': 10982,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
