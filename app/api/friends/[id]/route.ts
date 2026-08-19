@@ -3,6 +3,10 @@ import { refusalResponse, isRefusal, invalidUuidResponse } from '@/lib/api/route
 import { reportServerError } from '@/lib/observability'
 import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One action string.
+const MAX_BODY_BYTES = 4 * 1024
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
@@ -10,7 +14,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const { id } = await params
   const badId = invalidUuidResponse(id)
   if (badId) return badId
-  const { action } = await req.json()
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { action } = (read.body ?? {}) as { action?: unknown }
   const repo = await getRepositoryAsync()
   try {
     if (action === 'accept') {

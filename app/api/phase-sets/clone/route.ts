@@ -2,13 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A phase set to clone.
+const MAX_BODY_BYTES = 256 * 1024
 
 export async function POST(req: NextRequest) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json() as {
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const body = (read.body ?? {}) as {
     phaseSetId: string
     programName: string
     overrides: Record<number, number>  // position → durationCycles

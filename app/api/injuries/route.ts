@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { InjuryCreateSchema } from '@trainingai/shared/validation/injury'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One injury with its notes.
+const MAX_BODY_BYTES = 16 * 1024
 
 export async function GET() {
   const session = await auth()
@@ -19,7 +23,13 @@ export async function POST(req: NextRequest) {
   // Q-484: this route had no schema while its PATCH sibling had a complete one, so a 10 MB `notes`
   // was accepted and stored, and an unvalidated `startedDate` of "not-a-date" reached the date
   // arithmetic and 500'd. Same bounds as the PATCH now, from one definition.
-  const parsed = InjuryCreateSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = InjuryCreateSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const { muscleName, severity, notes, startedDate } = parsed.data
 

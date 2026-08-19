@@ -2136,54 +2136,6 @@ this fits without an extraction.
   warnings that remain are all device-sourced and unactionable, so a badge would report noise the
   user cannot clear. Worth doing only as a diagnostic surface, not a user-facing alert.
 
-### [platform] Q-322 — 92 route files still read their body with bare `req.json()`; the ratchet holds the line
-
-- **Branch:** `fix/bounded-request-bodies`
-- **Added:** 2026-08-19 · Lane A, the deferred halves (2) and (3) of Q-484. **Rewritten 2026-08-19
-  after the first slice shipped (PR #182), which also closed Q-498.**
-
-- **What is already done, so it is not re-done.**
-  - **The shared bounded reader exists** — `readJsonLimited(req, maxBytes)` in
-    `packages/shared/src/http/request-guards.ts`. Piece 1 of the original entry is complete; it
-    shipped with Q-498's sibling work and is measured: against a 20 MB body on a 16 KB cap it cuts
-    off at 2,949,120 bytes.
-  - **The three routes reachable without a session are converted** — `auth/register`,
-    `auth/exchange-mobile-token`, `health-connect/ingest` (Q-498, now removed from this queue). All
-    three used to accept the full 20,000,048 bytes and then answer 400; all three now answer 413.
-  - **`health-connect/ingest`'s ordering is fixed**, which was the larger half of Q-498: the
-    per-IP brute-force limiter now runs **above** the body read. Q-498 said this needed the secret
-    moved to a header; it did not — the limiter is keyed on the IP from the request headers, so
-    nothing had to come out of the body and the owner's Tasker profile was not touched.
-  - **`scripts/check-bounded-request-body.js` is in the Custom Rules job**, shrink-only per file.
-    The three converted routes are at zero, so re-adding a bare read to any of them fails
-    immediately. Verified by reverting one and watching it go red.
-
-- **Slice 2 shipped (PR #184): the six offline-first hot paths.** `nutrition/food-logs` (+ `[id]`),
-  `log-exercise`, `complete-workout`, `sync/push`, `water-log`. Two of them threw on malformed JSON —
-  a bare `req.json()` with no `.catch()`, which Next turned into a **500** rather than the 400 it is —
-  so those now answer 400 as well. `sync/push`'s cap was **measured**, not guessed: the envelope caps
-  the batch at 100 and the largest bounded domain (`workout_log`, arrays capped at 20, strings at 200)
-  is 6,010 bytes at its own limits, so a full worst-case batch is 0.57 MB against a 4 MB cap. **Do not
-  lower that one without re-measuring** — it is the outbox, and a rejected batch is the app's
-  worst-case data-loss path.
-- **What is left: 98 bare reads across 86 route files.** The baseline in that script is the list.
-  The number may only go down; a file that reaches zero is removed from it in the same PR.
-- **Do this in slices, not one sweep** — that is what the ratchet is for. Converting 92 files at
-  once is how a mistake hides in a diff nobody can read.
-- **This is a candidate count, not a defect count.** All 92 require a session, several do
-  hand-rolled checks, several are admin-gated. Read each before calling it broken *or* fine. The
-  suggested next slice, by exposure: `user/password`, `profile`, `user/goals`, then the admin and
-  AI routes, then the rest.
-- **Priced honestly.** Not attack — this app's users are its own account holders. It is worth doing
-  because `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full`
-  outage (2026-08-17), and an unbounded user-writable body is the shape that ritual exists to
-  catch — and because the stated direction is multi-user + Play Store, at which point "nobody is
-  attacking it" stops being an argument.
-- **⚠️ Do NOT quote 20 MB as a storage figure.** `pg_column_size` read ~120 kB for the probe rows
-  because the payload was one repeated character and TOAST compressed it almost perfectly. Real text
-  would not. The defensible statement is that the **transfer and parse** cost was unbounded.
-- **Lane A owns this** (`app/api/**`, `scripts/`).
-
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
 - **⛔ OWNER-DEFERRED 2026-08-18 — accepted risk, do NOT implement. The fix already exists.**

@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One id.
+const MAX_BODY_BYTES = 4 * 1024
 import {
   MIN_DISTANCE_M, MIN_AVG_SPEED_KMH, MIN_DURATION_SEC, MAX_DURATION_SEC,
 } from '@/lib/activity/detection-thresholds'
@@ -34,7 +38,13 @@ export async function PATCH(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const { id } = await req.json() as { id?: string }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { id } = (read.body ?? {}) as { id?: string }
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   const repo = await getRepository()
