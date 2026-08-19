@@ -497,6 +497,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(com.trainingai.app.oura.OuraBlePlugin.class);
         registerPlugin(com.trainingai.app.polar.PolarBlePlugin.class);
         registerPlugin(com.trainingai.app.scale.ScaleBlePlugin.class);
+        registerPlugin(com.trainingai.app.media.MediaSavePlugin.class);
         super.onCreate(savedInstanceState);
         getBridge().getWebView().addJavascriptInterface(new PipBridge(), "AndroidPip");
         getBridge().getWebView().addJavascriptInterface(new ScreenBridge(), "AndroidScreen");

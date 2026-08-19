@@ -69,6 +69,24 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][platform] Meal label saves to the gallery and declares 600 dpi (Q-400, v1.326.0) — NOT verified on device · needs: hardware + a printer
+
+- **What shipped**: the dead "Share or save" button became **Save to gallery** (native, over a new
+  `MediaSave` bridge → MediaStore) and **Share** (system sheet, `canShare` guard kept), every branch
+  ending in a toast; and the PNG both hand out now carries a `pHYs` chunk declaring its density.
+  [`journal`](docs/overview/entries/2026-08-19-label-save-to-gallery.md).
+- **Why it is here**: **needs a new APK**, and both fixes are unobservable from the sandbox — the
+  gallery write goes through a bridge that does not exist in a browser, and whether a printer honours
+  `pHYs` is a physical measurement. What *was* verified: the chunk read back out of a real PNG by an
+  independent decoder (**600.0 dpi** → 1,179 px measures **49.9 mm**, against **311.9 mm** unstamped),
+  and two E2E tests driving the real button.
+- **The check owed**: install the APK, tap Save, find the file in the Samsung Gallery. Then print
+  once and measure against `metrics.codeMm`. **That single print also answers Q-411** — whether the
+  circle template crops (module holds at 0.56 mm) or scales (falls to 0.397).
+- **Known limitation**: below Android 10 the save reports unavailable rather than falling back, and
+  the native paths never fall through to the browser download — in the WebView that is a no-op, so a
+  fall-through would toast success and produce nothing.
+
 ### [platform] 🟡 ACCEPTED RISK: a revoked admin keeps catalogue write access for ≤24h (Q-479, 2026-08-18)
 
 - **Owner decision, 2026-08-18: not fixing now — "only admin will be me for a long time."** The fix

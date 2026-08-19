@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.326.0",
+    date: "2026-08-19",
+    changes: [
+      "The meal label's Share button did nothing on the phone. It is now two buttons — Save to gallery, which writes the label straight into your Photos, and Share, which hands it to another app — and both of them tell you what happened either way.",
+      "A saved label now prints at the 50 mm it was drawn at. It carried no size information before, so printers assumed their own default and it came out at about 312 mm.",
+      "The label style you pick is remembered instead of resetting to the default every time you open the sheet.",
+    ],
+  },
+  {
     version: "1.325.9",
     date: "2026-08-19",
     changes: [

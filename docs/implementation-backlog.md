@@ -332,7 +332,7 @@ and the answers live in the entries rather than here:
 | decided | where it is written | build order |
 |---|---|---|
 | Label styles all draw **square** | **✅ Q-411 SHIPPED 2026-08-19 (v1.325.5)** — [`journal`](overview/entries/2026-08-19-square-label-canvas.md) | done |
-| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **now 1st — it is the gate on every print test** |
+| Save-to-gallery, and the PNG's missing physical size | **✅ Q-400 SHIPPED 2026-08-19** — [`journal`](overview/entries/2026-08-19-label-save-to-gallery.md) | **needs the new APK; the print test is unblocked once it is installed** |
 | Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
 | Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
 | Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
@@ -343,108 +343,20 @@ and the answers live in the entries rather than here:
 Q-411 shipped the square canvas and every module grew (the default 0.401 → **0.561 mm**), **but that
 gain is only real if the owner's circle template CROPS rather than SCALES.** If it scales, the square
 lands at 50 ÷ √2 = 35.4 mm and the default falls to **0.397** — fractionally worse than what it
-replaced. Q-400's saved PNG also declares no physical size, so it prints at 312 mm.
+replaced. Q-400's saved PNG **used to** declare no physical size, so it printed at 312 mm.
 
-**That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19: *"I can only do a
-print once the option to save to gallery exists"*. There is no export path on the APK, so **Q-400 is
-the gate on three separate answers** and is now first in this queue. Until it lands, **describe
-Q-411 as a simplification, not a scannability improvement.**
+**Q-400 shipped 2026-08-19**, so both halves are fixed in source: there is an export path, and the
+PNG now declares 600 dpi. What is left is entirely physical. The owner, 2026-08-19: *"I can only do a
+print once the option to save to gallery exists"* — so **install the APK carrying Q-400, then one
+print with a ruler answers three questions at once**: does the file reach the gallery, does it
+measure 50 mm rather than 312, and does the circle template crop or scale. Until that print happens,
+**describe Q-411 as a simplification, not a scannability improvement.**
 
 **Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
 `saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
 already stale when written. What remains of Q-406 is the row component itself, and it now waits on
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
-
-### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
-
-- **Branch:** `fix/label-save-to-gallery`
-- **Added:** 2026-08-18 · owner, on v1.324.6: *"the share button doesnt do anything - it should give
-  a download to gallery/images when clicking it."*
-- **Lane A** if it needs a Capacitor plugin or a Kotlin bridge (it does — see below), which also
-  means **a new APK**. State that in the PR: this half does not reach the device through a Railway
-  deploy.
-
-**Why it does nothing.** `meal-label-sheet.tsx` has two paths and both miss on the canonical runtime:
-1. `navigator.canShare?.({ files: [file] })` — share-*with-files* is narrower than share-with-text
-   and is not reliably available in the Samsung WebView, so the guard correctly returns false and
-   falls through. The guard is right; there is just nothing behind it.
-2. The fallback is `<a download>` on a blob URL — and **the code's own comment says this is
-   unreliable inside the WebView**, which is why it was written as the fallback. It is a silent
-   no-op there: no error, no file, no toast. Exactly what the owner reports.
-
-So the feature has only ever worked in `pnpm dev`. This is the failure class CLAUDE.md names
-directly — green on web, dead on the device, because the failing path is unreachable in the sandbox.
-
-**What to build.** A native save, not a better guess at a web API.
-- Write the PNG with **`@capacitor/filesystem`**, then make it visible to the gallery. On Android a
-  file written to app storage is invisible to the Photos app until it is registered with
-  **MediaStore** — writing to `Directory.Documents` and hoping is the trap here. Either use a
-  community MediaStore plugin or add a small Kotlin bridge beside `OuraBlePlugin`.
-- Keep the **share sheet** as a second, explicitly-labelled action: saving to the gallery and handing
-  the PNG to a label-printer app are different intents, and the owner asked for the first. One button
-  doing whichever happens to be available is what produced this bug.
-- **Fail loudly.** Every branch ends in a toast — saved, shared, or failed. A silent path is what made
-  this invisible for a release.
-
-- **⚠ Do not "fix" this by removing the `canShare` guard.** Calling `navigator.share` with files where
-  it is unsupported rejects, and the existing catch swallows `AbortError` — which would turn a dead
-  button into a dead button that also lies in the log.
-- **Verification is on-device only.** `pnpm dev` cannot prove any of it: tap save, then open the
-  Samsung Gallery and find the file. Web is not evidence here, and neither is a passing unit test.
-- **Related:** the label this saves was missing its ingredient list — **Q-399, fixed 2026-08-19
-  (v1.325.0)**. That prerequisite is cleared; the artwork this reaches the gallery with is now the
-  one the owner picked.
-
-**A small one alongside it, and the owner has set the priority: the chosen label style does not
-persist.** `meal-label-sheet.tsx` holds it in `useState(DEFAULT_MEAL_LABEL_STYLE)` and never stores
-it, so every open resets to the default. The docstring calls that deliberate (*"picked at print time
-… cycling is the point anyway"*), which was right when there were four styles and no settled
-favourite. **The owner's own read, 2026-08-19:** *"I would make the image very rarely; happy for it
-to default to the default and I can change it whenever I want. Keep in mind I just save the image
-and reuse that. Happy for it to persist if its easy."* So: **do it only if it is genuinely a few
-lines** — a `localStorage`-backed initial value, no schema, no settings surface — and drop it
-otherwise. It is a papercut on a flow used a handful of times, and the label PNG is saved and reused
-externally, so the cost of re-picking is near zero. **Do not spend a migration on this.**
-
-**A second defect on the same button, found 2026-08-19 — the PNG has no physical size, so it prints
-at the wrong size even once it reaches the gallery.** The owner's ask is *"download in full res to
-print onto a label"*, and **the resolution half is already done**: `DEFAULT_RENDER_SCALE = 6.24`
-makes a 50 mm label **1,179 px, which is 600 dpi** (`meal-label-render.ts:23`), and the docstring is
-explicit that *"the canvas IS the printed artwork"*. Nothing needs to be raised. **What is missing is
-the metadata that tells a printer what those pixels are worth.**
-- `canvas.toBlob(res, 'image/png')` (`meal-label-sheet.tsx:73`) writes a PNG with **no `pHYs`
-  chunk** — the canvas API has no way to set one. A PNG without `pHYs` has no declared physical
-  size, so every print path falls back to its own default, which is **96 dpi** almost everywhere.
-- The arithmetic is the whole bug: **1,179 px ÷ 96 dpi = 12.3 inches ≈ 312 mm**. A label drawn to be
-  50 mm arrives as a third of a metre. On a label printer with fixed media it will not fit at all;
-  in a print dialog the user has to notice and hand-set the scale to ~16%, every time.
-- **Fix:** inject a `pHYs` chunk declaring 600 dpi (23,622 pixels/metre, unit = 1) into the blob
-  before it is saved or shared. It is a 21-byte chunk spliced after `IHDR` with its own CRC — a
-  small pure function, so it gets a unit test that reads the chunk back rather than a visual check.
-  Write it in `packages/shared` beside the renderer so both the save and the share path use it; two
-  copies of this would drift and only one of them is easy to notice.
-- **This is invisible in every check we run.** The PNG is valid, the pixels are correct, the E2E
-  decodes the QR fine — the defect only appears on paper, which is also why it survived the 300→600
-  dpi change that was made specifically for print quality. **Verification is a physical print**: send
-  the saved file to the label printer and measure the code with a ruler. `metrics.codeMm` in the
-  sheet says what it should measure, so the check is exact rather than a judgement call.
-- **Order matters:** there is no point testing this before the save path exists. Fix the delivery
-  first, then the metadata, then print once and measure — one print proves both halves.
-
-**⚠ THIS ENTRY IS NOW A GATE ON Q-411 TOO, and the owner has said so outright:** *"I can only do a
-print once the option to save to gallery exists"*. Nothing reaches a printer until this ships —
-there is no export path at all on the APK. That makes one PR the blocker for **three** separate
-verifications:
-1. this entry's own delivery fix (does the file reach the gallery),
-2. the `pHYs` metadata above (does it print at 50 mm rather than 312), and
-3. **Q-411's central claim** — whether the owner's circle template crops the corners (module holds
-   at 0.56 mm) or scales the square inside the circle (module falls to 0.397, and the change is a
-   small regression instead of a 40% gain).
-**Treat it as higher priority than its queue position suggests**, and when it ships, tell the owner
-in the same breath that the print test is now unblocked — all three answers come from one print with
-a ruler.
-
 
 ### [nutrition] Q-413 — `logged_at` records when you pressed the button, not when you ate; resolve it against the meal window
 

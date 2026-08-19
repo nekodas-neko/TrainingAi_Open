@@ -37,6 +37,22 @@ const STACK_LINE_H = 8
  * at 300 dpi against a real printer, so this is likely to have helped the owed print test too.
  */
 const DEFAULT_RENDER_SCALE = 6.24
+
+/** The sheet is 50 mm across. Not a setting — it is what the label stock is. */
+export const LABEL_SHEET_MM = 50
+
+/**
+ * The dpi a rendered label actually carries, derived from the canvas rather than written down
+ * (Q-400). The PNG the save/share paths hand out has no `pHYs` chunk of its own — the canvas API
+ * cannot write one — so every print path assumes 96 dpi and a 50 mm label arrives at ~312 mm.
+ * `withPngDensity` stamps this figure in before the bytes leave.
+ *
+ * Computed from the canvas width so it cannot drift the next time `DEFAULT_RENDER_SCALE` moves; at
+ * 6.24 the canvas is 1,179 px and this returns ~599, which is the 600 dpi the scale was chosen for.
+ */
+export function labelPrintDpi(canvasPx: number): number {
+  return canvasPx / (LABEL_SHEET_MM / 25.4)
+}
 /**
  * The usable box. **Square, as of Q-411** — the owner's instruction, in their words: *"could we just
  * have this as a generic square? it will auto fit in the circle template when I need to print it -
