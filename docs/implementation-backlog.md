@@ -360,12 +360,23 @@ sequential.
 - **Branch:** `feat/combine-energy-and-macro-widgets`
 - **Added:** 2026-08-18 · owner, on the Nutrition tab: *"why are these values different? should it not
   match the nutrition goal? I was hopping we could combine these 2 widgets/displays"*
-- **⚠ SPLIT ACROSS LANES — check before starting.** The bar swap and the suppression rule in
-  finding 3 are **Lane B** (components only). Retiring `ACTIVITY_MULTIPLIERS` as a second TDEE
-  model touches `packages/shared/src/nutrition/goal-recommendation.ts`, which is **Lane A's**
-  under §3 — a Lane B session must hand that half over rather than reach into it. The two halves
-  are independent: the swap can land first, and the formula change does not need the UI.
-  No schema, no route, no migration either way.
+- **✅ THE LANE B HALF SHIPPED 2026-08-19 (v1.325.2). WHAT REMAINS IS LANE A'S, AND IT IS THE
+  LOAD-BEARING HALF.** Done: the zone bar replaces Home's gradient progress fill, both surfaces draw
+  it from **one** `CalorieZoneBar` component, each carries the "base + earned from movement" line,
+  and the Calorie Nudge's gate is split so the *explanation* shows on a formula-derived maintenance
+  while the *action* still waits for calibration.
+  [`Journal`](overview/entries/2026-08-19-calorie-zone-bar.md).
+  **Still open — Lane A:** points 1 and 2 below, retiring `ACTIVITY_MULTIPLIERS` in
+  `packages/shared/src/nutrition/goal-recommendation.ts` so there is one TDEE model. **Until that
+  lands the two numbers still disagree** — this PR makes the disagreement legible and says why, it
+  does not remove it. When Lane A is in that file, move `components/nutrition/budget-provenance.ts`
+  into `calorie-balance.ts` beside `computeCalorieBalance`; it is there only to avoid colliding with
+  this work.
+- **⚠ SPLIT ACROSS LANES.** The bar swap and the suppression rule in finding 3 were **Lane B**
+  (components only). Retiring `ACTIVITY_MULTIPLIERS` touches
+  `packages/shared/src/nutrition/goal-recommendation.ts`, which is **Lane A's** under §3 — a Lane B
+  session must hand that half over rather than reach into it. The two halves are independent, which
+  is why the swap landed first. No schema, no route, no migration either way.
 
 **Both numbers are correct and they measure different things.** Traced, not guessed
 (`lib/health/energy-balance-service.ts:180-181`):

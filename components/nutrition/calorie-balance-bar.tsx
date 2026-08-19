@@ -2,7 +2,7 @@
 
 import { memo, useState } from 'react'
 import { Info } from 'lucide-react'
-import { barBands, barPosition } from '@trainingai/shared/nutrition/calorie-balance'
+import { CalorieZoneBar } from './calorie-zone-bar'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 
 interface Props {
@@ -11,8 +11,6 @@ interface Props {
   isToday: boolean
   loading?: boolean
 }
-
-const BANDS = barBands()
 
 /**
  * Calories in vs calories out, banded against the user's goal.
@@ -43,7 +41,6 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
 
   const b = data.balance
   const m = data.maintenance
-  const pos = barPosition(b.deviationKcal)
   const overTarget = b.remainingKcal < 0
 
   return (
@@ -71,21 +68,16 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
         </button>
       </div>
 
-      {/* Five-band scale. Bands are decorative; the reading is the marker plus the label above. */}
-      <div className="relative h-3 rounded-full overflow-hidden flex" role="presentation">
-        {BANDS.map(band => (
-          <div key={band.zone} style={{ width: `${band.widthPct}%`, backgroundColor: band.color, opacity: 0.35 }} />
-        ))}
-        <div
-          className="absolute top-0 bottom-0 w-1 rounded-full transition-[left] duration-500 ease-out motion-reduce:transition-none"
-          style={{ left: `calc(${pos * 100}% - 2px)`, backgroundColor: b.zoneColor, boxShadow: '0 0 0 2px var(--background)' }}
-        />
-      </div>
-      <div className="mt-1.5 flex justify-between text-[9px] uppercase tracking-wide text-muted-foreground/70">
-        <span>Under-eating</span>
-        <span>On target</span>
-        <span>Over-eating</span>
-      </div>
+      {/* The bar itself lives in `CalorieZoneBar` so Home's nutrition card draws the identical
+          thing (Q-401). Two hand-maintained copies of this scale is exactly the class of drift that
+          put two different calorie budgets on one screen. */}
+      <CalorieZoneBar
+        deviationKcal={b.deviationKcal}
+        zoneColor={b.zoneColor}
+        restingBaseKcal={b.restingBaseKcal}
+        activeKcal={b.activeKcal}
+        targetNetKcal={b.targetNetKcal}
+      />
 
       <div className="mt-3 grid grid-cols-3 gap-2 text-center">
         <Stat label="Eaten" value={b.intakeKcal} />

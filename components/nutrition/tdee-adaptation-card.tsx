@@ -39,17 +39,48 @@ export function TdeeAdaptationCard({ energyBalance, onApplied }: Props) {
 
   const target = energyBalance?.target;
   const maintenance = energyBalance?.maintenance;
-  // Only ever suggest off a calibrated maintenance — nudging toward a number derived from the
-  // same formula the user already has just moves them sideways with false authority.
-  const canSuggest =
-    !dismissed &&
-    maintenance?.source === "calibrated" &&
-    target?.recommendedKcal != null &&
-    target.driftsFromRecommendation;
 
-  if (!canSuggest) return null;
+  // Q-401 finding 3. These used to be ONE condition, and that was the bug: the only surface that
+  // explains why two different calorie numbers sit on the same screen was gated shut in exactly the
+  // case where they differ and nothing else accounts for it. The gate is right for the ACTION and
+  // wrong for the EXPLANATION.
+  //
+  // Only ever *suggest* off a calibrated maintenance — nudging toward a number derived from the
+  // same formula the user already has just moves them sideways with false authority. But *saying*
+  // the two numbers disagree, and by how much, costs nothing and needs no calibration.
+  const drifts = target?.recommendedKcal != null && target.driftsFromRecommendation;
+  const canSuggest = !dismissed && maintenance?.source === "calibrated" && drifts;
+  const shouldExplain = !dismissed && maintenance?.source === "formula" && drifts;
+
+  if (!canSuggest && !shouldExplain) return null;
   const recommended = target!.recommendedKcal!;
   const current = target!.currentKcal;
+
+  // The explain-only variant: no buttons, because there is no action worth offering yet. Dismissing
+  // it would hide the reconciliation for the rest of the week, which is the opposite of the point.
+  if (shouldExplain) {
+    const gap = current != null ? Math.abs(current - recommended) : null;
+    return (
+      <div className="rounded-2xl border border-border bg-muted/60 p-4 space-y-2">
+        <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Why two numbers
+        </p>
+        <p className="text-sm leading-snug">
+          Your daily goal is set to{" "}
+          <span className="font-semibold tabular-nums">{current?.toLocaleString() ?? "—"} kcal</span>,
+          but today&apos;s budget works out to{" "}
+          <span className="font-semibold tabular-nums">{recommended.toLocaleString()} kcal</span>
+          {gap != null && <> — a {gap.toLocaleString()} kcal gap</>}.
+        </p>
+        <p className="text-[11px] leading-snug text-muted-foreground">
+          The set goal assumes a typical activity level; the budget starts from your resting burn and
+          adds what you actually moved today. {maintenance!.gapMessage
+            ? <>{maintenance!.gapMessage} — until then neither is measured, so nothing is changed for you.</>
+            : <>Neither is measured yet, so nothing is changed for you.</>}
+        </p>
+      </div>
+    );
+  }
 
   function markHandled() {
     try {
