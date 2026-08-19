@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/empty-backup-tables` · **Q band:** 500–529 (next free: 529 — band nearly exhausted, agree a new one with the owner)
+**Updated:** 2026-08-19 · **By:** `tuning/correct-retired-scales` · **Q band:** 500–529 (next free: 529 — band nearly exhausted, agree a new one with the owner)
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
@@ -63,7 +63,7 @@ Since then, working only scores no other lane holds:
     are overnight/previous-day, nothing reads today. **Presentation only → Lane B, unblocked now**;
     the "wait for Q-272" instruction no longer applies.
   - **Q-72 — the ask to spread the sleep ratings is WITHDRAWN.** `sleep_quality_feel` is the **most**
-    variable self-report in the app (`resting_soreness` is sd **0.00**, exactly 3 in 20 entries) and
+    variable **live** self-report (only `perceived_recovery`, sd 0.36, is still collected alongside it) and
     tracks efficiency at **+0.316**. Volume (+0.03) and RPE (−0.02) are **structurally disqualified** —
     volume is prescribed by the app, RPE has a 1.5 dead band. **Fix the yardstick, not the rating.**
     [`review`](../../reviews/2026-08-19-sleep-validation-targets.md).
@@ -298,6 +298,13 @@ for this work:
   **Coverage is not enough; check the input's SPREAD too.** An input that is always there and always
   the same reads, in code review, exactly like a working term. Steps are still the only movement
   input that is both present and variable.
+- **A column with rows is not a live field — check the last write date AND the write site.** I asked
+  the owner to reword or drop `resting_soreness` because it read exactly 3 in all 20 entries. It had
+  been **retired on 2026-07-23**, and `morning-checkin-sheet.tsx` says so in a comment two lines long:
+  *"Retired scales — always null so a re-save clears any historical value."* The owner caught it
+  (*"I thought we removed this?"*). **A constant value is a symptom of a retired question at least as
+  often as a broken one**, and `SELECT ... WHERE col IS NOT NULL` cannot tell them apart. One
+  `max(log_date)` per column would have.
 - **`pg_stat_user_tables` is the one read here that is NOT row-scoped — use it to check whether a
   table is empty.** Every `claude_ro` view shows the owner's rows only, so "0 rows" from one is
   ambiguous. The system-wide counter is what turned an ambiguous empty view into Q-528.

@@ -37,20 +37,38 @@ That leaves **steps** — real, weak, and worth using as a secondary check rathe
 
 ---
 
-## 2. Every other self-report in the app is worse, and one has never varied at all
+## 2. Of the *live* self-reports, the sleep rating is the most variable — and there are only two
 
-| field | n | sd | distinct values used |
-|---|---|---|---|
-| **`sleep_quality_feel` (the 1–5)** | 46 | **~0.8** | **5** |
-| `perceived_recovery` | 46 | 0.36 | 2 |
-| `motivation` | 35 | 0.34 | 3 |
-| `wake_mood` | 17 | 0.39 | 2 |
-| **`resting_soreness`** | 20 | **0.00** | **1 — recorded as exactly 3, every single time** |
-| `physical_tiredness` / `mental_drain` | 5 each | — | barely used |
+**⚠️ CORRECTED 2026-08-19, after the owner said "I thought we removed this?" — they were right.**
+The first version of this section compared six self-report scales as though all six were live. **Three
+of them are retired**, and `components/morning-checkin-sheet.tsx` says so in its own comment:
 
-**The rating the owner apologised for is the most variable self-report in the app.** `resting_soreness`
-has literally never been anything but the middle value in 20 entries — if any field should be
-questioned or removed, it is that one, not sleep feel.
+```ts
+// Retired scales — always null so a re-save clears any historical value.
+motivation:        null,
+restingSoreness:   null,
+wakeMood:          null,
+```
+
+Last stored value per field settles it:
+
+| field | n | sd | distinct values | last value | status |
+|---|---|---|---|---|---|
+| **`sleep_quality_feel`** | 46 | **~0.8** | **5** | **2026-08-19** | ✅ **live** |
+| `perceived_recovery` | 46 | 0.36 | 2 | **2026-08-19** | ✅ live |
+| `physical_tiredness` / `mental_drain` | 5 each | — | — | 2026-08-17 | live but barely used, and written by a surface other than the morning sheet |
+| `motivation` | 35 | 0.34 | 3 | 2026-08-07 | ⛔ retired |
+| `resting_soreness` | 20 | **0.00** | **1** | **2026-07-23** | ⛔ retired |
+| `wake_mood` | 17 | 0.39 | 2 | 2026-07-20 | ⛔ retired |
+
+**The conclusion survives and gets stronger.** Among the scales still being collected, the comparison
+is `sleep_quality_feel` (sd ~0.8 across 5 values) against `perceived_recovery` (sd 0.36 across 2) —
+a field of two, not six. The sleep rating is the most variable live self-report by a wide margin.
+
+**What was withdrawn:** this review previously recommended rewording or dropping `resting_soreness`
+on the grounds that it was "asking a question the owner isn't answering". It was already dropped, on
+2026-07-23. **Its constant 3 is the fossil of a retired question, not a live data-quality problem** —
+and a constant value is a plausible reason it was retired in the first place.
 
 **The one genuine alternative** is `mood_logs.energy_level`, which is **categorical, not a 1–5 scale**:
 75 entries splitting **ok 35 / good 34 / low 4 / drained 2**. That is a near 50/50 split across two
@@ -58,7 +76,10 @@ levels — far better spread than any numeric scale here, and it supports the ow
 exactly: they cannot put a magnitude on how rested they feel, but they evidently *do* distinguish "ok"
 from "good", 69 times. **Qualitative comparative labels get answered; abstract magnitudes get a 3.**
 
----
+**Observed and deliberately not filed:** the three retired columns still carry their full plumbing —
+local SQLite column, `RECONCILE_COLUMNS` entry, sync-engine mapping, adapter upsert arm. Removing them
+touches migrations, the local store and the sync path for no user-visible benefit, and dead columns
+cost essentially nothing. Recorded here so the next reader knows it was seen rather than missed.
 
 ## 3. But the numeric rating tracks sleep better than the categorical one does
 
