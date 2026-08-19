@@ -13,7 +13,7 @@
  * instead because it reconciles against the session's own `startedAt`, not just the clock.
  */
 
-import { shiftDateStr } from '../date-utils'
+import { isCalendarDate, shiftDateStr } from '../date-utils'
 
 /** A phone that has been offline for longer than this is not the source of a fresh reading. */
 export const INGEST_PAST_TOLERANCE_MS = 7 * 24 * 60 * 60_000
@@ -65,15 +65,11 @@ export function resolveIngestDate(
 ): string {
   if (!date) return todayInUserTz
 
-  // Both separators, checked on the RAW value before normalising: the client's `localDateString()`
-  // emits `YYYY/MM/DD`, and a dash-only shape check here would reject every real Tasker call.
-  if (!/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(date.slice(0, 10))) return todayInUserTz
+  // `isCalendarDate` accepts both separators and rejects a shape-passing non-date such as
+  // `2026-02-31`, which `Date` normalises to March 3 rather than refusing. It is the shared
+  // predicate (Q-496) rather than a second copy of the round-trip test.
+  if (!isCalendarDate(date.slice(0, 10))) return todayInUserTz
   const iso = date.replace(/\//g, '-').slice(0, 10)
-  // Rejects a shape-passing non-date such as `2026-02-31`, which `Date` normalises to March 3 rather
-  // than refusing. `shiftDateStr(x, 0)` round-trips through that normalisation, so a value that is
-  // not its own zero-shift was never a real calendar day. (Q-496 is the same input reaching further
-  // in; this closes it for the ingest route as a side effect of bounding the range.)
-  if (shiftDateStr(iso, 0) !== iso) return todayInUserTz
 
   if (iso > todayInUserTz) return todayInUserTz
 

@@ -50,7 +50,11 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const b = parsed.data
-  const date = b.date ?? todayInTz(session.user?.timezone ?? DEFAULT_TZ)
+  // Q-496: the GET above already routes its param through `normalizeDateParamIso`; this POST did
+  // not, so the schema's shape-only regex let `2026-13-45` reach the driver — measured as a 500 plus
+  // an `error_events` row, a client input error filed as a server fault.
+  const date = b.date ? normalizeDateParamIso(b.date) : todayInTz(session.user?.timezone ?? DEFAULT_TZ)
+  if (!date) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
   const repo = await getRepository()
   const saved = await repo.saveDayCheckin(userId, {
     logDate: date,

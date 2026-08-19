@@ -2291,29 +2291,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
   trusted-proxy count — the treatment `safeCompare` already has. Seven call sites should not each
   re-decide this.
 
-### [devices] Q-496 — a regex-passing but invalid ingest date returns 500 and writes an `error_events` row
-
-> **⚠️ Partly closed by Q-494 — re-verify before starting.** `health-connect/ingest` now routes its
-> date through `resolveIngestDate`, which rejects a shape-passing non-date (`2026-02-31`, `2026-13-01`)
-> and falls back to today rather than letting it reach the handler. Measured after the fix:
-> `POST {"date":"2026-02-31","steps":123}` → `200 {"date":"2026-08-20"}`, no 500 and no
-> `error_events` row. **If this entry names other routes, they are untouched** — check which of its
-> sites remain before implementing, and remove the entry outright if the ingest route was the only one.
-
-
-- **Branch:** `fix/ingest-date-semantic-validation`
-- **Added:** 2026-08-18 · review sweep ·
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](reviews/2026-08-18-health-connect-ingest.md)
-- **Placement:** medium. Needs the secret, so not an open spam vector — but it makes the fault table
-  every session is required to read less trustworthy.
-- **Measured:** `2026-13-45`, `2026-02-31`, `0000-00-00` each → **HTTP 500** plus an `error_events`
-  row (`[pg 22008]`). The regex accepts any `\d{4}[-/]\d{2}[-/]\d{2}`, so month 13 and day 45 pass
-  validation and fail at the driver.
-- **This is the class `normalizeDateParam` exists to prevent.** `CLAUDE.md` lists the routes
-  retrofitted with that guard; this one is not among them. A client input error is being recorded as a
-  server fault.
-- **Fix:** route the param through `normalizeDateParam` and return 400. Shares a location with Q-494.
-
 ### [devices] Q-495 — `z.coerce.number()` launders `[]`, `true` and `""` into stored readings
 
 - **Branch:** `fix/ingest-no-coercion`
