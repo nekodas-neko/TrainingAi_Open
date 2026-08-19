@@ -15,8 +15,8 @@ number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **201** | `lib/data/postgres/migrations/` (head: `200_claude_ro_views_applied_mutations.sql`) |
-| Local SQLite schema version | **v26** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
+| Next free Postgres migration | **203** | `lib/data/postgres/migrations/` (head: `202_claude_ro_views_food_logging_complete.sql`) |
+| Local SQLite schema version | **v27** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 | Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
 > **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
@@ -331,8 +331,8 @@ and the answers live in the entries rather than here:
 
 | decided | where it is written | build order |
 |---|---|---|
-| Label styles all draw **square** | **Q-411**, filed at the top of the queue | **1st — small, self-contained, retires a constraint** |
-| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **2nd — it is the gate on every print test** |
+| Label styles all draw **square** | **✅ Q-411 SHIPPED 2026-08-19 (v1.325.5)** — [`journal`](overview/entries/2026-08-19-square-label-canvas.md) | done |
+| Save-to-gallery, and the PNG's missing physical size | **Q-400**, moved up to 2nd on 2026-08-19 | **now 1st — it is the gate on every print test** |
 | Ingredient row: **option A**, collapse when not editing | Q-395 (the DECIDED block) | after `food-row.tsx` |
 | Log Food tabs are **Recent · My Foods**; Frequent dropped, Saved merged | Q-395 note 17 | with the rework |
 | Action row is **Photo · Barcode · Describe or enter** | Q-395 note 15 | with the rework |
@@ -340,93 +340,21 @@ and the answers live in the entries rather than here:
 | The coach must **write every plan meal into My Foods** | Q-407, and it makes Q-398 a prerequisite | after Q-398 |
 
 **Two things carry a caveat rather than a blocker, and both resolve on the same physical print:**
-Q-411's area gain is real only if the owner's circle template *crops* rather than *scales* (the
-arithmetic is in that entry), and Q-400's saved PNG currently declares no physical size at all, so
-it prints at 312 mm. **That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19:
-*"I can only do a print once the option to save to gallery exists"*. There is no export path on the
-APK, so **Q-400 moved to 2nd in this queue** and is the gate on three separate answers. Ship Q-411
-anyway without waiting for it, and leave the scannability claim unverified rather than asserted.
+Q-411 shipped the square canvas and every module grew (the default 0.401 → **0.561 mm**), **but that
+gain is only real if the owner's circle template CROPS rather than SCALES.** If it scales, the square
+lands at 50 ÷ √2 = 35.4 mm and the default falls to **0.397** — fractionally worse than what it
+replaced. Q-400's saved PNG also declares no physical size, so it prints at 312 mm.
 
-**Q-406 (`food-row.tsx`) is still the gate for the visual work** and has not moved: both landing
-files sit on the 800-line limit, and Q-395, Q-398 and the tab merge all want that component.
+**That print cannot happen at all until Q-400 ships** — the owner, 2026-08-19: *"I can only do a
+print once the option to save to gallery exists"*. There is no export path on the APK, so **Q-400 is
+the gate on three separate answers** and is now first in this queue. Until it lands, **describe
+Q-411 as a simplification, not a scannability improvement.**
 
-### [nutrition] Q-411 — every label style draws on a square canvas; the round constraint was costing 64% of the area
-
-- **Branch:** `feat/square-label-canvas`
-- **Added:** 2026-08-19 · owner, reviewing the interactive prototype · **top of the queue at the
-  owner's instruction**
-- **Owner's words:** *"could we just have this as a generic square? it will auto fit in the circle
-  template when I need to print it - so they could all start as squares."*
-- **Lane B** (`components/nutrition/meal-label-render.ts` + `meal-label-sheet.tsx`). No schema, no
-  migration, no APK — this is canvas geometry and ships on a Railway deploy.
-- **Do this before Q-395's row work if both are in flight**, not because it is bigger but because it
-  is small, self-contained, and it retires a constraint that three prior entries (Q-393, Q-397,
-  Q-399) each spent effort designing around.
-
-**The decision.** All six styles draw square. `squareOnly` disappears as a concept, the picker loses
-its `Square` badge, and the round die becomes a *print-time* consideration rather than a design
-constraint the renderer has to satisfy. **Draw no circle** — the owner saw a dashed round-die guide
-on the artwork and asked for it gone (*"dont have the circle background. Leave it for now"*). The
-label is a square with no circular framing, guide, or vignette; where the round die matters is at
-the printer, not on the canvas.
-
-**Why this is worth doing rather than merely allowed.** The renderer currently reserves a **centred
-usable box of 130 × 137** sheet units — *"what fits inside the inscribed circle once the corners are
-given up"* (`meal-label-render.ts:36-38`) — against a square box of **171 × 171**
-(`SQUARE_W`, `:260`). That is **17,810 against 29,241 square units, a 64% increase in usable area**,
-and the height it gives back goes to the code. Measured from the shipped `codeUnits` at 50 mm:
-
-| style | today | square | |
-|---|---|---|---|
-| `band` | 0.369 mm/module | 0.52 | the tightest, and the one that fails first |
-| `inlineCentred` (default) | 0.401 | **0.56** | **+40%** |
-| `ticket` | 0.417 | 0.61 | |
-| `editorial` | 0.481 | 0.59 | |
-| `plaque` | 0.520 | 0.68 | |
-| `square` | 0.561 | 0.72 | |
-
-Module size is the number that decides whether a printed code scans — at 300 dpi the E2E's decode of
-the default was *"a coin flip"* until the canvas scale was doubled. This buys the same kind of
-headroom a second time, for free, and `square`'s own code comment already made the argument:
-*"the most scannable code the feature has — which is the point of spending the corners."* The
-owner's message is that the corners were never actually being spent.
-
-**⚠ One measurement decides whether the gain is real, and it must be taken before anyone trusts the
-table above.** *"It will auto fit in the circle template"* has two possible meanings and they point
-opposite ways:
-- **The template CROPS the corners** (circle inscribed in a 50 mm square) → the artwork keeps 50 mm
-  of width and the module holds at **0.56 mm**. The table stands.
-- **The template SCALES the whole square to fit inside the circle** → the square lands at
-  50 ÷ √2 = **35.4 mm**, and the module falls to **0.397 mm** — *fractionally worse than the 0.401
-  it replaces.* Every gain above evaporates and the change is a small regression.
-
-**Resolve it with one test print — but that print is BLOCKED until Q-400 ships**, because there is
-no way to get the PNG off the device at all today (*"I can only do a print once the option to save
-to gallery exists"*). **This entry can and should still ship without it**: the square canvas is a
-simplification worth having either way, and holding a small self-contained change behind another
-lane's APK work helps nobody. Ship it, and leave the scannability claim unverified in the PR rather
-than asserting it. **It is the same print Q-400 already owes** (save the PNG,
-measure the code with a ruler against the `metrics.codeMm` figure the sheet displays). Until that
-print is done, **do not describe this entry as a scannability improvement** — describe it as a
-simplification that is *expected* to improve scannability. If the template turns out to scale rather
-than crop, the follow-up is to keep the square canvas anyway (it is simpler and the content still
-benefits) but design the critical content — name, calories, code — to sit inside the inscribed
-circle.
-
-**What it lets the other entries stop doing.** `centredStackLineBudget()` exists to clamp the
-ingredient stack into the inscribed circle, and Q-399 had to widen it to get three lines onto the
-default. On a square canvas that budget relaxes considerably — **re-derive it rather than leaving
-the round-era numbers in place**, or the extra area is reserved and never used. Keep the
-"as much of the ingredient list as fits" copy and the overflow summary: the list can still exceed
-the label, and Q-399's lesson was that a style silently printing *none* of it went unnoticed for a
-release.
-
-- **Verification.** `pnpm test` covers the geometry (`centredStackLineBudget` has regression tests
-  asserting `maxLines >= 3` for the default and `mmPerModule >= 0.36` — **both thresholds should be
-  raised** in this PR, since square makes them trivially true and a test that cannot fail is not a
-  test). Then re-run `e2e/meal-label.spec.ts`, which decodes the rendered code. **Neither proves the
-  print**, so the test print above is the acceptance criterion, and the PR should say plainly that
-  it was or was not done.
+**Q-406's headroom half is DONE** (v1.325.3): `nutrition-content.tsx` is 732 and
+`saved-meals-sheet.tsx` is 753, so the landing files are no longer the gate — that sentence was
+already stale when written. What remains of Q-406 is the row component itself, and it now waits on
+Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
+design decision. See the correction at the top of that entry.
 
 ### [nutrition][platform] Q-400 — "Share or save" does nothing on the APK; the label cannot reach the gallery
 
@@ -734,6 +662,24 @@ Worth reaching for only if the reassign proves harder than it looks.
   whatever renders it. Small, but it needs the product call on carbs-only first.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
+
+- **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
+  Done: `day_checkins.food_logging_completed_at` (migration **201**, local SQLite **v27**, both sync
+  directions, `claude_ro` views **202**), `POST /api/food-logging-complete` with its Undo, and
+  `estimateMaintenance` filtering on the flag instead of `intakeKcal > 0`. The partial-day case the
+  module had **zero** coverage of now has five tests, plus an end-to-end pair through
+  `computeEnergyBalance`. [`Journal`](overview/entries/2026-08-19-tdee-day-completeness.md).
+- **⚠️ Until the button ships, the calibration cannot engage** — no day can be marked, so every day
+  is excluded and `source` stays `'formula'`. That is the intended failure mode ("the estimate
+  waits", not "the estimate is quietly wrong") and it costs nothing today, because per Q-302 **0 of
+  the last 30 rolling windows** cleared `MIN_LOGGED_DAYS` anyway. It does mean the feature is inert
+  until Lane B lands.
+- **Still open — Lane B:** the *"Complete Today's Logging"* button as the last element in the day's
+  scroll (not the header, not beside the ring), the copy beneath it, the receipt-with-Undo it
+  becomes, and the **"N of 10 days" counter shipped with it, not after** — the button feeds
+  something invisible, and that invisibility is why this bug survived. `POST /api/food-logging-complete`
+  takes `{ date?, complete }` and answers `{ date, complete, completedAt }`; sending
+  `complete: false` is the Undo.
 
 - **Branch:** `fix/tdee-partial-day-completeness`
 - **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
@@ -1338,6 +1284,22 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 ### [nutrition][platform] Q-409 — paste a recipe URL and get a meal; the fetch is the whole security surface
 
+> **⚠️ The Lane A half SHIPPED (PR #180). What is left is Lane B only** — the UI in
+> `components/nutrition/my-meals-picker.tsx` that sends a `url` and renders what comes back.
+> `POST /api/nutrition/scan` now takes `{ url }`, answering with the ordinary scan payload plus
+> **`sourceUrl`** (the final URL after redirects — that is the attribution this entry asked for) and
+> **`recipeYield`** (servings, or **`null`**).
+>
+> **`recipeYield: null` is the one thing Lane B must handle, and it is not cosmetic.** With a stated
+> yield the route has already divided and the payload is per-serving (`notes` leads with *"Per
+> serving (1 of 12)."*). Without one the payload is the **whole recipe** — verified live: a
+> banana-bread page returned 1,956 kcal for the loaf. This entry's own rule applies — *ask, do not
+> assume 1* — so the picker must prompt for serves and divide, or it logs a tray as a meal.
+>
+> Rationale, measurements and the SSRF verification are in
+> [`entries/2026-08-19-recipe-url-to-meal.md`](overview/entries/2026-08-19-recipe-url-to-meal.md);
+> the modules are in [`module-map.md`](module-map.md). Everything below is the original entry.
+
 - **Branch:** `feat/recipe-url-to-meal`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner
 - **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
@@ -1398,7 +1360,8 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   a meal came from six months later, and it is the honest thing to do with someone else's recipe.
 
 - **Lane.** `app/api/nutrition/scan/route.ts` and any shared parser are **Lane A**;
-  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first.
+  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first — **it has
+  (PR #180), so only Lane B remains.**
 
 - **Verification.** Paste three real recipe URLs — one with JSON-LD, one without, one that 404s —
   and confirm: ingredients and yield resolve from the structured path; the fallback produces a
@@ -1718,33 +1681,6 @@ the H10 at home — which is the walk in the screenshot that started this.
   capture against a metronome, which is the procedure that produced the numbers in the docstring.
   State plainly that no device pass was run if none was.
 
-### [platform] Q-320 — `e.message` as a 500 body leaks the same SQL Q-483 just closed, at 14 sites
-
-- **Branch:** `fix/error-message-as-response-body`
-- **Added:** 2026-08-18 · Lane A, found while implementing Q-483 ·
-  [`docs/reviews/2026-08-18-malformed-route-ids.md`](reviews/2026-08-18-malformed-route-ids.md) is
-  Q-483's source; this is the widening that entry's scope deliberately did not cover.
-- **How it was found.** The first draft of `scripts/check-no-raw-error-in-response.js` flagged these
-  as well as Q-483's four, and it was **right to**: `const msg = e instanceof Error ? e.message :
-  'Create failed'` followed by `NextResponse.json({ error: msg }, { status: 500 })` publishes a
-  Drizzle error's message, and a Drizzle error's message *is* `Failed query: select "id", "user_id",
-  …`. Same disclosure, different spelling.
-- **Why it is not folded into Q-483.** 14 sites across 8 files, and **several are deliberate**: the
-  same `msg` is returned on **4xx** paths where it is a real user-facing message ("An exercise with
-  that name already exists", "Not authorized"). Sorting the deliberate from the accidental is the
-  work here, and doing it inside Q-483 would have turned a three-line fix into an untested sweep.
-- **The sites** (`grep -n "error: msg\|error: message\|error: detail" app/api/**/route.ts`):
-  `admin/db-query`, `admin/exercises`, `admin/invites` (×3), `coach/apply/[id]/undo`, `exercises`
-  (×2), `friends`, `friends/[id]`, `phase-sets/[id]` (×2), `workout-templates` (×2).
-- **Fix shape:** at each site, split the two cases the single `msg` currently serves — a *chosen*
-  message on the 4xx branch (keep it) and a *caught* one on the 500 branch (replace with a fixed
-  string, as Q-483 did). Then widen `check-no-raw-error-in-response.js`, whose comment already
-  records why it is narrow and points here.
-- **Priced honestly, and low:** disclosure to an **authenticated** user, and Q-483's production check
-  found **zero** `22P02` rows, so the sibling shape has most likely never been served either.
-  Re-check that before pricing it upward.
-- **Lane A owns this** (`app/api/**`, `scripts/`).
-
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 
 - **Branch:** `fix/tier-a-enqueue-visibility`
@@ -1811,34 +1747,46 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Related, and the natural client half:** nothing renders `warnings[]` yet. Surfacing it is
   `components/**` (Lane B) and should follow whatever this decides, not precede it.
 
-### [platform] Q-322 — 31 `req.json()` routes are unaudited, and nothing bounds a request body before it is parsed
+### [platform] Q-322 — 92 route files still read their body with bare `req.json()`; the ratchet holds the line
 
 - **Branch:** `fix/bounded-request-bodies`
-- **Added:** 2026-08-19 · Lane A, the deferred halves (2) and (3) of Q-484.
-- **What Q-484 closed and what it did not.** It gave the two *measured* create routes
-  (`injuries`, `supplements`) schemas sharing one definition with their PATCH siblings, so the pair
-  cannot drift again. A 10 MB body is now **400** instead of 201 — **but it is still parsed into
-  memory first**, because the rejection happens in Zod, after `req.json()`. The transfer-and-parse
-  cost is unchanged; only the storage is bounded.
-- **Two pieces of work, in this order:**
-  1. **A shared bounded reader.** `readJsonBounded(req, maxBytes)` (or equivalent), so a body is
-     capped *before* parse rather than after. This bounds all 33 routes at once, including the 31
-     nobody has looked at — which is the point: it makes the audit safe to do slowly.
-  2. **Audit the 31.** `grep` for `req.json()` with no `safeParse`/`.parse` in `app/api/**`. **This
-     is a candidate count, not a defect count** — several do hand-rolled checks and several are
-     admin-gated, which limits reach without adding validation. Do not treat them as broken *or* as
-     fine until each is read.
-- **Priced honestly.** Not attack — this app's users are its own account holders, `claude_ro.injuries`
-  is empty and `supplements` holds 2 rows with a 9-character max name. It is worth doing because
-  `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full` outage
-  (2026-08-17), and an unbounded user-writable text column is exactly the shape that ritual exists to
+- **Added:** 2026-08-19 · Lane A, the deferred halves (2) and (3) of Q-484. **Rewritten 2026-08-19
+  after the first slice shipped (PR #182), which also closed Q-498.**
+
+- **What is already done, so it is not re-done.**
+  - **The shared bounded reader exists** — `readJsonLimited(req, maxBytes)` in
+    `packages/shared/src/http/request-guards.ts`. Piece 1 of the original entry is complete; it
+    shipped with Q-498's sibling work and is measured: against a 20 MB body on a 16 KB cap it cuts
+    off at 2,949,120 bytes.
+  - **The three routes reachable without a session are converted** — `auth/register`,
+    `auth/exchange-mobile-token`, `health-connect/ingest` (Q-498, now removed from this queue). All
+    three used to accept the full 20,000,048 bytes and then answer 400; all three now answer 413.
+  - **`health-connect/ingest`'s ordering is fixed**, which was the larger half of Q-498: the
+    per-IP brute-force limiter now runs **above** the body read. Q-498 said this needed the secret
+    moved to a header; it did not — the limiter is keyed on the IP from the request headers, so
+    nothing had to come out of the body and the owner's Tasker profile was not touched.
+  - **`scripts/check-bounded-request-body.js` is in the Custom Rules job**, shrink-only per file.
+    The three converted routes are at zero, so re-adding a bare read to any of them fails
+    immediately. Verified by reverting one and watching it go red.
+
+- **What is left: 104 bare reads across 92 route files.** The baseline in that script is the list.
+  The number may only go down; a file that reaches zero is removed from it in the same PR.
+- **Do this in slices, not one sweep** — that is what the ratchet is for. Converting 92 files at
+  once is how a mistake hides in a diff nobody can read.
+- **This is a candidate count, not a defect count.** All 92 require a session, several do
+  hand-rolled checks, several are admin-gated. Read each before calling it broken *or* fine. The
+  suggested next slices, by exposure: the offline-first hot paths (`nutrition/food-logs`,
+  `log-exercise`, `complete-workout`, `sync/push`, `water-log`), then `user/password`, then the
+  rest.
+- **Priced honestly.** Not attack — this app's users are its own account holders. It is worth doing
+  because `CLAUDE.md` runs a session-start database-size ritual and records a real `disk_full`
+  outage (2026-08-17), and an unbounded user-writable body is the shape that ritual exists to
   catch — and because the stated direction is multi-user + Play Store, at which point "nobody is
   attacking it" stops being an argument.
-- **⚠️ Do NOT quote 10 MB as a storage figure.** `pg_column_size` read ~120 kB for the probe rows
+- **⚠️ Do NOT quote 20 MB as a storage figure.** `pg_column_size` read ~120 kB for the probe rows
   because the payload was one repeated character and TOAST compressed it almost perfectly. Real text
-  would not. The defensible statements are that the **transfer and parse** cost is unbounded, and the
-  stored size is bounded only by what the content happens to compress to.
-- **Lane A owns this** (`app/api/**`).
+  would not. The defensible statement is that the **transfer and parse** cost was unbounded.
+- **Lane A owns this** (`app/api/**`, `scripts/`).
 
 ### [platform][nutrition][workouts] Q-482 — an id that is not a UUID reaches Postgres and 500s, on 21 route/method pairs
 
@@ -2002,49 +1950,6 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Not verified:** the mismatch was measured with `date-fns-tz` directly, not by driving the app with
   a DST-zone user at that hour — the app cannot be time-travelled here (`faketime` shifts node's clock
   but not Postgres's). The consequence at each call site is read from source.
-
-### [nutrition] Q-358 — every meal-label QR is drawn on a fractional pixel grid, so every module edge is grey
-
-- **Branch:** `fix/label-code-pixel-snap`
-- **Added:** 2026-08-19 · Lane B, found while fixing Q-399 ·
-  [`journal`](overview/entries/2026-08-19-label-line-budget.md)
-- **Placement:** low-mid. **Mitigated, not fixed**, and the mitigation is what makes it low: Q-399
-  doubled the canvas to 600 dpi, which took the default's module from 4.7 device pixels to 9.5 and
-  made the E2E decode reliable again. The grid is still fractional; there is just enough resolution
-  now that it does not matter. That is a margin, not a fix.
-- **What.** `drawCode` sizes a module as `box / 33` in sheet units and the canvas is scaled by a
-  constant, so the module width in device pixels is `box × scale / 33` — **fractional for every
-  style that ships**, at every scale tried:
-  ```
-  scale 3.12 (300 dpi)   band 4.35 px   inlineCentred 4.73   plaque 5.67   square 6.62
-  scale 6.24 (600 dpi)   band 8.70 px   inlineCentred 9.45   plaque 11.35  square 13.24
-  ```
-  Every module edge therefore lands mid-pixel and antialiases to grey. **The `+0.04` bleed in
-  `drawCode` is an acknowledgement of exactly this** — it papers over the resulting hairline seams
-  instead of removing them, and its own comment says the seams "read as a lighter code and cost scan
-  margin".
-- **How it showed up.** At 300 dpi and 0.401 mm per module, `e2e/meal-label.spec.ts`'s decode of the
-  **rendered canvas** became a coin flip — the same geometry decoded on one run and failed the next,
-  with the label visibly correct in the screenshot. That is the signature: not a broken code, a
-  fuzzy one.
-- **Why it matters beyond the test.** The canvas **is** the printed artwork — share/save hands the
-  viewer these pixels. A grey-edged module is exactly what ink spread then merges, which is the
-  failure mode the owed print test is looking for, and it would present as "the scanner doesn't
-  work".
-- **Fix shape:** snap the cell to a whole number of device pixels (`floor(box × scale / 33)`), snap
-  the origin to a pixel boundary too, and drop the `+0.04` — adjacent modules then abut exactly.
-  **The catch, and why it was not folded into Q-399:** flooring shrinks the drawn box, and at
-  300 dpi it shrank it a lot (a 50-unit box snapped to 42.3, pitch 0.401 → 0.339). Every reported
-  figure would then be wrong — `codeMm`, the sheet's mm-per-module line, and
-  `mealLabelCodeMetrics`, which is the number `meal-label-code-size.test.ts` asserts and the number
-  the owner reads before printing. **At 600 dpi the loss is much smaller** (9.45 → 9 px, ~5%), which
-  is the version worth building: snap, then make `mealLabelCodeMetrics` report the SNAPPED size so
-  the figure and the artwork agree.
-- **Verification:** run the E2E decode several times, not once — the tell is flakiness, not failure.
-  Then the physical print, which is the only real check and is already owed.
-- **Lane B owns this** (`components/nutrition/**`).
-- **Not verified:** the pixel counts are arithmetic from `scale` and `codeUnits`, not measured off a
-  rendered canvas. No print.
 
 ### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
 
@@ -2283,43 +2188,6 @@ the H10 at home — which is the walk in the screenshot that started this.
 - **Still not exercised:** on device (APK WebView + native local store) and offline, where
   `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
   worklist.
-
-### [platform] Q-498 — three unauthenticated routes buffer an unbounded request body; one parses it before any check
-
-- **Branch:** `security/body-size-guard-coverage`
-- **Added:** 2026-08-18 · review sweep (request-body size guards) ·
-  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](reviews/2026-08-18-unbounded-request-bodies.md)
-- **Placement:** medium. No data exposed or corrupted — memory/CPU amplification on unauthenticated
-  endpoints. Ranked above ordinary because the ingest route does the work before *any* check, and
-  because **Q-493 removes the rate bound that would otherwise contain it**.
-- **The shared guard is correct and is not the defect.** `readJsonLimited` treats `Content-Length` as a
-  fast path and streams with a real byte counter, cancelling on overflow. Measured: a 20 MB body to
-  `/api/client-error` (16 KB cap) was **cut off at 2,949,120 bytes**.
-- **Coverage:** 113 route files export `POST`/`PUT`/`PATCH`; **7** use `readJsonLimited`; **93** use bare
-  `req.json()`. Of those 93, **exactly 3 are reachable without a session**: `auth/register`,
-  `auth/exchange-mobile-token`, `health-connect/ingest`. **The seven guarded routes are all *less*
-  exposed than these three.**
-- **Measured**, same 20 MB body: `auth/register` and `health-connect/ingest` each accepted the **full
-  20,000,048 bytes** and then returned 400 — read, buffered and parsed before deciding they did not
-  want it.
-- **⚠️ Ordering separates them, and one is much worse.** `auth/register` (limiter line 9, parse line 13)
-  and `exchange-mobile-token` (8 / 12) rate-limit **before** parsing, so the rate is bounded even with
-  no size cap. **`health-connect/ingest` reads at line 35 and Zod-parses at 40, but rate-limits at 53
-  and checks the secret at 58** — an unauthenticated caller **holding no secret** makes the server
-  buffer and fully parse an arbitrary body, and the limiter cannot throttle it because it runs after.
-- **Fix — two changes, the second matters more:**
-  1. Route the three through `readJsonLimited`. Coverage, not design; the helper exists and 7 routes
-     already use it.
-  2. **On `health-connect/ingest`, move the rate limit and secret compare above the body read.**
-     Independent of the size guard, and the larger win: it converts "anyone can make us parse
-     anything" into "only a caller past the gate can". Needs `secret` moved out of the body (to a
-     header) to do cleanly — a small shape change worth making.
-- **The other 90 all require a session**, which is a real mitigation at this user count and is why the
-  finding is scoped to 3 rather than 93. Recorded because that exposed set grows with the user base if
-  registration ever opens up, not with the code.
-- **Not exercised:** the actual ceiling was **not** probed — 20 MB proved there is no cap and going
-  further risked destabilising the server for no extra information. Railway's edge may impose its own
-  request-size limit, which would reduce practical exposure; not checked.
 
 ### [platform] Q-497 — a 31-day range that passes every guard makes two admin routes loop forever
 
@@ -6380,6 +6248,57 @@ session working from a temporarily restored copy.
 - **Do not implement this as "delete the night".** That discards valid physiology; on the reported night
   HRV read 61 ms against a 59 ms average and lowest HR read 53 — *exactly* the trailing average.
 - **Reversal cost:** low — a nullable column plus filters; unset it and the night returns.
+
+### [body] Q-521 — Body Battery's drain tracks how long the ring was worn, not what the owner did
+
+- **Branch:** `feat/exertion-integrated-battery-drain`
+- **Plan:** the design brief is
+  [`docs/reviews/2026-08-19-body-battery-drain-and-roadmap.md`](reviews/2026-08-19-body-battery-drain-and-roadmap.md) §3.
+  **Do Q-515 first** (see sequencing). Lane A implements; Tuning proposes only.
+- **Added:** 2026-08-19 · Tuning agent, from an **owner brief** (*"body battery still doesn't seem
+  that good… id like that type of granular drain"*)
+- **Measured** over 51 days, joined to steps and completed workouts:
+
+  | relationship | measured | should be |
+  |---|---|---|
+  | `corr(hr_sample_count, total_drained)` | **+0.518** | — |
+  | `corr(steps, total_drained)` | **−0.153** | strongly **positive** |
+  | `corr(steps, end_value)` | **+0.112** | strongly **negative** |
+  | `corr(total_drained, end_value)` | −0.674 | negative ✓ |
+
+  **The strongest predictor of ending low is how many HR samples were recorded — i.e. ring wear time.**
+  Steps are *negatively* associated with drain.
+- **A workout barely registers:** `end_value` averages **50.6** on 37 workout days vs **50.0** on 14
+  non-workout days — a **0.6-point** difference.
+- **The days that hit 0 are the quiet ones.** Four days ended at exactly 0 on **828–4,152 steps**
+  (median 3,020), while **16 of 51 days cleared the 8,000-step goal** and did *not* end lower. So `0`
+  currently means *"you wore the ring a long time"* and the owner wants it to mean *"you did
+  everything"* — close to opposites.
+- **Mechanism.** Drain is `-DRAIN_RATE × (hrr − REST_THRESHOLD) × dt`, purely HR-driven; steps,
+  workouts, zone minutes and calories enter only via their HR effect. With **Q-515**'s boundary having
+  fallen to ~60 bpm, nearly every waking sample drains, and `(hrr − threshold)` varies far less than
+  wear duration — so **drain ≈ rate × time worn**, which is what +0.518 says. **Q-521 is downstream of
+  Q-515**: fixing the boundary does not fix this, but leaving it broken re-poisons any replacement.
+- **First action — exertion-integrated drain** (§3): keep the morning anchor; replace time-integrated
+  HR drain with exertion combining steps/movement, HR above rest, workout load and zone minutes;
+  **normalise against that day's `getDailyGoals`** so "everything hit" lands near empty; **floor at 0
+  and route the overshoot to an overreach signal** rather than below empty (the same resolution the
+  owner chose for Activity).
+- **⚠️ Two constraints the data imposes.** (1) **`active_calories` is unusable as a load-bearing
+  input — present on 8 of 51 days**; steps are on all 51, and any design needing calories silently
+  degrades to the HR-only model being replaced. (2) Normalising to targets means **a fitter person
+  drains less for the same absolute work** — correct for "did I do my day", wrong for "how depleted am
+  I". The owner's brief chooses the former; **write that into the model's comment so it is not
+  silently reversed.**
+- **This model must NOT be asked to detect overreaching.** On a target-hitting day a well-recovered and
+  an overreached athlete both read 0. Overreach lives in ACWR/readiness/illness. This arguably resolves
+  **Q-276** by making Body Battery explicitly *not* a recovery number.
+- **Pass test:** re-run the four correlations above. `corr(steps, total_drained)` must become clearly
+  positive, and workout vs non-workout `end_value` must separate by far more than 0.6 points.
+- **Caveats:** n = 51, one athlete, Pearson on daily aggregates — the weak values (+0.112, −0.153) mean
+  *"no relationship"* rather than a precise signed effect. **Zone minutes and movement-per-hour were
+  not pulled or coverage-checked** — they are named because the owner named them, and checking their
+  coverage is the first implementation step, given what `active_calories` shows.
 
 ### [readiness][body] Q-276 — Readiness and Body Battery are both sold as "recovery" and share no variance
 

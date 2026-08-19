@@ -269,6 +269,7 @@ export const RECONCILE_COLUMNS: { table: string; column: string; ddl: string }[]
   { table: 'day_checkins',     column: 'perceived_recovery', ddl: `ALTER TABLE day_checkins ADD COLUMN perceived_recovery INTEGER` },
   { table: 'day_checkins',     column: 'motivation',         ddl: `ALTER TABLE day_checkins ADD COLUMN motivation INTEGER` },
   { table: 'day_checkins',     column: 'sleep_quality_feel', ddl: `ALTER TABLE day_checkins ADD COLUMN sleep_quality_feel INTEGER` },
+  { table: 'day_checkins',     column: 'food_logging_completed_at', ddl: `ALTER TABLE day_checkins ADD COLUMN food_logging_completed_at TEXT` },
   { table: 'day_checkins',     column: 'resting_soreness',   ddl: `ALTER TABLE day_checkins ADD COLUMN resting_soreness INTEGER` },
   // Q-113 — replaces motivation (retired in place, same reconcile pattern); touched flags
   // distinguish a genuinely-edited scale from an accepted score-derived prefill.
@@ -709,6 +710,9 @@ const CREATE_DAY_CHECKINS = `CREATE TABLE IF NOT EXISTS day_checkins (
   late_heavy_meal     INTEGER,
   sore_muscles        TEXT NOT NULL DEFAULT '[]',
   journal             TEXT,
+  -- Q-387. A column added to a CREATE TABLE IF NOT EXISTS body reaches FRESH INSTALLS ONLY, so it
+  -- also needs the v27 ALTER below and its RECONCILE_COLUMNS row — see the migrations rule.
+  food_logging_completed_at TEXT,
   updated_at          TEXT NOT NULL,
   deleted_at          TEXT,
   sync_status         TEXT NOT NULL DEFAULT 'pending',
@@ -1244,6 +1248,15 @@ export const MIGRATIONS: UpgradeStatement[] = [
       // ALTER counterpart — unlike v24/v25, which added columns to tables devices already had.
       CREATE_PLAN_MEAL_ANSWERS,
       CREATE_PLAN_MEAL_ANSWERS_IDX,
+    ],
+  },
+  {
+    toVersion: 27,
+    statements: [
+      // Q-387. `day_checkins` already exists on every upgraded device, so the CREATE TABLE body
+      // above is a no-op for them — this ALTER is the only thing that reaches them, and the
+      // RECONCILE_COLUMNS row is the authority if this upgrade half-applies.
+      `ALTER TABLE day_checkins ADD COLUMN food_logging_completed_at TEXT`,
     ],
   },
 ];

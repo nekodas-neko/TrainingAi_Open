@@ -13,10 +13,18 @@ import {
  * These are the numbers a printer actually has to reproduce.
  */
 describe('meal label code size', () => {
+  /**
+   * Raised 0.36 → 0.49 with Q-411's square canvas. A floor the whole set clears by a wide margin is
+   * not a floor: after the round constraint was retired the tightest style moved from 0.369 to
+   * 0.497, so the old number could no longer fail for any style and stopped being a test.
+   *
+   * 0.49 and not the 0.52 an area calculation suggests, because `codeUnits` is bounded by VERTICAL
+   * fit rather than by the area freed — see the note above `StyleSpec`.
+   */
   it('every style has a code, and none is smaller than the tightest shipped one', () => {
     for (const s of MEAL_LABEL_STYLES) {
       const { mmPerModule } = mealLabelCodeMetrics(s.value)
-      expect(mmPerModule, `${s.value}`).toBeGreaterThanOrEqual(0.36)
+      expect(mmPerModule, `${s.value}`).toBeGreaterThanOrEqual(0.49)
     }
   })
 
@@ -30,15 +38,15 @@ describe('meal label code size', () => {
     const before = mealLabelCodeMetrics('band').mmPerModule
     expect(DEFAULT_MEAL_LABEL_STYLE).toBe('inlineCentred')
     expect(now).toBeGreaterThan(before)
-    expect(now).toBeCloseTo(0.401, 3)
-    expect(before).toBeCloseTo(0.369, 3)
+    expect(now).toBeCloseTo(0.561, 3)
+    expect(before).toBeCloseTo(0.497, 3)
   })
 
   it('reports the symbol as 25/33 of the drawn box, since the quiet zone sits inside it', () => {
     const { boxMm, symbolMm, mmPerModule } = mealLabelCodeMetrics('inlineCentred')
     expect(symbolMm).toBeCloseTo(boxMm * 25 / 33, 6)
     expect(symbolMm / 25).toBeCloseTo(mmPerModule, 6)
-    expect(symbolMm).toBeCloseTo(10.0, 1)   // Q-399's retuned B2
+    expect(symbolMm).toBeCloseTo(14.0, 1)   // Q-411's square-canvas B2
   })
 })
 
@@ -63,9 +71,14 @@ describe('centred-stack ingredient budget', () => {
     }
   })
 
-  it('the default draws the three lines its picker copy promises', () => {
+  /**
+   * Raised 3 → 4 with Q-411. The square canvas gives the stack 34 more units of height, so three
+   * lines became trivially true and the assertion stopped being able to fail. The default now draws
+   * **four** lines *and* a larger code than before — the point of retiring the round constraint.
+   */
+  it('the default draws the four lines the square canvas affords', () => {
     const { maxLines } = centredStackLineBudget(DEFAULT_MEAL_LABEL_STYLE)
-    expect(maxLines).toBeGreaterThanOrEqual(3)
+    expect(maxLines).toBeGreaterThanOrEqual(4)
   })
 
   /**

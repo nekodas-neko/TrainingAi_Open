@@ -294,6 +294,9 @@ jobs:
       - name: No raw error in an API response body
         run: node scripts/check-no-raw-error-in-response.js
 
+      - name: Request bodies are bounded before they are parsed
+        run: node scripts/check-bounded-request-body.js
+
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 

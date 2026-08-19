@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// An email, a password capped at 200 characters and a name capped at 100. 8 KB is generous.
+const MAX_REGISTER_BODY_BYTES = 8 * 1024
 
 export async function POST(req: NextRequest) {
   // 5 registration attempts per IP per 15 minutes
@@ -10,12 +14,20 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests. Please try again later.' }, { status: 429 })
   }
 
-  const { email, password, name } = await req.json()
+  const read = await readJsonLimited(req, MAX_REGISTER_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { email, password, name } = (read.body ?? {}) as { email?: unknown; password?: unknown; name?: unknown }
 
   if (!email || !password) {
     return NextResponse.json({ error: 'Email and password are required.' }, { status: 400 })
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  // Typed explicitly now the body is `unknown` rather than `any`. The regex would have coerced a
+  // non-string and failed anyway, so this is the same answer said out loud.
+  if (typeof email !== 'string' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return NextResponse.json({ error: 'Invalid email address.' }, { status: 400 })
   }
   if (typeof password !== 'string' || password.length < 8 || password.length > 200) {

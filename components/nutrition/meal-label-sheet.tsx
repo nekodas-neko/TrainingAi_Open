@@ -159,12 +159,9 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
             </p>
           )}
 
-          {MEAL_LABEL_STYLES.find(s => s.value === style)?.squareOnly && (
-            <p role="status" className="w-full rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-[11px] leading-snug">
-              <span className="font-semibold">Square dies only.</span> This layout uses the corners to
-              fit the ingredient list — printed on a round die, the list is cropped.
-            </p>
-          )}
+          {/* The "Square dies only" warning that used to sit here is gone with Q-411: every style
+              draws square now, so there is no longer a layout that a round die would crop
+              differently from the others. Where the round die matters is at the printer. */}
 
           {/* The shared roving-tabindex hook, not a hand-rolled group — Q-350 put all eight of the
               app's radiogroups on it, and a ninth that behaves differently is the drift it fixed. */}
@@ -180,14 +177,7 @@ export function MealLabelSheet({ meal, open, onOpenChange }: Props) {
                     on ? 'border-[var(--color-brand)] bg-[var(--brand-card-bg)]' : 'border-border bg-muted/30'
                   }`}
                 >
-                  <span className="block text-[12px] font-semibold">
-                    {s.label}
-                    {s.squareOnly && (
-                      <span className="ml-1 rounded bg-amber-500/20 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-amber-600 dark:text-amber-400">
-                        Square
-                      </span>
-                    )}
-                  </span>
+                  <span className="block text-[12px] font-semibold">{s.label}</span>
                   <span className="block text-[10px] leading-snug text-muted-foreground">{s.note}</span>
                 </button>
               )

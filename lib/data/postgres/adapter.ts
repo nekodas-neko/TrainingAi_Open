@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { formatInTimeZone } from 'date-fns-tz'
 import { eq, and, or, inArray, gt, gte, lt, lte, asc, desc, sql, ne, isNotNull, isNull } from 'drizzle-orm'
 import { getDb } from './client'
@@ -2297,7 +2297,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return await this.db.transaction(async tx => {
       const [existing] = await tx.select().from(s.exerciseLibrary).where(eq(s.exerciseLibrary.id, id))
       if (!existing) throw new NotFoundError('Exercise')
-      if (existing.createdBy !== userId) throw new Error('Not authorized to rename this exercise')
+      if (existing.createdBy !== userId) throw new UserFacingError('Not authorized to rename this exercise', 403)
       const oldName = existing.name
       await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
       await tx.update(s.exerciseLogs).set({ exerciseName: newName }).where(eq(s.exerciseLogs.exerciseName, oldName))
@@ -2318,7 +2318,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       if (newName !== oldName) {
         const [conflict] = await tx.select({ id: s.exerciseLibrary.id }).from(s.exerciseLibrary)
           .where(and(eq(s.exerciseLibrary.name, newName), ne(s.exerciseLibrary.id, entry.id)))
-        if (conflict) throw new Error(`An exercise named "${newName}" already exists`)
+        if (conflict) throw new UserFacingError(`An exercise named "${newName}" already exists`, 409)
 
         await tx.update(s.sessionExercises).set({ exerciseName: newName }).where(eq(s.sessionExercises.exerciseName, oldName))
         await tx.update(s.exerciseLogs).set({ exerciseName: newName }).where(eq(s.exerciseLogs.exerciseName, oldName))
@@ -2928,7 +2928,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
       soreMuscles: r.soreMuscles ?? [],
-      journal: r.journal, createdAt: r.createdAt, updatedAt: r.updatedAt,
+      journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
+      createdAt: r.createdAt, updatedAt: r.updatedAt,
     }
   }
 
@@ -2946,11 +2947,19 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
       soreMuscles: r.soreMuscles ?? [],
-      journal: r.journal, createdAt: r.createdAt, updatedAt: r.updatedAt,
+      journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
+      createdAt: r.createdAt, updatedAt: r.updatedAt,
     }))
   }
 
-  async saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin> {
+  /**
+   * Q-387: `foodLoggingCompletedAt` is deliberately OPTIONAL here and is left alone when omitted.
+   * Finishing your food log and filling in the evening wellness check-in are separate acts on the
+   * same row, and this upsert overwrites every column it names — so listing it unconditionally
+   * would clear the flag every time the check-in was saved or edited. Pass `null` explicitly to
+   * undo; pass nothing to leave it as it is.
+   */
+  async saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'foodLoggingCompletedAt'> & { foodLoggingCompletedAt?: Date | null }): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin> {
     const [r] = await this.db.insert(s.dayCheckins)
       .values({
         userId,
@@ -2971,6 +2980,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         sleepQualityFeelTouched:   checkin.sleepQualityFeelTouched,
         soreMuscles:       checkin.soreMuscles,
         journal:           checkin.journal,
+        foodLoggingCompletedAt: checkin.foodLoggingCompletedAt ?? null,
         updatedAt:         new Date(),
       })
       .onConflictDoUpdate({
@@ -2991,6 +3001,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           sleepQualityFeelTouched:   sql`EXCLUDED.sleep_quality_feel_touched`,
           soreMuscles:       sql`EXCLUDED.sore_muscles`,
           journal:           sql`EXCLUDED.journal`,
+          // Only when the caller supplied one — otherwise keep whatever is stored (see the note
+          // above; an unconditional EXCLUDED here clears the flag on every check-in save).
+          ...(checkin.foodLoggingCompletedAt !== undefined
+            ? { foodLoggingCompletedAt: sql`EXCLUDED.food_logging_completed_at` }
+            : {}),
           updatedAt:         new Date(),
         },
       })
@@ -3004,7 +3019,8 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       illnessContext: r.illnessContext as import('@trainingai/shared/types/day-checkin').IllnessContext | null,
       perceivedRecoveryTouched: r.perceivedRecoveryTouched, sleepQualityFeelTouched: r.sleepQualityFeelTouched,
       soreMuscles: r.soreMuscles ?? [],
-      journal: r.journal, createdAt: r.createdAt, updatedAt: r.updatedAt,
+      journal: r.journal, foodLoggingCompletedAt: r.foodLoggingCompletedAt,
+      createdAt: r.createdAt, updatedAt: r.updatedAt,
     }
   }
 
