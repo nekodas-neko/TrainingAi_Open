@@ -24,6 +24,23 @@ Two traps in that command, both hit: `docs/agents/README.md` and `docs/implement
 `RV-1` its predecessor recorded — following the documented lookup beats being clever about it, and
 skipped numbers cost nothing. Legacy `Q-` numbers stay valid where already used and are never renumbered.
 
+## Previous run closed 2026-08-20 — read this before filing anything
+
+The run of sweeps 29–39 (PRs #140–#151) was closed by its own wrap-up, and its record is
+[`docs/handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md).
+**10 of its 13 findings have since shipped** (verified in source, not inferred from the queue's
+silence): Q-493, Q-494, Q-495, Q-496, Q-497, Q-498, Q-492, Q-552, Q-553, Q-554 — their
+`projectOverview.md` rows are in the resolved archive.
+
+**Three remain open — do not re-file them:** **Q-499** (self-fetching cards vanish on a failed fetch;
+its ten unverified candidates are a **worklist, not a defect count**), **Q-555** (offline, a tab tap
+is a silent no-op before the service worker claims the page), **Q-556** (`DELETE /api/activity-logs`
+reports success for a row it did not delete).
+
+**One surface that run left explicitly unverified, not clean:**
+`PATCH /api/activity-logs/<id>/metrics` — its probe payload was rejected by Zod before the ownership
+check ran, so that route's cross-user behaviour is **unknown**. Sweep 40 did not reach it either.
+
 ## Now — sweep 40 (2026-08-20)
 
 **Lens: the non-workout write surface** — the program / phase-set / progression-style / template routes —
@@ -60,6 +77,10 @@ before writing a paragraph about why it should.
 
 ## Next — in the order they are worth doing
 
+**Not this:** the documentation-integrity seam. Sweeps 34–37 were four consecutive passes over it and
+left three CI checks behind (`check-known-issue-duplication`, `check-index-doc-paths`,
+`check-module-map-symbols`). Pick a lens that runs the app.
+
 - **The other 23 FK edges into user-scoped tables.** `meal_plan_meals.saved_meal_id`,
   `saved_meal_items.food_item_id`, `prescribed_runs.plan_id`, `supplement_logs.supplement_id` first.
   The query that produces the inventory is in sweep 40's write-up §7.
@@ -70,6 +91,8 @@ before writing a paragraph about why it should.
 - **A clean clone, actually built.** Nobody has done `git clone` into an empty container and run
   `pnpm install && pnpm build && pnpm test`. It is the one check that would settle `NOTICE`'s claim outright,
   and Q-313 (no `next build` gate in the publish dry-run) is why it is worth doing.
+- **The sync/outbox under a server that fails mid-push, on the device half.** Sweep 10 drove the
+  server half; the local SQLite outbox has never been exercised, and it needs hardware.
 - **Q-452's siblings** — only the four `AiInsightCard` sections were checked for absent-vs-zero;
   `weekly-digest` and the coach were not.
 

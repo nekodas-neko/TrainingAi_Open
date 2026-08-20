@@ -329,24 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [platform] PS-1 — `docs/agents/README.md` §3 lists `lib/coach/` as Lane A while a queue entry says it belongs to neither lane
-
-- **Branch:** `docs/lane-coach-contradiction`
-- **Added:** 2026-08-19 · found while replacing the lane path lists with a rule
-- **Lane: B** — a docs-only reconciliation, no code.
-
-`docs/agents/README.md:124` lists `lib/coach/` under Lane A. Q-407's `Lane.` paragraph tells whoever
-takes it that **`lib/coach/**` belongs to neither lane's declared paths** and to claim it in a baton
-first. Both cannot be true, and the entry is the one an implementer reads.
-
-The path rule added in this branch settles it — `lib/coach/` is reached by `app/api/coach/route.ts`,
-so it is Lane A — but **Q-407's paragraph still says otherwise** and will be read before the README
-is. Correct the entry to match, or say explicitly why the rule does not apply to it.
-
-**Why this is worth an entry rather than a drive-by edit:** the same shape may exist on other
-entries written while the enumeration was the authority. Grep the queue for `neither lane` and
-`belongs to neither` before closing this.
-
 ### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
 
 - **Branch:** `docs/baseline-history-dedupe`
@@ -368,6 +350,29 @@ are the only record of why a number moved, and one documents a near-miss where a
 reverted another lane's raise.
 
 ### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
+
+> **⚠️ MEASURED AND MOSTLY DEFUSED 2026-08-20 (Lane A) — read this before starting; the entry below
+> is the original.** ([`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md))
+>
+> **The question this entry says to answer first is answered: production is clean.**
+> `claude_ro.schema_migrations` holds **206 of 206** filenames, the four among them — `054`, `055`
+> and `082` recorded 2026-07-21, `157` on 2026-07-28. So `ensureSchema` skips them in production and
+> nothing re-runs on a cold start there. This is local-only, exactly as the entry hoped rather than
+> feared.
+>
+> **And they were never failures.** The four raise SQLSTATEs (42710, 42710, 23505, 42P07) that
+> `ensureSchema()` classifies as *already present* and steps over; `migrate.js` had no classifier at
+> all and called them failures — the two runners disagreeing, in the file whose docstring says it
+> mirrors the other. Fixed, along with the larger thing it was hiding: `migrate.js` exited 0
+> regardless, so the CI job named **Migration Check** could not fail on a genuinely broken migration.
+>
+> **What is actually left is small.** The four are still not *recorded* locally, so they are retried
+> on every cold start — four statements that fail cleanly and are reported as benign. Making each
+> idempotent (`IF NOT EXISTS`, an explicit `pg_constraint` guard for the two `ADD CONSTRAINT`s,
+> `ON CONFLICT DO NOTHING` for the seed) would let them succeed and record, ending the retry. It
+> edits already-applied migration files, which is safe here because it changes nothing for a
+> database that has them and nothing for a fresh one — but it is no longer buying anything except
+> quiet. Judge it on that, not on the original framing.
 
 - **Branch:** `fix/non-idempotent-migrations`
 - **Added:** 2026-08-19 · observed in this session's own start-up hook output
@@ -722,6 +727,8 @@ that gets corrected upward that lopsidedly is not a neutral starting point.
 > place and losing the ability to tell them apart.
 
 
+- **Gate: owner** — needs a decision on the 6–10 → 1–10 scale mapping before anything is fitted;
+  see the re-measurement note above. Added 2026-08-20 for the same reason as Q-422's.
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
@@ -915,6 +922,9 @@ never written.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
+- **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
+  2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
+  further down the entry, and prose is exactly what the `Gate:` field replaced.
 - **Branch:** `feat/calibrated-active-energy-multiplier`
 - **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
   calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app
@@ -1191,6 +1201,15 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 > script before `pnpm test`, so this was CI's state every run. Measured: `schema_migrations` did not
 > exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
 > suite 200.19 s → 183.18 s.
+>
+> **⚠️ Correction 2026-08-20 (Lane A): "3 failed … now 1, unrelated" was wrong, and they were never
+> failures.** On this session's database the count read **4** — `054`, `055`, `082`, `157` — and all
+> four raise SQLSTATEs that `ensureSchema()` classifies as *already present* and steps over. The
+> discrepancy was `migrate.js` carrying **no error classifier at all**, in the file whose own
+> docstring says it mirrors `ensureSchema()`. Worse, it returned exit 0 whatever happened, so the CI
+> job named **Migration Check** — which runs this script and nothing else — could not fail on a
+> genuinely broken migration. Both fixed; the SQLSTATE list now lives in one JSON file both runners
+> read. [`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md).
 >
 > **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
 > today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
@@ -2093,8 +2112,10 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   the conversation has been used on-device for a plan the owner actually keeps. A conversational
   flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
 
-- **Lane.** Split, and **`lib/coach/**` belongs to neither lane's declared paths** — whoever takes
-  it claims that path in their baton first (`docs/agents/README.md` §"A path neither lane lists").
+- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
+  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
+  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
+  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
   `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
   prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
   `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
@@ -6978,24 +6999,22 @@ session working from a temporarily restored copy.
   read.
 - **Caveats:** one night, one athlete, `claude_ro` row-scoped.
 
-### [devices][platform] Q-528 — a full-history rollup can wipe every stored daily summary, and the guard is on the wrong side of the delete
+### [devices][platform] Q-528 — the daily-summary replace deletes before it checks for emptiness (latent: it has NOT fired)
 
 - **Branch:** `fix/daily-summary-replace-guard` · **Lane:** A
-- **Plan:** none needed for the guard — it is one reordering. **The rebuild after it is the real work.**
-  Evidence: [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](reviews/2026-08-19-daily-summary-replace-wipe.md).
-- **Added:** 2026-08-19 · Tuning agent, found while running Q-525's first action.
-- **Measured via `pg_stat_user_tables` — whole-database counts, not row-scoped:**
-
-  | table | live rows |
-  |---|---|
-  | `oura_raw_samples` | **198,223** |
-  | **`oura_daily_summary`** | **1** |
-  | `oura_bucket` | **0** |
-  | `step_live_windows` | **0** |
-
-  For contrast `oura_daily_derived` holds 96 rows, **46 with illness scores computed from the very
-  `summaryRows` array `oura_daily_summary` is the persisted copy of.**
-- **Mechanism.** `replaceOuraDailySummary` deletes unconditionally and *then* checks for emptiness:
+- **Plan:** none needed — it is one reordering. **There is nothing to rebuild.**
+  Evidence: [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md),
+  which retracts the original [`2026-08-19-daily-summary-replace-wipe.md`](reviews/2026-08-19-daily-summary-replace-wipe.md).
+- **Added:** 2026-08-19 · Tuning agent. **Rewritten 2026-08-20 by Tuning: the wipe never happened.**
+- **⚠️ THE ORIGINAL MEASUREMENT WAS WRONG — read this before acting.** This entry said
+  `oura_daily_summary` held **1 row** and that a full-history pass had wiped the history. It holds
+  **45 rows**, of which **43 were created 2026-08-17 07:50** and have existed continuously since —
+  straddling the 2026-08-19 measurement that reported one. The count came from
+  `pg_stat_user_tables.n_live_tup`, which is a **planner estimate, not a count**; `last_analyze` and
+  `last_autovacuum` are NULL on every table here, and the same field reads **0** against
+  `oura_raw_packed`'s **764** real rows. **To ask whether a table is empty, run `count(*)`.**
+- **What is still real — the code shape.** `replaceOuraDailySummary`
+  (`lib/data/postgres/slices/oura.ts:1345`) deletes unconditionally and *then* checks for emptiness:
 
   ```ts
   await db.delete(s.ouraDailySummary).where(eq(s.ouraDailySummary.userId, userId))
@@ -7003,24 +7022,18 @@ session working from a temporarily restored copy.
   await db.insert(...)
   ```
 
-  A full-history pass producing few or zero rows replaces the whole history and **returns
-  successfully** — no error, no log. The windowed path (`upsertOuraDailySummary`, per-day
-  `onConflictDoUpdate`) is safe, which is why this survived: **only the rarely-taken `fullHistory`
-  branch can do it.** Illness scores survived the same pass because they write to
-  `oura_daily_derived` through a COALESCE upsert — same input, different durability, and that
-  asymmetry is the evidence the input existed.
-- **First action:** move the guard above the delete, or make it a transactional
-  delete-and-insert so an empty computation cannot commit a wipe. **Then rebuild the summaries from
-  `oura_raw_samples`**, which still holds 198,223 rows and is the archival source of truth
-  (`CLAUDE.md`: never prune or mutate the server copy of `body_hex` — this is why).
-- **Do the guard BEFORE the rebuild.** Rebuilding into a function that can wipe on the next
-  full-history pass buys nothing.
-- **Pass test:** a full-history pass over a deliberately narrow input leaves prior rows intact; a
-  pass over the full archive produces a summary row per night with raw data.
-- **Caveats:** the mechanism is **read from source and matches the observed state; it is not
-  reproduced.** A dev-DB repro — populate, run full-history over one night, count rows — would settle
-  it. The alternative, that a full-history pass has simply never run over more than one night, is not
-  excluded.
+  A pass producing zero rows would replace the whole history and **return successfully** — no error,
+  no log. Its only production call site is `adapter.ts:6080`, reached **only** under `fullHistory`;
+  routine ingest takes `upsertOuraDailySummary` (per-day `onConflictDoUpdate`), which is safe.
+- **So this is a latent hazard on a hand-triggered path, not an incident.** Priority drops
+  accordingly, but it does not reach zero: `fullHistory` is also the **only** path that can ever
+  produce a chronic-stress score (TN-1), so this guard sits directly in front of the fix for a
+  dormant score.
+- **First action:** move the guard above the delete, or make it a transactional delete-and-insert so
+  an empty computation cannot commit a wipe. **Do not rebuild anything** — the table is intact.
+- **Pass test:** a `fullHistory` pass over a deliberately narrow input leaves prior rows intact.
+- **Caveats:** the mechanism is read from source and **not** reproduced. A dev-DB repro — populate,
+  run `fullHistory` over one night, count rows — would settle it, and is cheap.
 
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
 
@@ -7040,23 +7053,66 @@ session working from a temporarily restored copy.
   pass covering ≥21 nights of real ring data (owner/device-gated)."* **It is not enough for 21 good
   nights to exist — they must be present in ONE pass**, so a nightly incremental rollup can never
   satisfy it however long it runs.
-- **⚠️ DIAGNOSIS CORRECTED 2026-08-19 — do not check the summary table to answer this.**
-  `oura_daily_summary` holds **1 row** system-wide against 198,223 raw samples (**Q-528** — a
-  full-history pass deletes unconditionally before checking for emptiness). So **nothing can be
-  concluded from stored data about whether 21 qualifying nights exist**: the gate may be fine and the
-  history adequate, and the evidence was destroyed rather than never created. The "21 nights in one
-  pass" reading below still describes the gate accurately, but it was too confident as a *cause*.
-  **Do Q-528 first, rebuild the summaries, then ask this question again.**
-- **First action:** confirm whether ≥21 qualifying nights exist in the data at all before touching the
-  gate. If they do, this is a *trigger* problem (run the wide pass) and needs no code. If they do not,
-  it is a coverage problem and belongs with Q-510, which found daytime-stress coverage is not
-  persisted anywhere.
+- **✅ THE 2026-08-19 SUSPENSION IS WITHDRAWN — this entry is live again.** It said the summary table
+  held 1 row so nothing could be concluded, and that Q-528 had to be done first. **The table holds 45
+  rows and always did**; the "1" was a stale planner estimate. See
+  [`2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md).
+  Do **not** wait on Q-528 or on a rebuild.
+- **✅ MEASURED 2026-08-20 — the two countable gates both PASS, so neither is the cause.**
+  1. `summaryRows.length < 21` returns early on every routine pass (window ≈ 3 nights, because the
+     watermark advances hourly) — the incremental reading below is right. **But the 2026-08-17
+     `fullHistory` pass built 43 rows and cleared it.**
+  2. Summary-field completeness over the trailing 31 nights (2026-07-18 → 08-17): **27 of 31
+     complete** — six nights clear of the 21 needed.
+
+  That pass wrote **23** derived rows, illness scored on all 23, chronic stress on **0**. **The
+  refusal is inside the granular layer** (`signalsByDate` → `computeNightIntermediates`), which is
+  recomputed in memory by design and **persists no reason for a null**. Follow-up filed as **TN-1**.
+- **First action:** **instrument, do not relax.** Log the count of complete granular nights the pass
+  actually assembled. Relaxing `CHRONIC_STRESS_MIN_DAYS` without that is Q-504's mistake — loosening a
+  threshold whose input has not been checked.
 - **Do NOT merge with Q-507.** That is `STRESS_HIGH_DAY_THRESHOLD_MIN` — *daytime* stress minutes
   driving the session override, which does fire, on the wrong days. This is the separate vendored
   *cumulative* model. They share a word and nothing else.
 - **Caveats:** a dormant score is not a broken one — the gate may be correctly refusing to score on
   insufficient data, which is what the first action distinguishes. Do not relax a gate before knowing
   which.
+
+### [devices][readiness] TN-1 — chronic stress refuses inside the granular layer, and records no reason why
+
+- **Branch:** `feat/chronic-stress-null-reason` · **Lane:** A
+- **Plan:** none needed — it is a count and a log line. Evidence:
+  [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md) §4.
+- **Added:** 2026-08-20 · Tuning agent.
+- **The question this closes.** `chronic_stress_score` is NULL on all 96 `oura_daily_derived` rows and
+  always has been (Q-525). Both gates that can be counted from stored data have now been measured and
+  **both pass**: a `fullHistory` pass built **43** summary rows against a threshold of 21, and **27 of
+  31** nights in the trailing window are complete at the summary level. The 2026-08-17 pass wrote 23
+  derived rows, scored illness on all 23, and chronic stress on **0**. So the refusal is in the
+  granular layer — `signalsByDate` (`adapter.ts:5706`) feeding `computeNightIntermediates` — and
+  **there is no way to see it from outside**, because those intermediates are recomputed in memory by
+  design (*"no stored intermediate that could drift"*) and no reason-for-null is persisted.
+- **First action:** inside the `chronic_stress` step, count the nights in the 31-night window whose
+  granular signals are actually usable (non-empty hypnogram, non-empty rMSSD series, non-empty
+  skin-temp run) and record that count — a log line is enough; a nullable column beside
+  `chronic_stress_score` is better, and matches what readiness already does with its `provisional`
+  flags. **Do not relax `CHRONIC_STRESS_MIN_DAYS` in this change.**
+- **Why not just relax the gate.** The gate may be correctly refusing to score. Loosening a threshold
+  before checking the distribution of its input is the Q-504 mistake, and Q-506 is the same class:
+  there, a two-point threshold nudge would have hidden a biomarker whose baseline was 18.7× wrong.
+  Once the count exists, whether to relax is a **calibration question and comes back to Tuning**, and
+  any change to the scoring behaviour itself is the owner's call.
+- **Sequencing — do this with Q-528, not after it.** `fullHistory` is the **only** path that can ever
+  reach this model (a routine pass builds ~3 summary rows and returns early), and it is the same flag
+  that arms Q-528's unconditional delete. One branch should reorder that guard and add this count.
+- **Pass test:** a `fullHistory` pass leaves behind a number saying how many granular nights it found.
+  If that number is ≥ 21 and the score is still null, the fault is inside the vendored model and this
+  entry has done its job by proving it.
+- **Caveats:** whether the chronic-stress wiring was even deployed during the 2026-08-17 pass is
+  **unknown** — repo history was cut at the public-repo migration (50 commits, oldest 2026-08-19), so
+  no file can be dated before it. That makes the 08-17 pass weak evidence, not proof; the instrument
+  is what replaces it. **Do NOT merge with Q-507** — that is `STRESS_HIGH_DAY_THRESHOLD_MIN`, daytime
+  stress minutes, a different mechanism sharing a word.
 
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 

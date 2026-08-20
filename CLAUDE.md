@@ -24,6 +24,15 @@
   ```
   **`pg_stat_user_tables` is NOT row-scoped** — unlike every `claude_ro` view it reports physical sizes and
   lifetime counters for the whole database, so these numbers are complete rather than "the owner's, recently".
+  **But its SIZE columns and its ROW columns are not equally trustworthy, and conflating them cost a
+  session (2026-08-19/20).** `pg_total_relation_size`/`pg_relation_size`/`pg_indexes_size` are read from
+  the filesystem and are exact. **`n_live_tup`/`n_dead_tup` are planner ESTIMATES** maintained by
+  autovacuum and `ANALYZE` — and on this database `last_analyze` and `last_autovacuum` are **NULL on
+  every table**, so they can be arbitrarily stale. Measured 2026-08-20: `n_live_tup` read **0** against
+  `oura_raw_packed`'s **764** real rows, and **1** against an `oura_daily_summary` holding **45** — the
+  latter was filed as a data-loss incident (Q-528) that had never happened. **To ask whether a table is
+  empty, run `count(*)`;** where the worry is that a `claude_ro` view hides other users' rows, write the
+  finding as "none of the owner's" rather than reaching for a counter that cannot see them either.
   **Baseline: 171 MB total on 2026-08-18**, after the packing work took `oura_raw_samples` from 563 MB to
   50 MB. Growth should now be ~0.4 MB/day. Anything materially above that trend gets a Known-Issues row the
   same session.
@@ -49,19 +58,21 @@
 
 ---
 
-## The Standing Agents — five sessions, one repo
+## The Standing Agents — six sessions, one repo
 
 Full contract: [`docs/agents/README.md`](docs/agents/README.md). The rules below are the ones that
 must bind even if that file is never opened.
 
-**The roles.** **Implementation** runs in two lanes and is the only role that writes code — Lane A
+**The roles.** **Orchestrator** owns the queue and the docs — it clears completed entries, assigns
+batches, resolves lanes, and reconciles docs against reality on a weekly sweep. **Implementation**
+runs in two lanes and is the only role that writes code — Lane A
 owns the engine (`lib/data/**` including every migration, `lib/local-store/**`, `lib/sqlite/**`,
 `lib/cache-groups.ts`, `app/api/**`, `packages/shared/**` except `changelog.ts`, the domain-math and
 device pipelines, auth/security, `android/**`), Lane B owns the surface (`app/**` except
 `app/api/**`, `components/**`, `app/globals.css`, `lib/hooks/**`, `lib/stores/**`). **BugFix** turns
 owner reports into backlog entries. **Tuning** turns lived feedback into calibration proposals.
-**Review** sweeps weekly and files what it finds. Those three end at a docs-only PR and never write
-code — which is what keeps the collision surface to Lane A against Lane B.
+**Review** sweeps the running app weekly and files what it finds. Those four end at a docs-only PR
+and never write code — which is what keeps the collision surface to Lane A against Lane B.
 
 - **Lane ownership is decided by a rule, not a list.** Reached by `app/api/**` or touching storage
   → Lane A. Reached only from `app/**` or `components/**` → Lane B. Both → Lane A, engine half
@@ -70,7 +81,8 @@ code — which is what keeps the collision surface to Lane A against Lane B.
   authority. Where even the rule is ambiguous, the claiming lane records it in its baton first and
   releases the claim when that branch merges.
 - **Entry IDs come from your own letter and count up forever — there is no band and no pointer.**
-  Lane A `LA-` · Lane B `LB-` · BugFix `BF-` · Review `RV-` · Tuning `TN-` · one-off sessions `PS-`. Find
+  Lane A `LA-` · Lane B `LB-` · BugFix `BF-` · Review `RV-` · Tuning `TN-` · Orchestrator `OR-` ·
+  one-off sessions `PS-`. Find
   your next number with `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. A shared
   next-free pointer is a floor, not an authority — it cannot see an unmerged PR, which caused six
   collisions in three days and two live duplicates. Reserved bands fixed that and ran out instead
@@ -104,9 +116,14 @@ code — which is what keeps the collision surface to Lane A against Lane B.
   changes is that a green check goes stale while you work. Never merge a stale green.
 - **`get_check_runs` returning `total_count: 0` several minutes after opening a PR means a stale
   base, not slow CI.** Real CI reports queued checks within about a minute. Fetch, merge, push.
+- **A finished entry must not still be in the queue, and it is now checked.**
+  `check-backlog-pointers.js` fails on a NEW queue heading containing ✅/SHIPPED/FIXED/RESOLVED and
+  similar; the 17 that already did are baselined shrink-only, and clearing them is Orchestrator's
+  first sweep. An entry genuinely still owing an owner or device check states so with
+  `- **Keep:** <what is owed>` rather than being deleted or left to look finished.
 - **The session titles are fixed, and a successor reuses its predecessor's exactly** — `Implementation
   Agent (A) 🚧` · `Implementation Agent (B) 🚧` · `BugFix Intake Agent 🪲` · `Tuning Agent 🎶` ·
-  `Review Agent 📖`. The title is how the owner tells five concurrent sessions apart, so a renamed
+  `Review Agent 📖` · `Orchestrator 🪐`. The title is how the owner tells six concurrent sessions apart, so a renamed
   successor is a lost thread even when its baton is perfect. Every handoff states its successor's
   title outright rather than leaving it to be inferred.
 - **Handing over:** land everything first — the container is ephemeral, so an uncommitted baton is a

@@ -1,3 +1,20 @@
+> ## ⛔ RETRACTED 2026-08-20 — the wipe never happened
+>
+> This document's central measurement is wrong. `oura_daily_summary` was never reduced to one row:
+> it holds **45**, of which **43 were created 2026-08-17 07:50** and existed continuously through the
+> 2026-08-19 reading below. The "1" came from `pg_stat_user_tables.n_live_tup`, which is a **planner
+> estimate, not a count** — `last_analyze` is NULL on every table here, and the same field reads **0**
+> against `oura_raw_packed`'s **764** real rows.
+>
+> The *code shape* it describes is real and still worth fixing (Q-528), but it is a latent hazard on a
+> hand-triggered path, not an incident, and there is nothing to rebuild. Q-525, which this document
+> suspended, is live again.
+>
+> **Read [`2026-08-20-daily-summary-wipe-retracted.md`](2026-08-20-daily-summary-wipe-retracted.md)
+> instead.** Kept unedited below as the record of how the misread happened.
+
+---
+
 # `oura_daily_summary` holds 1 row against 198,223 raw samples
 
 **Date:** 2026-08-19 · **Agent:** Tuning 🎶 · **Pillars:** `[devices]` `[platform]` `[readiness]`
