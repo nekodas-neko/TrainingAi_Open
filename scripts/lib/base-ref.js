@@ -17,6 +17,8 @@
 // is the base's own content, which is what this resolves.
 'use strict';
 const { execFileSync } = require('child_process');
+const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const root = path.join(__dirname, '..', '..');
@@ -70,6 +72,39 @@ function countAtBase(baseRef, relPath, countFn) {
   return content === null ? null : countFn(content);
 }
 
+/**
+ * The base branch's copy of `paths`, checked out into a temp directory — or `null` when there is no
+ * base to be had (LA-16).
+ *
+ * **Why a whole tree rather than a file at a time.** Some ratchets are not per-file functions: the
+ * memo check first scans every file to learn which components are memoised, then counts inline props
+ * at their call sites. Feeding base *content* to a matcher built from the WORKING TREE's component
+ * list gets one case wrong, and wrong in the unsafe direction — a branch that newly memoises a
+ * component with pre-existing inline call sites would have those sites counted at the base too, and
+ * so read as "inherited" when the branch is exactly what made them violations.
+ *
+ * Materialising the base means the same scan runs over the base's own everything, which is the only
+ * way to answer honestly. One `git archive` is cheap; the caller must `cleanupBaseTree` it.
+ */
+function materialiseBaseTree(baseRef, paths) {
+  if (!baseRef) return null;
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ratchet-base-'));
+  try {
+    const tar = execFileSync('git', ['archive', baseRef, ...paths], {
+      cwd: root, maxBuffer: 1 << 28, stdio: ['ignore', 'pipe', 'ignore'],
+    });
+    execFileSync('tar', ['-x', '-C', dir], { input: tar, stdio: ['pipe', 'ignore', 'ignore'] });
+    return dir;
+  } catch {
+    cleanupBaseTree(dir);
+    return null;
+  }
+}
+
+function cleanupBaseTree(dir) {
+  if (dir) fs.rmSync(dir, { recursive: true, force: true });
+}
+
 /** Line count as the ratchets measure it — `split('\n').length`, i.e. `wc -l` + 1. */
 function lineCountAtBase(baseRef, relPath) {
   const content = fileAtBase(baseRef, relPath);
@@ -93,4 +128,7 @@ function verdict({ count, limit, atBase }) {
   return 'fail';
 }
 
-module.exports = { resolveBaseRef, fileAtBase, lineCountAtBase, countAtBase, verdict };
+module.exports = {
+  resolveBaseRef, fileAtBase, lineCountAtBase, countAtBase,
+  materialiseBaseTree, cleanupBaseTree, verdict,
+};

@@ -774,7 +774,7 @@ regression window the additive shape exists to avoid.
 
 - **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
 
-### [platform] LA-16 — three shrink-only ratchets are still order-dependent
+### [platform] LA-16 — two shrink-only ratchets are still order-dependent
 
 - **Branch:** `chore/ratchets-order-independence`
 - **Added:** 2026-08-20 · the half of Q-424 its own text flagged and its acceptance criterion did not cover
@@ -792,25 +792,32 @@ Still comparing a working tree against a committed absolute: `check-hex-literals
 `check-fetch-once-effects`, `check-component-size`, `check-memo-prop-stability`,
 `check-client-today-timezone`, and the non-strict-schema check.
 
-> **⚠️ HALF DONE 2026-08-20 — three of the six are converted and proven. Read this before starting.**
+> **⚠️ FOUR OF SIX CONVERTED 2026-08-20, and there are now TWO patterns to choose between. Read this
+> before starting.**
 >
-> `check-component-size`, `check-hex-literals` and `check-client-today-timezone` now use
-> `resolveBaseRef` + `verdict`, each demonstrated both ways: a branch inheriting an over-baseline
-> count from `main` is green and says so, a branch adding one is red.
->
-> The pattern to copy is in those three. The **counting** is what differs per script — each passes
-> its own counting function to `countAtBase`, so the base is measured by the SAME matcher as the
-> working tree. Never write a second regex for the base count; it would disagree with the working-tree
+> **Per-file, for a ratchet whose count is a function of one file's text** —
+> `check-component-size` (lines, via `lineCountAtBase`), `check-hex-literals` and
+> `check-client-today-timezone` (occurrences, via `countAtBase` with the script's **own** counting
+> function). Never write a second regex for the base count: it would disagree with the working-tree
 > count for reasons nobody could see.
+>
+> **Whole-tree, for a ratchet that is not a per-file function** — `check-memo-prop-stability` scans
+> every file to learn which components are memoised *before* counting call sites, so its base count
+> has to come from `materialiseBaseTree` + the same `scan(rootDir)` run over the base's own tree.
+> **The per-file shortcut is wrong here and wrong in the unsafe direction:** a branch that newly
+> memoises a component with pre-existing inline call sites would have those counted at the base too,
+> and read as *inherited* when the branch is exactly what made them violations. That case is pinned
+> by demonstration.
 
-**What is left, and why these three are the harder half:**
+**What is left:**
 
-- `check-fetch-once-effects` and `check-memo-prop-stability` build their per-file counts with a
-  brace-matching scan over the source rather than a single expression, so extracting a
-  `countFn(content)` seam is a real refactor rather than a one-liner. Do them one per PR, and prove
-  each the same way — these are gates, and a silently weakened gate is worse than an order-dependent
-  one.
+- `check-fetch-once-effects` — a brace-matching scan like the memo check. **Decide which of the two
+  patterns above it needs** before writing anything: if its count depends only on the file's own
+  text, per-file is enough; if it depends on a tree-wide pass, it needs the base tree.
 - `check-strict-request-schemas` — **still not read.** Do not assume it matches either shape.
+
+One per PR, each proven both ways — these are gates, and a silently weakened gate is worse than an
+order-dependent one.
 
 `verdict` is reusable as-is in every case; only the counting differs.
 
