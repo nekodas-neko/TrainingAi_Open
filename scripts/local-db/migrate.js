@@ -126,6 +126,18 @@ async function main() {
   )
   await pool.end()
 
+  // A replay that replayed nothing is the silent no-op this check is most likely to decay into: if the
+  // caller's TRUNCATE does not take effect, every file reads as already-recorded, the run reports
+  // `applied 0` and exits 0. Green, having verified nothing. Assert the work happened rather than
+  // trusting a human to notice a number in a log.
+  if (REPLAY && ran === 0 && failed.length === 0) {
+    console.error(
+      `[migrate] REPLAY VERIFIED NOTHING — 0 migrations were re-run, because all ${applied.size} were\n` +
+      `          already recorded. The caller must TRUNCATE schema_migrations before --replay.`,
+    )
+    process.exitCode = 1
+  }
+
   if (failed.length > 0) {
     console.error(`[migrate] ${failed.length} migration(s) DID NOT APPLY: ${failed.join(', ')}`)
     if (REPLAY) {

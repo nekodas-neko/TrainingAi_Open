@@ -42,6 +42,20 @@ argued*, and breaking a migration on purpose is what demonstrated it.
 | all three restored | **GREEN** |
 | ordinary (non-replay) run, dev database | unchanged — 206 skipped, 0 failed |
 
+## The check proves it did the work, because green would not have
+
+A replay that replays nothing is the silent no-op this would most likely decay into: if the caller's
+`TRUNCATE` stops taking effect, every file reads as already-recorded, the run reports `applied 0` and
+exits **0**. Green, having verified nothing — and indistinguishable in a green tick from 205 clean
+replays.
+
+So `--replay` fails when it re-ran nothing, naming the cause. Verified both ways: replaying without
+truncating is **RED** with *"REPLAY VERIFIED NOTHING"*, and with the truncate it is **GREEN**.
+
+This exists because I went to read the CI log to confirm the step had really replayed, and could not
+easily get at the line. Needing to read a log to know whether a check checked anything is the defect;
+the check should say so itself.
+
 ## The one exemption, by name and with its reason
 
 `001_initial.sql` creates `cardio_sessions` with a `user_id` FK, and `002` renamed the column it
