@@ -1110,9 +1110,22 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
   all until `ta_ss_cards` is set.
   **Why it asserts the request rather than the number:** a changed figure could come from a
   remount and an unchanged one proves nothing, so only a second GET is present-only-if-working.
-- **What is still open: the twelve latent sites.** None of them can bite — every one unmounts on
-  navigate — and each needs judging individually rather than a codemod. The entry stays queued for
-  them alone.
+- **What is still open: the twelve latent sites, and on current evidence NONE is worth converting.**
+  Judged per site 2026-08-20 and written into `scripts/check-fetch-once-effects.js` beside the
+  baseline, so the next session reads it where it is looking rather than re-deriving it. Four read
+  `hr-profile` or an HR series during or just after a run/workout, when nothing writes those keys;
+  `my-meals-picker` reads `saved-meals` and the only writer reachable from its flow runs **after**
+  `{step === 4 && …}` has unmounted it; the rest are route-level screens whose next mount refetches.
+  Converting one is not harmful but adds a refetch with no reader waiting, which this entry warns
+  against. **The limit of that judgement, stated rather than buried:** for `my-meals-picker` it is
+  "no writer found reachable", not "proven unreachable" — whether `saved-meals-sheet` can open on
+  top of the wizard was not traced. **Re-judge any site if a new writer starts clearing its key
+  while it is on screen.** The entry stays queued as the place that record lives.
+- **The check's own prose count had drifted, in the file whose lesson is about unverified counts.**
+  It read "13 sites across 11 files" against a baseline map holding **12 across 10** — a conversion
+  removed a file and left the sentence behind. Corrected, with a note to count off the map rather
+  than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
+  run line prints computed totals.
 
 ### [platform] Q-324 — the first suite run against a freshly-migrated database times out two test files, which is exactly what CI does every run
 
