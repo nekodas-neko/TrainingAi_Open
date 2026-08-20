@@ -1237,3 +1237,21 @@ linked with a summary from the pillar indexes, and every finding is already a Kn
 entry. What the baton keeps is state — next ID, current lens, what is blocked, and the method notes that
 cost a session each to learn. **The baseline is lowered to 170 in the same PR**, so the shrink ratchets
 rather than leaving 1,138 lines of headroom for it to grow back into.
+
+## 2026-08-20 — `projectOverview.md` 7838 → 7841, and `main` was the one over it
+
+**Raised from a PR that touches neither `projectOverview.md` nor this baseline.**
+`feat/home-card-invalidation-guard` is a test-only change — a Playwright spec and two `e2e/fixtures.ts`
+helpers. Merging current `origin/main` into it turned Custom Rules red, and the file it named was one
+this branch never edited: `origin/main`'s own `projectOverview.md` is **7841** against a stored
+**7838**. So the job is failing on every open branch, not this one, and the three lines are somebody
+else's landed content rather than growth to justify.
+
+Raised to main's actual number rather than trimming, for the same reason as the 2026-08-18 Q-397
+entry: reverting three lines of another lane's just-landed work to satisfy a counter is the wrong
+trade, and **the second time a shared ratchet is quietly exceeded is when people start assuming it is
+broken instead of binding**. Recorded here so the raise is attributable to a merge rather than read
+back later as this branch's own growth.
+
+This is the failure mode **Q-424** is queued for — a shrink-only ratchet can leave `main` red and
+nothing in the repo notices until the next branch merges main in. Third recorded occurrence.
