@@ -342,6 +342,12 @@ jobs:
       - name: Backlog pointers and Q numbers are accurate
         run: node scripts/check-backlog-pointers.js
 
+      # Q-424: the size ratchet asks whether THIS BRANCH grew a file, which needs the base branch's
+      # copy to compare against. `actions/checkout` is shallow (depth 1), so `main` is not present —
+      # one depth-1 fetch of that ref is all it takes, and the script degrades to baseline-only if it
+      # is missing rather than failing.
+      - name: Fetch the base branch, for the size ratchet's comparison
+        run: git fetch --depth=1 origin main
       - name: Orientation docs stay within their baselines
         run: node scripts/check-doc-index-size.js
 
