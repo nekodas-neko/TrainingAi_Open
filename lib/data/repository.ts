@@ -526,6 +526,9 @@ export interface WorkoutRepository {
   upsertBodyMetrics(userId: string, metrics: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>
   listBodyMetrics(userId: string, from: string, to: string): Promise<BodyMetrics[]>
   // Earliest-ever logged weight/body-fat values — "starting point" for long-term goal progress.
+  // NOT the current weight: it orders `asc(date)`, so the number it returns is frozen at the first
+  // reading ever taken and its error grows with every kilogram since. Anything asking "what does
+  // this user weigh?" wants `getMostRecentConfirmedWeightKg` below (Q-330).
   getBodyMetricsBaseline(userId: string): Promise<{ weightKg: number | null; bodyFatPct: number | null }>
 
   // ── Direct-BLE scale (docs/superpowers/plans/2026-07-27-renpho-ble-direct-scale.md) ────────
