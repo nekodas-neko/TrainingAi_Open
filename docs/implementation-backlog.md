@@ -1029,6 +1029,15 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 > exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
 > suite 200.19 s → 183.18 s.
 >
+> **⚠️ Correction 2026-08-20 (Lane A): "3 failed … now 1, unrelated" was wrong, and they were never
+> failures.** On this session's database the count read **4** — `054`, `055`, `082`, `157` — and all
+> four raise SQLSTATEs that `ensureSchema()` classifies as *already present* and steps over. The
+> discrepancy was `migrate.js` carrying **no error classifier at all**, in the file whose own
+> docstring says it mirrors `ensureSchema()`. Worse, it returned exit 0 whatever happened, so the CI
+> job named **Migration Check** — which runs this script and nothing else — could not fail on a
+> genuinely broken migration. Both fixed; the SQLSTATE list now lives in one JSON file both runners
+> read. [`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md).
+>
 > **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
 > today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
 > Keep the entry until it is seen again with this ruled out, or stays absent long enough to close on
