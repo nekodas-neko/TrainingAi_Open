@@ -757,34 +757,6 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [platform] LA-16 — the other six shrink-only ratchets are still order-dependent
-
-- **Branch:** `chore/ratchets-order-independence`
-- **Added:** 2026-08-20 · the half of Q-424 its own text flagged and its acceptance criterion did not cover
-- **Lane: A** — `scripts/**`.
-
-Q-424 made `check-doc-index-size.js` ask *"did this branch grow it"* rather than *"is it over"*, via
-`scripts/lib/base-ref.js` (`resolveBaseRef` · `lineCountAtBase` · the pure `verdict`). **Its own text
-said the class is shared and a fix should be shared too**, but its acceptance criterion named only the
-docs check, so the rest were deliberately left rather than swept in unmeasured.
-
-Still comparing a working tree against a committed absolute: `check-hex-literals`,
-`check-fetch-once-effects`, `check-component-size`, `check-memo-prop-stability`,
-`check-client-today-timezone`, and the non-strict-schema check.
-
-**They are not identical to the docs case and the difference decides the work.** Those baselines are
-per-file *occurrence counts*, not line counts, so `lineCountAtBase` does not apply — each needs its
-own "count this at the base ref" pass, which means running the script's own matcher over
-`git show <base>:<file>` rather than over the working tree. `verdict` is reusable as-is; the counting
-is not.
-
-Lower priority than Q-424 was: these fire far less often, because intake adds a backlog entry on
-almost every session while a hex literal or a memo call site is added rarely.
-
-- **What would count as done:** for each script, a branch that inherits an over-baseline count from
-  `main` without adding one is green, and a branch that adds one is red — demonstrated per script,
-  not argued from the docs case.
-
 ### [platform] LA-15 — remove the name-keyed `workoutDurations` once its consumers have moved
 
 - **Branch:** `chore/day-log-drop-legacy-durations`
@@ -828,32 +800,6 @@ match PATCH.
 - **What would count as done:** the two methods agree, or this entry records why they should not,
   with the outbox path checked rather than assumed.
 
-### [platform] LA-13 — nothing replays the migrations against a schema that already has everything
-
-- **Branch:** `feat/migration-replay-check`
-- **Added:** 2026-08-20 · found while fixing PS-3, by building the check by hand
-- **Lane: A** — `scripts/**` and `.github/workflows/**`.
-
-`Migration Check` runs `migrate.js` against a **fresh** database, which is the case where a
-non-idempotent migration cannot fail. PS-3's four hid for months because the only path that exercises
-them is a database that already holds their objects — and the worst of them, `157`, is a
-`CREATE TABLE` followed by ten `ADD COLUMN`s, where the first collision aborts every statement after
-it. That shape is how the local store has twice been left silently dead on Android; the Postgres side
-has no equivalent guard.
-
-The check is two lines on top of the job that already exists: after the fresh run, `TRUNCATE
-schema_migrations` and run it again. Measured on 2026-08-20 with PS-3's fixes in place — **205 of 206
-replay cleanly**.
-
-The one that does not is **`001_initial.sql`**, and it is not worth fixing: it fails with
-`foreign key constraint "cardio_sessions_user_id_fkey" cannot be implemented` because `002` renamed
-the column it references, so replaying `001` onto a modern schema is genuinely incoherent. A replay
-check needs to exempt it by name, with that reason recorded next to the exemption.
-
-- **What would count as done:** a deliberately non-idempotent statement added to any migration turns
-  the job red, and removing it turns it green — demonstrated, not argued.
-
-
 ### [platform] LA-17 — every workflow is pinned to an action GitHub is deprecating the runtime for
 
 - **Branch:** `chore/bump-github-actions`
@@ -882,6 +828,44 @@ ref-checkout behaviour, and Q-424 has just made the Custom Rules job depend on a
 - **What would count as done:** every job green with no Node-runtime deprecation warning in its log,
   and the Q-424 base fetch still resolving `origin/main` (its log line is
   `* [new branch] main -> origin/main`).
+
+### [platform] LA-16 — the other six shrink-only ratchets are still order-dependent
+
+- **Branch:** `chore/ratchets-order-independence`
+- **Added:** 2026-08-20 · the half of Q-424 its own text flagged and its acceptance criterion did not cover
+- **Lane: A** — `scripts/**`.
+- **Moved down 2026-08-20**, to match what this entry's own last bullet already said. It was filed at
+  the top of READY and its body says *"lower priority than Q-424 was"* — the position contradicted the
+  text, and position is what the tool reads.
+
+Q-424 made `check-doc-index-size.js` ask *"did this branch grow it"* rather than *"is it over"*, via
+`scripts/lib/base-ref.js` (`resolveBaseRef` · `lineCountAtBase` · the pure `verdict`). **Its own text
+said the class is shared and a fix should be shared too**, but its acceptance criterion named only the
+docs check, so the rest were deliberately left rather than swept in unmeasured.
+
+Still comparing a working tree against a committed absolute: `check-hex-literals`,
+`check-fetch-once-effects`, `check-component-size`, `check-memo-prop-stability`,
+`check-client-today-timezone`, and the non-strict-schema check.
+
+**They are not identical to the docs case, and the difference decides the work — but this entry
+overstated it when filed.** Corrected 2026-08-20 by reading each script:
+
+- **`check-component-size` is a LINE-count ratchet**, exactly like the docs one, so `lineCountAtBase`
+  applies unchanged. It is the cheapest of the six and should go first.
+- `check-hex-literals` and `check-client-today-timezone` count occurrences with a single expression
+  over the file's text, so each needs a one-line "count this string instead" seam.
+- `check-fetch-once-effects` and `check-memo-prop-stability` build their per-file counts with a
+  brace-matching scan, which is the real work here.
+- `check-strict-request-schemas` — not yet read.
+
+`verdict` is reusable as-is in every case; only the counting differs.
+
+Lower priority than Q-424 was: these fire far less often, because intake adds a backlog entry on
+almost every session while a hex literal or a memo call site is added rarely.
+
+- **What would count as done:** for each script, a branch that inherits an over-baseline count from
+  `main` without adding one is green, and a branch that adds one is red — demonstrated per script,
+  not argued from the docs case.
 
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 

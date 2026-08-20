@@ -391,6 +391,19 @@ jobs:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
         run: node scripts/local-db/migrate.js
 
+      # LA-13: the step above runs against a FRESH database, which is the one case where a
+      # non-idempotent migration cannot fail — PS-3's four hid for months for exactly that reason.
+      # Replaying every file against the schema it just built is what catches them. The truncate is
+      # here rather than inside the runner so the destructive step is visible at its call site; the
+      # database is a throwaway CI service container.
+      - name: Migrations are idempotent (replay against a schema that already has everything)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d trainingai_ci -c 'TRUNCATE schema_migrations'
+          node scripts/local-db/migrate.js --replay
+
   e2e:
     # Its own job, deliberately not folded into Tests: a browser job's runtime and failure modes
     # (flake, timeout, a dev server that never came up) are different enough that mixing them makes
