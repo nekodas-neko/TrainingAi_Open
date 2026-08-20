@@ -1049,3 +1049,12 @@ An entry is "linked" when any .md outside the entries directory mentions its fil
 into a single blob rather than grepping per entry — 60 entries x the whole docs tree is the kind
 of thing that quietly adds a minute to every CI run.
 ```
+
+## 2026-08-20 — `projectOverview.md` 8,018 → 8,046 (+28, Lane B)
+
+One Known-Issues row for the Q-415/Q-417/Q-323 calorie-budget work (v1.334.0). It is longer than a
+typical row on purpose: the entry carries **two outstanding checks rather than a description of the
+fix** — an unverified `earned > 0` path with the first thing to look at named, and a four-stop
+`conic-gradient` that has never met Samsung's WebView. Both are the kind of thing the next session
+must read *before* it can conclude this shipped clean, which is what this file is for; the narrative
+lives in `docs/overview/entries/2026-08-20-one-calorie-budget.md`.

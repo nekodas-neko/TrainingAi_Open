@@ -1,6 +1,6 @@
 'use client'
 
-import type { NutritionTargets } from '@trainingai/shared/types/nutrition'
+import { memo } from 'react'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 
 interface Props {
@@ -8,14 +8,27 @@ interface Props {
   proteinG: number
   carbsG: number
   fatG: number
-  targets: NutritionTargets | null
-  calsBurnedToday?: number | null
+  /** The day's budget from `ringTargets` — null when the day has no derived baseline. */
+  calorieTarget: number | null
+  proteinTarget: number | null
+  carbsTarget: number | null
+  fatTarget: number | null
+  /** kcal the day's movement added to the budget. */
+  earnedKcal: number
 }
 
-export function MacroRing({ calories, proteinG, carbsG, fatG, targets, calsBurnedToday }: Props) {
-  const calTarget = targets?.calories ?? 2000
-  const remaining = Math.max(0, calTarget - calories)
-  const pct = Math.min(100, Math.round((calories / calTarget) * 100))
+/**
+ * The Nutrition tab's calorie ring and macro bars.
+ *
+ * Scalar props rather than the `NutritionTargets` row (Q-417): the targets it renders are the day's
+ * *scaled* ones, which are not a row, and passing scalars keeps the memo working. What it must never
+ * do again is derive a budget of its own — see `ring-targets.ts` for why there were three.
+ */
+export const MacroRing = memo(function MacroRing({
+  calories, proteinG, carbsG, fatG, calorieTarget, proteinTarget, carbsTarget, fatTarget, earnedKcal,
+}: Props) {
+  const remaining = calorieTarget != null ? Math.round(calorieTarget - calories) : null
+  const pct = calorieTarget != null ? Math.min(100, Math.round((calories / calorieTarget) * 100)) : 0
   const ringMask = 'radial-gradient(farthest-side, transparent 69%, black 70% 89%, transparent 90%)'
 
   return (
@@ -46,25 +59,32 @@ export function MacroRing({ calories, proteinG, carbsG, fatG, targets, calsBurne
 
         {/* Stats */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-baseline justify-between mb-3">
+          <div className="flex items-baseline justify-between mb-3 gap-2">
+            {/* Q-417: this said "from cardio". The figure is `computeActiveEnergy` — strength
+                sessions and steps included — so on a leg day it credited a leg session to cardio.
+                "From movement" is the wording the bar above it already uses for the same quantity. */}
             <span className="text-xs text-muted-foreground">
-              {calsBurnedToday != null && calsBurnedToday > 0 ? `+${Math.round(calsBurnedToday)} from cardio` : 'Daily goal'}
+              {earnedKcal > 0 ? `+${Math.round(earnedKcal).toLocaleString()} from movement` : 'Daily goal'}
             </span>
-            <span className="text-xs font-semibold tabular-nums">{remaining > 0 ? `${remaining} left` : 'Goal reached'}</span>
+            {remaining != null && (
+              <span className="text-xs font-semibold tabular-nums">
+                {remaining >= 0 ? `${remaining.toLocaleString()} left` : `${Math.abs(remaining).toLocaleString()} over`}
+              </span>
+            )}
           </div>
           <div className="space-y-2">
-            <MacroBar label="Protein" value={proteinG} target={targets?.proteinG ?? 150} color={MACRO_COLORS.protein} />
-            <MacroBar label="Carbs"   value={carbsG}   target={targets?.carbsG   ?? 250} color={MACRO_COLORS.carbs} />
-            <MacroBar label="Fat"     value={fatG}      target={targets?.fatG     ?? 80}  color={MACRO_COLORS.fat} />
+            <MacroBar label="Protein" value={proteinG} target={proteinTarget} color={MACRO_COLORS.protein} />
+            <MacroBar label="Carbs"   value={carbsG}   target={carbsTarget}   color={MACRO_COLORS.carbs} />
+            <MacroBar label="Fat"     value={fatG}     target={fatTarget}     color={MACRO_COLORS.fat} />
           </div>
         </div>
       </div>
     </div>
   )
-}
+})
 
-function MacroBar({ label, value, target, color }: { label: string; value: number; target: number; color: string }) {
-  const pct = Math.min(100, Math.round((value / target) * 100))
+function MacroBar({ label, value, target, color }: { label: string; value: number; target: number | null; color: string }) {
+  const pct = target != null && target > 0 ? Math.min(100, Math.round((value / target) * 100)) : 0
   return (
     <div className="flex items-center gap-2">
       <span className="text-xs text-muted-foreground w-12 shrink-0">{label}</span>
@@ -75,7 +95,7 @@ function MacroBar({ label, value, target, color }: { label: string; value: numbe
         />
       </div>
       <span className="text-xs tabular-nums text-muted-foreground w-16 text-right shrink-0">
-        {Math.round(value)}/{Math.round(target)}g
+        {Math.round(value)}{target != null ? `/${Math.round(target)}` : ''}g
       </span>
     </div>
   )

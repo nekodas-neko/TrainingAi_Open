@@ -74,7 +74,7 @@ import {
   type MetaKey, type CardWidgetKey, type WidgetDef, type SectionKey,
   WIDGET_DEFS, DEFAULT_WIDGETS, DEFAULT_CARD_WIDGETS,
   loadPillColors, loadCardColors, CARD_COLORS_KEY,
-  loadWidgets, loadCardWidgets, loadCalorieGoal, loadCalorieType, loadWeightLookback,
+  loadWidgets, loadCardWidgets, loadCalorieType, loadWeightLookback,
   loadStepsGoal, loadStepsGoalType, loadSleepGoal, loadWaterGoal, loadWaterGoalType,
   loadHiddenSections, buildDefaultOrder, loadSectionOrder,
   SECTION_ORDER_KEY, HIDDEN_SECTIONS_KEY,
@@ -120,7 +120,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [metaToday, setMetaToday]           = useState<BodyMetaRow | null>(null);
   const [metaRecent, setMetaRecent]         = useState<BodyMetaRow[]>([]);
   const [metaLoading, setMetaLoading]       = useState(true);
-  const [activeEnergyKcalToday, setActiveEnergyKcalToday] = useState<number | null>(null);
   const [activeWidgets, setActiveWidgets]   = useState<MetaKey[]>(DEFAULT_WIDGETS);
   const [pillColors, setPillColors]         = useState<Record<string, string>>({});
   const [cardColors, setCardColors]         = useState<Record<string, string>>({});
@@ -129,7 +128,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // body-battery, training-load, muscle-recovery, oura-hr-day) instead of refetchAll
   // duplicating their fetch logic inline — one fetch call site per key, not two.
   const [refreshTick, setRefreshTick] = useState(0);
-  const [calorieGoal, setCalorieGoal]       = useState<number | null>(null);
   const [calorieType, setCalorieType]       = useState<"daily" | "weekly">("daily");
   const [weightLookback, setWeightLookback] = useState<7 | 30>(7);
   const [logWidget, setLogWidget]           = useState<WidgetDef | null>(null);
@@ -202,7 +200,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setActiveCardWidgets(cards);
     setSectionOrder(loadSectionOrder(cards));
     setHiddenSections(loadHiddenSections());
-    setCalorieGoal(loadCalorieGoal());
     setCalorieType(loadCalorieType());
     setWeightLookback(loadWeightLookback());
     setStepsGoal(loadStepsGoal());
@@ -240,8 +237,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         setActiveCardWidgets(refreshedCards);
         setSectionOrder(loadSectionOrder(refreshedCards));
         setHiddenSections(loadHiddenSections());
-        setCalorieGoal(loadCalorieGoal());
-        setCalorieType(loadCalorieType());
+            setCalorieType(loadCalorieType());
         setWeightLookback(loadWeightLookback());
         setStepsGoal(loadStepsGoal());
         setSleepGoal(loadSleepGoal());
@@ -517,7 +513,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         setMetaToday(data.today ?? null);
         setMetaRecent(data.recent ?? []);
         setWeekToDate(data.weekToDate ?? null);
-        setActiveEnergyKcalToday(data.activeEnergyKcalToday ?? null);
         setMetaLoading(false);
       },
     );
@@ -919,9 +914,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     setGoalsProfile(prev => prev ? { ...prev, activityLevel: updated.activityLevel ?? null, fitnessGoal: updated.fitnessGoal ?? null } : prev);
   }
 
+  // The calorie goal is deliberately not tracked here any more (Q-415): Home renders the derived
+  // baseline from `/api/nutrition/energy-balance`, and the stored goal is the rest-day floor that
+  // baseline is built from rather than a budget to display.
   function handleGoalsApplied(applied: { stepsGoal?: number; calorieGoal?: number; waterGoalMl?: number }) {
     if (applied.stepsGoal != null) setStepsGoal(applied.stepsGoal);
-    if (applied.calorieGoal != null) setCalorieGoal(applied.calorieGoal);
   }
 
   const handleHideSection = useCallback((id: string) => {
@@ -1220,9 +1217,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   metaToday={metaToday}
                   metaRecent={metaRecent}
                   metaLoading={metaLoading}
-                  activeEnergyKcalToday={activeEnergyKcalToday}
                   weekToDate={weekToDate}
-                  calorieGoal={calorieGoal}
                   calorieType={calorieType}
                   weightLookback={weightLookback}
                   stepsGoal={stepsGoal}

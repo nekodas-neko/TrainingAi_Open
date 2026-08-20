@@ -154,6 +154,19 @@ Live at the time of writing (2026-07-30):
   denormalised mirror that the Health tab and Home tiles read, kept in step by write-through in
   both `/api/nutrition/targets` and `/api/user/goals`. They drifted 200 kcal apart in production
   (1950 vs 1750) because the TDEE nudge card wrote only one. Do not add a third writer.
+- **Neither of those is the number to DISPLAY as a budget.** `nutrition_targets.calories` is the
+  **rest-day floor**; what a screen shows is `restingBase + goal delta + what movement earned`, from
+  `/api/nutrition/energy-balance` via `budgetProvenance()`. Three surfaces each derived their own —
+  the Home donut, the Nutrition ring and the zone bar — and showed **2,451 / 2,001 / 2,180** for one
+  day, with the ring printing *"Goal reached"* while the card above it said *"166 kcal left"*
+  (Q-401 → Q-415 → Q-417, v1.334.0). `components/nutrition/ring-targets.ts` is now the one place a
+  client resolves the day's budget and macro grams; check it before deriving a calorie figure
+  anywhere. Macro grams come from `macroTargets.scaled`, never the stored row —
+  [`journal`](../../overview/entries/2026-08-20-one-calorie-budget.md).
+- **Protein does not scale with a day's movement, and that is arithmetic rather than taste.** It is
+  dosed per kg of bodyweight; re-expressing it as a share of calories and applying that to a bigger
+  day turns 2 g/kg into 2.6 g/kg because the user went for a walk. Carbs and fat absorb the earned
+  kcal in the ratio they already hold (`scaleMacrosForEarnedKcal`).
 - **The model picks the food; code decides the grams.** `scaleIngredientsToTargets`
   (`packages/shared/src/nutrition/meal-split.ts`) sizes each ingredient group so its macro lands on
   target. Two classification traps it already fell into: **a fatty protein is a protein source, not
