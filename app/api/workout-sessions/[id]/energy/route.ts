@@ -40,11 +40,16 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
           ? (ws.completedAt.getTime() - ws.startedAt.getTime()) / 60_000
           : null
 
-    const [user, baseline] = await Promise.all([repo.getUserById(userId), repo.getBodyMetricsBaseline(userId)])
+    // Q-330: the LATEST weight, not `getBodyMetricsBaseline`, which orders `asc(date)` and so returns
+    // the first weight ever logged. This route estimates the calories of a session that just
+    // finished, so anchoring it to a months-old figure is wrong and — worse — never converges: the
+    // error grows with every kilogram gained or lost. `progress-summary` is the one caller for which
+    // "baseline" is the right reading.
+    const [user, latestWeightKg] = await Promise.all([repo.getUserById(userId), repo.getMostRecentConfirmedWeightKg(userId)])
     const sexRaw = user?.sex
     const sex: Sex | null = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
     const ageYears = user?.dateOfBirth ? yearsSince(user.dateOfBirth) : null
-    const weightKg = baseline.weightKg
+    const weightKg = latestWeightKg
 
     // A profile gap (no DOB / non-binary sex / no logged weight) means we can't run Schofield —
     // return kcal: null with a reason so the client shows nothing rather than a wrong number.
