@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.332.2",
+    date: "2026-08-20",
+    changes: [
+      "The calories shown when you finish a workout are now worked out from your most recent weigh-in. They were being worked out from the very first weight you ever logged, so the figure drifted further from the truth the more your weight moved \u2014 and it disagreed with the same workout's contribution to the day's energy budget. The two now match.",
+    ],
+  },
+  {
     version: "1.332.1",
     date: "2026-08-19",
     changes: [
