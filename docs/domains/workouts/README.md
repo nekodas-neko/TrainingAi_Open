@@ -165,6 +165,15 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
+  — 🆕 the workout-energy intake cluster (Q-391 · Q-419 · Q-423 · Q-420 · Q-421 · Q-422), from one
+  owner question about making the burn estimate more accurate. Records that `computeActiveEnergy`
+  **already** calls the estimator per strength session and discards the split; that the done screen
+  re-estimates on every RPE tap while the day budget hardcodes `'moderate'`; that per-set RPE is
+  **prefilled** from the planned percentage (`clamp(floor(pct/10), 6, 10)`), so the rated sets are not
+  all judgements and the 6 floor is a clamp; and that the ONNX energy model is vendored, downloaded
+  and tested with **zero production callers**. Owner decisions recorded there and not to be
+  re-litigated: no Oura models, and the rounded-mean derivation kept in set-RPE units.
 - **[`docs/overview/entries/2026-08-17-workout-select-empty-state.md`](../../overview/entries/2026-08-17-workout-select-empty-state.md)**
   — 🆕 Q-451: `/workout-select` with no program rendered the carousel anyway (position-0's palette
   emoji standing in for absent content) under a **Start Workout** button that short-circuited on the
