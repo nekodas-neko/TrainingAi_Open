@@ -2900,24 +2900,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **Extraction gate:** the server rollup must produce identical `sleep_sessions`/`body_metrics` output
   over a sample of historical days before and after. The extraction ships **no** behaviour change.
 
-### [platform][devices] Q-546 — WASM cannot instantiate in production: `script-src` has no `wasm-unsafe-eval`
-
-- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 4
-- **Branch:** `fix/csp-wasm-unsafe-eval`
-- **Added:** 2026-08-18 · **Lane A** (`next.config.ts`). Independent of everything else — do it early.
-- **Verified today.** `next.config.ts:10` sets `script-src 'self' 'unsafe-inline'` (plus `'unsafe-eval'`
-  in dev only) `https://accounts.google.com`. There is no `wasm-unsafe-eval`, so **no WASM session can
-  start in production**, and every on-device neural plan (D2 Task 6 — SleepNet + step_counter) is
-  blocked behind it.
-- **The trap is the one the master plan predicted:** *"the parity test runs under Node (no CSP) and
-  would false-green."* `lib/oura-models/__tests__/wasm-parity.test.ts` passes under vitest and proves
-  nothing about the device. It is a genuine parity proof against the TorchScript golden and a **useless
-  CSP proof**.
-- **Fix:** add `wasm-unsafe-eval` to the production `script-src`, then **assert on the S25 that a real
-  WASM session instantiates under the deployed header** — a green test is not the gate here, a device is.
-- **Security note:** `wasm-unsafe-eval` is narrower than `unsafe-eval` (it permits WASM compilation
-  only). State that in the PR rather than letting it read as a blanket eval relaxation.
-
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0

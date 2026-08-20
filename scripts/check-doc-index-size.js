@@ -790,7 +790,7 @@ const BASELINE = {
   // 2026-08-20 (Tuning): Q-529 scope correction -- the score DOES recompute; what survives is a
   // ~9-minute provisional-renders-as-final window. The refutation stays inline because the
   // original claim shipped and an implementer must not act on it.
-  'projectOverview.md': 8009,
+  'projectOverview.md': 8034,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
