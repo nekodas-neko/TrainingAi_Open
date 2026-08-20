@@ -651,6 +651,8 @@ that gets corrected upward that lopsidedly is not a neutral starting point.
 > place and losing the ability to tell them apart.
 
 
+- **Gate: owner** — needs a decision on the 6–10 → 1–10 scale mapping before anything is fitted;
+  see the re-measurement note above. Added 2026-08-20 for the same reason as Q-422's.
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
@@ -844,6 +846,9 @@ never written.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
+- **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
+  2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
+  further down the entry, and prose is exactly what the `Gate:` field replaced.
 - **Branch:** `feat/calibrated-active-energy-multiplier`
 - **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
   calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app

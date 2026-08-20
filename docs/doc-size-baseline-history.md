@@ -16,6 +16,27 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — session wrap-up (`fix/migrate-classifies-idempotent`)
+
+**projectOverview.md 8043 → 8050 · docs/implementation-backlog.md 11573 → 11578 ·
+docs/agents/state/implementation-lane-a.md 163 → 113 (a net ratchet DOWN of 50).**
+
+- **projectOverview +7**: the session-handoff pointer, which is part of the wrap-up ritual.
+- **backlog +5**: a `Gate: owner` field added to Q-420 and Q-422. Both listed as **READY** under
+  `scripts/next-item.js` while each says in its own body that it waits on the owner — the blocker
+  was in prose, which is exactly what the `Gate:` field replaced. Expect more of these; the tool can
+  only see the field.
+- **the baton −50**: rewritten in full rather than appended to, which is the rule. Its size is a
+  direct read of whether that rule was followed, so the number goes down with it.
+
+## 2026-08-20 — Lane A's baton, ratcheted down (`fix/migrate-classifies-idempotent`)
+
+**docs/agents/state/implementation-lane-a.md 163 → 103.**
+
+A ratchet *down*, not a raise. The baton is rewritten in full at every handoff rather than appended
+to — that is the rule that stops it accreting — so its size is a direct read of whether the rule was
+followed. Lowering the number is what makes the next drift visible.
+
 ## 2026-08-20 — PS-3's open question, answered against production (`fix/migrate-classifies-idempotent`)
 
 **docs/implementation-backlog.md 11559 → 11573.**

@@ -45,6 +45,13 @@ Legacy `Q-` numbers stay valid and are not renumbered. **An implementer's first 
 `Needs:` and `Gate: owner|device` fields — the queue file cannot show you which of its top entries
 are actually startable.
 
+**Session handoff:** [`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)
+— the CI job named **Migration Check** could not fail on a broken migration, and fixing that
+immediately caught one: `142_claude_ro_views.sql` creates a view over a table `143` creates, so on
+every fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
+the CSP's missing `'wasm-unsafe-eval'` and the done screen estimating calories from the first weight
+ever logged.
+
 **Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
 — the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is CLOSED
 (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread as a
