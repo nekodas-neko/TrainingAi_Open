@@ -369,6 +369,29 @@ reverted another lane's raise.
 
 ### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
 
+> **⚠️ MEASURED AND MOSTLY DEFUSED 2026-08-20 (Lane A) — read this before starting; the entry below
+> is the original.** ([`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md))
+>
+> **The question this entry says to answer first is answered: production is clean.**
+> `claude_ro.schema_migrations` holds **206 of 206** filenames, the four among them — `054`, `055`
+> and `082` recorded 2026-07-21, `157` on 2026-07-28. So `ensureSchema` skips them in production and
+> nothing re-runs on a cold start there. This is local-only, exactly as the entry hoped rather than
+> feared.
+>
+> **And they were never failures.** The four raise SQLSTATEs (42710, 42710, 23505, 42P07) that
+> `ensureSchema()` classifies as *already present* and steps over; `migrate.js` had no classifier at
+> all and called them failures — the two runners disagreeing, in the file whose docstring says it
+> mirrors the other. Fixed, along with the larger thing it was hiding: `migrate.js` exited 0
+> regardless, so the CI job named **Migration Check** could not fail on a genuinely broken migration.
+>
+> **What is actually left is small.** The four are still not *recorded* locally, so they are retried
+> on every cold start — four statements that fail cleanly and are reported as benign. Making each
+> idempotent (`IF NOT EXISTS`, an explicit `pg_constraint` guard for the two `ADD CONSTRAINT`s,
+> `ON CONFLICT DO NOTHING` for the seed) would let them succeed and record, ending the retry. It
+> edits already-applied migration files, which is safe here because it changes nothing for a
+> database that has them and nothing for a fresh one — but it is no longer buying anything except
+> quiet. Judge it on that, not on the original framing.
+
 - **Branch:** `fix/non-idempotent-migrations`
 - **Added:** 2026-08-19 · observed in this session's own start-up hook output
 - **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.
@@ -628,6 +651,8 @@ that gets corrected upward that lopsidedly is not a neutral starting point.
 > place and losing the ability to tell them apart.
 
 
+- **Gate: owner** — needs a decision on the 6–10 → 1–10 scale mapping before anything is fitted;
+  see the re-measurement note above. Added 2026-08-20 for the same reason as Q-422's.
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
@@ -821,6 +846,9 @@ never written.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
+- **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
+  2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
+  further down the entry, and prose is exactly what the `Gate:` field replaced.
 - **Branch:** `feat/calibrated-active-energy-multiplier`
 - **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
   calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app
@@ -1097,6 +1125,15 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 > script before `pnpm test`, so this was CI's state every run. Measured: `schema_migrations` did not
 > exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
 > suite 200.19 s → 183.18 s.
+>
+> **⚠️ Correction 2026-08-20 (Lane A): "3 failed … now 1, unrelated" was wrong, and they were never
+> failures.** On this session's database the count read **4** — `054`, `055`, `082`, `157` — and all
+> four raise SQLSTATEs that `ensureSchema()` classifies as *already present* and steps over. The
+> discrepancy was `migrate.js` carrying **no error classifier at all**, in the file whose own
+> docstring says it mirrors `ensureSchema()`. Worse, it returned exit 0 whatever happened, so the CI
+> job named **Migration Check** — which runs this script and nothing else — could not fail on a
+> genuinely broken migration. Both fixed; the SQLSTATE list now lives in one JSON file both runners
+> read. [`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md).
 >
 > **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
 > today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
