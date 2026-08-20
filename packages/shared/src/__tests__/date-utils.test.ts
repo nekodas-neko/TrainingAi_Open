@@ -66,6 +66,28 @@ describe('shiftDateStr', () => {
     expect(shiftDateStr('0999-12-31', 1) > shiftDateStr('1000-01-01', -1)).toBe(true)
   })
 
+  // Q-329. `Date.UTC` reads a year of 0–99 as 1900+y, so this returned 1900-12-31 — off by ~1,900
+  // years, silently, on a value `normalizeDateParamIso` accepts (`\d{4}` matches `0050`). The
+  // admin backfill route COMMITS, so it would have written recomputed scores onto 1950s dates.
+  it('does not shift a first-century date by ~1,900 years', () => {
+    expect(shiftDateStr('0001-01-01', -1)).toBe('0000-12-31')
+    expect(shiftDateStr('0050-06-15', 1)).toBe('0050-06-16')
+    expect(shiftDateStr('0099-12-31', 1)).toBe('0100-01-01')
+  })
+
+  // The boundary either side of the legacy mapping's range.
+  it('leaves years at and above 100 alone', () => {
+    expect(shiftDateStr('0100-01-01', -1)).toBe('0099-12-31')
+    expect(shiftDateStr('0100-01-01', 1)).toBe('0100-01-02')
+  })
+
+  // The correction must not reach the common path — this is the case that killed the tempting
+  // "construct in a safe year and re-stamp" rewrite, which returned March 1 here.
+  it('still handles an ordinary non-leap February boundary', () => {
+    expect(shiftDateStr('2026-03-01', -1)).toBe('2026-02-28')
+    expect(shiftDateStr('2024-03-01', -1)).toBe('2024-02-29')
+  })
+
   // The other half of Q-497, pinned so nobody reads the padding above as making string comparison
   // safe. It does not, and cannot: a 'YYYY-MM-DD' contract has no room for a five-digit year, and
   // padStart is a no-op on one. This is why the two admin range loops iterate a validated day COUNT

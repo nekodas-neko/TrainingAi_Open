@@ -2775,31 +2775,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
   `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
   worklist.
 
-### [platform] Q-329 — `shiftDateStr` moves a first-century date by ~1,900 years
-
-- **Branch:** `fix/shift-date-str-low-year`
-- **Added:** 2026-08-19 · Lane A, found while fixing Q-497 · [`journal`](overview/entries/2026-08-19-admin-range-loop-termination.md)
-- **Placement:** low. Exotic input on admin-only surfaces, and Q-497 removed the way it could hang
-  anything. Filed because it is a silent wrong answer rather than a visible failure, and because
-  Q-497's padding fix makes low years *look* supported when they are not.
-
-**Measured 2026-08-19:** `shiftDateStr('0001-01-01', -1)` returns **`1900-12-31`**, not `0000-12-31`.
-The cause is `Date.UTC`'s legacy two-digit-year mapping — a year of 0–99 is interpreted as 1900+y —
-and it is unaffected by the year padding Q-497 added, which only decides how the *result* is printed.
-
-- **Reachable, if absurd.** `normalizeDateParamIso`'s regex accepts `\d{4}`, so `0050-01-01` passes
-  validation on `admin/day-review` and `admin/backfill-derived-scores`. The second **commits**, so a
-  backfill over such a range would write recomputed scores onto 1950s dates.
-- **Fix:** build the date in a safe year and set the real one (`setUTCFullYear`) rather than passing
-  a sub-100 year to `Date.UTC`. It restructures the function, which is why it was not folded into
-  Q-497 — that change was about termination, and mixing a date-helper rewrite into it would have made
-  the loop fix harder to review.
-- **Cheaper alternative worth considering first:** reject a year below 1000 at
-  `normalizeDateParam`, so the out-of-contract value never reaches any helper. Decide which before
-  building — a validation change touches every date-param route, a helper change touches one file.
-- **Verification:** `shiftDateStr('0001-01-01', -1)` must give `0000-12-31`, and every existing
-  `shiftDateStr` test must still pass unchanged.
-
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
 - **Branch:** `fix/aria-expanded-collapsibles-ratchet`
