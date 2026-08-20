@@ -547,58 +547,6 @@ reporting **106** where they previously read 107 and 106. No test holds them the
   duration or intensity source.
 
 
-### [workouts] Q-423 — the per-set RPE prefill is measurably low, and it is the input every derived effort number will average
-
-- **Branch:** `fix/default-rpe-from-pct-rounding`
-- **Added:** 2026-08-19 · found while settling Q-420's derivation. Not a report — a measurement that
-  fell out of checking the owner's remark that set RPE *"auto prefills anyways"*.
-
-Every set's RPE arrives pre-filled from the planned intensity percentage:
-
-```
-defaultRpeFromPct(pct) = clamp(floor(pct / 10), 6, 10)      // components/workout/utils.ts:81-84
-```
-
-called from four sites in `components/workout-screen.tsx` (856, 898, 936, 1084), with `7` as the
-bodyweight fallback. **`floor` truncates**, so 79% and 70% both prefill as 7, and 89% and 80% both
-prefill as 8.
-
-**Measured in production against each set's own `planned_pct`** (the owner's rows, 625 rated sets):
-
-| | sets |
-|---|---|
-| left at the prefilled value | 360 (57.6%) |
-| **raised by hand** | **233** |
-| lowered by hand | 32 |
-
-Mean RPE **7.97** where it was changed, **7.11** where it was not, **+0.41** mean shift overall. The
-owner raises the default **7.3× more often** than they lower it — on 233 separate occasions. A default
-that gets corrected upward that lopsidedly is not a neutral starting point.
-
-- **Why it matters beyond the strip itself:** Q-420 derives a session's effort by averaging these
-  values, and Q-419 turns that into an intensity tier that scales a calorie figure. A prefill biased
-  low propagates all the way to the day's energy budget — **fix this before Q-420 fits anything to the
-  pool**, or the average is of a known-skewed sample.
-- **The likely fix is one line**, `floor` → `round`, which turns 75–79% into 8 rather than 7. **Do not
-  ship it on that reasoning alone** — round(8.5) = 9 pushes 85% up a point too, and the measured shift
-  is +0.41, not +1. Bracket it against the 625 rated sets: pick the mapping that minimises the
-  raise/lower asymmetry, not the one that looks tidiest.
-- **⚠ It is a calibration change, so the Tuning rule binds.** State how many past sets and sessions
-  move before it lands. It does **not** re-score history on its own — stored `set_logs.rpe` values are
-  untouched, only future prefills change — which makes it the safest item in this cluster and worth
-  doing first for that reason alone.
-- **⚠ The 6 floor is also the reason `'easy'` is unreachable.** `clamp(…, 6, 10)` and a strip that
-  offers 6–10 (`components/workout/rpe-strip.tsx:30`) mean no set can be rated below 6, which Q-420
-  concluded is acceptable for strength. Keep the floor; this entry is about the truncation, not the
-  clamp.
-- **Surface:** `components/workout/**` — **Lane B**, unlike Q-419/Q-420/Q-421, which are Lane A. The
-  measurement above is reproducible from the read-only endpoint; the UI change is browser-verifiable at
-  the S25 viewport.
-- **What would count as done:** the prefill's mapping is chosen against the 625 observed ratings rather
-  than by inspection, the raise/lower asymmetry narrows, and the chosen mapping is written down with
-  the number it was fitted against.
-
-
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -713,9 +661,16 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   | └ raised | 233 | |
   | └ lowered | 32 | |
 
-  Mean RPE is **7.97** where the owner changed it, **7.11** where they did not, **7.48** overall —
-  a mean shift of **+0.41**. They raise the prefill **7.3× more often** than they lower it, which
-  says the default is systematically low (filed separately as **Q-423**, Lane B).
+  > **⚠️ CORRECTED 2026-08-20 — this table is computed on the wrong basis, and Q-423, which it
+  > filed, is refuted.** `planned_pct` has only been written since **July 2026**: 312 of these 625
+  > sets have none, and the table filled them from `intensity_pct`, the *achieved* intensity rather
+  > than the planned percentage the prefill reads. On the **313** sets that do carry a
+  > `planned_pct`, the split is **288 unchanged / 25 raised / 0 lowered**, a mean shift of
+  > **+0.125**, and `floor(pct/10)` is the modal rating at all sixteen observed percentages —
+  > [`docs/reviews/2026-08-20-rpe-prefill-mapping-fit.md`](reviews/2026-08-20-rpe-prefill-mapping-fit.md).
+  > **This bites the derivation below**: recomputing `defaultRpeFromPct(planned_pct)` at read time
+  > recovers which sets were touched for 313 of 625 and returns nothing for the rest, so a
+  > touched-vs-untouched weighting cannot be evaluated on sets logged before July.
 - **The derivation to build: the plain mean of the session's rated set RPEs, rounded to nearest,
   written as the prefilled session RPE and overridable.** One sentence the owner can check against
   their own memory — *"your sets averaged 7.5, so the session is an 8"*. Explicitly rejected: a
