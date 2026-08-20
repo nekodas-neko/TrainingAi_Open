@@ -16,6 +16,28 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — the CSP could not start a WASM session (`fix/csp-wasm-unsafe-eval`, Q-546)
+
+**projectOverview.md 8018 → 8043.**
+
+One Known-Issues row, 25 lines. It is longer than a header change usually warrants because three
+things about it are not obvious from the diff and would otherwise be re-derived:
+
+- **Why the missing directive survived.** `onnxruntime-web`'s parity test passes under Node, which
+  enforces no CSP at all — so it proved the model matched its golden while nothing could have loaded
+  it in a WebView. A reader who does not know that reads the green test as coverage.
+- **What is still owed on the device, and that it is two separate things.** That the app still loads
+  on the S25 under the new header, and — not possible yet — that a real WASM session instantiates,
+  which cannot be asserted until the first client-side model lands.
+- **One thing measured and deliberately not acted on:** `onnxruntime-web` 1.27 can create a worker
+  from a blob URL when threading is enabled, which `script-src` would also have to permit. Recorded
+  so the next session does not re-measure it, and left alone because widening a security header on
+  speculation is the wrong order.
+
+The backlog shrank in the same PR (Q-546 removed), so only this number moves.
+
+---
+
 ## 2026-08-19 — the extraction itself (`claude/agent-setup-task-numbering-5gojd9`)
 
 **projectOverview.md 8009 → 8018 · docs/implementation-backlog.md 11177 → 11338 · CLAUDE.md 1085 → 1100.**
