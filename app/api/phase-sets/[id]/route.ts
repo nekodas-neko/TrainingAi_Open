@@ -31,8 +31,6 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
 
   const repo = await getRepository()
   try {
-    const ownedStyles = await repo.listProgressionStyles(userId)
-    const ownedStyleIds = new Set(ownedStyles.map(s => s.id))
     const phases = (body.phases ?? []).map((p, i) => ({
       position: i,
       name: p.name,
@@ -41,13 +39,11 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
       primaryStyleId: p.primaryStyleId,
       secondaryStyleId: p.secondaryStyleId,
     }))
-    for (const p of phases) {
-      if (p.primaryStyleId && !ownedStyleIds.has(p.primaryStyleId)) {
-        return NextResponse.json({ error: 'Invalid primaryStyleId' }, { status: 400 })
-      }
-      if (p.secondaryStyleId && !ownedStyleIds.has(p.secondaryStyleId)) {
-        return NextResponse.json({ error: 'Invalid secondaryStyleId' }, { status: 400 })
-      }
+    // RV-32: the same guard the create twin now runs, through the same helper. It used to hydrate
+    // every style and its sets to answer one boolean, and the two paths having their own copies is
+    // how the create path went four months without one.
+    if (!(await repo.progressionStyleIdsOwned(userId, phases.flatMap(p => [p.primaryStyleId, p.secondaryStyleId])))) {
+      return NextResponse.json({ error: 'Invalid styleId' }, { status: 400 })
     }
     const phaseSet = await repo.updatePhaseSet(
       id,

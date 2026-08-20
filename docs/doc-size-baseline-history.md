@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — RV-32 and RV-34 closed (`fix/style-id-ownership-on-create-paths`)
+
+**projectOverview.md 7848 → 7857.**
+
+Nine lines for a security batch, and the length is carrying one specific thing: production shows no
+row that was ever mis-linked, **and** `claude_ro` is row-scoped to the owner, so the victim's rows are
+exactly the ones that query cannot see. Recording the clean count without that caveat would read as
+"this never happened", which the data cannot support. The rest — which paths, which FK, what the
+unscoped join leaked — is the shortest form that lets a reader decide whether to open the journal.
+
+Measured at the end, on the base this actually merges into, which is the lesson from the entry below.
+
 ## 2026-08-20 — Q-331 closed (`test/session-energy-cross-surface-parity`)
 
 **projectOverview.md 7838 → 7848.**

@@ -479,6 +479,8 @@ export interface WorkoutRepository {
 
   // ── Progression Styles ─────────────────────────────────────────────────────
   listProgressionStyles(userId: string): Promise<ProgressionStyle[]>
+  /** True when every id supplied belongs to `userId` (RV-32). A malformed id is false, not a throw. */
+  progressionStyleIdsOwned(userId: string, ids: (string | null | undefined)[]): Promise<boolean>
   saveProgressionStyle(userId: string, style: ProgressionStyle): Promise<ProgressionStyle>
   deleteProgressionStyle(userId: string, styleId: string): Promise<void>
 

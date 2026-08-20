@@ -62,6 +62,15 @@ estimate and left the done screen's route on the MET fallback, so the 42 of 78 s
 mutation-verified parity test fails if either side drifts again
 ([journal](docs/overview/entries/2026-08-20-session-energy-cross-surface-parity.md)).
 
+**RV-32 and RV-34 closed (2026-08-20)** — the program-config write surface took two client-supplied
+FKs on trust. Three of four write paths accepted a `progression_styles` id belonging to another user
+(the fourth refused it), and `listPhaseSets` joined the style **name** in unscoped, so another user's
+words reached a screen and an LLM prompt. A foreign `program_sessions.id` was a raw duplicate-key 500
+with the failed SQL in `error_events`. All guarded, refusals verified live with two accounts, and
+production shows no row that was ever mis-linked — though `claude_ro` is row-scoped to the owner, so
+that is *no evidence*, not *has not happened*
+([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
 from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
