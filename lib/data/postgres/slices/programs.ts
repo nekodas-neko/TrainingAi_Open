@@ -10,6 +10,7 @@ import type {
 import type { ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseRole } from '@trainingai/shared/types/program'
 import { aestMidnight, toAestDateStr, todayInTz } from '@trainingai/shared/date-utils'
 import { buildOwnedPhaseSetName } from '@trainingai/shared/phase-set-naming'
+import { isUuid } from '@trainingai/shared/validation/uuid'
 
 type Db = ReturnType<typeof getDb>
 
@@ -241,6 +242,30 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
       await tx.delete(s.programSessions).where(eq(s.programSessions.programId, programId))
     }
 
+    // RV-34: `sessions[].id` is the client's, used verbatim as the new row's primary key so a program
+    // edit does not sever `workout_sessions.session_id` from already-logged workouts. Unchecked, an
+    // id belonging to ANOTHER user's program was a raw `23505` duplicate-key 500 with the failed SQL
+    // in `error_events` — failing closed by accident of a constraint rather than by design.
+    //
+    // The guard has to be "exists under a different program", NOT "not one of this program's rows":
+    // `builder-review.tsx` mints a fresh `crypto.randomUUID()` for every session on save, so the
+    // stricter reading refuses every save from the workout builder. An id that exists nowhere is an
+    // ordinary insert; an id that exists elsewhere is the case that used to 500.
+    const suppliedSessionIds = program.sessions.map(sess => sess.id).filter((id): id is string => !!id)
+    if (!suppliedSessionIds.every(isUuid)) {
+      // Would reach the driver as `22P02` on insert and surface as the same opaque 500.
+      throw new UserFacingError('This program contains a malformed session id. Reload and try again.', 400)
+    }
+    const foreignIds = suppliedSessionIds.filter(id => !oldIdSet.has(id))
+    if (foreignIds.length) {
+      const taken = await tx.select({ id: s.programSessions.id })
+        .from(s.programSessions)
+        .where(inArray(s.programSessions.id, foreignIds))
+      if (taken.length) {
+        throw new UserFacingError('This program refers to a session that belongs to another program. Reload and try again.', 409)
+      }
+    }
+
     const sessionsWithIds = program.sessions.map(sess => ({
       sess,
       sessionId: sess.id ?? crypto.randomUUID(),
@@ -424,7 +449,12 @@ export async function listPhaseSets(db: Db, userId: string): Promise<PhaseSetWit
       primaryStyleName: primaryStyle.name,
     })
     .from(s.programPhases)
-    .leftJoin(primaryStyle, eq(primaryStyle.id, s.programPhases.primaryStyleId))
+    // RV-32: scoped to the caller. `program_phases.primary_style_id` is a client-supplied FK that
+    // three write paths accepted without an ownership check, and this join is what turned a borrowed
+    // id into someone else's style NAME on screen and inside an LLM prompt. Scoping it means a
+    // reference the caller does not own reads as blank rather than as another user's words — which
+    // stays true for rows written before the write guards existed.
+    .leftJoin(primaryStyle, and(eq(primaryStyle.id, s.programPhases.primaryStyleId), eq(primaryStyle.userId, userId)))
     .where(inArray(s.programPhases.phaseSetId, sets.map(set => set.id)))
     .orderBy(asc(s.programPhases.position))
 
@@ -699,6 +729,29 @@ export async function confirmEarlyDeload(db: Db, userId: string, programId: stri
 }
 
 // ── Progression Styles ────────────────────────────────────────────────────────
+
+/**
+ * True when every id supplied is a progression style belonging to `userId` (RV-32).
+ *
+ * `progression_styles.user_id` is NOT NULL and there is no shared or global style, so an id the
+ * caller does not own is always wrong. The narrow shape matters: the three write paths that needed
+ * this include `logExerciseFromPayload`, which runs on every logged set — `listProgressionStyles`
+ * would be two queries and a full hydrate of every style's sets to answer one boolean.
+ *
+ * A malformed id is `false`, not a throw: the column is `uuid`, so passing one through would reach
+ * the driver as `22P02` and surface as an opaque 500 — the shape RV-33 is about.
+ */
+export async function progressionStyleIdsOwned(
+  db: Db, userId: string, ids: (string | null | undefined)[],
+): Promise<boolean> {
+  const wanted = [...new Set(ids.filter((v): v is string => typeof v === 'string' && v.length > 0))]
+  if (!wanted.length) return true
+  if (!wanted.every(isUuid)) return false
+  const rows = await db.select({ id: s.progressionStyles.id })
+    .from(s.progressionStyles)
+    .where(and(eq(s.progressionStyles.userId, userId), inArray(s.progressionStyles.id, wanted)))
+  return rows.length === wanted.length
+}
 
 export async function listProgressionStyles(db: Db, userId: string): Promise<ProgressionStyle[]> {
   const styleRows = await db.select().from(s.progressionStyles)

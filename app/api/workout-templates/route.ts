@@ -60,6 +60,16 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // RV-32: `session_exercises.style_id` is the same client-supplied FK into the same strictly
+    // user-scoped table as the phaseSetId check above, and it arrived here unchecked. Also
+    // `ON DELETE SET NULL`, so a borrowed style being deleted by its owner blanks a column in this
+    // program.
+    const incomingStyleIds = (body.program.sessions ?? []).flatMap(sess =>
+      (sess.exercises ?? []).map(ex => ex.styleId))
+    if (!(await repo.progressionStyleIdsOwned(userId, incomingStyleIds))) {
+      return NextResponse.json({ error: 'Invalid styleId' }, { status: 400 })
+    }
+
     // Capture the phase set this program was on before this save overwrites it,
     // so we can tell below whether the user just switched to a different one.
     const previousPhaseSetId = body.program.id

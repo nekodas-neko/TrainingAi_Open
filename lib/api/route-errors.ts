@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { isNotFoundError, isUserFacingError } from '@trainingai/shared/errors'
+import { isUuid } from '@trainingai/shared/validation/uuid'
 
 /**
  * Q-463 — the single mapper at the route boundary.
@@ -57,13 +58,10 @@ export function isRefusal(err: unknown): boolean {
   return isNotFoundError(err) || isUserFacingError(err)
 }
 
-// A v1–v8 UUID in canonical hyphenated form. Anything else reaching the driver is a Postgres
-// `22P02 invalid_text_representation`, which surfaces as a 500 on a request that is plainly a 400.
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-
-export function isUuid(v: unknown): v is string {
-  return typeof v === 'string' && UUID_RE.test(v)
-}
+// The guard moved to `@trainingai/shared/validation/uuid` so the repository layer can use it without
+// importing this module, which pulls in `next/server` (RV-32). Re-exported so existing call sites
+// keep working unchanged.
+export { isUuid }
 
 /**
  * The guard every dynamic `[id]` route runs before its id reaches the repository (Q-482).
