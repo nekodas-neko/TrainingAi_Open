@@ -15,6 +15,8 @@
  *   5. Every `Needs:` names an ID that exists, or has existed, somewhere in the tree.
  *   6. No cycle among `Needs:` edges.
  *   7. Every `Gate:` value is one this project knows how to resolve.
+ *   8. A `Batch:` is a kebab slug, and no batch mixes Lane A and Lane B — one batch is one PR, and
+ *      one PR is one lane.
  *
  * IDs are `<letter>-<number>` with an optional lowercase suffix: LA/LB (implementer lanes), BF
  * (BugFix), RV (Review), TN (Tuning), PS (one-off planning sessions), and the legacy Q. The old "next
@@ -37,6 +39,7 @@ const PILLARS = new Set([
 ]);
 
 const failures = [];
+let batchSummary = '';
 const text = fs.readFileSync(BACKLOG, 'utf8');
 const lines = text.split('\n');
 
@@ -51,12 +54,20 @@ const queue = lines.slice(queueStart);
 // ---- 1 & 2: entry headings -------------------------------------------------
 const seen = new Map();
 const entryOrder = [];
-/** id -> { needs: [], gates: [] } for the entry whose heading most recently opened. */
+/** id -> { needs: [], gates: [], batch: null, lane: null } for the most recently opened heading. */
 const meta = new Map();
 let currentId = null;
 
 for (let i = 0; i < queue.length; i++) {
   const line = queue[i];
+
+  // A `## ` section heading ends the previous entry. Without this, a field written under a section
+  // boundary — belonging to no entry — is attributed to the last entry above it. The queue carries
+  // eight such boundaries.
+  if (line.startsWith('## ') && !line.startsWith('### ')) {
+    currentId = null;
+    continue;
+  }
 
   if (!line.startsWith('### ')) {
     // Body lines belong to the heading above them. `Needs:` and `Gate:` are what make readiness
@@ -70,6 +81,12 @@ for (let i = 0; i < queue.length; i++) {
       }
       const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
       if (gate) meta.get(currentId).gates.push(gate[1].toLowerCase());
+
+      const batch = line.match(/^\s*[-*]\s*\*{0,2}Batch:\*{0,2}\s*`?([^`\s]+)`?/i);
+      if (batch && !meta.get(currentId).batch) meta.get(currentId).batch = batch[1];
+
+      const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/);
+      if (lane && !meta.get(currentId).lane) meta.get(currentId).lane = lane[1].trim();
     }
     continue;
   }
@@ -90,7 +107,7 @@ for (let i = 0; i < queue.length; i++) {
   const id = `${q[1]}-${q[2]}${q[3]}`;
   entryOrder.push(id);
   currentId = id;
-  if (!meta.has(id)) meta.set(id, { needs: [], gates: [] });
+  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null });
 
   if (seen.has(id)) {
     failures.push(
@@ -116,6 +133,36 @@ for (const [id, m] of meta) {
       );
     }
   }
+}
+
+// ---- 2b2: Batch slugs and lane purity --------------------------------------
+// A batch is a set of entries that ship as ONE pull request, so that one verification pass covers
+// all of them. One PR is one lane's work, so a batch spanning both lanes cannot be shipped as one.
+{
+  const batches = new Map();
+  for (const [id, m] of meta) {
+    if (!m.batch) continue;
+    if (!/^[a-z][a-z0-9-]*$/.test(m.batch)) {
+      failures.push(
+        `${id} has \`Batch: ${m.batch}\` — a batch name is a lowercase kebab slug (e.g. ` +
+          `\`nutrition-surface\`), because it is also the PR's branch suffix.`,
+      );
+      continue;
+    }
+    if (!batches.has(m.batch)) batches.set(m.batch, []);
+    batches.get(m.batch).push([id, m.lane]);
+  }
+  for (const [name, members] of batches) {
+    const lanes = new Set(members.map(([, l]) => l).filter((l) => l === 'A' || l === 'B'));
+    if (lanes.size > 1) {
+      const who = members.map(([id, l]) => `${id}=${l ?? '-'}`).join(', ');
+      failures.push(
+        `Batch \`${name}\` mixes Lane A and Lane B (${who}). A batch ships as one PR and a PR is ` +
+          `one lane's work — split it into one batch per lane, with a \`Needs:\` if one must land first.`,
+      );
+    }
+  }
+  batchSummary = [...batches.entries()].map(([n, m]) => `${n}×${m.length}`).join(', ');
 }
 
 // ---- 2c: Needs targets exist ----------------------------------------------
@@ -222,5 +269,6 @@ const withGate = [...meta.values()].filter((m) => m.gates.length).length;
 console.log(
   `check-backlog-pointers: OK — ${seen.size} entries, no duplicates, all tagged; ` +
     `${withNeeds} with Needs: (no cycles, all targets known), ${withGate} with Gate:; ` +
+    `batches [${batchSummary || 'none'}]; ` +
     `migration ${nextMigration}, SQLite v${Math.max(...versions)} match source.`,
 );

@@ -39,6 +39,28 @@ two recording contradictory figures for one change.
 - **`scripts/next-item.js`** prints READY / PARKED / UNCLASSIFIED per lane.
 - **Four findings filed** as `PS-1`…`PS-4`.
 
+## Batching — and why not in one pass
+
+The owner asked at what level 210 entries should aggregate into PRs. Measuring first killed both
+obvious answers: entries name **320 distinct files of which only 39 are shared**, so file-level
+batching yields almost nothing, and `platform` alone holds **106** entries, so domain is far too
+coarse. Median entry body is 40 lines with half over 40 — not a pile of trivia.
+
+CI is not the constraint: 210 PRs at 3–5 minutes is machine time nobody waits on. The constraints are
+the owner's attention and the device — **61 entries mention device verification and 20 touch
+native/Kotlin**, each of the latter costing an APK cycle whose install can force the uninstall that
+destroys the ring key. So the axis is **what one verification pass covers**: never batch the 41
+migration-touching entries, batch native hardest, batch UI by screen, and never split the 18 entries
+that are already one pattern across up to 263 files.
+
+Shipped as a `Batch: <slug>` field with grouping in `next-item.js`, plus two seeded worked examples.
+**Batches are assigned when an entry is next touched, not in a bulk pass** — grouping 200 entries at
+once means deciding for work nobody is about to start, from the least information anyone will ever
+have, on a queue that moves underneath it.
+
+Expected effect is **210 → roughly 60–80 PRs, not 20**; half these entries are substantive work that
+has to be reviewed on its own terms however it ships.
+
 ## Two things that only surfaced by testing
 
 **Single-letter prefixes do not survive this repo.** Testing the "find your next number" grep before
@@ -52,7 +74,13 @@ the `Needs:` line that names it. A typo'd target was therefore always "found" an
 fired. Caught by testing each check against a deliberate violation rather than reading the code;
 fixed by stripping `Needs:` lines from the evidence blob.
 
-A third, smaller one: extracting 955 comments into a `.md` file made one journal entry look cited by
+**A `## ` section heading did not end an entry.** Both new scripts tracked the current entry from one
+`### ` to the next, so a field written under one of the queue's **eight** `## ` section boundaries —
+belonging to no entry at all — was attributed to the last entry above it. Found while using the same
+parser shape to pick batch candidates, and it had already produced one wrong grouping. Both scripts
+now reset on a section heading.
+
+A fourth, smaller one: extracting 955 comments into a `.md` file made one journal entry look cited by
 a durable doc, which would have exempted it from compaction permanently. The history log is now
 excluded from that scan.
 

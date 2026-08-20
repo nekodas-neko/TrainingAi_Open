@@ -256,6 +256,45 @@ the order:
 `PS-4b` sits under PARKED until `PS-4a` leaves the queue, and then unparks with nobody editing
 anything.
 
+### Batching — aggregate on what has to be verified, not on subject
+
+Two hundred queue entries do not mean two hundred pull requests. But the axis to batch on is not the
+obvious one. Measured across the queue on 2026-08-19: entries name **320 distinct files and only 39
+are touched by more than one**, so batching by file buys almost nothing; and `platform` alone holds
+106 entries, so batching by domain is far too coarse. Half the entries carry 40+ lines of analysis —
+this is not a pile of trivia.
+
+**CI is not the scarce resource.** Two hundred PRs at 3–5 minutes is machine time nobody waits on.
+The scarce resources are **the owner's attention and the device**. So entries batch when *one
+verification pass covers all of them*, and not otherwise:
+
+| Class | Rule | Why |
+|---|---|---|
+| Touches a migration or the sync-push path | **Never batch** | Blast radius is data; the revert is a corrective migration, not a `git revert` |
+| Native / Kotlin (~20 entries) | **Batch hardest** | Each costs an APK build and a sideload, and an install can force the uninstall that destroys the ring key |
+| One screen or flow | **Batch by surface** | One `pnpm dev` pass and one device look covers every entry on that screen |
+| One pattern across N files (18 entries, up to 263 files each) | **Already a batch — never split** | One review of the pattern covers every site |
+
+A batch is too big when you can no longer describe it in one sentence or revert it as a unit. In
+practice that is around five entries or four hundred diff lines, whichever comes first.
+
+**Record it with a `Batch:` field**, because an unwritten grouping is not a grouping:
+
+```markdown
+- **Batch:** calorie-budget-surface
+```
+
+Entries sharing a slug ship as **one PR**, and `next-item.js` groups them so an implementer picks up
+the cluster rather than its top member alone. The batch inherits its highest member's queue
+position, so priority is unchanged. `scripts/check-backlog-pointers.js` fails a batch that mixes
+Lane A and Lane B — one PR is one lane's work — and the query flags any batched entry that looks
+like it carries a schema change.
+
+**Batches are assigned when an entry is next touched, not up front.** Grouping 200 entries in one
+pass means deciding for work nobody is about to start, from the least information anyone will ever
+have, and the queue moves underneath it. Two are seeded as worked examples:
+`calorie-budget-surface` and `scale-weighing-ui`.
+
 ### What an implementer reads to start
 
 ```bash

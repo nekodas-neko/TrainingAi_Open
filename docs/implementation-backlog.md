@@ -74,6 +74,13 @@ silently misdirecting the next session. Update them in the same PR that consumes
 >   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
 >   not a gate.
 >
+> - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
+>   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
+>   **Never batch a migration or a sync-push change**; batch native/Kotlin work hardest, since each
+>   one costs an APK cycle. The full rule, and why file and domain are the wrong axes, is in
+>   [`docs/agents/README.md`](agents/README.md) §3. Assign a batch when you next touch an entry —
+>   not in a bulk pass over work nobody is about to start.
+>
 > An item needing both halves of the app is **two entries** — `PS-4a` with `Lane: A`, `PS-4b` with
 > `Lane: B` and `Needs: PS-4a` — not one entry with a paragraph asking readers not to re-sort it.
 >
@@ -925,6 +932,8 @@ number.**
 
 ### [nutrition][app-shell] Q-417 — a THIRD calorie budget, 179 low, because the Nutrition ring keeps its optimistic local paint
 
+- **Batch:** calorie-budget-surface
+
 - **Branch:** `fix/nutrition-ring-active-energy`
 - **Added:** 2026-08-19 · owner, from three screenshots taken at 9:57: *"these nutrition values dont
   look like they are lining up"*
@@ -993,6 +1002,8 @@ about the same day.
   Then log a food item and confirm all four move together — that second step is what (a) failed.
 
 ### [nutrition][app-shell] Q-415 — Home shows two calorie budgets 271 apart; Q-401's sweep missed the donut
+
+- **Batch:** calorie-budget-surface
 
 - **Branch:** `fix/home-donut-budget-source`
 - **Added:** 2026-08-19 · owner, from a Home screenshot: *"explain this widget what ars those
@@ -9342,6 +9353,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [devices][body] Q-114 — scale "Weighing you…" progress bar has already drifted from the real native timeout; shorten both together
 
+- **Batch:** scale-weighing-ui
+
 - **Branch:** `fix/scale-cycle-budget-drift-and-trim`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 29
 - **Added:** 2026-08-06 · owner asked to trim ~2s off the scale weigh-in progress bar now that the
@@ -9592,6 +9605,8 @@ first, so the output is a design discussion, not a patch:
 > [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
+
+- **Batch:** scale-weighing-ui
 
 - **Branch:** `fix/scale-onunstablereading-ungated-recurrence`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 19

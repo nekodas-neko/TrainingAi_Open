@@ -81,6 +81,13 @@ code — which is what keeps the collision surface to Lane A against Lane B.
 - **An implementer starts from `node scripts/next-item.js --lane <A|B>`, not from a hand-scan.** It
   prints READY in queue order, PARKED with the reason, and UNCLASSIFIED for a `Lane: ?`. Whether the
   top entry is actually startable is exactly what reading the file cannot tell you.
+- **`Batch: <slug>` means these entries ship as ONE PR.** Aggregate on what has to be *verified*,
+  never on subject: entries name 320 files of which only 39 are shared, and `platform` alone holds
+  106 entries, so file and domain are both the wrong axis. CI is free; the owner's attention and the
+  device are not. **Never batch a migration or sync-push change** — its revert is a corrective
+  migration. Batch native/Kotlin hardest, because each costs an APK cycle and an install can force
+  the uninstall that destroys the ring key. A sweep across N files is already a batch: do not split
+  it. Assign batches when an entry is next touched, not in a bulk pass.
 - **`Needs:` / `Gate: owner` / `Gate: device` are fields, not prose.** `Needs:` names another entry
   and clears when that entry leaves the queue — **an absent target counts as shipped**, because the
   protocol removes completed entries. `Gate:` takes only `owner` or `device`.

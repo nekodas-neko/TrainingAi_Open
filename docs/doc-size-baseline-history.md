@@ -38,6 +38,12 @@ The first raise recorded here rather than in the script, which is the point of t
 - **projectOverview.md +9.** One Current Status paragraph naming the new prefixes and the query
   command, since that is the thing every session needs to know before it can file anything.
 
+**Amended the same day — batching (`Batch:` field).** implementation-backlog.md → 11353, CLAUDE.md →
+1107. The owner asked at what level 210 entries should aggregate into PRs; the answer and its
+measurements are documented in `docs/agents/README.md` §3, with a one-paragraph pointer in each of
+the other two. CLAUDE.md's +10 is the rule an implementer must have without opening the contract:
+never batch a migration, batch native hardest, a sweep is already a batch.
+
 Five files were added to the ratchet in the same change — the agent batons, at their measured sizes
 (BugFix 136, Lane A 163, Lane B 413, Tuning 563, Review 1,281). Those are entry rows, not raises.
 
