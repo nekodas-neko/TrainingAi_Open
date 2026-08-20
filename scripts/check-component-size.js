@@ -7,6 +7,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, lineCountAtBase, verdict } = require('./lib/base-ref');
 
 const LIMIT = 800;
 
@@ -46,6 +47,7 @@ const BASELINE = {
 
 const root = path.join(__dirname, '..');
 const failures = [];
+const inherited = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -59,14 +61,28 @@ function walk(dir) {
       // Match `wc -l` (newline count), so a baseline can be read straight off the shell.
       const lines = src.split('\n').length - (src.endsWith('\n') ? 1 : 0);
       const allowed = BASELINE[rel] ?? LIMIT;
-      if (lines > allowed) {
+      // LA-16 / Q-424: ask whether THIS BRANCH grew the file, not whether it is over. A file already
+      // over its number on the base is not this branch's to fix, and failing it here reports someone
+      // else's merge as this author's oversized change.
+      const v = verdict({ count: lines, limit: allowed, atBase: lineCountAtBase(baseRef, rel) });
+      if (v === 'inherited') {
+        inherited.push(`${rel}: ${lines} lines against a ${allowed}-line baseline, but the base branch is already there. Not this branch's growth.`);
+      } else if (v === 'fail') {
         failures.push({ rel, lines, allowed, grandfathered: rel in BASELINE });
       }
     }
   }
 }
 
+const baseRef = resolveBaseRef();
+
 for (const top of ['app', 'components']) walk(path.join(root, top));
+
+// Reported whether or not the run fails, and never as a failure (Q-424).
+if (inherited.length > 0) {
+  console.log('check-component-size: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
+}
 
 if (failures.length > 0) {
   console.error(`Component file(s) over the ${LIMIT}-line limit (CLAUDE.md: keep files under ~800 lines — extract into components/ children instead of appending):`);

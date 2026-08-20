@@ -356,7 +356,13 @@ jobs:
       # one depth-1 fetch of that ref is all it takes, and the script degrades to baseline-only if it
       # is missing rather than failing.
       - name: Fetch the base branch, for the size ratchet's comparison
-        run: git fetch --depth=1 origin main
+        # `|| true` because a fetch failure must not fail the gate. The checks degrade to the plain
+        # absolute comparison when no base resolves, which is STRICTER than the base-aware one — so
+        # the worst case is the behaviour we had before Q-424, never a weaker check. Without this the
+        # step turns a transient network blip into a red Custom Rules run on an unrelated change,
+        # which is the same "failure that is not the branch author's" this whole class is about. It
+        # bit locally the first time it was flaky.
+        run: git fetch --depth=1 origin main || true
       - name: Orientation docs stay within their baselines
         run: node scripts/check-doc-index-size.js
 

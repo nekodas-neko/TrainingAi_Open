@@ -774,7 +774,7 @@ regression window the additive shape exists to avoid.
 
 - **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
 
-### [platform] LA-16 — the other six shrink-only ratchets are still order-dependent
+### [platform] LA-16 — three shrink-only ratchets are still order-dependent
 
 - **Branch:** `chore/ratchets-order-independence`
 - **Added:** 2026-08-20 · the half of Q-424 its own text flagged and its acceptance criterion did not cover
@@ -792,16 +792,25 @@ Still comparing a working tree against a committed absolute: `check-hex-literals
 `check-fetch-once-effects`, `check-component-size`, `check-memo-prop-stability`,
 `check-client-today-timezone`, and the non-strict-schema check.
 
-**They are not identical to the docs case, and the difference decides the work — but this entry
-overstated it when filed.** Corrected 2026-08-20 by reading each script:
+> **⚠️ HALF DONE 2026-08-20 — three of the six are converted and proven. Read this before starting.**
+>
+> `check-component-size`, `check-hex-literals` and `check-client-today-timezone` now use
+> `resolveBaseRef` + `verdict`, each demonstrated both ways: a branch inheriting an over-baseline
+> count from `main` is green and says so, a branch adding one is red.
+>
+> The pattern to copy is in those three. The **counting** is what differs per script — each passes
+> its own counting function to `countAtBase`, so the base is measured by the SAME matcher as the
+> working tree. Never write a second regex for the base count; it would disagree with the working-tree
+> count for reasons nobody could see.
 
-- **`check-component-size` is a LINE-count ratchet**, exactly like the docs one, so `lineCountAtBase`
-  applies unchanged. It is the cheapest of the six and should go first.
-- `check-hex-literals` and `check-client-today-timezone` count occurrences with a single expression
-  over the file's text, so each needs a one-line "count this string instead" seam.
+**What is left, and why these three are the harder half:**
+
 - `check-fetch-once-effects` and `check-memo-prop-stability` build their per-file counts with a
-  brace-matching scan, which is the real work here.
-- `check-strict-request-schemas` — not yet read.
+  brace-matching scan over the source rather than a single expression, so extracting a
+  `countFn(content)` seam is a real refactor rather than a one-liner. Do them one per PR, and prove
+  each the same way — these are gates, and a silently weakened gate is worse than an order-dependent
+  one.
+- `check-strict-request-schemas` — **still not read.** Do not assume it matches either shape.
 
 `verdict` is reusable as-is in every case; only the counting differs.
 
