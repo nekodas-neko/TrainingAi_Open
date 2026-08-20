@@ -63,9 +63,26 @@ const BASELINE = {
   // Not by the directory the file sits in, and not by whether it is called a sheet — the tab
   // screens mount their sheets unconditionally with a null prop, so sheets do not unmount here.
 
-  // ── Unmount on navigate or on a conditional render, so their next mount refetches. 13 sites
-  // across 11 files.
-  // Latent rather than broken, and some may never be worth converting.
+  // ── Unmount on navigate or on a conditional render, so their next mount refetches. **12 sites
+  // across 10 files** — count them off the map below rather than trusting this line, which said
+  // "13 across 11" for a day after a conversion removed a file and left the prose behind. That is
+  // the same class of error as the over-counting scanner above, in the same file, and it is why the
+  // run line prints the computed totals.
+  //
+  // Latent rather than broken, and **on the evidence to date none of them is worth converting**
+  // (judged 2026-08-20, per site, not as a group):
+  //   · `run-hr-zone-hero`, `done-screen`, `run-active-screen` and `live-hr-chart` read `hr-profile`
+  //     or an HR series while a run/workout is in progress or just finished. Nothing writes those
+  //     keys during that window, so a subscription would wait on a signal that never fires.
+  //   · `my-meals-picker` reads `saved-meals`, and the only writer reachable from the flow it sits
+  //     in — `meal-plan-setup-sheet`'s `invalidateSavedMeals()` — runs at the END of the wizard,
+  //     after `{step === 4 && <MyMealsPicker/>}` has unmounted it. **Limit of this check:** whether
+  //     `saved-meals-sheet` can be opened on top of the wizard was not traced, so this is "no writer
+  //     found reachable", not "proven unreachable".
+  //   · The rest are route-level screens whose next mount refetches.
+  // Converting one anyway is not harmful, but it adds a refetch with no reader waiting for it,
+  // which the Q-359 entry explicitly warns against. Re-judge a site if a NEW writer starts clearing
+  // its key while it is on screen.
   'app/session-explain/session-explain-client.tsx': 1,       // route
   'components/coach/coach-history.tsx': 1,                   // route
   'components/activity/run-active-screen.tsx': 1,            // conditional inside its route
