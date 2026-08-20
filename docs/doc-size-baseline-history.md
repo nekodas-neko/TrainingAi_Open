@@ -18,6 +18,16 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — LA-13 closed (`feat/migration-replay-check`)
+
+**projectOverview.md 7883 → 7889.**
+
+Six lines, and four of them are carrying the near-miss rather than the feature: the first version of
+the check was **green with a migration deliberately broken**, because the SQLSTATEs that are benign on
+an ordinary run are the failure signal under replay. A reader who takes "CI now catches non-idempotent
+migrations" at face value would not know how narrowly that became true, or why the acceptance
+criterion said *demonstrated, not argued*.
+
 ## 2026-08-20 — Lane A's baton, rewritten mid-session (`docs/lane-a-baton-refresh`)
 
 **docs/agents/state/implementation-lane-a.md 113 → 124.** A raise, and it is worth saying why rather

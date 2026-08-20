@@ -97,6 +97,12 @@ label remains. Retagging it exposed that **`next-item.js` let an entry's prose o
 tag** — Q-529 had been served to Lane A for days while its field said B
 ([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
 
+**LA-13 closed (2026-08-20)** — `Migration Check` ran only against a **fresh** database, where a
+non-idempotent migration cannot fail; it now replays every file against the schema it just built.
+The first version was green with a migration deliberately broken, because the "already there"
+SQLSTATEs that are benign on an ordinary run are precisely the failure signal under replay
+([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
 from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
