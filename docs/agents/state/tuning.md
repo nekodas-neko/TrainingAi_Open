@@ -3,11 +3,29 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/accurate-on-first-open` · **Next ID:** `TN-1`. **The band that ran out is gone** — IDs now count up from your own `TN-` prefix with no ceiling, so there is nothing to agree with the owner. Find the next free with `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.
+**Updated:** 2026-08-20 · **By:** `claude/tuning-agent-0q9yl7` · **Next ID:** `TN-2`. **The band that ran out is gone** — IDs now count up from your own `TN-` prefix with no ceiling, so there is nothing to agree with the owner. Find the next free with `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
 Since then, working only scores no other lane holds:
+- **⛔ I RETRACTED MY OWN Q-528 ON 2026-08-20 — read this before trusting any row count in this baton.**
+  I filed "`oura_daily_summary` holds **1 row**, a full-history rollup wiped the history". **It holds 45,
+  and 43 of them were created 2026-08-17 07:50** — they existed continuously through the reading that
+  said one. The count came from `pg_stat_user_tables.n_live_tup`, which is a **planner ESTIMATE, not a
+  count**: `last_analyze`/`last_autovacuum` are NULL on every table here, and the same field reads **0**
+  against `oura_raw_packed`'s **764** real rows. **To ask whether a table is empty, run `count(*)`.**
+  Q-528 is rewritten as a latent hazard (the delete-before-guard shape is real, `fullHistory`-only, and
+  **has not fired**); its "rebuild the summaries" half is deleted. **CLAUDE.md's session-start size read
+  now carries the size-vs-counter split**, because that rule is what sent me wrong.
+  - **Q-525 IS LIVE AGAIN** — the suspension it inherited was based on a phantom. And it is sharper:
+    **both countable gates PASS.** The 2026-08-17 `fullHistory` pass built **43** summary rows against a
+    threshold of 21, and **27 of 31** nights in the trailing window are complete at the summary level.
+    That pass scored illness on all 23 derived rows it wrote and chronic stress on **0**. **The refusal
+    is inside the granular layer** (`signalsByDate` → `computeNightIntermediates`), which is recomputed
+    in memory by design and **persists no reason for a null** → filed **TN-1**.
+  - **Q-522's half still stands** — `oura_bucket` is genuinely 0 rows (row-scoped view, re-checked).
+    Only the `oura_daily_summary` line was misread; do not sweep the rest of that day's work away.
+  [`review`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md).
 - **Owner acceptance criterion on Q-529: "accurate on first open, without needing time to adjust".**
   Measured the whole chain — **the cause is neither scoring nor rollup. The ring uploads about once an
   hour**: 214 batches over 7 days, **median gap 62.0 min**, p90 71, max 306. The owner opened in the
@@ -43,17 +61,15 @@ Since then, working only scores no other lane holds:
   - **Not a duplicate of Q-520.** That is a genuinely incomplete night; this is a complete night
     scored against a partial copy of itself.
   [`review`](../../reviews/2026-08-20-sleep-score-computed-mid-sync.md).
-- **`oura_daily_summary` holds 1 row against 198,223 raw samples** (Q-528). Found running Q-525's own
-  first action. `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
-  the guard is on the INSERT — so a full-history pass over a narrow input wipes the history and
-  returns successfully. Illness scores from the same array survived because they write through a
-  COALESCE upsert to a different table.
-  - **CORRECTS Q-525, which I filed the same day.** "The gate is unsatisfiable" was too confident;
-    with the table at one row, **nothing can be concluded from stored data**. Rebuild first, then judge.
-  - **CHANGES Q-522's fix.** `oura_bucket` carries `met_mean`/`motion_mad` — **MET and motion do not
-    drift with fitness**, which is the principled answer to Q-515's whole problem. **It has 0 rows**,
-    so an HR-based fit inherits the drift. Do not fit one without recording that.
-  [`review`](../../reviews/2026-08-19-daily-summary-replace-wipe.md).
+- **~~`oura_daily_summary` holds 1 row against 198,223 raw samples~~ (Q-528) — ⛔ RETRACTED 2026-08-20,
+  see the top of this section.** The table holds 45 rows and always did. The `replaceOuraDailySummary`
+  delete-before-guard shape is real and `fullHistory`-only, but **it has not fired**; the "rebuild the
+  summaries" instruction is withdrawn. **Its two knock-on claims split:** the correction it applied to
+  **Q-525 is void** (that entry is live again, and sharper), while **Q-522's half stands** —
+  `oura_bucket` carries `met_mean`/`motion_mad`, MET and motion do not drift with fitness, and it
+  genuinely holds **0 rows**, so an HR-based fit still inherits the drift.
+  [`retraction`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md) ·
+  [`original`](../../reviews/2026-08-19-daily-summary-replace-wipe.md).
 - **Daily vs weekly windows — MEASURED, reshapes Q-505** (owner question, 2026-08-19). *"The goal
   being x heart minutes per day… but you also gotta count for weekly targets. How handle this?"* —
   correct, and bigger than it looks. `DEFAULT_ZONE_MINUTES_GOAL = 22` is **WHO 150/week ÷ 7**.
@@ -182,12 +198,10 @@ Since then, working only scores no other lane holds:
 2. ~~Verify the two shipped recalibrations against production~~ — **DONE 2026-08-18, both are LIVE**
    — **but see Q-518: the readiness stamp is erased within hours by the bodyComp backfill**, so the
    "merge held in production" half of that verification is **retracted**.
-   ~~original note follows~~
-   Readiness: 1 of 96 rows stamped `v3:ri5:2026-08-18`, and the shared JSONB **merge held**
-   (`bodyComp` survived). Sleep has no stamp so it was verified by recomputation — 08-17 stores 78
-   against a raw blend of 77.91 (old), 08-18 stores 92 against a calibrated 92 (new).
-   **The trend step falls between 2026-08-17 and 08-18**, and history is not back-filled, so 95 of 96
-   rows stay pre-recalibration. [`review`](../../reviews/2026-08-18-recalibrations-live-verified.md).
+   Sleep was verified by recomputation (no stamp): 08-17 stores 78 against a raw blend of 77.91 (old),
+   08-18 stores 92 against a calibrated 92 (new). **The trend step falls between 08-17 and 08-18** and
+   history is not back-filled, so 95 of 96 rows stay pre-recalibration.
+   [`review`](../../reviews/2026-08-18-recalibrations-live-verified.md).
 3. **Do NOT propose a Zone 2 floor for Q-523 without the owner's labels.** Fitting a threshold needs
    days the owner would call "active" to fit against; guessing a number into the code is how the
    current one got there. Ask for the labels, then fit — that half *is* Tuning's.
@@ -348,9 +362,14 @@ for this work:
   (*"I thought we removed this?"*). **A constant value is a symptom of a retired question at least as
   often as a broken one**, and `SELECT ... WHERE col IS NOT NULL` cannot tell them apart. One
   `max(log_date)` per column would have.
-- **`pg_stat_user_tables` is the one read here that is NOT row-scoped — use it to check whether a
-  table is empty.** Every `claude_ro` view shows the owner's rows only, so "0 rows" from one is
-  ambiguous. The system-wide counter is what turned an ambiguous empty view into Q-528.
+- **⛔ `pg_stat_user_tables` is NOT row-scoped, and that does NOT make its row counts true.** This
+  rule used to end *"use it to check whether a table is empty"* and that is how Q-528 was filed against
+  a table that was never empty. Its **size** columns are exact (filesystem reads); its **`n_live_tup`
+  / `n_dead_tup` are planner estimates**, and `last_analyze` is NULL on every table here, so they can be
+  arbitrarily stale — measured 2026-08-20: **0** against `oura_raw_packed`'s **764** rows, **1** against
+  an `oura_daily_summary` holding **45**. Use `count(*)`. Where the worry is that a `claude_ro` view
+  hides other users' rows, write the finding as **"none of the owner's"** — the counter cannot see them
+  either.
 - **Check a goal's WINDOW against its source, not just its value.** A weekly guideline divided by
   seven is a different guideline. `zoneMinutesGoal = 22` is WHO 150/week ÷ 7 and had been read as a
   daily target for months. The strength lane in the same file already does this correctly, which is

@@ -24,6 +24,15 @@
   ```
   **`pg_stat_user_tables` is NOT row-scoped** — unlike every `claude_ro` view it reports physical sizes and
   lifetime counters for the whole database, so these numbers are complete rather than "the owner's, recently".
+  **But its SIZE columns and its ROW columns are not equally trustworthy, and conflating them cost a
+  session (2026-08-19/20).** `pg_total_relation_size`/`pg_relation_size`/`pg_indexes_size` are read from
+  the filesystem and are exact. **`n_live_tup`/`n_dead_tup` are planner ESTIMATES** maintained by
+  autovacuum and `ANALYZE` — and on this database `last_analyze` and `last_autovacuum` are **NULL on
+  every table**, so they can be arbitrarily stale. Measured 2026-08-20: `n_live_tup` read **0** against
+  `oura_raw_packed`'s **764** real rows, and **1** against an `oura_daily_summary` holding **45** — the
+  latter was filed as a data-loss incident (Q-528) that had never happened. **To ask whether a table is
+  empty, run `count(*)`;** where the worry is that a `claude_ro` view hides other users' rows, write the
+  finding as "none of the owner's" rather than reaching for a counter that cannot see them either.
   **Baseline: 171 MB total on 2026-08-18**, after the packing work took `oura_raw_samples` from 563 MB to
   50 MB. Growth should now be ~0.4 MB/day. Anything materially above that trend gets a Known-Issues row the
   same session.

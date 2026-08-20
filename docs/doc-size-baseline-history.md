@@ -1087,3 +1087,26 @@ tracks how much state the role is carrying rather than accumulating. This rewrit
 cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
 having two causes — and one superseded decision recorded with its correction, which is worth more
 lines than the decision was.
+
+## 2026-08-20 — `tuning/retract-daily-summary-wipe`
+
+**CLAUDE.md (+9):** the session-start database-size read told sessions to trust
+`pg_stat_user_tables` because it is not row-scoped, which is true, and said nothing about the
+difference between its size columns (exact, read from the filesystem) and its row counters
+(planner estimates, and NULL `last_analyze` on every table here). A Tuning session read
+`n_live_tup = 1` off an `oura_daily_summary` holding 45 rows and filed a data-loss incident that had
+never happened. Nine lines that name the split, give the two measured counter-examples, and say to
+run `count(*)` instead — cheaper than the session it cost.
+
+**Backlog (+35):** one entry, TN-1 — chronic stress refuses inside its granular layer and persists no
+reason why. It is the entry that replaces the retracted half of Q-528: both of that score's countable
+gates were measured this session and both pass, which moves the question from "is the history there"
+to "why does the model refuse", and there is currently no way to see the answer from outside the pass.
+Q-528 and Q-525 were rewritten in place rather than added to.
+
+**Tuning baton (+19, after trimming a superseded note):** the session retracted a finding this baton
+itself carried (Q-528, a daily-summary wipe that never happened), so the correction has to sit *above*
+the claim it replaces and the original bullet has to stay legible as the record of the misread — a
+successor who reads only the new block and not the old one learns the fact but not the failure mode.
+The rule that produced it (`pg_stat_user_tables` as an emptiness check) is rewritten in place with its
+two measured counter-examples rather than deleted, for the same reason.
