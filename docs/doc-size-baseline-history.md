@@ -1087,3 +1087,23 @@ tracks how much state the role is carrying rather than accumulating. This rewrit
 cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
 having two causes — and one superseded decision recorded with its correction, which is worth more
 lines than the decision was.
+
+## 2026-08-20 — `projectOverview.md` 8043 → 8078, `docs/implementation-backlog.md` 11610 → 11704, `docs/agents/state/review.md` 1281 → 140
+
+Review sweep 40 — the non-workout write surface and the first audit of ownership rule (b).
+
+**Backlog (+94):** three entries. RV-32 and RV-34 batch as one PR over the program-config write path;
+RV-33 is the Q-462/Q-463 status class on two routes that fix missed. RV-32 carries a measured
+impact-bound (the leak stops at the style *name*) because the entry is otherwise easy to size as either
+much larger or much smaller than it is.
+
+**projectOverview (+35):** one Known-Issues row. It is here rather than queue-only because a write path
+accepting another account's row id is the kind of thing every session's orientation read should see, and
+because the clean result beside it — rule (b) audited and sound — is what stops the next sweep re-running it.
+
+**Review baton (−1,141):** rewritten from 1,280 lines to 139, which is PS-4's complaint discharged for one
+of the five batons. Nothing was lost: all 39 earlier sweeps have their own `docs/reviews/` write-up, each
+linked with a summary from the pillar indexes, and every finding is already a Known-Issues row or a queue
+entry. What the baton keeps is state — next ID, current lens, what is blocked, and the method notes that
+cost a session each to learn. **The baseline is lowered to 140 in the same PR**, so the shrink ratchets
+rather than leaving 1,141 lines of headroom for it to grow back into.
