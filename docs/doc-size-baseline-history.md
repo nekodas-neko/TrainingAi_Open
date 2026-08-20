@@ -1202,7 +1202,7 @@ figures "against `git log` for the commits that raised them". This repository's 
 here. The reconciliation above is therefore from the copies' own content, and says so rather than
 implying a provenance it does not have.
 
-## 2026-08-20 — `projectOverview.md` 7875 → 7838, `docs/implementation-backlog.md` 11666 → 11328, `docs/agents/state/review.md` 1308 → 163
+## 2026-08-20 — `projectOverview.md` 7875 → 7838, `docs/implementation-backlog.md` 11666 → 11328, `docs/agents/state/review.md` 1308 → 170
 
 Review sweep 40 — the non-workout write surface and the first audit of ownership rule (b).
 
@@ -1215,11 +1215,11 @@ much larger or much smaller than it is.
 accepting another account's row id is the kind of thing every session's orientation read should see, and
 because the clean result beside it — rule (b) audited and sound — is what stops the next sweep re-running it.
 
-**Review baton (−1,145):** rewritten from 1,307 lines to 162, which is PS-4's complaint discharged for one
+**Review baton (−1,138):** rewritten from 1,307 lines to 169, which is PS-4's complaint discharged for one
 of the batons. The 24 lines the wrap-up session added on the same day — what shipped from sweeps
 29–39, the three findings still open, and the one route left unverified — are carried across, since
 that is state and not history. Nothing was lost: all 39 earlier sweeps have their own `docs/reviews/` write-up, each
 linked with a summary from the pillar indexes, and every finding is already a Known-Issues row or a queue
 entry. What the baton keeps is state — next ID, current lens, what is blocked, and the method notes that
-cost a session each to learn. **The baseline is lowered to 163 in the same PR**, so the shrink ratchets
-rather than leaving 1,145 lines of headroom for it to grow back into.
+cost a session each to learn. **The baseline is lowered to 170 in the same PR**, so the shrink ratchets
+rather than leaving 1,138 lines of headroom for it to grow back into.

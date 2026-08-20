@@ -133,6 +133,13 @@ None. This role's PRs are docs-only.
 - Screens: temporary specs in `e2e/`, run against the already-running server with
   `E2E_BASE_URL=http://localhost:3000` **and `DATABASE_URL=…` set** (`zero-data.setup.ts` fails loudly
   without it, before your spec runs). **Delete the spec and `test-results/` before committing.**
+- **`get_check_runs` returning `total_count: 0` has a third cause, and it is the likeliest one here.**
+  `CLAUDE.md` names a stale base; the PR field to read is **`mergeable_state`**. `dirty` means a merge
+  conflict, and **GitHub runs no PR checks at all while it cannot compute the merge commit** — so a
+  conflicted PR looks exactly like CI that never fired. Sweep 40 lost fifteen minutes to this with a
+  base that was provably current (`git merge-base --is-ancestor origin/main HEAD` passed). Resolve the
+  conflict and the checks start within seconds; `unstable` means mergeable with checks still running.
+  **Check `mergeable_state` before waiting on anything.**
 - **Assert every probe reached a real route.** Next's HTML 404 for an unmatched path is indistinguishable
   from an access-control rejection by status alone — the tell is the body, HTML vs JSON. A 405 means the
   route is real and the verb is wrong; check the handler before concluding anything.
