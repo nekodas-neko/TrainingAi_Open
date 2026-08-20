@@ -18,6 +18,15 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — Q-362a closed (`fix/day-log-workout-durations-key`)
+
+**projectOverview.md 7864 → 7870.**
+
+Six lines, and half of them are carrying the *shape* rather than the fix: this shipped additively, so
+the index has to say that the old colliding record is still being emitted on purpose. A reader who
+takes "closed" to mean the name-keyed record is gone would go looking for a consumer bug that does
+not exist — and would not know LA-15 is what finishes it.
+
 ## 2026-08-20 — RV-33 closed (`fix/ownership-refusal-status-two-routes`)
 
 **projectOverview.md 7857 → 7864.**

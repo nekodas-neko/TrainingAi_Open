@@ -430,23 +430,6 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [workouts][app-shell] Q-362a — `/api/day-log` keys `workoutDurations` by session NAME, so two same-named sessions in a day collide
-
-- **Branch:** `fix/day-log-durations-by-id`
-- **Added:** 2026-08-20 · **Lane: A** — `app/api/day-log/route.ts`
-- **Placement:** low. Real and now reproduced, but it needs the same session logged twice in one day.
-
-**REPRODUCED 2026-08-20** against `pnpm dev`, which is what the original entry asked for before
-anyone fixed it — two `Push` sessions on one Brisbane day return **one** `workoutDurations` key
-holding only the later window; the earlier session's is gone, not merged. `route.ts:144-166` writes
-`workoutDurations[ws.sessionName]` in a loop, so the last session wins, while the `exercises` array
-beside it carries the correct `workoutSessionId` on every row — which is what makes the fix cheap.
-Response and fixture in the [journal](overview/entries/2026-08-20-docs-split-day-log-session-identity.md).
-
-**Fix.** Key the record by `workout_sessions.id`, not `ws.sessionName`. Every consumer already has
-the id to hand (Q-362b). It is a response-shape change, so Q-362b lands immediately after — a
-name-keyed consumer reading an id-keyed record renders no duration at all.
-
 ### [workouts][app-shell] Q-362b — three day surfaces group workouts by NAME, and one of them shows the wrong session's heart rate
 
 - **Branch:** `fix/day-surfaces-session-identity`
@@ -470,7 +453,10 @@ worse bug than the duration collision it was filed for.**
    way: one merged block, one duration chip. The shape `day-sections` had before Q-391.
 
 **Fix.** Group by `workoutSessionId` in (2) and (3) as (1) already does, and look the duration up by
-that id in all three once Q-362a ships it that way. (2) additionally needs its `expandKey` moved off
+that id in all three. **Q-362a has shipped, and it shipped additively** — the route now emits
+`workoutDurationsById` (keyed by `workout_sessions.id`) *beside* the legacy name-keyed
+`workoutDurations`, which is unchanged and still collides. So there is no coordinated-merge window:
+read the new field, and nothing breaks whenever this lands. LA-15 removes the legacy one afterwards. (2) additionally needs its `expandKey` moved off
 the name, since two cards would otherwise share one expanded state.
 
 - **Verified:** the route's collision is reproduced (Q-362a). The three consumers are read from
@@ -825,7 +811,24 @@ change.
   without the second one, or `main`, going red — demonstrated, not argued.
 
 
-### [platform] LA-14 — `DELETE /api/nutrition/food-logs/[id]` answers 200 for a log that is not yours
+### [platform] LA-15 — remove the name-keyed `workoutDurations` once its consumers have moved
+
+- **Branch:** `chore/day-log-drop-legacy-durations`
+- **Added:** 2026-08-20 · the contract half of Q-362a's expand/contract
+- **Lane: A** — `app/api/day-log/route.ts`.
+- **Needs:** Q-362b
+
+Q-362a keyed workout durations by `workout_sessions.id` **additively**: `workoutDurationsById` is the
+correct record, and the colliding name-keyed `workoutDurations` is still emitted beside it so the
+three Lane B surfaces keep rendering until Q-362b moves them. It carries a `@deprecated` on the type.
+
+Once Q-362b has landed, delete the legacy record, its loop writes and the `@deprecated` field, and
+grep for any consumer added in the meantime. **Do not do this before Q-362b merges** — that is the
+regression window the additive shape exists to avoid.
+
+- **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
+
+### [platform] LA-14 — the food-log DELETE answers 200 for a log that is not yours
 
 - **Branch:** `fix/food-log-delete-refusal`
 - **Added:** 2026-08-20 · found while fixing RV-33, one method over in the same file

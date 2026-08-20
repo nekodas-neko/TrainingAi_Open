@@ -85,7 +85,17 @@ export interface DayLogResult {
   date: string;
   exercises: DayExercise[];
   bodyMeta: DayBodyMeta | null;
+  /**
+   * Keyed by session NAME, so two same-named sessions in one day collide and the later one wins
+   * (Q-362a, reproduced). **Kept only until Q-362b moves its three consumers to the field below**,
+   * then removed — switching the key outright would have left those surfaces showing no duration at
+   * all for however long the two lanes' PRs were apart.
+   *
+   * @deprecated read `workoutDurationsById`.
+   */
   workoutDurations: Record<string, WorkoutDuration | null>;
+  /** Keyed by `workout_sessions.id` — the identity that cannot collide (Q-362a). */
+  workoutDurationsById: Record<string, WorkoutDuration | null>;
   activityLogs: ActivityLog[];
   sleep: DaySleep | null;
   scores: DayScores | null;
@@ -140,14 +150,18 @@ export async function GET(req: NextRequest) {
     }))
   );
 
-  // Per-session workout durations
+  // Per-session workout durations, keyed by session id — a name is not an identity, and two `Push`
+  // sessions on one day left a single key holding only the later window (Q-362a). The name-keyed
+  // record is written alongside it, unchanged, until Q-362b's consumers move over.
   const workoutDurations: Record<string, WorkoutDuration | null> = {};
+  const workoutDurationsById: Record<string, WorkoutDuration | null> = {};
   for (const ws of workoutSessions) {
     const timedExercises = ws.exercises
       .filter(e => e.loggedAt)
       .map(e => ({ t: e.loggedAt.getTime(), dur: (e.timeToComplete ?? 0) * 1000 }));
     if (timedExercises.length === 0) {
       workoutDurations[ws.sessionName] = null;
+      workoutDurationsById[ws.id] = null;
       continue;
     }
     // Check if startedAt is more than 1 minute into the local day (not UTC midnight).
@@ -160,11 +174,13 @@ export async function GET(req: NextRequest) {
       ? ws.startedAt.getTime()
       : Math.min(...timedExercises.map(x => x.t));
     const endMs = Math.max(...timedExercises.map(x => x.t + x.dur));
-    workoutDurations[ws.sessionName] = {
+    const duration = {
       start: fmtMs(startMs),
       end:   fmtMs(endMs),
       minutes: Math.round((endMs - startMs) / 60000),
     };
+    workoutDurations[ws.sessionName] = duration;
+    workoutDurationsById[ws.id] = duration;
   }
 
   const pgDate = date.replace(/\//g, "-");
@@ -258,6 +274,6 @@ export async function GET(req: NextRequest) {
 
   const activityLogs = await repo.listActivityLogs(userId, pgDate, pgDate);
 
-  const result: DayLogResult = { date, exercises, bodyMeta, workoutDurations, activityLogs, sleep, scores, hr };
+  const result: DayLogResult = { date, exercises, bodyMeta, workoutDurations, workoutDurationsById, activityLogs, sleep, scores, hr };
   return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });
 }

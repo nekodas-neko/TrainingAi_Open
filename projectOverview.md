@@ -78,6 +78,12 @@ and filed it as a server fault, because the `NotFoundError` escaped an unguarded
 `.set()` wholesale — is whitelisted column by column
 ([journal](docs/overview/entries/2026-08-20-ownership-refusal-status.md)).
 
+**Q-362a closed (2026-08-20)** — `/api/day-log` keyed workout durations by session **name**, so two
+`Push` sessions in one day left a single window and the earlier one vanished. Now keyed by
+`workout_sessions.id`, and shipped **additively**: the colliding name-keyed record is still emitted
+so the three Lane B surfaces that read it keep working until Q-362b moves them, with LA-15 to remove
+it afterwards ([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
 from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
