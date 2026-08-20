@@ -4,11 +4,11 @@
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread
 > even with a perfect baton.
 
-**Updated:** 2026-08-20 · **By:** the seventh Lane B run · **Next ID:** `LB-1` (unused — this run
-split and refuted rather than filing, so the letter is still at its start)
+**Updated:** 2026-08-20 · **By:** the seventh Lane B run · **Next ID:** `LB-1`, unused — this run split and refuted rather than filed
 
 ## Now
-Nothing in flight. Five PRs merged this run, all green, nothing left open.
+Nothing in flight. **Seven PRs merged this run** (#266, #268, #272, #273, #275, #276, #277), all
+green, nothing left open.
 
 ## This run (2026-08-20, seventh) — the queue's top four, and three of them were wrong
 
@@ -16,69 +16,72 @@ The top of the queue was docs debt and stale premises. **Three of the four entri
 survive re-verification**, which is the run's actual finding: `next-item.js` tells you what is
 startable, never whether it is true.
 
-- **PS-1 SHIPPED** (#266) — `docs/agents/README.md` §3 listed `lib/coach/` as Lane A while Q-407 told
-  whoever took it the directory *"belongs to neither lane's declared paths"*. **Six `app/api/coach/**`
-  routes import it** (nine imports; `apply.ts` and `patch.ts` also write storage), so the path rule
-  answers Lane A twice over. Q-407 also cited a README section that does not exist. Grepped for the
-  same shape elsewhere: none.
+- **PS-1 SHIPPED** (#266) — the README listed `lib/coach/` as Lane A while Q-407 told whoever took
+  it the directory *"belongs to neither lane's declared paths"*. **Six `app/api/coach/**` routes
+  import it** and `apply.ts`/`patch.ts` write storage, so the rule answers Lane A twice over. Q-407
+  also cited a README section that does not exist. No other entry has the shape.
   [Journal](../../overview/entries/2026-08-20-docs-lane-coach-contradiction.md).
 
 - **PS-2 SHIPPED** (#268) — the extracted doc-size history was deduped. **PS-2 said one block,
-  duplicated twice, byte-identical. It was eight records, two of them appearing three times, and
-  none byte-identical.** Three of the eight differ in their *opening line*, so grouping by first line
-  finds five of eight and looking for exact repeats finds none; a similarity sweep over whole records
-  finds all eight above 0.80. **Deduping was a merge, not a delete** — each copy had drifted and
-  carried a fact the others lacked. Two independent records had been glued inside duplicates with no
-  blank line and would have gone with a wholesale delete.
+  duplicated twice, byte-identical. It was eight records, two appearing three times, none
+  byte-identical.** Three differ in their *opening line*, so grouping by first line finds five of
+  eight; a similarity sweep over whole records finds all eight above 0.80. **Deduping was a merge,
+  not a delete** — each copy had drifted and carried a fact the others lacked, and two independent
+  records glued inside duplicates would have gone with a wholesale delete.
   [Journal](../../overview/entries/2026-08-20-docs-baseline-history-dedupe.md).
 
-- **Q-362 REPRODUCED AND SPLIT** (#272) — the entry asked to establish the collision before fixing
-  it. Two same-named sessions on one Brisbane day return **one** `workoutDurations` key holding only
-  the later window. The consumer half was recorded as "one line in one file"; **it is three files**,
-  and `day-overlay-sheet` groups by name and then calls `loadSessionHr(sessExercises[0].workoutSessionId)`
-  — **one session's heart rate under a card listing both**, which is a worse bug than the duplicated
-  duration it was filed for. Now `Q-362a` (Lane A, the route) and `Q-362b` (Lane B, `Needs: Q-362a`).
+- **Q-362 REPRODUCED AND SPLIT** (#272) — two same-named sessions on one Brisbane day return
+  **one** `workoutDurations` key holding only the later window. The consumer half was recorded as
+  "one line in one file"; **it is three**, and `day-overlay-sheet` groups by name then calls
+  `loadSessionHr(sessExercises[0].workoutSessionId)` — **one session's heart rate under a card
+  listing both**, worse than the duplicated duration it was filed for. Now `Q-362a` (Lane A, the
+  route) and `Q-362b` (Lane B, `Needs: Q-362a`).
   [Journal](../../overview/entries/2026-08-20-docs-split-day-log-session-identity.md).
 
-- **Q-423 REFUTED** (#273) — *"the per-set RPE prefill is measurably low"*, 233 raises against 32
-  lowers. **The prefill reads `planned_pct`, and 312 of the 625 sets have none** — the column only
-  exists since July 2026. Reproducing the entry's table with `COALESCE(planned_pct, intensity_pct)`
-  returns its +0.41 and its 7.11 exactly, so the missing 312 were scored against the *achieved*
-  intensity. On the 313 that carry one: **288 unchanged, 25 raised, 0 lowered, +0.125**, and
-  `floor(pct/10)` is the modal rating at **all sixteen** observed percentages. `round` misses five and
-  turns 25 under-prefills into **82 over-prefills**.
+- **Q-423 REFUTED** (#273) — *"the prefill is measurably low"*, 233 raises against 32 lowers.
+  **The prefill reads `planned_pct`, and 312 of the 625 sets have none** (the column dates from July
+  2026); reproducing the table with `COALESCE(planned_pct, intensity_pct)` returns its +0.41 and its
+  7.11 exactly, so those 312 were scored against the *achieved* intensity. On the 313 that carry one:
+  **288 unchanged, 25 raised, 0 lowered, +0.125**, and `floor(pct/10)` is the modal rating at **all
+  sixteen** observed percentages; `round` turns 25 under-prefills into **82 over-prefills**.
   [Review](../../reviews/2026-08-20-rpe-prefill-mapping-fit.md) ·
   [Journal](../../overview/entries/2026-08-20-docs-refute-rpe-prefill-mapping.md).
 
-- **Q-359's fixture SHIPPED** (#275) — the only code this run. Q-402's fix had merged **unguarded**:
-  three attempts to drive it measured zero `/api/nutrition/energy-balance` requests. Both blockers are
-  fixtures now (`ensureEnergyBalanceProfile`, `enableHomeCards` in `e2e/fixtures.ts`) and
-  `e2e/home-card-invalidation-refetch.spec.ts` drives the mechanism end to end. Mutation-checked both
-  ways. [Journal](../../overview/entries/2026-08-20-home-card-invalidation-guard.md).
+- **Q-359 CLOSED OUT** (#275, #277) — the only code this run. Q-402's fix had merged **unguarded**:
+  three attempts to drive it measured zero `/api/nutrition/energy-balance` requests. Both blockers
+  are fixtures now (`ensureEnergyBalanceProfile`, `enableHomeCards` in `e2e/fixtures.ts`) and
+  `e2e/home-card-invalidation-refetch.spec.ts` drives it end to end. Mutation-checked both
+  ways. #277 then judged the twelve remaining latent sites (**none worth converting**), fixed the
+  check's own prose count — "13 across 11" against a map holding 12 across 10 — and carried the
+  **compaction sweep**, 59 unlinked entries into `history-2026-08-18.md`.
+  [Journals](../../overview/entries/2026-08-20-home-card-invalidation-guard.md) ·
+  [2](../../overview/entries/2026-08-20-fetch-once-per-site-judgement.md).
 
 ## Next
 Work the queue top-down with `node scripts/next-item.js --lane B`, and **re-verify the premise before
 building** — three of four failed that this run.
 
-1. **Q-359's remainder** is twelve latent fetch-once sites, all unmounting, none able to bite. Judge
-   each individually; it is not a codemod. Low value now that the fixture and guard exist.
-2. **Q-323 / the `calorie-budget-surface` batch (Q-417 + Q-415)** — three calorie budgets disagreeing
-   across Home and Nutrition. This is the real next work and it is genuinely Lane B.
-3. **Q-406 before Q-395** — `food-row.tsx` has to be extracted first; both landing files sit on the
-   800-line limit, so a rework has nowhere to land until it is.
+**Start at Q-323 / the `calorie-budget-surface` batch (Q-417 + Q-415)** — three calorie budgets
+disagreeing across Home and Nutrition, the first substantive UI item on the queue. After it,
+**Q-406 before Q-395**: `food-row.tsx` must be extracted first, because both landing files sit on
+the 800-line limit and a rework has nowhere to land until it is.
+
+**Q-359 is judged out, not skipped** — none of its twelve sites is worth converting, and the
+reasoning plus its one stated limit sit beside the baseline map in
+`scripts/check-fetch-once-effects.js`. Re-judge a site only if a NEW writer starts clearing its key
+while it is on screen.
 
 ## Do not re-litigate
-- **`lib/coach/**` is Lane A.** Settled by PS-1 against the import trace, not by the path list.
+- **`lib/coach/**` is Lane A** — settled by PS-1 against the import trace, not the path list.
 - **`floor(pct/10)` is the right RPE prefill.** Refuted on production data, with the candidate
   mappings scored. Do not re-propose `round`, and note the review also records **why Q-423's own
   acceptance criterion picks the wrong answer**: 92% of the ratings were never touched, so they *are*
   the prefill, and any statistic over all of them is the prefill agreeing with itself.
-- **The seeded user is missing only `date_of_birth`**, not `height_cm`/`sex` — both are present. The
-  older note in Q-359 saying otherwise is corrected.
-- Everything in the previous baton's "Do not re-litigate" still stands: `FactorBar` is not a
-  colour-only violation, absent scores are handled correctly on all 14 surfaces, Q-309 is refuted as
-  a user-facing bug while Q-354 (mouse clicks on Nutrition) is real and parked, `radiogroup` beat
-  `group` + `aria-pressed`, and `coach-content.tsx`'s `scrollIntoView` is correct.
+- **The seeded user is missing only `date_of_birth`** — `height_cm` and `sex` are both present.
+- Still standing from earlier runs: `FactorBar` is not a colour-only violation; absent scores are
+  handled correctly on all 14 surfaces; Q-309 is refuted as a user-facing bug while Q-354 (mouse
+  clicks on Nutrition) is real and parked; `radiogroup` beat `group` + `aria-pressed`; and
+  `coach-content.tsx`'s `scrollIntoView` is correct.
 
 ## Owed (device / physical — unchanged from the previous run)
 - A **test print** of the meal label, black band first (Q-389) — 0.49–0.66 mm per module, ink spread
@@ -91,13 +94,10 @@ building** — three of four failed that this run.
 - **Q-450's device path** — the E2E run took the web fallback, not SQLite + outbox.
 
 ## Claimed paths
-None held. The previous run's four "release when convenient" claims
-(`packages/shared/src/nutrition/label-payload.ts`, `lib/github-release.ts`, `lib/sqlite/cache.ts`,
-`.github/workflows/ci.yml`) are released — every branch holding them has merged, and a claim whose
-branch is gone is gone with it.
-
-This run touched `docs/doc-size-baseline.json` and `docs/doc-size-baseline-history.md`, neither a
-lane path; both are shared by every agent and neither is held.
+None held. The previous run's four "release when convenient" claims (`label-payload.ts`,
+`lib/github-release.ts`, `lib/sqlite/cache.ts`, `.github/workflows/ci.yml`) are released — every
+branch holding them has merged, and a claim whose branch is gone is gone with it. This run touched
+`docs/doc-size-baseline*` and `scripts/check-fetch-once-effects.js`, none a lane path, none held.
 
 ## Gotchas worth carrying
 - **`get_check_runs` lags reality; attempting the merge is the reliable check.** Confirmed twice this
