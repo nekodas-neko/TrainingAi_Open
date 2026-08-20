@@ -329,26 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
-
-- **Branch:** `docs/baseline-history-dedupe`
-- **Added:** 2026-08-19 · found while extracting the baselines out of the check script
-- **Lane: B** — docs only.
-
-`docs/doc-size-baseline-history.md` is the 955 comment lines lifted verbatim out of
-`scripts/check-doc-index-size.js`. It was extracted unedited **on purpose**, so the extraction is
-reviewable as a pure move — but it carries known corruption from the conflict-splicing that motivated
-the move in the first place:
-
-- The **Q-553** block appears **twice, byte-identical** (it was at lines 30 and 35 of the old script).
-- Two blocks record the same change with different figures: one says `projectOverview -> 7785`, the
-  other `7805 -> 7785`.
-
-Dedupe the exact repeats and reconcile the contradictory pair against `git log` for the commits that
-raised them. **Do not summarise or prune the rest** — Q-543 was explicit that several of those notes
-are the only record of why a number moved, and one documents a near-miss where a splice would have
-reverted another lane's raise.
-
 ### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
 
 > **⚠️ MEASURED AND MOSTLY DEFUSED 2026-08-20 (Lane A) — read this before starting; the entry below
