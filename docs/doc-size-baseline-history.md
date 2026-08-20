@@ -1087,3 +1087,19 @@ tracks how much state the role is carrying rather than accumulating. This rewrit
 cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
 having two causes — and one superseded decision recorded with its correction, which is worth more
 lines than the decision was.
+
+## 2026-08-20 — Review session wrap-up (sweeps 29–39)
+
+**`projectOverview.md` 8043 → 7863, a ratchet DOWN of 180 lines.** Eight Known-Issues rows were
+struck to `known-issues-resolved.md` because their findings had shipped — each verified in source on
+`main` first, not inferred from the queue's silence. The shrink-only baseline exists so reclaimed
+space cannot quietly refill, so the lower number is the point of the exercise rather than a side
+effect.
+
+**`docs/agents/state/review.md` 1281 → 1308, a raise of 27 lines.** A "session closed — read this
+first" block at the top of the Review baton: which of the previous run's thirteen findings shipped
+(ten) with the evidence, which three remain open so a successor does not re-file them, the one probe
+that never reached its ownership check and is therefore **unknown rather than clean**, and where to
+start given that four consecutive documentation sweeps had already covered that seam. It sits in the
+baton rather than the handoff because the baton is what a cold successor reads as state; the handoff
+is the narrative behind it.
