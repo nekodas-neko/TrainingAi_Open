@@ -3,14 +3,16 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { errorLog } from '@trainingai/shared/logger'
-import { estWorkoutKcal, intensityFromRpe, metForActivity, isKnownActivity, DEFAULT_ACTIVITY_ID, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estSessionKcal, isKnownActivity, DEFAULT_ACTIVITY_ID, type Sex } from '@trainingai/shared/health/workout-energy'
 import { reportServerError } from '@/lib/observability'
 import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { ageFromDob } from '@trainingai/shared/date-utils'
 
-// Estimated per-workout active energy via Oura's MET fallback (Phase A). Deterministic —
-// duration + intensity (RPE) + the user's profile → kcal. `durationMin`/`rpe` come from the
-// client (authoritative, and avoids depending on completion having synced to the server yet);
-// the server verifies session ownership and supplies the profile + formula.
+// Estimated per-workout active energy: heart rate when the session has one, Oura's MET fallback
+// otherwise. Deterministic — duration + intensity (RPE) + the user's profile → kcal.
+// `durationMin`/`rpe` come from the client (authoritative, and avoids depending on completion having
+// synced to the server yet); the server verifies session ownership and supplies the profile, the
+// heart rate and the formula, which is `estSessionKcal` — the same one the day's energy budget runs.
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
     const session = await auth()
@@ -45,10 +47,22 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     // finished, so anchoring it to a months-old figure is wrong and — worse — never converges: the
     // error grows with every kilogram gained or lost. `progress-summary` is the one caller for which
     // "baseline" is the right reading.
-    const [user, latestWeightKg] = await Promise.all([repo.getUserById(userId), repo.getMostRecentConfirmedWeightKg(userId)])
+    //
+    // Q-331: the day's energy budget estimates this same session from heart rate when it has one,
+    // and this route did not — so a session with an `avg_bpm` was reported twice, by two different
+    // formulas, on two screens. Same input, same estimator, both places.
+    const [user, latestWeightKg, avgBpmBySession] = await Promise.all([
+      repo.getUserById(userId),
+      repo.getMostRecentConfirmedWeightKg(userId),
+      repo.getAvgBpmBySession(userId, [sessionId]),
+    ])
     const sexRaw = user?.sex
     const sex: Sex | null = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
-    const ageYears = user?.dateOfBirth ? yearsSince(user.dateOfBirth) : null
+    // Q-331: `ageFromDob` rather than a private fractional-years helper, which is what this route
+    // had. Keytel weights age at 0.2017 kJ/min per year, so 33 whole years against 33.18 fractional
+    // ones moved a 55-minute session by 1 kcal — enough for the day screen and the done screen to
+    // print different numbers for the same workout, which is the whole point of this pass.
+    const ageYears = ageFromDob(user?.dateOfBirth ?? null, new Date())
     const weightKg = latestWeightKg
 
     // A profile gap (no DOB / non-binary sex / no logged weight) means we can't run Schofield —
@@ -66,16 +80,20 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
       )
     }
 
-    const intensity = intensityFromRpe(rpe)
     const activityParam = Number(url.searchParams.get('activityId'))
     const activityId = Number.isFinite(activityParam) && isKnownActivity(activityParam) ? activityParam : DEFAULT_ACTIVITY_ID
-    const kcal = estWorkoutKcal({ durationMin, ageYears, weightKg, sex, activityId, intensity })
+    const { kcal, source, intensity, met } = estSessionKcal({
+      durationMin, rpe, avgBpm: avgBpmBySession.get(sessionId) ?? null, ageYears, weightKg, sex, activityId,
+    })
 
     return NextResponse.json(
       {
         kcal: kcal != null ? Math.round(kcal) : null,
         intensity,
-        met: metForActivity(activityId, intensity),
+        source,
+        // Null whenever the heart-rate estimate ran — no MET was consulted, and reporting one would
+        // suggest it produced the number.
+        met,
         activityId,
         durationMin: Math.round(durationMin),
       },
@@ -90,12 +108,4 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     errorLog(error, 'GET /api/workout-sessions/[id]/energy')
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
-}
-
-function yearsSince(isoDate: string): number | null {
-  const dob = new Date(isoDate)
-  if (Number.isNaN(dob.getTime())) return null
-  const diffMs = Date.now() - dob.getTime()
-  if (diffMs <= 0) return null
-  return diffMs / (365.25 * 24 * 3600 * 1000)
 }

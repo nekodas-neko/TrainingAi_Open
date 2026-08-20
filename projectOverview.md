@@ -55,6 +55,13 @@ database already holding their objects — and so were retried on every cold sta
 and the dev database now records 206 of 206
 ([journal](docs/overview/entries/2026-08-20-non-idempotent-migrations.md)).
 
+**Q-331 closed on top of that (2026-08-20, v1.333.1):** the done screen and the day screen were
+estimating the same workout with **different formulas** — Q-421 gave the day path a heart-rate
+estimate and left the done screen's route on the MET fallback, so the 42 of 78 sessions carrying an
+`avg_bpm` were reported twice, differently. Both now call one `estSessionKcal`, and a
+mutation-verified parity test fails if either side drifts again
+([journal](docs/overview/entries/2026-08-20-session-energy-cross-surface-parity.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
 from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
