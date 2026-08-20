@@ -17,7 +17,7 @@ the work, or a fix production later refuted. That is why the check exists.
 
 ## Next — in this order
 
-1. **Aggregation (sweep 2).** 203 entries, **4 carry a `Batch:`** — still only the two seeds.
+1. **Aggregation (sweep 2).** 204 entries, **4 carry a `Batch:`** — still only the two seeds.
    `docs/agents/README.md` §3 holds the measurements that decide the axis. **Start with the ~20
    native entries**: each is an APK cycle, the priciest verification the owner performs.
 2. **Lane and readiness (sweep 3).** One `Lane: ?` (`PS-4` — may legitimately stay `?`). Four prose
