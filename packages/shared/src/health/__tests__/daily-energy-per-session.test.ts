@@ -56,6 +56,28 @@ describe('computeActiveEnergy per-session workout breakdown (Q-391)', () => {
     expect(r.workoutKcalBySession.map(s => s.id)).toEqual(['real'])
   })
 
+  // Q-421 asked for the estimator basis to be stored rather than chosen silently. Roughly half of
+  // the owner's sessions have no strap reading, so a per-session figure on screen is produced by one
+  // of two formulas and nothing said which. This is meaningful under fixtures because the HR path is
+  // pure arithmetic — it needs no MET table, so it is not subject to the vacuity trap above.
+  it('records which estimator produced each addend, per session', () => {
+    const r = computeActiveEnergy({
+      profile,
+      strengthSessions: [
+        { id: 'with-strap', durationMin: 55, avgBpm: 91 },
+        { id: 'no-strap', durationMin: 55 },
+      ],
+      ...base,
+    })
+    expect(r.workoutKcalBySession.map(s => [s.id, s.source])).toEqual([
+      ['with-strap', 'hr'],
+      ['no-strap', 'met'],
+    ])
+    // And the basis is a real distinction, not a label: the HR session has a non-zero estimate even
+    // under the scrubbed fixtures, where the MET one is 0.
+    expect(r.workoutKcalBySession.find(s => s.id === 'with-strap')!.kcal).toBeGreaterThan(0)
+  })
+
   it('leaves callers that pass no id unchanged — the breakdown is simply empty', () => {
     const r = computeActiveEnergy({ profile, strengthSessions: [{ durationMin: 49 }], ...base })
     expect(r.workoutKcalBySession).toEqual([])

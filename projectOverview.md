@@ -91,6 +91,12 @@ file, reports an inherited overage instead of failing it, and says how many line
 added. Custom Rules is **51 steps** now — a base fetch was added
 ([journal](docs/overview/entries/2026-08-20-doc-size-ratchet-order-independence.md)).
 
+**Q-421 is Lane B's now (2026-08-20)** — route (a) shipped, route (b) is owner-rejected, and the
+per-session estimator basis (`source: 'hr' | 'met'`) is stored on both surfaces. Only the on-screen
+label remains. Retagging it exposed that **`next-item.js` let an entry's prose outrank its own lane
+tag** — Q-529 had been served to Lane A for days while its field said B
+([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
 from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries

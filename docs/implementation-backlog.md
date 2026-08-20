@@ -637,8 +637,21 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 > data (max 104) and should not be quoted as a prediction. That over-read is exactly what the ONNX
 > model exists to fix.
 >
-> **Still open in this entry:** route (b), and the "store which basis was used and label it" note —
-> the basis is currently chosen silently per session. Surfacing it is a UI decision (Lane B).
+> **⚠️ RE-CHECKED 2026-08-20 (Lane A) — nothing here is Lane A's any more. Retagged, not removed.**
+>
+> Adding it up: route **(a) shipped** 2026-08-19. Route **(b) is owner-rejected** — *"I dont want to
+> use oura models"* — and is retained below as the record of why, not as work. That left one clause,
+> *"store which basis was used and label it"*, and **the storing half is now done on both surfaces**:
+> `estSessionKcal` returns `source: 'hr' | 'met'`, `GET /api/workout-sessions/[id]/energy` returns it
+> (Q-331), and `computeActiveEnergy`'s `workoutKcalBySession` now carries it per addend.
+>
+> **What is left is the label**, on whichever per-session figures are shown — a UI decision, and Lane
+> B's. The lane tag below is changed to match; the entry keeps its number and its record.
+>
+> Worth surfacing rather than leaving implicit: **roughly half the owner's sessions have no strap
+> reading** (42 of 78 have `avg_bpm`), so two sessions side by side on the same screen are routinely
+> produced by two different formulas whose outputs overlap rather than agree. That is the case for
+> labelling it, and it is permanent — the strap is not always worn.
 
 
 - **Branch:** `feat/hr-based-workout-energy`
@@ -693,8 +706,10 @@ never written.
   The ONNX heads are the models. Replacing the MET/Schofield port as well would be a much larger
   question about where the numbers come from at all, and **the owner has not asked for that** — do not
   read it into this decision. Ask before widening it.
-- **Surface:** `packages/shared/**` and `app/api/**` — **Lane A**. `lib/oura-models/**` is no longer in
-  scope for this item, which is the practical effect of the decision above.
+- **Surface: Lane B** as of 2026-08-20 — the remaining work is the label on a per-session figure.
+  `packages/shared/**` and `app/api/**` are done and `lib/oura-models/**` was never in scope after the
+  owner's decision above.
+- **Lane: B**
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
