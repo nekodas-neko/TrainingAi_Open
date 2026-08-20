@@ -329,24 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [platform] PS-1 — `docs/agents/README.md` §3 lists `lib/coach/` as Lane A while a queue entry says it belongs to neither lane
-
-- **Branch:** `docs/lane-coach-contradiction`
-- **Added:** 2026-08-19 · found while replacing the lane path lists with a rule
-- **Lane: B** — a docs-only reconciliation, no code.
-
-`docs/agents/README.md:124` lists `lib/coach/` under Lane A. Q-407's `Lane.` paragraph tells whoever
-takes it that **`lib/coach/**` belongs to neither lane's declared paths** and to claim it in a baton
-first. Both cannot be true, and the entry is the one an implementer reads.
-
-The path rule added in this branch settles it — `lib/coach/` is reached by `app/api/coach/route.ts`,
-so it is Lane A — but **Q-407's paragraph still says otherwise** and will be read before the README
-is. Correct the entry to match, or say explicitly why the rule does not apply to it.
-
-**Why this is worth an entry rather than a drive-by edit:** the same shape may exist on other
-entries written while the enumeration was the authority. Grep the queue for `neither lane` and
-`belongs to neither` before closing this.
-
 ### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
 
 - **Branch:** `docs/baseline-history-dedupe`
@@ -2036,8 +2018,10 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   the conversation has been used on-device for a plan the owner actually keeps. A conversational
   flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
 
-- **Lane.** Split, and **`lib/coach/**` belongs to neither lane's declared paths** — whoever takes
-  it claims that path in their baton first (`docs/agents/README.md` §"A path neither lane lists").
+- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
+  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
+  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
+  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
   `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
   prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
   `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are

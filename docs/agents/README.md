@@ -162,9 +162,12 @@ lib/view-transition.ts  lib/use-copy.ts  lib/use-online-status.ts  lib/session-i
 ### Anything not listed — decide it by the rule, not by the list
 
 `lib/` holds around 68 top-level entries and **40 of them are named in neither list above**. An
-enumeration of that surface goes stale within a month and then quietly misleads: `lib/coach/` is
-listed under Lane A here while a queue entry instructs whoever takes it to claim it in a baton
-"because it belongs to neither lane's declared paths". Both cannot be right, and nothing catches it.
+enumeration of that surface goes stale within a month and then quietly misleads, and it already had:
+`lib/coach/` was listed under Lane A here while Q-407 told whoever took it to claim the path in a
+baton "because it belongs to neither lane's declared paths". Six `app/api/coach/**` routes import
+that directory, so the rule below had always answered Lane A; the entry was corrected to match
+(PS-1, 2026-08-20). Nothing caught the contradiction on its own, and an enumeration never will —
+which is the argument for the rule.
 
 So the lists above are the obvious cases, and this rule settles everything else:
 
