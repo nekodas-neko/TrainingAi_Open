@@ -774,32 +774,6 @@ regression window the additive shape exists to avoid.
 
 - **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
 
-### [platform] LA-14 — the food-log DELETE answers 200 for a log that is not yours
-
-- **Branch:** `fix/food-log-delete-refusal`
-- **Added:** 2026-08-20 · found while fixing RV-33, one method over in the same file
-- **Lane: A** — `app/api/**` and `lib/data/postgres/slices/nutrition.ts`.
-
-`updateFoodLog` throws `NotFoundError` when its scoped UPDATE matches no row, which is what made
-RV-33's PATCH a 404. **`deleteFoodLog` does not** — its soft-delete UPDATE is scoped to `user_id`,
-matches nothing, and returns normally, so the route answers `{"success":true}` for another user's log
-and for an id that does not exist.
-
-**Nothing cross-user is written and nothing leaks** — the scope holds, and the response body is the
-same either way. It is a truthfulness problem, not a security one: two methods on the same resource
-answer the same refusal differently, and a client cannot tell a delete that happened from one that
-did not.
-
-**Decide the posture before writing code, because idempotent-DELETE is a real argument.** A DELETE
-that no-ops on an absent row is a defensible convention, and this app's offline outbox replays
-deletes — a 404 on replay of an already-deleted row would be a poison pill, which is the same trap
-RV-32 hit on the log path. Check whether `food_log` deletes go through `pushMutations` before
-choosing; if they do, the answer is probably to keep the 200 and document it here rather than to
-match PATCH.
-
-- **What would count as done:** the two methods agree, or this entry records why they should not,
-  with the outbox path checked rather than assumed.
-
 ### [platform] LA-17 — every workflow is pinned to an action GitHub is deprecating the runtime for
 
 - **Branch:** `chore/bump-github-actions`
