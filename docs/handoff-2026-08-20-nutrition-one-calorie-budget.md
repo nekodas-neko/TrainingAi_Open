@@ -136,7 +136,7 @@ Read, in this order:
 Then: git fetch origin && git checkout claude/implementation-lane-b-0o7kb9 && git merge origin/main
 
 YOUR FIRST ACTION is not a new feature. There is an OPEN, UNMERGED PR on that branch
-(v1.334.0 — Q-415 + Q-417 + Q-323, one calorie budget across every surface). Every mechanical gate is
+(PR #265, v1.334.0 — Q-415 + Q-417 + Q-323, one calorie budget across every surface). Every mechanical gate is
 green: tsc, pnpm build, `pnpm check:rules` Ran 50 of 50, and 3,744 tests. What is missing is the
 "tested" bar: the `earned > 0` path was never exercised on a running server, because
 /api/nutrition/energy-balance returns activeKcal: 0 on the local dev DB even with a 60-minute walk

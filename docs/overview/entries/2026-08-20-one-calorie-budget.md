@@ -1,6 +1,6 @@
 # 2026-08-20 — one calorie budget, and a bar you finish (Q-415, Q-417, Q-323)
 
-**Branch:** `claude/implementation-lane-b-0o7kb9` · **Lane:** Implementation B · **PR:** #TBD ·
+**Branch:** `claude/implementation-lane-b-0o7kb9` · **Lane:** Implementation B · **PR:** [#265](https://github.com/nekodas-neko/TrainingAi_Open/pull/265) ·
 **v1.334.0**
 
 ## What this closes
