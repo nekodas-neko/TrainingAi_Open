@@ -235,6 +235,15 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- **[`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](../../handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)**
+  — the CI job named **Migration Check** could not fail on a broken migration: `migrate.js` exited 0
+  whatever happened, and it had no error classifier, so it also called four already-applied
+  migrations "failed" where `ensureSchema()` calls them benign. Fixing the gate immediately caught a
+  real one — **`142_claude_ro_views.sql` creates a view over a table `143` creates**, so on every
+  fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
+  carries the CSP work (`'wasm-unsafe-eval'`, and two dead Oura Cloud hosts removed) and the
+  body-weight source fix behind the done screen's calorie figure.
+
 - **[`docs/handoff-2026-08-13-cross-combined-backlog-handover.md`](../../handoff-2026-08-13-cross-combined-backlog-handover.md)**
   — ⭐ **START HERE for backlog work.** Reconciles the two sessions that ran in parallel on 2026-08-13
   (the queue drain and the production outage) into one queue and one pickup prompt, and corrects two
@@ -398,6 +407,7 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md) — **Review sweeps 29–39, 2026-08-20** (11 PRs, Q-492…Q-499 + Q-552…Q-556; three CI checks added for documentation facts nothing was checking). **10 of 13 findings have since shipped**, verified in source. Its most transferable output is the method section: **five measurements were wrong, each producing a plausible result in the expected direction** — and the keeper, *corroboration between two weak signals is not evidence when they can fail for the same reason*.
 - [`handoff-2026-08-18-platform-decision-brief-rule.md`](../../handoff-2026-08-18-platform-decision-brief-rule.md)
   — the `CLAUDE.md` rule governing how a decision is brought to the owner (#69), and the merge
   friction that shipping it exposed: **three of four CI rounds were base collisions on the doc-index

@@ -14,9 +14,31 @@
 // A file is recorded ONLY when it applied cleanly. A migration that genuinely failed must stay
 // unrecorded so `ensureSchema()` retries it, exactly as it does in production — recording a failure
 // here would silently skip it forever.
+//
+// **It classifies "already there" the same way `ensureSchema()` does, and exits non-zero when
+// anything else fails.** Neither was true until 2026-08-20, and the two halves compounded. This
+// runner had no error classifier at all, so on any database that already held the objects it
+// reported four migrations as *failed* — 054 and 055 (42710, a UNIQUE constraint Postgres gives no
+// `IF NOT EXISTS` for), 082 (23505, a seed row) and 157 (42P07, a table) — while `ensureSchema()`
+// read the same four as "already present" and carried on. Two runners disagreeing about what a
+// failure is, in the file whose own docstring says it mirrors the other.
+//
+// And it returned 0 regardless, so the CI job named **Migration Check** — which runs this script and
+// nothing else — could not fail on a genuinely broken migration. It would print `1 failed` and go
+// green.
+//
+// **A file that fails idempotently is still not recorded, deliberately.** `isIdempotentMigrationError`
+// fires on the FIRST statement that collides, and the statements after it may never have run —
+// migration 157 is a `CREATE TABLE` followed by eight `ALTER TABLE … ADD COLUMN`s, so recording it
+// on a duplicate-table error could freeze a half-applied migration as done, forever. Retrying every
+// boot is noisy; recording a partial application is unrecoverable.
 const { Pool } = require('pg')
 const { readFileSync, readdirSync } = require('fs')
 const { join } = require('path')
+
+const IDEMPOTENT_SQLSTATES = new Set(Object.keys(
+  require('../../lib/data/postgres/idempotent-sqlstates.json').codes,
+))
 
 async function main() {
   const pool = new Pool({ connectionString: process.env.DATABASE_URL })
@@ -34,6 +56,7 @@ async function main() {
   const applied = new Set(rows.map(r => r.filename))
 
   let ran = 0
+  const alreadyPresent = []
   const failed = []
   for (const file of files) {
     if (applied.has(file)) continue
@@ -43,13 +66,28 @@ async function main() {
       await pool.query('INSERT INTO schema_migrations (filename) VALUES ($1) ON CONFLICT DO NOTHING', [file])
       ran++
     } catch (err) {
-      failed.push(file)
-      console.warn(`[migrate] ${file}:`, err.message?.slice(0, 200))
+      if (IDEMPOTENT_SQLSTATES.has(err.code)) {
+        alreadyPresent.push(file)
+        continue
+      }
+      failed.push(`${file} [${err.code ?? 'no code'}]`)
+      console.error(`[migrate] FAILED ${file} [${err.code ?? 'no code'}]:`, err.message?.slice(0, 200))
     }
   }
 
-  console.info(`[migrate] applied ${ran}, skipped ${applied.size} already recorded, ${failed.length} failed`)
+  if (alreadyPresent.length > 0) {
+    console.info(`[migrate] ${alreadyPresent.length} already present: ${alreadyPresent.join(', ')}`)
+  }
+  console.info(
+    `[migrate] applied ${ran}, skipped ${applied.size} already recorded, ` +
+    `${alreadyPresent.length} already present, ${failed.length} failed`,
+  )
   await pool.end()
+
+  if (failed.length > 0) {
+    console.error(`[migrate] ${failed.length} migration(s) DID NOT APPLY: ${failed.join(', ')}`)
+    process.exitCode = 1
+  }
 }
 
 main().catch(err => {

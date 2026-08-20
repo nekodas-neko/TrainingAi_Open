@@ -329,24 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [platform] PS-1 — `docs/agents/README.md` §3 lists `lib/coach/` as Lane A while a queue entry says it belongs to neither lane
-
-- **Branch:** `docs/lane-coach-contradiction`
-- **Added:** 2026-08-19 · found while replacing the lane path lists with a rule
-- **Lane: B** — a docs-only reconciliation, no code.
-
-`docs/agents/README.md:124` lists `lib/coach/` under Lane A. Q-407's `Lane.` paragraph tells whoever
-takes it that **`lib/coach/**` belongs to neither lane's declared paths** and to claim it in a baton
-first. Both cannot be true, and the entry is the one an implementer reads.
-
-The path rule added in this branch settles it — `lib/coach/` is reached by `app/api/coach/route.ts`,
-so it is Lane A — but **Q-407's paragraph still says otherwise** and will be read before the README
-is. Correct the entry to match, or say explicitly why the rule does not apply to it.
-
-**Why this is worth an entry rather than a drive-by edit:** the same shape may exist on other
-entries written while the enumeration was the authority. Grep the queue for `neither lane` and
-`belongs to neither` before closing this.
-
 ### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
 
 - **Branch:** `docs/baseline-history-dedupe`
@@ -368,6 +350,29 @@ are the only record of why a number moved, and one documents a near-miss where a
 reverted another lane's raise.
 
 ### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
+
+> **⚠️ MEASURED AND MOSTLY DEFUSED 2026-08-20 (Lane A) — read this before starting; the entry below
+> is the original.** ([`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md))
+>
+> **The question this entry says to answer first is answered: production is clean.**
+> `claude_ro.schema_migrations` holds **206 of 206** filenames, the four among them — `054`, `055`
+> and `082` recorded 2026-07-21, `157` on 2026-07-28. So `ensureSchema` skips them in production and
+> nothing re-runs on a cold start there. This is local-only, exactly as the entry hoped rather than
+> feared.
+>
+> **And they were never failures.** The four raise SQLSTATEs (42710, 42710, 23505, 42P07) that
+> `ensureSchema()` classifies as *already present* and steps over; `migrate.js` had no classifier at
+> all and called them failures — the two runners disagreeing, in the file whose docstring says it
+> mirrors the other. Fixed, along with the larger thing it was hiding: `migrate.js` exited 0
+> regardless, so the CI job named **Migration Check** could not fail on a genuinely broken migration.
+>
+> **What is actually left is small.** The four are still not *recorded* locally, so they are retried
+> on every cold start — four statements that fail cleanly and are reported as benign. Making each
+> idempotent (`IF NOT EXISTS`, an explicit `pg_constraint` guard for the two `ADD CONSTRAINT`s,
+> `ON CONFLICT DO NOTHING` for the seed) would let them succeed and record, ending the retry. It
+> edits already-applied migration files, which is safe here because it changes nothing for a
+> database that has them and nothing for a fresh one — but it is no longer buying anything except
+> quiet. Judge it on that, not on the original framing.
 
 - **Branch:** `fix/non-idempotent-migrations`
 - **Added:** 2026-08-19 · observed in this session's own start-up hook output
@@ -628,6 +633,8 @@ that gets corrected upward that lopsidedly is not a neutral starting point.
 > place and losing the ability to tell them apart.
 
 
+- **Gate: owner** — needs a decision on the 6–10 → 1–10 scale mapping before anything is fitted;
+  see the re-measurement note above. Added 2026-08-20 for the same reason as Q-422's.
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
@@ -821,6 +828,9 @@ never written.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
+- **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
+  2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
+  further down the entry, and prose is exactly what the `Gate:` field replaced.
 - **Branch:** `feat/calibrated-active-energy-multiplier`
 - **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
   calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app
@@ -1097,6 +1107,15 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 > script before `pnpm test`, so this was CI's state every run. Measured: `schema_migrations` did not
 > exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
 > suite 200.19 s → 183.18 s.
+>
+> **⚠️ Correction 2026-08-20 (Lane A): "3 failed … now 1, unrelated" was wrong, and they were never
+> failures.** On this session's database the count read **4** — `054`, `055`, `082`, `157` — and all
+> four raise SQLSTATEs that `ensureSchema()` classifies as *already present* and steps over. The
+> discrepancy was `migrate.js` carrying **no error classifier at all**, in the file whose own
+> docstring says it mirrors `ensureSchema()`. Worse, it returned exit 0 whatever happened, so the CI
+> job named **Migration Check** — which runs this script and nothing else — could not fail on a
+> genuinely broken migration. Both fixed; the SQLSTATE list now lives in one JSON file both runners
+> read. [`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md).
 >
 > **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
 > today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
@@ -1999,8 +2018,10 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   the conversation has been used on-device for a plan the owner actually keeps. A conversational
   flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
 
-- **Lane.** Split, and **`lib/coach/**` belongs to neither lane's declared paths** — whoever takes
-  it claims that path in their baton first (`docs/agents/README.md` §"A path neither lane lists").
+- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
+  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
+  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
+  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
   `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
   prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
   `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are

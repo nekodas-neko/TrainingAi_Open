@@ -168,7 +168,30 @@ SELECT
 FROM public.day_checkins t
 WHERE t.user_id = 'fe481797-4114-4f59-824d-223e0281823e';
 
--- db_query_log: shared reference data, not row-scoped
+-- db_query_log: shared reference data, not row-scoped.
+--
+-- The table is created here as well as in 143, which is where it was originally added — one
+-- migration too late. On a fresh database this file referenced a table that did not exist yet, so
+-- it aborted at this statement with 42P01 and, because a multi-statement migration is one implicit
+-- transaction, **every view below rolled back with it**. That was invisible for two reasons: 144
+-- rebuilds the whole schema so the end state came out right, and `migrate.js` exited 0 on a failed
+-- migration so the CI job named Migration Check went green over it (fixed 2026-08-20).
+--
+-- `CREATE TABLE IF NOT EXISTS` here and in 143 alike, so this is a no-op on every database that
+-- already has it — which is all of them except a fresh one. CLAUDE.md's rule: create what you
+-- reference in the same migration.
+CREATE TABLE IF NOT EXISTS public.db_query_log (
+  id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  created_at   timestamptz NOT NULL DEFAULT now(),
+  sql_text     text NOT NULL,
+  row_count    integer,
+  duration_ms  integer,
+  truncated    boolean NOT NULL DEFAULT false,
+  ok           boolean NOT NULL,
+  error        text,
+  caller_ip    text
+);
+
 CREATE VIEW claude_ro.db_query_log AS
 SELECT
   t.id,

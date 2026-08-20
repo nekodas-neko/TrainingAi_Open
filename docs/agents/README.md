@@ -1,6 +1,6 @@
 # The standing agents
 
-Four agent roles run against this repo, one of them in two parallel lanes — five concurrent
+Five agent roles run against this repo, one of them in two parallel lanes — six concurrent
 sessions at full strength. This file is the contract between them. Read it before starting a
 session, and read it again if you are about to touch a path you do not own.
 
@@ -10,10 +10,11 @@ session, and read it again if you are about to touch a path you do not own.
 | **BugFix** | 1 | The owner — screenshots, reports, "this looks wrong" | Triaged backlog entries | No |
 | **Tuning** | 1 | The owner — lived experience against what a score said | Calibration evidence + proposals | No |
 | **Review** | 1, weekly | The app itself | Review write-ups + backlog entries | No |
+| **Orchestrator** | 1, weekly | The queue and the docs | Sweeps: completions cleared, batches assigned, lanes resolved | No |
 
-**Only the two Implementation lanes write code.** The other three are intake and analysis roles
+**Only the two Implementation lanes write code.** The other four are intake and analysis roles
 that end at a docs-only PR. That is the single most important property of this arrangement: it
-means the collision surface between five concurrent agents is just Lane A against Lane B, and
+means the collision surface between six concurrent agents is just Lane A against Lane B, and
 everything else merges freely.
 
 ---
@@ -82,6 +83,26 @@ This repo has paid for that repeatedly; the 2026-08-08 review that actually ran 
 live bugs that source-reading had missed several times. Run it. `pnpm dev` works, the E2E harness
 exists, and production is queryable.
 
+### Orchestrator
+
+The only role whose subject is the process rather than the product. Review sweeps the running app
+for bugs; Orchestrator sweeps the *repository* for what makes the queue hard to work from: entries
+already done, entries that should ship together, entries nobody can tell which lane owns, docs that
+no longer describe reality.
+
+It exists because those four jobs have no natural owner. Every other role is measured on what it
+finds or ships, so queue hygiene is always somebody's second priority — and the evidence is that it
+was nobody's: **17 queue entries announce their own completion in their own headings**, and 4 of 211
+carry a batch. Neither is a failure of any individual session; both are what happens when a standing
+chore has no standing owner.
+
+It runs one of four sweeps per session — completions, aggregation, lane/readiness, docs-vs-reality —
+and says which. Its authority is docs-only, same as BugFix, Tuning and Review. **Reordering the queue
+is the one place it can do real damage**, so it never moves an entry inside an owner-directed focus
+block or one carrying `Gate: owner`, never moves down what the owner moved up, and states every move
+it does make in the PR body. A silent reprioritisation is indistinguishable from a bad merge, and
+this repo has had both.
+
 ---
 
 ## 2. What every agent may do without asking
@@ -141,9 +162,12 @@ lib/view-transition.ts  lib/use-copy.ts  lib/use-online-status.ts  lib/session-i
 ### Anything not listed — decide it by the rule, not by the list
 
 `lib/` holds around 68 top-level entries and **40 of them are named in neither list above**. An
-enumeration of that surface goes stale within a month and then quietly misleads: `lib/coach/` is
-listed under Lane A here while a queue entry instructs whoever takes it to claim it in a baton
-"because it belongs to neither lane's declared paths". Both cannot be right, and nothing catches it.
+enumeration of that surface goes stale within a month and then quietly misleads, and it already had:
+`lib/coach/` was listed under Lane A here while Q-407 told whoever took it to claim the path in a
+baton "because it belongs to neither lane's declared paths". Six `app/api/coach/**` routes import
+that directory, so the rule below had always answered Lane A; the entry was corrected to match
+(PS-1, 2026-08-20). Nothing caught the contradiction on its own, and an enumeration never will —
+which is the argument for the rule.
 
 So the lists above are the obvious cases, and this rule settles everything else:
 
@@ -190,6 +214,7 @@ makes "what has Review found, and did any of it get built" a question you can ac
 | BugFix | `BF-` |
 | Review | `RV-` |
 | Tuning | `TN-` |
+| Orchestrator | `OR-` |
 | One-off sessions (planning, urgent) | `PS-` |
 
 Counters are **unbounded**. Find your next free number with one command:
@@ -336,6 +361,7 @@ glance, so a renamed successor is a lost thread even when its baton is perfect.
 | **BugFix Intake Agent 🪲** | `state/bugfix.md` | `prompts/bugfix.md` |
 | **Tuning Agent 🎶** | `state/tuning.md` | `prompts/tuning.md` |
 | **Review Agent 📖** | `state/review.md` | `prompts/review.md` |
+| **Orchestrator 🪐** | `state/orchestrator.md` | `prompts/orchestrator.md` |
 
 The two Implementation lanes deliberately share an emoji and differ only by the `(A)` / `(B)`
 suffix — they are one role in two lanes, and the suffix is the part that carries meaning. Do not
@@ -386,10 +412,15 @@ baton first. No prompt needs editing between generations; the baton carries the 
 
 ---
 
-## 5. Rules that exist because there are five of you
+## 5. Rules that exist because there are six of you
 
 Everything in `CLAUDE.md` applies unchanged. These are the additions that only matter under
 concurrency:
+
+- **A whole-file or whole-directory chore needs the open-PR list checked first.** Orchestrator's
+  sweeps and the journal compaction are both whole-file operations, unlike ordinary per-entry work,
+  so two sessions running one concurrently is guaranteed conflict — it has happened twice (#130,
+  #152) and one PR's work was discarded whole.
 
 - **Re-merge `origin/main` immediately before opening each PR, and again before merging.** Not just
   when cutting the branch. With five agents landing work, a branch cut from a current `main` goes
@@ -418,6 +449,7 @@ Paste the matching prompt from [`prompts/`](prompts/):
 | BugFix | [`prompts/bugfix.md`](prompts/bugfix.md) |
 | Tuning | [`prompts/tuning.md`](prompts/tuning.md) |
 | Review | [`prompts/review.md`](prompts/review.md) |
+| Orchestrator | [`prompts/orchestrator.md`](prompts/orchestrator.md) |
 
 Each prompt is written to be pasted verbatim into a cold session. None of them reference a
 conversation, and none need editing between generations.

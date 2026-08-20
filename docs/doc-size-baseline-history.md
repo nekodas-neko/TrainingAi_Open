@@ -16,6 +16,84 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — re-measured a third time, after #263 (`fix/migrate-classifies-idempotent`)
+
+**projectOverview.md → 8055 · docs/implementation-backlog.md → 11647 ·
+docs/agents/state/implementation-lane-a.md → 113.**
+
+Three PRs landed on `main` while this one was open — #261, #263 — and a parallel session pushed its
+own merge onto this same branch. Each time both numbers were rebuilt from `origin/main` and
+re-measured on the merged tree rather than spliced.
+
+**Correcting the entry below:** the baton ratcheted to **113**, not 103. The 103 was measured before
+the wrap-up added its `next-item.js` guidance, and the number that shipped is the later one. Left as
+a correction rather than an edit, because this log is append-only and a silently-edited figure is
+exactly what makes the other entries untrustworthy.
+
+## 2026-08-20 — re-measured after #261 landed mid-PR (`fix/migrate-classifies-idempotent`)
+
+**projectOverview.md → 8055 · docs/implementation-backlog.md → 11647.**
+
+Both numbers were rebuilt from `origin/main` and re-measured on the merged tree, not spliced from
+either side of the conflict — the two sessions had each raised the same two numbers for different
+reasons, which is precisely the case where taking one side loses the other's growth.
+
+**And the conflict itself had already been mis-resolved once, on `main`.** The BugFix session's
+wrap-up replaced the `Session handoff:` link in `projectOverview.md` but left the *previous*
+handoff's description attached to it — so the index credited the 2026-08-20 energy-intake handoff
+with "six findings from a live APK reinstall and Oura re-sync" and Q-536's closure, which belong to
+the 2026-08-17 one. Fixed here by rebuilding the block so each of the three links carries its own
+description. Worth knowing because it is the same splice failure this history file exists to
+prevent, one file over.
+
+## 2026-08-20 — session wrap-up (`fix/migrate-classifies-idempotent`)
+
+**projectOverview.md 8043 → 8050 · docs/implementation-backlog.md 11573 → 11578 ·
+docs/agents/state/implementation-lane-a.md 163 → 113 (a net ratchet DOWN of 50).**
+
+- **projectOverview +7**: the session-handoff pointer, which is part of the wrap-up ritual.
+- **backlog +5**: a `Gate: owner` field added to Q-420 and Q-422. Both listed as **READY** under
+  `scripts/next-item.js` while each says in its own body that it waits on the owner — the blocker
+  was in prose, which is exactly what the `Gate:` field replaced. Expect more of these; the tool can
+  only see the field.
+- **the baton −50**: rewritten in full rather than appended to, which is the rule. Its size is a
+  direct read of whether that rule was followed, so the number goes down with it.
+
+## 2026-08-20 — Lane A's baton, ratcheted down (`fix/migrate-classifies-idempotent`)
+
+**docs/agents/state/implementation-lane-a.md 163 → 103.**
+
+A ratchet *down*, not a raise. The baton is rewritten in full at every handoff rather than appended
+to — that is the rule that stops it accreting — so its size is a direct read of whether the rule was
+followed. Lowering the number is what makes the next drift visible.
+
+## 2026-08-20 — PS-3's open question, answered against production (`fix/migrate-classifies-idempotent`)
+
+**docs/implementation-backlog.md 11559 → 11573.**
+
+Fourteen lines annotating PS-3, and every one of them is a measurement or a scope reduction rather
+than narrative:
+
+- **The question the entry says to answer first is answered.** `claude_ro.schema_migrations` holds
+  206 of 206 filenames, the four among them. Production skips all four; this is local-only. Without
+  that on the entry, the next session repeats the query — and it is a production read, not a
+  grep.
+- **They were never failures.** The four raise SQLSTATEs `ensureSchema()` treats as *already
+  present*; `migrate.js` had no classifier. Recorded because the entry's own framing ("4 failed") is
+  what a reader would otherwise carry forward.
+- **What is left is smaller than the entry implies**, and the note says so outright so the item is
+  judged on quiet rather than on the original framing.
+## 2026-08-20 — the Orchestrator role
+
+**CLAUDE.md 1107 → 1115.** A sixth standing agent, owning queue and docs hygiene: clearing entries
+that announce their own completion, assigning batches, resolving lanes, reconciling docs against
+reality. The CLAUDE.md growth is the two rules an implementer needs without opening the contract —
+the completed-heading check and its `Keep:` opt-out, and the role's place in the letter list.
+
+`docs/agents/state/orchestrator.md` joins the ratchet as a new row at 62 lines, not a raise.
+
+---
+
 ## 2026-08-20 — the CSP could not start a WASM session (`fix/csp-wasm-unsafe-eval`, Q-546)
 
 **projectOverview.md 8018 → 8043.**
@@ -1088,25 +1166,18 @@ cost time in the session — the `wc -l` off-by-one, the baseline conflict proce
 having two causes — and one superseded decision recorded with its correction, which is worth more
 lines than the decision was.
 
-## 2026-08-20 — `tuning/retract-daily-summary-wipe`
+## 2026-08-20 — Review session wrap-up (sweeps 29–39)
 
-**CLAUDE.md (+9):** the session-start database-size read told sessions to trust
-`pg_stat_user_tables` because it is not row-scoped, which is true, and said nothing about the
-difference between its size columns (exact, read from the filesystem) and its row counters
-(planner estimates, and NULL `last_analyze` on every table here). A Tuning session read
-`n_live_tup = 1` off an `oura_daily_summary` holding 45 rows and filed a data-loss incident that had
-never happened. Nine lines that name the split, give the two measured counter-examples, and say to
-run `count(*)` instead — cheaper than the session it cost.
+**`projectOverview.md` 8043 → 7863, a ratchet DOWN of 180 lines.** Eight Known-Issues rows were
+struck to `known-issues-resolved.md` because their findings had shipped — each verified in source on
+`main` first, not inferred from the queue's silence. The shrink-only baseline exists so reclaimed
+space cannot quietly refill, so the lower number is the point of the exercise rather than a side
+effect.
 
-**Backlog (+35):** one entry, TN-1 — chronic stress refuses inside its granular layer and persists no
-reason why. It is the entry that replaces the retracted half of Q-528: both of that score's countable
-gates were measured this session and both pass, which moves the question from "is the history there"
-to "why does the model refuse", and there is currently no way to see the answer from outside the pass.
-Q-528 and Q-525 were rewritten in place rather than added to.
-
-**Tuning baton (+19, after trimming a superseded note):** the session retracted a finding this baton
-itself carried (Q-528, a daily-summary wipe that never happened), so the correction has to sit *above*
-the claim it replaces and the original bullet has to stay legible as the record of the misread — a
-successor who reads only the new block and not the old one learns the fact but not the failure mode.
-The rule that produced it (`pg_stat_user_tables` as an emptiness check) is rewritten in place with its
-two measured counter-examples rather than deleted, for the same reason.
+**`docs/agents/state/review.md` 1281 → 1308, a raise of 27 lines.** A "session closed — read this
+first" block at the top of the Review baton: which of the previous run's thirteen findings shipped
+(ten) with the evidence, which three remain open so a successor does not re-file them, the one probe
+that never reached its ownership check and is therefore **unknown rather than clean**, and where to
+start given that four consecutive documentation sweeps had already covered that seam. It sits in the
+baton rather than the handoff because the baton is what a cold successor reads as state; the handoff
+is the narrative behind it.
