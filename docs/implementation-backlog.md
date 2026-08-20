@@ -7977,9 +7977,11 @@ session working from a temporarily restored copy.
 ### [platform][app-shell] Q-254 — strike the device-verification rows an E2E spec can now cover (re-tagging landed 2026-08-15; the striking half remains)
 
 - **Needs:** Q-297
-- **Re-measured 2026-08-20:** 85 device rows, tagged **browser 31 · android 26 · data 11 ·
-  hardware 15** — 2 rows carry no `needs:` tag at all and want one. The striking half has not
-  moved since 2026-08-15 and cannot until Q-297 writes the specs.
+- **Re-measured 2026-08-20:** **85 rows still match the device-verification pattern, and 3 of them
+  carry no `needs:` tag at all** — `projectOverview.md:1209` (Q-281 colour-only-state),
+  `:1272` (Q-532) and `:1577` (Q-260/Q-258). Tag census across the file: browser 31 · android 27 ·
+  data 11 · hardware 15. The striking half has not moved since 2026-08-15 and cannot until Q-297
+  writes the specs.
 
 - **Half of this is done. 2026-08-15: all 83 rows now carry a `· needs:` tag** naming the capability
   each is actually waiting on — **browser 32 · android 26 · data 11 · hardware 13**

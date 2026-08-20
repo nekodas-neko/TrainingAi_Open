@@ -63,8 +63,9 @@ three stages has been exercised on the S25, and that gate is untouched by any of
   enough that the entry says so.
 - **22 of 78 completed workout sessions still hold no per-set HR attribution**, and no bulk
   `computed_at` batch has landed since 2026-07-22 — the Q-11 backfill button has not been pressed.
-- **85 device-verification rows**, tagged browser 31 · android 26 · data 11 · hardware 15. **Two carry
-  no `needs:` tag at all**; Q-254 now says so.
+- **85 rows still match the device-verification pattern and 3 carry no `needs:` tag at all**
+  (tag census across the file: browser 31 · android 27 · data 11 · hardware 15). Q-254 now names the
+  three by line.
 
 ### Verification
 

@@ -17,15 +17,15 @@ the work, or a fix production later refuted. That is why the check exists.
 
 ## Next — in this order
 
-1. **Aggregation (sweep 2).** 204 entries, **4 carry a `Batch:`** — still only the two seeds.
+1. **Aggregation (sweep 2).** 203 entries, **4 carry a `Batch:`** — still only the two seeds.
    `docs/agents/README.md` §3 holds the measurements that decide the axis. **Start with the ~20
    native entries**: each is an APK cycle, the priciest verification the owner performs.
 2. **Lane and readiness (sweep 3).** One `Lane: ?` (`PS-4` — may legitimately stay `?`). Four prose
    `⛔` markers left for a human read: `Q-529`, `Q-49`, `Q-3b`, `Q-1b`. Queue now carries 4 `Needs:`
    and 20 `Gate:`.
-3. **Docs against reality (sweep 4).** Two leads sweep 1 surfaced and did not take: **2 of the 85
-   device-verification rows carry no `needs:` tag** (the rest: browser 31 · android 26 · data 11 ·
-   hardware 15), and **Q-49 sits at 🔴 while the public-repo migration it describes has happened** —
+3. **Docs against reality (sweep 4).** Two leads sweep 1 surfaced and did not take: **3 of the 85
+   device-verification rows carry no `needs:` tag**, named by line in Q-254,
+   and **Q-49 sits at 🔴 while the public-repo migration it describes has happened** —
    this repo is the public one. Reconciling it probably wants the owner on what of Phase A remains.
 
 ## Blocked
