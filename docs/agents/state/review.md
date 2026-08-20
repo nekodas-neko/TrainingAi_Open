@@ -3,7 +3,34 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37) — **all eleven pillars covered** · **Next ID:** `RV-1`. **Bands are gone**, and with them the block-claiming procedure that this baton correctly warned would have collided with fourteen live numbers. IDs count up from `RV-` with no ceiling and no ledger: `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy Q-450…499 and Q-552…601 stay valid where already used.
+**Updated:** 2026-08-20 (session wrap-up) · **By:** thirty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37) — **all eleven pillars covered** · **Next ID:** `RV-1`. **Bands are gone**, and with them the block-claiming procedure that this baton correctly warned would have collided with fourteen live numbers. IDs count up from `RV-` with no ceiling and no ledger: `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy Q-450…499 and Q-552…601 stay valid where already used.
+
+## Session closed 2026-08-20 — read this first
+
+**The previous run (sweeps 29–39, PRs #140–#151) is closed and its record is
+[`docs/handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md).**
+
+**10 of its 13 findings have since shipped** — verified in source on 2026-08-20, not inferred from the
+queue's silence. **Q-493** (trusted-hop IP, #235), **Q-494** (`resolveIngestDate` — the recommended
+one-formula fix, not a bespoke bound), **Q-495**, **Q-496**, **Q-497** (`shiftDateStr` pads the year),
+**Q-498** (`readJsonLimited` on all three unauthenticated routes), **Q-492**, and Q-552–554. Their
+`projectOverview.md` rows were struck to the archive during this wrap-up.
+
+**Three remain open — do not re-file them:** **Q-499** (self-fetching cards vanish on a failed fetch;
+its ten unverified candidates are a **worklist, not a defect count**), **Q-555** (offline, a tab tap is
+a silent no-op before the service worker claims the page), **Q-556** (`DELETE /api/activity-logs`
+reports success for a row it did not delete).
+
+**One thing the previous run could not reach and left explicitly unverified:**
+`PATCH /api/activity-logs/<id>/metrics` — its probe payload was rejected by Zod before the ownership
+check ran, so that route's cross-user behaviour is **unknown**, not clean.
+
+**Where to start.** The previous run did four consecutive documentation-integrity sweeps and added
+three CI checks there (`check-known-issue-duplication`, `check-index-doc-paths`,
+`check-module-map-symbols`), so that seam is well covered — **pick a lens that runs the app.** The
+device runtime is the one genuinely open surface. If no device is available, the strongest untried
+web-reachable lens is **the sync/outbox under a server that fails mid-push**: sweep 10 drove the
+server half, and the on-device half has never been exercised.
 
 ## Now
 
