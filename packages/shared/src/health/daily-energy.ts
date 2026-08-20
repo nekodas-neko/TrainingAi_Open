@@ -95,7 +95,7 @@ export interface ActiveEnergyResult {
    * A session filtered out by the plausibility guard is absent rather than zero — it contributed
    * nothing to the total, and zero would read as "measured, and it was nothing".
    */
-  workoutKcalBySession: { id: string; kcal: number }[]
+  workoutKcalBySession: { id: string; kcal: number; source: 'hr' | 'met' }[]
 }
 
 /** Duration (min) for a logged activity: use the recorded duration, else estimate from distance. */
@@ -132,7 +132,7 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
   // `intensityFromRpe` returns 'moderate' for a null RPE, so an unrated session is unchanged and no
   // history without a rating moves.
   let workoutKcal = 0
-  const workoutKcalBySession: { id: string; kcal: number }[] = []
+  const workoutKcalBySession: { id: string; kcal: number; source: 'hr' | 'met' }[] = []
   for (const s of input.strengthSessions) {
     if (s.durationMin > 0 && s.durationMin <= MAX_PLAUSIBLE_SESSION_MIN) {
       // Q-421: heart rate first, MET as the fallback — which is what the MET path always was
@@ -141,11 +141,16 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
       // 36 of the owner's 78 sessions have no HR at all, so the fallback is the common case rather
       // than an edge one. Q-331: the precedence itself lives in `estSessionKcal`, because the done
       // screen's route has to make the same choice and had drifted to MET-only.
-      const kcal = estSessionKcal({
+      const est = estSessionKcal({
         durationMin: s.durationMin, rpe: s.rpe, avgBpm: s.avgBpm, ageYears, weightKg, sex, activityId: 8,
-      }).kcal ?? 0
+      })
+      const kcal = est.kcal ?? 0
       workoutKcal += kcal
-      if (s.id != null) workoutKcalBySession.push({ id: s.id, kcal })
+      // Q-421 asked for the basis to be stored rather than chosen silently, because roughly half of
+      // sessions have no strap reading and the two estimators are not interchangeable. The done
+      // screen's route already returns it (Q-331); this is the same fact on the day's breakdown, so
+      // a surface showing a per-session figure can say which estimator produced it.
+      if (s.id != null) workoutKcalBySession.push({ id: s.id, kcal, source: est.source })
     }
   }
 

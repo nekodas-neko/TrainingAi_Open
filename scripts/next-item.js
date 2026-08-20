@@ -19,6 +19,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { LANE_FIELD_RE, LANE_LOOSE_RE } = require('./lib/lane');
+
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
 
@@ -74,8 +76,21 @@ for (const line of lines.slice(queueStart)) {
   if (/\bmigration\b|schema change|ADD COLUMN|local SQLite version/i.test(line)) current.schemaRisk = true;
 
   // `Lane: ?` is a deliberate "I could not tell" — it must reach a human, not be filtered away.
-  const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/);
-  if (lane && !current.lane) current.lane = lane[1].trim();
+  //
+  // Two forms are read, and the FIELD form wins wherever an entry has one. 75 of 205 entries state
+  // the lane without a colon ("**Lane B**", "— Lane A"), so requiring the colon would unclassify a
+  // third of the queue — but taking the first loose match instead let an entry's PROSE outrank its
+  // own field. Measured 2026-08-20: Q-529 says "Re-scoped from Lane A to Lane B" fourteen lines
+  // above its `**Lane:** B`, and was being served to Lane A; Q-421's shipped-banner said "(Lane A)"
+  // and outranked the retag that was meant to hand it over.
+  const field = line.match(LANE_FIELD_RE);
+  if (field && !current.laneField) current.laneField = field[1].trim();
+  const lane = line.match(LANE_LOOSE_RE);
+  if (lane && !current.laneLoose) current.laneLoose = lane[1].trim();
+  // `?? null` matters: an entry that states no lane must stay `null`, which `wantLane` reads as
+  // "visible to both lanes". Letting it fall to `undefined` hid 96 of 203 entries from BOTH lanes —
+  // caught only because the READY count moved further than the two-entry fix could explain.
+  current.lane = current.laneField ?? current.laneLoose ?? null;
 
   // Entries not yet migrated off the prose marker. Treated as parked, and named as unmigrated so
   // the remaining ones stay visible instead of quietly reading as ready.

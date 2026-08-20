@@ -18,6 +18,18 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — Q-421 handed to Lane B (`feat/migration-replay-check`)
+
+**projectOverview.md 7877 → 7883.**
+
+Six lines, and the first raise made under the new rule — which now names the branch's own contribution
+in the failure message (*"6 of which this branch added"*), so the number is no longer something to
+work out by subtraction.
+
+The lines are carrying two facts a reader cannot reconstruct: that Q-421 is finished as far as Lane A
+is concerned, and that the queue tool was routing an entry to the wrong lane. The second is the kind
+of thing that silently wastes a session.
+
 ## 2026-08-20 — Q-424 closed: this file's own failure mode, fixed (`fix/doc-index-baseline-order-independence`)
 
 **projectOverview.md 7870 → 7877.**

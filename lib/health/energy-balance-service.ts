@@ -67,7 +67,7 @@ export interface EnergyBalanceResult {
     stepsKcal: number
     /** The exact addends of `workoutKcal`, per strength session (Q-391). Unrounded — see
      *  `computeActiveEnergy`. Join on `workoutSessionId` from `/api/day-log`. */
-    workoutKcalBySession: { id: string; kcal: number }[]
+    workoutKcalBySession: { id: string; kcal: number; source: 'hr' | 'met' }[]
   }
   goal: FitnessGoal | null
   missingProfileFields: string[]
