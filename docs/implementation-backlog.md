@@ -369,6 +369,29 @@ reverted another lane's raise.
 
 ### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
 
+> **⚠️ MEASURED AND MOSTLY DEFUSED 2026-08-20 (Lane A) — read this before starting; the entry below
+> is the original.** ([`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md))
+>
+> **The question this entry says to answer first is answered: production is clean.**
+> `claude_ro.schema_migrations` holds **206 of 206** filenames, the four among them — `054`, `055`
+> and `082` recorded 2026-07-21, `157` on 2026-07-28. So `ensureSchema` skips them in production and
+> nothing re-runs on a cold start there. This is local-only, exactly as the entry hoped rather than
+> feared.
+>
+> **And they were never failures.** The four raise SQLSTATEs (42710, 42710, 23505, 42P07) that
+> `ensureSchema()` classifies as *already present* and steps over; `migrate.js` had no classifier at
+> all and called them failures — the two runners disagreeing, in the file whose docstring says it
+> mirrors the other. Fixed, along with the larger thing it was hiding: `migrate.js` exited 0
+> regardless, so the CI job named **Migration Check** could not fail on a genuinely broken migration.
+>
+> **What is actually left is small.** The four are still not *recorded* locally, so they are retried
+> on every cold start — four statements that fail cleanly and are reported as benign. Making each
+> idempotent (`IF NOT EXISTS`, an explicit `pg_constraint` guard for the two `ADD CONSTRAINT`s,
+> `ON CONFLICT DO NOTHING` for the seed) would let them succeed and record, ending the retry. It
+> edits already-applied migration files, which is safe here because it changes nothing for a
+> database that has them and nothing for a fresh one — but it is no longer buying anything except
+> quiet. Judge it on that, not on the original framing.
+
 - **Branch:** `fix/non-idempotent-migrations`
 - **Added:** 2026-08-19 · observed in this session's own start-up hook output
 - **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.

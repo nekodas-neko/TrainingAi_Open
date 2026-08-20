@@ -2,9 +2,19 @@
 
 **PR:** #TBD · branch `fix/migrate-classifies-idempotent` · Lane A
 
-## How this was found
+## How this was found — and a dedup miss worth recording
 
-Not from the queue. The session-start hook printed `[migrate] applied 0, skipped 202 already
+**PS-3 already described this**, filed a day earlier by the one-off session whose work landed in
+#254 about ninety minutes before I started. My pre-flight check covered branch names and open PRs and
+found nothing, because PS-3's branch (`fix/non-idempotent-migrations`) had never been pushed. **What
+I did not do was grep the queue for the symptom**, which would have found it instantly. Branch-name
+dedup does not catch a finding filed under a different name; searching the backlog for the observed
+string does.
+
+The overlap turned out to be partial — PS-3 proposes making the four migrations idempotent, this
+fixes the classifier and the CI gate — so both survive, and PS-3 is annotated rather than removed.
+
+Not from the queue, then. The session-start hook printed `[migrate] applied 0, skipped 202 already
 recorded, 4 failed` on every session boot, and Q-324's note said the number was *"now 1,
 unrelated"*. Chasing that one-line discrepancy is what turned up the rest.
 
@@ -61,13 +71,21 @@ runners keep the retry.
 - `scripts/build-rollup-worker.mjs` bundles (the worker imports `client.ts`, so the JSON import had
   to survive esbuild) · `tsc` clean · **Ran 50 of 50 Custom Rules steps** · 4,356 unit tests pass.
 
+## PS-3's open question, answered
+
+That entry says: *"What needs establishing before any fix is whether the same four are unrecorded in
+production"*, because `ensureSchema` tracks by filename and an unrecorded migration re-runs on every
+cold start.
+
+**They are recorded.** `claude_ro.schema_migrations` holds **206 of 206** filenames — `054`, `055`
+and `082` stamped 2026-07-21, `157` on 2026-07-28. Production skips all four; this is local-only.
+
 ## Honest limits
 
-- **The four migrations are left non-idempotent.** Making them so means editing already-applied
-  files, which changes nothing for any database that has them and is safe — but it is a separate,
-  larger judgement than this fix, and the retry is harmless. Not filed as a queue entry because the
-  classifier change removes the symptom that would have justified it; if a fifth appears, that is
-  the moment.
+- **The four migrations are left non-idempotent**, so they are still retried on every local cold
+  start — four statements that now fail cleanly and are reported as benign. Making them idempotent
+  would let them record and end the retry; with production clean it buys quiet and nothing else.
+  PS-3 stays in the queue for that, rewritten with this measurement.
 - **The CI gate is not proven in CI.** It is proven locally on both branches of the condition. CI
   applies to a fresh database where all 206 succeed, so the failing branch cannot be exercised there
   without deliberately breaking a migration on `main`.

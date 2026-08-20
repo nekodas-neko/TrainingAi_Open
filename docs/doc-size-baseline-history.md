@@ -16,6 +16,23 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — PS-3's open question, answered against production (`fix/migrate-classifies-idempotent`)
+
+**docs/implementation-backlog.md 11559 → 11573.**
+
+Fourteen lines annotating PS-3, and every one of them is a measurement or a scope reduction rather
+than narrative:
+
+- **The question the entry says to answer first is answered.** `claude_ro.schema_migrations` holds
+  206 of 206 filenames, the four among them. Production skips all four; this is local-only. Without
+  that on the entry, the next session repeats the query — and it is a production read, not a
+  grep.
+- **They were never failures.** The four raise SQLSTATEs `ensureSchema()` treats as *already
+  present*; `migrate.js` had no classifier. Recorded because the entry's own framing ("4 failed") is
+  what a reader would otherwise carry forward.
+- **What is left is smaller than the entry implies**, and the note says so outright so the item is
+  judged on quiet rather than on the original framing.
+
 ## 2026-08-20 — the CSP could not start a WASM session (`fix/csp-wasm-unsafe-eval`, Q-546)
 
 **projectOverview.md 8018 → 8043.**
