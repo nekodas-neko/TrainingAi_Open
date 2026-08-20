@@ -474,31 +474,51 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [workouts][app-shell] Q-362 — `workoutDurations` is keyed by session NAME, so two same-named sessions in a day collide
+### [workouts][app-shell] Q-362a — `/api/day-log` keys `workoutDurations` by session NAME, so two same-named sessions in a day collide
 
 - **Branch:** `fix/day-log-durations-by-id`
-- **Added:** 2026-08-20 · Lane B, found while wiring Q-391's per-session calories
-- **Placement:** low. Real but narrow — it needs the same session logged twice in one day.
+- **Added:** 2026-08-20 · **Lane: A** — `app/api/day-log/route.ts`
+- **Placement:** low. Real and now reproduced, but it needs the same session logged twice in one day.
 
-**What.** `/api/day-log` returns `workoutDurations` as `Record<sessionName, {start, end, minutes}>`
-(`route.ts:144-163`), so a second session with the same name **overwrites the first**. The day
-screen's Training card then shows one duration against both cards — whichever session was written
-last.
+**REPRODUCED 2026-08-20** against `pnpm dev`, which is what the original entry asked for before
+anyone fixed it — two `Push` sessions on one Brisbane day return **one** `workoutDurations` key
+holding only the later window; the earlier session's is gone, not merged. `route.ts:144-166` writes
+`workoutDurations[ws.sessionName]` in a loop, so the last session wins, while the `exercises` array
+beside it carries the correct `workoutSessionId` on every row — which is what makes the fix cheap.
+Response and fixture in the [journal](overview/entries/2026-08-20-docs-split-day-log-session-identity.md).
 
-**Why it surfaced now.** Q-391 moved the Training card's grouping from name to session **id**,
-because the calories join has to be on identity. The card now groups correctly and still looks its
-duration up by name, so the collision is visible in one place rather than two. **That is not a
-regression this introduced** — the same overwrite existed when the grouping was name-keyed, it was
-simply invisible because the two sessions were already merged into one card.
+**Fix.** Key the record by `workout_sessions.id`, not `ws.sessionName`. Every consumer already has
+the id to hand (Q-362b). It is a response-shape change, so Q-362b lands immediately after — a
+name-keyed consumer reading an id-keyed record renders no duration at all.
 
-**Fix.** Key it by `workout_sessions.id`, as the exercises already are (`workoutSessionId` is on
-every row). `/api/day-log` is **Lane A's**; the consumer change in
-`components/health/day-detail/day-sections.tsx` is Lane B's and is one line.
+### [workouts][app-shell] Q-362b — three day surfaces group workouts by NAME, and one of them shows the wrong session's heart rate
 
-- **Not verified:** not reproduced. Inferred from the route's own `Record<string, …>` keyed on
-  `ws.sessionName` — establish it with two same-named sessions on one day before fixing, so the fix
-  is aimed at something observed.
+- **Branch:** `fix/day-surfaces-session-identity`
+- **Added:** 2026-08-20 · **Lane: B** · **Placement:** low, with Q-362a — same trigger
+- **Needs:** Q-362a
 
+**Q-362 said this half was "one line" in one file. It is three files, and one of them carries a
+worse bug than the duration collision it was filed for.**
+
+1. **`components/health/day-detail/day-sections.tsx:87`** — groups by session **id** (Q-391) and
+   looks the duration up by **name**. Two correct cards, the same duration printed on both. This is
+   the one line the entry meant, and it is the only one that is genuinely one line.
+
+2. **`components/health/day-overlay-sheet.tsx:76-90`** — groups by **name**, so the two sessions
+   merge into one card, and `loadSessionHr(sessExercises[0]?.workoutSessionId)` then loads **one**
+   session's heart rate under a card listing both, with nothing on screen saying which. A wrong
+   number presented as the right one is worse than a missing one, and it is not what Q-362 was
+   filed about.
+
+3. **`app/session-select/components/week-day-sheet.tsx:57-62,96`** — groups by **name** the same
+   way: one merged block, one duration chip. The shape `day-sections` had before Q-391.
+
+**Fix.** Group by `workoutSessionId` in (2) and (3) as (1) already does, and look the duration up by
+that id in all three once Q-362a ships it that way. (2) additionally needs its `expandKey` moved off
+the name, since two cards would otherwise share one expanded state.
+
+- **Verified:** the route's collision is reproduced (Q-362a). The three consumers are read from
+  source — **the merged-card and wrong-HR rendering is inferred, not observed on screen.**
 
 ### [workouts] Q-331 — the done screen and the day agree on a session's kcal, but only a measurement says so, not a test
 
