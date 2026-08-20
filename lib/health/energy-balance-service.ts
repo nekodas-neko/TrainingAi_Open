@@ -106,6 +106,12 @@ export async function computeEnergyBalance(
     repo.listDayCheckins(userId, windowStart, date, 'evening').catch(() => []),
   ])
 
+  // Q-421: one batch read for the whole window rather than a query per session. Sessions with no
+  // usable HR are absent from the map and fall back to the MET estimate inside `computeActiveEnergy`.
+  const avgBpmBySession = await repo
+    .getAvgBpmBySession(userId, workouts.filter(w => w.completedAt != null).map(w => w.id))
+    .catch(() => new Map<string, number>())
+
   const intakeByDate = new Map(foodSummary.map(r => [r.date, r.calories]))
   const loggingCompleteByDate = new Set(
     dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate),
@@ -134,7 +140,7 @@ export async function computeEnergyBalance(
         // `/api/day-log` already exposes `workoutSessionId` per exercise, so the day screen's
         // Training card can join on it without keying by session NAME — which is not identity here
         // and breaks outright for two same-named sessions in one day.
-        .map(ws => ({ id: ws.id, durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null })),
+        .map(ws => ({ id: ws.id, durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
       activities: activityLogs
         .filter(a => a.date === day)
         .map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),

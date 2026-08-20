@@ -112,3 +112,61 @@ export function estWorkoutKcal(input: WorkoutEnergyInput): number | null {
   if (met == null) return null
   return Math.max(0, durationMin * (met - 1.5) * bmrPerMinute(ageYears, weightKg, sex))
 }
+
+// ── Heart-rate-based estimate (Q-421) ────────────────────────────────────────────────────────────
+
+/**
+ * Calories from average heart rate, the Keytel et al. (2005) regression.
+ *
+ * **Why this exists beside the MET path rather than replacing it.** `estWorkoutKcal` above is
+ * explicitly Oura's `has_enough_motion === false` FALLBACK — duration × a flat MET tier. It cannot
+ * tell a 49-minute session that moved 2,364 kg from one that moved 800 kg, because load, volume and
+ * reps are not inputs; only the clock and an RPE-derived tier are. Heart rate is the first input the
+ * app already stores that actually responds to effort.
+ *
+ * **Coverage is partial and that is permanent, not a migration state.** Measured on production
+ * 2026-08-19: **42 of 78** completed sessions carry an `avg_bpm` — the strap is not always worn. So
+ * this returns `null` when it has no usable HR and the caller falls back to the MET path, rather than
+ * this guessing a heart rate.
+ *
+ * **The coefficients are the published regression, sex-specific**, in kJ/min:
+ *   male:   −55.0969 + 0.6309·HR + 0.1988·kg + 0.2017·age
+ *   female: −20.4022 + 0.4472·HR − 0.1263·kg + 0.0740·age
+ * divided by 4.184 to reach kcal/min, then multiplied by duration.
+ *
+ * **Two guards worth knowing about.** The regression was fitted on *exercising* subjects, so at the
+ * bottom of the range it can go negative — **for a light, young profile**: a 20-year-old 50 kg male
+ * at 60 bpm computes −0.78 kcal/min, crossing back above zero around 65 bpm. (It does NOT go negative
+ * for every profile — a 33-year-old at 80 kg is still +1.27 kcal/min at 60 bpm, which is why the
+ * floor is a real guard rather than dead code, and why an example had to be computed rather than
+ * assumed.) The result is floored at 0.
+ *
+ * And it is only meaningful inside the range it was fitted over, so an `avgBpm` outside
+ * `[HR_MIN_PLAUSIBLE, HR_MAX_PLAUSIBLE]` returns `null` and defers to MET rather than extrapolating.
+ */
+export const HR_MIN_PLAUSIBLE = 60
+export const HR_MAX_PLAUSIBLE = 220
+const KJ_PER_KCAL = 4.184
+
+export interface HrEnergyInput {
+  durationMin: number
+  avgBpm: number | null | undefined
+  ageYears: number | null | undefined
+  weightKg: number | null | undefined
+  sex: Sex | null | undefined
+}
+
+/** kcal for a session from its average HR, or `null` when the inputs cannot support an estimate. */
+export function estWorkoutKcalFromHr(input: HrEnergyInput): number | null {
+  const { durationMin, avgBpm, ageYears, weightKg, sex } = input
+  if (sex !== 'male' && sex !== 'female') return null
+  if (![durationMin, avgBpm, ageYears, weightKg].every(v => typeof v === 'number' && Number.isFinite(v))) return null
+  if (durationMin <= 0 || ageYears! <= 0 || weightKg! <= 0) return null
+  if (avgBpm! < HR_MIN_PLAUSIBLE || avgBpm! > HR_MAX_PLAUSIBLE) return null
+
+  const kjPerMin = sex === 'male'
+    ? -55.0969 + 0.6309 * avgBpm! + 0.1988 * weightKg! + 0.2017 * ageYears!
+    : -20.4022 + 0.4472 * avgBpm! - 0.1263 * weightKg! + 0.0740 * ageYears!
+
+  return Math.max(0, (kjPerMin / KJ_PER_KCAL) * durationMin)
+}

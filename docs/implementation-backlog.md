@@ -775,6 +775,39 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 
 ### [workouts][platform] Q-421 — the accurate energy model is already vendored, downloaded and tested, and has zero callers
 
+> **⚠️ ROUTE (a) SHIPPED 2026-08-19 (Lane A), owner-approved. Route (b) — the ONNX vector — is still
+> open and still blocked on the feature spec.**
+>
+> `estWorkoutKcalFromHr` (Keytel et al. 2005) is in `workout-energy.ts`, and `computeActiveEnergy`
+> now prefers it per session, falling back to the MET tier when it returns null. Both call sites
+> batch-read `avg_bpm` via the new `getAvgBpmBySession`.
+>
+> **Blast radius, measured against production rather than assumed.** Coverage: **42 of 78** completed
+> sessions have an `avg_bpm`; the other 36 keep the MET estimate, permanently — the strap is not
+> always worn. Owner profile 33 y / 71.5 kg / male, median session 58 min, and the **real** avg-BPM
+> range is **73–104, median 91** — resistance training, not steady-state cardio:
+>
+> | avg bpm | Keytel kcal |
+> |---|---|
+> | 73 (min) | **164** |
+> | 91 (median) | **321** |
+> | 104 (max) | **435** |
+>
+> The MET path's own test pins a 55-minute session to a **~200–400** band, so this **overlaps rather
+> than inflates**: low-HR sessions move down, high-HR sessions move up, which is the entire point —
+> the number now responds to effort instead of only to the clock.
+>
+> **⚠ One caveat to carry into route (b):** Keytel is fitted on *steady-state aerobic* subjects and
+> is known to over-read for intermittent resistance work, where HR stays elevated between sets
+> without the matching oxygen cost. It does not misbehave at the owner's observed HRs — but a first
+> local check injected **150 bpm** and got **823 kcal**, which is not a number that occurs in this
+> data (max 104) and should not be quoted as a prediction. That over-read is exactly what the ONNX
+> model exists to fix.
+>
+> **Still open in this entry:** route (b), and the "store which basis was used and label it" note —
+> the basis is currently chosen silently per session. Surfacing it is a UI decision (Lane B).
+
+
 - **Branch:** `feat/hr-based-workout-energy`
 - **Added:** 2026-08-19 · from the owner's question *"how can we make energy usage/burned from
   excercuse more accurate"*. Tier 2 of the three-rung answer (Q-419 is tier 1, Q-422 tier 3).

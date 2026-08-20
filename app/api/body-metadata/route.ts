@@ -145,13 +145,20 @@ export async function GET() {
   // Total active energy to add to the energy budget's "burned" — strength workouts + logged
   // activities (walk/run/cycle/…) + passive steps above a sedentary baseline, all net-of-rest via
   // the shared MET/Schofield estimator, de-duplicated so nothing is counted twice (see daily-energy).
+  // Q-421: batch the HR lookup for today's sessions; absent = no usable HR, and the MET estimate
+  // stands in for that session.
+  const avgBpmBySession = await repo
+    .getAvgBpmBySession(userId, todayWorkouts.filter(w => w.completedAt != null).map(w => w.id))
+    .catch(() => new Map<string, number>());
+
   const activeEnergy = computeActiveEnergy({
     profile: { ageYears, weightKg: bodyWeightForEnergy, sex: userSex },
     strengthSessions: todayWorkouts
       .filter(ws => ws.completedAt != null)
       // Q-419: the session's own RPE decides the intensity tier, matching the done screen. Without it
       // this route reported a different burn for the same workout than the screen that logged it.
-      .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null })),
+      // Q-421: and `avgBpm` takes precedence over the tier where the strap was worn.
+      .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
     activities: todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
     pedometerSteps: todayMetric?.steps ?? null,
   });
