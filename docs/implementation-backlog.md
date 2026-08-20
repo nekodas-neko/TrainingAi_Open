@@ -854,6 +854,35 @@ check needs to exempt it by name, with that reason recorded next to the exemptio
   the job red, and removing it turns it green — demonstrated, not argued.
 
 
+### [platform] LA-17 — every workflow is pinned to an action GitHub is deprecating the runtime for
+
+- **Branch:** `chore/bump-github-actions`
+- **Added:** 2026-08-20 · read off the tail of a green CI log, not reported
+- **Lane: A** — `.github/workflows/**`.
+
+Every job in `ci.yml` and `android.yml` uses `actions/checkout@v4`, which targets **Node 20**. GitHub
+is deprecating that runtime and already force-runs these actions on Node 24, emitting a warning on
+**every job of every run**:
+
+```
+Node.js 20 is deprecated. The following actions target Node.js 20 but are being
+forced to run on Node.js 24: actions/checkout@v4
+```
+
+**Nothing is broken and nothing is urgent** — the forced upgrade is GitHub's own compatibility
+shim, and it works. What it is, is a dated one: when the shim is withdrawn, every workflow in the repo
+fails at the checkout step at once, on a day nobody chose. That is the whole argument for doing it
+early and cheaply.
+
+The fix is a version bump (`actions/checkout@v5`, and check `setup-node`/`pnpm/action-setup` in the
+same pass, since the warning names only the action that happened to run first). **Verify against the
+action's release notes rather than bumping blind** — a major bump can change default `fetch-depth` or
+ref-checkout behaviour, and Q-424 has just made the Custom Rules job depend on a base-branch fetch.
+
+- **What would count as done:** every job green with no Node-runtime deprecation warning in its log,
+  and the Q-424 base fetch still resolving `origin/main` (its log line is
+  `* [new branch] main -> origin/main`).
+
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`

@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — Lane A's baton, rewritten mid-session (`docs/lane-a-baton-refresh`)
+
+**docs/agents/state/implementation-lane-a.md 113 → 124.** A raise, and it is worth saying why rather
+than quietly taking it.
+
+The predecessor's 113 covered a session that shipped three items; this one covers six, and most of the
+growth is a **Traps** section — `reset --soft` does not merge, a rebase replays conflict resolutions
+as new content, a count that moves further than your change explains is the bug. That is the part a
+successor cannot re-derive.
+
+**The ratchet is an awkward fit on this one file and the number should be read with that in mind.** A
+baton is *rewritten in full* at every handoff, so its size measures one session's state rather than
+accretion — which is what the ratchet exists to catch everywhere else. PS-4 (baton compaction) sets
+the real target at **~150 lines**, and 124 is comfortably under it. Trimmed from 126 first; the
+remainder is content, not padding.
+
 ## 2026-08-20 — Q-421 handed to Lane B (`feat/migration-replay-check`)
 
 **projectOverview.md 7877 → 7883.**
