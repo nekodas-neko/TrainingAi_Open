@@ -2531,7 +2531,7 @@ consistent, and it is not proof: a barcode request was never recorded either way
 
 **Do not close this from the recovery.** If it recurs, `error_events` will now hold the reason.
 
-### [platform][devices] ⚠️ Production stalls — all three Q-213 stages shipped 2026-08-13; production has NOT yet confirmed it
+### [platform][devices] ⚠️ Production stalls — all three Q-213 stages shipped 2026-08-13; production has now confirmed them, the device has not · needs: android
 
 **Stage 1 shipped.** `aggregateOuraRawSamples` re-read, hex-decoded and re-derived a 35-day window of
 `oura_raw_samples` on every BLE sync — **984,862 rows against ~37 days of history**, i.e. the whole
@@ -2592,6 +2592,40 @@ and only production caught them.
 
 Keep watching Railway CPU: the sustained 1.0–1.6 plateaus should stop recurring. `/api/version`
 latency is the cheapest ongoing probe — it should stay in milliseconds.
+
+
+**✅ RESOLVED — production has now confirmed it, 2026-08-20.** The whole retained `error_events`
+window (2026-07-20 → 2026-08-19; the table prunes at 30 days and is row-scoped to the owner) grouped
+by day, counting the two connect fingerprints, this route, and the two fan-out routes:
+
+| day | connect-timeout | `/api/sync/pull` | body-battery + readiness-score | all events |
+|---|---:|---:|---:|---:|
+| 08-19 | 0 | 0 | 0 | 1 |
+| 08-18 | 0 | 0 | 0 | 1 |
+| 08-17 | **1** | 0 | 0 | 8 |
+| 08-16 | 0 | 0 | 0 | 1 |
+| 08-15 | 0 | 0 | 0 | 1 |
+| 08-13 | 16 | 1 | 2 | 757 |
+| 08-12 | 39 | 0 | 2 | 2,556 |
+| 08-11 | 20 | 1 | 0 | 38 |
+| 08-10 | 16 | 1 | 0 | 31 |
+| 08-09 | 33 | 1 | 3 | 2,615 |
+
+**Every one of the three families stops dead on 2026-08-13**, the day Q-213's stages shipped. The
+single connect-timeout since then landed on 2026-08-17, inside the unrelated `disk_full` outage that
+day (the same date carries two `[pg 53100]` rows). Six days, one event.
+
+**Two limits on this, stated rather than left implicit.** `claude_ro.error_events` is scoped to the
+owner's rows, so this is a claim about the owner's account and not about anyone else's; and it is a
+claim that the fault stopped, which the "stopped is not fixed" rule says to hold loosely — except
+that here the stop coincides exactly with a shipped fix whose mechanism predicts it, which is the
+one case where a silence is evidence. The app was in use throughout: `set_hr_stats` rows were
+computed on 08-15, 08-16, 08-17 and 08-19.
+
+**This row stays ⚠️ rather than moving to the archive** for the one gate that is left: none of the
+three stages has been exercised on the S25. The BLE plugin does not run in the sandbox, so the
+ingest path was only ever driven through the route and the repository, against a seeded table 40×
+smaller than production.
 
 ### [platform][readiness] A check-in tapped during the local-store init window was silently lost (fixed v1.302.1, 2026-08-13) — NOT verified on device · needs: hardware
 
@@ -3852,83 +3886,6 @@ Full/Deload/Rest choice moved off Home (now Rest/Full only) onto the pre-workout
 Quick/Normal/Long duration picker, so choosing Deload happens at the point that actually determines
 the session.
 
-### [platform] 🟠 `/api/sync/pull` intermittently fails one of its ~21 parallel per-domain queries — likely DB-pool contention, cursor stuck for 4+ days on one device (found 2026-08-05/06, NOT fixed)
-
-Owner reported the client-side symptom: pull-to-sync on Home surfaces "Sync is backing off after an
-earlier error — retrying shortly" (the deliberate Q-37 backoff-copy branch,
-`session-select-content.tsx:660` — see `docs/overview/entries/2026-08-02-local-sqlite-init-recovery.md`).
-That toast only means *a prior pull already failed and set the backoff window* — it doesn't say why.
-Queried `claude_ro.error_events` for the real cause (per the session-start orientation rule) and
-found a live, ongoing, evidenced production fault, not just a copy question.
-
-**What the evidence shows:** the same user (`fe481797-...`) hit `/api/sync/pull` server errors
-repeatedly from 2026-07-30 through 2026-08-01 (quiet since in the 7-day window checked, which per
-the "stopped ≠ fixed" rule is not proof it's resolved) — a different table each time (`programs`,
-`day_checkins`, `injuries`, `mood_logs`, `food_logs`, `set_logs`, `progression_styles`,
-`prescribed_runs`), Drizzle's generic `"Failed query: select ..."` wrapper with no underlying
-Postgres cause captured in either `message` or `stack`. **Every one of these errors carries the
-exact same `since` cursor param, `2026-07-28T01:09:17.285Z`, unchanged across 4+ days of failures**
-— strong evidence this device's local sync cursor was stuck retrying the same page repeatedly
-without ever fully succeeding over that window (a partial/first-page pull failure never advances
-`lastSyncAt`, so this is consistent with `pullDelta`'s existing backoff design, not a mystery — the
-mystery is why the underlying query kept failing).
-
-**Root-cause theory, not yet confirmed against Railway's own logs:** `getSyncDelta`
-(`lib/data/postgres/adapter.ts:3211-3235`) fires **~21 queries in one `Promise.all`** per pull call.
-The app's own DB-pool rule (`lib/data/postgres/client.ts`, documented in this file's Database
-section) keeps `max: 10` connections deliberately modest — a single sync pull alone can want more
-connections than the whole pool has, and the moment any other concurrent request on the same pool
-also needs a connection, one of the 21 queries is the one left waiting and is the one that times out
-or errors — which matches the observed fingerprint exactly (a different, effectively-random table
-failing each time, same user, repeated occurrences, not a deterministic query bug that would fail
-100% of the time for every user). CLAUDE.md's own Database section already flags this class of risk
-for "a heavy sync domain" — this reads as that risk materialising, not a new category of bug.
-
-**Not yet done:** confirming the pool-contention theory against Railway's actual Postgres logs
-(connection-acquire timeouts / `statement_timeout` hits, not just the app's own truncated error
-report); reducing `getSyncDelta`'s query parallelism (chunk the 21 queries instead of one flat
-`Promise.all`) to cut peak connection demand; capturing the underlying Postgres error `cause` in the
-server error-report path so this class of failure doesn't need a manual query dig next time; and
-confirming whether today's live toast (2026-08-06, screenshot) is the same fault recurring or a
-distinct client-side network blip that never reached the server (which would produce no
-`error_events` row at all). Backlog entry: **Q-107** (`docs/implementation-backlog.md`).
-
-**🆕 Amended 2026-08-08 — the pool-contention theory above is weakly supported, and the "capture the
-`cause`" item is now its own top-priority entry.** ([review §1.1, §1.2](docs/reviews/2026-08-08-db-scalability-and-tooling-review.md))
-Widening the query from `/api/sync/pull` to **all 98 `Failed query` events across every route** and
-grouping them by the second they landed in: **77 are a lone query failing while every other query in
-flight succeeded**, 12 in pairs, and 4+5 in two bursts. Pool exhaustion fails everything competing
-for a connection at once — that is the shape of the two bursts, covering 21 of 98, not of the 77. An
-isolated single-query failure fits a per-connection drop or `statement_timeout: 15_000` better. The
-theory above is not refuted (the bursts are real, and `getSyncDelta`'s ~21-query `Promise.all` is
-still a genuine peak-demand risk) but it should **not** be the first thing built. The `cause`-capture
-item this row already listed under "Not yet done" is now **Q-142** with a written scope — it is the
-smallest diff available and it makes the next occurrence self-diagnosing. Take it first, read one
-real Postgres error, then decide whether to chunk `getSyncDelta`.
-
-**🆕 Amended 2026-08-13/14 — much sharper burst evidence, found investigating an unrelated sleep-data
-report (see the new `[sleep]` Q-225 row below), plus a candidate downstream consequence.** A 3-day
-`error_events` pull found a **chronic background rate (1–9 timeout/connection-terminated/aborted
-errors per hour) sustained continuously the whole time this entry has been open**, with two much
-sharper bursts on top: **23 errors in the 23:00 UTC hour of 2026-08-12, 15 in the 02:00 UTC hour of
-2026-08-13** — each spanning 15-20+ unrelated routes (`oura-ble/samples`, `next-session`,
-`workout-sessions/day`, `sync/pull`, `body-battery`, `readiness-score`, `hr-ingest`, several
-`nutrition/*` routes, and more) within the same ~20-minute window. That is a much cleaner
-pool-exhaustion signature than the 2026-08-08 measurement found (max burst there was 5). The now-live
-`cause` capture (Q-142, shipped) confirms it directly: `[cause: timeout exceeded when trying to
-connect]` / `[cause: Connection terminated due to connection timeout]` on the app's own
-`pool.max: 10` (`client.ts:19`) — not a `statement_timeout` cancellation. Checked Postgres's own
-side: `max_connections = 500`, only 11 in use at check time, so there is headroom on the database;
-the constraint is the app pool size relative to burst demand. **Not confirmed ongoing right now**
-(0 matches in the last hour checked) — consistent with "stopped ≠ fixed," since this went quiet
-before and came back. **Candidate downstream consequence, not proven:** Q-225's stale sleep-session
-row was last written a few hours after the second burst ended; a fresh recomputation from the same
-raw data does not reproduce it. Plausible mechanism (a rollup succeeding overall while one internal
-query silently saw a partial result during contention), not confirmed. Neither the `getSyncDelta`
-batching fix nor a `pool.max` increase (500-connection ceiling leaves large headroom, but this file
-is CLAUDE.md's load-bearing pool config — a size change should get the same review as the
-timeout/error-handler settings next to it) was done this session.
-
 ### [sleep][devices][platform] 🟠 A sleep session can get stuck on a stale, narrower window with no self-heal (Q-225, found 2026-08-13/14)
 
 Owner reported the previous night's displayed bedtime (1:15am) looked far too late. Not the
@@ -4660,35 +4617,6 @@ breaks the parse fails loudly instead of passing vacuously.
 - A `BeginTransactionAlready in transaction` error also appeared. Most likely a cascade from the
   above (a failed statement leaves the transaction open and the next `applyDelta` cannot begin), but
   that is reasoning, not evidence — re-check on device once the arity fix ships.
-
-### [platform] ⚠️ `/api/body-battery` and `/api/readiness-score` 500'd in production, cause NOT diagnosed (reporting added 2026-08-04)
-
-Seen in the owner's device console on 2026-08-03, ~23:04–23:13 UTC. **Not reproduced and not
-explained.** What is actually established:
-
-- **It is transient, not deterministic.** `body_battery_daily` carries a row for 2026-08-04 with
-  `updated_at = 2026-08-03T23:19:53Z` — the route completed successfully six minutes after the 500s,
-  from the same data. A data-shape fault would not self-heal.
-- **Nothing was logged.** Neither route had a `catch`, so no row reached `error_events`. Confirmed
-  by query: the only rows in that window are ten React #418 hydration errors, none server-side.
-- Both return **200 locally** against the seeded DB.
-
-**What changed (this PR):** both handlers are now thin — auth + rate-limit, then a `try` around an
-extracted `buildBodyBattery` / `buildReadinessScore`, with `reportServerError({ userId, url })` and a
-JSON 500 in the `catch`. Proven end-to-end locally by injecting a throw: 500 body returned *and* a
-row with the full stack landed in `error_events`. **The next occurrence is readable remotely** via
-`POST /api/admin/db-query`.
-
-**Leading hypothesis — connection-pool acquisition timeout. Unproven; do not record it as cause.**
-The pool is `max: 10` with `connectionTimeoutMillis: 5_000` (`lib/data/postgres/client.ts`), and a
-failed acquire *throws*, which in an unwrapped handler is exactly a bare 500. These two routes have
-the largest single-request fan-out in the codebase — `readiness-score` issues **11** concurrent
-`repo.*` queries and `body-battery` **8** (`day-timeline` is next at 10) — so they are the first to
-starve under contention, and the arity bug above was making the device retry sync pulls in a loop at
-the same time. That is a coherent mechanism, not evidence. One logged stack settles it.
-
-**Systemic, filed separately as backlog Q-58:** only **11 of 200** API route files call
-`reportServerError` at all, so a 500 in any of the other 189 is invisible the same way these two were.
 
 ### [app-shell][platform] ⚠️ The APK's version was frozen at 1.30.0, so "Update available" was always on (fixed v1.252.7, 2026-08-03) — needs the next APK
 
