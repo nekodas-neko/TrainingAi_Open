@@ -14,9 +14,10 @@ Rewrite this file **in full** — never append — before the session ends or co
 
 ## Standing facts for this role
 
-- **Q number band: 387–449.** Take numbers directly from that band. Do **not** read or update the
-  backlog header's "Next free Q number" pointer — that belongs to other lanes, and touching it is
-  how two lanes race for a number. Nothing in 387–449 was claimed as of 2026-08-17.
+- **Entry IDs are `BF-<n>`, counting up forever.** Bands and the shared pointer are both gone (see
+  `docs/agents/README.md` §3). Find your next number with
+  `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy Q-387…449 stay valid
+  where already used.
 - **No migration numbers.** Intake never claims one. If an entry needs a corrective migration, say
   so in the entry and leave the number to the implementer.
 - **Docs-only PRs, opened and merged without asking** (CLAUDE.md Standing Instructions). CI still
@@ -48,8 +49,7 @@ operating model landed the same day. Read it: §1 defines this role, §2 is the 
 is the handoff ritual this file is part of. The cold-start prompt for the role is
 [`docs/agents/prompts/bugfix.md`](../prompts/bugfix.md).
 
-The Q band recorded above (387–449) matches the band table in that document, which was written
-independently — no reconciliation was needed.
+The band this baton used to record is gone; IDs now come from the `BF-` prefix.
 
 ---
 
@@ -132,4 +132,4 @@ so a bad splice silently reprioritises someone else's work.
 
 **Nothing mid-triage. Nothing received-but-unfiled. Nothing blocked.**
 
-Next intake session starts at **Q-388** (band 387–449; 387 is now taken).
+Next intake session starts at **`BF-1`** (no band, no ceiling).

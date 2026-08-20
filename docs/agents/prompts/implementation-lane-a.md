@@ -26,12 +26,14 @@ the domain-math directories under `lib/`, the BLE and device pipelines, auth/sec
 `android/**`. Lane B owns the screens and components. If you need a path neither lane lists, claim
 it in your baton before touching it, and check Lane B's baton first.
 
-**Your Q band is 314–349.** Take new numbers from it directly. Do not read or write the backlog's
-next-free pointer — that is what the bands exist to avoid. Postgres migration numbers and local
+**Your entry IDs are `LA-<n>`, counting up forever — there is no band and no pointer.** Find your
+next number with `grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The letter records
+that *you* found the item; it never says who ships it and it never changes. Postgres migration numbers and local
 SQLite versions are yours alone; no other agent takes one.
 
-**Your first action:** work the backlog queue top-down and take the highest item that falls inside
-Lane A's ownership. Before you build it, re-verify its premise against current `main` — entries in
+**Your first action:** run `node scripts/next-item.js --lane A` and take the top READY item.
+It prints what is parked behind a `Needs:` or a `Gate:` and what carries `Lane: ?` for you to
+decide — which is exactly what reading the queue file cannot tell you. Before you build it, re-verify its premise against current `main` — entries in
 this queue are leads, not specs, and have repeatedly turned out to be already shipped, already
 refuted, or wrong about the number of call sites. If the item is stale, remove its entry with a
 one-line note in a docs-only PR rather than forcing a mismatched implementation to clear the queue.

@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** `tuning/accurate-on-first-open` · **Q band:** 500–529 (**BAND EXHAUSTED — 529 was the last. Agree a new band with the owner before filing anything.**)
+**Updated:** 2026-08-19 · **By:** `tuning/accurate-on-first-open` · **Next ID:** `TN-1`. **The band that ran out is gone** — IDs now count up from your own `TN-` prefix with no ceiling, so there is nothing to agree with the owner. Find the next free with `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.
 
 ## Now
 The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.

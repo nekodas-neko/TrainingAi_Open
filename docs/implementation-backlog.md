@@ -7,29 +7,33 @@ git history and the session journal (`docs/overview/`).
 
 ## Live pointers
 
-**These three numbers are the ones sessions collide on.** They are checked by
+**These two numbers are the ones sessions collide on.** They are checked by
 `scripts/check-backlog-pointers.js` in the Custom Rules job, which reads the real values from the
-migrations directory, `lib/sqlite/migrations.ts` and the queue below — so a stale line here fails
-CI instead of silently misdirecting the next session. Update them in the same PR that consumes a
-number.
+migrations directory and `lib/sqlite/migrations.ts` — so a stale line here fails CI instead of
+silently misdirecting the next session. Update them in the same PR that consumes a number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` (head: `205_claude_ro_views_saved_meal_image.sql`) |
+| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
-> **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
-> 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
-> its own, so no agent needs to read or write this table for a routine finding. The bands exist
-> because a shared next-free pointer is a *floor*, not an authority: it cannot see an unmerged PR,
-> and a number can be claimed and merged inside a single session without ever appearing in an open
-> one. That caused six collisions in three days, and two live ones — **Q-306 and Q-307 were each
-> held by two different entries** — survived in this file until 2026-08-17.
+> **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
+> never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
+> unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
+> bands replaced it and bought exhaustion instead — Tuning reached 29 of its 30, Review burned all
+> 50 in two days — plus a ledger that drifted twice.
 >
-> Q numbers are identifiers, not priorities. Priority is queue position, so a Q-451 sitting above a
-> Q-314 is correct and expected. When a band runs out, claim the next block of 50 from the pointer
-> above, record it in the band table, and bump this row.
+> **Each agent now owns a letter and counts up forever:** Lane A `LA-` · Lane B `LB-` · BugFix `BF-` ·
+> Review `RV-` · Tuning `TN-` · one-off sessions `PS-`. Find your next number with
+> `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The full reasoning is in
+> [`docs/agents/README.md`](agents/README.md) §3.
+>
+> **The letter says who found the item, not who ships it, and it never changes** — an entry filed by
+> Review and built by Lane A keeps its `RV-`. Priority is queue position, so an `RV-31` above an
+> `LA-12` is correct and expected.
+>
+> **Legacy `Q-` numbers stay exactly as they are** and remain valid IDs. There are over 10,000
+> references across 775 files; renumbering would be risk for no function.
 >
 > **Postgres migration numbers and local SQLite versions belong to Implementation Lane A alone.**
 >
@@ -46,16 +50,42 @@ number.
 > per-pillar sweep, so `scripts/check-backlog-pointers.js` fails on one. Read that pillar's index
 > (`docs/domains/<pillar>/README.md`) before starting: it carries the pillar's reference docs, open
 > known issues and gotchas.
+>
+> Tags are **mutable** — retag an entry as understanding improves. The ID never changes, which is
+> why subject lives in the tag and not in the identifier.
 
-## The optional `Lane:` field
+## The fields that decide whether an entry can be started
 
-> Most entries have no lane line, and that is correct — **lane ownership is decided by the file
-> paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md), which is the
-> authority. An entry states a lane only when the answer is worth writing down: the item spans paths
-> that are **unlisted** in §3 and therefore need a baton claim, it needs a Postgres migration number
-> or local SQLite version (**Lane A alone**), or two queued entries share a path and must not run
-> concurrently. Introduced 2026-08-17 on Q-530/Q-288, which are all three at once. Do not read the
-> absence of the field as "unassigned" — read it as "§3 already answers it".
+> **`node scripts/next-item.js --lane A`** is what an implementer runs. It prints READY in queue
+> order, PARKED with the reason, and UNCLASSIFIED for anything it could not place. Priority is still
+> yours and still queue position — the script computes *readiness*, never priority.
+>
+> - **`Lane: A` / `Lane: B`** — optional, and usually absent, which is correct: **lane ownership is
+>   decided by the file paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md).
+>   State a lane when the rule is genuinely ambiguous, when the item needs a migration number
+>   (**Lane A alone**), or when two queued entries share a path and must not run concurrently. Where
+>   the filer cannot tell, write **`Lane: ?`** — the first lane to reach it decides and edits the
+>   entry. Do not read an absent field as "unassigned"; read it as "the rule already answers it".
+> - **`Needs: <ID>`** — this entry cannot start until that one ships. **A target no longer in the
+>   queue counts as satisfied**, because a completed entry is removed by the protocol below. That
+>   makes a typo look exactly like a success, so the check fails on a target that has never existed
+>   anywhere under `docs/`. Cycles fail too.
+> - **`Gate: owner`** / **`Gate: device`** — waiting on an owner decision, or on the S25 smoke run.
+>   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
+>   not a gate.
+>
+> - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
+>   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
+>   **Never batch a migration or a sync-push change**; batch native/Kotlin work hardest, since each
+>   one costs an APK cycle. The full rule, and why file and domain are the wrong axes, is in
+>   [`docs/agents/README.md`](agents/README.md) §3. Assign a batch when you next touch an entry —
+>   not in a bulk pass over work nobody is about to start.
+>
+> An item needing both halves of the app is **two entries** — `PS-4a` with `Lane: A`, `PS-4b` with
+> `Lane: B` and `Needs: PS-4a` — not one entry with a paragraph asking readers not to re-sort it.
+>
+> Some entries still carry the older prose `⛔` marker. The query parks them and prints the marker
+> text, so they stay visible; convert one to a field when you next touch its entry.
 
 ## Before you start any item
 
@@ -81,13 +111,17 @@ number.
 1. Write the implementation plan to `docs/superpowers/plans/YYYY-MM-DD-<name>.md`
    (per the writing-plans conventions). Do **not** implement it.
 2. Insert an entry into the Queue below at the priority you judge right (position
-   in the list IS the priority). Include: plan doc path, a stable feature-branch
-   name, date added, and a one-line rationale for its placement.
+   in the list IS the priority). Take the next number from **your own letter** (see
+   Live pointers). Include: plan doc path, a stable feature-branch name, date
+   added, a one-line rationale for its placement, and any `Needs:` / `Gate:` /
+   `Lane: ?` that applies.
 3. Land the plan + backlog entry via a docs-only PR (no merge-confirmation gate
    needed per CLAUDE.md).
 
 **For implementer sessions (working the queue):**
-1. Take the **top** item in the Queue. One item per session run.
+1. Run `node scripts/next-item.js --lane <A|B>` and take the **top READY** item.
+   One item per session run. Do not hand-scan the file — the query is what knows
+   which entries are parked behind a `Needs:` or a `Gate:`.
 2. Dedup check before starting: if the item's branch already exists on `origin`,
    check it out and **continue** it (don't restart); if an open PR already covers
    the item, don't duplicate — babysit that PR to green or stop.
@@ -288,6 +322,96 @@ below threshold and left in place for next time.
 <!-- NUTRITION FOCUS BLOCK — the owner asked on 2026-08-18 to concentrate on nutrition. The eight
      entries below are ordered by dependency, not by Q number. Do not re-sort them into numeric
      order; the sequence is the point. -->
+
+## Filed 2026-08-19 — the workflow review that produced the ID scheme
+
+*These four came out of reviewing the multi-agent setup itself. They are filed rather than fixed
+because none of them is the change that review was for, and per **No orphaned findings** a finding
+without a queue entry is a dropped finding.*
+
+### [platform] PS-1 — `docs/agents/README.md` §3 lists `lib/coach/` as Lane A while a queue entry says it belongs to neither lane
+
+- **Branch:** `docs/lane-coach-contradiction`
+- **Added:** 2026-08-19 · found while replacing the lane path lists with a rule
+- **Lane: B** — a docs-only reconciliation, no code.
+
+`docs/agents/README.md:124` lists `lib/coach/` under Lane A. Q-407's `Lane.` paragraph tells whoever
+takes it that **`lib/coach/**` belongs to neither lane's declared paths** and to claim it in a baton
+first. Both cannot be true, and the entry is the one an implementer reads.
+
+The path rule added in this branch settles it — `lib/coach/` is reached by `app/api/coach/route.ts`,
+so it is Lane A — but **Q-407's paragraph still says otherwise** and will be read before the README
+is. Correct the entry to match, or say explicitly why the rule does not apply to it.
+
+**Why this is worth an entry rather than a drive-by edit:** the same shape may exist on other
+entries written while the enumeration was the authority. Grep the queue for `neither lane` and
+`belongs to neither` before closing this.
+
+### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
+
+- **Branch:** `docs/baseline-history-dedupe`
+- **Added:** 2026-08-19 · found while extracting the baselines out of the check script
+- **Lane: B** — docs only.
+
+`docs/doc-size-baseline-history.md` is the 955 comment lines lifted verbatim out of
+`scripts/check-doc-index-size.js`. It was extracted unedited **on purpose**, so the extraction is
+reviewable as a pure move — but it carries known corruption from the conflict-splicing that motivated
+the move in the first place:
+
+- The **Q-553** block appears **twice, byte-identical** (it was at lines 30 and 35 of the old script).
+- Two blocks record the same change with different figures: one says `projectOverview -> 7785`, the
+  other `7805 -> 7785`.
+
+Dedupe the exact repeats and reconcile the contradictory pair against `git log` for the commits that
+raised them. **Do not summarise or prune the rest** — Q-543 was explicit that several of those notes
+are the only record of why a number moved, and one documents a near-miss where a splice would have
+reverted another lane's raise.
+
+### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
+
+- **Branch:** `fix/non-idempotent-migrations`
+- **Added:** 2026-08-19 · observed in this session's own start-up hook output
+- **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.
+
+`scripts/local-db/migrate.js` reports `applied 0, skipped 200 already recorded, 4 failed` on every
+run of an already-migrated database. The four never reach the recorded set, so they are retried
+forever:
+
+```
+054_users_email_unique.sql        relation "users_email_unique" already exists
+055_friends_and_titles.sql        relation "users_friend_code_unique" already exists
+082_exercise_library_expand_2.sql duplicate key value violates unique constraint "exercise_library_name_key"
+157_scale_ble.sql                 relation "scale_raw_samples" already exists
+```
+
+**These are distinct from the three (`038`, `040`, `041`) Lane A's baton records as known and
+ignorable** — do not assume the baton already covers them.
+
+Locally this is noise: the objects exist, so nothing is broken. **What needs establishing before any
+fix is whether the same four are unrecorded in production**, because `ensureSchema` tracks by
+filename and an unrecorded migration is one that re-runs on every cold start. Answer that first via
+the admin query endpoint; the fix (make each idempotent — `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`)
+is small and uninteresting by comparison, and per this repo's own rule a seed that never corrects a
+drifted production row is the trap to check for.
+
+### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
+
+- **Branch:** `docs/baton-compaction`
+- **Added:** 2026-08-19 · measured while adding batons to the size ratchet
+- **Lane: ?** — whichever role is doing its own handoff next; this is not one job.
+
+`docs/agents/state/README.md` says a baton is *"state, not narrative"* and *"if it is over a screen,
+the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
+**412** (its `Now` section alone is 200), Tuning **562**, Review **1,280**.
+
+This matters more than tidiness. With the lane path lists replaced by a rule, a baton's **Claimed
+paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
+412-line file before starting an item, which means the mechanism is not doing its job.
+
+All five are now in `docs/doc-size-baseline.json`, shrink-only, so they cannot grow further. The
+work is to bring them down, and **it is not a separate task**: a baton is rewritten in full at every
+handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
+Close this when all five are under ~150 lines.
 
 ## Nutrition focus — the owner's priority, 2026-08-18
 
@@ -1125,6 +1249,8 @@ number.**
 
 ### [nutrition][app-shell] Q-417 — a THIRD calorie budget, 179 low, because the Nutrition ring keeps its optimistic local paint
 
+- **Batch:** calorie-budget-surface
+
 - **Branch:** `fix/nutrition-ring-active-energy`
 - **Added:** 2026-08-19 · owner, from three screenshots taken at 9:57: *"these nutrition values dont
   look like they are lining up"*
@@ -1193,6 +1319,8 @@ about the same day.
   Then log a food item and confirm all four move together — that second step is what (a) failed.
 
 ### [nutrition][app-shell] Q-415 — Home shows two calorie budgets 271 apart; Q-401's sweep missed the donut
+
+- **Batch:** calorie-budget-surface
 
 - **Branch:** `fix/home-donut-budget-source`
 - **Added:** 2026-08-19 · owner, from a Home screenshot: *"explain this widget what ars those
@@ -2399,6 +2527,8 @@ this fits without an extraction.
 
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
+- **Gate:** owner
+
 - **⛔ OWNER-DEFERRED 2026-08-18 — accepted risk, do NOT implement. The fix already exists.**
   The owner's call: *"leave that as a known issue for now — only admin will be me for a long time."*
   The window opens only on **revocation**, and with a single permanent admin it never opens.
@@ -3016,6 +3146,8 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
+- **Gate:** owner
+
 - **Branch:** `feat/meal-label-ingredient-breakdown`
 - **⬆ MOVED TO THE TOP OF THE QUEUE by the owner, 2026-08-18** — *"can this be added to the top
   of the lanes queue - I will test and get back"*. Take this before the numbered items below it.
@@ -3257,6 +3389,8 @@ moving *beside* the calories rather than under them.
   drive adoption, or narrow? **Owner's call, not Lane A's.**
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
+
+- **Needs:** Q-468
 
 - **Branch:** `feat/coach-undo-control`
 - **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
@@ -4021,6 +4155,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   and the notification arrives.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
+
+- **Gate:** owner
 
 - ⛔ **blocked: needs an owner decision before any code moves.** Skipped by Implementation Lane B on
   2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
@@ -5260,7 +5396,7 @@ session working from a temporarily restored copy.
      autoregulation fire less, never more.
   3. Investigate the non-monotonic top end separately — it may be a `maxRepsAtPct` bug, not a
      calibration issue.
-- **Gate:** re-run this exact measurement after the change. The harness is ~30 lines against
+- **Re-measure:** re-run this exact measurement after the change. The harness is ~30 lines against
   `set_logs`; the review has the query.
 - **Depends on Q-290** — the input signal's own variance bounds what any calibration can achieve.
 
@@ -5428,6 +5564,8 @@ session working from a temporarily restored copy.
   is touched anyway — not worth its own PR.
 
 ### [platform] Q-287 — there is no self-service account deletion, and the Play Store requires one
+
+- **Gate:** owner
 
 - **Branch:** `feat/account-deletion`
 - **Plan:** **required before any code** — this is destructive and irreversible
@@ -5715,7 +5853,7 @@ session working from a temporarily restored copy.
      independently against the stored HR series before picking.
   2. Feed daytime HRV into the charge term. `rr_intervals` holds ~49,900 rows and
      `daytime_stress_scaled` exists on 22 of 40 days; neither reaches the battery model today.
-- **Gate:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
+- **Re-measure:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
   the before/after comparison is not interpretable.
 - **⚠️ Read [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md)
   (Q-502) before starting. It re-measured this entry (still true — 5.6× on 14 v5 days now) and found
@@ -5744,6 +5882,8 @@ session working from a temporarily restored copy.
 - **Follow-up (not blocking):** re-derive the anchor on ~15 BLE-era nights. This fit is Cloud-era and
   BLE overnight HR is ~2× noisier, so the anchor is conservative for current data rather than wrong.
 ### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
+
+- **Needs:** Q-526
 
 - **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
 - **No longer blocked.** All three decisions were resolved 2026-08-18 — the owner delegated them
@@ -7656,6 +7796,8 @@ session working from a temporarily restored copy.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+- **Gate:** device
+
 > **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
 > Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
 > in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
@@ -8296,6 +8438,8 @@ session working from a temporarily restored copy.
 
 ### [nutrition][platform] Q-201 — a plan meal's suggested time is stored, shown, and never used for anything
 
+- **Gate:** owner
+
 - **⛔ Needs an owner decision before implementing (added 2026-08-12, while shipping Q-200).** The
   two things are not the same notification. The existing reminders fire at a **meal type's end
   hour** as a *"you didn't log this"* catch-up (`computeMealReminderActions`); a plan's
@@ -8913,6 +9057,8 @@ measured, not the ~3,300-test full suite.
 
 ### [sleep][readiness] 🔴 Q-72 — the Sleep Score cannot tell a good night from a bad one (MEASURED, needs an owner decision)
 
+- **Gate:** owner
+
 - **Added:** 2026-08-04. Started as *"put the sleep rating on the morning check-in"* (the owner's
   idea). **That turned out to be already built** — `MorningCheckinSheet` has collected
   `sleepQualityFeel` (1–5, 1 = best) since at least 2026-07-03, and
@@ -9052,6 +9198,8 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
+- **Gate:** device
+
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
   entry is removed per this file's own rule that a finished item must never linger.
 - **What Q-157 delivered:** five write domains (session exercises, macro targets, user goals,
@@ -9138,6 +9286,8 @@ per-field merge where an AI write has no honest source rank to claim.
 
 
 ### [app-shell] ⛔ Q-147 — cold app start has never been measured on the device (owner action)
+
+- **Gate:** device
 
 - **Added:** 2026-08-08 · [journal](overview/history-2026-08-07.md)
 - **⛔ blocked: needs the S25.** Not implementable in a session — filed so the gap is tracked rather
@@ -9319,6 +9469,8 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [activity][readiness] Q-137 — the Activity Score is effectively a step counter: 57 of 100 weight is constant, and it lost its second-best input a month ago
 
+- **Gate:** owner
+
 - **Branch:** `fix/activity-score-calibration`
 - **Added:** 2026-08-07 · [review §6.1-6.3](reviews/2026-08-07-full-app-review.md)
 - **⛔ Needs an owner decision before code**, same shape as Q-72 — this changes a number read daily.
@@ -9440,6 +9592,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [workouts] Q-85 — a shortened session keeps full-length rest periods, which is what actually caps its exercise count
 
+- **Gate:** owner
+
 - **Branch:** `feat/preset-aware-rest-compression`
 - **Plan:** [`2026-08-15-preset-aware-rest-compression.md`](superpowers/plans/2026-08-15-preset-aware-rest-compression.md)
   (written 2026-08-15). **⛔ Needs one owner decision before code** — the plan measures the options
@@ -9490,6 +9644,8 @@ first, so the output is a design discussion, not a patch:
   real before writing a fix.
 
 ### [devices][body] Q-114 — scale "Weighing you…" progress bar has already drifted from the real native timeout; shorten both together
+
+- **Batch:** scale-weighing-ui
 
 - **Branch:** `fix/scale-cycle-budget-drift-and-trim`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 29
@@ -9742,6 +9898,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
+- **Batch:** scale-weighing-ui
+
 - **Branch:** `fix/scale-onunstablereading-ungated-recurrence`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 19
 - **Added:** 2026-08-05 · owner-reported (screenshot): the "Weighing you…" progress toast appeared
@@ -9789,6 +9947,8 @@ first, so the output is a design discussion, not a patch:
   when this ships.
 
 ### [sleep] ⛔ Q-102 — wire the morning sleep-feel rating into the live Sleep Score, neutral at 3/5 — OWNER DECLINED 2026-08-06
+
+- **Gate:** owner
 
 > **⛔ Owner explicitly ruled this out, in person, 2026-08-06** — walked through it live against a
 > real disrupted night: does not want `sleep_quality_feel` driving the score at all, wants it kept
@@ -10828,6 +10988,8 @@ Two independent findings, both low-urgency:
 
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
+- **Gate:** owner
+
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
 
@@ -10837,6 +10999,8 @@ is essentially never worn for sleep, so there's no ground truth to calibrate
 against yet. Blocked on real-data capture, not code.
 
 ### [devices][readiness] 🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
+
+- **Gate:** device
 
 > **⚑ Re-measured 2026-08-08 — it is ten, not eight, and here is the exact list.** Machine-counted
 > every column in the table against 82 rows rather than spot-checking: **`active_calories_est`,
@@ -10902,6 +11066,8 @@ What is left of Q-10 is only the nice-to-have above: persisting Oura's session
 `type` / the ring's bedtime-period tag.
 
 ### [sleep] 🟢 Q-34 — sleep-staging Phase 1b: items 2 and 4 remain
+
+- **Gate:** device
 
 Plan: [`docs/superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md`](superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md).
 Branch: `feat/sleep-staging-ultradian-prior` (item 2).
@@ -11294,44 +11460,6 @@ since the CI link check (item 1) catches a botched rewrite immediately.
   specifically" caveat is now answered — it is fine, as are the other three. **The rule at the top
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
-
----
-
-### [platform] 🟢 Q-543 — every concurrent PR conflicts on the doc-index BASELINE object
-
-`scripts/check-doc-index-size.js` holds three numbers — `projectOverview.md`,
-`docs/implementation-backlog.md`, `CLAUDE.md` — in one object literal, under ~170 lines of
-accumulated raise-history commentary. Every lane that raises a baseline edits the same few lines of
-the same file on the same day, so the ratchet has become the repo's most reliable merge conflict.
-
-**Measured on this branch, 2026-08-18:** one docs-only PR (#69, a single `CLAUDE.md` row) took four
-CI rounds. One was a genuine ratchet failure and correct. The other three were base collisions with
-#68, then #65/#71, then #75 — **all three on this file, none on the content being changed.** The
-file's own comments record the same thing happening to other lanes repeatedly, describing "the
-fourth same-day ratchet collision on this branch" and warning in five separate places that splicing
-a conflict hunk silently un-does the other lane's raise. That warning exists because it has been got
-wrong before.
-
-**This is the same problem `docs/overview/entries/` already solved.** Per-entry journal files took
-the journal-prepend conflict class to zero on the reasoning that two PRs writing *different files*
-cannot conflict. The baselines are the remaining shared-line edit that every PR touches.
-
-**Shape worth considering** (not a spec — the decision is which, and it is cheap to reverse):
-
-- **Per-file baseline fragments** — `scripts/doc-baselines/<slug>.json` or similar, one file per
-  ratcheted doc, read and merged by the check. Directly mirrors the entries-directory fix. Costs a
-  small loader; removes the conflict class outright.
-- **Move the raise-history prose out of the source file** into a log the check does not parse. Much
-  smaller change, and it shrinks the conflict window without closing it — two lanes raising the same
-  file the same day still collide, they just collide on one line instead of thirty.
-
-**Do not** solve it by dropping the history commentary wholesale. Several of those notes are the
-only record of *why* a number moved, and at least one documents a real near-miss where a splice
-would have reverted another lane's raise.
-
-**Not urgent.** It costs minutes per PR, never correctness — the check itself works exactly as
-intended, and caught a real overrun on #69. Filed per "no orphaned findings" rather than taken,
-because restructuring a CI gate mid-merge is not a docs change.
 
 ---
 

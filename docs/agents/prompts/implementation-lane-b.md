@@ -25,12 +25,14 @@ session. A previous session may have run under this name; if so, its baton is wa
 Lane A owns data, sync, scoring, server routes and the device pipelines. If you need a path neither
 lane lists, claim it in your baton before touching it, and check Lane A's baton first.
 
-**Your Q band is 350–386.** Take new numbers from it directly. Do not read or write the backlog's
-next-free pointer — that is what the bands exist to avoid. **You take no migration numbers at all**;
-if an item turns out to need a schema change, stop and hand it to Lane A rather than taking one.
+**Your entry IDs are `LB-<n>`, counting up forever — there is no band and no pointer.** Find your
+next number with `grep -rhoE '\bLB-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The letter records
+that *you* found the item; it never says who ships it and it never changes. **You take no migration numbers at all**; if an
+item turns out to need a schema change, stop and hand it to Lane A rather than taking one.
 
-**Your first action:** work the backlog queue top-down and take the highest item that falls inside
-Lane B's ownership. Before you build it, re-verify its premise against current `main` — entries in
+**Your first action:** run `node scripts/next-item.js --lane B` and take the top READY item.
+It prints what is parked behind a `Needs:` or a `Gate:` and what carries `Lane: ?` for you to
+decide — which is exactly what reading the queue file cannot tell you. Before you build it, re-verify its premise against current `main` — entries in
 this queue are leads, not specs, and have repeatedly turned out to be already shipped, already
 refuted, or wrong about the number of call sites. If the item is stale, remove its entry with a
 one-line note in a docs-only PR rather than forcing a mismatched implementation to clear the queue.

@@ -36,6 +36,15 @@ ownership, plus a BugFix, a Tuning and a Review agent. Their roles, authority li
 and cold-start prompts are in [`docs/agents/README.md`](docs/agents/README.md). Start there rather
 than picking an item straight off the queue.
 
+**Entry IDs come from your agent's own prefix now, not a reserved band** (2026-08-19). `LA-` Lane A ·
+`LB-` Lane B · `BF-` BugFix · `RV-` Review · `TN-` Tuning · `PS-` one-off sessions, counting up with
+no shared pointer to collide on. Bands exhausted and their ledger drifted twice; the prefix says who
+*found* an item and never changes, so an entry filed by Review and built by Lane A keeps its `RV-`.
+Legacy `Q-` numbers stay valid and are not renumbered. **An implementer's first command is now
+`node scripts/next-item.js --lane <A|B>`**, which prints READY / PARKED / UNCLASSIFIED from the new
+`Needs:` and `Gate: owner|device` fields — the queue file cannot show you which of its top entries
+are actually startable.
+
 **Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
 — the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is CLOSED
 (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread as a

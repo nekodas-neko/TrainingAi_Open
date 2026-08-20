@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** the fourth session to run as Lane A · **Q band:** 314–349 (next free: **327**)
+**Updated:** 2026-08-19 · **By:** the fourth session to run as Lane A · **Next ID:** `LA-1` (bands are gone — see `docs/agents/README.md` §3; legacy Q-314…349 stay valid where already used)
 **Migrations:** 189–203 taken; next free is **204**. Local SQLite **v27**, untouched this session.
 
 ## Now
