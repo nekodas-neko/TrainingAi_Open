@@ -44,12 +44,12 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
         with:
           version: 10.33.0
       # Node 22, not 20: the Capacitor CLI 8.x (`npx cap sync`) requires >=22.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -58,7 +58,7 @@ jobs:
       # cap sync needs the webDir to exist; the APK loads the UI remotely
       # (capacitor.config.ts server.url), so an empty dir is fine.
       - run: mkdir -p www && npx cap sync android
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -100,7 +100,7 @@ jobs:
       - name: Assemble debug APK
         working-directory: android
         run: ./gradlew :app:assembleDebug --no-daemon
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: app-debug-apk
           path: android/app/build/outputs/apk/debug/app-debug.apk

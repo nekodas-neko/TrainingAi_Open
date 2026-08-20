@@ -1,5 +1,9 @@
 name: Android Emulator
 
+# NOTE: this workflow is `workflow_dispatch`-only until Q-250 restores its `pull_request` trigger, so
+# the LA-17 action bumps below are UNVERIFIED — no PR can run them. They match the versions ci.yml
+# and android.yml verified on a real run; re-check them when Q-250 turns this job back on.
+
 # Q-250. Runs the local SQLite migrations against a real Android SQLite, in an emulator.
 #
 # Why this job exists: the local store has been silently killed twice by migration bugs (a WAL
@@ -95,14 +99,14 @@ jobs:
       WEBHOOK_USER_ID: placeholder
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v5
         with:
           version: 10.33.0
 
       # Node 22, not 20: the Capacitor CLI 8.x (`npx cap sync`) requires >=22.
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '22'
           cache: 'pnpm'
@@ -163,7 +167,7 @@ jobs:
           done
           echo "server never accepted a connection in 120s:"; cat /tmp/next-server.log; exit 1
 
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '21'
@@ -198,7 +202,7 @@ jobs:
         if: always()
         run: tail -100 /tmp/next-server.log || true
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: emulator-diagnostics
