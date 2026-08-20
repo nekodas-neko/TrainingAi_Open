@@ -537,6 +537,58 @@ widening that type.
   value; an unrated session is unchanged; and a test pins the three surfaces to one number.
 
 
+### [workouts] Q-423 — the per-set RPE prefill is measurably low, and it is the input every derived effort number will average
+
+- **Branch:** `fix/default-rpe-from-pct-rounding`
+- **Added:** 2026-08-19 · found while settling Q-420's derivation. Not a report — a measurement that
+  fell out of checking the owner's remark that set RPE *"auto prefills anyways"*.
+
+Every set's RPE arrives pre-filled from the planned intensity percentage:
+
+```
+defaultRpeFromPct(pct) = clamp(floor(pct / 10), 6, 10)      // components/workout/utils.ts:81-84
+```
+
+called from four sites in `components/workout-screen.tsx` (856, 898, 936, 1084), with `7` as the
+bodyweight fallback. **`floor` truncates**, so 79% and 70% both prefill as 7, and 89% and 80% both
+prefill as 8.
+
+**Measured in production against each set's own `planned_pct`** (the owner's rows, 625 rated sets):
+
+| | sets |
+|---|---|
+| left at the prefilled value | 360 (57.6%) |
+| **raised by hand** | **233** |
+| lowered by hand | 32 |
+
+Mean RPE **7.97** where it was changed, **7.11** where it was not, **+0.41** mean shift overall. The
+owner raises the default **7.3× more often** than they lower it — on 233 separate occasions. A default
+that gets corrected upward that lopsidedly is not a neutral starting point.
+
+- **Why it matters beyond the strip itself:** Q-420 derives a session's effort by averaging these
+  values, and Q-419 turns that into an intensity tier that scales a calorie figure. A prefill biased
+  low propagates all the way to the day's energy budget — **fix this before Q-420 fits anything to the
+  pool**, or the average is of a known-skewed sample.
+- **The likely fix is one line**, `floor` → `round`, which turns 75–79% into 8 rather than 7. **Do not
+  ship it on that reasoning alone** — round(8.5) = 9 pushes 85% up a point too, and the measured shift
+  is +0.41, not +1. Bracket it against the 625 rated sets: pick the mapping that minimises the
+  raise/lower asymmetry, not the one that looks tidiest.
+- **⚠ It is a calibration change, so the Tuning rule binds.** State how many past sets and sessions
+  move before it lands. It does **not** re-score history on its own — stored `set_logs.rpe` values are
+  untouched, only future prefills change — which makes it the safest item in this cluster and worth
+  doing first for that reason alone.
+- **⚠ The 6 floor is also the reason `'easy'` is unreachable.** `clamp(…, 6, 10)` and a strip that
+  offers 6–10 (`components/workout/rpe-strip.tsx:30`) mean no set can be rated below 6, which Q-420
+  concluded is acceptable for strength. Keep the floor; this entry is about the truncation, not the
+  clamp.
+- **Surface:** `components/workout/**` — **Lane B**, unlike Q-419/Q-420/Q-421, which are Lane A. The
+  measurement above is reproducible from the read-only endpoint; the UI change is browser-verifiable at
+  the S25 viewport.
+- **What would count as done:** the prefill's mapping is chosen against the 625 observed ratings rather
+  than by inspection, the raise/lower asymmetry narrows, and the chosen mapping is written down with
+  the number it was fitted against.
+
+
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
@@ -593,10 +645,52 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   inert on three sessions in four until this lands. Land Q-420 first, or land them together.
 - **Surface:** browser-reproducible at the S25 viewport against the seeded DB. Touches
   `packages/shared/**`, `lib/data/**` and a migration — **Lane A throughout**.
+
+- **✅ DECIDED 2026-08-19 — the owner delegated the choice and then supplied the fact that settles it.**
+  Asked which derivation to use, they answered: *"i probably wont be able to judge a session rpe that
+  well; but i can judge how close each excercise was to failure. and it auto prefills anwyays."*
+  **That invalidates the calibration target proposed above.** The 20 paired sessions were going to be
+  the thing the derivation was fitted to — and the owner has now said the target itself is unreliable.
+  The data agrees: across 20 sessions they used only **7, 8 and 9**, never below, never 10. That is
+  range compression, which is what a scale someone cannot judge looks like from the outside. **The
+  paired sessions are a sanity check — does the derived value correlate and land in the right
+  region — and are NOT a fitting target.** Do not tune a mapping to them.
+- **⚠ AND THE SET RATINGS ARE PREFILLED, which was not known when this entry was written.**
+  `defaultRpeFromPct(pct) = clamp(floor(pct / 10), 6, 10)` (`components/workout/utils.ts:81-84`) fills
+  every set's RPE from the *planned intensity percentage* before the owner sees it — called at four
+  sites in `components/workout-screen.tsx` (856, 898, 936, 1084). So the 625 rated sets are **not 625
+  judgements**, and the 6-as-a-floor observed above is the clamp, not the owner's opinion. Measured in
+  production against each set's own `planned_pct`:
+
+  | | sets | share |
+  |---|---|---|
+  | left at the prefilled value | 360 | 57.6% |
+  | changed by hand | **265** | **42.4%** |
+  | └ raised | 233 | |
+  | └ lowered | 32 | |
+
+  Mean RPE is **7.97** where the owner changed it, **7.11** where they did not, **7.48** overall —
+  a mean shift of **+0.41**. They raise the prefill **7.3× more often** than they lower it, which
+  says the default is systematically low (filed separately as **Q-423**, Lane B).
+- **The derivation to build: the plain mean of the session's rated set RPEs, rounded to nearest,
+  written as the prefilled session RPE and overridable.** One sentence the owner can check against
+  their own memory — *"your sets averaged 7.5, so the session is an 8"*. Explicitly rejected: a
+  weighting that counts hand-changed sets more than prefill-agreeing ones. It is **available without a
+  schema change** — recomputing `defaultRpeFromPct(planned_pct)` at read time recovers which sets were
+  touched, exactly as the table above does — but on this data it moves the result by roughly 0.2 of a
+  point, and a rule that cannot be explained in one sentence is not worth 0.2. Record it here as the
+  known next lever if the simple mean proves too flat.
+- **Do NOT map the 6–10 set scale onto the 1–10 session scale.** The earlier bullets treated that as
+  required; it is not, and doing it would be inventing precision. Since the owner cannot judge the
+  session number anyway, the derived value should stay in the units it was measured in — an average
+  proximity to failure — and **`intensityFromRpe` should get its own thresholds for a derived value**
+  rather than having a set-scale number pushed through Foster thresholds calibrated for a different
+  instrument. `'easy'` being unreachable for strength is the correct outcome, not a bug to engineer
+  around: a logged lifting session where every set sat at 6+ is not an easy session.
 - **What would count as done:** a session with rated sets and no manual rating shows a derived session
-  RPE the owner can see and change; the derived value maps onto the 1–10 session scale rather than
-  being copied off the 6–10 set scale; an override survives later set edits; and the intensity tier it
-  produces is checked against the 20 paired sessions above before it feeds any calorie figure.
+  RPE, visible and overridable; the value is the rounded mean of that session's rated sets, in set-RPE
+  units, with its own intensity thresholds rather than Foster's; an override survives later set edits;
+  and the result is checked against the 20 paired sessions for *plausibility* — not fitted to them.
 
 ### [workouts][platform] Q-421 — the accurate energy model is already vendored, downloaded and tested, and has zero callers
 
@@ -637,8 +731,23 @@ never written.
   repeating one layer up. Pick the basis per session, store which was used, and label it.
 - **⚠ Re-scores history** for every session with HR. Size it before shipping, per the Tuning rule —
   and note it moves the `adaptive-tdee` maintenance window too, since that reads the same figures.
-- **Surface:** `packages/shared/**`, `lib/oura-models/**`, `app/api/**` — **Lane A**. The ONNX runtime
-  is server-only, so none of this can move client-side.
+- **✅ DECIDED 2026-08-19 — route (b), the ONNX path, is REJECTED by the owner. Do not re-propose it.**
+  Asked to choose, they said: *"I dont want to use oura models - so skip that option where possible."*
+  So this entry is now **route (a) only** — the closed-form HR estimator. Everything above about
+  assembling the 50-feature vector is retained as the record of why the model was not used, not as
+  work to do.
+- **That decision makes the item smaller and cleaner, not weaker.** The closed-form estimator needs
+  only average HR, age, weight and sex, so **it introduces no model, no ONNX runtime, no new download,
+  and no new Oura dependency of any kind** — it is the option that best matches the instruction, not a
+  compromise against it.
+- **⚠ One distinction to keep straight, so this decision is not over-applied.** *"No Oura models"* does
+  not retire the estimator in use today. `estWorkoutKcal` is a **ported formula** — a MET lookup table
+  plus Schofield BMR arithmetic — not a model: no inference, no weights, nothing loaded at runtime.
+  The ONNX heads are the models. Replacing the MET/Schofield port as well would be a much larger
+  question about where the numbers come from at all, and **the owner has not asked for that** — do not
+  read it into this decision. Ask before widening it.
+- **Surface:** `packages/shared/**` and `app/api/**` — **Lane A**. `lib/oura-models/**` is no longer in
+  scope for this item, which is the practical effect of the decision above.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
@@ -682,7 +791,6 @@ residual into a correction rather than a mystery.
 - **What would count as done:** a stated multiplier with its confidence, derived only from gated
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
-
 
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
