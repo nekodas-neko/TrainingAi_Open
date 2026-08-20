@@ -367,6 +367,36 @@ design decision. See the correction at the top of that entry.
 
 ### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
 
+> **⚠️ The Lane A half SHIPPED 2026-08-19 — but NOT where this entry says, and the difference is the
+> point. What remains is Lane B: render it.**
+>
+> The entry says *"`/api/day-log` is Lane A's"*. Putting the figure there would have **recreated the
+> exact defect the day screen already guards against.** `components/health/day-detail/energy-summary.ts`
+> states the rule outright: the Energy section's `workoutKcal` is read from
+> `/api/nutrition/energy-balance` *"because the day screen disagreeing with Nutrition about how much
+> was burned is worse than either being slightly off"*. A second per-session estimate computed in
+> `day-log` off its own profile and weight lookups would disagree with the total sitting two cards
+> below it, on the same screen.
+>
+> **So it ships from `computeActiveEnergy` — the function that already sums the day total — as the
+> addends of that total.** `activeBreakdown.workoutKcalBySession: { id, kcal }[]` on
+> `/api/nutrition/energy-balance`. The parts cannot disagree with the total because they *are* the
+> terms that were summed.
+>
+> **Lane B: join on session `id`, not name.** `/api/day-log` already exposes `workoutSessionId` per
+> exercise, so no name-keying is needed — which matters, since a name is not identity here and two
+> same-named sessions in one day would collide.
+>
+> **Values are unrounded on purpose.** Rounding each addend and rounding their sum are different
+> numbers; a card reading 120 + 130 under a total of 251 is what that avoids. Round at render.
+>
+> **Still Lane B's, and still open:** the presentation question this entry raises — the estimate is
+> **duration-only** (flat MET 8 over the clock; load, volume and reps are not inputs), so a 49-minute
+> session moving 2,364 kg and one moving 800 kg produce the same number. Sitting it in the same row as
+> VOLUME KG / EXERCISES / SETS implies it is derived from them. Label it (`est.`, `~kcal`) or place it
+> where the implication is weaker. That decision was not made here.
+
+
 - **Branch:** `feat/day-training-card-kcal-stat`
 - **Added:** 2026-08-18 · owner, with a screenshot of the day screen (Tuesday 18 August):
   *"the training shohld have a stat saying the calories burnt from the workout."*

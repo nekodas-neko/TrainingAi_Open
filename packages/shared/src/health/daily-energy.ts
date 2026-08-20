@@ -63,8 +63,9 @@ export interface EnergyProfile {
 
 export interface ActiveEnergyInput {
   profile: EnergyProfile
-  /** Completed strength sessions today (duration in minutes). */
-  strengthSessions: { durationMin: number }[]
+  /** Completed strength sessions today (duration in minutes). `id` is optional so existing callers
+   *  are unchanged; pass it to get the per-session breakdown back. */
+  strengthSessions: { durationMin: number; id?: string }[]
   /** Today's logged activities. */
   activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null }[]
   /** Phone-pedometer steps today (body_metrics), excluding treadmill/logged-indoor steps. */
@@ -76,6 +77,20 @@ export interface ActiveEnergyResult {
   activityKcal: number
   stepsKcal: number
   total: number
+  /**
+   * The addends of `workoutKcal`, per strength session that supplied an `id` (Q-391).
+   *
+   * **The point of returning them from here rather than recomputing per session elsewhere** is that
+   * a per-session figure and the day total then cannot disagree — these ARE the terms that were
+   * summed. `energy-summary.ts` already records why that matters: the day screen's Energy section
+   * deliberately reads its `workoutKcal` from this same route *"because the day screen disagreeing
+   * with Nutrition about how much was burned is worse than either being slightly off"*. A second
+   * estimate computed in `/api/day-log` off its own profile inputs would reintroduce exactly that.
+   *
+   * A session filtered out by the plausibility guard is absent rather than zero — it contributed
+   * nothing to the total, and zero would read as "measured, and it was nothing".
+   */
+  workoutKcalBySession: { id: string; kcal: number }[]
 }
 
 /** Duration (min) for a logged activity: use the recorded duration, else estimate from distance. */
@@ -96,7 +111,7 @@ function activityDurationMin(a: { activityType: string; durationMin?: number | n
  */
 export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResult {
   const { ageYears, weightKg, sex } = input.profile
-  const zero = { workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0 }
+  const zero = { workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0, workoutKcalBySession: [] }
   if (ageYears == null || weightKg == null || sex == null) return zero
 
   const est = (activityId: number, durationMin: number) =>
@@ -104,8 +119,13 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
 
   // Strength — activity 8.
   let workoutKcal = 0
+  const workoutKcalBySession: { id: string; kcal: number }[] = []
   for (const s of input.strengthSessions) {
-    if (s.durationMin > 0 && s.durationMin <= MAX_PLAUSIBLE_SESSION_MIN) workoutKcal += est(8, s.durationMin)
+    if (s.durationMin > 0 && s.durationMin <= MAX_PLAUSIBLE_SESSION_MIN) {
+      const kcal = est(8, s.durationMin)
+      workoutKcal += kcal
+      if (s.id != null) workoutKcalBySession.push({ id: s.id, kcal })
+    }
   }
 
   // Logged activities — MET by type over their duration.
@@ -128,5 +148,10 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
 
   const round = (n: number) => Math.round(n)
   workoutKcal = round(workoutKcal); activityKcal = round(activityKcal); stepsKcal = round(stepsKcal)
-  return { workoutKcal, activityKcal, stepsKcal, total: workoutKcal + activityKcal + stepsKcal }
+  // `workoutKcalBySession` is deliberately NOT rounded here, while `workoutKcal` is. Rounding each
+  // addend and rounding their sum are different numbers, and a card showing 120 + 130 under a total
+  // of 251 is the failure this breakdown exists to avoid. Returned exact, the parts sum to the
+  // pre-rounding total by construction — the same additions in the same order — and how to display
+  // them is the renderer's decision.
+  return { workoutKcal, activityKcal, stepsKcal, total: workoutKcal + activityKcal + stepsKcal, workoutKcalBySession }
 }

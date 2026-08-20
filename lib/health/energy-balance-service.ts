@@ -61,7 +61,14 @@ export interface EnergyBalanceResult {
     scaled: { proteinG: number; carbsG: number; fatG: number }
     earnedKcal: number
   } | null
-  activeBreakdown: { workoutKcal: number; activityKcal: number; stepsKcal: number }
+  activeBreakdown: {
+    workoutKcal: number
+    activityKcal: number
+    stepsKcal: number
+    /** The exact addends of `workoutKcal`, per strength session (Q-391). Unrounded — see
+     *  `computeActiveEnergy`. Join on `workoutSessionId` from `/api/day-log`. */
+    workoutKcalBySession: { id: string; kcal: number }[]
+  }
   goal: FitnessGoal | null
   missingProfileFields: string[]
 }
@@ -123,7 +130,11 @@ export async function computeEnergyBalance(
       profile: energyProfile,
       strengthSessions: workouts
         .filter(ws => ws.completedAt != null && ws.startedAt >= start && ws.startedAt < end)
-        .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000 })),
+        // `id` threads through so `workoutKcalBySession` can come back keyed by the session (Q-391).
+        // `/api/day-log` already exposes `workoutSessionId` per exercise, so the day screen's
+        // Training card can join on it without keying by session NAME — which is not identity here
+        // and breaks outright for two same-named sessions in one day.
+        .map(ws => ({ id: ws.id, durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000 })),
       activities: activityLogs
         .filter(a => a.date === day)
         .map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
@@ -135,6 +146,7 @@ export async function computeEnergyBalance(
     workoutKcal: activeEnergy.workoutKcal,
     activityKcal: activeEnergy.activityKcal,
     stepsKcal: activeEnergy.stepsKcal,
+    workoutKcalBySession: activeEnergy.workoutKcalBySession,
   }
 
   const intakeKcal = Math.round(intakeByDate.get(date) ?? 0)
