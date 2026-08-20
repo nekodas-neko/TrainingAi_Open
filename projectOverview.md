@@ -71,6 +71,13 @@ production shows no row that was ever mis-linked — though `claude_ro` is row-s
 that is *no evidence*, not *has not happened*
 ([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
 
+**RV-33 closed alongside it** — `POST /api/progression-styles` and
+`PATCH /api/nutrition/food-logs/[id]` answered a *correct* ownership refusal with an empty-bodied 500
+and filed it as a server fault, because the `NotFoundError` escaped an unguarded handler. Both are
+404s with a body now, and `updateMealType` — the only repository writer that passed its argument into
+`.set()` wholesale — is whitelisted column by column
+([journal](docs/overview/entries/2026-08-20-ownership-refusal-status.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
 from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries

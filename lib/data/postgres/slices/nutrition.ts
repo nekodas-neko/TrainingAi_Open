@@ -82,8 +82,23 @@ export async function updateMealType(db: Db, id: string, userId: string, data: P
   // Q-482's probe, which sends `{}`; every sibling PATCH route already handled this, so it is the
   // one route, not a class. Guarded here rather than at the route so a second caller cannot repeat it.
   if (Object.keys(data).length === 0) throw new UserFacingError('No fields to update', 400)
+  // RV-33: column by column, the way its ~20 siblings already do. Passing `data` into `.set()`
+  // wholesale was safe only because its one caller validates with a `.strict()` Zod schema — the
+  // guarantee lived at the route, so a second caller would inherit nothing, and `userId`/`createdAt`
+  // are settable column keys whatever the TypeScript `Omit<>` says (it is compile-time only).
+  const patch: Partial<typeof s.mealTypes.$inferInsert> = {}
+  if (data.name !== undefined)             patch.name = data.name
+  if (data.emoji !== undefined)            patch.emoji = data.emoji
+  if (data.sortOrder !== undefined)        patch.sortOrder = data.sortOrder
+  if (data.timeStartHour !== undefined)    patch.timeStartHour = data.timeStartHour
+  if (data.timeEndHour !== undefined)      patch.timeEndHour = data.timeEndHour
+  if (data.remindersEnabled !== undefined) patch.remindersEnabled = data.remindersEnabled
+  if (data.required !== undefined)         patch.required = data.required
+  // A body of only unknown keys reaches the same "No values to set" throw the guard above exists to
+  // prevent, so it gets the same refusal rather than a 500.
+  if (Object.keys(patch).length === 0) throw new UserFacingError('No fields to update', 400)
   const [r] = await db.update(s.mealTypes)
-    .set(data)
+    .set(patch)
     .where(and(eq(s.mealTypes.id, id), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
     .returning()
   if (!r) throw new NotFoundError('Meal type')
