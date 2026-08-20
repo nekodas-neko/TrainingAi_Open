@@ -3,12 +3,13 @@
   "files": {
     "projectOverview.md": 8043,
     "docs/implementation-backlog.md": 11610,
-    "CLAUDE.md": 1107,
+    "CLAUDE.md": 1115,
     "docs/agents/state/implementation-lane-a.md": 163,
     "docs/agents/state/implementation-lane-b.md": 413,
     "docs/agents/state/bugfix.md": 161,
     "docs/agents/state/review.md": 1281,
-    "docs/agents/state/tuning.md": 563
+    "docs/agents/state/tuning.md": 563,
+    "docs/agents/state/orchestrator.md": 62
   },
   "entries": {
     "dir": "docs/overview/entries",
