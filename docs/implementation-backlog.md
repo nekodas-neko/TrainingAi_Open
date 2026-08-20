@@ -329,56 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
-
-> **⚠️ MEASURED AND MOSTLY DEFUSED 2026-08-20 (Lane A) — read this before starting; the entry below
-> is the original.** ([`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md))
->
-> **The question this entry says to answer first is answered: production is clean.**
-> `claude_ro.schema_migrations` holds **206 of 206** filenames, the four among them — `054`, `055`
-> and `082` recorded 2026-07-21, `157` on 2026-07-28. So `ensureSchema` skips them in production and
-> nothing re-runs on a cold start there. This is local-only, exactly as the entry hoped rather than
-> feared.
->
-> **And they were never failures.** The four raise SQLSTATEs (42710, 42710, 23505, 42P07) that
-> `ensureSchema()` classifies as *already present* and steps over; `migrate.js` had no classifier at
-> all and called them failures — the two runners disagreeing, in the file whose docstring says it
-> mirrors the other. Fixed, along with the larger thing it was hiding: `migrate.js` exited 0
-> regardless, so the CI job named **Migration Check** could not fail on a genuinely broken migration.
->
-> **What is actually left is small.** The four are still not *recorded* locally, so they are retried
-> on every cold start — four statements that fail cleanly and are reported as benign. Making each
-> idempotent (`IF NOT EXISTS`, an explicit `pg_constraint` guard for the two `ADD CONSTRAINT`s,
-> `ON CONFLICT DO NOTHING` for the seed) would let them succeed and record, ending the retry. It
-> edits already-applied migration files, which is safe here because it changes nothing for a
-> database that has them and nothing for a fresh one — but it is no longer buying anything except
-> quiet. Judge it on that, not on the original framing.
-
-- **Branch:** `fix/non-idempotent-migrations`
-- **Added:** 2026-08-19 · observed in this session's own start-up hook output
-- **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.
-
-`scripts/local-db/migrate.js` reports `applied 0, skipped 200 already recorded, 4 failed` on every
-run of an already-migrated database. The four never reach the recorded set, so they are retried
-forever:
-
-```
-054_users_email_unique.sql        relation "users_email_unique" already exists
-055_friends_and_titles.sql        relation "users_friend_code_unique" already exists
-082_exercise_library_expand_2.sql duplicate key value violates unique constraint "exercise_library_name_key"
-157_scale_ble.sql                 relation "scale_raw_samples" already exists
-```
-
-**These are distinct from the three (`038`, `040`, `041`) Lane A's baton records as known and
-ignorable** — do not assume the baton already covers them.
-
-Locally this is noise: the objects exist, so nothing is broken. **What needs establishing before any
-fix is whether the same four are unrecorded in production**, because `ensureSchema` tracks by
-filename and an unrecorded migration is one that re-runs on every cold start. Answer that first via
-the admin query endpoint; the fix (make each idempotent — `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`)
-is small and uninteresting by comparison, and per this repo's own rule a seed that never corrects a
-drifted production row is the trap to check for.
-
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -988,6 +938,32 @@ change.
   sandbox; no device, no production data.
 - **What would count as done:** two independently-green additive docs PRs can merge in either order
   without the second one, or `main`, going red — demonstrated, not argued.
+
+
+### [platform] LA-13 — nothing replays the migrations against a schema that already has everything
+
+- **Branch:** `feat/migration-replay-check`
+- **Added:** 2026-08-20 · found while fixing PS-3, by building the check by hand
+- **Lane: A** — `scripts/**` and `.github/workflows/**`.
+
+`Migration Check` runs `migrate.js` against a **fresh** database, which is the case where a
+non-idempotent migration cannot fail. PS-3's four hid for months because the only path that exercises
+them is a database that already holds their objects — and the worst of them, `157`, is a
+`CREATE TABLE` followed by ten `ADD COLUMN`s, where the first collision aborts every statement after
+it. That shape is how the local store has twice been left silently dead on Android; the Postgres side
+has no equivalent guard.
+
+The check is two lines on top of the job that already exists: after the fresh run, `TRUNCATE
+schema_migrations` and run it again. Measured on 2026-08-20 with PS-3's fixes in place — **205 of 206
+replay cleanly**.
+
+The one that does not is **`001_initial.sql`**, and it is not worth fixing: it fails with
+`foreign key constraint "cardio_sessions_user_id_fkey" cannot be implemented` because `002` renamed
+the column it references, so replaying `001` onto a modern schema is genuinely incoherent. A replay
+check needs to exempt it by name, with that reason recorded next to the exemption.
+
+- **What would count as done:** a deliberately non-idempotent statement added to any migration turns
+  the job red, and removing it turns it green — demonstrated, not argued.
 
 
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse

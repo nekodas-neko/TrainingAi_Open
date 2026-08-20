@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — PS-3 closed (`fix/non-idempotent-migrations`)
+
+**No raise — recorded because one was drafted twice and both figures went stale.**
+
+Three lines went onto the existing migration-gate handoff paragraph, recording that the four
+migrations retried on every cold start are now idempotent and the dev database records 206 of 206.
+Against `main` at the time that needed 8055 → 8058; a compaction landed mid-PR and it became
+7875 → 7878; a second compaction landed and the file now sits at **7806**, comfortably under the
+7875 already on `main`. So the raise was withdrawn rather than carried.
+
+Worth a block despite raising nothing: a baseline drafted against a `main` that then compacts is a
+number that *looks* deliberate and is stale. Re-measure on the merged tree at the end, not when the
+lines are written.
+
 ## 2026-08-20 — re-measured a third time, after #263 (`fix/migrate-classifies-idempotent`)
 
 **projectOverview.md → 8055 · docs/implementation-backlog.md → 11647 ·

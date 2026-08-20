@@ -1,4 +1,7 @@
 -- Add friend_code and equipped_title to users
+--
+-- IDEMPOTENT: the ADD CONSTRAINT is guarded with a pg_constraint check, matching 003.
+
 ALTER TABLE users ADD COLUMN IF NOT EXISTS friend_code text;
 ALTER TABLE users ADD COLUMN IF NOT EXISTS equipped_title text;
 
@@ -23,7 +26,15 @@ BEGIN
   END LOOP;
 END $$;
 
-ALTER TABLE users ADD CONSTRAINT users_friend_code_unique UNIQUE (friend_code);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'users_friend_code_unique' AND conrelid = 'users'::regclass
+  ) THEN
+    ALTER TABLE users ADD CONSTRAINT users_friend_code_unique UNIQUE (friend_code);
+  END IF;
+END $$;
 
 -- Friend connections
 CREATE TABLE IF NOT EXISTS friendships (
