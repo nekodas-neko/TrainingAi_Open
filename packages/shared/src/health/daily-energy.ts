@@ -14,7 +14,7 @@
  * subtracts a 1.5-MET resting baseline, so every term here is net active energy above rest —
  * consistent with the sedentary base.
  */
-import { estWorkoutKcal, intensityFromRpe, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estWorkoutKcal, estWorkoutKcalFromHr, intensityFromRpe, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
 
 // Defined in a dependency-free leaf module and re-exported here, so a caller that needs only the
 // number does not pull in this file's `workout-energy` → `oura-models` → `node:path` chain. Every
@@ -70,7 +70,7 @@ export interface ActiveEnergyInput {
    * back. `rpe` is the session's stored `session_rpe` (Q-419) — omit it and the session is estimated
    * at `moderate`, exactly as before.
    */
-  strengthSessions: { durationMin: number; id?: string; rpe?: number | null }[]
+  strengthSessions: { durationMin: number; id?: string; rpe?: number | null; avgBpm?: number | null }[]
   /** Today's logged activities. */
   activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null }[]
   /** Phone-pedometer steps today (body_metrics), excluding treadmill/logged-indoor steps. */
@@ -135,7 +135,14 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
   const workoutKcalBySession: { id: string; kcal: number }[] = []
   for (const s of input.strengthSessions) {
     if (s.durationMin > 0 && s.durationMin <= MAX_PLAUSIBLE_SESSION_MIN) {
-      const kcal = est(8, s.durationMin, intensityFromRpe(s.rpe))
+      // Q-421: heart rate first, MET as the fallback — which is what the MET path always was
+      // (Oura's `has_enough_motion === false` branch). `estWorkoutKcalFromHr` returns null whenever
+      // it cannot support an estimate (no strap that session, an implausible bpm, an incomplete
+      // profile), and 36 of the owner's 78 sessions have no HR at all, so the fallback is the common
+      // case rather than an edge one.
+      const kcal = estWorkoutKcalFromHr({
+        durationMin: s.durationMin, avgBpm: s.avgBpm, ageYears, weightKg, sex,
+      }) ?? est(8, s.durationMin, intensityFromRpe(s.rpe))
       workoutKcal += kcal
       if (s.id != null) workoutKcalBySession.push({ id: s.id, kcal })
     }
