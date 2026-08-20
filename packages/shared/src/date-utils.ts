@@ -182,12 +182,21 @@ export function isCalendarDate(dateStr: string): boolean {
 // on exactly that. A `YYYY-MM-DD` contract cannot express a five-digit year, so the fix belongs at
 // the call site: iterate a validated day COUNT, never `for (d = start; d <= end; …)`.
 //
-// Known limit, deliberately not handled here: `Date.UTC` maps a year of 0–99 onto 1900–1999, so a
-// date in the first century shifts to ~1900. Tracked as Q-329 — it needs the function restructured,
-// not a pad.
+// The 0–99 year range is corrected inside the function (Q-329) — `Date.UTC` would otherwise read it
+// as 1900+y and move a first-century date by ~1,900 years.
 export function shiftDateStr(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   const shifted = new Date(Date.UTC(y, m - 1, d + days))
+  // `Date.UTC` applies the legacy two-digit-year mapping: a year of 0–99 is read as 1900+y, so
+  // `shiftDateStr('0001-01-01', -1)` returned **1900-12-31** instead of 0000-12-31 — off by ~1,900
+  // years, silently (Q-329). Undo it for exactly that range and leave every ordinary year on the
+  // path all the existing tests cover.
+  //
+  // Deliberately a correction rather than a rebuild: constructing in a safe year and re-stamping
+  // was tried first and is WRONG — anchoring on 2000 (a leap year) makes `2026-03-01` minus a day
+  // return March 1 again, because the intermediate lands on Feb 29 and re-stamping a non-leap year
+  // rolls it forward. The conditional keeps that whole class out of the common path.
+  if (y >= 0 && y < 100) shifted.setUTCFullYear(shifted.getUTCFullYear() - 1900)
   return [
     String(shifted.getUTCFullYear()).padStart(4, '0'),
     String(shifted.getUTCMonth() + 1).padStart(2, '0'),
