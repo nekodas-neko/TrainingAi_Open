@@ -1,37 +1,9 @@
 import type { NextConfig } from "next";
+import { buildCsp } from "./lib/security/csp";
 
 const isDev = process.env.NODE_ENV === 'development';
 
-const csp = [
-  "default-src 'self'",
-  // 'unsafe-inline': Next.js App Router emits inline bootstrap/Flight scripts
-  // and we have no middleware to attach nonces (follow-up). 'unsafe-eval' is
-  // dev-only — Turbopack/React Refresh need eval for HMR; production does not.
-  `script-src 'self' 'unsafe-inline'${isDev ? " 'unsafe-eval'" : ''} https://accounts.google.com`,
-  // 'unsafe-inline' styles: motion/Radix/next-themes set inline style
-  // attributes (Tailwind itself is a compiled stylesheet and doesn't need it).
-  "style-src 'self' 'unsafe-inline'",
-  // raw.githubusercontent.com: the exercise dataset's GIFs and stills, rendered as plain <img src>
-  // by exercise-stats-sheet.tsx and written into exercise_library by seed-exercise-gifs. The host
-  // was in images.remotePatterns below but in neither directive here, so every exercise without an
-  // S3 GIF (getThumbnail's same-origin proxy path) showed nothing at all.
-  "img-src 'self' data: blob: https://raw.githubusercontent.com https://*.tile.openstreetmap.org https://*.tile.thunderforest.com https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com",
-  "font-src 'self'",
-  // Tile domains: the service worker's fetch handler re-issues fetch() for every request
-  // (including cross-origin tile <img> loads) to populate its cache — a fetch() call made
-  // from inside a service worker is governed by connect-src, not img-src, regardless of the
-  // resource type. img-src alone (above) covers a direct <img> load but not the SW's own
-  // re-fetch of that same request, so both must be listed here too or the SW's fetch is
-  // silently CSP-blocked and every tile request fails.
-  // raw.githubusercontent.com is here for the same reason the tile domains are — the SW's re-fetch,
-  // not the <img> itself. Listing it only in img-src reproduces the exact bug this comment
-  // describes, one host later.
-  "connect-src 'self' https://generativelanguage.googleapis.com https://accounts.google.com https://oauth2.googleapis.com https://cloud.ouraring.com https://api.ouraring.com https://api.open-meteo.com https://geocoding-api.open-meteo.com https://raw.githubusercontent.com https://*.tile.openstreetmap.org https://*.tile.thunderforest.com wss: ws:",
-  "frame-src 'none'",
-  "object-src 'none'",
-  "base-uri 'self'",
-  "form-action 'self' https://accounts.google.com",
-].join('; ');
+const csp = buildCsp(isDev);
 
 const securityHeaders = [
   {

@@ -16,6 +16,39 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — the Orchestrator role
+
+**CLAUDE.md 1107 → 1115.** A sixth standing agent, owning queue and docs hygiene: clearing entries
+that announce their own completion, assigning batches, resolving lanes, reconciling docs against
+reality. The CLAUDE.md growth is the two rules an implementer needs without opening the contract —
+the completed-heading check and its `Keep:` opt-out, and the role's place in the letter list.
+
+`docs/agents/state/orchestrator.md` joins the ratchet as a new row at 62 lines, not a raise.
+
+---
+
+## 2026-08-20 — the CSP could not start a WASM session (`fix/csp-wasm-unsafe-eval`, Q-546)
+
+**projectOverview.md 8018 → 8043.**
+
+One Known-Issues row, 25 lines. It is longer than a header change usually warrants because three
+things about it are not obvious from the diff and would otherwise be re-derived:
+
+- **Why the missing directive survived.** `onnxruntime-web`'s parity test passes under Node, which
+  enforces no CSP at all — so it proved the model matched its golden while nothing could have loaded
+  it in a WebView. A reader who does not know that reads the green test as coverage.
+- **What is still owed on the device, and that it is two separate things.** That the app still loads
+  on the S25 under the new header, and — not possible yet — that a real WASM session instantiates,
+  which cannot be asserted until the first client-side model lands.
+- **One thing measured and deliberately not acted on:** `onnxruntime-web` 1.27 can create a worker
+  from a blob URL when threading is enabled, which `script-src` would also have to permit. Recorded
+  so the next session does not re-measure it, and left alone because widening a security header on
+  speculation is the wrong order.
+
+The backlog shrank in the same PR (Q-546 removed), so only this number moves.
+
+---
+
 ## 2026-08-19 — the extraction itself (`claude/agent-setup-task-numbering-5gojd9`)
 
 **projectOverview.md 8009 → 8018 · docs/implementation-backlog.md 11177 → 11338 · CLAUDE.md 1085 → 1100.**
@@ -1050,11 +1083,30 @@ into a single blob rather than grepping per entry — 60 entries x the whole doc
 of thing that quietly adds a minute to every CI run.
 ```
 
-## 2026-08-20 — `projectOverview.md` 8,018 → 8,046 (+28, Lane B)
+## 2026-08-20 — `docs/implementation-backlog.md` 11559 → 11610, `docs/agents/state/bugfix.md` 136 → 161
 
-One Known-Issues row for the Q-415/Q-417/Q-323 calorie-budget work (v1.334.0). It is longer than a
-typical row on purpose: the entry carries **two outstanding checks rather than a description of the
-fix** — an unverified `earned > 0` path with the first thing to look at named, and a four-stop
-`conic-gradient` that has never met Samsung's WebView. Both are the kind of thing the next session
-must read *before* it can conclude this shipped clean, which is what this file is for; the narrative
-lives in `docs/overview/entries/2026-08-20-one-calorie-budget.md`.
+Session wrap-up for the workout-energy intake cluster.
+
+**Backlog (+51):** one entry, Q-424 — a shrink-only ratchet can leave `main` red and nothing looks.
+Found by walking into it: a branch cut from pristine `origin/main` failed `pnpm check:rules` on a
+change that could not have caused it, because two docs PRs had each merged green against a baseline
+the other was also raising. #254 (this file's own origin) fixed the conflict *frequency* by moving the
+numbers here; it did not make the check order-independent, which is what the entry is about.
+
+**Baton (+25):** the BugFix baton is rewritten in full at each handover, not appended, so its size
+tracks how much state the role is carrying rather than accumulating. This rewrite added the traps that
+cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
+having two causes — and one superseded decision recorded with its correction, which is worth more
+lines than the decision was.
+
+## 2026-08-20 — `projectOverview.md` 8,043 → 8,070 (+27); Lane B baton 413 → 115 (Lane B)
+
+**Up:** one Known-Issues row for the Q-415/Q-417/Q-323 calorie-budget work (v1.334.0). Longer than a
+typical row on purpose — it carries **two outstanding checks rather than a description of the fix**:
+an unverified `earned > 0` path with the first thing to look at named, and a four-stop
+`conic-gradient` that has never met Samsung's WebView. Both must be read *before* the next session
+can conclude this shipped clean, which is what the index is for. The narrative lives in
+`docs/overview/entries/2026-08-20-one-calorie-budget.md`.
+
+**Down:** the Lane B baton was rewritten in full per the handover rule (never appended) and came in
+at 115 lines against a 413 baseline, so the baseline follows it down.
