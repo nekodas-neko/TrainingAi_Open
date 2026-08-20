@@ -1818,6 +1818,7 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 - **Branch:** `feat/nutrition-coach-meal-plan`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
 - **Lane:** ?
+- **Needs:** Q-398
 - **Placement:** in the nutrition cluster, after Q-398. It **depends on Q-398**: the plan's exit
   route in this design is "Save all as meals", and until plan meals can become ordinary saved
   meals, a conversational plan has nowhere to land and is only a nicer-looking dead end.
@@ -2625,6 +2626,7 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 
 - **Branch:** `fix/activity-log-delete-affected-rows`
+- **Needs:** Q-328
 - **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
   [`docs/reviews/2026-08-18-cross-user-isolation.md`](reviews/2026-08-18-cross-user-isolation.md)
 - **Placement:** low. **Not a leak — verified, not assumed.** As user B, deleting user A's activity

@@ -18,6 +18,24 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — Lane A's baton, second raise in one day (`fix/queue-blockers-as-fields`)
+
+**docs/agents/state/implementation-lane-a.md 124 → 150.** 113 → 124 → 150 in a single day, and a
+ratchet raised twice by the same author on the same file is exactly the erosion these baselines exist
+to prevent. So: what it bought, and what should happen instead.
+
+The growth is four more traps (a helper extracted for testability but never wired to its caller;
+green not proving a CI-only path ran; a check that adds a network call adds a way to fail) and a
+**Now** section that says why each of the top three queue items is not startable — which is the single
+most useful thing a successor can be told, and it cannot be derived from the queue.
+
+**The honest conclusion is that the ratchet is the wrong instrument here, and PS-4 is the fix.** A
+baton is rewritten in full at every handoff, so its number measures one session, not accretion; 150 is
+PS-4's own ceiling, and I trimmed twice to reach it rather than raising to whatever fell out. The
+durable part — inherited findings none of which is recorded elsewhere — should move to permanent homes
+(the Oura ones to `docs/oura-ble-operations.md`) at the next handoff, which is the real reduction. The
+baton now says so in place.
+
 ## 2026-08-20 — LA-13 closed (`feat/migration-replay-check`)
 
 **projectOverview.md 7883 → 7889.**
