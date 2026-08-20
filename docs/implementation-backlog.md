@@ -339,6 +339,12 @@ without a queue entry is a dropped finding.*
 the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
 **412** (its `Now` section alone is 200), Tuning **562**, Review **1,280**.
 
+**Re-measured 2026-08-20 — three of six are done, and each fell at its own role's handoff, which is
+what the entry predicted.** Orchestrator **62**, Lane A **113**, Lane B **134** (412 → 134 at the
+seventh Lane B handoff; its baseline is ratcheted down to lock the reclaim in). Still over: BugFix
+**161**, Review **170**, Tuning **582**. Tuning is the one that will not fall out of a routine
+handoff — it is 4× the target and needs its narrative moved to a dated handoff doc deliberately.
+
 This matters more than tidiness. With the lane path lists replaced by a rule, a baton's **Claimed
 paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
 412-line file before starting an item, which means the mechanism is not doing its job.
