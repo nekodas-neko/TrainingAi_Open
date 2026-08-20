@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — Q-331 closed (`test/session-energy-cross-surface-parity`)
+
+**projectOverview.md 7838 → 7848.**
+
+Ten lines, because the entry was filed as a hardening item and closed as a live defect: the done
+screen and the day screen were estimating the same workout with two different formulas, for 42 of 78
+sessions. A reader of the index needs the *defect*, not the test — so the index says which sessions
+were affected and that a mutation-verified test now holds the two together, and the journal entry
+carries the measurement and the vacuity trap the test had to get past.
+
+**This number was drafted three times before it was right** — 8058, then 7885, then no raise at all,
+as two compactions and four other PRs moved the base underneath it. Only the last one was measured on
+the tree this PR actually merges into. Draft the prose when the lines are written; take the number at
+the end, on the final base, or it is a figure that looks deliberate and is stale.
+
 ## 2026-08-20 — PS-3 closed (`fix/non-idempotent-migrations`)
 
 **No raise — recorded because one was drafted twice and both figures went stale.**

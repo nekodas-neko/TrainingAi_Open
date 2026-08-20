@@ -564,33 +564,6 @@ the name, since two cards would otherwise share one expanded state.
 - **Verified:** the route's collision is reproduced (Q-362a). The three consumers are read from
   source — **the merged-card and wrong-HR rendering is inferred, not observed on screen.**
 
-### [workouts] Q-331 — the done screen and the day agree on a session's kcal, but only a measurement says so, not a test
-
-- **Branch:** `test/session-energy-cross-surface-parity`
-- **Added:** 2026-08-20 · Lane A, filed closing Q-330 · [`journal`](overview/entries/2026-08-20-session-energy-weight-source.md)
-- **Placement:** low. Nothing is broken — this is the one clause of Q-419's acceptance criterion
-  (*"a test pins the three surfaces to one number"*) that its own PR could not close.
-
-Q-419 and Q-330 between them made `GET /api/workout-sessions/[id]/energy` and
-`computeActiveEnergy`'s `workoutKcalBySession` agree for the same session. **Verified by measurement
-against the running app on 2026-08-20** — a session completed that minute, RPE 9, both surfaces
-reporting **106** where they previously read 107 and 106. No test holds them there.
-
-- **Why the obvious test cannot be written yet.** Both surfaces estimate strength as activity **8**,
-  and the committed fixture constants list it as `met_moderate: 0.6` — below `estWorkoutKcal`'s
-  `met - 1.5` floor, so in CI and the sandbox **both sides are 0**. An equality assertion between two
-  zeroes passes whatever the inputs are: it is the Q-391 vacuity trap, one surface wider. Picking a
-  different activity is not available either — the day path hardcodes 8.
-- **What would actually work:** inject the MET table (or the estimator) into both paths for the test,
-  so parity is asserted at a MET the formula responds to. That is a testability change to
-  `daily-energy.ts` / the energy route, not a fixture change — **do not "fix" this by unscrubbing the
-  fixtures**, which is Q-312 and deliberate.
-- **Surface:** `packages/shared/**`, `app/api/**` — Lane A. No device, no production data.
-- **What would count as done:** one test computes a session's kcal through both surfaces at a MET
-  above the floor and asserts the same rounded number, and fails if either side changes its weight,
-  duration or intensity source.
-
-
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
