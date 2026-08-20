@@ -25,7 +25,7 @@
 ## 🔖 Current Status
 
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-17.
+**Last updated:** 2026-08-20.
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is
@@ -50,7 +50,10 @@ are actually startable.
 immediately caught one: `142_claude_ro_views.sql` creates a view over a table `143` creates, so on
 every fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
 the CSP's missing `'wasm-unsafe-eval'`, and the done screen estimating calories from the first
-weight ever logged.
+weight ever logged. **PS-3 closed on top of it (2026-08-20):** the four migrations that failed on a
+database already holding their objects — and so were retried on every cold start — are idempotent,
+and the dev database now records 206 of 206
+([journal](docs/overview/entries/2026-08-20-non-idempotent-migrations.md)).
 
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned

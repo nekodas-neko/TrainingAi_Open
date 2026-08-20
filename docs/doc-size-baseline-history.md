@@ -16,6 +16,15 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — PS-3 closed (`fix/non-idempotent-migrations`)
+
+**projectOverview.md 8055 → 8058.**
+
+Three lines on the existing migration-gate handoff paragraph, recording that the four migrations
+retried on every cold start are now idempotent and the dev database records 206 of 206. It sits with
+the gate work rather than opening a section of its own, which is why it is three lines and not a
+block. The backlog shrank in the same PR — PS-3 removed, LA-13 added — so no raise was needed there.
+
 ## 2026-08-20 — re-measured a third time, after #263 (`fix/migrate-classifies-idempotent`)
 
 **projectOverview.md → 8055 · docs/implementation-backlog.md → 11647 ·
