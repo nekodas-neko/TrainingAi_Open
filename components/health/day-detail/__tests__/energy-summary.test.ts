@@ -7,12 +7,13 @@
 // day screen simply never asked for it. These tests cover the display rules the new section adds
 // on top: when it stays hidden, and how the net figure is labelled.
 import { describe, it, expect } from 'vitest'
-import { energyDaySummary } from '../energy-summary'
+import { energyDaySummary, workoutKcalBySession } from '../energy-summary'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 
 function response(over: {
   intakeKcal?: number; expenditureKcal?: number; restingBaseKcal?: number; netKcal?: number
   workoutKcal?: number; activityKcal?: number; stepsKcal?: number
+  bySession?: { id: string; kcal: number }[]
   balanceNull?: boolean
 }): EnergyBalanceResponse {
   return {
@@ -30,6 +31,7 @@ function response(over: {
       workoutKcal: over.workoutKcal ?? 0,
       activityKcal: over.activityKcal ?? 0,
       stepsKcal: over.stepsKcal ?? 0,
+      workoutKcalBySession: over.bySession ?? [],
     },
     goal: null,
     missingProfileFields: [],
@@ -79,5 +81,64 @@ describe('energyDaySummary (Q-247)', () => {
     expect(Number.isInteger(s.expenditureKcal)).toBe(true)
     expect(Number.isInteger(s.netKcal)).toBe(true)
     expect(s.breakdown.every(b => Number.isInteger(b.kcal))).toBe(true)
+  })
+})
+
+describe('workoutKcalBySession (Q-391)', () => {
+  /**
+   * The consistency requirement the entry names: the session cards on a day must sum to the ENERGY
+   * section's "Workouts" row on the same screen. It holds **by construction** — these are the
+   * addends `computeActiveEnergy` summed, not a second estimate — and this asserts the wiring keeps
+   * it that way rather than trusting the comment.
+   */
+  it('the per-session parts sum exactly to the day total they were summed from', () => {
+    const parts = [
+      { id: 'a', kcal: 120.4 },
+      { id: 'b', kcal: 130.2 },
+      { id: 'c', kcal: 110.9 },
+    ]
+    const total = parts.reduce((n, p) => n + p.kcal, 0)
+    const map = workoutKcalBySession(response({ workoutKcal: total, bySession: parts, intakeKcal: 500 }))
+    expect([...map.values()].reduce((n, k) => n + k, 0)).toBeCloseTo(total, 10)
+  })
+
+  /**
+   * And the reason the map is unrounded. Rounding each addend then summing is not the same number as
+   * rounding the sum: these three render as 120 + 130 + 111 = 361 under a "Workouts 362" row. Half a
+   * kcal per card is the accepted drift; compounding it inside the helper would not be.
+   */
+  it('leaves rounding to the caller, so the drift is bounded per card', () => {
+    const parts = [{ id: 'a', kcal: 120.4 }, { id: 'b', kcal: 130.2 }, { id: 'c', kcal: 110.9 }]
+    const map = workoutKcalBySession(response({ workoutKcal: 361.5, bySession: parts, intakeKcal: 500 }))
+    expect(map.get('a')).toBe(120.4)
+
+    const renderedSum = [...map.values()].reduce((n, k) => n + Math.round(k), 0)
+    const renderedTotal = Math.round(361.5)
+    expect(Math.abs(renderedSum - renderedTotal)).toBeLessThanOrEqual(Math.ceil(parts.length / 2))
+  })
+
+  it('is keyed by session id, so two same-named sessions in a day do not collide', () => {
+    // The whole reason the join is on id. Name-keying would leave one card showing the other's
+    // figure — or one card showing both.
+    const map = workoutKcalBySession(response({
+      bySession: [{ id: 'morning', kcal: 200 }, { id: 'evening', kcal: 90 }],
+      workoutKcal: 290, intakeKcal: 500,
+    }))
+    expect(map.size).toBe(2)
+    expect(map.get('morning')).toBe(200)
+    expect(map.get('evening')).toBe(90)
+  })
+
+  it('yields no entry rather than a zero when the estimate could not be made', () => {
+    // A profile missing age/weight/sex produces no addends. The card must then show nothing — a
+    // confident "0 kcal" is indistinguishable from a real one (the Q-278 class).
+    const map = workoutKcalBySession(response({ workoutKcal: 0, intakeKcal: 500 }))
+    expect(map.get('anything')).toBeUndefined()
+    expect(map.size).toBe(0)
+  })
+
+  it('survives a response with no balance at all', () => {
+    expect(workoutKcalBySession(response({ balanceNull: true })).size).toBe(0)
+    expect(workoutKcalBySession(null).size).toBe(0)
   })
 })

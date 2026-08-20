@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.333.0",
+    date: "2026-08-20",
+    changes: [
+      "Each workout on the day screen now shows what it burned, beside its volume, exercises and sets \u2014 the same figure the day’s energy breakdown counts, so the two cannot disagree. It reads as ~639 EST. KCAL because it is an estimate from the session’s length and heart rate, not from the weight you moved; a session with nothing to estimate from shows no figure rather than a confident zero.",
+    ],
+  },
+  {
     version: "1.332.1",
     date: "2026-08-19",
     changes: [

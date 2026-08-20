@@ -365,117 +365,31 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
+### [workouts][app-shell] Q-362 — `workoutDurations` is keyed by session NAME, so two same-named sessions in a day collide
 
-> **⚠️ The Lane A half SHIPPED 2026-08-19 — but NOT where this entry says, and the difference is the
-> point. What remains is Lane B: render it.**
->
-> The entry says *"`/api/day-log` is Lane A's"*. Putting the figure there would have **recreated the
-> exact defect the day screen already guards against.** `components/health/day-detail/energy-summary.ts`
-> states the rule outright: the Energy section's `workoutKcal` is read from
-> `/api/nutrition/energy-balance` *"because the day screen disagreeing with Nutrition about how much
-> was burned is worse than either being slightly off"*. A second per-session estimate computed in
-> `day-log` off its own profile and weight lookups would disagree with the total sitting two cards
-> below it, on the same screen.
->
-> **So it ships from `computeActiveEnergy` — the function that already sums the day total — as the
-> addends of that total.** `activeBreakdown.workoutKcalBySession: { id, kcal }[]` on
-> `/api/nutrition/energy-balance`. The parts cannot disagree with the total because they *are* the
-> terms that were summed.
->
-> **Lane B: join on session `id`, not name.** `/api/day-log` already exposes `workoutSessionId` per
-> exercise, so no name-keying is needed — which matters, since a name is not identity here and two
-> same-named sessions in one day would collide.
->
-> **Values are unrounded on purpose.** Rounding each addend and rounding their sum are different
-> numbers; a card reading 120 + 130 under a total of 251 is what that avoids. Round at render.
->
-> **Still Lane B's, and still open:** the presentation question this entry raises — the estimate is
-> **duration-only** (flat MET 8 over the clock; load, volume and reps are not inputs), so a 49-minute
-> session moving 2,364 kg and one moving 800 kg produce the same number. Sitting it in the same row as
-> VOLUME KG / EXERCISES / SETS implies it is derived from them. Label it (`est.`, `~kcal`) or place it
-> where the implication is weaker. That decision was not made here.
+- **Branch:** `fix/day-log-durations-by-id`
+- **Added:** 2026-08-20 · Lane B, found while wiring Q-391's per-session calories
+- **Placement:** low. Real but narrow — it needs the same session logged twice in one day.
 
+**What.** `/api/day-log` returns `workoutDurations` as `Record<sessionName, {start, end, minutes}>`
+(`route.ts:144-163`), so a second session with the same name **overwrites the first**. The day
+screen's Training card then shows one duration against both cards — whichever session was written
+last.
 
-- **Branch:** `feat/day-training-card-kcal-stat`
-- **Added:** 2026-08-18 · owner, with a screenshot of the day screen (Tuesday 18 August):
-  *"the training shohld have a stat saying the calories burnt from the workout."*
-- **What the screenshot shows:** a day detail with READY 76 / HR 51 / SLEEP 92 / MOVE 65 across the
-  top. Under **TRAINING**, one session card — "Push, 8:24am → 9:13am · 49 min" — listing five
-  exercises, footed by three stats: **VOLUME KG 2,364 · EXERCISES 5 · SETS 10**. Directly below,
-  the **ACTIVITY** card for a treadmill walk *does* show "101 kcal" alongside bpm and steps. That
-  contrast is the report: the activity gets a calorie figure and the workout does not.
+**Why it surfaced now.** Q-391 moved the Training card's grouping from name to session **id**,
+because the calories join has to be on identity. The card now groups correctly and still looks its
+duration up by name, so the collision is visible in one place rather than two. **That is not a
+regression this introduced** — the same overwrite existed when the grouping was name-keyed, it was
+simply invisible because the two sessions were already merged into one card.
 
-**This was already considered and deliberately deferred — the reasoning is on file.**
-`projectOverview.md` (Q-247's entry) says outright: *"Deliberately not done: a per-workout kcal
-estimate in the day screen's Training section. It needs `estWorkoutKcal` per session, which is the
-Q-230 bundle hazard from a client component — doing it properly means computing it server-side in
-`/api/day-log`."* The owner asking for it is what moves this from *deferred* to *queued*; the
-blocker and the intended shape were both already named, so **do not re-derive them.**
+**Fix.** Key it by `workout_sessions.id`, as the exercises already are (`workoutSessionId` is on
+every row). `/api/day-log` is **Lane A's**; the consumer change in
+`components/health/day-detail/day-sections.tsx` is Lane B's and is one line.
 
-- **Where it goes:** `components/health/day-detail/day-sections.tsx:112-116` — the `TrainingSection`
-  stat row (`Volume kg` / `Exercises` / `Sets`, all derived client-side from the sets data).
-  `data.workoutDurations[sessionName]` on the same component already carries `{start, end, minutes}`
-  **per session**, so the duration the estimator needs is present; the profile inputs are not.
-- **⚠ The existing `workoutKcal` is a DAY total, not a session figure — this is the thing to get
-  right.** `computeActiveEnergy` (`packages/shared/src/health/daily-energy.ts:107-109`) sums
-  `estWorkoutKcal` over *every* strength session in the day, and that day-level number **already
-  renders on this very screen**, as the "Workouts" row of the ENERGY section
-  (`components/health/day-detail/energy-summary.ts:33`). So this is not "surface the field that
-  exists" — a card is per session, and two sessions in one day would both show the day total.
-  It needs a **per-session** call to the same shared estimator, server-side per the deferral note.
-- **⚠ The deferral note undersells the blocker: it is not a bundle-size hazard, it is impossible.**
-  `estWorkoutKcal` → `getEnergyFeatureSpec()` (`lib/oura-models/constants/index.ts:442`) → `readJson`,
-  which calls **`fs.readFileSync`**. That cannot run in a client component at all, so there is no
-  "accept the bundle cost" option — the per-session figure has to come from the server. **That makes
-  this cross-lane: `/api/day-log` is Lane A's.** Lane B can render it the moment the field exists.
-  Verified 2026-08-18 while working the queue.
-- **⚠ And it is a duration-only estimate.** `daily-energy.ts:102-103` is
-  `estWorkoutKcal({ durationMin, …, activityId: 8, intensity: 'moderate' })` — a flat MET 8 over the
-  clock. **Load, volume and reps are not inputs.** A 49-minute session moving 2,364 kg and a
-  49-minute session moving 800 kg produce the *same* number. Placing it in the same row as VOLUME KG
-  / EXERCISES / SETS — three measured facts — implies it is derived from them, and it is not. Either
-  label it so the basis is legible ("~kcal", "est."), or put it somewhere the implication is weaker.
-  This is a presentation decision, not a formula one; the formula is fine for what it is.
-- **Consistency requirement:** once a per-session figure ships, the session cards on a day must sum
-  to the ENERGY section's "Workouts" row on the same screen. `energy-summary.ts`'s own header states
-  the principle it was built on — *"the day screen disagreeing with Nutrition about how much was
-  burned is worse than either being slightly off"* — and this adds a third place on one screen for
-  the two to disagree. Assert the sum in a test.
-- **Empty state:** `computeActiveEnergy` returns zeros and `estWorkoutKcal` returns `null` when
-  age / weight / sex are missing (`workout-energy.ts:109-110`). A profile-less user must not see a
-  confident `0 kcal` — same class as Q-278 (a score that could not be computed rendering identically
-  to a real one). Decide what the stat shows when the estimate is unavailable.
-- **Not a duplicate:** nothing in the backlog covers it, and `projectOverview.md`'s only mention is
-  the deferral quoted above. **Q-312 is unrelated** despite touching `estWorkoutKcal` — that is the
-  synthetic *test* constants scrubbing METs below 1.0 in CI, not the production MET table.
-- **What would count as done:** each session card on the day screen carries a calories figure for
-  *that session*, computed server-side in `/api/day-log` from the session's own duration, labelled so
-  it does not read as measured; the figures sum to the ENERGY section's Workouts row; and a user with
-  an incomplete profile sees an honest absence rather than a zero.
+- **Not verified:** not reproduced. Inferred from the route's own `Record<string, …>` keyed on
+  `ws.sessionName` — establish it with two same-named sessions on one day before fixing, so the fix
+  is aimed at something observed.
 
-- **⬆ ASKED A SECOND TIME AND MOVED TO THE TOP OF THE QUEUE, 2026-08-19.** The owner, with a fresh
-  day-screen screenshot (Wednesday 19 August — Legs, 92 min, VOLUME KG 8,618 · EXERCISES 5 · SETS 18,
-  and a treadmill walk below it showing `101 kcal`): *"i want the caloeies burned showed per event;
-  so on the training; next to volume,excercises,sets, i want Energy Usage (or calories burned) same
-  with activity so I can look at each card and see howmuch that activity burns."* Same request, same
-  contrast, one day apart — **treat the placement as settled: it goes in the stat
-  row beside Volume / Exercises / Sets**, which resolves the "or put it somewhere the implication is
-  weaker" option above in favour of labelling instead.
-- **Naming: the owner offered "Energy Usage" or "calories burned".** Prefer a form that carries the
-  estimate in the label rather than a separate disclaimer — `~410` with the label `EST. KCAL` fits
-  the existing `Stat value/label` shape without a fourth element. The tilde is doing the work the
-  bullet above asks for.
-- **Nothing new is needed to build it, and that is worth stating plainly:**
-  `computeActiveEnergy` **already calls the estimator per session** — `daily-energy.ts:107-109` loops
-  `input.strengthSessions` and calls `est(8, s.durationMin)` for each (→ `estWorkoutKcal`, `:102-103`) — and then **adds them into one
-  `workoutKcal` and discards the split**. The per-session figure is computed today and thrown away.
-  Returning the breakdown alongside the total is the whole server-side change; the consistency
-  requirement above is then satisfied by construction rather than by a second calculation.
-- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — no device or
-  production data needed. Spans `app/api/day-log` (Lane A) and `components/**` (Lane B); the deferral
-  note says the server half is the correct home, so **route it to Lane A** with the display change
-  riding along.
 
 ### [workouts][nutrition] Q-419 — the done screen and the day's energy budget disagree about the same workout, because only one of them reads your RPE
 

@@ -1012,7 +1012,12 @@ const BASELINE = {
   // Raised 2026-08-19 (Lane A, Q-421 route (a) shipped): 11559 -> 11592. The measured blast radius
   // the entry required before it could land, plus the Keytel over-read caveat that route (b) exists
   // to fix.
-  'docs/implementation-backlog.md': 11624,
+  // Ratchets DOWN 2026-08-20 (Lane B, Q-391 shipped): its entry out, Q-362 in, net much smaller.
+  // Q-362 is what moving the Training card's grouping from name to session id made visible —
+  // `workoutDurations` is still name-keyed upstream, so two same-named sessions in a day collide.
+  // Filed rather than fixed because the route is Lane A's, and filed as NOT REPRODUCED because it
+  // was inferred from the route's type rather than observed.
+  'docs/implementation-backlog.md': 11513,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
