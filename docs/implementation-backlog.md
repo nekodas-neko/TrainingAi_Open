@@ -825,6 +825,7 @@ almost every session while a hex literal or a memo call site is added rarely.
 
 - **Branch:** `feat/meal-type-reassign-dialog`
 - **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-412 once the endpoint shipped
+- **Lane:** B
 - **Lane B** (`components/nutrition/meal-type-manager.tsx`). The server half is done and merged —
   see [`entries/2026-08-19-meal-type-reassign.md`](overview/entries/2026-08-19-meal-type-reassign.md).
 
@@ -1090,6 +1091,7 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 
 - **Branch:** `feat/macros-follow-earned-calories`
 - **Added:** 2026-08-19 · Lane A/B split, the residual of Q-401 after both its halves landed.
+- **Lane:** B
 - **What is now true.** One TDEE model: `nutrition_targets.calories` is the **rest-day floor**, and
   the zone bar renders `base + earned from movement`. So the calorie figure a user sees moves during
   the day. The **macro grams do not** — they come from the same stored row and are fixed.
@@ -1480,6 +1482,7 @@ line and makes the rest of Q-395 additive rather than blocked.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
+- **Lane:** B
   could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
 - **What this entry is for.** A taste request cannot be implemented from as written, so this
   separates the part that is objectively wrong (findings 1–3, each with a CI check that already
@@ -1770,6 +1773,7 @@ whether or not anyone draws them first.
 
 - **Branch:** `feat/meal-plan-to-saved-meals`
 - **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
+- **Lane:** B
   used too much; it will be created - then likely not used again. It would be good if each item from
   the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
   sections."*
@@ -1813,6 +1817,7 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
+- **Lane:** ?
 - **Placement:** in the nutrition cluster, after Q-398. It **depends on Q-398**: the plan's exit
   route in this design is "Save all as meals", and until plan meals can become ordinary saved
   meals, a conversational plan has nowhere to land and is only a nicer-looking dead end.
@@ -1959,6 +1964,7 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 - **Branch:** `feat/recipe-url-to-meal`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner
+- **Lane:** B
 - **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
   in the conversational shape it is one more thing you can hand the coach. It does **not** depend on
   Q-407: the stepper's "Yours" step can take a URL today, and shipping it there first is fine.
@@ -2032,6 +2038,7 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 - **Branch:** `feat/saved-meal-thumbnail-ui`
 - **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-396 once the column shipped.
+- **Lane:** B
 - **Lane B** (`components/nutrition/`). The storage half is done and merged —
   see [`entries/2026-08-19-saved-meal-thumbnail.md`](overview/entries/2026-08-19-saved-meal-thumbnail.md).
 
@@ -2141,6 +2148,7 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 
 - **Branch:** `feat/walk-step-goal`
 - **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk
+- **Lane:** ?
 - **Owner's words:** *"for the walking section I'd it to show the speed and total step count.
   rather than a HR goal we should be looking at a step goal; we should enough data on how to do
   this."*
@@ -2383,6 +2391,7 @@ this fits without an extraction.
 
 - **Branch:** `feat/push-coercion-per-field-policy`
 - **Added:** 2026-08-19 · Lane A, the deliberately-deferred third step of Q-485.
+- **Lane:** B
 - **What Q-485 did and did not do.** It made the discard *visible* — a named `warnings[]` entry per
   mutation and one `error_events` row per push, so a value the web route refuses with a message is no
   longer dropped without a trace. It did **not** change which values are dropped, and that was on
@@ -2553,6 +2562,7 @@ this fits without an extraction.
 
 - **Branch:** `feat/activity-log-delete-outbox`
 - **Added:** 2026-08-19 · Lane A, found while reconciling Q-556 · [`journal`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md)
+- **Lane:** B
 - **Placement:** immediately above Q-556, which it gates. Small on its own; it is the prerequisite
   that makes Q-556's 404 half safe.
 
@@ -2793,6 +2803,7 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 - **Branch:** `fix/client-today-uses-user-timezone`
 - **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
+- **Lane:** B
   [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
 - **Placement:** upper-mid. **Latent today** — every user row is `Australia/Brisbane`, so nothing is
   broken in production — but the app ships the button that triggers it, and the fix wants a ratchet
@@ -3422,6 +3433,7 @@ moving *beside* the calories rather than under them.
 
 - **Branch:** `feat/server-backed-user-preferences`
 - **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
+- **Lane:** A
   - when i do a new install or open on computer - it loses all the saved preferences. We need to
   make it persist across installs/etc."*
 - **Screenshot context** (Home, so it does not need to survive): the customised surface is exactly
@@ -3559,6 +3571,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
   Lane A's and already shipped (Q-314).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Lane:** B
 - **Why it matters more than a convenience.** The whole point of Q-314 is that a re-key is
   **declared** rather than inferred, because inferring it from counter shape re-timed the owner's
   entire sleep history twice. A declaration nobody can make in the app is a declaration that will be
@@ -3580,6 +3593,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `fix/redecode-async-job`
 - **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
+- **Lane:** ?
 - **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
   no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
   moved that work off the event loop into the rollup worker, which is why the rest of the process
@@ -3626,6 +3640,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Lane B.** `components/oura-ble/oura-ble-debug.tsx` and `components/oura-ble/step-backfill-console.tsx`
   only — the job store, the route and the reaper are Lane A's and already shipped (Q-535).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Lane:** B
 - **Why the default was not flipped for you.** `?async=1` exists and works, but both consoles read
   the synchronous response shape and report completion from it. Switched blind, `oura-ble-debug.tsx`
   falls back to *"redecode ran (response was slow to return) — data refreshed"* and
@@ -3655,6 +3670,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Lane B.** `components/oura-ble/db-footprint-card.tsx` only — the route, the repository method and
   the slice all exist and are Lane A's, already shipped.
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Lane:** B
 - **What exists already:** `GET /api/oura-ble/samples/pack` returns `{ buckets, sealBelowDs }` — how
   many sealed buckets are packable right now, touching nothing. `POST` (optional body
   `{ maxBuckets }`, default 25, cap 200) packs that many and returns
@@ -3679,6 +3695,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
 - **Added:** 2026-08-18 (found while measuring production for Q-541)
+- **Lane:** A
 - **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
   12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
   database** held by four rows.
@@ -3930,6 +3947,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `perf/oura-two-tier-frame-reader` (Tasks 0–2 landed on `perf/oura-raw-frame-packing`)
 - **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
 - **Added:** 2026-08-17
+- **Lane:** A
 - ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
   archival rule does not consider, and the only one that makes the growth curve sustainable without
   deleting anything or depending on the phone.
@@ -4237,6 +4255,7 @@ ehr     0     0     0     0   648   208   128   556     0
 
 - **Branch:** `fix/strict-request-schemas`
 - **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+- **Lane:** A
   [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
 - **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
   the failure mode is silent data misplacement and this repo has already paid for the class once.
