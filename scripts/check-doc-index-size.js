@@ -1,91 +1,34 @@
 #!/usr/bin/env node
-// 2026-08-18 (Review sweep 39, Q-556 cross-user isolation): backlog -> 9953, projectOverview -> 7876.
-// Rebuilt from origin/main after a parallel compaction sweep landed the same history file --
-// splicing the conflict hunks would have produced two baselines for one number.
 //
-// Keeps the orientation documents readable. Same ratchet shape as check-component-size.js.
+// Shrink-only size ratchet for the documents every session reads before it can start.
 //
-// These files are what every session reads before it can start, and they are the ones that rot,
-// because appending to them is always the locally cheapest move. By 2026-08-17 projectOverview.md
-// had reached 9,647 lines — 3,361 of them a Current Status section holding 157 dated notes in no
-// date order, describing work going back ten weeks — while its own opening line called it a lean
-// index. The backlog carried a 397-line header, 268 of which were one nested chain of
-// "Previously N (updated ... Previously N (updated ...". Prose asking for restraint did not hold;
-// nothing measured it.
+// These files rot because appending to them is always the locally cheapest move: by 2026-08-17
+// projectOverview.md had reached 9,647 lines while its own opening line called it a lean index.
+// Prose asking for restraint did not hold; nothing measured it. So a file may sit at or below its
+// recorded size and may never grow, and a change that genuinely has to add lines raises the number
+// in the same PR — which puts the growth in the diff where it can be seen.
 //
-// So: a shrink-only baseline. A file may sit at or below its recorded size and may never grow.
-// A change that genuinely has to add lines raises the number here in the same PR, which puts the
-// growth in the diff where it can be seen, rather than letting it drift up one commit at a time.
+// The baselines live in docs/doc-size-baseline.json and the reasoning behind each change lives in
+// docs/doc-size-baseline-history.md. They used to live here as comments, which is why this file had
+// reached 1,091 lines with 955 of them prose: every PR that added a documentation line prepended a
+// paragraph to the same region, making this the repository's most frequent merge conflict (32 of
+// the last 40 commits touched it) and corrupting two blocks into verbatim duplicates. Keep the
+// rationale out of this file.
+//
 'use strict';
 const fs = require('fs');
 const path = require('path');
 
 const root = path.join(__dirname, '..');
-//
-// 2026-08-18 (Review, Q-554 orientation-index paths): backlog -> 9876, projectOverview -> 7806.
-// One queue entry and its row. Both keep the module-map specifics (row 232, decodeStepsPacket, zero
-// references) because "a doc named a path that does not exist" is forgettable while "the map read to
-// avoid re-implementing things listed something never built" is the reason the check exists.
-//
-// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
-// projectOverview SHRANK by ~70 lines here even after adding an entry: Q-139's stale 69-line
-// "OPEN" body was replaced with a compact device-check row, and Q-81's duplicate archive copy was
-// cut. Baselines are shrink-only, so this ratchets down and the space cannot be reclaimed silently.
-//
-// 2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
-// projectOverview RATCHETS DOWN here (7805 -> 7785) even though an entry was added: Q-139's stale
-// 69-line "OPEN" body became a compact device-check row and Q-81's duplicate archive copy was cut.
-// The baseline is shrink-only, so locking the lower number in is the point -- reclaimed space
-// cannot quietly refill.
-//
-// Raised 2026-08-18 (Review, Q-499 reproduced + Q-552 ledger): backlog -> 9809, projectOverview -> 7805.
-// Q-499's entry grew rather than a new one being added: it was filed on static reading and is now
-// reproduced, and the before/after (1 node -> 0, control at 1) is what makes it actionable. Plus one
-// new entry for the Q-block ledger near-miss.
-//
-// Raised 2026-08-18 (Review, silent card failures, Q-499): backlog -> 9762, projectOverview -> 7773.
-// One queue entry and its row. Both keep the 78/18 and 12-candidates/2-confirmed splits, because the
-// honest scope IS the finding here -- a row that said "12 cards vanish" would be a defect count this
-// sweep did not earn, and the next reader would inherit it as fact.
-//
-// Raised 2026-08-18 (Review, unbounded request bodies, Q-498): backlog 9690 -> 9727,
-// projectOverview 7722 -> 7747. One queue entry and its row. Both keep the 113/7/93/3
-// coverage split and the line numbers showing the ingest route parses at 40 and checks the secret
-// at 58 -- the ordering is the finding, and a summary that drops it reads as "add a size cap",
-// which is the smaller half of the fix.
-//
-// Raised 2026-08-18 (Review, admin range-loop termination, Q-497): backlog 9652 -> 9690,
-// projectOverview 7693 -> 7722. One queue entry and its row. The entry keeps the measured loop
-// trace (iter 32 = 10000-01-01, still looping at 5000) because the defect is invisible from the
-// source -- every guard on the route reads correct, and only the trace shows the exit condition
-// inverting. It also names the second site, which writes.
-//
-// Raised 2026-08-18 (Review, health-connect ingest, Q-493..Q-496): backlog 9557 -> 9652,
-// projectOverview 7655 -> 7693. Four queue entries and one row, for four findings on one route.
-// The rows carry the measured before/after pairs (81 kg -> 499 kg; 1 limiter key at 20 vs 30 at 1)
-// because both findings are counter-intuitive from the source alone -- the limiter returns an
-// identical 401 either way, so without the numbers the next reader re-runs the experiment.
-//
-// Raised 2026-08-18 (Review, CLAUDE.md prose counts, Q-492): backlog 9520 -> 9557,
-// projectOverview 7631 -> 7655. One queue entry and its row. The measurement they carry is the
-// count-by-count table, which is the whole finding — a summary of it would leave the next reader
-// re-deriving nine numbers to know which are trustworthy.
-//
-// Raised 2026-08-18 (Review, aria-expanded collapsibles, Q-491): backlog 9477 -> 9520,
-// projectOverview 7603 -> 7631. One queue entry and its row. The lines that earn their place are the
-// MEMBERSHIP diff, not the count: CLAUDE.md's nine and today's nine are different sets (one fixed,
-// one never listed, two moved), so citing the count alone would hide that the list is what drifted.
-// Both also carry the meta-pattern — three hand-maintained counts in CLAUDE.md found stale this run
-// (Q-480, Q-490, Q-491) while every ratcheted count is current — which is the argument for fixing
-// this with a script rather than a sweep.
+const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baseline.json'), 'utf8'));
+const BASELINE = config.files;
+const { dir: ENTRIES_DIR, chore: ENTRIES_CHORE, limit: ENTRIES_LIMIT, totalCeiling: ENTRIES_TOTAL_CEILING } =
+  config.entries;
 
-//
-// Raised 2026-08-18 (Review, render rules part 2): projectOverview 7576 -> 7603. No queue entry —
-// all four rules held. The row is worth its lines because it records the three raw counts that look
-// like findings and are not (85 index keys, all on static lists; a 62-field useShallow pick holding
-// actions rather than hot-path values; 25 bare readCacheSync hits, three of them false positives in
-// the orchestrator and one of those the COMMENT stating the rule). Without it the next sweep
-// re-derives all three and may file them.
+// This log quotes historical rationale that happens to name a journal entry, so scanning it would
+// mark that entry as cited by a durable doc and exempt it from compaction forever. It is a log, not
+// a citation.
+const NOT_A_CITATION = 'doc-size-baseline-history.md';
 
 //
 // Raised 2026-08-18 (Review, memo-stability audit, Q-490): backlog 9439 -> 9477, projectOverview
@@ -94,7 +37,6 @@ const root = path.join(__dirname, '..');
 // here, and both carry the fix caveat that the per-meal site wants SCALARS rather than a useMemo —
 // a useMemo there needs one memo per row, which is worse than the bug. Both also flag that no render
 // counts were measured; the claim is from object identity, not a profiler.
-
 //
 // Raised 2026-08-18 (Review, ms-offset → calendar day, Q-489): backlog 9393 -> 9439, projectOverview
 // 7523 -> 7551. One queue entry and its row, and the lines that earn their place are the NEGATIVE
@@ -102,7 +44,6 @@ const root = path.join(__dirname, '..');
 // hours-based consumers like computeMuscleRecovery), so an implementer who greps the pattern and
 // "fixes" all twelve would break muscle recovery. Both also carry the measured DST table, which
 // cannot be re-derived without re-running the transition arithmetic.
-
 //
 // Raised 2026-08-18 (Review, local-first write coverage): backlog 9387 -> 9393, projectOverview
 // 7501 -> 7523. No new entry — the sweep BOUNDS Q-488 (it is one handler, not a class), which is the
@@ -110,7 +51,6 @@ const root = path.join(__dirname, '..');
 // row also carries two things a later audit would otherwise get wrong: the file-level version of
 // this check is unsound (it clears the very file Q-488 is in), and "no pull mapping" is not evidence
 // of a gap, because saved_meals is push-only and kept fresh by hydrate-on-read by design.
-
 //
 // Raised 2026-08-18 (Review, server-only writes to local-first domains, Q-488): backlog 9384 -> 9387,
 // projectOverview 7468 -> 7501. One queue entry and its row. Both carry three lines that decide how
@@ -118,7 +58,6 @@ const root = path.join(__dirname, '..');
 // the originating screen is CORRECT because it reads the server-side day-log aggregate, which is why
 // nothing on that screen could reveal it; and making the delete work offline is a separate, larger
 // question that must not be folded into the one-call fix.
-
 //
 // Raised 2026-08-18 (Review, seed-only read paths — case (b)): projectOverview 7439 -> 7468. No
 // queue entry; the audit found no gap. The row is worth its lines for two things that are otherwise
@@ -127,14 +66,12 @@ const root = path.join(__dirname, '..');
 // local-store read+setCached — and the third is the app's most authoritative path, so a
 // network-shaped test marks it stale. Plus: a `Q-NNN:` comment here is usually a fix's rationale,
 // not an open defect. That misread cost a false alarm twice in this run (Q-117, Q-126).
-
 //
 // Raised 2026-08-18 (Review, load-bearing cache audit): projectOverview 7411 -> 7439. No queue entry
 // — the audit found no gap. The row is the *result table* plus two things that would otherwise be
 // rediscovered the hard way: session-select-content.tsx:896's "never invalidated" comment is the
 // comment on the Q-117 FIX, not a live defect (it reads exactly like one), and case (b) of Q-262's
 // test — seed-only read paths — remains unaudited and is the likelier source of a stale-value report.
-
 //
 // Raised 2026-08-18 (Review, production verification round 2): backlog 9359 -> 9384,
 // projectOverview 7369 -> 7406. No new queue entries — six existing ones amended in place with what
@@ -143,7 +80,6 @@ const root = path.join(__dirname, '..');
 // the evidence for Q-475 and cannot be re-derived after error_events prunes at 30 days. It also
 // carries the two queries that look like evidence and are NOT (water is too sparse; null-weight-with-
 // steps is the expected shape), so the next reader does not pick them up.
-
 //
 // Raised 2026-08-18 (Review, Tier-A enqueue silence, Q-486): backlog 9312 -> 9359,
 // projectOverview 7339 -> 7369. One queue entry and its row. The lines that earn their place are the
@@ -151,7 +87,6 @@ const root = path.join(__dirname, '..');
 // outbox — that ordering is deliberate and documented in the file), do not convert the four calls to
 // `await` (they are fire-and-forget so the UI stays instant), and do not treat this as reproduced —
 // it needs a broken local SQLite on a device and the web sandbox cannot reach the code path at all.
-
 //
 // Raised 2026-08-18 (Review, implausible-value sweep, Q-485): backlog 9264 -> 9312,
 // projectOverview 7309 -> 7339. One queue entry and its row, both carrying the two lines that stop
@@ -159,7 +94,6 @@ const root = path.join(__dirname, '..');
 // One Place is holding — only the behaviour differs), and the fix is NOT "throw everywhere", because
 // a throw quarantines the mutation and the poison-pill rule forbids that for a validation failure.
 // An entry missing either line produces a worse app than the bug does.
-
 //
 // Raised 2026-08-18 (Review, unvalidated-create-bodies sweep, Q-484): backlog 9214 -> 9264,
 // projectOverview 7277 -> 7309. One queue entry and its row. Both carry two caveats inline that are
@@ -167,7 +101,6 @@ const root = path.join(__dirname, '..');
 // a single repeated character to ~120 kB, real text would not), and the 33 no-schema routes are a
 // CANDIDATE count, not a defect count — 31 are unaudited and are neither broken nor fine. An entry
 // that dropped either caveat would get implemented against numbers that do not mean what they say.
-
 //
 // Raised 2026-08-18 (Review, malformed-route-id sweep, Q-482/Q-483): backlog 9049 -> 9138,
 // projectOverview 7243 -> 7277. Two queue entries and the row indexing them. Q-482 carries its
@@ -175,14 +108,12 @@ const root = path.join(__dirname, '..');
 // to guard, and re-deriving it means re-running 39 probes. Both carry the evidence-reading caveat
 // (a 500 is conclusive, a 400 is not, because the probe sent an empty body) — without it the routes
 // absent from the table read as verified-correct, which they are not.
-
 //
 // Raised 2026-08-18 (Review, empty/n=1 account sweep): projectOverview 7213 -> 7243. No queue entry
 // — the sweep found nothing to file. The row exists for the method correction inside it: a probe
 // that greps a JSON response for NaN/Infinity detects neither, because JSON.stringify serialises
 // both to null. That check had already produced two clean-looking runs before it was caught, and it
 // is the kind of thing a later sweep repeats unless it is written where orientation reads it.
-
 //
 // Raised 2026-08-18 (Review, outbox-replay-idempotency sweep, Q-481): backlog 9005 -> 9049,
 // projectOverview 7184 -> 7213. One queue entry and its Known-Issues row. Both carry the SYNC-P7
@@ -190,7 +121,6 @@ const root = path.join(__dirname, '..');
 // set reintroduces the clobber it was written to prevent — and both carry the activity_logs result
 // that looks like it contradicts sweep 9 and does not (different writers). Those two are the lines
 // that stop the entry being implemented wrongly, which is the only reason the entry exists.
-
 //
 // Raised 2026-08-18 (Review, server-side verification sweep, Q-480): backlog 8967 -> 9005,
 // projectOverview 7157 -> 7184. One queue entry and one Known-Issues row, both for a sweep that
@@ -199,7 +129,6 @@ const root = path.join(__dirname, '..');
 // all 104 rate-limit keys are user- or IP-scoped — and that inventory is the entire value: without
 // it the next sweep re-derives it, and Q-477's fix scope stays unbounded. A clean result costs lines
 // exactly once.
-
 //
 // Raised 2026-08-18 (Review, auth/session-boundaries sweep, Q-479): backlog 8846 -> 8894,
 // projectOverview 7122 -> 7157. One queue entry and its Known-Issues row. Both carry the measured
@@ -208,7 +137,6 @@ const root = path.join(__dirname, '..');
 // harness warning that produced a false clean on the first run — a session-staleness test needs a
 // cookie jar that is written back. The sweep's prose is in
 // docs/reviews/2026-08-18-auth-session-boundaries.md, which this ratchet does not govern.
-
 //
 // Raised 2026-08-18 (Review, non-default-timezone sweep, Q-477/Q-478): backlog 8908 -> 9005,
 // projectOverview 7068 -> 7122 (the last 8 record that #112 fixed Q-473 and that Review re-ran the
@@ -219,7 +147,6 @@ const root = path.join(__dirname, '..');
 // finding IS that table, and reproducing it needs a moment when three calendar dates are
 // simultaneously live plus a fresh login to re-stamp the JWT. The sweep's prose is in
 // docs/reviews/2026-08-18-timezone-non-default-user.md, which this ratchet does not govern.
-
 //
 // Raised 2026-08-18 (Review, outbox-under-failure sweep, Q-475/Q-476): backlog 8802 -> 8908,
 // projectOverview 7028 -> 7068. Two queue entries and the one Known-Issues row indexing them.
@@ -227,7 +154,6 @@ const root = path.join(__dirname, '..');
 // dead-letter the queue) because the whole finding is that number: the entry is unreadable as a
 // priority call without it, and re-deriving it means stopping a database. The sweep's prose is in
 // docs/reviews/2026-08-18-outbox-under-failure.md, which this ratchet does not govern.
-
 //
 // Raised 2026-08-18 (Review, write-concurrency sweep, Q-473/Q-474): backlog 8634 -> 8722,
 // projectOverview 6991 -> 7028. Two queue entries and the one Known-Issues row indexing them —
@@ -236,8 +162,6 @@ const root = path.join(__dirname, '..');
 // workout row and a 65-second wait for the rate-limit window), and an implementer fixing a race
 // needs the reproduction rate, not a claim. The sweep's prose is in
 // docs/reviews/2026-08-18-write-concurrency.md, which this ratchet does not govern.
-
-
 // Baseline recorded 2026-08-17, immediately after the cleanup that produced these numbers.
 //
 // Raised 2026-08-17 (Tuning, Q-500/Q-501): backlog 5698 -> 5722, projectOverview 6372 -> 6382.
@@ -409,7 +333,6 @@ const root = path.join(__dirname, '..');
 // filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
 // oura_heartrate index ratio, and the owner decision on leaving Railway (deferred behind Q-545 so it
 // is not decided on a pre-fix, deploy-inflated baseline).
-const BASELINE = {
   // Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
   // check, so it belongs here rather than in the resolved archive, which only takes an entry when
   // nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
@@ -467,7 +390,6 @@ const BASELINE = {
   // step in the trend chart where the old and new model scores meet, and no device verification.
   // Recomputed from the MERGED file rather than spliced: this collided with same-day raises from
   // other lanes twice, which is the case the note below warns silently drops one side.
-
   //
   // Raised 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A): 6843 -> 6853. Ten lines on the
   // disk-full item, and they carry the one distinction that item most needs: the outage's MECHANISM
@@ -544,7 +466,6 @@ const BASELINE = {
   // Q-541 status block for the packer plus the new Q-316 entry (the packer has no button, because
   // components/** belongs to the other lane, and the entry carries the warning that its confirm copy
   // must not read like the lossless VACUUM beside it).
-
   //
   // Recomputed 2026-08-18 (Q-541 task 4, Lane A) from the MERGED files — every number rebuilt, no
   // hunk spliced. Lane A's own delta was the Q-541 packer status block plus the new Q-316 entry
@@ -557,8 +478,6 @@ const BASELINE = {
   // reclaimed. Carries the one thing an implementer must not get wrong — the allowlist is the safety
   // boundary because the table name is interpolated, and `in` accepts `toString` where
   // `hasOwnProperty` does not.
-
-
   //
   // Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files. Lane A's
   // own deltas: +10 on projectOverview, carrying the distinction that item most needs — the outage's
@@ -574,7 +493,6 @@ const BASELINE = {
   // session's behaviour rather than recording one session's work. Drafted at 49 lines and cut to 34
   // before raising, since a rule about brevity that arrives verbose argues against itself.
   // Recomputed from the MERGED file after three same-day collisions with concurrent raises.
-
   //
   // Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files, on each of
   // the two merges this branch took. Lane A's delta: +10 on projectOverview carrying the one
@@ -583,13 +501,11 @@ const BASELINE = {
   // caveat that keeps the 136 MB honest (measured index size, not a reclaim that has happened). On
   // the backlog, finding 4 is struck in place with the three consequences the entry did not
   // anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
-
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file. Lane A's delta was +12,
   // splitting Q-315 into the half that shipped and the half that has not: the route exists and is
   // verified, and nobody has pressed it against production. Without that split the entry reads as
   // done and the 49 MB never gets reclaimed.
-
   //
   // Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
   // took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
@@ -630,7 +546,6 @@ const BASELINE = {
   // class must do (construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock). This is the file every session reads before it can start, and the rule it
   // sits beside is the reason this bug was filed rather than repeated.
-
   //
   // Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file. Lane A's delta was +29:
   // Q-535 now states the 502 is NOT gone yet and why the default was left alone, that half its own
@@ -642,7 +557,6 @@ const BASELINE = {
   // 17.7 points and the recalibration removed 82% of it. The entry is long because most of it is a
   // PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
   // owner-reported bug in another pillar, and that only lands with the numbers attached.
-
   //
   // Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
   // side of a rolling window"; it did not cover the shape that broke every branch for two hours a
@@ -654,7 +568,6 @@ const BASELINE = {
   // Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
   // Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
   // half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
-
   // Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
   // left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
   // bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -681,7 +594,6 @@ const BASELINE = {
   // that the two landing files are already on the 800-line limit. Q-396 is the new entry for
   // meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
   // data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
-
   //
   // Raised 2026-08-18 (Q-464 ratchet, Lane A): 8257 -> 8310. Two blocks, both carrying measurements
   // a successor would otherwise have to re-derive. Q-464 gains the two corrections found while
@@ -735,16 +647,11 @@ const BASELINE = {
   // mechanism, the two correct fixture shapes, and the one thing a regression test for this class
   // must do: construct the failure band rather than wait for it, because faketime cannot move
   // Postgres's clock. Recomputed from the merged file on each merge this branch took.
-
   //
   // Recomputed 2026-08-18 (Q-464 ratchet, Lane A) from the MERGED file. Lane A's delta was +53: the
   // two corrections found while implementing Q-464 — that it IS a live bug, and that its sync/push
   // caveat applies to every schema pushMutations parses rather than one route — plus a new Q-472 for
   // the live one, which since Q-464 shipped fails loudly instead of silently.
-
-
-
-
   // Raised 2026-08-18 (Lane B, Q-478 shipped). Five lines on an existing row rather
   // than a new one. Two of them are corrections to the original finding that a striking-through
   // would have destroyed: the "loading state never clears" consequence was overstated (a second
@@ -790,7 +697,6 @@ const BASELINE = {
   // 2026-08-20 (Tuning): Q-529 scope correction -- the score DOES recompute; what survives is a
   // ~9-minute provisional-renders-as-final window. The refutation stays inline because the
   // original claim shipped and an implementer must not act on it.
-  'projectOverview.md': 8009,
   // Raised 2026-08-18 (Tuning): Q-518 — the readiness model stamp is erased by a sibling
   // writer within hours. The two timestamped readings are the entry: without them this reads as a
   // design opinion about COALESCE rather than an observed clobber, and it is the evidence that
@@ -1017,7 +923,6 @@ const BASELINE = {
   // `workoutDurations` is still name-keyed upstream, so two same-named sessions in a day collide.
   // Filed rather than fixed because the route is Lane A's, and filed as NOT REPRODUCED because it
   // was inferred from the route's type rather than observed.
-  'docs/implementation-backlog.md': 11513,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
@@ -1037,10 +942,6 @@ const BASELINE = {
   // part that cost a backlog entry. It names the check to run first, because the reflex it trains
   // otherwise is "CI is flaky", and it belongs beside the behaviour it follows from rather than in
   // a journal entry nobody reads before debugging.
-  'CLAUDE.md': 1085,
-
-};
-
 // docs/overview/entries/ is a holding area. Its README sets the compaction chore at ~20 files;
 // that is a chore trigger, not an error, so CI does not fail there — failing at 20 would block
 // unrelated PRs for a tidiness task. This is the runaway guard instead: the directory reached 509
@@ -1061,15 +962,10 @@ const BASELINE = {
 // catches the thing this guard was written for: if nobody sweeps, unlinked entries pile up and it
 // fires. A separate, much higher ceiling on the TOTAL keeps the 509-file readability failure
 // caught, since that scenario is real and is not about sweepability.
-const ENTRIES_DIR = 'docs/overview/entries';
-const ENTRIES_CHORE = 20;
-const ENTRIES_LIMIT = 60;
-const ENTRIES_TOTAL_CEILING = 250;
-
 // An entry is "linked" when any .md outside the entries directory mentions its filename. Read once
 // into a single blob rather than grepping per entry — 60 entries x the whole docs tree is the kind
 // of thing that quietly adds a minute to every CI run.
-function linkedEntryNames(root, entriesAbs) {
+  'docs/implementation-backlog.md': 11559,
   let blob = '';
   const walk = (dir) => {
     for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -1078,12 +974,12 @@ function linkedEntryNames(root, entriesAbs) {
         if (e.name === 'node_modules' || e.name === '.next' || e.name === '.git') continue;
         if (path.resolve(full) === path.resolve(entriesAbs)) continue;
         walk(full);
-      } else if (e.name.endsWith('.md')) {
+      } else if (e.name.endsWith('.md') && e.name !== NOT_A_CITATION) {
         blob += fs.readFileSync(full, 'utf8');
       }
     }
   };
-  walk(root);
+  walk(rootDir);
   return blob;
 }
 
@@ -1100,17 +996,15 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     failures.push(
       `${rel} is ${lines} lines, over its ${limit}-line baseline by ${lines - limit}.\n` +
         `      Move the new material to where it belongs — a journal entry, an archive, a reference\n` +
-        `      doc — or raise the baseline in this file in the same PR if the growth is genuinely\n` +
-        `      part of the index.`,
+        `      doc — or raise the baseline in docs/doc-size-baseline.json in the same PR, with a note\n` +
+        `      in docs/doc-size-baseline-history.md, if the growth is genuinely part of the index.`,
     );
   }
 }
 
 const entriesAbs = path.join(root, ENTRIES_DIR);
 if (fs.existsSync(entriesAbs)) {
-  const names = fs
-    .readdirSync(entriesAbs)
-    .filter((f) => f.endsWith('.md') && f !== 'README.md');
+  const names = fs.readdirSync(entriesAbs).filter((f) => f.endsWith('.md') && f !== 'README.md');
   const count = names.length;
   const blob = linkedEntryNames(root, entriesAbs);
   const unlinked = names.filter((f) => !blob.includes(f));

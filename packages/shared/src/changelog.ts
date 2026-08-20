@@ -9,7 +9,14 @@ export const CHANGELOG: ChangelogEntry[] = [
     version: "1.333.0",
     date: "2026-08-20",
     changes: [
-      "Each workout on the day screen now shows what it burned, beside its volume, exercises and sets \u2014 the same figure the day’s energy breakdown counts, so the two cannot disagree. It reads as ~639 EST. KCAL because it is an estimate from the session’s length and heart rate, not from the weight you moved; a session with nothing to estimate from shows no figure rather than a confident zero.",
+      "Each workout on the day screen now shows what it burned, beside its volume, exercises and sets — the same figure the day’s energy breakdown counts, so the two cannot disagree. It reads as ~639 EST. KCAL because it is an estimate from the session’s length and heart rate, not from the weight you moved; a session with nothing to estimate from shows no figure rather than a confident zero.",
+    ],
+  },
+  {
+    version: "1.332.2",
+    date: "2026-08-20",
+    changes: [
+      "The calories shown when you finish a workout are now worked out from your most recent weigh-in. They were being worked out from the very first weight you ever logged, so the figure drifted further from the truth the more your weight moved \u2014 and it disagreed with the same workout's contribution to the day's energy budget. The two now match.",
     ],
   },
   {

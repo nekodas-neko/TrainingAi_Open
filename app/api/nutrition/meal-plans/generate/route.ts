@@ -110,14 +110,15 @@ export async function POST(req: Request) {
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const repo = await getRepository()
-  const [balance, targets, restrictions, baseline, savedMeals] = await Promise.all([
+  const [balance, targets, restrictions, currentWeightKg, savedMeals] = await Promise.all([
     computeEnergyBalance(repo, userId, tz, todayInTz(tz)),
     repo.getNutritionTargets(userId),
     repo.listUserDietaryRestrictions(userId),
     // CURRENT weight, not `users.weight_goal_kg` — the meal-count suggestion is protein per kg of
     // the body doing the eating, and the goal weight would skew it by however far off target
-    // the user is.
-    repo.getBodyMetricsBaseline(userId),
+    // the user is. Q-330: `getBodyMetricsBaseline` reads `asc(date)`, i.e. the FIRST weight ever
+    // logged, which is the opposite of what that sentence asks for.
+    repo.getMostRecentConfirmedWeightKg(userId),
     // Only fetched when the user asked to keep some — listing the library on every generate would
     // be a wasted query on the common path.
     input.keepSavedMealIds?.length ? repo.listSavedMeals(userId) : Promise.resolve([]),
@@ -161,7 +162,7 @@ export async function POST(req: Request) {
   })
 
   const mealCount = input.mealCount
-    ?? suggestMealCount(dailyProtein, baseline.weightKg ?? 0)
+    ?? suggestMealCount(dailyProtein, currentWeightKg ?? 0)
     ?? 3
 
   const allergies = restrictions.filter(r => r.severity === 'allergy').map(r => r.label)

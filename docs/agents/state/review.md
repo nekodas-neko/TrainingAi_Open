@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-18 · **By:** thirty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37) — **all eleven pillars covered** · **Q band:** ~~450–499~~ **exhausted** → **552–601** (next free: **557**). **Do NOT take 500–529 (Tuning) or 530–551 (one-off sessions, all live).** Before claiming any future block, grep the tree for the highest `Q-` in use — the README's "next block of 50 above 529" instruction is a starting number, not a procedure, and following it literally would have collided with fourteen live numbers (Q-552).
+**Updated:** 2026-08-18 · **By:** thirty-nine sweeps (2026-08-17 ×2, 2026-08-18 ×37) — **all eleven pillars covered** · **Next ID:** `RV-1`. **Bands are gone**, and with them the block-claiming procedure that this baton correctly warned would have collided with fourteen live numbers. IDs count up from `RV-` with no ceiling and no ledger: `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy Q-450…499 and Q-552…601 stay valid where already used.
 
 ## Now
 
@@ -259,7 +259,7 @@ row said **552**, was correct all along, and is **CI-enforced** (`scripts/check-
 — and it caught me in the same PR when I claimed 552 without updating the band table. **The
 machine-checked source was right; only the prose was wrong, and the README points you at the prose.**
 
-**→ Read the "Next unallocated Q band" pointer in `docs/implementation-backlog.md`, never the prose
+**→ (Superseded 2026-08-19: that pointer no longer exists. Kept for the reasoning.) Read the pointer in `docs/implementation-backlog.md`, never the prose
 list.** Claimed 552–601, recorded 544–551, bumped the pointer to 602.
 
 **Third confirmed instance of Q-492's thesis** (prose decays, checked values do not) — and the first
