@@ -1071,3 +1071,19 @@ An entry is "linked" when any .md outside the entries directory mentions its fil
 into a single blob rather than grepping per entry — 60 entries x the whole docs tree is the kind
 of thing that quietly adds a minute to every CI run.
 ```
+
+## 2026-08-20 — `docs/implementation-backlog.md` 11559 → 11610, `docs/agents/state/bugfix.md` 136 → 161
+
+Session wrap-up for the workout-energy intake cluster.
+
+**Backlog (+51):** one entry, Q-424 — a shrink-only ratchet can leave `main` red and nothing looks.
+Found by walking into it: a branch cut from pristine `origin/main` failed `pnpm check:rules` on a
+change that could not have caused it, because two docs PRs had each merged green against a baseline
+the other was also raising. #254 (this file's own origin) fixed the conflict *frequency* by moving the
+numbers here; it did not make the check order-independent, which is what the entry is about.
+
+**Baton (+25):** the BugFix baton is rewritten in full at each handover, not appended, so its size
+tracks how much state the role is carrying rather than accumulating. This rewrite added the traps that
+cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
+having two causes — and one superseded decision recorded with its correction, which is worth more
+lines than the decision was.

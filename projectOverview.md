@@ -45,7 +45,7 @@ Legacy `Q-` numbers stay valid and are not renumbered. **An implementer's first 
 `Needs:` and `Gate: owner|device` fields — the queue file cannot show you which of its top entries
 are actually startable.
 
-**Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
+**Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is CLOSED
 (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread as a
 clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short daytime
