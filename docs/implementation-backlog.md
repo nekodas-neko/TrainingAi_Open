@@ -890,6 +890,75 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
+### [platform] Q-424 — a shrink-only ratchet can leave `main` red, and nothing in this repo looks
+
+- **Branch:** `fix/doc-index-baseline-order-independence`
+- **Added:** 2026-08-19 · not a report. Found by walking into it: a branch cut from pristine
+  `origin/main` failed `pnpm check:rules` on a change that had nothing to do with the failure.
+
+> **⚠️ RE-CHECKED 2026-08-20 against `main` after #254 landed — the entry survives, but half of what it
+> described is already fixed. Read this first.**
+>
+> #254 moved the baselines out of the script and into `docs/doc-size-baseline.json`, with the
+> rationale in `docs/doc-size-baseline-history.md`. That was the right fix for a **different** problem
+> — the script had reached 1,091 lines with 955 of them prose, and *32 of the last 40 commits touched
+> it*. Conflict **frequency** is solved; every branch no longer collides on a shared prose region.
+>
+> **The order-dependence is untouched.** Two PRs can still each raise the same JSON number, each be
+> green against the value as it stood when its own job ran, and produce a merged `main` that is over
+> its own baseline. Nothing detects that, because CI still has no `push: [main]` trigger. The scenario
+> below is unchanged by #254 — only the file it happens in has moved.
+>
+> **So the remaining item is narrower than the original text implies:** make the check
+> order-independent, per direction (a). Do not re-litigate where the baselines live.
+
+**`main` was red on Custom Rules at commit `39e948b`, and had been since it was created.**
+`docs/implementation-backlog.md` stood 31 lines over its own `check-doc-index-size` baseline. Two
+docs PRs merged in parallel: **#246** tightened the baseline to a zero-slack 11127 while **#245** was
+already open against the looser 11259. Each was genuinely green when its own CI ran. Their **sum**
+was not.
+
+**Nothing detects this, by design.** `.github/workflows/ci.yml:8-12` states the reasoning outright:
+
+> *"There is deliberately no `push: [main]` trigger. `main` is protected and only reached through an
+> already-green PR, so re-running the full suite on the post-merge push is pure redundancy."*
+
+**That premise is false for an order-dependent check.** A per-PR green certifies the branch against
+the baseline *as it stood when the job ran*; it certifies nothing about the merged result when the
+other half of the comparison is itself editable and another PR is editing it. The cost is not
+theoretical: **four separate baseline resolutions in one session** (2026-08-19), across #247, #249,
+#250 and the pre-existing breakage, each one a merge-conflict-resolve-remeasure cycle on a docs-only
+change.
+
+- **⚠ Do NOT fix this by adding `push: [main]`.** The comment's cost figure is right — roughly 11
+  billed minutes per merge to recompute a result the PR run already produced, for every merge,
+  forever. That trade was made deliberately and should stand.
+- **The defect is that the check is order-dependent at all.** A ratchet whose pass/fail depends on
+  *which* of two independently-green PRs merged first is measuring merge order, not the thing it
+  claims to measure. Cheaper directions, in rough order of preference:
+  **(a)** have the check derive the baseline from `origin/main` at run time and assert only that the
+  branch does not grow it, so two additive PRs compose instead of colliding;
+  **(b)** allow a small slack band, accepting that it weakens the ratchet;
+  **(c)** keep it exact but auto-write the baseline in a pre-commit hook so it is never hand-set.
+  **(a) is the one that actually removes the class** — (b) and (c) reduce how often it fires.
+- **⚠ The same argument applies to every shrink-only baseline in Custom Rules**, not just this one —
+  `check-hex-literals`, `check-fetch-once-effects`, `check-component-size`,
+  `check-memo-prop-stability`, `check-client-today-timezone` and the non-strict-schema check all
+  compare against a committed number. This one fires most because intake adds an entry per report,
+  but the class is shared and a fix should be shared too.
+- **⚠ And the failure is maximally misleading.** It surfaces on an unrelated branch as an unrelated
+  file being over an unrelated limit, which reads as "your change was too big" when the change was
+  eleven lines. Whatever the fix, the message should distinguish *"your branch grew this"* from
+  *"`main` is already over"* — the second is not the branch author's problem and should say so.
+- **One measurement trap worth keeping** (cost a resolution tonight): `wc -l` reports **one lower**
+  than the check does, so a baseline set from `wc -l` is still red. Take the number from
+  `node scripts/check-doc-index-size.js`, which prints it.
+- **Surface:** `scripts/**` and `.github/workflows/**` — **Lane A**. Fully reproducible in the
+  sandbox; no device, no production data.
+- **What would count as done:** two independently-green additive docs PRs can merge in either order
+  without the second one, or `main`, going red — demonstrated, not argued.
+
+
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`

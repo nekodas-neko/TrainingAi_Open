@@ -49,14 +49,19 @@ are actually startable.
 — the CI job named **Migration Check** could not fail on a broken migration, and fixing that
 immediately caught one: `142_claude_ro_views.sql` creates a view over a table `143` creates, so on
 every fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
-the CSP's missing `'wasm-unsafe-eval'` and the done screen estimating calories from the first weight
-ever logged.
+the CSP's missing `'wasm-unsafe-eval'`, and the done screen estimating calories from the first
+weight ever logged.
+
+**Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
+— the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
+from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
+were built by Lane A within hours of being filed.
 
 **Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
-— the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is CLOSED
-(2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread as a
-clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short daytime
-fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
+— the agent model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is
+CLOSED (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread
+as a clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short
+daytime fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
 
 **Open at the time of writing:** PR #6 (session notes the public cut did not carry), PR #10 (the
 public-repo migration handoff). Check `list_pull_requests` rather than trusting this line — it is a
