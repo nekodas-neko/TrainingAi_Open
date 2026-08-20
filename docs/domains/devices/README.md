@@ -162,6 +162,17 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 ## Open issues
 
+> **2026-08-20 — one correction worth reading before you trust a row count here.**
+> [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md)
+> retracts the 2026-08-19 finding that a `fullHistory` rollup had wiped `oura_daily_summary`. It had
+> not: the table holds **45 rows, 43 created 2026-08-17 07:50**. The "1 row" came from
+> `pg_stat_user_tables.n_live_tup`, a **planner estimate** — `last_analyze` is NULL on every table
+> here and the same field reads **0** against `oura_raw_packed`'s **764** real rows. **To ask whether
+> a table in this pipeline is empty, run `count(*)`.** Also recorded there: `oura_raw_samples` keeping
+> only a ~10-day hot window is **not** data loss — the older 941,233 frames are packed in
+> `oura_raw_packed` and `readRawFrames` reads both tiers.
+
+
 ```bash
 grep -n '^### .*\[devices\]' projectOverview.md   # 45 entries today
 grep -n '\[devices\]' docs/implementation-backlog.md   # 5 queue items today

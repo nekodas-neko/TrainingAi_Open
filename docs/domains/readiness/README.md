@@ -48,6 +48,15 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   proposed as 5 (**Q-500, ⛔ owner sign-off**); and Q-271's headline numbers ("never above 50, ever",
   "2.2 pts/day") are an 8-day artefact — over 41 days it is 12 days above 50 and 0.71 pts/day. Also
   files **Q-501**: persisted readiness rows drift from the summaries they derive from.
+- [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md)
+  — **retracts the 2026-08-19 claim that a rollup wiped the daily summaries, and restores Q-525.**
+  `oura_daily_summary` holds **45 rows, 43 of them created 2026-08-17 07:50** and untouched since; the
+  "1 row" came from `pg_stat_user_tables.n_live_tup`, a **planner estimate** that reads **0** against
+  `oura_raw_packed`'s **764** real rows. Q-528's code shape survives as a latent hazard on the
+  `fullHistory` path; its rebuild half does not. For **chronic stress**, both countable gates were then
+  measured and **both pass** — 43 summary rows against a threshold of 21, and 27 of 31 nights complete
+  in the trailing window — so the refusal is inside the **granular** layer, which persists no reason
+  for a null. Filed **TN-1**.
 - [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
   — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
   at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's
