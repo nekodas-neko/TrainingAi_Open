@@ -35,7 +35,7 @@ Six backlog entries, five merged PRs — plus Q-424 in this one:
 | **Q-391** — per-session calories on the day screen's Training card | #247 (promotion) | ✅ **shipped** — Lane A, #260 |
 | **Q-419** — the day budget ignores the RPE the done screen reads | #249 | ✅ **shipped** — #252 |
 | **Q-421** — HR-based workout energy, closed-form only | #250, amended #253 | ✅ **route (a) shipped** — #255 |
-| **Q-423** — the per-set RPE prefill is measurably low | #253 | queued, **Lane B** |
+| ~~**Q-423**~~ — the per-set RPE prefill is measurably low | #253 | **REFUTED 2026-08-20**, removed from the queue — see below |
 | **Q-420** — derive session RPE from the set ratings | #250, amended #253 | queued — **re-measured, #256** |
 | **Q-422** — calibrate against the owner's own energy balance | #250 | queued, Tuning → A |
 | **Q-424** — a shrink-only ratchet can leave `main` red | this PR | queued |
@@ -191,13 +191,20 @@ Paired sessions (both a session RPE and rated sets), n = 20:
 - **Nothing is blocked on the owner.** Both decisions they were holding (Q-420's derivation, Q-421's
   route) were answered and are recorded in the entries.
 - **Q-420 still needs a migration number** for session-RPE provenance — Lane A's to claim.
-- **Q-423's exact mapping is unchosen on purpose.** `floor` → `round` is the tempting one-liner, but
-  `round(8.5) = 9` moves 85% up a full point while the measured shift is +0.41. Bracket it against
-  the 625 observed ratings rather than picking by inspection.
-- **Every entry above Q-423 re-scores history**, including the `adaptive-tdee` maintenance window,
-  which reads the same active-energy figures. Each carries a "size the blast radius first"
-  requirement. Q-423 is the only one that re-scores nothing — stored ratings are untouched, only
-  future prefills change — which makes it the safest starting point.
+- ~~**Q-423's exact mapping is unchosen on purpose.**~~ **REFUTED 2026-08-20 — Q-423 is removed from
+  the queue and there is no mapping to choose.** It was bracketed against the ratings as this bullet
+  asked, and two things came back. The 625-set table was computed over sets of which **312 have no
+  `planned_pct` at all** — the column only exists since July 2026 — and were filled from
+  `intensity_pct`, the *achieved* intensity, not the planned percentage the prefill reads. On the 313
+  that do carry one the split is **288 unchanged / 25 raised / 0 lowered**, +0.125, and
+  `floor(pct/10)` is the modal rating at **all sixteen** observed percentages, 313 of 313 sets;
+  `round` misses five and turns 25 under-prefills into **82 over-prefills**. The `round(8.5) = 9`
+  worry above is moot for a third reason: **no set in the data has a planned percentage above 84**.
+  Full working: [`docs/reviews/2026-08-20-rpe-prefill-mapping-fit.md`](reviews/2026-08-20-rpe-prefill-mapping-fit.md).
+- **Every remaining entry in this cluster re-scores history**, including the `adaptive-tdee`
+  maintenance window, which reads the same active-energy figures. Each carries a "size the blast
+  radius first" requirement. Q-423 was the one exception and it is gone, so **there is no longer a
+  no-blast-radius starting point in this cluster**.
 
 ## Pickup prompt
 
@@ -243,6 +250,6 @@ First action: there is no outstanding report. Do the session-start reads above, 
 error_events and the database size per CLAUDE.md's standing instructions, and file anything new
 the same session. Then wait for the owner. If they raise the workout-energy work again, the
 cluster is already three-sixths built (Q-391, Q-419 and Q-421 shipped on 2026-08-19); what is
-left — Q-423, Q-420, Q-422 — is fully specified and needs an Implementation lane, not more
+left — ~~Q-423~~ (refuted 2026-08-20), Q-420, Q-422 — is fully specified and needs an Implementation lane, not more
 intake. Read Q-420's re-measure banner before repeating anything this handoff says about it.
 ```
