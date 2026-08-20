@@ -640,6 +640,38 @@ Same intensity, same duration, same estimator — so the input that differs is *
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
+> **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
+> evaporated, and the real case is a different one. Read this before starting.**
+>
+> This was filed adjacent to the energy-accuracy thread, and the implied benefit was that more session
+> RPEs means better burn estimates. **Q-421 changed that**: heart rate now takes precedence over the
+> RPE tier per session. Measured against production:
+>
+> | | count |
+> |---|---|
+> | completed sessions that would GAIN a derived RPE | **24** |
+> | …of those, sessions with **no HR**, i.e. where the tier still decides the burn | **3** |
+>
+> So the calorie impact is **3 sessions, not 24**. Deriving session RPE for energy accuracy is now
+> close to pointless.
+>
+> **The real consumer is `health-trends`, and it is a better case than the original one.**
+> `app/api/health-trends/route.ts:172` computes `sessionLoad = sessionRpe × durationMin` — Foster's
+> session-RPE method — plus an "average effort" summary line. Deriving takes that series from **20 to
+> 44 points**, more than doubling it. The done screen (`workout-sessions/[id]/energy`) and the AI
+> recap also read `sessionRpe` and would fill in.
+>
+> **⚠ And the scale mismatch bites HARDEST exactly there, which the original framing missed.** Foster's
+> method is defined on the **CR-10 (1–10)** scale. The per-set strip floors at **6**, so a mean of set
+> RPEs cannot go below 6 — feeding that straight into `sessionRpe × durationMin` **systematically
+> inflates session load**, and the training-load and ACWR thresholds downstream are calibrated on the
+> unscaled figure. A mapping is not optional here; it is the whole item.
+>
+> **Worth considering when it is picked up:** store a derived value distinctly from a self-reported
+> one, so the load series can decide whether to trust it, rather than backfilling `session_rpe` in
+> place and losing the ability to tell them apart.
+
+
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the

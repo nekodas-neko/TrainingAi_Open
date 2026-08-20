@@ -1007,10 +1007,12 @@ const BASELINE = {
   // left `main` red on Custom Rules earlier the same evening.
   // Raised 2026-08-19 (Lane A, Q-419 shipped). Re-measured from the MERGED file, not spliced from
   // either side of the conflict — three separate baseline races landed here this evening.
+  // Raised 2026-08-19 (Lane A, Q-420 re-measured). Re-measured from the MERGED file, not spliced —
+  // Q-421's own raise landed on main in between.
   // Raised 2026-08-19 (Lane A, Q-421 route (a) shipped): 11559 -> 11592. The measured blast radius
   // the entry required before it could land, plus the Keytel over-read caveat that route (b) exists
   // to fix.
-  'docs/implementation-backlog.md': 11592,
+  'docs/implementation-backlog.md': 11624,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
