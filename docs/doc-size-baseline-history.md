@@ -1181,3 +1181,24 @@ that never reached its ownership check and is therefore **unknown rather than cl
 start given that four consecutive documentation sweeps had already covered that seam. It sits in the
 baton rather than the handoff because the baton is what a cold successor reads as state; the handoff
 is the narrative behind it.
+
+## 2026-08-20 — `claude/tuning-agent-0q9yl7`
+
+**CLAUDE.md (+9):** the session-start database read told sessions to trust `pg_stat_user_tables`
+because it is not row-scoped — true, and silent on the difference between its size columns (exact,
+read from the filesystem) and its row counters (planner estimates, with `last_analyze` NULL on every
+table here). A Tuning session read `n_live_tup = 1` off an `oura_daily_summary` holding 45 rows and
+filed a data-loss incident that had never happened. Nine lines naming the split, giving the two
+measured counter-examples, and saying to run `count(*)`.
+
+**Backlog (+19):** one entry, TN-1 — chronic stress refuses inside its granular layer and persists no
+reason why. It replaces the retracted half of Q-528: both of that score's countable gates were
+measured this session and both pass, which moves the question from "is the history there" to "why does
+the model refuse", and nothing outside the pass can currently see the answer. Q-528 and Q-525 were
+rewritten in place rather than added to, so the entry is most of the growth.
+
+**Tuning baton (+19, after trimming a superseded note):** the session retracted a finding this baton
+itself carried, so the correction has to sit *above* the claim it replaces while the original bullet
+stays legible as the record of the misread — a successor who reads only the new block learns the fact
+but not the failure mode. The rule that produced it is rewritten in place with its counter-examples
+rather than deleted, for the same reason.
