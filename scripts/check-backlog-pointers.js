@@ -17,6 +17,9 @@
  *   7. Every `Gate:` value is one this project knows how to resolve.
  *   8. A `Batch:` is a kebab slug, and no batch mixes Lane A and Lane B — one batch is one PR, and
  *      one PR is one lane.
+ *   9. No NEW queue entry announces its own completion in its heading. The queue tracks what is
+ *      still open; the PR and the journal are the record of what shipped. The 17 that already do
+ *      are baselined below and the list is shrink-only.
  *
  * IDs are `<letter>-<number>` with an optional lowercase suffix: LA/LB (implementer lanes), BF
  * (BugFix), RV (Review), TN (Tuning), PS (one-off planning sessions), and the legacy Q. The old "next
@@ -40,6 +43,7 @@ const PILLARS = new Set([
 
 const failures = [];
 let batchSummary = '';
+let completedSummary = '';
 const text = fs.readFileSync(BACKLOG, 'utf8');
 const lines = text.split('\n');
 
@@ -54,7 +58,7 @@ const queue = lines.slice(queueStart);
 // ---- 1 & 2: entry headings -------------------------------------------------
 const seen = new Map();
 const entryOrder = [];
-/** id -> { needs: [], gates: [], batch: null, lane: null } for the most recently opened heading. */
+/** id -> { needs: [], gates: [], batch: null, lane: null, keep: false } for the most recently opened heading. */
 const meta = new Map();
 let currentId = null;
 
@@ -85,6 +89,8 @@ for (let i = 0; i < queue.length; i++) {
       const batch = line.match(/^\s*[-*]\s*\*{0,2}Batch:\*{0,2}\s*`?([^`\s]+)`?/i);
       if (batch && !meta.get(currentId).batch) meta.get(currentId).batch = batch[1];
 
+      if (/^\s*[-*]\s*\*{0,2}Keep:\*{0,2}\s*\S/i.test(line)) meta.get(currentId).keep = true;
+
       const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/);
       if (lane && !meta.get(currentId).lane) meta.get(currentId).lane = lane[1].trim();
     }
@@ -107,7 +113,7 @@ for (let i = 0; i < queue.length; i++) {
   const id = `${q[1]}-${q[2]}${q[3]}`;
   entryOrder.push(id);
   currentId = id;
-  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null });
+  if (!meta.has(id)) meta.set(id, { needs: [], gates: [], batch: null, lane: null, keep: false });
 
   if (seen.has(id)) {
     failures.push(
@@ -163,6 +169,46 @@ for (const [id, m] of meta) {
     }
   }
   batchSummary = [...batches.entries()].map(([n, m]) => `${n}×${m.length}`).join(', ');
+}
+
+// ---- 2b3: entries that announce their own completion -----------------------
+// "Never mark an issue fixed from intent" has a mirror: an entry that says it is finished should
+// not still be in the queue, because the protocol removes a completed entry in the PR that
+// completes it. Seventeen had accumulated by 2026-08-20 — the queue's own rule was not holding,
+// and nothing measured it. Shrink-only: an ID may leave this list, never join it.
+//
+// An entry genuinely worth keeping past completion (a shipped fix still owing an owner or device
+// check) states so with a `Keep:` line giving the reason, and is removed from this list.
+const COMPLETED_HEADING_BASELINE = new Set([
+  'Q-394', 'Q-298', 'Q-500', 'Q-254', 'Q-213', 'Q-219', 'Q-217', 'Q-207', 'Q-170',
+  'Q-139', 'Q-71', 'Q-270', 'Q-107', 'Q-1b', 'Q-32', 'Q-149', 'Q-11',
+]);
+{
+  const DONE = /(✅|\bSHIPPED\b|\bCOMPLETE\b|\bDONE\b|\bSUPERSEDED\b|\bDROPPED\b|\bFIXED\b|\bRESOLVED\b)/;
+  const flagged = [];
+  for (const [id, heading] of seen) {
+    if (!DONE.test(heading)) continue;
+    if (meta.get(id)?.keep) continue;
+    if (COMPLETED_HEADING_BASELINE.has(id)) continue;
+    flagged.push(`${id} — ${heading.slice(4, 110)}`);
+  }
+  if (flagged.length) {
+    failures.push(
+      `These queue entries announce their own completion in the heading:\n` +
+        flagged.map((f) => `      ${f}`).join('\n') +
+        `\n      Remove a finished entry — the PR and the journal entry are the record, and this ` +
+        `file\n      only tracks what is still open. If something is genuinely still owed (an owner ` +
+        `or\n      device check), add \`- **Keep:** <what is still owed>\` and say what closes it.`,
+    );
+  }
+  const stale = [...COMPLETED_HEADING_BASELINE].filter((id) => !seen.has(id) || !DONE.test(seen.get(id)));
+  if (stale.length) {
+    failures.push(
+      `COMPLETED_HEADING_BASELINE lists ${stale.join(', ')}, which no longer needs baselining. ` +
+        `The list is shrink-only — delete those entries from it in this PR.`,
+    );
+  }
+  completedSummary = `${COMPLETED_HEADING_BASELINE.size} baselined done-headings`;
 }
 
 // ---- 2c: Needs targets exist ----------------------------------------------
@@ -269,6 +315,6 @@ const withGate = [...meta.values()].filter((m) => m.gates.length).length;
 console.log(
   `check-backlog-pointers: OK — ${seen.size} entries, no duplicates, all tagged; ` +
     `${withNeeds} with Needs: (no cycles, all targets known), ${withGate} with Gate:; ` +
-    `batches [${batchSummary || 'none'}]; ` +
+    `batches [${batchSummary || 'none'}]; ${completedSummary}; ` +
     `migration ${nextMigration}, SQLite v${Math.max(...versions)} match source.`,
 );

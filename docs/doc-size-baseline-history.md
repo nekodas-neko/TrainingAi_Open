@@ -16,6 +16,17 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — the Orchestrator role
+
+**CLAUDE.md 1107 → 1115.** A sixth standing agent, owning queue and docs hygiene: clearing entries
+that announce their own completion, assigning batches, resolving lanes, reconciling docs against
+reality. The CLAUDE.md growth is the two rules an implementer needs without opening the contract —
+the completed-heading check and its `Keep:` opt-out, and the role's place in the letter list.
+
+`docs/agents/state/orchestrator.md` joins the ratchet as a new row at 62 lines, not a raise.
+
+---
+
 ## 2026-08-20 — the CSP could not start a WASM session (`fix/csp-wasm-unsafe-eval`, Q-546)
 
 **projectOverview.md 8018 → 8043.**
