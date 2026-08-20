@@ -17,6 +17,7 @@ import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/r
 import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { EnergyTimelineChart } from "@/components/health/energy-timeline-chart";
+import { workoutKcalBySession } from "@/components/health/day-detail/energy-summary";
 
 /** Cache key per day — the whole point of this screen is swiping between days, so each day's
  *  payload is seeded synchronously from cache and revalidated, never shown as a skeleton twice. */
@@ -93,6 +94,10 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
   // `loggedAt` means when the food was EATEN, not when the row was written — that is Q-413, and it
   // is the whole reason this chart can exist. Before it, every back-filled day spiked at whatever
   // hour the user reached for their phone.
+  // Q-391: the per-session addends of the Energy section's "Workouts" row, so a session card and
+  // the day total on the same screen cannot disagree — they are the same numbers.
+  const kcalBySession = useMemo(() => workoutKcalBySession(energy), [energy]);
+
   const intakeEvents = useMemo(
     () => (foodLogs ?? []).map(l => ({ atMs: new Date(l.loggedAt).getTime(), kcal: l.calories })),
     [foodLogs],
@@ -212,7 +217,7 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
             transition={{ duration: 0.16 }}
             className="space-y-4"
           >
-            {data && <TrainingSection data={data} />}
+            {data && <TrainingSection data={data} kcalBySession={kcalBySession} />}
             {data && <ActivitySection data={data} />}
             <EnergySection energy={energy} />
             {energy?.balance && (
