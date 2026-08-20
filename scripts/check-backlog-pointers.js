@@ -177,12 +177,17 @@ for (const [id, m] of meta) {
 // completes it. Seventeen had accumulated by 2026-08-20 — the queue's own rule was not holding,
 // and nothing measured it. Shrink-only: an ID may leave this list, never join it.
 //
+// The list is now EMPTY, cleared 2026-08-20 by the Orchestrator's first sweep. Only seven of the
+// seventeen turned out to be finished and removable. Three more had shipped their code and still
+// owed the owner an action, so they kept a `Keep:` line. The remaining SEVEN were not finished at
+// all — their headings announced a diagnosis, or a half, or a fix that production later refuted
+// (Q-270 read FIXED FORWARD while `training_load_ots` was still 0 of 96 days, five days on). That
+// ratio is the argument for this check: a completion claim in a heading is a claim, and ten of the
+// seventeen did not survive being checked against a merged diff.
+//
 // An entry genuinely worth keeping past completion (a shipped fix still owing an owner or device
 // check) states so with a `Keep:` line giving the reason, and is removed from this list.
-const COMPLETED_HEADING_BASELINE = new Set([
-  'Q-394', 'Q-298', 'Q-500', 'Q-254', 'Q-213', 'Q-219', 'Q-217', 'Q-207', 'Q-170',
-  'Q-139', 'Q-71', 'Q-270', 'Q-107', 'Q-1b', 'Q-32', 'Q-149', 'Q-11',
-]);
+const COMPLETED_HEADING_BASELINE = new Set([]);
 {
   const DONE = /(✅|\bSHIPPED\b|\bCOMPLETE\b|\bDONE\b|\bSUPERSEDED\b|\bDROPPED\b|\bFIXED\b|\bRESOLVED\b)/;
   const flagged = [];
