@@ -7,29 +7,33 @@ git history and the session journal (`docs/overview/`).
 
 ## Live pointers
 
-**These three numbers are the ones sessions collide on.** They are checked by
+**These two numbers are the ones sessions collide on.** They are checked by
 `scripts/check-backlog-pointers.js` in the Custom Rules job, which reads the real values from the
-migrations directory, `lib/sqlite/migrations.ts` and the queue below — so a stale line here fails
-CI instead of silently misdirecting the next session. Update them in the same PR that consumes a
-number.
+migrations directory and `lib/sqlite/migrations.ts` — so a stale line here fails CI instead of
+silently misdirecting the next session. Update them in the same PR that consumes a number.
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` (head: `205_claude_ro_views_saved_meal_image.sql`) |
+| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
-| Next unallocated Q band | **602** | the band table in [`docs/agents/README.md`](agents/README.md) |
 
-> **Do not take Q numbers from here one at a time.** Each standing agent owns a band — Lane A
-> 314–349, Lane B 350–386, BugFix 387–449, Review 450–499, Tuning 500–529 — and takes numbers from
-> its own, so no agent needs to read or write this table for a routine finding. The bands exist
-> because a shared next-free pointer is a *floor*, not an authority: it cannot see an unmerged PR,
-> and a number can be claimed and merged inside a single session without ever appearing in an open
-> one. That caused six collisions in three days, and two live ones — **Q-306 and Q-307 were each
-> held by two different entries** — survived in this file until 2026-08-17.
+> **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
+> never were safely: a next-free pointer is a *floor*, not an authority, because it cannot see an
+> unmerged PR. That caused six collisions in three days and two live duplicates. Reserved per-agent
+> bands replaced it and bought exhaustion instead — Tuning reached 29 of its 30, Review burned all
+> 50 in two days — plus a ledger that drifted twice.
 >
-> Q numbers are identifiers, not priorities. Priority is queue position, so a Q-451 sitting above a
-> Q-314 is correct and expected. When a band runs out, claim the next block of 50 from the pointer
-> above, record it in the band table, and bump this row.
+> **Each agent now owns a letter and counts up forever:** Lane A `LA-` · Lane B `LB-` · BugFix `BF-` ·
+> Review `RV-` · Tuning `TN-` · one-off sessions `PS-`. Find your next number with
+> `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The full reasoning is in
+> [`docs/agents/README.md`](agents/README.md) §3.
+>
+> **The letter says who found the item, not who ships it, and it never changes** — an entry filed by
+> Review and built by Lane A keeps its `RV-`. Priority is queue position, so an `RV-31` above an
+> `LA-12` is correct and expected.
+>
+> **Legacy `Q-` numbers stay exactly as they are** and remain valid IDs. There are over 10,000
+> references across 775 files; renumbering would be risk for no function.
 >
 > **Postgres migration numbers and local SQLite versions belong to Implementation Lane A alone.**
 >
@@ -46,16 +50,42 @@ number.
 > per-pillar sweep, so `scripts/check-backlog-pointers.js` fails on one. Read that pillar's index
 > (`docs/domains/<pillar>/README.md`) before starting: it carries the pillar's reference docs, open
 > known issues and gotchas.
+>
+> Tags are **mutable** — retag an entry as understanding improves. The ID never changes, which is
+> why subject lives in the tag and not in the identifier.
 
-## The optional `Lane:` field
+## The fields that decide whether an entry can be started
 
-> Most entries have no lane line, and that is correct — **lane ownership is decided by the file
-> paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md), which is the
-> authority. An entry states a lane only when the answer is worth writing down: the item spans paths
-> that are **unlisted** in §3 and therefore need a baton claim, it needs a Postgres migration number
-> or local SQLite version (**Lane A alone**), or two queued entries share a path and must not run
-> concurrently. Introduced 2026-08-17 on Q-530/Q-288, which are all three at once. Do not read the
-> absence of the field as "unassigned" — read it as "§3 already answers it".
+> **`node scripts/next-item.js --lane A`** is what an implementer runs. It prints READY in queue
+> order, PARKED with the reason, and UNCLASSIFIED for anything it could not place. Priority is still
+> yours and still queue position — the script computes *readiness*, never priority.
+>
+> - **`Lane: A` / `Lane: B`** — optional, and usually absent, which is correct: **lane ownership is
+>   decided by the file paths an item touches**, per §3 of [`docs/agents/README.md`](agents/README.md).
+>   State a lane when the rule is genuinely ambiguous, when the item needs a migration number
+>   (**Lane A alone**), or when two queued entries share a path and must not run concurrently. Where
+>   the filer cannot tell, write **`Lane: ?`** — the first lane to reach it decides and edits the
+>   entry. Do not read an absent field as "unassigned"; read it as "the rule already answers it".
+> - **`Needs: <ID>`** — this entry cannot start until that one ships. **A target no longer in the
+>   queue counts as satisfied**, because a completed entry is removed by the protocol below. That
+>   makes a typo look exactly like a success, so the check fails on a target that has never existed
+>   anywhere under `docs/`. Cycles fail too.
+> - **`Gate: owner`** / **`Gate: device`** — waiting on an owner decision, or on the S25 smoke run.
+>   Only these two values; anything else fails the check. A dependency on another entry is `Needs:`,
+>   not a gate.
+>
+> - **`Batch: <slug>`** — these entries ship as **one PR**, because one verification pass covers all
+>   of them. `next-item.js` groups them and the batch takes its highest member's queue position.
+>   **Never batch a migration or a sync-push change**; batch native/Kotlin work hardest, since each
+>   one costs an APK cycle. The full rule, and why file and domain are the wrong axes, is in
+>   [`docs/agents/README.md`](agents/README.md) §3. Assign a batch when you next touch an entry —
+>   not in a bulk pass over work nobody is about to start.
+>
+> An item needing both halves of the app is **two entries** — `PS-4a` with `Lane: A`, `PS-4b` with
+> `Lane: B` and `Needs: PS-4a` — not one entry with a paragraph asking readers not to re-sort it.
+>
+> Some entries still carry the older prose `⛔` marker. The query parks them and prints the marker
+> text, so they stay visible; convert one to a field when you next touch its entry.
 
 ## Before you start any item
 
@@ -81,13 +111,17 @@ number.
 1. Write the implementation plan to `docs/superpowers/plans/YYYY-MM-DD-<name>.md`
    (per the writing-plans conventions). Do **not** implement it.
 2. Insert an entry into the Queue below at the priority you judge right (position
-   in the list IS the priority). Include: plan doc path, a stable feature-branch
-   name, date added, and a one-line rationale for its placement.
+   in the list IS the priority). Take the next number from **your own letter** (see
+   Live pointers). Include: plan doc path, a stable feature-branch name, date
+   added, a one-line rationale for its placement, and any `Needs:` / `Gate:` /
+   `Lane: ?` that applies.
 3. Land the plan + backlog entry via a docs-only PR (no merge-confirmation gate
    needed per CLAUDE.md).
 
 **For implementer sessions (working the queue):**
-1. Take the **top** item in the Queue. One item per session run.
+1. Run `node scripts/next-item.js --lane <A|B>` and take the **top READY** item.
+   One item per session run. Do not hand-scan the file — the query is what knows
+   which entries are parked behind a `Needs:` or a `Gate:`.
 2. Dedup check before starting: if the item's branch already exists on `origin`,
    check it out and **continue** it (don't restart); if an open PR already covers
    the item, don't duplicate — babysit that PR to green or stop.
@@ -289,6 +323,96 @@ below threshold and left in place for next time.
      entries below are ordered by dependency, not by Q number. Do not re-sort them into numeric
      order; the sequence is the point. -->
 
+## Filed 2026-08-19 — the workflow review that produced the ID scheme
+
+*These four came out of reviewing the multi-agent setup itself. They are filed rather than fixed
+because none of them is the change that review was for, and per **No orphaned findings** a finding
+without a queue entry is a dropped finding.*
+
+### [platform] PS-1 — `docs/agents/README.md` §3 lists `lib/coach/` as Lane A while a queue entry says it belongs to neither lane
+
+- **Branch:** `docs/lane-coach-contradiction`
+- **Added:** 2026-08-19 · found while replacing the lane path lists with a rule
+- **Lane: B** — a docs-only reconciliation, no code.
+
+`docs/agents/README.md:124` lists `lib/coach/` under Lane A. Q-407's `Lane.` paragraph tells whoever
+takes it that **`lib/coach/**` belongs to neither lane's declared paths** and to claim it in a baton
+first. Both cannot be true, and the entry is the one an implementer reads.
+
+The path rule added in this branch settles it — `lib/coach/` is reached by `app/api/coach/route.ts`,
+so it is Lane A — but **Q-407's paragraph still says otherwise** and will be read before the README
+is. Correct the entry to match, or say explicitly why the rule does not apply to it.
+
+**Why this is worth an entry rather than a drive-by edit:** the same shape may exist on other
+entries written while the enumeration was the authority. Grep the queue for `neither lane` and
+`belongs to neither` before closing this.
+
+### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
+
+- **Branch:** `docs/baseline-history-dedupe`
+- **Added:** 2026-08-19 · found while extracting the baselines out of the check script
+- **Lane: B** — docs only.
+
+`docs/doc-size-baseline-history.md` is the 955 comment lines lifted verbatim out of
+`scripts/check-doc-index-size.js`. It was extracted unedited **on purpose**, so the extraction is
+reviewable as a pure move — but it carries known corruption from the conflict-splicing that motivated
+the move in the first place:
+
+- The **Q-553** block appears **twice, byte-identical** (it was at lines 30 and 35 of the old script).
+- Two blocks record the same change with different figures: one says `projectOverview -> 7785`, the
+  other `7805 -> 7785`.
+
+Dedupe the exact repeats and reconcile the contradictory pair against `git log` for the commits that
+raised them. **Do not summarise or prune the rest** — Q-543 was explicit that several of those notes
+are the only record of why a number moved, and one documents a near-miss where a splice would have
+reverted another lane's raise.
+
+### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
+
+- **Branch:** `fix/non-idempotent-migrations`
+- **Added:** 2026-08-19 · observed in this session's own start-up hook output
+- **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.
+
+`scripts/local-db/migrate.js` reports `applied 0, skipped 200 already recorded, 4 failed` on every
+run of an already-migrated database. The four never reach the recorded set, so they are retried
+forever:
+
+```
+054_users_email_unique.sql        relation "users_email_unique" already exists
+055_friends_and_titles.sql        relation "users_friend_code_unique" already exists
+082_exercise_library_expand_2.sql duplicate key value violates unique constraint "exercise_library_name_key"
+157_scale_ble.sql                 relation "scale_raw_samples" already exists
+```
+
+**These are distinct from the three (`038`, `040`, `041`) Lane A's baton records as known and
+ignorable** — do not assume the baton already covers them.
+
+Locally this is noise: the objects exist, so nothing is broken. **What needs establishing before any
+fix is whether the same four are unrecorded in production**, because `ensureSchema` tracks by
+filename and an unrecorded migration is one that re-runs on every cold start. Answer that first via
+the admin query endpoint; the fix (make each idempotent — `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`)
+is small and uninteresting by comparison, and per this repo's own rule a seed that never corrects a
+drifted production row is the trap to check for.
+
+### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
+
+- **Branch:** `docs/baton-compaction`
+- **Added:** 2026-08-19 · measured while adding batons to the size ratchet
+- **Lane: ?** — whichever role is doing its own handoff next; this is not one job.
+
+`docs/agents/state/README.md` says a baton is *"state, not narrative"* and *"if it is over a screen,
+the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
+**412** (its `Now` section alone is 200), Tuning **562**, Review **1,280**.
+
+This matters more than tidiness. With the lane path lists replaced by a rule, a baton's **Claimed
+paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
+412-line file before starting an item, which means the mechanism is not doing its job.
+
+All five are now in `docs/doc-size-baseline.json`, shrink-only, so they cannot grow further. The
+work is to bring them down, and **it is not a separate task**: a baton is rewritten in full at every
+handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
+Close this when all five are under ~150 lines.
+
 ## Nutrition focus — the owner's priority, 2026-08-18
 
 *"lets focus on the nutrition changes now. id like to get this perfected today"*
@@ -365,176 +489,57 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [workouts][app-shell] Q-391 — the day screen's Training card has no calories-burnt stat, and the estimate it needs is already on the same screen
+### [workouts][app-shell] Q-362 — `workoutDurations` is keyed by session NAME, so two same-named sessions in a day collide
 
-> **⚠️ The Lane A half SHIPPED 2026-08-19 — but NOT where this entry says, and the difference is the
-> point. What remains is Lane B: render it.**
->
-> The entry says *"`/api/day-log` is Lane A's"*. Putting the figure there would have **recreated the
-> exact defect the day screen already guards against.** `components/health/day-detail/energy-summary.ts`
-> states the rule outright: the Energy section's `workoutKcal` is read from
-> `/api/nutrition/energy-balance` *"because the day screen disagreeing with Nutrition about how much
-> was burned is worse than either being slightly off"*. A second per-session estimate computed in
-> `day-log` off its own profile and weight lookups would disagree with the total sitting two cards
-> below it, on the same screen.
->
-> **So it ships from `computeActiveEnergy` — the function that already sums the day total — as the
-> addends of that total.** `activeBreakdown.workoutKcalBySession: { id, kcal }[]` on
-> `/api/nutrition/energy-balance`. The parts cannot disagree with the total because they *are* the
-> terms that were summed.
->
-> **Lane B: join on session `id`, not name.** `/api/day-log` already exposes `workoutSessionId` per
-> exercise, so no name-keying is needed — which matters, since a name is not identity here and two
-> same-named sessions in one day would collide.
->
-> **Values are unrounded on purpose.** Rounding each addend and rounding their sum are different
-> numbers; a card reading 120 + 130 under a total of 251 is what that avoids. Round at render.
->
-> **Still Lane B's, and still open:** the presentation question this entry raises — the estimate is
-> **duration-only** (flat MET 8 over the clock; load, volume and reps are not inputs), so a 49-minute
-> session moving 2,364 kg and one moving 800 kg produce the same number. Sitting it in the same row as
-> VOLUME KG / EXERCISES / SETS implies it is derived from them. Label it (`est.`, `~kcal`) or place it
-> where the implication is weaker. That decision was not made here.
+- **Branch:** `fix/day-log-durations-by-id`
+- **Added:** 2026-08-20 · Lane B, found while wiring Q-391's per-session calories
+- **Placement:** low. Real but narrow — it needs the same session logged twice in one day.
+
+**What.** `/api/day-log` returns `workoutDurations` as `Record<sessionName, {start, end, minutes}>`
+(`route.ts:144-163`), so a second session with the same name **overwrites the first**. The day
+screen's Training card then shows one duration against both cards — whichever session was written
+last.
+
+**Why it surfaced now.** Q-391 moved the Training card's grouping from name to session **id**,
+because the calories join has to be on identity. The card now groups correctly and still looks its
+duration up by name, so the collision is visible in one place rather than two. **That is not a
+regression this introduced** — the same overwrite existed when the grouping was name-keyed, it was
+simply invisible because the two sessions were already merged into one card.
+
+**Fix.** Key it by `workout_sessions.id`, as the exercises already are (`workoutSessionId` is on
+every row). `/api/day-log` is **Lane A's**; the consumer change in
+`components/health/day-detail/day-sections.tsx` is Lane B's and is one line.
+
+- **Not verified:** not reproduced. Inferred from the route's own `Record<string, …>` keyed on
+  `ws.sessionName` — establish it with two same-named sessions on one day before fixing, so the fix
+  is aimed at something observed.
 
 
-- **Branch:** `feat/day-training-card-kcal-stat`
-- **Added:** 2026-08-18 · owner, with a screenshot of the day screen (Tuesday 18 August):
-  *"the training shohld have a stat saying the calories burnt from the workout."*
-- **What the screenshot shows:** a day detail with READY 76 / HR 51 / SLEEP 92 / MOVE 65 across the
-  top. Under **TRAINING**, one session card — "Push, 8:24am → 9:13am · 49 min" — listing five
-  exercises, footed by three stats: **VOLUME KG 2,364 · EXERCISES 5 · SETS 10**. Directly below,
-  the **ACTIVITY** card for a treadmill walk *does* show "101 kcal" alongside bpm and steps. That
-  contrast is the report: the activity gets a calorie figure and the workout does not.
+### [workouts] Q-331 — the done screen and the day agree on a session's kcal, but only a measurement says so, not a test
 
-**This was already considered and deliberately deferred — the reasoning is on file.**
-`projectOverview.md` (Q-247's entry) says outright: *"Deliberately not done: a per-workout kcal
-estimate in the day screen's Training section. It needs `estWorkoutKcal` per session, which is the
-Q-230 bundle hazard from a client component — doing it properly means computing it server-side in
-`/api/day-log`."* The owner asking for it is what moves this from *deferred* to *queued*; the
-blocker and the intended shape were both already named, so **do not re-derive them.**
+- **Branch:** `test/session-energy-cross-surface-parity`
+- **Added:** 2026-08-20 · Lane A, filed closing Q-330 · [`journal`](overview/entries/2026-08-20-session-energy-weight-source.md)
+- **Placement:** low. Nothing is broken — this is the one clause of Q-419's acceptance criterion
+  (*"a test pins the three surfaces to one number"*) that its own PR could not close.
 
-- **Where it goes:** `components/health/day-detail/day-sections.tsx:112-116` — the `TrainingSection`
-  stat row (`Volume kg` / `Exercises` / `Sets`, all derived client-side from the sets data).
-  `data.workoutDurations[sessionName]` on the same component already carries `{start, end, minutes}`
-  **per session**, so the duration the estimator needs is present; the profile inputs are not.
-- **⚠ The existing `workoutKcal` is a DAY total, not a session figure — this is the thing to get
-  right.** `computeActiveEnergy` (`packages/shared/src/health/daily-energy.ts:107-109`) sums
-  `estWorkoutKcal` over *every* strength session in the day, and that day-level number **already
-  renders on this very screen**, as the "Workouts" row of the ENERGY section
-  (`components/health/day-detail/energy-summary.ts:33`). So this is not "surface the field that
-  exists" — a card is per session, and two sessions in one day would both show the day total.
-  It needs a **per-session** call to the same shared estimator, server-side per the deferral note.
-- **⚠ The deferral note undersells the blocker: it is not a bundle-size hazard, it is impossible.**
-  `estWorkoutKcal` → `getEnergyFeatureSpec()` (`lib/oura-models/constants/index.ts:442`) → `readJson`,
-  which calls **`fs.readFileSync`**. That cannot run in a client component at all, so there is no
-  "accept the bundle cost" option — the per-session figure has to come from the server. **That makes
-  this cross-lane: `/api/day-log` is Lane A's.** Lane B can render it the moment the field exists.
-  Verified 2026-08-18 while working the queue.
-- **⚠ And it is a duration-only estimate.** `daily-energy.ts:102-103` is
-  `estWorkoutKcal({ durationMin, …, activityId: 8, intensity: 'moderate' })` — a flat MET 8 over the
-  clock. **Load, volume and reps are not inputs.** A 49-minute session moving 2,364 kg and a
-  49-minute session moving 800 kg produce the *same* number. Placing it in the same row as VOLUME KG
-  / EXERCISES / SETS — three measured facts — implies it is derived from them, and it is not. Either
-  label it so the basis is legible ("~kcal", "est."), or put it somewhere the implication is weaker.
-  This is a presentation decision, not a formula one; the formula is fine for what it is.
-- **Consistency requirement:** once a per-session figure ships, the session cards on a day must sum
-  to the ENERGY section's "Workouts" row on the same screen. `energy-summary.ts`'s own header states
-  the principle it was built on — *"the day screen disagreeing with Nutrition about how much was
-  burned is worse than either being slightly off"* — and this adds a third place on one screen for
-  the two to disagree. Assert the sum in a test.
-- **Empty state:** `computeActiveEnergy` returns zeros and `estWorkoutKcal` returns `null` when
-  age / weight / sex are missing (`workout-energy.ts:109-110`). A profile-less user must not see a
-  confident `0 kcal` — same class as Q-278 (a score that could not be computed rendering identically
-  to a real one). Decide what the stat shows when the estimate is unavailable.
-- **Not a duplicate:** nothing in the backlog covers it, and `projectOverview.md`'s only mention is
-  the deferral quoted above. **Q-312 is unrelated** despite touching `estWorkoutKcal` — that is the
-  synthetic *test* constants scrubbing METs below 1.0 in CI, not the production MET table.
-- **What would count as done:** each session card on the day screen carries a calories figure for
-  *that session*, computed server-side in `/api/day-log` from the session's own duration, labelled so
-  it does not read as measured; the figures sum to the ENERGY section's Workouts row; and a user with
-  an incomplete profile sees an honest absence rather than a zero.
+Q-419 and Q-330 between them made `GET /api/workout-sessions/[id]/energy` and
+`computeActiveEnergy`'s `workoutKcalBySession` agree for the same session. **Verified by measurement
+against the running app on 2026-08-20** — a session completed that minute, RPE 9, both surfaces
+reporting **106** where they previously read 107 and 106. No test holds them there.
 
-- **⬆ ASKED A SECOND TIME AND MOVED TO THE TOP OF THE QUEUE, 2026-08-19.** The owner, with a fresh
-  day-screen screenshot (Wednesday 19 August — Legs, 92 min, VOLUME KG 8,618 · EXERCISES 5 · SETS 18,
-  and a treadmill walk below it showing `101 kcal`): *"i want the caloeies burned showed per event;
-  so on the training; next to volume,excercises,sets, i want Energy Usage (or calories burned) same
-  with activity so I can look at each card and see howmuch that activity burns."* Same request, same
-  contrast, one day apart — **treat the placement as settled: it goes in the stat
-  row beside Volume / Exercises / Sets**, which resolves the "or put it somewhere the implication is
-  weaker" option above in favour of labelling instead.
-- **Naming: the owner offered "Energy Usage" or "calories burned".** Prefer a form that carries the
-  estimate in the label rather than a separate disclaimer — `~410` with the label `EST. KCAL` fits
-  the existing `Stat value/label` shape without a fourth element. The tilde is doing the work the
-  bullet above asks for.
-- **Nothing new is needed to build it, and that is worth stating plainly:**
-  `computeActiveEnergy` **already calls the estimator per session** — `daily-energy.ts:107-109` loops
-  `input.strengthSessions` and calls `est(8, s.durationMin)` for each (→ `estWorkoutKcal`, `:102-103`) — and then **adds them into one
-  `workoutKcal` and discards the split**. The per-session figure is computed today and thrown away.
-  Returning the breakdown alongside the total is the whole server-side change; the consistency
-  requirement above is then satisfied by construction rather than by a second calculation.
-- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — no device or
-  production data needed. Spans `app/api/day-log` (Lane A) and `components/**` (Lane B); the deferral
-  note says the server half is the correct home, so **route it to Lane A** with the display change
-  riding along.
-
-### [workouts][nutrition] Q-419 — the done screen and the day's energy budget disagree about the same workout, because only one of them reads your RPE
-
-- **Branch:** `fix/day-energy-ignores-session-rpe`
-- **Added:** 2026-08-19 · found while answering the owner's question *"how can we make energy usage/burned
-  from excercuse more accurate, what type of data can we feed to calibrate it over time"*. Not a report —
-  this is the first rung of that answer, and it is a straight defect rather than a calibration change.
-
-**Two live paths call the same estimator with different intensities for the same session.**
-
-| path | intensity | file |
-|---|---|---|
-| done screen → `GET /api/workout-sessions/[id]/energy` | `intensityFromRpe(rpe)` — easy / moderate / hard | `app/api/workout-sessions/[id]/energy/route.ts:64` |
-| day ENERGY row, Nutrition earned-kcal, Home budget | **hardcoded `'moderate'`** | `packages/shared/src/health/daily-energy.ts:103` |
-
-`computeActiveEnergy` never receives an RPE — `ActiveEnergyInput.strengthSessions` is
-`{ durationMin }[]` and nothing else (`daily-energy.ts:66-67`), so the tier cannot be threaded without
-widening that type.
-
-- **The user watches the number change and then watches it not apply.** `done-screen.tsx:130-152`
-  re-fetches on every RPE tap, keyed by `workout-energy:<id>:<activityId>:<rpe>` precisely so a different
-  rating re-estimates. So on the done screen an RPE 9 session reads higher than an RPE 3 one — and the
-  moment that session lands in the day's ENERGY section, in Nutrition's earned calories, and in the Home
-  budget, it reverts to the moderate figure. The tap looks load-bearing and is not.
-- **Magnitude is exact in form even though the tiers are not readable here.** `estWorkoutKcal` is
-  `durationMin × (MET − 1.5) × bmrPerMinute` (`workout-energy.ts:113`), so the ratio between tiers is
-  `(met_hard − 1.5) / (met_moderate − 1.5)` — nothing else in the expression changes. The **real** MET
-  table cannot be quoted from the sandbox: `lib/oura-models/constants/` is runtime-only (absent here) and
-  the committed fixture is deliberately scrubbed — it lists strength as `met_easy: 1, met_moderate: 0.6,
-  met_hard: 3`, which is not a MET table (that scrubbing is Q-312). **Measure against the runtime table
-  before quoting a kcal delta anywhere user-facing.**
-- **`sessionRpe` is already stored and already synced.** `workout_sessions.session_rpe`
-  (`schema.ts:169`), written through the `session_rpe` outbox domain by `handleRpeTap` (`done-screen.tsx:154-170`). This
-  needs no new capture, no migration, no schema change — only for the day-level path to read a column it
-  already has.
-- **Where it has to be plumbed.** `energy-balance-service.ts:122-126` and `app/api/body-metadata/route.ts:148`
-  both build `strengthSessions` from workout rows they have already fetched, so `ws.sessionRpe` is in hand
-  at both sites. Widen `ActiveEnergyInput.strengthSessions` to `{ durationMin; rpe?: number | null }` and
-  call `intensityFromRpe(s.rpe)` instead of the literal. `intensityFromRpe` already defaults to
-  `'moderate'` on null (`workout-energy.ts:87`), so an unrated session is unchanged — which is what keeps
-  this from re-scoring history that has no RPE.
-- **⚠ It DOES re-score history that has one, and that is the thing to size before shipping.** Every past
-  day carrying a rated session moves. Per the Tuning rule, state how many days change and by how much
-  before this lands — and note it moves *maintenance* too, since `adaptive-tdee`'s calibration window
-  reads the same active-energy figures. A silent re-score of the number the app eats against is worse
-  than the disagreement it fixes.
-- **Fixes a stated invariant, not just an oddity.** `energy-summary.ts`'s own header says the day screen
-  disagreeing with Nutrition about how much was burned is worse than either being slightly off. This is
-  that disagreement, one layer up — the done screen against both of them.
-- **Relationship to Q-391:** same file, same function, adjacent change. Q-391 needs
-  `computeActiveEnergy` to return its per-session breakdown instead of discarding it; this needs the same
-  loop to read an intensity per session. **Do them in one visit** — and if Q-391 ships first, its
-  per-session figures must carry the tier, or the Training card inherits this same contradiction.
-- **Surface:** browser-reproducible at the S25 viewport against the seeded DB — complete a workout, tap
-  an RPE, compare the done screen's kcal with the same day's ENERGY row. No device, no production data.
-  Spans `packages/shared/**`, `lib/health/**` and `app/api/**` — all Lane A.
-- **What would count as done:** the kcal the done screen shows for a session is the kcal that session
-  contributes to the day's ENERGY row, Nutrition's earned calories and the Home budget, for every RPE
-  value; an unrated session is unchanged; and a test pins the three surfaces to one number.
+- **Why the obvious test cannot be written yet.** Both surfaces estimate strength as activity **8**,
+  and the committed fixture constants list it as `met_moderate: 0.6` — below `estWorkoutKcal`'s
+  `met - 1.5` floor, so in CI and the sandbox **both sides are 0**. An equality assertion between two
+  zeroes passes whatever the inputs are: it is the Q-391 vacuity trap, one surface wider. Picking a
+  different activity is not available either — the day path hardcodes 8.
+- **What would actually work:** inject the MET table (or the estimator) into both paths for the test,
+  so parity is asserted at a MET the formula responds to. That is a testability change to
+  `daily-energy.ts` / the energy route, not a fixture change — **do not "fix" this by unscrubbing the
+  fixtures**, which is Q-312 and deliberate.
+- **Surface:** `packages/shared/**`, `app/api/**` — Lane A. No device, no production data.
+- **What would count as done:** one test computes a session's kcal through both surfaces at a MET
+  above the floor and asserts the same rounded number, and fails if either side changes its weight,
+  duration or intensity source.
 
 
 ### [workouts] Q-423 — the per-set RPE prefill is measurably low, and it is the input every derived effort number will average
@@ -590,6 +595,38 @@ that gets corrected upward that lopsidedly is not a neutral starting point.
 
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
+
+> **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
+> evaporated, and the real case is a different one. Read this before starting.**
+>
+> This was filed adjacent to the energy-accuracy thread, and the implied benefit was that more session
+> RPEs means better burn estimates. **Q-421 changed that**: heart rate now takes precedence over the
+> RPE tier per session. Measured against production:
+>
+> | | count |
+> |---|---|
+> | completed sessions that would GAIN a derived RPE | **24** |
+> | …of those, sessions with **no HR**, i.e. where the tier still decides the burn | **3** |
+>
+> So the calorie impact is **3 sessions, not 24**. Deriving session RPE for energy accuracy is now
+> close to pointless.
+>
+> **The real consumer is `health-trends`, and it is a better case than the original one.**
+> `app/api/health-trends/route.ts:172` computes `sessionLoad = sessionRpe × durationMin` — Foster's
+> session-RPE method — plus an "average effort" summary line. Deriving takes that series from **20 to
+> 44 points**, more than doubling it. The done screen (`workout-sessions/[id]/energy`) and the AI
+> recap also read `sessionRpe` and would fill in.
+>
+> **⚠ And the scale mismatch bites HARDEST exactly there, which the original framing missed.** Foster's
+> method is defined on the **CR-10 (1–10)** scale. The per-set strip floors at **6**, so a mean of set
+> RPEs cannot go below 6 — feeding that straight into `sessionRpe × durationMin` **systematically
+> inflates session load**, and the training-load and ACWR thresholds downstream are calibrated on the
+> unscaled figure. A mapping is not optional here; it is the whole item.
+>
+> **Worth considering when it is picked up:** store a derived value distinctly from a self-reported
+> one, so the load series can decide whether to trust it, rather than backfilling `session_rpe` in
+> place and losing the ability to tell them apart.
+
 
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
@@ -694,6 +731,39 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 
 ### [workouts][platform] Q-421 — the accurate energy model is already vendored, downloaded and tested, and has zero callers
 
+> **⚠️ ROUTE (a) SHIPPED 2026-08-19 (Lane A), owner-approved. Route (b) — the ONNX vector — is still
+> open and still blocked on the feature spec.**
+>
+> `estWorkoutKcalFromHr` (Keytel et al. 2005) is in `workout-energy.ts`, and `computeActiveEnergy`
+> now prefers it per session, falling back to the MET tier when it returns null. Both call sites
+> batch-read `avg_bpm` via the new `getAvgBpmBySession`.
+>
+> **Blast radius, measured against production rather than assumed.** Coverage: **42 of 78** completed
+> sessions have an `avg_bpm`; the other 36 keep the MET estimate, permanently — the strap is not
+> always worn. Owner profile 33 y / 71.5 kg / male, median session 58 min, and the **real** avg-BPM
+> range is **73–104, median 91** — resistance training, not steady-state cardio:
+>
+> | avg bpm | Keytel kcal |
+> |---|---|
+> | 73 (min) | **164** |
+> | 91 (median) | **321** |
+> | 104 (max) | **435** |
+>
+> The MET path's own test pins a 55-minute session to a **~200–400** band, so this **overlaps rather
+> than inflates**: low-HR sessions move down, high-HR sessions move up, which is the entire point —
+> the number now responds to effort instead of only to the clock.
+>
+> **⚠ One caveat to carry into route (b):** Keytel is fitted on *steady-state aerobic* subjects and
+> is known to over-read for intermittent resistance work, where HR stays elevated between sets
+> without the matching oxygen cost. It does not misbehave at the owner's observed HRs — but a first
+> local check injected **150 bpm** and got **823 kcal**, which is not a number that occurs in this
+> data (max 104) and should not be quoted as a prediction. That over-read is exactly what the ONNX
+> model exists to fix.
+>
+> **Still open in this entry:** route (b), and the "store which basis was used and label it" note —
+> the basis is currently chosen silently per session. Surfacing it is a UI decision (Lane B).
+
+
 - **Branch:** `feat/hr-based-workout-energy`
 - **Added:** 2026-08-19 · from the owner's question *"how can we make energy usage/burned from
   excercuse more accurate"*. Tier 2 of the three-rung answer (Q-419 is tier 1, Q-422 tier 3).
@@ -797,6 +867,22 @@ residual into a correction rather than a mystery.
 - **Branch:** `fix/doc-index-baseline-order-independence`
 - **Added:** 2026-08-19 · not a report. Found by walking into it: a branch cut from pristine
   `origin/main` failed `pnpm check:rules` on a change that had nothing to do with the failure.
+
+> **⚠️ RE-CHECKED 2026-08-20 against `main` after #254 landed — the entry survives, but half of what it
+> described is already fixed. Read this first.**
+>
+> #254 moved the baselines out of the script and into `docs/doc-size-baseline.json`, with the
+> rationale in `docs/doc-size-baseline-history.md`. That was the right fix for a **different** problem
+> — the script had reached 1,091 lines with 955 of them prose, and *32 of the last 40 commits touched
+> it*. Conflict **frequency** is solved; every branch no longer collides on a shared prose region.
+>
+> **The order-dependence is untouched.** Two PRs can still each raise the same JSON number, each be
+> green against the value as it stood when its own job ran, and produce a merged `main` that is over
+> its own baseline. Nothing detects that, because CI still has no `push: [main]` trigger. The scenario
+> below is unchanged by #254 — only the file it happens in has moved.
+>
+> **So the remaining item is narrower than the original text implies:** make the check
+> order-independent, per direction (a). Do not re-litigate where the baselines live.
 
 **`main` was red on Custom Rules at commit `39e948b`, and had been since it was created.**
 `docs/implementation-backlog.md` stood 31 lines over its own `check-doc-index-size` baseline. Two
@@ -1146,6 +1232,8 @@ number.**
 
 ### [nutrition][app-shell] Q-417 — a THIRD calorie budget, 179 low, because the Nutrition ring keeps its optimistic local paint
 
+- **Batch:** calorie-budget-surface
+
 - **Branch:** `fix/nutrition-ring-active-energy`
 - **Added:** 2026-08-19 · owner, from three screenshots taken at 9:57: *"these nutrition values dont
   look like they are lining up"*
@@ -1214,6 +1302,8 @@ about the same day.
   Then log a food item and confirm all four move together — that second step is what (a) failed.
 
 ### [nutrition][app-shell] Q-415 — Home shows two calorie budgets 271 apart; Q-401's sweep missed the donut
+
+- **Batch:** calorie-budget-surface
 
 - **Branch:** `fix/home-donut-budget-source`
 - **Added:** 2026-08-19 · owner, from a Home screenshot: *"explain this widget what ars those
@@ -2420,6 +2510,8 @@ this fits without an extraction.
 
 ### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
 
+- **Gate:** owner
+
 - **⛔ OWNER-DEFERRED 2026-08-18 — accepted risk, do NOT implement. The fix already exists.**
   The owner's call: *"leave that as a known issue for now — only admin will be me for a long time."*
   The window opens only on **revocation**, and with a single permanent admin it never opens.
@@ -2714,31 +2806,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
   `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
   worklist.
 
-### [platform] Q-329 — `shiftDateStr` moves a first-century date by ~1,900 years
-
-- **Branch:** `fix/shift-date-str-low-year`
-- **Added:** 2026-08-19 · Lane A, found while fixing Q-497 · [`journal`](overview/entries/2026-08-19-admin-range-loop-termination.md)
-- **Placement:** low. Exotic input on admin-only surfaces, and Q-497 removed the way it could hang
-  anything. Filed because it is a silent wrong answer rather than a visible failure, and because
-  Q-497's padding fix makes low years *look* supported when they are not.
-
-**Measured 2026-08-19:** `shiftDateStr('0001-01-01', -1)` returns **`1900-12-31`**, not `0000-12-31`.
-The cause is `Date.UTC`'s legacy two-digit-year mapping — a year of 0–99 is interpreted as 1900+y —
-and it is unaffected by the year padding Q-497 added, which only decides how the *result* is printed.
-
-- **Reachable, if absurd.** `normalizeDateParamIso`'s regex accepts `\d{4}`, so `0050-01-01` passes
-  validation on `admin/day-review` and `admin/backfill-derived-scores`. The second **commits**, so a
-  backfill over such a range would write recomputed scores onto 1950s dates.
-- **Fix:** build the date in a safe year and set the real one (`setUTCFullYear`) rather than passing
-  a sub-100 year to `Date.UTC`. It restructures the function, which is why it was not folded into
-  Q-497 — that change was about termination, and mixing a date-helper rewrite into it would have made
-  the loop fix harder to review.
-- **Cheaper alternative worth considering first:** reject a year below 1000 at
-  `normalizeDateParam`, so the out-of-contract value never reaches any helper. Decide which before
-  building — a validation change touches every date-param route, a helper change touches one file.
-- **Verification:** `shiftDateStr('0001-01-01', -1)` must give `0000-12-31`, and every existing
-  `shiftDateStr` test must still pass unchanged.
-
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
 - **Branch:** `fix/aria-expanded-collapsibles-ratchet`
@@ -2946,24 +3013,6 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
 - **Extraction gate:** the server rollup must produce identical `sleep_sessions`/`body_metrics` output
   over a sample of historical days before and after. The extraction ships **no** behaviour change.
 
-### [platform][devices] Q-546 — WASM cannot instantiate in production: `script-src` has no `wasm-unsafe-eval`
-
-- **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 4
-- **Branch:** `fix/csp-wasm-unsafe-eval`
-- **Added:** 2026-08-18 · **Lane A** (`next.config.ts`). Independent of everything else — do it early.
-- **Verified today.** `next.config.ts:10` sets `script-src 'self' 'unsafe-inline'` (plus `'unsafe-eval'`
-  in dev only) `https://accounts.google.com`. There is no `wasm-unsafe-eval`, so **no WASM session can
-  start in production**, and every on-device neural plan (D2 Task 6 — SleepNet + step_counter) is
-  blocked behind it.
-- **The trap is the one the master plan predicted:** *"the parity test runs under Node (no CSP) and
-  would false-green."* `lib/oura-models/__tests__/wasm-parity.test.ts` passes under vitest and proves
-  nothing about the device. It is a genuine parity proof against the TorchScript golden and a **useless
-  CSP proof**.
-- **Fix:** add `wasm-unsafe-eval` to the production `script-src`, then **assert on the S25 that a real
-  WASM session instantiates under the deployed header** — a green test is not the gate here, a device is.
-- **Security note:** `wasm-unsafe-eval` is narrower than `unsafe-eval` (it permits WASM compilation
-  only). State that in the PR rather than letting it read as a blanket eval relaxation.
-
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
@@ -3061,6 +3110,8 @@ and it is unaffected by the year padding Q-497 added, which only decides how the
   which matters because Railway can run more than one. **Lane A.**
 
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
+
+- **Gate:** owner
 
 - **Branch:** `feat/meal-label-ingredient-breakdown`
 - **⬆ MOVED TO THE TOP OF THE QUEUE by the owner, 2026-08-18** — *"can this be added to the top
@@ -3303,6 +3354,8 @@ moving *beside* the calories rather than under them.
   drive adoption, or narrow? **Owner's call, not Lane A's.**
 
 ### [app-shell][workouts][platform] Q-467 — the Coach can change your programme and nothing in the app can undo it
+
+- **Needs:** Q-468
 
 - **Branch:** `feat/coach-undo-control`
 - **Added:** 2026-08-18 · review sweep (the Coach write path — **the first review ever to cover it**) ·
@@ -4067,6 +4120,8 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   and the notification arrives.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
+
+- **Gate:** owner
 
 - ⛔ **blocked: needs an owner decision before any code moves.** Skipped by Implementation Lane B on
   2026-08-17 while taking Q-532 below it. This entry asks for the *premise* of a shipped IA decision
@@ -5306,7 +5361,7 @@ session working from a temporarily restored copy.
      autoregulation fire less, never more.
   3. Investigate the non-monotonic top end separately — it may be a `maxRepsAtPct` bug, not a
      calibration issue.
-- **Gate:** re-run this exact measurement after the change. The harness is ~30 lines against
+- **Re-measure:** re-run this exact measurement after the change. The harness is ~30 lines against
   `set_logs`; the review has the query.
 - **Depends on Q-290** — the input signal's own variance bounds what any calibration can achieve.
 
@@ -5474,6 +5529,8 @@ session working from a temporarily restored copy.
   is touched anyway — not worth its own PR.
 
 ### [platform] Q-287 — there is no self-service account deletion, and the Play Store requires one
+
+- **Gate:** owner
 
 - **Branch:** `feat/account-deletion`
 - **Plan:** **required before any code** — this is destructive and irreversible
@@ -5761,7 +5818,7 @@ session working from a temporarily restored copy.
      independently against the stored HR series before picking.
   2. Feed daytime HRV into the charge term. `rr_intervals` holds ~49,900 rows and
      `daytime_stress_scaled` exists on 22 of 40 days; neither reaches the battery model today.
-- **Gate:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
+- **Re-measure:** re-run the r = +0.67 check after the change. Per Q-273, stamp the new model version or
   the before/after comparison is not interpretable.
 - **⚠️ Read [`docs/reviews/2026-08-17-body-battery-calibration.md`](reviews/2026-08-17-body-battery-calibration.md)
   (Q-502) before starting. It re-measured this entry (still true — 5.6× on 14 v5 days now) and found
@@ -5790,6 +5847,8 @@ session working from a temporarily restored copy.
 - **Follow-up (not blocking):** re-derive the anchor on ~15 BLE-era nights. This fit is Cloud-era and
   BLE overnight HR is ~2× noisier, so the anchor is conservative for current data rather than wrong.
 ### [activity] Q-505 — Activity Score: redesign as a daily effort meter with a target (decisions resolved, ready to build)
+
+- **Needs:** Q-526
 
 - **Branch:** `fix/activity-score-lane-weights` · **Lane:** A
 - **No longer blocked.** All three decisions were resolved 2026-08-18 — the owner delegated them
@@ -7702,6 +7761,8 @@ session working from a temporarily restored copy.
 
 ### [platform][devices] Q-250 — an Android emulator job in CI, to close the 17 rows that need an Android runtime and nothing else
 
+- **Gate:** device
+
 > **⛔ THE JOB IS DISABLED AND THE ASSERTION NEVER PASSED — read this before anything below.**
 > Corrected 2026-08-17, hours after the note that follows. That note says the local-SQLite half is
 > in. **It is not.** The job was merged, ran for the first time on a real runner, and failed — and
@@ -8342,6 +8403,8 @@ session working from a temporarily restored copy.
 
 ### [nutrition][platform] Q-201 — a plan meal's suggested time is stored, shown, and never used for anything
 
+- **Gate:** owner
+
 - **⛔ Needs an owner decision before implementing (added 2026-08-12, while shipping Q-200).** The
   two things are not the same notification. The existing reminders fire at a **meal type's end
   hour** as a *"you didn't log this"* catch-up (`computeMealReminderActions`); a plan's
@@ -8959,6 +9022,8 @@ measured, not the ~3,300-test full suite.
 
 ### [sleep][readiness] 🔴 Q-72 — the Sleep Score cannot tell a good night from a bad one (MEASURED, needs an owner decision)
 
+- **Gate:** owner
+
 - **Added:** 2026-08-04. Started as *"put the sleep rating on the morning check-in"* (the owner's
   idea). **That turned out to be already built** — `MorningCheckinSheet` has collected
   `sleepQualityFeel` (1–5, 1 = best) since at least 2026-07-03, and
@@ -9098,6 +9163,8 @@ each other. The score has ~18 points of dynamic range and spends all of it above
 
 ### [platform][workouts][nutrition] Q-168 — AI Coach follow-ups (Q-157 is complete)
 
+- **Gate:** device
+
 - **Added:** 2026-08-09 · Q-157 shipped across four PRs (#1191, #1195, #1197, and phase 3b) and its
   entry is removed per this file's own rule that a finished item must never linger.
 - **What Q-157 delivered:** five write domains (session exercises, macro targets, user goals,
@@ -9184,6 +9251,8 @@ per-field merge where an AI write has no honest source rank to claim.
 
 
 ### [app-shell] ⛔ Q-147 — cold app start has never been measured on the device (owner action)
+
+- **Gate:** device
 
 - **Added:** 2026-08-08 · [journal](overview/history-2026-08-07.md)
 - **⛔ blocked: needs the S25.** Not implementable in a session — filed so the gap is tracked rather
@@ -9365,6 +9434,8 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [activity][readiness] Q-137 — the Activity Score is effectively a step counter: 57 of 100 weight is constant, and it lost its second-best input a month ago
 
+- **Gate:** owner
+
 - **Branch:** `fix/activity-score-calibration`
 - **Added:** 2026-08-07 · [review §6.1-6.3](reviews/2026-08-07-full-app-review.md)
 - **⛔ Needs an owner decision before code**, same shape as Q-72 — this changes a number read daily.
@@ -9486,6 +9557,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [workouts] Q-85 — a shortened session keeps full-length rest periods, which is what actually caps its exercise count
 
+- **Gate:** owner
+
 - **Branch:** `feat/preset-aware-rest-compression`
 - **Plan:** [`2026-08-15-preset-aware-rest-compression.md`](superpowers/plans/2026-08-15-preset-aware-rest-compression.md)
   (written 2026-08-15). **⛔ Needs one owner decision before code** — the plan measures the options
@@ -9536,6 +9609,8 @@ first, so the output is a design discussion, not a patch:
   real before writing a fix.
 
 ### [devices][body] Q-114 — scale "Weighing you…" progress bar has already drifted from the real native timeout; shorten both together
+
+- **Batch:** scale-weighing-ui
 
 - **Branch:** `fix/scale-cycle-budget-drift-and-trim`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 29
@@ -9788,6 +9863,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
+- **Batch:** scale-weighing-ui
+
 - **Branch:** `fix/scale-onunstablereading-ungated-recurrence`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 19
 - **Added:** 2026-08-05 · owner-reported (screenshot): the "Weighing you…" progress toast appeared
@@ -9835,6 +9912,8 @@ first, so the output is a design discussion, not a patch:
   when this ships.
 
 ### [sleep] ⛔ Q-102 — wire the morning sleep-feel rating into the live Sleep Score, neutral at 3/5 — OWNER DECLINED 2026-08-06
+
+- **Gate:** owner
 
 > **⛔ Owner explicitly ruled this out, in person, 2026-08-06** — walked through it live against a
 > real disrupted night: does not want `sleep_quality_feel` driving the score at all, wants it kept
@@ -10874,6 +10953,8 @@ Two independent findings, both low-urgency:
 
 ### [sleep] 🟠 Q-4 — `respiratory_rate` is persisted from an estimator its own docs call uncalibrated
 
+- **Gate:** owner
+
 > **⚑ Owner answered 2026-08-04: willing to wear the Polar H10 overnight for ground truth — *"yes but
 > not tonight."*** Still owner-gated, but the gate is now scheduling rather than consent.
 
@@ -10883,6 +10964,8 @@ is essentially never worn for sleep, so there's no ground truth to calibrate
 against yet. Blocked on real-data capture, not code.
 
 ### [devices][readiness] 🟠 Q-7b — the **ten** device-owned `oura_daily_derived` columns have no producer
+
+- **Gate:** device
 
 > **⚑ Re-measured 2026-08-08 — it is ten, not eight, and here is the exact list.** Machine-counted
 > every column in the table against 82 rows rather than spot-checking: **`active_calories_est`,
@@ -10948,6 +11031,8 @@ What is left of Q-10 is only the nice-to-have above: persisting Oura's session
 `type` / the ring's bedtime-period tag.
 
 ### [sleep] 🟢 Q-34 — sleep-staging Phase 1b: items 2 and 4 remain
+
+- **Gate:** device
 
 Plan: [`docs/superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md`](superpowers/plans/2026-07-11-oura-ble-sleep-staging-phase1b-signal-upgrades.md).
 Branch: `feat/sleep-staging-ultradian-prior` (item 2).
@@ -11340,44 +11425,6 @@ since the CI link check (item 1) catches a botched rewrite immediately.
   specifically" caveat is now answered — it is fine, as are the other three. **The rule at the top
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
-
----
-
-### [platform] 🟢 Q-543 — every concurrent PR conflicts on the doc-index BASELINE object
-
-`scripts/check-doc-index-size.js` holds three numbers — `projectOverview.md`,
-`docs/implementation-backlog.md`, `CLAUDE.md` — in one object literal, under ~170 lines of
-accumulated raise-history commentary. Every lane that raises a baseline edits the same few lines of
-the same file on the same day, so the ratchet has become the repo's most reliable merge conflict.
-
-**Measured on this branch, 2026-08-18:** one docs-only PR (#69, a single `CLAUDE.md` row) took four
-CI rounds. One was a genuine ratchet failure and correct. The other three were base collisions with
-#68, then #65/#71, then #75 — **all three on this file, none on the content being changed.** The
-file's own comments record the same thing happening to other lanes repeatedly, describing "the
-fourth same-day ratchet collision on this branch" and warning in five separate places that splicing
-a conflict hunk silently un-does the other lane's raise. That warning exists because it has been got
-wrong before.
-
-**This is the same problem `docs/overview/entries/` already solved.** Per-entry journal files took
-the journal-prepend conflict class to zero on the reasoning that two PRs writing *different files*
-cannot conflict. The baselines are the remaining shared-line edit that every PR touches.
-
-**Shape worth considering** (not a spec — the decision is which, and it is cheap to reverse):
-
-- **Per-file baseline fragments** — `scripts/doc-baselines/<slug>.json` or similar, one file per
-  ratcheted doc, read and merged by the check. Directly mirrors the entries-directory fix. Costs a
-  small loader; removes the conflict class outright.
-- **Move the raise-history prose out of the source file** into a log the check does not parse. Much
-  smaller change, and it shrinks the conflict window without closing it — two lanes raising the same
-  file the same day still collide, they just collide on one line instead of thirty.
-
-**Do not** solve it by dropping the history commentary wholesale. Several of those notes are the
-only record of *why* a number moved, and at least one documents a real near-miss where a splice
-would have reverted another lane's raise.
-
-**Not urgent.** It costs minutes per PR, never correctness — the check itself works exactly as
-intended, and caught a real overrun on #69. Filed per "no orphaned findings" rather than taken,
-because restructuring a CI gate mid-merge is not a docs change.
 
 ---
 

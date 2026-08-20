@@ -66,19 +66,26 @@ export const DayHrTrace = memo(function DayHrTrace({ points }: { points: DayHrPo
   );
 });
 
-export const TrainingSection = memo(function TrainingSection({ data }: { data: DayLogResult }) {
+export const TrainingSection = memo(function TrainingSection(
+  { data, kcalBySession }: { data: DayLogResult; kcalBySession?: Map<string, number> },
+) {
   if (data.exercises.length === 0) return null;
-  const bySession = new Map<string, typeof data.exercises>();
+  // Grouped by session **id**, not name (Q-391). A name is not identity: repeat the same session
+  // twice in a day and the two cards would collide on the key. `workoutDurations` is still
+  // name-keyed upstream, so its two entries would still collide — pre-existing, and out of this
+  // change's scope, but the calories join is on the id that actually identifies the session.
+  const bySession = new Map<string, { name: string; exercises: typeof data.exercises }>();
   for (const ex of data.exercises) {
-    const list = bySession.get(ex.sessionName) ?? [];
-    list.push(ex);
-    bySession.set(ex.sessionName, list);
+    const group = bySession.get(ex.workoutSessionId) ?? { name: ex.sessionName, exercises: [] };
+    group.exercises.push(ex);
+    bySession.set(ex.workoutSessionId, group);
   }
   return (
     <div>
       <SectionLabel>Training</SectionLabel>
-      {[...bySession.entries()].map(([sessionName, exercises]) => {
+      {[...bySession.entries()].map(([sessionId, { name: sessionName, exercises }]) => {
         const dur = data.workoutDurations[sessionName];
+        const kcal = kcalBySession?.get(sessionId);
         // Derived here rather than server-side: the route already returns every set's weight and
         // rep count, so a second source of truth for volume would be a formula in two places.
         const volume = exercises.reduce((sum, ex) => {
@@ -86,7 +93,7 @@ export const TrainingSection = memo(function TrainingSection({ data }: { data: D
           return sum + ex.setWeights.reduce((s, w, i) => s + (w ?? 0) * (reps[i] ?? 0), 0);
         }, 0);
         return (
-          <div key={sessionName} className="mb-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+          <div key={sessionId} className="mb-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
             <div className="flex items-center gap-2.5 pb-2.5">
               <Dumbbell className="h-4 w-4 flex-none" style={{ color: "var(--accent-cyan)" }} />
               <span className="text-[14.5px] font-bold tracking-tight">{sessionName}</span>
@@ -113,6 +120,18 @@ export const TrainingSection = memo(function TrainingSection({ data }: { data: D
                 <Stat value={Math.round(volume).toLocaleString()} label="Volume kg" />
                 <Stat value={String(exercises.length)} label="Exercises" />
                 <Stat value={String(exercises.reduce((n, e) => n + (e.sets ?? 0), 0))} label="Sets" />
+                {/*
+                  The tilde and the "est." are load-bearing, not decoration. Unlike the three stats
+                  beside it, this is NOT derived from the sets: it is a flat MET 8 over the session's
+                  clock, so a 49-minute session moving 2,364 kg and one moving 800 kg produce the
+                  same figure. Sitting it in a row of measured facts is what the owner asked for;
+                  saying so in the label is what stops it reading as one of them.
+
+                  Absent rather than zero when the estimate cannot be made — a profile without age,
+                  weight or sex yields no figure, and a confident `0 kcal` would be indistinguishable
+                  from a real one (the Q-278 class).
+                */}
+                {kcal != null && <Stat value={`~${Math.round(kcal).toLocaleString()}`} label="Est. kcal" />}
               </div>
             )}
           </div>

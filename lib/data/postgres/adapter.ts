@@ -6878,6 +6878,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async upsertDaytimeHrvModel(userId: string, model: { intercept: number; hrCoef: number; tempCoef: number; residualStd: number; nSamples: number }) { return oura.upsertDaytimeHrvModel(this.db, userId, model) }
   async upsertWorkoutHrStats(userId: string, sessionId: string, stats: import('../repository').WorkoutHrStatsInput) { return oura.upsertWorkoutHrStats(this.db, userId, sessionId, stats) }
   async getWorkoutHrStats(userId: string, sessionId: string) { return oura.getWorkoutHrStats(this.db, userId, sessionId) }
+  async getAvgBpmBySession(userId: string, sessionIds: string[]) { return oura.getAvgBpmBySession(this.db, userId, sessionIds) }
   async listSessionsMissingHrStats(userId: string, since: Date, limit: number) { return oura.listSessionsMissingHrStats(this.db, userId, since, limit) }
   async getSetDetailsForSession(workoutSessionId: string) { return oura.getSetDetailsForSession(this.db, workoutSessionId) }
   async upsertSetHrStats(userId: string, workoutSessionId: string, rows: import('@trainingai/shared/workout/set-hr-stats').SetHrRow[]) { return oura.upsertSetHrStats(this.db, userId, workoutSessionId, rows) }

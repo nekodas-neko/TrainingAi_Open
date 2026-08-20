@@ -48,9 +48,9 @@ establish — a keyword bucketing of 81 rows is directionally sound and not auth
 should be written that way. And when something comes back **clean**, say so explicitly: a pillar
 reviewed and found sound is a real result, and recording it stops the next sweep re-covering it.
 
-**Your Q band is 450–499.** Take numbers from it directly; do not read or write the backlog's
-next-free pointer. If a sweep produces more findings than your band holds, claim the next block of
-50 above 529 and record it in the table in `docs/agents/README.md`. You take no migration numbers.
+**Your entry IDs are `RV-<n>`, counting up forever — there is no band and no pointer.** Find your
+next number with `grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. The letter records
+that *you* found the item; it never says who ships it and it never changes. You take no migration numbers.
 
 **Placing what you file.** Queue position is priority. A data-correctness or prescription bug goes
 near the top; a cosmetic inconsistency does not. Tag every heading with its pillar(s), primary

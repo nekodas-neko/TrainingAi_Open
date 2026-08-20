@@ -15,10 +15,10 @@ Rewrite this file **in full** — never append — before the session ends or co
 
 ## Standing facts for this role
 
-- **Q number band: 387–449.** Take numbers directly from that band. Do **not** read or update the
-  backlog header's "Next free Q number" pointer — that belongs to other lanes, and touching it is how
-  two lanes race for a number. **Used through Q-424 as of 2026-08-20; next free is Q-425.** Check the
-  open-PR list too — an unmerged PR can already hold a number, which is how Q-141 collided once.
+- **Entry IDs are `BF-<n>`, counting up forever.** Bands and the shared pointer are both gone (see
+  `docs/agents/README.md` §3). Find your next number with
+  `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy Q-387…449 stay valid where
+  already used — this role's last band entry was **Q-424** (2026-08-20); everything after it is `BF-`.
 - **No migration numbers.** Intake never claims one. If an entry needs a corrective migration or a new
   column, say so in the entry and hand the number to Lane A.
 - **Docs-only PRs, opened and merged without asking** (CLAUDE.md Standing Instructions). CI still has
@@ -52,28 +52,28 @@ Rewrite this file **in full** — never append — before the session ends or co
 
 `docs/agents/README.md` is the operating model — §1 defines this role, §2 is the authority table, §4
 is the handoff ritual this file is part of. The cold-start prompt is
-[`docs/agents/prompts/bugfix.md`](../prompts/bugfix.md). The Q band above matches that document's band
-table.
+[`docs/agents/prompts/bugfix.md`](../prompts/bugfix.md). §3 is where the `BF-` ID scheme replacing the
+old bands is defined — it landed 2026-08-19, mid-session, which is why an earlier version of this
+baton still described a band.
 
 ---
 
 ## Traps this role hits every session — read before the first PR
 
 - **`check-doc-index-size` fails every intake PR.** Intake adds an entry per report, so it trips every
-  time. Raise the baseline in the same PR (the precedent the other lanes set — read the comments above
-  `BASELINE`), but treat the failure as a real signal first and budget ~30 lines per queue entry.
+  time. Raise the baseline in the same PR, but treat the failure as a real signal first and budget
+  ~30 lines per queue entry.
+- **The baselines moved on 2026-08-19 (#254) — they are in `docs/doc-size-baseline.json` now**, not in
+  comments at the top of the script. That killed the *conflict-frequency* half of this trap: the
+  script had reached 1,091 lines with 955 of them prose, and 32 of the last 40 commits touched it.
+  Anything below that says "edit the baseline in the script" is describing a file that no longer
+  exists in that form.
 - **Take the count from `node scripts/check-doc-index-size.js`, never from `wc -l`** — `wc -l` reads
   **one lower**, and a baseline set from it leaves the branch red. Cost a resolution on 2026-08-19.
-- **Never edit that baseline by line number.** A `sed -i "902s/…"` hit the wrong line once because the
-  baseline had moved to 907. Use a Python replace on the exact string.
-- **Expect the baseline to conflict — four times in one session on 2026-08-19.** Working resolution,
-  in order: `git merge origin/main` → `git checkout --theirs scripts/check-doc-index-size.js` (keeps
-  main's whole file, preserving checks other lanes added) → re-measure → set exactly → re-run
-  `pnpm check:rules`.
-- **`main` itself can be red and nothing looks.** CI has no `push: [main]` trigger, deliberately, so a
-  shrink-only ratchet left stale by two parallel merges surfaces as an unrelated failure on the next
-  branch cut from `main`. Happened on 2026-08-19; filed as **Q-424**. If a fresh branch fails a check
-  it could not have caused, test `main` before debugging your own diff.
+- **Two parallel PRs can still each raise the baseline and collide, and `main` can still end up over
+  its own number** — the JSON move fixed how *often* that happens, not that it can. CI has no
+  `push: [main]` trigger, so nothing looks. Happened on 2026-08-19 and filed as **Q-424**. **If a
+  fresh branch fails a check it could not have caused, test `main` before debugging your own diff.**
 - **`get_check_runs` returning `total_count: 0` has two causes** — a stale base, or checks queuing on a
   push you just made. `git log --oneline HEAD..origin/main` tells them apart in one command.
 - **A stacked PR conflicts once its parent squash-merges.** Check whether `main`'s side of the hunk is
@@ -97,6 +97,8 @@ table.
   not the report and would have been easy to skim past.
 - **A feature request is still filed**, but say so in the entry and point at the planning-session
   requirement — intake does not write implementation plans. Q-389 is the shape.
+- **A feature request is still filed**, but say so in the entry and point at the planning-session
+  requirement — intake does not write implementation plans. Q-389 is the shape to copy.
 - **Do not fit to a target the owner has just told you is unreliable.** Q-420 was going to be
   calibrated against 20 paired sessions until the owner said they cannot judge that scale; the stored
   data agreed (only 7, 8, 9 ever used). The paired data became a sanity check.
@@ -122,20 +124,37 @@ it. Output: **six entries, five merged PRs**, all docs-only. Full narrative, mea
 in
 [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md).
 
-| entry | what | lane |
+| entry | what | state at 2026-08-20 |
 |---|---|---|
-| **Q-391** | per-session calories on the day screen's Training card — *promoted*, not re-filed, when the owner asked a second time | A |
-| **Q-419** | the done screen and the day budget disagree about the same workout; only one reads the RPE | A |
-| **Q-423** | the per-set RPE prefill is measurably low — 233 raised by hand vs 32 lowered | **B** |
-| **Q-420** | derive session RPE from the set ratings — 20 of 78 sessions rated vs 625 of 1,047 sets | A |
-| **Q-421** | HR-based workout energy; ONNX route rejected by the owner | A |
-| **Q-422** | calibrate the burn against the owner's own energy balance | Tuning → A |
-| **Q-424** | a shrink-only ratchet can leave `main` red and nothing looks | A |
+| **Q-391** | per-session calories on the day screen's Training card — *promoted*, not re-filed, when the owner asked a second time | ✅ **shipped** (#260) |
+| **Q-419** | the done screen and the day budget disagree about the same workout; only one reads the RPE | ✅ **shipped** (#252) |
+| **Q-421** | HR-based workout energy; ONNX route rejected by the owner | ✅ **route (a) shipped** (#255); route (b) closed by the owner |
+| **Q-423** | the per-set RPE prefill is measurably low — 233 raised by hand vs 32 lowered | queued, Lane B |
+| **Q-420** | derive session RPE from the set ratings | queued — **re-measured by Lane A (#256), see below** |
+| **Q-422** | calibrate the burn against the owner's own energy balance | queued, Tuning → A |
+| **Q-424** | a shrink-only ratchet can leave `main` red and nothing looks | queued |
 
-Two owner decisions are recorded in the entries and must not be re-litigated: **no Oura models**
-(Q-421 keeps the closed-form HR estimator only — but note this does *not* extend to `estWorkoutKcal`,
-which is a ported formula rather than a model, and widening it needs asking), and **the derivation for
-Q-420** (plain rounded mean of a session's rated sets, kept in set-RPE units, no mapping onto the
-1–10 session scale).
+**Three of the six shipped within hours of being filed.** Worth knowing as a calibration on this role:
+entries that trace to a file and carry a measurement get picked up fast, so the cost of a vague entry
+is not that it sits — it is that it gets built vaguely.
+
+**⚠ One decision recorded in this session was superseded the same day, and the correction is better
+than the original.** Q-420's amendment argued *against* mapping the 6–10 set scale onto the 1–10
+session scale, on the grounds that the only consumer was the energy tier and inventing a mapping would
+be inventing precision. **That reasoning held only for the consumer that was checked.** Lane A's
+re-measure (#256) found that Q-421 shipping had gutted the energy case — HR now takes precedence, so
+the tier decides the burn on **3** sessions, not 24 — and that the real consumer is
+`app/api/health-trends/route.ts:172`, which computes Foster's `sessionLoad = sessionRpe × durationMin`
+on the **CR-10** scale. A value floored at 6 fed into that **systematically inflates session load**,
+and ACWR thresholds downstream are calibrated on the unscaled figure. **There the mapping is not
+optional; it is the whole item.** The lesson for this role is narrow and reusable: *a decision about a
+number is only as good as the enumeration of who reads it* — grep every consumer before ruling one
+out.
+
+**The owner decision that does stand: no Oura models.** Q-421 keeps the closed-form Keytel estimator.
+It does **not** extend to `estWorkoutKcal`, which is a ported formula rather than a model; widening it
+needs asking. Carry Lane A's caveat too — Keytel is fitted on steady-state aerobic subjects and
+over-reads for intermittent resistance work (a 150 bpm probe returned 823 kcal, against an observed
+max of 104 bpm).
 
 **Nothing mid-triage. Nothing received-but-unfiled. Nothing blocked on the owner.**

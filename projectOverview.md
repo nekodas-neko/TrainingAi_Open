@@ -36,6 +36,15 @@ ownership, plus a BugFix, a Tuning and a Review agent. Their roles, authority li
 and cold-start prompts are in [`docs/agents/README.md`](docs/agents/README.md). Start there rather
 than picking an item straight off the queue.
 
+**Entry IDs come from your agent's own prefix now, not a reserved band** (2026-08-19). `LA-` Lane A ·
+`LB-` Lane B · `BF-` BugFix · `RV-` Review · `TN-` Tuning · `PS-` one-off sessions, counting up with
+no shared pointer to collide on. Bands exhausted and their ledger drifted twice; the prefix says who
+*found* an item and never changes, so an entry filed by Review and built by Lane A keeps its `RV-`.
+Legacy `Q-` numbers stay valid and are not renumbered. **An implementer's first command is now
+`node scripts/next-item.js --lane <A|B>`**, which prints READY / PARKED / UNCLASSIFIED from the new
+`Needs:` and `Gate: owner|device` fields — the queue file cannot show you which of its top entries
+are actually startable.
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is CLOSED
 (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread as a
@@ -68,6 +77,31 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [platform][devices] 🟡 The CSP now permits WASM, and dropped two dead hosts — neither checked on the device (Q-546, 2026-08-20)
+
+- **What shipped.** `script-src` gained **`'wasm-unsafe-eval'`**, which permits WebAssembly
+  compilation and nothing else. Without it no WASM session can start in the browser, so every
+  on-device model was blocked behind a one-line change — `onnxruntime-web` is already a dependency
+  with a passing parity test, and that test runs under Node, which enforces no CSP at all. It proved
+  the model matched its golden while nothing could have loaded it.
+- **And `connect-src` lost `cloud.ouraring.com` and `api.ouraring.com`**, seven days after the Oura
+  Cloud integration was deleted. `lib/oura/__tests__/no-cloud-calls.test.ts` already proved no source
+  file calls them — but it swept `app/`, `components/`, `lib/` and `packages/shared/src`, and the CSP
+  lived in `next.config.ts` at the repo root, where nothing looked. The guard now sweeps five root
+  files too, and fails if one is renamed out of the sweep.
+- **⚠ NOT verified on device.** The APK is a WebView loading the Railway URL, so it receives this
+  header. `pnpm dev` serves the new directive and the app renders under it, and the deployed header
+  can be read with `curl -sI`, but **neither shows the S25's WebView accepting it**. Two things are
+  outstanding: that the app still loads normally on the device after the deploy, and — separately,
+  and not possible yet — that a real WASM session instantiates, which cannot be asserted until the
+  first client-side model actually lands. That assertion belongs in that PR, not this one.
+- **`'wasm-unsafe-eval'` is narrower than `'unsafe-eval'`**, does not imply it, and production still
+  does not carry `'unsafe-eval'` — a test asserts both halves of that.
+- **One thing measured but deliberately not acted on:** `onnxruntime-web` 1.27 can create workers
+  from a blob URL when threading/proxying is enabled, which `script-src` would also have to permit.
+  Whether that configuration is used is a decision for the PR that adds the first client model, and
+  widening a security header on speculation is the wrong order.
 
 ### [nutrition] Food logs changed shape three times in one day and none of it is device-verified (Q-413, Q-325, Q-412 · v1.327.0–1.328.0) — NOT verified on device · needs: hardware
 

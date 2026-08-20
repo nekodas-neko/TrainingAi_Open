@@ -8,10 +8,15 @@
 // source-text sweep — the same shape as the decoder-constants and config-redirect checks, and for
 // the same reason: the mistake lives in a string, which never crosses a typed boundary.
 import { describe, it, expect } from 'vitest'
-import { readFileSync, readdirSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const ROOTS = ['app', 'components', 'lib', 'packages/shared/src']
+// Root-level config and entrypoints, which the four directories above do not reach. The CSP used to
+// live in `next.config.ts` and kept `connect-src` open to both Oura Cloud hosts for a week after the
+// integration was deleted, entirely unseen by this guard (2026-08-20, Q-546). `auth.ts` and
+// `middleware.ts` are here for the same reason: a call could plausibly hide in either.
+const ROOT_FILES = ['next.config.ts', 'auth.ts', 'middleware.ts', 'instrumentation.ts', 'instrumentation-node.ts']
 const REPO = join(__dirname, '..', '..', '..')
 
 // The Cloud host, the OAuth/PAT/webhook routes, and the two libs that held the HTTP client and the
@@ -62,7 +67,7 @@ function walk(dir: string, out: string[] = []): string[] {
 }
 
 describe('the Oura Cloud integration stays removed', () => {
-  const files = ROOTS.flatMap(r => walk(join(REPO, r)))
+  const files = [...ROOTS.flatMap(r => walk(join(REPO, r))), ...ROOT_FILES.map(f => join(REPO, f)).filter(existsSync)]
     .map(f => f.slice(REPO.length + 1).replace(/\\/g, '/'))
     .filter(f => f !== 'lib/oura/__tests__/no-cloud-calls.test.ts' && !EXEMPT.has(f))
 
@@ -70,6 +75,9 @@ describe('the Oura Cloud integration stays removed', () => {
   // vacuously and this guard would be worthless while looking green.
   it('sweeps the whole source tree', () => {
     expect(files.length).toBeGreaterThan(1000)
+    // A renamed or deleted root file would otherwise drop out of the sweep silently — the count
+    // floor above cannot see five files going missing among two thousand.
+    for (const f of ROOT_FILES) expect(files, `${f} is no longer being swept`).toContain(f)
   })
 
   for (const [pattern, what] of BANNED) {

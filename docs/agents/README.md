@@ -138,14 +138,30 @@ lib/haptics.ts  lib/shell-nav.ts  lib/navigate-with-transition.ts
 lib/view-transition.ts  lib/use-copy.ts  lib/use-online-status.ts  lib/session-icon.tsx
 ```
 
-### Anything not listed
+### Anything not listed — decide it by the rule, not by the list
 
-`lib/` holds ~60 top-level entries and enumerating all of them here would go stale within a month.
-So: **if a path is not listed, the lane that needs it claims it in its state file before touching
-it**, and the other lane checks state files before starting an item. First claim wins for the
-duration of that item. If both lanes need the same file at the same time, the item that needs it
-*changed* outranks the item that needs it *read*, and the other lane picks a different item rather
-than negotiating.
+`lib/` holds around 68 top-level entries and **40 of them are named in neither list above**. An
+enumeration of that surface goes stale within a month and then quietly misleads: `lib/coach/` is
+listed under Lane A here while a queue entry instructs whoever takes it to claim it in a baton
+"because it belongs to neither lane's declared paths". Both cannot be right, and nothing catches it.
+
+So the lists above are the obvious cases, and this rule settles everything else:
+
+> **Reached by `app/api/**`, or it reads or writes storage → Lane A.**
+> **Reached only from `app/**` or `components/**` → Lane B.**
+> **Both → Lane A, and the engine half lands first.**
+
+Trace the import, don't search this file. A rule survives a new directory; a list does not.
+
+Where even the rule is ambiguous — a genuinely new shared module, a script, a workflow file — the
+lane that needs it **claims it in its baton before touching it**, and the other lane checks batons
+before starting an item. First claim wins for that item's duration. If both lanes need the same file
+at once, the item that needs it *changed* outranks the item that needs it *read*, and the other lane
+picks a different item rather than negotiating.
+
+**Release a claim when the PR that took it merges.** Four claims in Lane B's baton currently end
+"release the claim when convenient", which is how a lease becomes permanent. A claim names the
+branch that holds it; when that branch is gone, so is the claim.
 
 ### The files both lanes will fight over anyway
 
@@ -161,66 +177,146 @@ way through it:
 > number, write the whole file. This corrupted the changelog twice in one day before the approach
 > changed.
 
-### Numbers, reserved up front
+### Identifiers — one letter per agent, counting up forever
 
-The repo has lost sessions to number collisions — six in three days at the worst, and two live
-duplicate Q numbers survived in the backlog until 2026-08-17. The pointer in the backlog is a
-*floor*: it cannot see an unmerged PR, and a number can be claimed and merged inside a single
-session without ever appearing in an open one.
+Every queue entry carries an ID. **The letter says who found it. It never says who ships it, and it
+never changes** — an item filed by Review and built by Lane A keeps its `RV-` for good, which is what
+makes "what has Review found, and did any of it get built" a question you can actually ask.
 
-So numbers are **not** taken one at a time from the pointer. Each agent owns a band:
-
-| Agent | Q band |
+| Agent | Letter |
 |---|---|
-| Implementation Lane A | **314 – 349** |
-| Implementation Lane B | **350 – 386** |
-| BugFix | **387 – 449** |
-| Review | **450 – 499** (exhausted 2026-08-18) → **552 – 601** |
-| Tuning | **500 – 529** |
-| *(one-off planning sessions)* | no standing band — take a block from the pointer |
+| Implementation Lane A | `LA-` |
+| Implementation Lane B | `LB-` |
+| BugFix | `BF-` |
+| Review | `RV-` |
+| Tuning | `TN-` |
+| One-off sessions (planning, urgent) | `PS-` |
 
-**Review's band 450–499 was exhausted on 2026-08-18** (Q-499 was the last) and the role has claimed
-**552–601** as its second band, per the "next block of 50" instruction below.
+Counters are **unbounded**. Find your next free number with one command:
 
-**⚠️ The block ledger below was incomplete, which is the same failure it exists to prevent.** It
-recorded 530–537, 538–542 and 543, but **544–551 were also in use** — across
-`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`,
-`docs/handoff-2026-08-18-platform-database-reclaim.md`, `docs/overview/history-2026-08-15.md`,
-`docs/domains/devices/README.md` and the backlog — and appeared nowhere here. A Review session
-following this file's own instruction literally ("claim the next block of 50 above 529") would have
-taken 530–579 and collided with fourteen live numbers. That is precisely the renumbering incident
-recorded below, repeating. **Reading the instruction is not enough: grep the tree for the highest
-`Q-` in use before claiming, and add your block here in the same PR.**
+```bash
+grep -rhoE '\bRV-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1
+```
 
-Blocks taken this way so far: **530–537** (2026-08-17), **538–542** (2026-08-17, DB storage /
-raw-sample retention) and **543** (2026-08-18, owner-directed session — the decision-brief rule
-in `CLAUDE.md`; one number, not a block of fifty, because the session filed one finding),
-**544–551** (2026-08-18, DB storage / device-primary compute and database reclaim — in use since
-2026-08-18 but recorded here only on 2026-08-18 by Review, see the warning above) and
-**552–601** (2026-08-18, **Review's second standing band** after 450–499 was exhausted). The second of those was **renumbered from 530–536 on merge** — it had taken
-its block from a pointer reading 530 while a concurrent planning session held the same numbers
-unmerged, which is the exact failure the standing bands exist to prevent and which the pointer
-cannot prevent, because it cannot see an unmerged PR. **If you are a one-off session, take your
-block, and re-check it against `origin/main` immediately before you open the PR as well as when you
-claim it.**
+**Why this replaced reserved number bands.** Bands were introduced because a single shared
+next-free pointer is a *floor*, not an authority — it cannot see an unmerged PR, and that caused six
+collisions in three days plus two live duplicates that survived for weeks. Bands fixed that and
+bought two new problems: they **run out** (Tuning reached 29 of its 30; Review burned all 50 in two
+days), and they need a ledger that has now drifted twice — the second time, following this file's
+own "take the next block of 50" instruction literally would have collided with fourteen live
+numbers.
 
-A session that is not one of the five standing agents — a one-off planning session started from its
-own prompt — has no band. It takes the next numbers from the pointer in the backlog and bumps that
-row, which is what the pointer is for.
+Per-agent counters prevent cross-agent collisions exactly as well as bands did. Both still fail if
+two sessions of the *same* role run at once and cannot see each other's unmerged PRs — that is
+unavoidable in any allocation scheme, and it has happened (two sessions once ran the same compaction
+chore and one PR's work was discarded whole). The difference is that counters never exhaust and need
+no ledger, and `scripts/check-backlog-pointers.js` fails CI on a duplicate ID, so a same-role
+collision surfaces at review rather than living in the queue. Resolve one by appending a letter:
+the second `RV-14` becomes `RV-14a`.
 
-Take numbers from your own band and you never need to read the pointer or write to it — which also
-removes the shared-line edit at the top of the backlog that would otherwise conflict five ways.
-When a band runs out, claim the next block of 50 above 529, record it in this table, and say so in
-your handoff.
+**Existing `Q-` numbers stay exactly as they are.** There are over 10,000 references to them across
+775 files; renumbering that surface would be days of risk for no function. `Q-` is a valid legacy
+ID, and both schemes coexist in the queue indefinitely.
 
-Q numbers are identifiers, not priorities. Priority is queue position. A Q-451 sitting above a
-Q-315 is correct and expected.
+Priority is queue position, not the ID. An `RV-31` above an `LA-12` is correct and expected.
 
 **Postgres migration numbers and local SQLite versions belong to Lane A alone.** No other agent
-takes one. If work outside Lane A turns out to need a schema change, stop and hand it to Lane A
-rather than taking a number.
+takes one — not Review, not BugFix, not an urgent one-off. Work outside Lane A that turns out to
+need a schema change stops and hands the item to Lane A.
 
----
+### The three fields that decide what is startable
+
+Beyond the `[domain]` tags, an entry may carry:
+
+- **`Lane: A` / `Lane: B`** — which implementer. A *prediction*, useful when the rule above is
+  ambiguous or the item spans unlisted paths. Most entries carry none, and that is correct: the rule
+  already answers it. Where the filer genuinely cannot tell, write **`Lane: ?`** — the first lane to
+  reach it decides and edits the entry, rather than both assuming the other owns it.
+- **`Needs: <ID>`** — this entry cannot start until that one has shipped. **A target that is not in
+  the queue counts as satisfied**, because a completed entry is removed from the queue by the
+  protocol; treating its absence as an error would wedge every dependent the day its blocker
+  succeeded. The cost of that rule is that a typo'd ID looks identical to a shipped one, so the
+  check script fails on a `Needs:` naming an ID that has never existed anywhere in the tree.
+- **`Gate: owner`** / **`Gate: device`** — waiting on a decision from the owner, or on the S25 smoke
+  run. These used to be prose `⛔ blocked:` markers that conflated three different things with three
+  different resolvers; separating them is what lets a script tell you what is genuinely ready.
+
+An item that needs both halves of the app is **two entries**, not one with a paragraph explaining
+the order:
+
+```markdown
+### [platform] PS-4a — wire the SDK into instrumentation.ts
+- Lane: A
+
+### [platform] PS-4b — surface it in the admin console
+- Lane: B
+- Needs: PS-4a
+```
+
+`PS-4b` sits under PARKED until `PS-4a` leaves the queue, and then unparks with nobody editing
+anything.
+
+### Batching — aggregate on what has to be verified, not on subject
+
+Two hundred queue entries do not mean two hundred pull requests. But the axis to batch on is not the
+obvious one. Measured across the queue on 2026-08-19: entries name **320 distinct files and only 39
+are touched by more than one**, so batching by file buys almost nothing; and `platform` alone holds
+106 entries, so batching by domain is far too coarse. Half the entries carry 40+ lines of analysis —
+this is not a pile of trivia.
+
+**CI is not the scarce resource.** Two hundred PRs at 3–5 minutes is machine time nobody waits on.
+The scarce resources are **the owner's attention and the device**. So entries batch when *one
+verification pass covers all of them*, and not otherwise:
+
+| Class | Rule | Why |
+|---|---|---|
+| Touches a migration or the sync-push path | **Never batch** | Blast radius is data; the revert is a corrective migration, not a `git revert` |
+| Native / Kotlin (~20 entries) | **Batch hardest** | Each costs an APK build and a sideload, and an install can force the uninstall that destroys the ring key |
+| One screen or flow | **Batch by surface** | One `pnpm dev` pass and one device look covers every entry on that screen |
+| One pattern across N files (18 entries, up to 263 files each) | **Already a batch — never split** | One review of the pattern covers every site |
+
+A batch is too big when you can no longer describe it in one sentence or revert it as a unit. In
+practice that is around five entries or four hundred diff lines, whichever comes first.
+
+**Record it with a `Batch:` field**, because an unwritten grouping is not a grouping:
+
+```markdown
+- **Batch:** calorie-budget-surface
+```
+
+Entries sharing a slug ship as **one PR**, and `next-item.js` groups them so an implementer picks up
+the cluster rather than its top member alone. The batch inherits its highest member's queue
+position, so priority is unchanged. `scripts/check-backlog-pointers.js` fails a batch that mixes
+Lane A and Lane B — one PR is one lane's work — and the query flags any batched entry that looks
+like it carries a schema change.
+
+**Batches are assigned when an entry is next touched, not up front.** Grouping 200 entries in one
+pass means deciding for work nobody is about to start, from the least information anyone will ever
+have, and the queue moves underneath it. Two are seeded as worked examples:
+`calorie-budget-surface` and `scale-weighing-ui`.
+
+### What an implementer reads to start
+
+```bash
+node scripts/next-item.js --lane A
+```
+
+One global queue, ordered by you; two views onto it. It prints READY in priority order, PARKED with
+the reason, and UNCLASSIFIED for anything it could not place — an entry invisible to the query would
+be worse than one you had to read.
+
+### An urgent fix from outside the two lanes
+
+Occasionally a session that is not Lane A or Lane B needs to ship a fix now. The usual and preferred
+form is still: **write the plan, file it at the top of a lane's queue, stop.** When it does ship:
+
+1. **Read both implementer batons' `Now` section first**, so the fix cannot collide with a branch
+   already in flight.
+2. **Never take a migration number.** If the fix needs a schema change it goes to Lane A, without
+   exception — this is the one that turns a hotfix into a mess.
+3. Ship it, under every rule in `CLAUDE.md` that a lane would follow.
+4. **File the entry anyway** (`PS-`, marked shipped in the same PR). A fix that skipped the queue is
+   a fix nobody else can see coming.
 
 ## 4. Identity and handoff
 
@@ -257,6 +353,18 @@ It is deliberately not a narrative. The narrative goes in a dated handoff doc
 (`docs/handoff-YYYY-MM-DD-<domain>-<title>.md`, written with the `handoff` skill) when a session
 closes a cluster of related work. The two have different jobs — the baton is *state* and is always
 current; the handoff is *history* and is never edited after the fact.
+
+### Batons are size-ratcheted, because they are read under time pressure
+
+The baton is how the other lane finds out what you have claimed and what is in flight, and its own
+template says to keep it under a screen. Measured 2026-08-19: BugFix 135 lines, Lane A 162, Lane B
+412 (its `Now` section alone is 200), Tuning 562, Review 1,280. Nobody reliably reads a 412-line
+file before starting an item, which means the coordination mechanism is not working as one.
+
+All five are now in `docs/doc-size-baseline.json` at their current sizes, shrink-only. They can only
+come down, and every handoff is an opportunity — the baton is rewritten in full anyway, and anything
+that reads as narrative belongs in a dated handoff doc instead. The target is a screen; the ratchet
+just stops the drift going the other way.
 
 ### The handoff ritual
 

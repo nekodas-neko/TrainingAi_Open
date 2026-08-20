@@ -3,7 +3,7 @@
 > **Successor sessions are titled `Implementation Agent (B) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
-**Updated:** 2026-08-19 · **By:** the sixth Lane B run · **Q band:** 350–386 (next free: **360**)
+**Updated:** 2026-08-19 · **By:** the sixth Lane B run · **Next ID:** `LB-1` (bands are gone — see `docs/agents/README.md` §3; legacy Q-350…386 stay valid where already used)
 
 ## Now
 Nothing in flight. **The meal-label (food sticker) work is the live thread** — Q-389 built it, Q-393
@@ -332,7 +332,7 @@ scoring, prompts) or was routed there by this lane: **Q-351** (activity `duratio
 Otherwise the lane list in [`docs/agents/README.md`](../README.md) §3.
 
 ## Do not re-litigate
-- The lane contract, authority limits and Q bands are settled in
+- The lane contract, authority limits and entry-ID prefixes are settled in
   [`docs/agents/README.md`](../README.md).
 - **`FactorBar` is NOT a colour-only-state violation to fix.** It matches the rule literally (band
   colour on bar and value, no band word) and was inspected and **declined** in the Q-281 audit: the

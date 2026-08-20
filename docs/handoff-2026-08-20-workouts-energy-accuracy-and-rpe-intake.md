@@ -4,9 +4,9 @@ _Domain: `workouts` (also touches `nutrition`, `platform`) · Branch: `docs/sess
 
 > **Read first:** `projectOverview.md` (status + Known Issues), then
 > [`docs/domains/workouts/README.md`](domains/workouts/README.md), then
-> [`docs/implementation-backlog.md`](implementation-backlog.md) — the first six entries in the queue
-> are this session's output and they are meant to be read in order. This file covers only what *this*
-> session did and what it leaves behind.
+> [`docs/implementation-backlog.md`](implementation-backlog.md) — the queue is the authority on what
+> is outstanding. This file covers only what *this* session did and what it leaves behind; three of its
+> six entries were built by Lane A within hours of being filed, so read it as reasoning, not status.
 
 ## Goal
 
@@ -20,24 +20,32 @@ entries good enough to implement from. **No product code was written and none sh
 - **Build/test:** `pnpm check:rules` — **50 of 50** Custom Rules steps, run before every push. `pnpm
   dev` was **not** run and no route was driven: every PR this session was docs-only.
 - **Device-verified:** not applicable — nothing shipped that a device could exercise.
-- **All five PRs merged.** Nothing left open, nothing mid-triage, nothing received-but-unfiled.
+- **All five intake PRs merged.** Nothing left open, nothing mid-triage, nothing received-but-unfiled.
+- **The queue moved underneath this doc while it was being written** — Q-391, Q-419 and Q-421 shipped,
+  the agent ID scheme changed from bands to `BF-` prefixes, and the doc-size baselines moved into
+  `docs/doc-size-baseline.json`. All three are reflected below; anything that still reads as stale is a
+  miss, not a deliberate record.
 
 ## What shipped
 
-Six backlog entries, five merged PRs. Queue order at the end of the session:
+Six backlog entries, five merged PRs — plus Q-424 in this one:
 
-| pos | entry | PR | lane |
-|---|---|---|---|
-| 1 | **Q-391** — per-session calories on the day screen's Training card | #247 (promotion) | A |
-| 2 | **Q-419** — the day budget ignores the RPE the done screen reads | #249 | A |
-| 3 | **Q-423** — the per-set RPE prefill is measurably low | #253 | **B** |
-| 4 | **Q-420** — derive session RPE from the set ratings | #250, amended #253 | A |
-| 5 | **Q-421** — HR-based workout energy, closed-form only | #250, amended #253 | A |
-| 6 | **Q-422** — calibrate against the owner's own energy balance | #250 | Tuning → A |
-| — | **Q-424** — a shrink-only ratchet can leave `main` red | this PR | A |
+| entry | filed in | state at 2026-08-20 |
+|---|---|---|
+| **Q-391** — per-session calories on the day screen's Training card | #247 (promotion) | ✅ **shipped** — Lane A, #260 |
+| **Q-419** — the day budget ignores the RPE the done screen reads | #249 | ✅ **shipped** — #252 |
+| **Q-421** — HR-based workout energy, closed-form only | #250, amended #253 | ✅ **route (a) shipped** — #255 |
+| **Q-423** — the per-set RPE prefill is measurably low | #253 | queued, **Lane B** |
+| **Q-420** — derive session RPE from the set ratings | #250, amended #253 | queued — **re-measured, #256** |
+| **Q-422** — calibrate against the owner's own energy balance | #250 | queued, Tuning → A |
+| **Q-424** — a shrink-only ratchet can leave `main` red | this PR | queued |
 
 Q-391 already existed (filed 2026-08-18) and was **promoted rather than re-filed** when the owner
 asked a second time — see "Key decisions".
+
+**Three of the six shipped within hours**, while this session was still filing the rest. If you are
+reading this to pick up work, the queue — not this table — is the authority; treat everything below as
+the reasoning behind the entries rather than a statement of what is outstanding.
 
 ## The findings worth not re-deriving
 
@@ -107,6 +115,15 @@ Paired sessions (both a session RPE and rated sets), n = 20:
 - **No mapping from the 6–10 set scale onto the 1–10 session scale.** Inventing it would be inventing
   precision. `'easy'` being unreachable for strength is the correct outcome, not a bug to engineer
   around.
+  > **⚠️ SUPERSEDED the same day, and the correction is the better answer — do not act on the bullet
+  > above.** It was reasoned from the only consumer that had been checked, the energy tier. Lane A's
+  > re-measure (#256) found Q-421 shipping had gutted that case — HR now takes precedence, so the tier
+  > decides the burn on **3** sessions, not 24 — and that the real consumer is
+  > `app/api/health-trends/route.ts:172`, which computes Foster's `sessionLoad = sessionRpe ×
+  > durationMin` on the **CR-10** scale. A value floored at 6 fed into that **systematically inflates
+  > session load**, and the ACWR thresholds downstream are calibrated on the unscaled figure. **There
+  > the mapping is not optional; it is the whole item.** The reusable lesson: a decision about a number
+  > is only as good as the enumeration of who reads it — grep every consumer before ruling one out.
 - **Q-421 keeps the closed-form HR estimator and drops the ONNX route** — owner: *"I dont want to use
   oura models."* Recorded in the entry as rejected so it is not re-proposed. **The decision does not
   extend to `estWorkoutKcal`**, which is a ported formula (MET lookup + Schofield arithmetic, no
@@ -137,6 +154,9 @@ Paired sessions (both a session RPE and rated sets), n = 20:
   `git checkout --theirs scripts/check-doc-index-size.js` (keeps main's whole file, preserving checks
   other lanes added) → `node scripts/check-doc-index-size.js` → set the baseline to **exactly** the
   count it prints → re-run `pnpm check:rules`.
+  **Note the baselines moved to `docs/doc-size-baseline.json` on 2026-08-19 (#254)**, which removes the
+  conflict-frequency half of this — the script had reached 1,091 lines with 955 of them prose. The
+  order-dependence it does not remove is Q-424.
 - **`wc -l` reports one lower than the check does.** A baseline set from `wc -l` leaves the branch
   red. Cost one resolution before it was noticed.
 - **Never edit the baseline by line number.** A `sed -i "902s/…"` targeted the wrong line earlier in
@@ -200,16 +220,17 @@ docs-only PRs, merge on green, wait for the next. You do NOT fix code — the Im
 lanes do.
 
 Constraints that would otherwise be re-discovered:
-  - Q-number band 387–449, taken directly from the band, never from the backlog's shared
-    "next free Q" pointer. Used through Q-424; next free is Q-425. Check open PRs too — an
-    unmerged PR can already hold a number.
+  - Entry IDs are `BF-<n>` now, not a reserved band — the scheme changed on 2026-08-19 (#254),
+    mid-session. Find your next number with
+    `grep -rhoE '\bBF-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy Q- numbers stay
+    valid; this role's last band entry was Q-424.
   - Never claim a migration number. Hand any entry needing schema work to Lane A.
   - pnpm check:rules is the only custom-rules gate. It is 50 of 50 right now; quote the count
     the runner prints, never a remembered number.
   - Every intake PR trips check-doc-index-size, because intake adds an entry per report. Raise
-    the baseline in the same PR — and take the number from
-    `node scripts/check-doc-index-size.js`, NOT from `wc -l`, which reads one lower. Edit that
-    line by content match (a Python replace on the exact string), never by line number.
+    the baseline in the same PR — it lives in docs/doc-size-baseline.json now, with the
+    reasoning in docs/doc-size-baseline-history.md. Take the number from
+    `node scripts/check-doc-index-size.js`, NOT from `wc -l`, which reads one lower.
   - Expect the baseline to conflict; it did four times on 2026-08-19. Resolve with
     `git merge origin/main`, then `git checkout --theirs scripts/check-doc-index-size.js`, then
     re-measure and re-run the gate.
@@ -221,6 +242,7 @@ Constraints that would otherwise be re-discovered:
 First action: there is no outstanding report. Do the session-start reads above, then read
 error_events and the database size per CLAUDE.md's standing instructions, and file anything new
 the same session. Then wait for the owner. If they raise the workout-energy work again, the
-cluster Q-391 / Q-419 / Q-423 / Q-420 / Q-421 / Q-422 is fully specified and needs an
-Implementation lane, not more intake.
+cluster is already three-sixths built (Q-391, Q-419 and Q-421 shipped on 2026-08-19); what is
+left — Q-423, Q-420, Q-422 — is fully specified and needs an Implementation lane, not more
+intake. Read Q-420's re-measure banner before repeating anything this handoff says about it.
 ```

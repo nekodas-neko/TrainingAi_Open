@@ -11,12 +11,15 @@ The full narrative, every production measurement, and the gotchas are in
 [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md).
 What follows is the short record.
 
-## The cluster, in dependency order
+## The cluster — and three of it shipped the same day
 
-**Q-391** (promoted to the top, not re-filed) · **Q-419** · **Q-423** · **Q-420** · **Q-421** ·
-**Q-422**. Queue position is priority, and these are ordered by what depends on what rather than by
-when they were filed — Q-423 is fourth by age and third by position because Q-420 averages the pool it
-is about.
+**Q-391** (promoted, not re-filed) · **Q-419** · **Q-423** · **Q-420** · **Q-421** · **Q-422**, filed
+in dependency order rather than by age. Lane A then built **Q-391 (#260)**, **Q-419 (#252)** and
+**Q-421 route (a) (#255)** within hours, while this session was still filing the rest. Q-423, Q-420
+and Q-422 remain queued.
+
+That speed is the useful calibration on intake: a traced, measured entry gets picked up almost
+immediately, so the cost of a vague one is not that it waits — it is that it gets built vaguely.
 
 ## Three things found by reading rather than assuming
 
@@ -30,8 +33,11 @@ is about.
   `energy-summary.ts`'s own header states.
 - **The ONNX energy model is vendored, downloaded at runtime, unit-tested, and has zero production
   callers.** Its only caller anywhere is its own test file. The MET formula standing in for it is
-  documented as Oura's *fallback* path. The owner has since ruled the model out, so Q-421 keeps the
-  closed-form HR estimator — which needs no model, no runtime and no new dependency.
+  documented as Oura's *fallback* path. The owner ruled the model out, so Q-421 kept the closed-form
+  HR estimator — which needs no model, no runtime and no new dependency. It shipped the same day as
+  `estWorkoutKcalFromHr`, with Lane A measuring the blast radius rather than assuming it: 42 of 78
+  sessions have an `avg_bpm`, and at the owner's real range (73–104 bpm, median 91) the new figures
+  overlap the MET band rather than inflating it.
 
 ## An aside that invalidated an entry already written
 
@@ -69,3 +75,19 @@ The instance is fixed. The class is not.
 Four separate baseline resolutions in one session. The working procedure — merge `main`, take its
 whole copy of the check script with `--theirs`, re-measure from the script rather than `wc -l`, set
 exactly, re-run the gate — is in the handoff and in the role's baton.
+
+## A decision this session made, and the same-day correction that beat it
+
+Q-420 was amended to argue *against* mapping the 6–10 set-RPE scale onto the 1–10 session scale:
+inventing the mapping would be inventing precision, and `'easy'` being unreachable for a lifting
+session is the right outcome. **That reasoning held only for the consumer that had been checked.**
+
+Lane A's re-measure (#256) found Q-421 shipping had gutted the energy case — heart rate now takes
+precedence, so the RPE tier decides the burn on **3** sessions rather than 24 — and that the real
+consumer is `app/api/health-trends/route.ts:172`, computing Foster's `sessionLoad = sessionRpe ×
+durationMin` on the **CR-10** scale. A value floored at 6 fed into that systematically inflates session
+load, and the ACWR thresholds downstream are calibrated on the unscaled figure. There the mapping is
+not optional; it is the whole item.
+
+Recorded because the failure is reusable and cheap to avoid: **a decision about a number is only as
+good as the enumeration of who reads it.** Grep every consumer before ruling one out.
