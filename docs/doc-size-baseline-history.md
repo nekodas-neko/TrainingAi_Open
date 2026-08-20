@@ -16,59 +16,43 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
-## 2026-08-20 — re-measured after #261 landed mid-PR (`fix/migrate-classifies-idempotent`)
+## 2026-08-20 — Lane A's wrap-up, re-measured twice on a moving base (`fix/migrate-classifies-idempotent`)
 
-**projectOverview.md → 8055 · docs/implementation-backlog.md → 11647.**
+**projectOverview.md → 8055 · docs/implementation-backlog.md → 11647 ·
+docs/agents/state/implementation-lane-a.md 163 → 113 (a ratchet DOWN).**
 
-Both numbers were rebuilt from `origin/main` and re-measured on the merged tree, not spliced from
-either side of the conflict — the two sessions had each raised the same two numbers for different
-reasons, which is precisely the case where taking one side loses the other's growth.
+Three sessions raised the same two numbers within the hour, so these were rebuilt from
+`origin/main` and re-measured on the merged tree — twice, once after #261 landed and again after
+#263 — never spliced from either side of a conflict. Taking one side of a shared-number conflict
+silently discards the other session's growth, which is what this file exists to stop.
 
-**And the conflict itself had already been mis-resolved once, on `main`.** The BugFix session's
-wrap-up replaced the `Session handoff:` link in `projectOverview.md` but left the *previous*
-handoff's description attached to it — so the index credited the 2026-08-20 energy-intake handoff
-with "six findings from a live APK reinstall and Oura re-sync" and Q-536's closure, which belong to
-the 2026-08-17 one. Fixed here by rebuilding the block so each of the three links carries its own
-description. Worth knowing because it is the same splice failure this history file exists to
-prevent, one file over.
+What the lines are:
 
-## 2026-08-20 — session wrap-up (`fix/migrate-classifies-idempotent`)
-
-**projectOverview.md 8043 → 8050 · docs/implementation-backlog.md 11573 → 11578 ·
-docs/agents/state/implementation-lane-a.md 163 → 113 (a net ratchet DOWN of 50).**
-
-- **projectOverview +7**: the session-handoff pointer, which is part of the wrap-up ritual.
-- **backlog +5**: a `Gate: owner` field added to Q-420 and Q-422. Both listed as **READY** under
-  `scripts/next-item.js` while each says in its own body that it waits on the owner — the blocker
-  was in prose, which is exactly what the `Gate:` field replaced. Expect more of these; the tool can
-  only see the field.
+- **projectOverview +12**: the session-handoff pointer, part of the wrap-up ritual, plus the repair
+  below.
+- **backlog +37**: PS-3 annotated with the production measurement that defuses it
+  (`claude_ro.schema_migrations` holds 206 of 206, so the four unrecorded migrations are local-only),
+  a `Gate: owner` field on Q-420 and Q-422, and Q-331 filed.
 - **the baton −50**: rewritten in full rather than appended to, which is the rule. Its size is a
   direct read of whether that rule was followed, so the number goes down with it.
 
-## 2026-08-20 — Lane A's baton, ratcheted down (`fix/migrate-classifies-idempotent`)
+**One repair, worth knowing because it is this file's own failure mode.** The BugFix session's
+wrap-up replaced the `Session handoff:` link in `projectOverview.md` but left the *previous*
+handoff's description attached to it — so the index credited the 2026-08-20 energy-intake handoff
+with "six findings from a live APK reinstall and Oura re-sync" and with Q-536's closure, both of
+which belong to the 2026-08-17 handoff. That reached `main`. The block now carries three links,
+each with its own description.
 
-**docs/agents/state/implementation-lane-a.md 163 → 103.**
+## 2026-08-20 — the Orchestrator role
 
-A ratchet *down*, not a raise. The baton is rewritten in full at every handoff rather than appended
-to — that is the rule that stops it accreting — so its size is a direct read of whether the rule was
-followed. Lowering the number is what makes the next drift visible.
+**CLAUDE.md 1107 → 1115.** A sixth standing agent, owning queue and docs hygiene: clearing entries
+that announce their own completion, assigning batches, resolving lanes, reconciling docs against
+reality. The CLAUDE.md growth is the two rules an implementer needs without opening the contract —
+the completed-heading check and its `Keep:` opt-out, and the role's place in the letter list.
 
-## 2026-08-20 — PS-3's open question, answered against production (`fix/migrate-classifies-idempotent`)
+`docs/agents/state/orchestrator.md` joins the ratchet as a new row at 62 lines, not a raise.
 
-**docs/implementation-backlog.md 11559 → 11573.**
-
-Fourteen lines annotating PS-3, and every one of them is a measurement or a scope reduction rather
-than narrative:
-
-- **The question the entry says to answer first is answered.** `claude_ro.schema_migrations` holds
-  206 of 206 filenames, the four among them. Production skips all four; this is local-only. Without
-  that on the entry, the next session repeats the query — and it is a production read, not a
-  grep.
-- **They were never failures.** The four raise SQLSTATEs `ensureSchema()` treats as *already
-  present*; `migrate.js` had no classifier. Recorded because the entry's own framing ("4 failed") is
-  what a reader would otherwise carry forward.
-- **What is left is smaller than the entry implies**, and the note says so outright so the item is
-  judged on quiet rather than on the original framing.
+---
 
 ## 2026-08-20 — the CSP could not start a WASM session (`fix/csp-wasm-unsafe-eval`, Q-546)
 

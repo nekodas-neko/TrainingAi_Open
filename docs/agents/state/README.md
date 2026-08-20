@@ -10,6 +10,7 @@ session reads its own baton first and continues from it under the same name.
 | `bugfix.md` | BugFix |
 | `tuning.md` | Tuning |
 | `review.md` | Review |
+| `orchestrator.md` | Orchestrator (queue and docs hygiene) |
 
 ## What a baton is for
 

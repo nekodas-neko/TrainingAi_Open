@@ -1,6 +1,6 @@
 # Implementation Agent (A) 🚧 — baton
 
-> **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
+> **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title is how six concurrent sessions stay tellable apart — Orchestrator 🪐 joined on 2026-08-20 (#263); a renamed
 > successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-20 · **By:** the fifth session to run as Lane A · **Next ID:** `LA-1` (bands are gone — `docs/agents/README.md` §3; legacy `Q-` IDs stay valid where already used)
