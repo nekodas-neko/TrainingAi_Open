@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.333.1",
+    date: "2026-08-20",
+    changes: [
+      "The calories shown when you finish a workout now come from your heart rate for that session, the same as everywhere else in the app. The finish screen was still estimating from the clock and your effort rating alone, so a workout you wore the strap for was reported one way there and another way on the day screen \u2014 two different figures for the same session. There is now one estimate behind both.",
+    ],
+  },
+  {
     version: "1.333.0",
     date: "2026-08-20",
     changes: [

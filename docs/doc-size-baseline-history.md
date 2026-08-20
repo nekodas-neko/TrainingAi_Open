@@ -18,6 +18,21 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — Q-331 closed (`test/session-energy-cross-surface-parity`)
+
+**projectOverview.md 7838 → 7848.**
+
+Ten lines, because the entry was filed as a hardening item and closed as a live defect: the done
+screen and the day screen were estimating the same workout with two different formulas, for 42 of 78
+sessions. A reader of the index needs the *defect*, not the test — so the index says which sessions
+were affected and that a mutation-verified test now holds the two together, and the journal entry
+carries the measurement and the vacuity trap the test had to get past.
+
+**This number was drafted three times before it was right** — 8058, then 7885, then no raise at all,
+as two compactions and four other PRs moved the base underneath it. Only the last one was measured on
+the tree this PR actually merges into. Draft the prose when the lines are written; take the number at
+the end, on the final base, or it is a figure that looks deliberate and is stale.
+
 ## 2026-08-20 — PS-3 closed (`fix/non-idempotent-migrations`)
 
 **No raise — recorded because one was drafted twice and both figures went stale.**
@@ -1238,7 +1253,7 @@ entry. What the baton keeps is state — next ID, current lens, what is blocked,
 cost a session each to learn. **The baseline is lowered to 170 in the same PR**, so the shrink ratchets
 rather than leaving 1,138 lines of headroom for it to grow back into.
 
-## 2026-08-20 — `projectOverview.md` 7838 → 7841, and `main` was the one over it
+## 2026-08-20 — `projectOverview.md` 7838 → 7841, and `main` was the one over it (superseded the same hour)
 
 **Raised from a PR that touches neither `projectOverview.md` nor this baseline.**
 `feat/home-card-invalidation-guard` is a test-only change — a Playwright spec and two `e2e/fixtures.ts`
@@ -1255,3 +1270,10 @@ back later as this branch's own growth.
 
 This is the failure mode **Q-424** is queued for — a shrink-only ratchet can leave `main` red and
 nothing in the repo notices until the next branch merges main in. Third recorded occurrence.
+
+**Superseded within the hour, and the resolution is the point.** By the time this branch merged
+`main` again to open its PR, another lane had raised the same number to **7848**. The conflict fell
+on that one line. Resolved by taking `origin/main`'s file whole and **re-measuring the merged tree**
+— 7847 lines, which the script counts as 7848 — rather than splicing either side's hunk. Two same-day
+raises spliced together silently drop one side, which is the accident this log exists to prevent, and
+7841 was only ever the number `main` happened to carry when it was read.

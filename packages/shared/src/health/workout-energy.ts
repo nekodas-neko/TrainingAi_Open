@@ -156,6 +156,60 @@ export interface HrEnergyInput {
   sex: Sex | null | undefined
 }
 
+// ── One session, one estimate (Q-331) ────────────────────────────────────────────────────────────
+
+export interface SessionEnergyInput {
+  durationMin: number
+  rpe: number | null | undefined
+  avgBpm: number | null | undefined
+  ageYears: number
+  weightKg: number
+  sex: Sex
+  /** Defaults to strength (activity 8), which is what a workout session is. */
+  activityId?: number
+}
+
+export interface SessionEnergyResult {
+  kcal: number | null
+  /** Which estimator produced `kcal`. `met` is null under `'hr'` — no MET was consulted. */
+  source: 'hr' | 'met'
+  intensity: Intensity
+  met: number | null
+  activityId: number
+}
+
+/**
+ * One workout session's active energy — heart rate first, MET as the fallback.
+ *
+ * **This exists because the two surfaces that report a session's calories drifted apart.** Q-419
+ * made the done screen and the day's energy budget agree on one number for one session; Q-421 then
+ * added the HR estimate to the day path (`computeActiveEnergy`) and not to the done screen's route,
+ * so any session carrying an `avg_bpm` — 42 of the owner's 78 — was reported by Keytel on one screen
+ * and by the MET fallback on the other. Both now call this, so agreement is structural rather than
+ * re-measured.
+ *
+ * `intensity` is the RPE tier and is returned under both sources: it labels the effort the user
+ * rated, which is true whichever estimator ran. `met` is only meaningful when the MET path was taken,
+ * so it is null otherwise — and deliberately not computed there, which keeps the HR path independent
+ * of the pinned activity table.
+ */
+export function estSessionKcal(input: SessionEnergyInput): SessionEnergyResult {
+  const { durationMin, rpe, avgBpm, ageYears, weightKg, sex } = input
+  const activityId = input.activityId ?? DEFAULT_ACTIVITY_ID
+  const intensity = intensityFromRpe(rpe)
+
+  const hrKcal = estWorkoutKcalFromHr({ durationMin, avgBpm, ageYears, weightKg, sex })
+  if (hrKcal != null) return { kcal: hrKcal, source: 'hr', intensity, met: null, activityId }
+
+  return {
+    kcal: estWorkoutKcal({ durationMin, ageYears, weightKg, sex, activityId, intensity }),
+    source: 'met',
+    intensity,
+    met: metForActivity(activityId, intensity),
+    activityId,
+  }
+}
+
 /** kcal for a session from its average HR, or `null` when the inputs cannot support an estimate. */
 export function estWorkoutKcalFromHr(input: HrEnergyInput): number | null {
   const { durationMin, avgBpm, ageYears, weightKg, sex } = input
