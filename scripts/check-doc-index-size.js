@@ -1007,7 +1007,11 @@ const BASELINE = {
   // left `main` red on Custom Rules earlier the same evening.
   // Raised 2026-08-19 (Lane A, Q-419 shipped). Re-measured from the MERGED file, not spliced from
   // either side of the conflict — three separate baseline races landed here this evening.
-  'docs/implementation-backlog.md': 11559,
+  // Raised 2026-08-19 (Lane A, Q-420 re-measured): 11559 -> 11591. It replaces a wrong premise
+  // rather than adding narrative — the entry's energy case evaporated when Q-421 made HR outrank the
+  // RPE tier, and its real consumer (health-trends' session-load series) is where the scale mismatch
+  // actually bites.
+  'docs/implementation-backlog.md': 11591,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
