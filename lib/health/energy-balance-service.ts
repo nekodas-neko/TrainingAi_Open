@@ -134,7 +134,7 @@ export async function computeEnergyBalance(
         // `/api/day-log` already exposes `workoutSessionId` per exercise, so the day screen's
         // Training card can join on it without keying by session NAME — which is not identity here
         // and breaks outright for two same-named sessions in one day.
-        .map(ws => ({ id: ws.id, durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000 })),
+        .map(ws => ({ id: ws.id, durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null })),
       activities: activityLogs
         .filter(a => a.date === day)
         .map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),

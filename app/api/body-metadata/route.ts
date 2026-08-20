@@ -149,7 +149,9 @@ export async function GET() {
     profile: { ageYears, weightKg: bodyWeightForEnergy, sex: userSex },
     strengthSessions: todayWorkouts
       .filter(ws => ws.completedAt != null)
-      .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000 })),
+      // Q-419: the session's own RPE decides the intensity tier, matching the done screen. Without it
+      // this route reported a different burn for the same workout than the screen that logged it.
+      .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null })),
     activities: todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
     pedometerSteps: todayMetric?.steps ?? null,
   });

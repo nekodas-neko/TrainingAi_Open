@@ -479,6 +479,26 @@ blocker and the intended shape were both already named, so **do not re-derive th
 
 ### [workouts][nutrition] Q-419 — the done screen and the day's energy budget disagree about the same workout, because only one of them reads your RPE
 
+> **⚠️ SHIPPED 2026-08-19 (Lane A), owner-approved for all days. One residual is filed as Q-330 — read
+> that before calling this closed.**
+>
+> `computeActiveEnergy` now takes `rpe` per session and calls `intensityFromRpe(s.rpe)` instead of the
+> `'moderate'` literal; both call sites (`energy-balance-service`, `body-metadata`) thread
+> `ws.sessionRpe`. An unrated session is untouched.
+>
+> **Blast radius, measured against production before shipping** (the entry required it): of **78**
+> completed sessions, **20** carry an RPE — 3 at 7, 15 at 8, 2 at 9. `intensityFromRpe` is ≤4 easy,
+> ≥8 hard, so **17 sessions across up to 17 days move, all upward** (moderate → hard); the three at
+> RPE 7 stay moderate. Nothing is stored — these figures are derived on read from a column already in
+> the DB — so the change is one line to revert with no migration and no data rewrite. That reversal
+> cost is what made shipping to all days the right call rather than a cutover.
+>
+> **Verified against the running app:** with the seeded 55-minute session set to RPE 9, the done
+> screen reports `intensity: "hard"` and the day's breakdown reports the same session at the same
+> tier — where before the day path scored it `moderate`, which under the scrubbed fixture MET is
+> literally **0** against the done screen's 107.
+
+
 - **Branch:** `fix/day-energy-ignores-session-rpe`
 - **Added:** 2026-08-19 · found while answering the owner's question *"how can we make energy usage/burned
   from excercuse more accurate, what type of data can we feed to calibrate it over time"*. Not a report —
@@ -536,6 +556,35 @@ widening that type.
   contributes to the day's ENERGY row, Nutrition's earned calories and the Home budget, for every RPE
   value; an unrated session is unchanged; and a test pins the three surfaces to one number.
 
+
+### [workouts][nutrition] Q-330 — the done screen and the day still differ by ~1 kcal, because they resolve body weight differently
+
+- **Branch:** `fix/session-energy-weight-source`
+- **Added:** 2026-08-19 · Lane A, found finishing Q-419 · [`journal`](overview/entries/2026-08-19-day-energy-session-rpe.md)
+- **Placement:** low. It is a **1 kcal** display difference, not a wrong number — but it is the last
+  reason the two surfaces do not agree exactly, and Q-419's acceptance criterion is that they do.
+
+**Measured** with the seeded 55-minute session at RPE 9, both paths now agreeing on `hard`:
+
+| surface | value |
+|---|---|
+| `GET /api/workout-sessions/[id]/energy` | **107** |
+| `activeBreakdown.workoutKcalBySession` | **107.927…**, day total **108** |
+
+Same intensity, same duration, same estimator — so the input that differs is **body weight**:
+
+- the done-screen route uses `baseline.weightKg`;
+- `energy-balance-service` uses *"last known weight, however old"* **within the 14-day window ending
+  on that date** (`:117`).
+
+- **⚠ They may be correctly different, and that is the question to answer first.** For a *historical*
+  session, weighing it against the weight the user was at the time is arguably right, and that is what
+  the day path does. The done screen is shown immediately after finishing, when "latest" and "now"
+  coincide — so the two may agree exactly for a session completed today and diverge only for old ones.
+  **Check that before changing either**: if they already agree for a same-day session, the fix is to
+  document the difference rather than remove it.
+- **Not verified:** whether a same-day session agrees exactly. Requires a session completed today;
+  the seeded ones are days old.
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
