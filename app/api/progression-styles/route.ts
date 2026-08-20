@@ -3,6 +3,7 @@ import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import type { ProgressionStyle } from "@trainingai/shared/types";
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { withRouteErrors } from '@/lib/api/route-errors'
 
 // A progression style with its per-set rows.
 const MAX_BODY_BYTES = 256 * 1024
@@ -38,12 +39,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many sets' }, { status: 413 });
   }
 
-  const saved = await (await getRepository()).saveProgressionStyle(userId, {
-    ...body.style,
-    userId,
-    id: body.style.id ?? '',
+  // RV-33: `saveProgressionStyle` throws `NotFoundError` for a style id owned by someone else — the
+  // correct refusal — and with no guard here it escaped as an empty-bodied 500 and an `error_events`
+  // row filed as a server fault. Same miss Q-463 fixed on the sibling `[id]` routes.
+  return withRouteErrors(async () => {
+    const saved = await (await getRepository()).saveProgressionStyle(userId, {
+      ...body.style,
+      userId,
+      id: body.style.id ?? '',
+    });
+    return NextResponse.json({ ok: true, style: saved });
   });
-  return NextResponse.json({ ok: true, style: saved });
 }
 
 export async function DELETE(req: NextRequest) {

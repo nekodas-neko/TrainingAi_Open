@@ -18,6 +18,16 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — RV-33 closed (`fix/ownership-refusal-status-two-routes`)
+
+**projectOverview.md 7857 → 7864.**
+
+Seven lines. The index needs the *shape* of this one because it recurs: the refusal was already
+correct and the repository was already throwing the right error — what was missing was the handler
+guard, so a 404 arrived as an empty 500 and filed itself as a server fault. Naming the two routes and
+the `updateMealType` hardening is what stops the next reader assuming the ownership check itself was
+absent.
+
 ## 2026-08-20 — RV-32 and RV-34 closed (`fix/style-id-ownership-on-create-paths`)
 
 **projectOverview.md 7848 → 7857.**

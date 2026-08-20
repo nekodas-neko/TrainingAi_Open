@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
-import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { invalidUuidResponse, withRouteErrors } from '@/lib/api/route-errors'
 
 // One number. 4 KB is already two orders of magnitude of headroom.
 const MAX_BODY_BYTES = 4 * 1024
@@ -27,8 +27,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'quantityMultiplier must be between 0.01 and 100' }, { status: 400 })
   }
   const repo = await getRepository()
-  const log = await repo.updateFoodLog(id, userId, quantityMultiplier)
-  return NextResponse.json(log)
+  // RV-33: `updateFoodLog` throws `NotFoundError` for an id that is not the caller's — the correct
+  // refusal — and with no guard here it escaped as an empty-bodied 500 and an `error_events` row
+  // filed as a server fault. Same miss Q-463 fixed on the sibling `[id]` routes.
+  return withRouteErrors(async () => {
+    const log = await repo.updateFoodLog(id, userId, quantityMultiplier)
+    return NextResponse.json(log)
+  })
 }
 
 export async function DELETE(_req: Request, { params }: { params: Promise<{ id: string }> }) {

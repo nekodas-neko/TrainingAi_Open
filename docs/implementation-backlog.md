@@ -430,39 +430,6 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [platform][nutrition] RV-33 — two routes answer an ownership refusal with an empty-bodied 500 and file it as a server fault
-
-- **Branch:** `fix/ownership-refusal-status-two-routes`
-- **Added:** 2026-08-20 · Review sweep 40
-- **Lane: A** — both are `app/api/**`.
-- **Write-up:** [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](reviews/2026-08-20-non-workout-write-surface-ownership.md) §5
-
-Q-462/Q-463 established that a not-yours id is a 404, not a server fault, and fixed it on
-`phase-sets/[id]`, `supplements/[id]`, `meal-types/[id]`, `activity-logs` and `log-exercise`. Two routes
-were missed:
-
-- **`POST /api/progression-styles`** with a style id owned by someone else → **HTTP 500, completely empty
-  body.** `saveProgressionStyle`'s `NotFoundError` — the *correct* refusal — escapes an unguarded handler.
-- **`PATCH /api/nutrition/food-logs/[id]`** with an id that is not the caller's → **HTTP 500, empty body.**
-
-Both wrote an `error_events` row (`Progression style not found`, `Food log not found`) as `source: server`.
-Verified by reading the table after each probe.
-
-**Neither is a leak or an outbox wedge** — both refuse correctly and neither is on a `pushMutations` path.
-The cost is a UI that cannot render a message for an empty 500, and correctly-refused requests filling the
-fault channel `CLAUDE.md` says nobody is watching.
-
-**Also fold in one hardening bullet** while in these files: `updateMealType`
-(`lib/data/postgres/slices/nutrition.ts:86`) is the only repo function that `.set()`s its argument
-wholesale. It is safe today solely because its one caller uses a `.strict()` Zod schema — the guarantee
-lives at the route, not the writer, so a second caller inherits nothing. Whitelist column by column there,
-the way its ~20 siblings already do.
-
-**How the two were found, since the method finds the rest:** cross the 20 repo/slice functions that
-`throw new NotFoundError`/`UserFacingError` against the 54 of 116 mutating routes carrying neither a `try {`
-nor a shared error helper. Four intersect; two were reachable with a refusable id and both reproduced. The
-62 routes that *do* carry a `try {` were not checked for whether they map to the *right* status.
-
 ### [workouts][app-shell] Q-362a — `/api/day-log` keys `workoutDurations` by session NAME, so two same-named sessions in a day collide
 
 - **Branch:** `fix/day-log-durations-by-id`
@@ -857,6 +824,32 @@ change.
 - **What would count as done:** two independently-green additive docs PRs can merge in either order
   without the second one, or `main`, going red — demonstrated, not argued.
 
+
+### [platform] LA-14 — `DELETE /api/nutrition/food-logs/[id]` answers 200 for a log that is not yours
+
+- **Branch:** `fix/food-log-delete-refusal`
+- **Added:** 2026-08-20 · found while fixing RV-33, one method over in the same file
+- **Lane: A** — `app/api/**` and `lib/data/postgres/slices/nutrition.ts`.
+
+`updateFoodLog` throws `NotFoundError` when its scoped UPDATE matches no row, which is what made
+RV-33's PATCH a 404. **`deleteFoodLog` does not** — its soft-delete UPDATE is scoped to `user_id`,
+matches nothing, and returns normally, so the route answers `{"success":true}` for another user's log
+and for an id that does not exist.
+
+**Nothing cross-user is written and nothing leaks** — the scope holds, and the response body is the
+same either way. It is a truthfulness problem, not a security one: two methods on the same resource
+answer the same refusal differently, and a client cannot tell a delete that happened from one that
+did not.
+
+**Decide the posture before writing code, because idempotent-DELETE is a real argument.** A DELETE
+that no-ops on an absent row is a defensible convention, and this app's offline outbox replays
+deletes — a 404 on replay of an already-deleted row would be a poison pill, which is the same trap
+RV-32 hit on the log path. Check whether `food_log` deletes go through `pushMutations` before
+choosing; if they do, the answer is probably to keep the 200 and document it here rather than to
+match PATCH.
+
+- **What would count as done:** the two methods agree, or this entry records why they should not,
+  with the outbox path checked rather than assumed.
 
 ### [platform] LA-13 — nothing replays the migrations against a schema that already has everything
 
