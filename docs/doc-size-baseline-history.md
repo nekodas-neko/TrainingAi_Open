@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — PS-3 closed (`fix/non-idempotent-migrations`)
+
+**No raise — recorded because one was drafted twice and both figures went stale.**
+
+Three lines went onto the existing migration-gate handoff paragraph, recording that the four
+migrations retried on every cold start are now idempotent and the dev database records 206 of 206.
+Against `main` at the time that needed 8055 → 8058; a compaction landed mid-PR and it became
+7875 → 7878; a second compaction landed and the file now sits at **7806**, comfortably under the
+7875 already on `main`. So the raise was withdrawn rather than carried.
+
+Worth a block despite raising nothing: a baseline drafted against a `main` that then compacts is a
+number that *looks* deliberate and is stale. Re-measure on the merged tree at the end, not when the
+lines are written.
+
 ## 2026-08-20 — re-measured a third time, after #263 (`fix/migrate-classifies-idempotent`)
 
 **projectOverview.md → 8055 · docs/implementation-backlog.md → 11647 ·
@@ -1202,3 +1216,24 @@ figures "against `git log` for the commits that raised them". This repository's 
 here. The reconciliation above is therefore from the copies' own content, and says so rather than
 implying a provenance it does not have.
 
+## 2026-08-20 — `projectOverview.md` 7875 → 7838, `docs/implementation-backlog.md` 11666 → 11328, `docs/agents/state/review.md` 1308 → 170
+
+Review sweep 40 — the non-workout write surface and the first audit of ownership rule (b).
+
+**Backlog (+94 from this branch, net −358 after merging `main`'s archive sweep):** three entries. RV-32 and RV-34 batch as one PR over the program-config write path;
+RV-33 is the Q-462/Q-463 status class on two routes that fix missed. RV-32 carries a measured
+impact-bound (the leak stops at the style *name*) because the entry is otherwise easy to size as either
+much larger or much smaller than it is.
+
+**projectOverview (+35 from this branch, net −37 after the same merge):** one Known-Issues row. It is here rather than queue-only because a write path
+accepting another account's row id is the kind of thing every session's orientation read should see, and
+because the clean result beside it — rule (b) audited and sound — is what stops the next sweep re-running it.
+
+**Review baton (−1,138):** rewritten from 1,307 lines to 169, which is PS-4's complaint discharged for one
+of the batons. The 24 lines the wrap-up session added on the same day — what shipped from sweeps
+29–39, the three findings still open, and the one route left unverified — are carried across, since
+that is state and not history. Nothing was lost: all 39 earlier sweeps have their own `docs/reviews/` write-up, each
+linked with a summary from the pillar indexes, and every finding is already a Known-Issues row or a queue
+entry. What the baton keeps is state — next ID, current lens, what is blocked, and the method notes that
+cost a session each to learn. **The baseline is lowered to 170 in the same PR**, so the shrink ratchets
+rather than leaving 1,138 lines of headroom for it to grow back into.

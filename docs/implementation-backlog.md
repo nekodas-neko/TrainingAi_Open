@@ -329,56 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
-
-> **⚠️ MEASURED AND MOSTLY DEFUSED 2026-08-20 (Lane A) — read this before starting; the entry below
-> is the original.** ([`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md))
->
-> **The question this entry says to answer first is answered: production is clean.**
-> `claude_ro.schema_migrations` holds **206 of 206** filenames, the four among them — `054`, `055`
-> and `082` recorded 2026-07-21, `157` on 2026-07-28. So `ensureSchema` skips them in production and
-> nothing re-runs on a cold start there. This is local-only, exactly as the entry hoped rather than
-> feared.
->
-> **And they were never failures.** The four raise SQLSTATEs (42710, 42710, 23505, 42P07) that
-> `ensureSchema()` classifies as *already present* and steps over; `migrate.js` had no classifier at
-> all and called them failures — the two runners disagreeing, in the file whose docstring says it
-> mirrors the other. Fixed, along with the larger thing it was hiding: `migrate.js` exited 0
-> regardless, so the CI job named **Migration Check** could not fail on a genuinely broken migration.
->
-> **What is actually left is small.** The four are still not *recorded* locally, so they are retried
-> on every cold start — four statements that fail cleanly and are reported as benign. Making each
-> idempotent (`IF NOT EXISTS`, an explicit `pg_constraint` guard for the two `ADD CONSTRAINT`s,
-> `ON CONFLICT DO NOTHING` for the seed) would let them succeed and record, ending the retry. It
-> edits already-applied migration files, which is safe here because it changes nothing for a
-> database that has them and nothing for a fresh one — but it is no longer buying anything except
-> quiet. Judge it on that, not on the original framing.
-
-- **Branch:** `fix/non-idempotent-migrations`
-- **Added:** 2026-08-19 · observed in this session's own start-up hook output
-- **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.
-
-`scripts/local-db/migrate.js` reports `applied 0, skipped 200 already recorded, 4 failed` on every
-run of an already-migrated database. The four never reach the recorded set, so they are retried
-forever:
-
-```
-054_users_email_unique.sql        relation "users_email_unique" already exists
-055_friends_and_titles.sql        relation "users_friend_code_unique" already exists
-082_exercise_library_expand_2.sql duplicate key value violates unique constraint "exercise_library_name_key"
-157_scale_ble.sql                 relation "scale_raw_samples" already exists
-```
-
-**These are distinct from the three (`038`, `040`, `041`) Lane A's baton records as known and
-ignorable** — do not assume the baton already covers them.
-
-Locally this is noise: the objects exist, so nothing is broken. **What needs establishing before any
-fix is whether the same four are unrecorded in production**, because `ensureSchema` tracks by
-filename and an unrecorded migration is one that re-runs on every cold start. Answer that first via
-the admin query endpoint; the fix (make each idempotent — `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`)
-is small and uninteresting by comparison, and per this repo's own rule a seed that never corrects a
-drifted production row is the trap to check for.
-
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -473,6 +423,100 @@ since the complaint that started it came from paper.
 already stale when written. What remains of Q-406 is the row component itself, and it now waits on
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
+
+### [workouts][platform] RV-32 — three write paths accept a progression-style id belonging to another user; the fourth rejects it
+
+- **Branch:** `fix/style-id-ownership-on-create-paths`
+- **Added:** 2026-08-20 · Review sweep 40, measured live against two signed-in accounts
+- **Batch:** `program-write-fk-ownership` — with RV-34; one verification pass over the program-config write path covers both
+- **Lane: A** — `app/api/**` and `lib/data/postgres/slices/programs.ts`.
+- **Write-up:** [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](reviews/2026-08-20-non-workout-write-surface-ownership.md) §3
+
+`progression_styles.user_id` is `NOT NULL` and there is no shared or global style, so a style id the
+caller does not own is always wrong. Q-129 settled the posture for this exact shape on
+`programs.phase_set_id`. Three write paths never got it:
+
+| write path | column | result as B, using A's style id |
+|---|---|---|
+| `PUT /api/phase-sets/[id]` | `program_phases.primary_style_id` | **400 `Invalid primaryStyleId`** ✅ |
+| `POST /api/phase-sets` | `program_phases.primary_style_id` | **201, row persisted** ❌ |
+| `POST /api/workout-templates` | `session_exercises.style_id` | **200, row persisted** ❌ |
+| `POST /api/log-exercise` | `exercise_logs.style_id` | **200, row persisted** ❌ |
+
+**The first two rows are the whole entry: same value, same resource, same session — PUT 400, POST 201.**
+The check is `app/api/phase-sets/[id]/route.ts:34-50` and was never copied into the create twin.
+
+**What it costs, measured — read this before sizing the fix.** `listPhaseSets` joins the style name
+in **without a user scope** (`lib/data/postgres/slices/programs.ts:427`), so `GET /api/phase-sets`
+returned **A's style name to B**, and `primaryStyleName` is rendered in `builder-review.tsx:484` and
+interpolated into the LLM prompt in `app/api/nutrition-goals/recommend/route.ts:103`. It stops at the
+name: every other read of `progression_styles` is `user_id`-scoped, so the borrowed style's set
+structure never reaches the borrower. Separately, all three FKs are `ON DELETE SET NULL`, so **A
+deleting their own style nulls a column in B's program and workout history.**
+
+**Not exploited in the data available:** production shows 0 of 46 phase rows, 0 of 82 styled
+`session_exercises` and 0 of 280 styled `exercise_logs` pointing outside the owner's own styles.
+`claude_ro` is row-scoped to the owner, and the victim's rows are the ones it cannot show — so that is
+"no evidence", not "has not happened".
+
+**The fix is the shape that already exists twice.** Validate against `listProgressionStyles(userId)`
+at each of the three sites (`foodLogRefsValid` is the reference — it is the only guard in the repo
+implemented on **both** the web route and the `pushMutations` branch), and scope the `leftJoin` at
+`programs.ts:427` to the caller. Do the join fix even if the write guards land first: it is what turns
+a stale reference into a blank rather than someone else's word.
+
+### [workouts][platform] RV-34 — a client-supplied `program_sessions.id` that is not yours is a `pg 23505` 500 and an `error_events` row
+
+- **Branch:** `fix/style-id-ownership-on-create-paths`
+- **Added:** 2026-08-20 · Review sweep 40
+- **Batch:** `program-write-fk-ownership` — with RV-32
+- **Lane: A**
+- **Write-up:** [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](reviews/2026-08-20-non-workout-write-surface-ownership.md) §4
+
+`saveProgram` uses the client's `sessions[].id` as the primary key of the row it inserts — deliberately,
+so a program edit does not sever `workout_sessions.session_id` from already-logged workouts. The id is
+never checked against the caller. Saving a program as B with **A's** `program_sessions.id` gives
+**HTTP 500 `{"error":"Save failed"}`** from a raw duplicate-key violation, plus an `error_events` row
+carrying the failed SQL.
+
+It fails closed — the transaction rolls back and nothing cross-user is written — but by accident of a PK
+constraint rather than by design, which is precisely what Q-129's own comment at `programs.ts:181` calls
+out about the sibling case it fixed. **Check the supplied session ids against the program's existing rows
+and refuse with a 4xx**, so a genuine client bug (a stale id after a program was rebuilt elsewhere)
+reports as a refusal instead of burning a slot in the one fault channel nobody watches.
+
+### [platform][nutrition] RV-33 — two routes answer an ownership refusal with an empty-bodied 500 and file it as a server fault
+
+- **Branch:** `fix/ownership-refusal-status-two-routes`
+- **Added:** 2026-08-20 · Review sweep 40
+- **Lane: A** — both are `app/api/**`.
+- **Write-up:** [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](reviews/2026-08-20-non-workout-write-surface-ownership.md) §5
+
+Q-462/Q-463 established that a not-yours id is a 404, not a server fault, and fixed it on
+`phase-sets/[id]`, `supplements/[id]`, `meal-types/[id]`, `activity-logs` and `log-exercise`. Two routes
+were missed:
+
+- **`POST /api/progression-styles`** with a style id owned by someone else → **HTTP 500, completely empty
+  body.** `saveProgressionStyle`'s `NotFoundError` — the *correct* refusal — escapes an unguarded handler.
+- **`PATCH /api/nutrition/food-logs/[id]`** with an id that is not the caller's → **HTTP 500, empty body.**
+
+Both wrote an `error_events` row (`Progression style not found`, `Food log not found`) as `source: server`.
+Verified by reading the table after each probe.
+
+**Neither is a leak or an outbox wedge** — both refuse correctly and neither is on a `pushMutations` path.
+The cost is a UI that cannot render a message for an empty 500, and correctly-refused requests filling the
+fault channel `CLAUDE.md` says nobody is watching.
+
+**Also fold in one hardening bullet** while in these files: `updateMealType`
+(`lib/data/postgres/slices/nutrition.ts:86`) is the only repo function that `.set()`s its argument
+wholesale. It is safe today solely because its one caller uses a `.strict()` Zod schema — the guarantee
+lives at the route, not the writer, so a second caller inherits nothing. Whitelist column by column there,
+the way its ~20 siblings already do.
+
+**How the two were found, since the method finds the rest:** cross the 20 repo/slice functions that
+`throw new NotFoundError`/`UserFacingError` against the 54 of 116 mutating routes carrying neither a `try {`
+nor a shared error helper. Four intersect; two were reachable with a refusable id and both reproduced. The
+62 routes that *do* carry a `try {` were not checked for whether they map to the *right* status.
 
 ### [workouts][app-shell] Q-362a — `/api/day-log` keys `workoutDurations` by session NAME, so two same-named sessions in a day collide
 
@@ -894,6 +938,32 @@ change.
   sandbox; no device, no production data.
 - **What would count as done:** two independently-green additive docs PRs can merge in either order
   without the second one, or `main`, going red — demonstrated, not argued.
+
+
+### [platform] LA-13 — nothing replays the migrations against a schema that already has everything
+
+- **Branch:** `feat/migration-replay-check`
+- **Added:** 2026-08-20 · found while fixing PS-3, by building the check by hand
+- **Lane: A** — `scripts/**` and `.github/workflows/**`.
+
+`Migration Check` runs `migrate.js` against a **fresh** database, which is the case where a
+non-idempotent migration cannot fail. PS-3's four hid for months because the only path that exercises
+them is a database that already holds their objects — and the worst of them, `157`, is a
+`CREATE TABLE` followed by ten `ADD COLUMN`s, where the first collision aborts every statement after
+it. That shape is how the local store has twice been left silently dead on Android; the Postgres side
+has no equivalent guard.
+
+The check is two lines on top of the job that already exists: after the fresh run, `TRUNCATE
+schema_migrations` and run it again. Measured on 2026-08-20 with PS-3's fixes in place — **205 of 206
+replay cleanly**.
+
+The one that does not is **`001_initial.sql`**, and it is not worth fixing: it fails with
+`foreign key constraint "cardio_sessions_user_id_fkey" cannot be implemented` because `002` renamed
+the column it references, so replaying `001` onto a modern schema is genuinely incoherent. A replay
+check needs to exempt it by name, with that reason recorded next to the exemption.
+
+- **What would count as done:** a deliberately non-idempotent statement added to any migration turns
+  the job red, and removing it turns it green — demonstrated, not argued.
 
 
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
