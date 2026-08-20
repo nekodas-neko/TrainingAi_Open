@@ -18,6 +18,20 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-20 — Q-424 closed: this file's own failure mode, fixed (`fix/doc-index-baseline-order-independence`)
+
+**projectOverview.md 7870 → 7877.**
+
+The last raise made under the old rule, and the one that explains why nine of the entries below exist.
+The ratchet compared the tree against a committed number, so it was answering *"is this file over"* —
+a fact about `main` as much as about the branch — and two independently-green PRs could merge into a
+red `main`. It now asks whether **this branch** grew the file, and an inherited overage is reported
+rather than failed.
+
+**Expect this log to get shorter.** Most of the recent entries are re-measurements forced by the base
+moving mid-PR, not decisions about documentation. Those stop being necessary: a branch that did not
+grow a file no longer has to touch its number at all.
+
 ## 2026-08-20 — Q-362a closed (`fix/day-log-workout-durations-key`)
 
 **projectOverview.md 7864 → 7870.**

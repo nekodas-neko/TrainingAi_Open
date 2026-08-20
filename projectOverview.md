@@ -84,6 +84,13 @@ and filed it as a server fault, because the `NotFoundError` escaped an unguarded
 so the three Lane B surfaces that read it keep working until Q-362b moves them, with LA-15 to remove
 it afterwards ([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
 
+**Q-424 closed (2026-08-20)** — the doc-size ratchet compared the tree against a committed number, so
+two independently-green PRs could merge into a red `main` and the failure then landed on an unrelated
+branch as an unrelated file over an unrelated limit. It now asks whether **this branch** grew the
+file, reports an inherited overage instead of failing it, and says how many lines the branch itself
+added. Custom Rules is **51 steps** now — a base fetch was added
+([journal](docs/overview/entries/2026-08-20-doc-size-ratchet-order-independence.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
 — the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
 from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
