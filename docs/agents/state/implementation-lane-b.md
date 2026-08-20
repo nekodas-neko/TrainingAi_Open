@@ -12,7 +12,7 @@
 
 ## Now — there is an OPEN, UNMERGED PR on your branch. Deal with it first.
 
-`claude/implementation-lane-b-0o7kb9`, **v1.334.0** — Q-415 + Q-417 + Q-323, one calorie budget
+**[PR #265](https://github.com/nekodas-neko/TrainingAi_Open/pull/265)** on `claude/implementation-lane-b-0o7kb9`, **v1.334.0** — Q-415 + Q-417 + Q-323, one calorie budget
 across every surface. Full context:
 [`docs/handoff-2026-08-20-nutrition-one-calorie-budget.md`](../../handoff-2026-08-20-nutrition-one-calorie-budget.md),
 which carries the pickup prompt.
@@ -51,7 +51,7 @@ Ten PRs merged, then the calorie-budget batch left open above.
 | #213/#219/#226 | Q-414 | energy in against energy out on one timeline (`components/health/energy-timeline.ts`) |
 | #239 | Q-416 | `centredStackOffset` — the one-ingredient label's 8.6 mm dead band halved and moved above the block |
 | #260 | Q-391 | per-session kcal on the day screen's Training card, keyed by `workoutSessionId` |
-| *(open)* | Q-415 + Q-417 + Q-323 | one calorie budget everywhere; the zone bar became a progress bar |
+| **#265 (open)** | Q-415 + Q-417 + Q-323 | one calorie budget everywhere; the zone bar became a progress bar |
 
 **`lib/hooks/use-invalidation-refetch.ts`** came out of the Q-359 work — the escape hatch for reads
 `useCachedValue` cannot own (a read that also seeds from local SQLite, wraps its fetch in

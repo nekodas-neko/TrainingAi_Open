@@ -1,7 +1,7 @@
 # Handoff — one calorie budget across every surface, and a bar you finish
 
 **Date:** 2026-08-20 · **Agent:** Implementation Lane B · **Branch:**
-`claude/implementation-lane-b-0o7kb9` · **Version:** v1.334.0 · **Domain:** `nutrition`
+`claude/implementation-lane-b-0o7kb9` · **PR:** [#265](https://github.com/nekodas-neko/TrainingAi_Open/pull/265) (open, unmerged) · **Version:** v1.334.0 · **Domain:** `nutrition`
 
 ---
 
