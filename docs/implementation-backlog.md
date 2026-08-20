@@ -1089,13 +1089,24 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
   six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
   routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
   fixture below, which still does not exist.
-- **A guard needs a fixture that does not exist, and this is the reusable part.** Q-402's fix could
-  not be driven end to end because the seeded user has no `height_cm`/`date_of_birth`/`sex` (so the
-  energy card shows "add your details") **and** `DEFAULT_CARD_WIDGETS` is empty, so Home renders no
-  card widgets at all until one is turned on. Three probes measured zero
-  `/api/nutrition/energy-balance` requests. Whoever takes this should build that fixture first —
-  a seeded body plus `ta_ss_cards` via `page.addInitScript` — because every Home-card guard needs
-  it, and its absence is part of why a shell-only staleness bug reached a user report.
+- **✅ THE FIXTURE AND THE GUARD SHIPPED 2026-08-20.** `e2e/fixtures.ts` gains
+  `ensureEnergyBalanceProfile()` and `enableHomeCards(page, keys)`, and
+  `e2e/home-card-invalidation-refetch.spec.ts` drives Q-402's mechanism end to end for the first
+  time: Home stays mounted, a body-metric write from its own quick-log sheet clears
+  `energy-balance:`, and the card issues a **second** GET. Mutation-checked — restoring the
+  pre-Q-402 `useEffect(…, [])` shape makes it red with its own message.
+  [`Journal`](overview/entries/2026-08-20-home-card-invalidation-guard.md).
+  **Correction to what this bullet used to say:** the seeded user was described as missing
+  `height_cm`/`date_of_birth`/`sex`. It has height (180) and sex (male) — **only `date_of_birth`
+  was missing**, and the route names exactly one field in `missingProfileFields`. The fixture is one
+  column, not three, and `COALESCE`s the other two so it stays correct if the seed changes.
+  The second half was right: `DEFAULT_CARD_WIDGETS` is empty, so Home renders no card widgets at
+  all until `ta_ss_cards` is set.
+  **Why it asserts the request rather than the number:** a changed figure could come from a
+  remount and an unchanged one proves nothing, so only a second GET is present-only-if-working.
+- **What is still open: the twelve latent sites.** None of them can bite — every one unmounts on
+  navigate — and each needs judging individually rather than a codemod. The entry stays queued for
+  them alone.
 
 ### [platform] Q-324 — the first suite run against a freshly-migrated database times out two test files, which is exactly what CI does every run
 
