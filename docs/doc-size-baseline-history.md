@@ -1202,7 +1202,7 @@ figures "against `git log` for the commits that raised them". This repository's 
 here. The reconciliation above is therefore from the copies' own content, and says so rather than
 implying a provenance it does not have.
 
-## 2026-08-20 — `projectOverview.md` 7875 → 7838, `docs/implementation-backlog.md` 11666 → 11308, `docs/agents/state/review.md` 1308 → 163
+## 2026-08-20 — `projectOverview.md` 7875 → 7838, `docs/implementation-backlog.md` 11666 → 11328, `docs/agents/state/review.md` 1308 → 163
 
 Review sweep 40 — the non-workout write surface and the first audit of ownership rule (b).
 
