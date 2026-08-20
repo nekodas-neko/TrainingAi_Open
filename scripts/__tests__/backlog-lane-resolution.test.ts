@@ -44,6 +44,30 @@ describe('backlog lane resolution', () => {
     expect(got).not.toBeUndefined()
   })
 
+  // The residual class, found after the field-vs-prose fix: an entry with NO field form whose bare
+  // mentions disagree. Measured 2026-08-20 — 19 entries, and EIGHT of Lane A's top ten READY items
+  // among them, because a banner reading "the Lane A half SHIPPED, what is left is Lane B" puts an
+  // `A` ahead of the real tag. Taking the first is a coin toss dressed as an answer.
+  it('refuses to guess when bare mentions disagree and there is no field', () => {
+    expect(laneFromLines([
+      '> **⚠️ The Lane A half SHIPPED. What is left is Lane B only** — switching the client over.',
+      '- **Lane B** (`components/nutrition/meal-type-manager.tsx`).',
+    ])).toBe('?')
+  })
+
+  it('still answers when the bare mentions agree', () => {
+    expect(laneFromLines([
+      '- **Lane B.** `components/oura-ble/` only — the route is Lane B too.',
+      'and the console is Lane B.',
+    ])).toBe('B')
+  })
+
+  it('a field form settles it even when the prose disagrees repeatedly', () => {
+    expect(laneFromLines([
+      'the Lane A half shipped', 'and more Lane A prose', '- **Lane:** B',
+    ])).toBe('B')
+  })
+
   it('preserves an explicit unknown', () => {
     expect(laneFromLines(['- **Lane: ?** — whichever role does its handoff next'])).toBe('?')
   })

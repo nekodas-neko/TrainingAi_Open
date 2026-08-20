@@ -19,7 +19,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { LANE_FIELD_RE, LANE_LOOSE_RE } = require('./lib/lane');
+const { laneFromLines } = require('./lib/lane');
 
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
@@ -49,7 +49,7 @@ for (const line of lines.slice(queueStart)) {
     const id = line.match(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/);
     const title = line.replace(/^###\s*/, '');
     current = id
-      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false }
+      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false }
       : null;
     if (current) entries.push(current);
     continue;
@@ -77,20 +77,11 @@ for (const line of lines.slice(queueStart)) {
 
   // `Lane: ?` is a deliberate "I could not tell" — it must reach a human, not be filtered away.
   //
-  // Two forms are read, and the FIELD form wins wherever an entry has one. 75 of 205 entries state
-  // the lane without a colon ("**Lane B**", "— Lane A"), so requiring the colon would unclassify a
-  // third of the queue — but taking the first loose match instead let an entry's PROSE outrank its
-  // own field. Measured 2026-08-20: Q-529 says "Re-scoped from Lane A to Lane B" fourteen lines
-  // above its `**Lane:** B`, and was being served to Lane A; Q-421's shipped-banner said "(Lane A)"
-  // and outranked the retag that was meant to hand it over.
-  const field = line.match(LANE_FIELD_RE);
-  if (field && !current.laneField) current.laneField = field[1].trim();
-  const lane = line.match(LANE_LOOSE_RE);
-  if (lane && !current.laneLoose) current.laneLoose = lane[1].trim();
-  // `?? null` matters: an entry that states no lane must stay `null`, which `wantLane` reads as
-  // "visible to both lanes". Letting it fall to `undefined` hid 96 of 203 entries from BOTH lanes —
-  // caught only because the READY count moved further than the two-entry fix could explain.
-  current.lane = current.laneField ?? current.laneLoose ?? null;
+  // The lane rule lives in `lib/lane.js` and is applied over the whole entry once it is collected —
+  // NOT re-implemented here. It was, briefly, and the two copies drifted within a day: the lib
+  // learned to refuse an ambiguous entry and this file went on guessing, so the unit test was
+  // testing a function the tool did not call.
+  current.laneLines.push(line);
 
   // Entries not yet migrated off the prose marker. Treated as parked, and named as unmigrated so
   // the remaining ones stay visible instead of quietly reading as ready.
@@ -98,6 +89,8 @@ for (const line of lines.slice(queueStart)) {
     current.legacyBlocked = line.replace(/^\s*[-*]?\s*/, '').slice(0, 90);
   }
 }
+
+for (const e of entries) e.lane = laneFromLines(e.laneLines);
 
 const inQueue = new Set(entries.map((e) => e.id));
 // An absent target means shipped — the protocol removes a completed entry from the queue.
