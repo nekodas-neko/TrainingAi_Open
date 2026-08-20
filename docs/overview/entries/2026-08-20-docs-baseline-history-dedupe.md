@@ -24,7 +24,7 @@ records is what finds them: all eight sat above 0.80, and the file now reports z
 **Deduping is a merge, not a delete.** Each copy had drifted, so each carried a fact the others did
 not. Every surviving record is the union — Q-356 keeps its `1044 -> 1056` figure from one copy and
 its recompute note from another; the Q-464 ratchet keeps `8257 -> 8310` from two copies and Lane A's
-`+53` delta from the third. A sentence-level audit of the file before and against after confirms
+`+53` delta from the third. A sentence-level audit of the file before and after confirms
 every distinct sentence survives exactly once (541 sentences → 514, all 27 removed being duplicates).
 
 **Two independent records were nearly lost with the duplicates that had swallowed them.** A lost
@@ -34,8 +34,9 @@ wholesale would have taken both with it, and no per-record tool can see a record
 in front of it. Both are records in their own right now.
 
 **`git log` could not do the reconciliation PS-2 asked for.** The entry says to reconcile the
-figures against the commits that raised them. This repository's history begins **2026-08-19** — 53
-commits, none earlier — and every record in the extracted block is dated 2026-08-18 or before. Those
+figures against the commits that raised them. This repository's history begins **2026-08-19**, with
+no commit earlier than that, and every record in the extracted block is dated 2026-08-18 or before.
+Those
 commits are in the archived private repo. The reconciliation is therefore from the copies' own
 content, and the file now says so rather than implying a provenance it does not have.
 

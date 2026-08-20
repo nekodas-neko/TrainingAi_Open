@@ -1134,6 +1134,27 @@ start given that four consecutive documentation sweeps had already covered that 
 baton rather than the handoff because the baton is what a cold successor reads as state; the handoff
 is the narrative behind it.
 
+## 2026-08-20 — `claude/tuning-agent-0q9yl7`
+
+**CLAUDE.md (+9):** the session-start database read told sessions to trust `pg_stat_user_tables`
+because it is not row-scoped — true, and silent on the difference between its size columns (exact,
+read from the filesystem) and its row counters (planner estimates, with `last_analyze` NULL on every
+table here). A Tuning session read `n_live_tup = 1` off an `oura_daily_summary` holding 45 rows and
+filed a data-loss incident that had never happened. Nine lines naming the split, giving the two
+measured counter-examples, and saying to run `count(*)`.
+
+**Backlog (+19):** one entry, TN-1 — chronic stress refuses inside its granular layer and persists no
+reason why. It replaces the retracted half of Q-528: both of that score's countable gates were
+measured this session and both pass, which moves the question from "is the history there" to "why does
+the model refuse", and nothing outside the pass can currently see the answer. Q-528 and Q-525 were
+rewritten in place rather than added to, so the entry is most of the growth.
+
+**Tuning baton (+19, after trimming a superseded note):** the session retracted a finding this baton
+itself carried, so the correction has to sit *above* the claim it replaces while the original bullet
+stays legible as the record of the misread — a successor who reads only the new block learns the fact
+but not the failure mode. The rule that produced it is rewritten in place with its counter-examples
+rather than deleted, for the same reason.
+
 ## 2026-08-20 — the extracted history is deduped (PS-2, `docs/baseline-history-dedupe`)
 
 **No baseline moved.** This is the one deliberate exception to the append-only rule, authorised by
@@ -1176,7 +1197,8 @@ deleted as part of the duplicate that swallowed it.
 
 **`git log` could not be used, and PS-2 assumed it could.** The entry says to reconcile the
 figures "against `git log` for the commits that raised them". This repository's history begins
-**2026-08-19** — 53 commits, none earlier — and every record in the extracted block is dated
+**2026-08-19**, with no commit earlier than that, and every record in the extracted block is dated
 2026-08-18 or before. The commits that raised those numbers are in the archived private repo, not
 here. The reconciliation above is therefore from the copies' own content, and says so rather than
 implying a provenance it does not have.
+
