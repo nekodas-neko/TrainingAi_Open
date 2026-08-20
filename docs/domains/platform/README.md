@@ -407,6 +407,7 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md) — **Review sweeps 29–39, 2026-08-20** (11 PRs, Q-492…Q-499 + Q-552…Q-556; three CI checks added for documentation facts nothing was checking). **10 of 13 findings have since shipped**, verified in source. Its most transferable output is the method section: **five measurements were wrong, each producing a plausible result in the expected direction** — and the keeper, *corroboration between two weak signals is not evidence when they can fail for the same reason*.
 - [`handoff-2026-08-18-platform-decision-brief-rule.md`](../../handoff-2026-08-18-platform-decision-brief-rule.md)
   — the `CLAUDE.md` rule governing how a decision is brought to the owner (#69), and the merge
   friction that shipping it exposed: **three of four CI rounds were base collisions on the doc-index

@@ -18,12 +18,16 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ## 2026-08-20 — PS-3 closed (`fix/non-idempotent-migrations`)
 
-**projectOverview.md 8055 → 8058.**
+**projectOverview.md 7875 → 7878.**
 
 Three lines on the existing migration-gate handoff paragraph, recording that the four migrations
 retried on every cold start are now idempotent and the dev database records 206 of 206. It sits with
 the gate work rather than opening a section of its own, which is why it is three lines and not a
 block. The backlog shrank in the same PR — PS-3 removed, LA-13 added — so no raise was needed there.
+
+The number was re-measured after the Review session's compaction landed mid-PR, which took
+projectOverview from 8055 to 7875; the raise is the same three lines against the smaller file, not a
+splice of either side's figure.
 
 ## 2026-08-20 — re-measured a third time, after #263 (`fix/migrate-classifies-idempotent`)
 
@@ -1174,3 +1178,19 @@ tracks how much state the role is carrying rather than accumulating. This rewrit
 cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
 having two causes — and one superseded decision recorded with its correction, which is worth more
 lines than the decision was.
+
+## 2026-08-20 — Review session wrap-up (sweeps 29–39)
+
+**`projectOverview.md` 8043 → 7863, a ratchet DOWN of 180 lines.** Eight Known-Issues rows were
+struck to `known-issues-resolved.md` because their findings had shipped — each verified in source on
+`main` first, not inferred from the queue's silence. The shrink-only baseline exists so reclaimed
+space cannot quietly refill, so the lower number is the point of the exercise rather than a side
+effect.
+
+**`docs/agents/state/review.md` 1281 → 1308, a raise of 27 lines.** A "session closed — read this
+first" block at the top of the Review baton: which of the previous run's thirteen findings shipped
+(ten) with the evidence, which three remain open so a successor does not re-file them, the one probe
+that never reached its ownership check and is therefore **unknown rather than clean**, and where to
+start given that four consecutive documentation sweeps had already covered that seam. It sits in the
+baton rather than the handoff because the baton is what a cold successor reads as state; the handoff
+is the narrative behind it.

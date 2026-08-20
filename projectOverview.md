@@ -11,7 +11,7 @@
 
 | Kind of work | Where it lives |
 |---|---|
-| **Who does what** | [`docs/agents/README.md`](docs/agents/README.md) — the four standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
+| **Who does what** | [`docs/agents/README.md`](docs/agents/README.md) — the six standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
 | **Upcoming — ready to build** | [`docs/implementation-backlog.md`](docs/implementation-backlog.md) — a priority-ordered queue; implementer sessions take the top item per the protocol in that file |
 | **Upcoming — ideas/findings** | [`docs/planned_upgrades.md`](docs/planned_upgrades.md) — open uplift ideas; they graduate to the backlog once a session writes their implementation plan |
 | **Completed — session journal** | `docs/overview/entries/` (current window, one file per PR) then the batched `docs/overview/history-*.md` |
@@ -31,10 +31,10 @@
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is
 reference only — nothing lands there.
 
-**Work runs through four standing agents.** Two Implementation lanes split the backlog by file
-ownership, plus a BugFix, a Tuning and a Review agent. Their roles, authority limits, lane contract
-and cold-start prompts are in [`docs/agents/README.md`](docs/agents/README.md). Start there rather
-than picking an item straight off the queue.
+**Work runs through six standing agents.** Two Implementation lanes split the backlog by file
+ownership, plus an Orchestrator owning the queue and docs, and a BugFix, a Tuning and a Review
+agent. Their roles, authority limits, lane contract and cold-start prompts are in
+[`docs/agents/README.md`](docs/agents/README.md). Start there, not straight off the queue.
 
 **Entry IDs come from your agent's own prefix now, not a reserved band** (2026-08-19). `LA-` Lane A ·
 `LB-` Lane B · `BF-` BugFix · `RV-` Review · `TN-` Tuning · `PS-` one-off sessions, counting up with
@@ -264,70 +264,6 @@ order.
   has still passes. That half remains unmeasured.
 
 
-### [platform] 🟢 The orientation indexes named paths that do not exist, one of them never built (Q-554, 2026-08-18)
-
-- **Filed and fixed in the same PR**, kept as the record of the class.
-  [`docs/reviews/2026-08-18-orientation-index-paths.md`](docs/reviews/2026-08-18-orientation-index-paths.md).
-- **`CLAUDE.md` has had a path check since Q-153; `docs/module-map.md` and the eleven domain indexes
-  had none** — though sessions are told to read them before building a helper or working in a pillar.
-- **⚠️ `module-map.md:232` described a module that has never existed** — `lib/oura-ble/steps-motion-decoder.ts`
-  → `decodeStepsPacket`, **zero references tree-wide**. The real port is the row below
-  (`lib/oura-models/…`), itself flagged there as **"NOT yet wired"**. So the map presented *planned
-  wiring* as existing infrastructure, in the table read specifically **to avoid re-implementing what
-  already exists**. Marked `⚠️ NOT BUILT`.
-- **Three stale rows fixed** — `app/history/` (workouts), `docs/oura-models/` (devices), `app/overview/`
-  (app-shell); none exist. **Plus 49 malformed display paths** (`docs/../overview/…`) across all eleven
-  indexes: link targets were correct, the visible labels were not.
-- **Now enforced:** `scripts/check-index-doc-paths.js`, step **42 of 42**, covering **748 paths across 12
-  docs**. Its first pass reported 59 of 787 — nearly all noise — and the fixes then re-triggered it,
-  since naming a path as *absent* still names it; four `DELIBERATE` entries carry their reasons.
-- **Not exercised:** existence only. It does **not** check that the description beside a path is true —
-  a row naming a real file while describing behaviour it lacks still passes.
-
-
-### [platform] 🟢 A Known Issue was in both the live list and the resolved archive; nothing checked (Q-553, 2026-08-18)
-
-- **Filed and fixed in the same PR**, kept as the record of the class.
-  [`docs/reviews/2026-08-18-known-issue-duplication.md`](docs/reviews/2026-08-18-known-issue-duplication.md).
-- **Q-139 read `🔴 OPEN` here and `✅ fixed` in the archive, for ten days** — 69 lines describing a bug
-  fixed 2026-08-08 in v1.270.25. **Every session's mandated orientation read showed a red,
-  highest-severity open issue for a ten-day-old fix.** Both halves verified fixed **in source**
-  (`packages/shared/src/health/step-estimate.ts:176`), not taken on the archive's word. **Q-81** was a
-  byte-identical 31-line entry in both files.
-- **⚠️ Both were also archived early.** The rule allows a move only when nothing is owed, *including a
-  pending device check* — and both entries name one. So: **copied rather than moved, and moved before
-  it was allowed.** Resolution: cut the premature archive copies, keep the live entries (where an owed
-  check belongs), fold in anything unique first.
-- **Now enforced:** `scripts/check-known-issue-duplication.js`, step **41 of 41** in Custom Rules. Its
-  first version reported 4 of which 2 were real, so it skips **range** headings and identifies an entry
-  by its **first** Q number — both narrowings documented in the script itself.
-- **Not exercised:** static reconciliation. Q-139 still owes an on-device check after the next history
-  drain; Q-81 owes a production check. Neither is possible in this harness.
-
-
-### [platform] 🟢 Two sources of truth for the next Q band; the prose one was wrong (Q-552, 2026-08-18)
-
-- **Review's band 450–499 was exhausted by Q-499.** `docs/agents/README.md` says *"claim the next block
-  of 50 above 529"* — which literally gives **530–579** and collides with **fourteen numbers already
-  in use**. The predecessor baton had already written 530–579 into the handover.
-- **The ledger recorded 530–537, 538–542 and 543; `544–551` were also live** across two platform
-  handoffs, `docs/overview/history-2026-08-15.md`, the devices domain index and the backlog, and
-  appeared nowhere in it.
-- **⚠️ Correcting this row's first draft: the ledger is NOT the only defence, and the truth is more
-  interesting.** Two sources exist for the same fact — the backlog's *Live pointers* row said
-  **552** and is **CI-enforced** (`scripts/check-backlog-pointers.js`); the README's prose ledger and
-  its *"next block of 50 above 529"* said **530** and was stale. **The machine-checked pointer was
-  right the whole time**, and the collision was reachable only by following the prose instruction —
-  which is what the README tells you to do, and what the Review baton had copied.
-- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
-  in this very PR (*"a band was used without being recorded"*).
-- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
-  count in a script is a fact* — and the first where the checked copy was silently right while the
-  prose copy was silently wrong.
-- **Fixed in the same PR:** claimed **552–601**, recorded 544–551, bumped the pointer to **602**, and
-  pointed the instruction at the checked source. Kept as the record of why the procedure changed.
-
-
 ### [app-shell][health] 🟢 Three lenses — two clean, and cards that cannot tell "no data" from "the fetch failed" (Q-499, 2026-08-18)
 
 - **Two lenses came up clean and are recorded so nobody re-runs them.**
@@ -361,122 +297,6 @@ order.
   "can't reproduce" dismissal the report-invalidation rule exists to prevent.
 - **Still not exercised:** on device and offline (where `cachedFetch` cannot revalidate at all). **One**
   card proven; the other eleven remain a worklist.
-
-
-### [platform] 🟡 Three unauthenticated routes buffer an unbounded request body; one parses it before any check (Q-498, 2026-08-18)
-
-- **Lens taken from sweep 31's method note** — *find bounds declared one way and enforced another*.
-  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](docs/reviews/2026-08-18-unbounded-request-bodies.md).
-- **The shared guard is correct and is not the defect.** `readJsonLimited` uses `Content-Length` only
-  as a fast path and streams with a real byte counter. Measured: 20 MB to `/api/client-error` (16 KB
-  cap) was **cut off at 2,949,120 bytes**.
-- **Coverage:** 113 routes take a body, **7** are guarded, **93** are not — and of those 93 exactly
-  **3** are reachable without a session: `auth/register`, `auth/exchange-mobile-token`,
-  `health-connect/ingest`. **The seven guarded routes are all *less* exposed than these three.**
-  Measured: the two tested each accepted the **full 20,000,048 bytes**, then returned 400.
-- **⚠️ Ordering separates them.** `auth/register` and `exchange-mobile-token` rate-limit **before**
-  parsing, so the rate is bounded. **`health-connect/ingest` reads at line 35 and Zod-parses at 40 but
-  rate-limits at 53 and checks the secret at 58** — a caller **holding no secret** makes the server
-  buffer and fully parse an arbitrary body, unthrottleable because the limiter runs after.
-- **Compounds with Q-493:** all three limiters key on the spoofable `x-forwarded-for` leftmost hop, so
-  the ordering that protects the two auth routes is itself bypassable. Two independent defects that
-  remove each other's mitigation.
-- **Fix:** route the three through `readJsonLimited`, **and** move the limiter + secret check above the
-  body read on the ingest route — the second is the larger win and is independent of the first.
-- **Not exercised:** the actual ceiling was **not** probed (20 MB proved there is no cap; going further
-  risked destabilising the server for no extra information). Railway's edge may impose its own limit —
-  not checked. No device, no production.
-
-
-### [platform] 🟡 A 31-day range that passes every guard makes two admin routes loop forever (Q-497, 2026-08-18)
-
-- **Applied sweep 30's lesson to the *other* secret-gated route.** `admin/day-review` is gated by
-  `ADMIN_EXPORT_SECRET`; sweep 30 had just shown that "needs configuration" was never a real barrier.
-  [`docs/reviews/2026-08-18-admin-range-loop-termination.md`](docs/reviews/2026-08-18-admin-range-loop-termination.md).
-- **All three of `CLAUDE.md`'s claims about the route hold** — GET-only, fail-closed on either unset
-  var, and `requireAdmin` on the token path so the token widens *transport* not authority. Checked,
-  not assumed.
-- **🟡 Q-497 — the day loop compares strings, and `shiftDateStr` does not pad the year.** One day after
-  `9999-12-31` is `10000-01-01`, and `'10000-01-01' <= '9999-12-31'` is **true** (`'1' < '9'`).
-  `from=9999-12-01&to=9999-12-31` passes `normalizeDateParamIso`, passes `end < start`, and spans
-  **exactly 31 = `MAX_RANGE_DAYS`** — then runs forever. Measured: still looping at iteration 5000, at
-  year 10013; the control range terminates at 31. Each iteration is a `buildDayAudit` (~12 queries)
-  against a `max: 10` pool.
-- **The comment directly above the loop** explains the days run sequentially rather than concurrently
-  because fanning out *"would starve the rest of the app (the failure mode that took production down
-  in session 165)"*. The sequential loop avoids that — and then never stops.
-- **Two sites; the second writes.** `admin/backfill-derived-scores:80` has the identical loop and
-  identical guards, and `dryRun=false` commits — unbounded writes, not just a hang.
-  `energy-balance-service.ts:152` is safe (start derived by shifting back from today).
-- **Severity: medium — admin-only.** Weigh it as *"one mistyped year takes the app down"*, not an
-  attack. **Fix:** pad the year in `shiftDateStr`, the single place producing the malformed value.
-- **Also corroborates Q-496 directly:** `2026-13-45` / `2026-02-31` / `0000-00-00` return **400** here
-  via `normalizeDateParamIso` and **500** on `health-connect/ingest` via its raw regex. Same inputs,
-  opposite outcomes, one directory apart — the correct behaviour is already demonstrated next door.
-- **Not exercised:** the loop was reproduced verbatim in isolation, not by hitting the route — driving
-  it against a running server *is* the hang. No device, no production.
-
-
-### [devices][platform][body] 🔴 The Health Connect ingest route, driven for real — the brute-force gate is bypassable and a far-future date poisons "latest" permanently (Q-493…Q-496, 2026-08-18)
-
-- **The only unauthenticated write into `body_metrics`, exercised for the first time.** It has sat on
-  the Review baton as untested since sweep 1 because it needs `HEALTH_CONNECT_INGEST_SECRET` set. All
-  four findings are **reproduced against a running server**:
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](docs/reviews/2026-08-18-health-connect-ingest.md).
-- **🔴 Q-493 — the SEC-I3 brute-force gate is bypassed by rotating one request header.** The limiter
-  keys on `x-forwarded-for`'s **leftmost** hop, which is the value the *client* supplies. Measured, 30
-  wrong-secret attempts each way: **fixed** header → 1 key at count 20, gate engaged; **rotating** →
-  **30 keys at count 1, all 30 reached the secret compare.** **Seven sites** share the pattern,
-  including `admin/day-review` (bearer path to the owner's full health history). Nothing in the docs
-  records it, and the R1 security-hardening plan *propagated* it as "the existing pattern".
-  **⚠️ Unverified: whether Railway's proxy sanitises the header** — not determinable from the sandbox,
-  and production's limiter was not probed. The fix does not depend on the answer.
-- **🔴 Q-494 — one far-future date permanently captures every `ORDER BY date DESC LIMIT 1` read.**
-  `POST {"date":"9999/12/30","weightKg":499}` took `getMostRecentConfirmedWeightKg` from **81 kg to
-  499 kg**, and no later write can outrank it. Feeds the BLE-scale confirmation path and
-  `deriveActivityKcal`. **The ranked source merge is orthogonal to this, not weak against it** —
-  ranking is per column *per date*, and a row on a date nothing else writes has no competitor.
-  **⚠️ And it is not a novel class:** `packages/shared/src/validation/ingest-clock.ts` exists for
-  exactly this and guards `scale-ble/samples`; `oura-ble/samples` is guarded downstream; the workout
-  path got `resolveCompletedAt` at **Q-24 §7**, whose comment uses the same phrase — *"accepted
-  unbounded and uncompared"*. **`health-connect/ingest` is the only health-write ingest path with no
-  clock bound anywhere in its chain** — the sibling-surface rule missed twice. The fix is to route the
-  date through `ingest-clock`, not to add a bespoke range check.
-- **🟡 Q-496** — `2026-13-45` / `2026-02-31` / `0000-00-00` pass the shape regex and return **HTTP 500**
-  plus an `error_events` row each. The class `normalizeDateParam` exists to prevent; this route never
-  got the guard. **🟢 Q-495** — `z.coerce.number()` turns `[]`→0, `true`→1, `""`→0 kg; the route's own
-  comment names two garbage inputs and both are correctly rejected, these three are not named.
-- **What the route gets right, stated because three findings are refinements of it:** the gate runs
-  *before* the compare and returns an identical 401 on trip; `safeCompare` is constant-time and
-  length-safe; the date regex accepts both separators (the Q-130 lesson); both garbage examples its
-  comment names are rejected.
-- **Not exercised:** local dev server, seeded DB. Not on device, not against production, not against
-  Railway's real proxy — the one unknown Q-493 turns on. All test rows, `error_events` and
-  `rate_limits` rows were deleted and the 81 kg reading verified restored.
-
-
-### [platform] 🟡 Seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current (Q-492, 2026-08-18)
-
-- **The lens was the file every session must read first.** Three sweeps this week each found a stale
-  `CLAUDE.md` number by accident (Q-480, Q-490, Q-491). This one enumerated **every** checkable count
-  and re-derived it against `main` at `63fb89c`:
-  [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](docs/reviews/2026-08-18-claude-md-prose-counts.md).
-- **Script-backed: 3 of 3 current.** Sparkline (3 inline / 6 exempt), `Ran 40 of 40` custom rules, the
-  rollup vitest glob. **Prose: 7 of 9 stale** — hex literals **471 → 428**; the >800-line hotspot list
-  still names `more/profile-tab.tsx` (**476 lines**); "22 of 33" → **29 of 40**; `READINESS_SCORE_TTL`
-  "four sites" → **6**; suite "448 files" → **504**; plus the two already filed. **Two prose counts are
-  right** (score-band 17, "11 inline grep rules") — the correlation is strong, not absolute.
-- **Two items are more than drift.** `more/profile-tab.tsx` **should already have been struck** — the
-  same paragraph mandates it and cites `health-sections.tsx` as the precedent. And the rollup-glob
-  maintenance command at `CLAUDE.md:976` is scoped to the directory the glob covers, so it **can only
-  confirm the glob against itself** — a rollup test written elsewhere is invisible to the check that
-  exists to find it. **Both defects are latent:** no test outside the glob calls the rollup today.
-- **One ratchet with slack.** `check-component-size.js` is shrink-only; `components/workout-screen.tsx`
-  is pinned at **1850** against an actual **1831** — 19 lines of regrowth that would pass silently.
-- **The fix is not correcting seven numbers** — that buys a week. Cite the command, or delete the
-  number and keep the rule. The file already contains the model in its own sparkline paragraph.
-  *A count in prose is a claim with a decay date; a count in a script is a fact.*
-- **Not exercised:** static verification only — no runtime, no device.
 
 
 ### [platform][app-shell][readiness] 🟢 This run's own findings checked against production — one refuted, two re-scoped, one new (Q-472, 2026-08-18)
