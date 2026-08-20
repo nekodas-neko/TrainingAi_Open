@@ -11,7 +11,7 @@
 
 | Kind of work | Where it lives |
 |---|---|
-| **Who does what** | [`docs/agents/README.md`](docs/agents/README.md) — the four standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
+| **Who does what** | [`docs/agents/README.md`](docs/agents/README.md) — the six standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
 | **Upcoming — ready to build** | [`docs/implementation-backlog.md`](docs/implementation-backlog.md) — a priority-ordered queue; implementer sessions take the top item per the protocol in that file |
 | **Upcoming — ideas/findings** | [`docs/planned_upgrades.md`](docs/planned_upgrades.md) — open uplift ideas; they graduate to the backlog once a session writes their implementation plan |
 | **Completed — session journal** | `docs/overview/entries/` (current window, one file per PR) then the batched `docs/overview/history-*.md` |
@@ -31,10 +31,10 @@
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is
 reference only — nothing lands there.
 
-**Work runs through four standing agents.** Two Implementation lanes split the backlog by file
-ownership, plus a BugFix, a Tuning and a Review agent. Their roles, authority limits, lane contract
-and cold-start prompts are in [`docs/agents/README.md`](docs/agents/README.md). Start there rather
-than picking an item straight off the queue.
+**Work runs through six standing agents.** Two Implementation lanes split the backlog by file
+ownership, plus an Orchestrator owning the queue and docs, and a BugFix, a Tuning and a Review
+agent. Their roles, authority limits, lane contract and cold-start prompts are in
+[`docs/agents/README.md`](docs/agents/README.md). Start there, not straight off the queue.
 
 **Entry IDs come from your agent's own prefix now, not a reserved band** (2026-08-19). `LA-` Lane A ·
 `LB-` Lane B · `BF-` BugFix · `RV-` Review · `TN-` Tuning · `PS-` one-off sessions, counting up with
