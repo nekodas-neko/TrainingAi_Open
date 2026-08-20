@@ -34,6 +34,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 
 const root = path.join(__dirname, '..');
 
@@ -109,6 +110,13 @@ function stripComments(src) {
     .replace(/(^|[^:])\/\/[^\n]*/g, (m, p) => p + ' '.repeat(m.length - p.length));
 }
 
+/** The one counting pass, so the working tree and the base branch are measured identically (LA-16). */
+function countBare(raw) {
+  const src = stripComments(raw);
+  BARE.lastIndex = 0;
+  return [...src.matchAll(BARE)].length;
+}
+
 const counts = new Map();
 let scanned = 0;
 
@@ -117,9 +125,7 @@ for (const dir of DIRS) {
     const rel = path.relative(root, full).split(path.sep).join('/');
     if (SKIP_PREFIX.some(p => rel.startsWith(p))) continue;
     scanned++;
-    const src = stripComments(fs.readFileSync(full, 'utf8'));
-    BARE.lastIndex = 0;
-    const n = [...src.matchAll(BARE)].length;
+    const n = countBare(fs.readFileSync(full, 'utf8'));
     if (n > 0) counts.set(rel, n);
   }
 }
@@ -132,11 +138,25 @@ if (process.argv.includes('--print')) {
   process.exit(0);
 }
 
+const baseRef = resolveBaseRef();
 const offenders = [];
+const inherited = [];
 for (const [rel, n] of counts) {
   if (EXEMPT.has(rel)) continue;
   const allowed = BASELINE[rel] ?? 0;
-  if (n > allowed) offenders.push({ rel, n, allowed });
+  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
+  const v = verdict({ count: n, limit: allowed, atBase: countAtBase(baseRef, rel, countBare) });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${n} bare call(s) against a baseline of ${allowed}, but the base branch is already there.`);
+  } else if (v === 'fail') {
+    offenders.push({ rel, n, allowed });
+  }
+}
+
+// Reported whether or not the run fails, and never as a failure (Q-424).
+if (inherited.length > 0) {
+  console.log('check-client-today-timezone: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
 }
 const stale = Object.keys(BASELINE).filter(rel => (counts.get(rel) ?? 0) < BASELINE[rel]);
 const staleExempt = [...EXEMPT.keys()].filter(rel => !counts.has(rel));

@@ -53,6 +53,23 @@ function fileAtBase(baseRef, relPath) {
   }
 }
 
+/**
+ * A ratchet's own count, applied to the file as it stands at `baseRef` (LA-16).
+ *
+ * The line-count ratchets can use `lineCountAtBase`; the rest count OCCURRENCES with their own
+ * matcher, and that matcher is the thing that must not be duplicated here — a base count computed by
+ * a second, near-identical regex is worse than no base count at all, because it would disagree with
+ * the working-tree count for reasons nobody could see. So the caller passes its own counting
+ * function and it runs over the base content unchanged.
+ *
+ * `null` when the file does not exist at the base, which is the ordinary case for a file the branch
+ * adds and must NOT read as a count of zero.
+ */
+function countAtBase(baseRef, relPath, countFn) {
+  const content = fileAtBase(baseRef, relPath);
+  return content === null ? null : countFn(content);
+}
+
 /** Line count as the ratchets measure it — `split('\n').length`, i.e. `wc -l` + 1. */
 function lineCountAtBase(baseRef, relPath) {
   const content = fileAtBase(baseRef, relPath);
@@ -76,4 +93,4 @@ function verdict({ count, limit, atBase }) {
   return 'fail';
 }
 
-module.exports = { resolveBaseRef, fileAtBase, lineCountAtBase, verdict };
+module.exports = { resolveBaseRef, fileAtBase, lineCountAtBase, countAtBase, verdict };
