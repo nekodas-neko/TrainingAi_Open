@@ -1277,3 +1277,20 @@ on that one line. Resolved by taking `origin/main`'s file whole and **re-measuri
 — 7847 lines, which the script counts as 7848 — rather than splicing either side's hunk. Two same-day
 raises spliced together silently drop one side, which is the accident this log exists to prevent, and
 7841 was only ever the number `main` happened to carry when it was read.
+
+## 2026-08-20 — Lane B's baton ratchets DOWN, 413 → 134
+
+**A shrink, not a raise.** The seventh Lane B handoff rewrote `docs/agents/state/implementation-lane-b.md`
+in full, as the handoff ritual requires, and it came out at **134** lines against a stored 413. The
+baseline is shrink-only precisely so reclaimed space cannot quietly refill, so the lower number is
+locked in here in the same PR rather than left as headroom for the narrative to leak back into.
+
+What went: six runs of accumulated "This run" sections and their per-item detail, which is what
+journal entries and the linked reviews are for. What stayed is what a cold successor needs as state —
+what is in flight (nothing), what was refuted and must not be re-proposed, what is owed on the device,
+what paths are claimed (none), and the gotchas that cost this run time.
+
+**PS-4 is now three of six.** Orchestrator 62, Lane A 113, Lane B 134 are under the ~150-line target;
+BugFix 161, Review 170 and Tuning 582 are not. The entry's own thesis holds — each fell at its role's
+own handoff rather than in a compaction pass — with one exception it should expect: Tuning at 582 is
+4× the target and will not come down as a side effect of a routine rewrite.
