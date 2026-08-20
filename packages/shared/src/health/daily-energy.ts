@@ -14,7 +14,7 @@
  * subtracts a 1.5-MET resting baseline, so every term here is net active energy above rest —
  * consistent with the sedentary base.
  */
-import { estWorkoutKcal, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estWorkoutKcal, estWorkoutKcalFromHr, intensityFromRpe, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
 
 // Defined in a dependency-free leaf module and re-exported here, so a caller that needs only the
 // number does not pull in this file's `workout-energy` → `oura-models` → `node:path` chain. Every
@@ -63,9 +63,14 @@ export interface EnergyProfile {
 
 export interface ActiveEnergyInput {
   profile: EnergyProfile
-  /** Completed strength sessions today (duration in minutes). `id` is optional so existing callers
-   *  are unchanged; pass it to get the per-session breakdown back. */
-  strengthSessions: { durationMin: number; id?: string }[]
+  /**
+   * Completed strength sessions today (duration in minutes).
+   *
+   * `id` is optional so existing callers are unchanged; pass it to get the per-session breakdown
+   * back. `rpe` is the session's stored `session_rpe` (Q-419) — omit it and the session is estimated
+   * at `moderate`, exactly as before.
+   */
+  strengthSessions: { durationMin: number; id?: string; rpe?: number | null; avgBpm?: number | null }[]
   /** Today's logged activities. */
   activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null }[]
   /** Phone-pedometer steps today (body_metrics), excluding treadmill/logged-indoor steps. */
@@ -114,15 +119,30 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
   const zero = { workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0, workoutKcalBySession: [] }
   if (ageYears == null || weightKg == null || sex == null) return zero
 
-  const est = (activityId: number, durationMin: number) =>
-    estWorkoutKcal({ durationMin, ageYears, weightKg, sex, activityId, intensity: 'moderate' }) ?? 0
+  const est = (activityId: number, durationMin: number, intensity: Intensity = 'moderate') =>
+    estWorkoutKcal({ durationMin, ageYears, weightKg, sex, activityId, intensity }) ?? 0
 
-  // Strength — activity 8.
+  // Strength — activity 8, at the intensity the user's own RPE implies (Q-419).
+  //
+  // **This was hardcoded to 'moderate' while the done screen used `intensityFromRpe(rpe)` for the
+  // same session**, so tapping an RPE changed the number on that screen and then changed nothing
+  // anywhere else — the day's ENERGY row, Nutrition's earned calories and the Home budget all
+  // reverted to moderate. The tap looked load-bearing and was not.
+  //
+  // `intensityFromRpe` returns 'moderate' for a null RPE, so an unrated session is unchanged and no
+  // history without a rating moves.
   let workoutKcal = 0
   const workoutKcalBySession: { id: string; kcal: number }[] = []
   for (const s of input.strengthSessions) {
     if (s.durationMin > 0 && s.durationMin <= MAX_PLAUSIBLE_SESSION_MIN) {
-      const kcal = est(8, s.durationMin)
+      // Q-421: heart rate first, MET as the fallback — which is what the MET path always was
+      // (Oura's `has_enough_motion === false` branch). `estWorkoutKcalFromHr` returns null whenever
+      // it cannot support an estimate (no strap that session, an implausible bpm, an incomplete
+      // profile), and 36 of the owner's 78 sessions have no HR at all, so the fallback is the common
+      // case rather than an edge one.
+      const kcal = estWorkoutKcalFromHr({
+        durationMin: s.durationMin, avgBpm: s.avgBpm, ageYears, weightKg, sex,
+      }) ?? est(8, s.durationMin, intensityFromRpe(s.rpe))
       workoutKcal += kcal
       if (s.id != null) workoutKcalBySession.push({ id: s.id, kcal })
     }

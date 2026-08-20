@@ -987,6 +987,8 @@ export interface WorkoutRepository {
   // 180d oura_heartrate / 90d rr_intervals prunes.
   upsertWorkoutHrStats(userId: string, sessionId: string, stats: WorkoutHrStatsInput): Promise<void>
   getWorkoutHrStats(userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null>
+  /** `sessionId → avgBpm` for the sessions that have one (Q-421). Absent = no usable HR. */
+  getAvgBpmBySession(userId: string, sessionIds: string[]): Promise<Map<string, number>>
   listSessionsMissingHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   // Per-SET HR metric snapshot (migration 139) — durable per-set record for per-exercise HR trends,
   // sibling of workout_hr_stats. getSetDetailsForSession feeds the formula; the rest persist/read it.
