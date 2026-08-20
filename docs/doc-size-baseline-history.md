@@ -1098,3 +1098,15 @@ tracks how much state the role is carrying rather than accumulating. This rewrit
 cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
 having two causes — and one superseded decision recorded with its correction, which is worth more
 lines than the decision was.
+
+## 2026-08-20 — `projectOverview.md` 8,043 → 8,070 (+27); Lane B baton 413 → 115 (Lane B)
+
+**Up:** one Known-Issues row for the Q-415/Q-417/Q-323 calorie-budget work (v1.334.0). Longer than a
+typical row on purpose — it carries **two outstanding checks rather than a description of the fix**:
+an unverified `earned > 0` path with the first thing to look at named, and a four-stop
+`conic-gradient` that has never met Samsung's WebView. Both must be read *before* the next session
+can conclude this shipped clean, which is what the index is for. The narrative lives in
+`docs/overview/entries/2026-08-20-one-calorie-budget.md`.
+
+**Down:** the Lane B baton was rewritten in full per the handover rule (never appended) and came in
+at 115 lines against a 413 baseline, so the baseline follows it down.

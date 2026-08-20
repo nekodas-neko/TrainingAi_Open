@@ -6,6 +6,17 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.334.0",
+    date: "2026-08-20",
+    changes: [
+      "Your calorie budget is now one number everywhere. Home\u2019s nutrition card, the Nutrition tab\u2019s ring and both Energy Balance cards were each working it out differently \u2014 on one morning they showed 2,451, 2,001 and 2,180 for the same day, so the Nutrition ring said \u201cGoal reached\u201d while the card above it said you still had 166 kcal left. They all read the same figure now: your rest-day floor plus what today\u2019s movement actually earned.",
+      "The calorie bar is now a progress bar you finish rather than a dial you sit on. It runs red \u2192 amber \u2192 green up to a notch at your goal, with a short amber-then-red tail for going over, and the fill takes the colour of wherever it currently ends.",
+      "Home\u2019s nutrition ring fills as you eat instead of always drawing a full circle \u2014 the coloured part is what you have eaten, the grey is what is left, and the middle counts down to \u201cleft\u201d or up to \u201cover\u201d.",
+      "The macro grams under the Nutrition ring now grow with the day like the calories above them do. They were the rest-day figures, so on a day with 551 earned calories the card reported fat over target at 68/60 g when the day actually called for 85 g. Protein deliberately does not move: it is dosed by bodyweight, and going for a walk does not create a protein requirement.",
+      "\u201C+551 from cardio\u201D under the ring now reads \u201cfrom movement\u201d, which is what the number has always been \u2014 strength sessions and steps included.",
+    ],
+  },
+  {
     version: "1.333.0",
     date: "2026-08-20",
     changes: [

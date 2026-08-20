@@ -78,6 +78,33 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][app-shell] One calorie budget everywhere, and a bar you finish (Q-415, Q-417, Q-323 · v1.334.0) — NOT verified on device, and the "earned" path is unit-tested only · needs: hardware
+
+Three surfaces each computed their own calorie budget and put **2,451 / 2,001 / 2,180** on one
+screen for one day — the Nutrition ring printing *"Goal reached"* at 2,014 eaten while the card two
+rows above it said *"166 kcal left"*. All four surfaces now read
+`/api/nutrition/energy-balance`'s figure. The bar under them became a progress bar with a goal notch
+and a short overshoot tail, Home's ring sweeps to `eaten / budget` with a grey remainder, and the
+Nutrition ring renders `macroTargets.scaled` instead of the rest-day grams.
+
+**Two things are outstanding and both are checks, not work.**
+
+1. **`earned > 0` was never exercised live.** On `pnpm dev`,
+   `/api/nutrition/energy-balance` returned `activeKcal: 0` for a day seeded with a 60-minute walk
+   **and** 18,000 steps, while the same window's food logs resolved fine (`intakeKcal: 2014`). So the
+   `+N from movement` subtitle, the scaled macro grams and the earned half of the budget line are
+   covered by unit tests and by nothing else. **Filed as LB-4** — the first thing to check is whether
+   `rowToActivityLog`/`rowToBodyMetric` put a `Date` where `activeEnergyFor(day)`'s `a.date === day`
+   expects a `YYYY-MM-DD` string, which would make both filters miss silently. Production is known to
+   work (the owner's 2026-08-19 screenshots carried a live `551 earned from movement`), so if it is
+   code it is data-shape-dependent rather than universal.
+2. **Home's donut now draws a FOUR-stop `conic-gradient` where it drew three** — the grey remainder
+   is the fourth stop. Samsung's WebView compositor is this repo's standing hazard for exactly this
+   (SVGs and gradients inside card grids wiping sibling backgrounds), and nothing here was seen on
+   the S25. Check the donut and its neighbouring cards on the APK before treating this as done.
+
+Nothing rendered in a browser at all this session — the headless login did not complete — so the
+layout claims above rest on the code and the unit tests, not on a screenshot.
 ### [platform][devices] 🟡 The CSP now permits WASM, and dropped two dead hosts — neither checked on the device (Q-546, 2026-08-20)
 
 - **What shipped.** `script-src` gained **`'wasm-unsafe-eval'`**, which permits WebAssembly

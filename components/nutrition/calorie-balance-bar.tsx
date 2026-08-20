@@ -2,7 +2,7 @@
 
 import { memo, useState } from 'react'
 import { Info } from 'lucide-react'
-import { CalorieZoneBar } from './calorie-zone-bar'
+import { CalorieProgressBar } from './calorie-progress-bar'
 import type { EnergyBalanceResponse } from '@/app/api/nutrition/energy-balance/route'
 
 interface Props {
@@ -68,12 +68,11 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
         </button>
       </div>
 
-      {/* The bar itself lives in `CalorieZoneBar` so Home's nutrition card draws the identical
+      {/* The bar itself lives in `CalorieProgressBar` so Home's nutrition card draws the identical
           thing (Q-401). Two hand-maintained copies of this scale is exactly the class of drift that
           put two different calorie budgets on one screen. */}
-      <CalorieZoneBar
+      <CalorieProgressBar
         deviationKcal={b.deviationKcal}
-        zoneColor={b.zoneColor}
         restingBaseKcal={b.restingBaseKcal}
         activeKcal={b.activeKcal}
         targetNetKcal={b.targetNetKcal}

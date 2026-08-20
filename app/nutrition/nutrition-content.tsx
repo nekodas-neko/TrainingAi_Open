@@ -8,6 +8,7 @@ import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
 import { Settings, ChevronLeft, ChevronRight, MoonIcon } from "lucide-react";
 import { MacroRing } from "@/components/nutrition/macro-ring";
+import { ringTargets } from "@/components/nutrition/ring-targets";
 import { MealCard } from "@/components/nutrition/meal-card";
 import { FoodLoggerSheet } from "@/components/nutrition/food-logger-sheet";
 import { QuickEditLogSheet } from "@/components/nutrition/quick-edit-log-sheet";
@@ -109,7 +110,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
   const [weeklyData, setWeeklyData] = useState<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>([]);
   const [adherence, setAdherence] = useState<NutritionAdherenceResponse | null>(null);
-  const [activeEnergyKcalToday, setActiveEnergyKcalToday] = useState<number | null>(null);
   const [todayWaterMl, setTodayWaterMl] = useState<number | null>(null);
   const [waterLogOpen, setWaterLogOpen] = useState(false);
   const [energyBalance, setEnergyBalance] = useState<EnergyBalanceResponse | null>(null);
@@ -146,7 +146,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     if (cachedAdherence) setAdherence(cachedAdherence);
     const meta = readCacheSync<{ today: BodyMetaRow | null; activeEnergyKcalToday?: number | null }>('body-metadata');
     if (meta && isBodyMetadataFresh(meta, tz)) {
-      if (meta.activeEnergyKcalToday != null) setActiveEnergyKcalToday(meta.activeEnergyKcalToday);
       if (meta.today?.waterMl != null) setTodayWaterMl(meta.today.waterMl);
     }
     const supps = readTodayCacheSync<SupplementWithStatus[]>('supplements');
@@ -191,28 +190,13 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   // no local store (web), fall back to the server-only read.
   const loadFoodLogs = useFoodLogsLoader({ userId, logsDateRef, selectedDateRef, setLogs });
 
-  // Date-dependent only: today's calories-burned-from-activity + the food log itself.
-  // The mount-scoped fetches below (meal types, targets, weekly summary, adherence,
-  // body-metadata) don't depend on selectedDate — see fetchMountData.
+  // Date-dependent only: the day's food log and its energy balance. The mount-scoped fetches below
+  // (meal types, targets, weekly summary, adherence, body-metadata) don't depend on selectedDate —
+  // see fetchMountData.
   const fetchData = useCallback(async (date?: string) => {
     const today = date ?? selectedDateRef.current;
     setLoading(true);
     try {
-      const store = userId ? getLocalStore(userId) : null;
-      if (store) {
-        try {
-          // Optimistic local paint only, ahead of the mount-scoped body-metadata network fetch
-          // (which sets the authoritative activeEnergyKcalToday). NOTE: still narrower than that
-          // fetch — activity_logs carries only logged walk/run/cycle activities (and a Guided Walk
-          // writes caloriesBurned:null, same as the Q-96 root cause), never strength workouts. A
-          // full computeActiveEnergy port to the local store would be needed to close that gap;
-          // out of scope here since the network fetch corrects it moments later.
-          const acts = (await store.getActivityLogs(today)).filter(a => a.date === today);
-          if (acts.length) {
-            setActiveEnergyKcalToday(acts.reduce((sum, a) => sum + (a.caloriesBurned ?? 0), 0));
-          }
-        } catch { /* local store unavailable — server/cache path below still runs */ }
-      }
       // Date-scoped, so it belongs here rather than in the mount-scoped block below. Seeded
       // synchronously from the same key in the layout effect, so a revisit paints last-known
       // numbers instead of a skeleton.
@@ -225,7 +209,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       ]);
     } catch { /* non-fatal */ }
     finally { setLoading(false); }
-  }, [loadFoodLogs, userId]);
+  }, [loadFoodLogs]);
 
   // Mount-scoped (PERF-5) — these seven fetches don't depend on selectedDate, so they
   // previously all re-ran on every date-swipe (≈40 requests browsing back 5 days).
@@ -273,10 +257,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         cachedFetch<{ today: BodyMetaRow | null; activeEnergyKcalToday?: number | null }>(
           'body-metadata', '/api/body-metadata', TTL_MEDIUM,
           d => {
-            if (isBodyMetadataFresh(d, tz)) {
-              setActiveEnergyKcalToday(d.activeEnergyKcalToday ?? null);
-              setTodayWaterMl(d.today?.waterMl ?? null);
-            }
+            if (isBodyMetadataFresh(d, tz)) setTodayWaterMl(d.today?.waterMl ?? null);
           },
         ),
       ]);
@@ -431,16 +412,12 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     refreshAffected();
   }, [confirmDeleteLogId, loadFoodLogs, userId]);
 
-  // activeEnergyKcalToday genuinely only ever holds *today's* burn (the mount-scoped
-  // body-metadata fetch is today-scoped) — never apply it to a past day's ring/goal, or
-  // yesterday's macros read against an inflated target.
-  const burnedForSelectedDate = selectedDate === todayStr ? activeEnergyKcalToday : null;
-  const effectiveCalorieGoal = targets?.calories != null && burnedForSelectedDate != null && burnedForSelectedDate > 0
-    ? targets.calories + Math.round(burnedForSelectedDate)
-    : targets?.calories ?? null;
-  const effectiveTargets = targets != null && effectiveCalorieGoal != null
-    ? { ...targets, calories: effectiveCalorieGoal }
-    : targets;
+  // Q-417: the ring's budget and macro grams come from the day's energy-balance payload, which is
+  // date-scoped and is the same figure the card above it renders. It used to be
+  // `targets.calories + <local activity_logs sum>`, a third budget that raced a network fetch and
+  // usually won — 179 kcal low, printing "Goal reached" while the card said "166 kcal left".
+  const balanceForSelectedDate = energyBalance?.date === selectedDate ? energyBalance : null;
+  const ring = ringTargets(balanceForSelectedDate, targets);
 
   const bindDateSwipe = useDrag(
     ({ movement: [mx], last, velocity: [vx] }) => {
@@ -521,7 +498,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             {/* Guarded on the payload's own date: the swipe re-renders before the new date's
                 fetch resolves, and showing the previous day's balance is worse than a skeleton. */}
             <CalorieBalanceBar
-              data={energyBalance?.date === selectedDate ? energyBalance : null}
+              data={balanceForSelectedDate}
               isToday={selectedDate === todayStr}
               loading={loading}
             />
@@ -531,8 +508,11 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               proteinG={totals.proteinG}
               carbsG={totals.carbsG}
               fatG={totals.fatG}
-              targets={effectiveTargets}
-              calsBurnedToday={burnedForSelectedDate}
+              calorieTarget={ring.calories}
+              proteinTarget={ring.proteinG}
+              carbsTarget={ring.carbsG}
+              fatTarget={ring.fatG}
+              earnedKcal={ring.earnedKcal}
             />
 
             {/* Actions sit here, directly under the ring, rather than being reached by scroll depth
@@ -582,7 +562,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             )}
 
             <TdeeAdaptationCard
-              energyBalance={energyBalance?.date === selectedDate ? energyBalance : null}
+              energyBalance={balanceForSelectedDate}
               onApplied={() => {
                 cachedFetch<NutritionTargets>('nutrition-targets', '/api/nutrition/targets', TTL_LONG, d => setTargets(d ?? null));
               }}
