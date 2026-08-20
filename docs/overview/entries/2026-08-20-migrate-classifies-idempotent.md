@@ -71,6 +71,38 @@ runners keep the retry.
 - `scripts/build-rollup-worker.mjs` bundles (the worker imports `client.ts`, so the JSON import had
   to survive esbuild) · `tsc` clean · **Ran 50 of 50 Custom Rules steps** · 4,356 unit tests pass.
 
+## What the gate caught the moment it existed
+
+**CI went red on this very PR, on three jobs at once — and it was right.** `Tests`, `Migration
+Check` and `E2E` all run `migrate.js`, and on a fresh database it genuinely fails:
+
+```
+[migrate] FAILED 142_claude_ro_views.sql [42P01]: relation "public.db_query_log" does not exist
+[migrate] applied 205, skipped 0 already recorded, 0 already present, 1 failed
+```
+
+**`142_claude_ro_views.sql` creates a view over `public.db_query_log`. `143_db_query_log.sql`
+creates that table.** One migration too late. A multi-statement migration is a single implicit
+transaction, so 142 did not fail *partially* — it aborted at that statement and **every view below
+it rolled back**.
+
+It was invisible for two compounding reasons, and both are the subject of this PR: `144` rebuilds
+the whole `claude_ro` schema, so the end state came out right anyway — and `migrate.js` exited 0, so
+all three jobs reported success over it. **This has been happening on every fresh CI database in
+three jobs, for as long as 142 has existed.**
+
+The fix is the repo's own rule — *create what you reference in the same migration*. 142 now carries
+`CREATE TABLE IF NOT EXISTS public.db_query_log`, matching 143's own `IF NOT EXISTS`, so it is a
+no-op on every database that already has the table, which is all of them but a fresh one.
+
+| fresh database | before | after |
+|---|---|---|
+| `migrate.js` | 205 applied, **1 failed**, exit 0 | **206 applied, 0 failed**, exit 0 |
+| re-run | — | 206 skipped, 0 failed |
+| `claude_ro` views | 85 | 85 — unchanged, confirming 144+ were rebuilding them |
+
+**Production is untouched:** 142 is already recorded there, so the new statement never runs.
+
 ## PS-3's open question, answered
 
 That entry says: *"What needs establishing before any fix is whether the same four are unrecorded in
