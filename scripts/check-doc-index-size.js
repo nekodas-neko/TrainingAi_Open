@@ -1005,11 +1005,9 @@ const BASELINE = {
   // Raised 2026-08-19 (Lane A, Q-391). Re-measured from the MERGED file rather than taken from
   // either side: another lane had raised this to 11372 meanwhile, and splicing a hunk here is what
   // left `main` red on Custom Rules earlier the same evening.
-  // Raised 2026-08-19 (Lane A, Q-419 shipped): 11402 -> 11451. Q-419's annotation carries the
-  // measured blast radius the entry required before it could land (17 of 78 sessions move, all
-  // upward), and Q-330 is the residual it uncovered — a 1 kcal gap from two different body-weight
-  // lookups, which may be correct rather than a defect and says so.
-  'docs/implementation-backlog.md': 11451,
+  // Raised 2026-08-19 (Lane A, Q-419 shipped). Re-measured from the MERGED file, not spliced from
+  // either side of the conflict — three separate baseline races landed here this evening.
+  'docs/implementation-backlog.md': 11559,
   // Raised 2026-08-18 (Lane B, Q-488): 1075 -> 1077. Two lines for the inverse of the
   // offline-first rule directly above it — a domain read local-first needs EVERY write to update
   // the local store, deletes included, and including a write made from a screen that itself reads
