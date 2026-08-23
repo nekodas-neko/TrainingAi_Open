@@ -464,6 +464,32 @@ jobs:
       # No PLAYWRIGHT_BROWSERS_PATH here: the runner has no pre-installed Chromium, so Playwright
       # manages its own. playwright.config.ts only pins an executablePath when the sandbox's
       # /opt/pw-browsers/chromium exists, which it does not on a GitHub runner.
+      #
+      # The browser binaries are cached separately from the pnpm store (Q-466). `setup-node`'s
+      # `cache: 'pnpm'` covers node_modules and nothing else; Chromium lives in
+      # ~/.cache/ms-playwright and was re-downloaded — ~150 MB — on every single E2E run. Three
+      # times on 2026-08-18 that download sat in_progress for 6–22 minutes with every other job
+      # already green, and E2E is a required check, so it blocked the merge outright rather than
+      # merely slowing it. The tell: `Install Chromium` running while `pnpm e2e` is still pending
+      # means the CDN, not the specs.
+      - name: Resolve the installed Playwright version
+        id: playwright
+        # The RESOLVED version, not the `^1.62.1` range in package.json — the range does not change
+        # when the lockfile moves to a new build, and a cache keyed on it would serve the previous
+        # browser forever. Hashing the whole lockfile would work too, and would throw the browsers
+        # away on every unrelated dependency bump.
+        run: echo "version=$(node -p "require('@playwright/test/package.json').version")" >> "$GITHUB_OUTPUT"
+      - name: Cache the Playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          # No restore-keys on purpose. A prefix match would restore a different build's binaries,
+          # which the install step below would then have to replace anyway — paying the download it
+          # was meant to avoid, and saving a mixed directory under the new key.
+          key: playwright-${{ runner.os }}-${{ steps.playwright.outputs.version }}
+      # Still runs on a cache hit, and must: it places the system packages `--with-deps` installs,
+      # which are apt packages outside ~/.cache and cannot be cached here. On a hit it finds the
+      # browser already present and skips the download, which is the whole saving.
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - run: pnpm e2e

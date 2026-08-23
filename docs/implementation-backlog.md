@@ -3910,41 +3910,6 @@ ehr     0     0     0     0   648   208   128   556     0
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
 
-### [platform] Q-466 — CI re-downloads the Playwright browser on every E2E run, and a slow CDN turns that into an indefinite stall
-
-- **Branch:** `ci/cache-playwright-browsers`
-- **Added:** 2026-08-18 · review sweep (observed while landing the section-coverage PRs) ·
-  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
-- **Placement:** low-mid. Costs nothing when the CDN is healthy and blocks a PR entirely when it is not.
-- **What.** `.github/workflows/ci.yml:391-392` runs `npx playwright install --with-deps chromium` on
-  **every** E2E run, with no cache:
-  ```yaml
-  - name: Install Chromium
-    run: npx playwright install --with-deps chromium
-  ```
-  `actions/setup-node`'s `cache: 'pnpm'` (five jobs use it) caches the pnpm store, **not** the
-  Playwright browser binaries, which live in `~/.cache/ms-playwright`. So each run pulls ~150 MB of
-  Chromium plus system packages afresh.
-- **Observed three times on 2026-08-18**, on PR #47 and twice on PR #66, out of roughly 8–10 E2E runs
-  that day — a small sample, so treat the *rate* as indicative rather than measured, but three in one
-  day on one repo is not a coincidence. In both cases the step sat
-  `in_progress` for **6–22 minutes** with every other job already green, and the job had to be
-  cancelled and re-run; the re-run completed the same step in well under a minute. The tell is
-  distinctive and worth knowing: `Install Chromium` `in_progress` while `Run pnpm e2e` is still
-  `pending` means the download, not the specs.
-- **Why it is worth fixing rather than tolerating.** E2E is a **required check**, so this blocks the
-  merge outright rather than degrading it, and the recovery (cancel the run, re-run the workflow,
-  wait again) costs ~20 minutes of wall clock each time. With five concurrent agents landing PRs, that
-  is paid repeatedly.
-- **Fix shape:** add `actions/cache` for `~/.cache/ms-playwright`, keyed on the resolved
-  `@playwright/test` version from `pnpm-lock.yaml` so a version bump invalidates it — the standard
-  pattern from Playwright's own CI docs. Keep the `install` step (it must still run to place the
-  browser and system deps on a cache miss); the cache only removes the download.
-- **Note for the implementer:** `playwright.config.ts` deliberately prefers the sandbox's
-  `/opt/pw-browsers/chromium` when present and falls back to Playwright's managed download elsewhere,
-  which is why CI needs the install at all. That comment explains the design — do not "simplify" it
-  away while adding the cache.
-
 ### [readiness] Q-465 — `POST /api/day-checkin` creates a check-in row from a completely empty body
 
 - **Branch:** `fix/day-checkin-requires-an-answer`
