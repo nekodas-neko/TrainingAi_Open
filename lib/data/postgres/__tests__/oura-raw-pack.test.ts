@@ -3,6 +3,7 @@ import { bodyToHex, hexToBody, packFrames, unpackFrames } from '@/lib/oura-ble/f
 import { DS_BUCKET_SPAN, readRawFrames } from '@/lib/data/postgres/slices/oura-raw-frames'
 import {
   HOT_WINDOW_DS, frameSequenceSha256, packOuraRawBuckets, countPackableBuckets, verifyStoredBucket,
+  claimAutoPackSlot, resetAutoPackThrottle, AUTOPACK_THROTTLE_MS,
 } from '@/lib/data/postgres/slices/oura-raw-pack'
 
 // Q-541 Task 4. The packer holds the only DELETE of an archival frame in this project, so what these
@@ -155,6 +156,59 @@ describe.skipIf(!canRun)('the raw-frame packer', () => {
     expect(second.remaining).toBe(0)
   })
 
+  // Q-541 Task 6 makes this reachable rather than theoretical. The packer computes eligibility, then
+  // reads a bucket's rows, then deletes — and firing it from the ingest path is arranging for it to
+  // run while frames are arriving. A frame landing in that window would be deleted by a delete keyed
+  // on the bucket RANGE, having never been packed: gone from both tiers.
+  //
+  // The trigger reproduces exactly that interleaving, deterministically: it fires on the blob insert,
+  // which is after the rows were read and before the delete. Nothing else can put a row there at
+  // that instant.
+  it('does not delete a frame that arrives after the rows were read', async () => {
+    await insertHot(coldFrames)
+    await insertNewest()
+    const lateDs = coldFrames[0].ds + 1
+    await pool.query(`
+      CREATE OR REPLACE FUNCTION ta_test_late_frame() RETURNS trigger AS $$
+      BEGIN
+        INSERT INTO oura_raw_samples (user_id, ring_timestamp_ds, tag, event_name, body_hex, epoch, recorded_at)
+        VALUES (NEW.user_id, ${lateDs}, NEW.tag, 'test', 'deadbeef', 0, now())
+        ON CONFLICT DO NOTHING;
+        RETURN NEW;
+      END; $$ LANGUAGE plpgsql`)
+    await pool.query(`CREATE TRIGGER ta_test_late_frame_trg AFTER INSERT ON oura_raw_packed
+                      FOR EACH ROW EXECUTE FUNCTION ta_test_late_frame()`)
+    try {
+      const res = await packOuraRawBuckets(db, TEST_USER_ID)
+      expect(res.packed).toBe(1)
+      expect(res.framesMoved).toBe(coldFrames.length)   // the blob holds what was read, no more
+
+      const [{ n }] = (await pool.query(
+        `SELECT count(*)::int n FROM oura_raw_samples WHERE user_id=$1 AND ring_timestamp_ds=$2`,
+        [TEST_USER_ID, lateDs])).rows
+      expect(n).toBe(1)                                  // …and the late frame is still in the hot tier
+    } finally {
+      await pool.query(`DROP TRIGGER IF EXISTS ta_test_late_frame_trg ON oura_raw_packed`)
+      await pool.query(`DROP FUNCTION IF EXISTS ta_test_late_frame()`)
+    }
+  })
+
+  // The aftermath of the same situation, one run later: the bucket is sealed, a blob exists, and the
+  // hot tier holds a frame the blob does not. The packer must not reconcile that on its own — an
+  // `onConflictDoUpdate` would overwrite a verified blob to make the counts agree.
+  it('refuses a bucket whose blob no longer describes the hot rows', async () => {
+    await insertHot(coldFrames)
+    await insertNewest()
+    expect((await packOuraRawBuckets(db, TEST_USER_ID)).packed).toBe(1)
+
+    await insertHot([{ ds: coldFrames[0].ds + 2, hex: 'feedface' }])
+    const second = await packOuraRawBuckets(db, TEST_USER_ID)
+    expect(second.packed).toBe(0)
+    expect(second.refused).toBe(1)
+    expect(second.buckets[0].refused).toMatch(/frame_count/)
+    expect(await hotCount()).toBe(1)                     // left exactly where it was
+  })
+
   it('scopes the delete to one user', async () => {
     const OTHER = '00000000-0000-4000-8000-000000054103'
     await pool.query(
@@ -225,5 +279,41 @@ describe('verifyStoredBucket', () => {
     const stored = { blob: packFrames(other), frameCount: other.length, bodySha256: frameSequenceSha256(other) }
     expect(verifyStoredBucket(stored, source)).toMatch(/differ/)
     expect(unpackFrames(stored.blob).map(f => bodyToHex(f.body))).toEqual(['aabb', '9999'])
+  })
+})
+
+// Q-541 Task 6. The throttle is the whole difference between "the packer exists" and "the table
+// stops growing", and it is pure — so it is tested without a database.
+describe('claimAutoPackSlot', () => {
+  const USER = 'user-a'
+  beforeEach(() => resetAutoPackThrottle())
+
+  it('claims once, then refuses until the window has passed', () => {
+    expect(claimAutoPackSlot(USER, 1_000, {})).toBe(true)
+    expect(claimAutoPackSlot(USER, 1_000, {})).toBe(false)
+    expect(claimAutoPackSlot(USER, 1_000 + AUTOPACK_THROTTLE_MS - 1, {})).toBe(false)
+    expect(claimAutoPackSlot(USER, 1_000 + AUTOPACK_THROTTLE_MS, {})).toBe(true)
+  })
+
+  // The reason this is a Map and not the single module-level timestamp the other prunes use: with
+  // one shared clock, a user ingesting every few minutes claims every window and the other user's
+  // table never gets packed at all.
+  it('throttles each user independently', () => {
+    expect(claimAutoPackSlot('user-a', 1_000, {})).toBe(true)
+    expect(claimAutoPackSlot('user-b', 1_000, {})).toBe(true)
+    expect(claimAutoPackSlot('user-a', 1_000, {})).toBe(false)
+  })
+
+  it('is off entirely when OURA_AUTOPACK=off, and claims nothing while it is', () => {
+    expect(claimAutoPackSlot(USER, 1_000, { OURA_AUTOPACK: 'off' })).toBe(false)
+    // Not merely skipped — a refused claim must not consume the window, or turning it back on would
+    // silently wait out a throttle that never ran anything.
+    expect(claimAutoPackSlot(USER, 1_000, {})).toBe(true)
+  })
+
+  it('is on for any other value, including unset', () => {
+    expect(claimAutoPackSlot('u1', 1_000, {})).toBe(true)
+    expect(claimAutoPackSlot('u2', 1_000, { OURA_AUTOPACK: 'on' })).toBe(true)
+    expect(claimAutoPackSlot('u3', 1_000, { OURA_AUTOPACK: '' })).toBe(true)
   })
 })
