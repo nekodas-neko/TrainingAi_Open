@@ -35,8 +35,9 @@ shipped in v1.334.0.
 `node scripts/next-item.js --lane B`, and **re-verify the premise first** — **six of eleven entries
 taken this run had a wrong premise**. The tool says what is startable, never whether it is true.
 BF-4 reads as top and its Lane B half is done (the rest is Lane A's); Q-326, the
-`calorie-budget-surface` batch, Q-323, Q-387 and Q-359 are shipped or closed. Head is **Q-406 before
-Q-395** — `food-row.tsx` is extracted first. LB-3 was moved down to match its "Placement: low".
+`calorie-budget-surface` batch, Q-323, Q-387 and Q-359 are shipped or closed. Head is **Q-406**, then
+**Q-395a → Q-395b → Q-395c**: #327 split the nutrition rework into phases and **Q-395 is now the
+spec and final checkpoint, not a work item** — read it before any phase. LB-3 sits low, as it says.
 
 ## Do not re-litigate
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.
@@ -87,8 +88,7 @@ None held. This run touched `scripts/check-backlog-pointers.js` and `app/health/
   launch it as its own step. `E2E_BASE_URL=http://localhost:3000` points Playwright at it.
 - **`pnpm check:rules` ran 52 of 52 on 2026-08-23.** Quote the count, never "pass".
 - **Two Lane A paths edited and released**: `packages/shared/.../calorie-balance.ts` (Q-323's
-  `barProgress`, reached only from `components/`) and one line in `lib/cache-groups.ts` registering
-  `day-checkin:` (Q-387 — that write is the flag's only writer).
+  `barProgress`) and one line in `lib/cache-groups.ts` registering `day-checkin:` (Q-387).
 - **`projectOverview.md` and this baton sit ON their ratchet baselines, and RAISING one costs you the
   merge race.** Every agent edits `doc-size-baseline.json` and the history log, so a raise conflicts
   on every parallel merge — #320 lost three races that way and only landed once the entries were

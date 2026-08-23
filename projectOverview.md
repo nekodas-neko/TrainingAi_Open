@@ -27,6 +27,14 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
+backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
+the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
+inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
+with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
+(6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
+points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
+
 **Preferences have a server home; nothing reads it yet (Q-392, engine half).**
 `users.preferences` JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, which **merges**
 under a row lock — the unlocked version demonstrably drops the other device's key when a write
@@ -202,24 +210,17 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [nutrition] ⚠️ The maintenance calibration can finally engage — the "finished logging" control shipped (Q-387, 2026-08-23)
-
-**Fixed in v1.337.0.** Q-387's Lane A half (2026-08-19) taught `estimateMaintenance` to count only days flagged complete, but **nothing could set the flag**, so every day was excluded and `source` was stuck on `'formula'`. The Nutrition day now ends with an "I've finished logging" button, its Undo, and the "N of 10 days" counter that makes the flag visible ([`journal`](docs/overview/entries/2026-08-23-food-logging-complete.md)). Q-359 is closed out with it: its can-bite group has been zero since v1.325.9 and the remaining twelve sites are latent by definition, frozen shrink-only by `check-fetch-once-effects.js`.
-
-- **Keep: not device-verified,** and **the write has no outbox domain** — marking a day complete with no network fails visibly rather than queueing. Acceptable for a once-a-day action whose value is in the calibration window rather than the moment, but it is a deliberate gap, not an oversight.
-
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
 **Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
 - **🟠 LB-4 — logging food invalidates BEFORE its push,** so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path.
-- **v1.336.0 finished Q-323's display half.** The zone bar is now a progress bar filling toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), and Home's donut became a progress ring with a grey remainder — it was a 360° macro split, which the rows beside it already give in grams ([`journal`](docs/overview/entries/2026-08-23-calorie-progress-bar.md)). **`barPosition`/`barBands` are deleted**; `barProgress` replaces them. Note the entry said "the macro ring" but described Home's donut — the Nutrition ring already did the asked-for thing.
-- **Keep: not device-verified.** The sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here — only the heart-rate contribution ran. The bar and ring are purely visual and were judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair.
+- **v1.336.0 finished Q-323's display half.** The bar fills toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`) and Home's donut became a progress ring — it was a 360° macro split, which the rows beside it already give in grams ([`journal`](docs/overview/entries/2026-08-23-calorie-progress-bar.md)). **`barPosition`/`barBands` deleted** for `barProgress`. The entry said "the macro ring" but described Home's donut; the Nutrition ring already did the asked-for thing.
+- **v1.337.0 shipped Q-387's Lane B half and closed Q-359.** The Nutrition day now ends with an "I've finished logging" button, its Undo and the "N of 10 days" counter — the flag `estimateMaintenance` filters on, which until now nothing could set, so the calibration was stuck on `'formula'` ([`journal`](docs/overview/entries/2026-08-23-food-logging-complete.md)). **That write has no outbox domain**: marking a day complete offline fails visibly rather than queueing — deliberate for a once-a-day action, not an oversight. Q-359's can-bite group has been zero since v1.325.9 and its remaining twelve sites are latent by definition, frozen shrink-only.
+- **v1.337.0 shipped Q-387's Lane B half and closed Q-359.** The Nutrition day now ends with an "I've finished logging" button, its Undo and the "N of 10 days" counter — the flag `estimateMaintenance` filters on, which nothing could set until now, so the calibration was stuck on `'formula'` ([`journal`](docs/overview/entries/2026-08-23-food-logging-complete.md)). **That write has no outbox domain**: marking a day complete offline fails visibly rather than queueing. Q-359's can-bite group has been zero since v1.325.9; its remaining twelve sites are latent by definition and frozen shrink-only.
 
 ### [workouts][activity][app-shell] ⚠️ Editing and deleting logged training is back, but has not been checked on the device (LB-1, 2026-08-23)
 
-**Fixed in v1.334.0** — `/health/day` carries edit + delete on every exercise row, delete on every session card and every activity, reusing `day-overlay-dialogs.tsx` unchanged. The four handlers moved into `lib/hooks/use-day-entry-mutations.ts`, called by the day screen *and* `health-content.tsx`, so there is one write path per domain. Guarded by `e2e/day-entry-edit-delete.spec.ts` — four cases asserting on the **database**, not on the row disappearing: every handler toasts and closes *before* its request resolves, so a control wired to nothing looks identical on screen ([`journal`](docs/overview/entries/2026-08-23-day-screen-edit-delete.md)).
-
-**For the record:** Q-110 (2026-08-08, v1.270.0) repointed the calendar day-tap from `DayOverlaySheet` to `/health/day` and the controls stayed on the sheet, which nothing else opened — so the app's only Edit/Delete controls, and the only client callers of the three DELETE routes, sat unreachable.
+**Fixed in v1.334.0** — `/health/day` carries edit + delete on every exercise row, delete on every session card and every activity, reusing `day-overlay-dialogs.tsx` unchanged. The four handlers moved into `lib/hooks/use-day-entry-mutations.ts`, called by the day screen *and* `health-content.tsx`, so there is one write path per domain. Guarded by `e2e/day-entry-edit-delete.spec.ts` — four cases asserting on the **database**, not on the row disappearing: every handler toasts and closes *before* its request resolves, so a control wired to nothing looks identical on screen ([`journal`](docs/overview/entries/2026-08-23-day-screen-edit-delete.md)). **How it happened:** Q-110 (2026-08-08, v1.270.0) repointed the calendar day-tap from `DayOverlaySheet` to `/health/day` and the controls stayed on the sheet, which nothing else opened — so the app's only Edit/Delete controls, and the only client callers of the three DELETE routes, sat unreachable.
 - **Keep: not device-verified.** The 48dp targets and the dialogs' safe-area clearance were built to the rule but the sandbox renders insets as 0, and the local-store mirroring in all four handlers never ran (`getLocalStore` is null on web) — so the offline half is verified by reading only.
 - **Follow-up: LB-3** — `day-overlay-sheet.tsx` is still unreachable in the tree, deliberately: deleting it discards three affordances the day screen has not got (exercise-name tap → `ExerciseHistorySheet`, activity tap → `ActivityDetailSheet`, per-session HR expander).
 
