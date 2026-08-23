@@ -19,6 +19,13 @@ const SubscribeSchema = z.object({
 })
 
 export async function GET() {
+  // Auth first (Q-454). A 503 "Push not configured" to an anonymous caller discloses deployment
+  // configuration — whether this instance has VAPID keys — before it establishes that the caller is
+  // anyone at all. The key it guards is a *public* key, so nothing secret was reachable; what was
+  // reachable was a fact about the deployment, to anybody who asked.
+  const session = await auth()
+  if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
   const publicKey = getVapidPublicKey()
   if (!publicKey) return NextResponse.json({ error: 'Push not configured' }, { status: 503 })
   return NextResponse.json({ publicKey })

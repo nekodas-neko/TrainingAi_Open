@@ -31,6 +31,16 @@ export type IsActiveClaim = {
  * This governs the **UI** only: `requireAdmin` reads the row from the database on every call and
  * never trusts this claim. The claim decides whether the admin entry point is drawn.
  *
+ * **That sentence was false for one route until 2026-08-18, and the comment is why it went unseen —
+ * a reviewer who reads "never trusts this claim" stops looking.** `isAdminUser(userId, isAdmin?)`
+ * *does* trust it when the second argument is supplied, and `app/api/exercises` passed it, so a
+ * revoked admin could still write to the shared exercise catalogue for up to 24 hours (Q-479).
+ *
+ * So, stated as a rule rather than a description: **an API route must never pass this claim to an
+ * authorisation check.** Use `requireAdmin`, which reads the row. Page guards may pass it — a
+ * revoked admin seeing an empty admin shell for up to a day, while every API behind it answers 403,
+ * is the intended trade. `scripts/check-admin-claim-in-api.js` fails the build on the API case.
+ *
  * Throttled because NextAuth's jwt callback runs on *every* `auth()` call, not only on
  * its own token rotation — an unthrottled read would be a DB query per request. One read
  * per user per day bounds staleness to a day at negligible cost.

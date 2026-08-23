@@ -1841,3 +1841,20 @@ is gone, so nothing was still owed on it — against 21 lines added for the reso
 ring-key progress note.
 
 `docs/implementation-backlog.md` loses 335: Q-534 closed on measurement rather than implementation.
+
+## 2026-08-23 — `projectOverview.md` 7983 → 7989
+
+Six lines: a Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch.
+
+Worth recording *how* this nearly went wrong, since the Lane B baton warned about it and it happened
+anyway. Resolving the merge with a blind "keep both sides" **duplicated the ring-service paragraph**
+— main had compacted the same entry I had written, so the two sides were one entry reworded, not two
+independent ones. The tell was the arithmetic: the check reported 14 lines added by a branch whose
+own addition is 6. "Keep both" is right for genuinely independent appended entries and wrong for a
+rewritten one, and the only reliable way to tell them apart is to read the resolved text.
+
+## 2026-08-23 — `projectOverview.md` 7869 → 7879
+
+Ten lines: the Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch, restored after
+a merge. The count moved because the surrounding section shrank underneath it, not because the entry
+grew.

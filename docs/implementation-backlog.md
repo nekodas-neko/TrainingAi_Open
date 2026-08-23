@@ -1857,96 +1857,6 @@ whether or not anyone draws them first.
   say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
   thread) was not exercised unless it was.
 
-### [nutrition][platform] Q-409 — paste a recipe URL and get a meal; the fetch is the whole security surface
-
-> **⚠️ The Lane A half SHIPPED (PR #180). What is left is Lane B only** — the UI in
-> `components/nutrition/my-meals-picker.tsx` that sends a `url` and renders what comes back.
-> `POST /api/nutrition/scan` now takes `{ url }`, answering with the ordinary scan payload plus
-> **`sourceUrl`** (the final URL after redirects — that is the attribution this entry asked for) and
-> **`recipeYield`** (servings, or **`null`**).
->
-> **`recipeYield: null` is the one thing Lane B must handle, and it is not cosmetic.** With a stated
-> yield the route has already divided and the payload is per-serving (`notes` leads with *"Per
-> serving (1 of 12)."*). Without one the payload is the **whole recipe** — verified live: a
-> banana-bread page returned 1,956 kcal for the loaf. This entry's own rule applies — *ask, do not
-> assume 1* — so the picker must prompt for serves and divide, or it logs a tray as a meal.
->
-> Rationale, measurements and the SSRF verification are in
-> [`entries/2026-08-19-recipe-url-to-meal.md`](overview/entries/2026-08-19-recipe-url-to-meal.md);
-> the modules are in [`module-map.md`](module-map.md). Everything below is the original entry.
-
-- **Branch:** `feat/recipe-url-to-meal`
-- **Added:** 2026-08-19 · BugFix Intake, from the owner
-- **Lane:** B
-- **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
-  in the conversational shape it is one more thing you can hand the coach. It does **not** depend on
-  Q-407: the stepper's "Yours" step can take a URL today, and shipping it there first is fine.
-- **Owner's words:** *"when making the meal plan; I should be able to link recipe websites/urls and
-  it create a meal from it. So in the section where it asks any meals you want to add - I'd like
-  that ability too."*
-
-- **Where it goes.** `components/nutrition/my-meals-picker.tsx` — the "Meals you already eat" step
-  (`STEPS[4] = 'Yours'`). It already takes free text, POSTs it to `/api/nutrition/scan` (line 95),
-  and stores the result as a `TypedMeal { text, name, ingredients, looking, failed, keep }`. **A
-  URL is a third input mode alongside image and text, resolving to the same shape**, so the widget,
-  the `keep` semantics and the downstream plan payload need no change at all. That is why this is a
-  small feature and not a new subsystem.
-
-- **`/api/nutrition/scan` is the route to extend, not a new one.** It already runs
-  `generateObject` against `ScanSchema` (`identified` + `ingredients[]`), is rate-limited
-  (`rateLimit(\`${userId}:nutrition-scan\`, 10, 60_000)`), caps its text input at 500 chars with a
-  control-character strip, and sets `maxRetries: 0`. Add a `url` branch beside `image` and `text`.
-  **Match the existing branches' discipline** — a new branch that skips the cap or the rate limit
-  reintroduces what the other two already handle.
-
-- **The fetch is the part that can go wrong, and it is not a detail.** This is the app's first
-  server-side fetch of a **user-supplied URL**, which is a server-side request forgery surface: the
-  server sits on Railway's private network with the database on it. CLAUDE.md's rule is that
-  security checks **fail closed**. Concretely:
-  - **Allow `https:` only.** Reject `http:`, and reject every other scheme outright — `file:`,
-    `gopher:`, `data:`. Scheme-checking by prefix string is not enough; parse with `new URL()` and
-    compare `protocol`.
-  - **Resolve the host and reject private/loopback/link-local ranges before connecting** —
-    `127.0.0.0/8`, `10/8`, `172.16/12`, `192.168/16`, `169.254/16` (cloud metadata), `::1`, and the
-    IPv6 unique-local range. Rejecting on the *hostname* is not sufficient: a public name can
-    resolve to a private address.
-  - **Do not follow redirects blindly.** A permitted URL that 302s to `169.254.169.254` defeats
-    every check above. Either set `redirect: 'manual'` and re-validate each hop, or cap at zero
-    hops and tell the user.
-  - **Bound the response**: a timeout (a few seconds), a byte cap, and a content-type check for
-    HTML. An unbounded read of an attacker-chosen URL is Q-322/Q-498's class in a new place.
-  - **Never surface the fetch error verbatim** — Q-320 is exactly this leak (`e.message` as a 500
-    body). "Could not read that page" is the whole message.
-
-- **Parse before you prompt, because most recipe sites hand you the answer.** Recipe pages very
-  commonly carry schema.org `Recipe` JSON-LD (`<script type="application/ld+json">`) with
-  `recipeIngredient[]`, `recipeYield` and sometimes `nutrition`. **Read that first and only fall
-  back to the model when it is absent** — it is free, exact, and it gives real serving counts,
-  which the owner has already asked for elsewhere (Q-395's "how many serves" note). When falling
-  back, send the extracted **text**, never the raw HTML: page markup is both enormous and
-  attacker-controlled, and the existing text branch's 500-char cap exists for that reason. Treat
-  page content as untrusted input to the prompt, not as instructions.
-
-- **`recipeYield` is the field that makes this useful.** A recipe is *n* servings; a meal is one.
-  Divide the ingredient quantities by the yield and say so in the UI ("from a 4-serve recipe"),
-  because silently importing a whole tray as one meal is a 4× calorie error that looks plausible.
-  If the yield is missing, ask rather than assume 1.
-
-- **Attribution.** Store the source URL on the resulting meal and show it. It tells the owner where
-  a meal came from six months later, and it is the honest thing to do with someone else's recipe.
-
-- **Lane.** `app/api/nutrition/scan/route.ts` and any shared parser are **Lane A**;
-  `components/nutrition/my-meals-picker.tsx` is **Lane B**. The route branch lands first — **it has
-  (PR #180), so only Lane B remains.**
-
-- **Verification.** Paste three real recipe URLs — one with JSON-LD, one without, one that 404s —
-  and confirm: ingredients and yield resolve from the structured path; the fallback produces a
-  sane estimate; and the failure shows a message rather than a stack. **Then prove the SSRF
-  guards by test, not by reading the code**: `http://`, `file:///etc/passwd`,
-  `https://127.0.0.1`, a URL that redirects to a private address, and an oversized response must
-  each be rejected. Those five cases are the acceptance criteria for this entry — the feature is
-  the easy half.
-
 ### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
 
 - **Branch:** `feat/retire-day-overlay-sheet`
@@ -2341,72 +2251,6 @@ this fits without an extraction.
   `components/**` (Lane B). With the decision above it is **lower value than it looked** — the
   warnings that remain are all device-sourced and unactionable, so a badge would report noise the
   user cannot clear. Worth doing only as a diagnostic surface, not a user-facing alert.
-
-### [platform] Q-479 — a revoked admin can still write to the shared exercise catalogue for up to 24 hours, and the module docstring says this cannot happen
-
-- **Gate:** owner
-
-- **⛔ OWNER-DEFERRED 2026-08-18 — accepted risk, do NOT implement. The fix already exists.**
-  The owner's call: *"leave that as a known issue for now — only admin will be me for a long time."*
-  The window opens only on **revocation**, and with a single permanent admin it never opens.
-  - **The work is done, tested and CI-green on `fix/exercises-route-admin-db-check` (PR #124)** —
-    the one-argument route change, the corrected `is-active-refresh.ts` docstring, four contract
-    tests, and `scripts/check-admin-claim-in-api.js`. Re-implementing it would duplicate that
-    branch, not add anything. If this becomes live, **merge #124**; do not start over.
-  - **What makes it live again:** a second admin granted and later revoked; the Play Store /
-    multi-user path advancing; or `isAdminUser` gaining another API-route caller (the CI check that
-    would catch that is on the branch, not on `main`).
-  - Full reasoning, and the caveat that `is-active-refresh.ts`'s docstring is currently **wrong**
-    until #124 lands, are in the `projectOverview.md` Known-Issues row.
-  - **Left in the queue rather than removed**, because the risk is accepted, not resolved — and a
-    removed entry is how a decision like this gets silently forgotten.
-
-- **Branch:** `fix/exercises-route-admin-db-check`
-- **Added:** 2026-08-18 · review sweep (auth/session boundaries) ·
-  [`docs/reviews/2026-08-18-auth-session-boundaries.md`](reviews/2026-08-18-auth-session-boundaries.md)
-- **Placement:** mid. **Moderate-low impact** — the gain is rows in a catalogue, not user data — but
-  it is privilege persistence with a working proof of concept and the fix is deleting one argument.
-- **Two admin checks in one file disagree.** `lib/admin.ts`: `requireAdmin(userId, _isAdmin?)` accepts
-  the flag for signature compatibility and **refuses to trust it**, reading the row every call (**61
-  API routes**). `isAdminUser(userId, isAdmin?)` **returns the passed flag** when given one.
-- **Ten sites call `isAdminUser`; seven pass `session.user.isAdmin` (the JWT claim).** Six are page
-  guards, which is UI and fine. **The seventh is an API write route** —
-  `app/api/exercises/route.ts:38`, gating `createExercise`, a write into `exercise_library`, the
-  catalogue every user reads.
-- **The claim is refreshed only once a day.** `lib/auth/is-active-refresh.ts` re-reads `isActive`/
-  `isAdmin` inside the jwt callback, throttled by `ISACTIVE_RECHECK_MS = 24h` — a sound decision
-  (unthrottled would be a DB query per request). The problem is what it then claims:
-  > *"This governs the **UI** only: `requireAdmin` reads the row from the database on every call and
-  > never trusts this claim."*
-
-  **That is false**, and it is why this is easy to miss — a reviewer who reads it stops looking.
-- **Measured**, admin granted → fresh login → token warmed → admin revoked in the DB, **no re-login**,
-  cookie rotation persisted as a browser does:
-  ```
-  POST /api/exercises    = 201   ← isAdminUser, JWT claim
-  GET  /api/admin/errors = 403   ← requireAdmin, DB read  (the control)
-  session claim still says: isAdmin = True
-  → row "ZZ Probe Revoked" created in exercise_library
-  ```
-  Same cookie, same instant, one route refusing and the other admitting. **Window: up to 24 h.**
-- **Fix shape:**
-  1. `app/api/exercises/route.ts:38` — drop the second argument, or better, use `requireAdmin` like
-     its 61 siblings so the file stops being the odd one out.
-  2. **Correct the docstring** in `lib/auth/is-active-refresh.ts`; step 1 is what makes "UI only"
-     true. Say outright that an API route must never pass the claim — **the wrong comment is more
-     dangerous than the wrong call, because it scales to the next route someone adds.**
-  3. *Optional ratchet:* fail Custom Rules on `isAdminUser(` with a second argument under
-     `app/api/**`. Cheap, and the shape this repo already uses where prose did not hold.
-- **Lane A owns this** (`app/api/**`, `lib/admin.ts`, `lib/auth/**`).
-- **Do NOT "fix" the six page guards** — they are UI, they match the docstring, and a revoked admin
-  seeing an empty admin shell for ≤24 h while every API behind it 403s is the intended trade.
-- **Not verified on:** the APK (its WebView keeps cookies, so it behaves like the corrected harness)
-  or production. `ISACTIVE_RECHECK_MS` is read from source, not observed over a real 24-hour window.
-- **⚠️ If you re-run this, persist cookie rotation.** My first run reported revocation working and was
-  **wrong**: `curl -b` without `-c` discards the rotated cookie, so every request re-sent a token with
-  no `isActiveCheckedAt`, the throttle never engaged, and the DB was re-read every time. Use `-b` and
-  `-c` on the same file.
-
 
 ### [nutrition][app-shell] Q-357 — four memoised call sites are still defeated, and one of them is inside a list
 
@@ -4050,38 +3894,6 @@ ehr     0     0     0     0   648   208   128   556     0
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
 
-### [readiness] Q-465 — `POST /api/day-checkin` creates a check-in row from a completely empty body
-
-- **Branch:** `fix/day-checkin-requires-an-answer`
-- **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
-  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
-- **Placement:** low. **The consequence is unproven and the entry says so** — do not implement this as
-  if a known symptom were being fixed.
-- **Observed.** `POST /api/day-checkin` with a body of exactly `{}` returns **201** and writes a row
-  with every metric null:
-  ```
-  log_date    phase    physical_tiredness  mental_drain  hydration  sore_muscles
-  2026-08-18  evening  (null)              (null)        (null)     {}
-  ```
-  An unknown field is accepted and dropped too (`{"sleepQuality":"banana"}` → 201, nothing stored —
-  `day_checkins` has no such column). That half belongs to Q-464.
-- **Both consumers were checked and neither shows a user-visible bug.**
-  `components/morning-checkin-sheet.tsx:58-70` pre-fills from a saved row but coalesces every field
-  through `?? NEUTRAL_SCALES`, so an all-null row behaves identically to no row.
-  `app/api/workout-data/route.ts:471` feeds the check-in into `reevaluationKey(...)`, where an empty
-  row changes the key and can trigger a re-evaluation carrying no new information.
-- **Why it is still worth closing:** the row is indistinguishable from a real check-in in which the
-  user answered nothing, and readiness is precisely the pillar where *"the user told us nothing"* and
-  *"the user told us they feel neutral"* must not collapse to the same value.
-- **Fix shape:** require at least one meaningful field, or return the existing row unchanged when the
-  body carries no answers. **Lane A.**
-- **🔎 AMENDED 2026-08-18 from production — REFUTED in practice; drop the priority.** Across all 50 of
-  the owner's check-in rows, checked against **every** answer column (including the six morning ones:
-  `wake_mood`, `perceived_recovery`, `motivation`, `sleep_quality_feel`, `resting_soreness`,
-  `illness_context`), **zero are truly empty** — 45 morning and 5 evening, all carrying answers. The
-  route will write a hollow row if handed `{}`, but nothing in real use has done so.
-  ⚠️ **A first version of that query said "45 of 50 entirely empty" and was WRONG** — it tested only
-  the evening columns. Recorded so the false number is not picked up from anywhere it leaked.
 
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
@@ -4715,43 +4527,6 @@ session working from a temporarily restored copy.
 - **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
   than the release and tag, so the release id and tag survive the swap.
 
-### [platform] Q-454 — two routes validate their params before checking auth, out of 122
-
-- **Branch:** `fix/auth-before-param-validation`
-- **Added:** 2026-08-17 · review sweep (failure-cells lens, **all 122 GET routes called anonymously**) ·
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
-- **Placement:** low. **No data leaks** — this is ordering, not a hole.
-- **Measured.** 122 `app/api` GET routes called with no session cookie. 120 reveal nothing about their
-  contract. Two answer the *parameter* question first:
-  - `GET /api/day-log` → `400 {"error":"Missing date"}`
-  - `GET /api/exercise-history` → `400 {"error":"Missing name"}`
-- **Verified not a leak.** Supply the missing param and both return `401 {"error":"Unauthorized"}`
-  (`/api/day-log?date=2026-08-14`, `/api/exercise-history?name=Bench%20Press` — both 401 anonymous).
-- **Why fix it anyway:** the stated rule is that security checks fail closed and fail *first*. Today
-  the pre-auth code only reads a search param; it is cheap to reorder now, and expensive the day
-  someone adds a param handler above the `auth()` call that touches the DB.
-- **Filed here rather than separately, same class:** `GET /api/push/subscribe` returns
-  `503 {"error":"Push not configured"}` to an anonymous caller, disclosing deployment configuration
-  before authentication. (Q-285/Q-286 already cover web push having no senders or subscribers; this is
-  only about the pre-auth answer.)
-
-### [platform][devices] Q-455 — an unhandled throw in a GET route returns a bodiless 500, not a JSON error
-
-- **Branch:** `fix/decoder-constants-json-error-shape`
-- **Added:** 2026-08-17 · review sweep (failure-cells lens) ·
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
-- **Placement:** low.
-- **Observed.** `GET /api/oura-ble/decoder-constants` returned **500 with an empty body** — no JSON,
-  no `error` key — because a `JSON.parse(fs.readFileSync(...))` threw straight out of
-  `app/api/oura-ble/decoder-constants/route.ts:29` with nothing catching it.
-- **The trigger is environmental and is NOT what is being filed.** This sandbox cannot reach the
-  model-constants bucket (`SignatureDoesNotMatch (403)` at boot, logged by instrumentation) — the
-  already-recorded Known Issue *"The bucket download path for the model constants has never actually
-  run (2026-08-15)"*. In production with working credentials the read succeeds.
-- **What is filed is the shape.** `CLAUDE.md` requires routes to return a JSON error rather than
-  throwing; a client doing `res.json()` on this gets a parse exception stacked on top of the original
-  fault. The route has a deliberate boot-time check that turns this into a deploy failure rather than
-  a first-request one — but the first-request path still exists and still answers with nothing.
 
 ### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
 

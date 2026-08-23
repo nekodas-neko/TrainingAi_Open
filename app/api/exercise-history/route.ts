@@ -34,12 +34,13 @@ function isDeloadRow(row: ExerciseHistoryLogRow): boolean {
 const HISTORY_LIMIT = 20;
 
 export async function GET(req: NextRequest) {
-  const name = req.nextUrl.searchParams.get("name");
-  if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
-
+  // Auth first, then the parameter — see the note in `app/api/day-log/route.ts` (Q-454).
   const session = await auth();
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const name = req.nextUrl.searchParams.get("name");
+  if (!name) return NextResponse.json({ error: "Missing name" }, { status: 400 });
 
   const tz = session.user.timezone ?? DEFAULT_TZ;
   const repo = await getRepository();
