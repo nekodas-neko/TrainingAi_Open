@@ -116,6 +116,9 @@ Live at the time of writing (2026-07-30):
   one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
   before starting any phase; the phases point back rather than copying its decisions.
 
+- ⚠️ **Q-323 turned the calorie bar into a progress bar and Home's donut into a progress ring**
+  (2026-08-23, v1.336.0). `barPosition`/`barBands` are gone; `barProgress()` replaces them. **Not
+  device-verified** — [`journal`](../../overview/entries/2026-08-23-calorie-progress-bar.md).
 - ⚠️ **Three calorie budgets were live on one screen; there is now one** (Q-415/Q-417, fixed
   2026-08-23, v1.335.0). Home's nutrition card and the Nutrition ring both read
   `budgetProvenance(...).total` rather than composing `nutrition_targets.calories` — the **rest-day

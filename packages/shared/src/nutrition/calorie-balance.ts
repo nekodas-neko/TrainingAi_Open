@@ -160,30 +160,43 @@ export function scaleMacrosForEarnedKcal(base: MacroTargets, earnedKcal: number)
 }
 
 /**
- * Marker position for the bar, 0..1 across the five bands. The bar is drawn on a fixed
- * deviation scale of ±(OUTER + ON_TARGET) so the green band always occupies the same middle
- * slice and the eye learns one layout; deviations beyond the scale clamp to the ends.
+ * The calorie bar as a PROGRESS bar rather than a gauge (Q-323).
+ *
+ * The owner's words: *"more like Red/Orange/green; all the way like a progress bar with the green
+ * towards the end, and then a little orange/red bar after to depict going over. So it still looks
+ * like a progress bar where you want to go to the end."* That inverts what the old bar meant — it
+ * drew fixed deviation bands with a marker showing where you sat, which reads as a dial. This has
+ * an end you walk toward.
+ *
+ * The x-axis is INTAKE, from 0 to `budget + OUTER_KCAL`, so the notch sits at the budget and the
+ * tail past it is exactly the far-over threshold — long enough to read, short enough that it does
+ * not present itself as a second target.
+ *
+ * **The stops sit on the real thresholds, and that is what keeps the colour honest.** A literal
+ * five-band reading would make the on-target stripe `ON_TARGET_KCAL / (budget + OUTER)` wide —
+ * **under 6% of the bar** on a 2,180 kcal day, too thin to see. Returning colour *stops* instead of
+ * band widths lets the gradient interpolate: green is exact at the notch and blends out across the
+ * ±150 window, so the green region reads about as wide as it truly is while every boundary stays
+ * where `balanceZone()` puts it. A caller that clips this same gradient to `fillPct` therefore gets
+ * the owner's "fill takes the colour of the band it currently ends in" for free, and cannot drift
+ * from the zone label printed beside it.
  */
-export const BAR_SCALE_KCAL = OUTER_KCAL + ON_TARGET_KCAL
-
-export function barPosition(deviationKcal: number): number {
-  const clamped = Math.max(-BAR_SCALE_KCAL, Math.min(BAR_SCALE_KCAL, deviationKcal))
-  return (clamped + BAR_SCALE_KCAL) / (2 * BAR_SCALE_KCAL)
-}
-
-/** The five bands as fractions of the bar width, left (well under) to right (well over). */
-export function barBands(): { zone: BalanceZone; label: string; color: string; widthPct: number }[] {
-  const total = 2 * BAR_SCALE_KCAL
-  const outerW = ((BAR_SCALE_KCAL - OUTER_KCAL) / total) * 100
-  const midW = ((OUTER_KCAL - ON_TARGET_KCAL) / total) * 100
-  const centreW = ((2 * ON_TARGET_KCAL) / total) * 100
-  return [
-    { zone: 'far_under', ...ZONE_META.far_under, widthPct: outerW },
-    { zone: 'under',     ...ZONE_META.under,     widthPct: midW },
-    { zone: 'on_target', ...ZONE_META.on_target, widthPct: centreW },
-    { zone: 'over',      ...ZONE_META.over,      widthPct: midW },
-    { zone: 'far_over',  ...ZONE_META.far_over,  widthPct: outerW },
+export function barProgress(
+  { intakeKcal, budgetKcal }: { intakeKcal: number; budgetKcal: number },
+): { fillPct: number; notchPct: number; stops: { color: string; pct: number }[] } {
+  const scale = Math.max(1, budgetKcal + OUTER_KCAL)
+  const at = (kcal: number) => Math.max(0, Math.min(1, kcal / scale))
+  // Monotonic by construction after clamping, which matters for a tiny budget where
+  // `budget - OUTER_KCAL` goes negative and several stops collapse onto 0.
+  const stops = [
+    { color: ZONE_META.far_under.color, pct: 0 },
+    { color: ZONE_META.far_under.color, pct: at(budgetKcal - OUTER_KCAL) },
+    { color: ZONE_META.under.color, pct: at(budgetKcal - ON_TARGET_KCAL) },
+    { color: ZONE_META.on_target.color, pct: at(budgetKcal) },
+    { color: ZONE_META.over.color, pct: at(budgetKcal + ON_TARGET_KCAL) },
+    { color: ZONE_META.far_over.color, pct: 1 },
   ]
+  return { fillPct: at(intakeKcal), notchPct: at(budgetKcal), stops }
 }
 
 /** The daily calorie target implied by a maintenance estimate and the goal's offset. */

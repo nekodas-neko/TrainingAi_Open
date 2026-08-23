@@ -581,35 +581,6 @@ the payload to a standing inefficiency. Open, all Lane A's:
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
-### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
-
-- **Branch:** `feat/retire-day-overlay-sheet`
-- **Added:** 2026-08-23 · **Lane: B**
-- **Placement:** low. Nothing is broken by leaving it; what is here is dead code plus three
-  capabilities that have been gone since Q-110 (2026-08-08) without a report.
-
-LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
-hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
-logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
-because deleting it silently discards three things the day screen does not have:
-
-| unreachable affordance | where it lives |
-|---|---|
-| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
-| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
-| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
-
-`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
-only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
-and `historyExercise`/`selectedActivity` can now only ever be `null` there.
-
-**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
-keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
-`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
-`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
-route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
-controls, so a third target needs a layout decision rather than another icon.
-
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -973,98 +944,6 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
   removed a file and left the sentence behind. Corrected, with a note to count off the map rather
   than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
   run line prints computed totals.
-
-### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
-
-> **⚠️ NARROWED 2026-08-23 — the budget is now correct everywhere, so only the two DISPLAY changes
-> are left.** v1.335.0 pointed Home's nutrition card and the Nutrition ring at
-> `budgetProvenance(...).total` and made the ring render `macroTargets.scaled`
-> ([`journal`](overview/entries/2026-08-23-one-calorie-budget.md)), which closes the
-> "rendering `scaled` instead of the stored row" half listed below and retires Q-415/Q-417.
-> **What remains is (1) the macro ring's grey remainder and (2) the zone bar as a progress bar.**
-> The blocking order in this entry is now satisfied — the bar can be built, because the number it
-> fills toward is right. Note `barBands`/`barPosition` live in `packages/shared` but are reached
-> only from `components/`, so claim the lane in your baton before starting.
->
-> **⚠️ THE LANE A HALF SHIPPED 2026-08-19 — what is left is Lane B**
-> ([`journal`](overview/entries/2026-08-19-macros-follow-earned-calories.md)).
-> `scaleMacrosForEarnedKcal(base, earnedKcal)` lives in
-> `packages/shared/src/nutrition/calorie-balance.ts` and **`GET /api/nutrition/energy-balance` already
-> returns the answer**: `macroTargets: { base, scaled, earnedKcal }`. Do not re-derive it client-side.
->
-> **What is left:** the two display changes below — the macro ring's grey remainder, and the zone bar
-> as a progress bar with a short overshoot tail — plus rendering `scaled` instead of the stored row.
-> **The bar still must ship in the same PR as Q-415**, or it fills toward the wrong number.
->
-> **One precision worth carrying:** what the split preserves is the **carbs:fat energy ratio**, not
-> each macro's share of the day — protein's share necessarily falls as the budget grows. Both are
-> pinned by test. Everything below is the original entry.
-
-- **Branch:** `feat/macros-follow-earned-calories`
-- **Added:** 2026-08-19 · Lane A/B split, the residual of Q-401 after both its halves landed.
-- **Lane:** B
-- **What is now true.** One TDEE model: `nutrition_targets.calories` is the **rest-day floor**, and
-  the zone bar renders `base + earned from movement`. So the calorie figure a user sees moves during
-  the day. The **macro grams do not** — they come from the same stored row and are fixed.
-- **That is deliberate for now, and it is the safer half.** Q-401's load-bearing choice was that the
-  ring keeps the SET goal, because the grams beneath it are derived from that row; pointing the ring
-  at a moving number while the bars stay fixed makes the card contradict itself internally, which is
-  worse than the gap it would close.
-- **The question this leaves.** If 300 earned kcal are added to the budget, which macro absorbs them?
-  **Not protein** — it is dosed per kg of bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`) and does not scale
-  with a day's movement. Q-401's answer was *"the earned calories belong to carbs"*, which is
-  sensible and unimplemented. Fat is currently 25% of calories, so scaling it uniformly would be a
-  third answer nobody chose.
-- **Do not scale all three uniformly.** That reintroduces the Q-401 shape in a new place: the ring
-  and the bars disagreeing, this time within one card.
-- **✅ THE PRODUCT CALL IS MADE — owner, 2026-08-19. Carbs and fat scale; protein holds.** The owner
-  asked for *"%'s to calculate the protein/fat/carbs so that when it increase due to excercise; the
-  macros increase as well"*, and after the arithmetic below was put in front of them, agreed to the
-  amended version. **This unblocks the entry — implement it.**
-  - **Protein is excluded, and the reason is arithmetic rather than taste.** It is dosed per kg of
-    bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`), so 150 g is ~2 g/kg. Express that as a share
-    (31.6% of a 1,900 kcal base) and apply it to a 2,447 kcal day and it becomes **193 g — 2.6 g/kg**:
-    a protein requirement that rises because the user went for a walk. Movement burns carbohydrate
-    and fat; it does not create protein demand.
-  - **Carbs take the majority and fat takes the rest, in their existing ratio.** Q-401's own answer
-    was *"the earned calories belong to carbs"*, and fat sitting at 25% of calories means a
-    carbs-only split makes fat's share drift downward as the day's movement grows. Splitting the
-    earned kcal between carbs and fat **in the proportion they already hold to each other** keeps
-    both percentages stable and needs no new constant.
-  - **This resolves the "do not scale all three uniformly" warning above rather than contradicting
-    it.** That warning was about the ring and the bars disagreeing inside one card. Here every
-    figure moves off the same budget, so the card stays internally consistent — which is the
-    property the warning was protecting.
-- **Lane A** for the arithmetic (`packages/shared/src/nutrition/calorie-balance.ts`), **Lane B** for
-  whatever renders it. **No longer blocked.**
-
-**Two display changes ride with this, from the same owner review, and they are the reason the entry
-is now worth doing as one piece.**
-
-**(1) The macro ring shows its remainder in grey.** *"I'd like the macro ring to show grey to
-indicate whats left."* Today the ring is a full 360° split by macro — it encodes *composition* and
-says nothing about progress. Sweep the coloured arc to `eaten / budget` of the circle and leave the
-remainder a neutral grey, so the same ring answers "what have I eaten" **and** "how much is left"
-without a number changing. At or past the budget there is no grey and the centre flips from
-`left` to `over`.
-
-**(2) The zone bar becomes a progress bar you finish.** *"more like Red/Orange/green; all the way
-like a progress bar with the green towards the end, and then a little orange/red bar after to depict
-going over. So it still looks like a progress bar where you want to go to the end."*
-  - The track runs **red → amber → green → amber → red** left to right, with the **green band
-    immediately before the goal notch** and only a short tail beyond it. The fill grows with intake
-    and takes the colour of the band it currently ends in.
-  - **The overshoot tail is deliberately short** — long enough to read, short enough that it does
-    not present itself as a second target to aim for.
-  - **This inverts what the bar means today**, and that is the point: it currently renders fixed
-    zones with a marker showing where you sit, which reads as a gauge. The owner wants something
-    with an end you walk toward.
-  - **Colour is not the only signal** — the remaining/over figure beside it carries the state in
-    words, per the standing rule.
-  - Drawn in three states (under, on target, over) during the 2026-08-19 review.
-
-**⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
-right number.**
 
 ### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
@@ -1672,6 +1551,36 @@ whether or not anyone draws them first.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
 
+### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
+
+- **Branch:** `feat/retire-day-overlay-sheet`
+- **Added:** 2026-08-23 · **Lane: B**
+- **Placement:** low, and it now SITS low — it was filed into the slot LB-1 vacated, near the top,
+  which contradicted this line (queue position is priority). Moved 2026-08-23. Nothing is broken by
+  leaving it: what is here is dead code plus three capabilities gone since Q-110 (2026-08-08)
+  without a report.
+
+LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
+hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
+logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
+because deleting it silently discards three things the day screen does not have:
+
+| unreachable affordance | where it lives |
+|---|---|
+| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
+| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
+| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
+
+`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
+only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
+and `historyExercise`/`selectedActivity` can now only ever be `null` there.
+
+**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
+keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
+`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
+`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
+route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
+controls, so a third target needs a layout decision rather than another icon.
 
 ### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 

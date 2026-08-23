@@ -6,7 +6,7 @@
 **Updated:** 2026-08-23 · **By:** the eighth Lane B run · **Next ID:** `LB-5`
 
 ## Now
-Nothing in flight. Seven PRs merged 2026-08-23 (#296, #297, #300, #311, #313, #316, #320). Nothing
+Nothing in flight. Eight PRs merged 2026-08-23 (#296, #297, #300, #311, #313, #316, #320, +Q-323). Nothing
 waits on the owner: LB-1's gate was answered (*"Yes put the controls where reccomended"*) and
 shipped in v1.334.0.
 
@@ -25,18 +25,17 @@ shipped in v1.334.0.
   `budgetProvenance(...).total`. Q-417 proposed tracking which source last wrote; reading the budget
   from the payload was better — `activeEnergyKcalToday` then has no consumer, so the unsequenced
   optimistic paint was **deleted** rather than ordered. Found **LB-4** on the way.
+- **Q-323's display half** (v1.336.0) — the bar fills toward a goal notch instead of marking a
+  centred gauge; Home's donut became a progress ring. `barPosition`/`barBands` deleted for
+  `barProgress`. Its item (1) said "the macro ring" but described **Home's** donut.
 
 ## Next
 `node scripts/next-item.js --lane B`, and **re-verify the premise first** — across the last two runs
 **five of seven entries taken had a wrong premise**. The tool says what is startable, never whether
-it is true. **BF-4 reads as top and its Lane B half is done** (the rest is Lane A's); **Q-326 and the
-`calorie-budget-surface` batch are shipped**. Next is **Q-323's two remaining DISPLAY changes**; its
-blocking order is satisfied now the number the bar fills toward is right. **Its item (1) names "the
-macro ring" but describes "a full 360° split by macro" — that is HOME's donut, not the Nutrition
-tab's `MacroRing`, which already sweeps a progress arc over a grey track.** **Claim the lane first**:
-`barBands`/`barPosition` sit in `packages/shared` (Lane A by path) but are reached only from
-`components/` (Lane B by the import trace, which is the authority). Then **Q-406 before Q-395** —
-`food-row.tsx` is extracted first.
+it is true. **BF-4 reads as top and its Lane B half is done** (the rest is Lane A's); **Q-326, the
+`calorie-budget-surface` batch and Q-323 are all shipped**. So the queue's real head is **Q-359**,
+then **Q-387**, then **Q-406 before Q-395** — `food-row.tsx` is extracted first. LB-3 was moved down
+to match its own "Placement: low" (it had been filed into the slot LB-1 vacated).
 
 ## Do not re-litigate
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.
@@ -78,17 +77,18 @@ None held. This run touched `scripts/check-backlog-pointers.js` and `app/health/
   **`git fetch --unshallow origin` immediately before every merge**; `test -f .git/shallow` tells you
   in one line. Confirm against GitHub (`list_commits`) before believing the history is gone.
 - **Check the actual date on resume** (`TZ=Australia/Brisbane date`) — this one resumed three days on.
-- **The aged local seed bites `goal-invalidation.spec.ts`** — it needs **today's** `body_metrics`
-  row to carry steps, and `order by date desc limit 1` is not "today" once the container has aged.
-  It fails identically on clean `main`; top the row up rather than debugging the diff.
+- **The aged local seed bites `goal-invalidation.spec.ts`** — it needs **today's** `body_metrics` row
+  to carry steps, and `order by date desc limit 1` is not "today" once the container has aged. It
+  fails identically on clean `main`; top the row up rather than debugging the diff.
 - **`get_check_runs` lags; attempting the merge is the reliable check.** The ratchets say whether
   YOUR branch grew the file (LA-16) — re-read them AFTER the final merge.
 - **A `Gate:`/`Needs:` field written inline is ignored** — it must start its own bullet. Cost this lane
   twice; `check-backlog-pointers.js` now fails on it, and on an unknown `[domain]` tag.
 - **A backgrounded `pnpm dev` dies with its task** — `setsid nohup pnpm dev > log 2>&1 &` survives;
-  launch it as its own step, never chained after a `pkill`. `E2E_BASE_URL=http://localhost:3000`
-  points Playwright at it, much faster than letting it start its own.
+  launch it as its own step. `E2E_BASE_URL=http://localhost:3000` points Playwright at it.
 - **`pnpm check:rules` ran 52 of 52 on 2026-08-23.** Quote the count, never "pass".
+- **`packages/shared/src/nutrition/calorie-balance.ts` was edited by this lane** (Q-323's
+  `barProgress`) on the import-trace rule: it is reached only from `components/`. Released.
 - **`projectOverview.md` and this baton sit ON their ratchet baselines, and RAISING one costs you the
   merge race.** Every agent edits `doc-size-baseline.json` and the history log, so a raise conflicts
   on every parallel merge — #320 lost three races that way and only landed once the entries were

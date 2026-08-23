@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest'
 import {
-  balanceZone, computeCalorieBalance, barPosition, barBands,
+  balanceZone, computeCalorieBalance, barProgress,
   targetFromMaintenance, goalToDailyKcal, dailyKcalToGoal,
-  ON_TARGET_KCAL, OUTER_KCAL, BAR_SCALE_KCAL,
+  ON_TARGET_KCAL, OUTER_KCAL,
 } from '../calorie-balance'
 
 describe('balanceZone', () => {
@@ -90,34 +90,58 @@ describe('computeCalorieBalance', () => {
   })
 })
 
-describe('barPosition / barBands', () => {
-  it('puts a perfectly on-target day at the centre', () => {
-    expect(barPosition(0)).toBeCloseTo(0.5, 6)
+describe('barProgress', () => {
+  const BUDGET = 2180
+
+  it('puts the goal notch at the budget, with the far-over threshold as the whole tail', () => {
+    const { notchPct } = barProgress({ intakeKcal: 0, budgetKcal: BUDGET })
+    expect(notchPct).toBeCloseTo(BUDGET / (BUDGET + OUTER_KCAL), 6)
+    // The tail is short on purpose: long enough to read, not long enough to look like a second
+    // target to aim for.
+    expect(1 - notchPct).toBeLessThan(0.2)
   })
 
-  it('clamps beyond the scale instead of overflowing the bar', () => {
-    expect(barPosition(BAR_SCALE_KCAL * 10)).toBe(1)
-    expect(barPosition(-BAR_SCALE_KCAL * 10)).toBe(0)
-    expect(barPosition(99999)).toBeLessThanOrEqual(1)
+  it('lands the fill exactly on the notch when intake equals the budget', () => {
+    const { fillPct, notchPct } = barProgress({ intakeKcal: BUDGET, budgetKcal: BUDGET })
+    expect(fillPct).toBeCloseTo(notchPct, 6)
   })
 
-  it('is monotonic in deviation', () => {
-    const xs = [-800, -400, -150, 0, 150, 400, 800].map(barPosition)
-    for (let i = 1; i < xs.length; i++) expect(xs[i]).toBeGreaterThanOrEqual(xs[i - 1])
+  it('clamps rather than overflowing the track', () => {
+    expect(barProgress({ intakeKcal: 99999, budgetKcal: BUDGET }).fillPct).toBe(1)
+    expect(barProgress({ intakeKcal: -500, budgetKcal: BUDGET }).fillPct).toBe(0)
   })
 
-  it('emits five bands that exactly fill the bar', () => {
-    const bands = barBands()
-    expect(bands.map(b => b.zone)).toEqual(['far_under', 'under', 'on_target', 'over', 'far_over'])
-    expect(bands.reduce((s, b) => s + b.widthPct, 0)).toBeCloseTo(100, 6)
+  it('keeps the stops in order and spanning the whole track', () => {
+    const { stops } = barProgress({ intakeKcal: 0, budgetKcal: BUDGET })
+    expect(stops[0].pct).toBe(0)
+    expect(stops[stops.length - 1].pct).toBe(1)
+    for (let i = 1; i < stops.length; i++) expect(stops[i].pct).toBeGreaterThanOrEqual(stops[i - 1].pct)
   })
 
-  it('lines the green band up with where barPosition puts an on-target day', () => {
-    const bands = barBands()
-    const leftEdge = bands[0].widthPct + bands[1].widthPct
-    const rightEdge = leftEdge + bands[2].widthPct
-    expect(barPosition(-ON_TARGET_KCAL) * 100).toBeCloseTo(leftEdge, 6)
-    expect(barPosition(ON_TARGET_KCAL) * 100).toBeCloseTo(rightEdge, 6)
+  it('puts green at the notch and the thresholds where balanceZone puts them', () => {
+    const { stops, notchPct } = barProgress({ intakeKcal: 0, budgetKcal: BUDGET })
+    const green = stops.find(s => s.color === balanceZone(0).color)!
+    expect(green.pct).toBeCloseTo(notchPct, 6)
+    // The amber stop after the notch is exactly the on-target/over boundary, so the fill's leading
+    // edge changes colour at the same intake where the LABEL changes. The two cannot disagree.
+    const amberAfter = stops[stops.indexOf(green) + 1]
+    expect(amberAfter.pct).toBeCloseTo((BUDGET + ON_TARGET_KCAL) / (BUDGET + OUTER_KCAL), 6)
+  })
+
+  it('survives a budget smaller than the outer threshold without inverting', () => {
+    // `budget - OUTER_KCAL` goes negative here and several stops collapse onto 0; the clamp has to
+    // leave them ordered or the gradient renders backwards.
+    const { stops, fillPct, notchPct } = barProgress({ intakeKcal: 100, budgetKcal: 200 })
+    for (let i = 1; i < stops.length; i++) expect(stops[i].pct).toBeGreaterThanOrEqual(stops[i - 1].pct)
+    expect(fillPct).toBeGreaterThan(0)
+    expect(notchPct).toBeGreaterThan(0)
+  })
+
+  it('never divides by zero on a zero budget', () => {
+    const { fillPct, notchPct, stops } = barProgress({ intakeKcal: 0, budgetKcal: 0 })
+    expect(Number.isFinite(fillPct)).toBe(true)
+    expect(Number.isFinite(notchPct)).toBe(true)
+    expect(stops.every(s => Number.isFinite(s.pct))).toBe(true)
   })
 })
 
