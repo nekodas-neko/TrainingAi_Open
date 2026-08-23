@@ -18,6 +18,24 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — BF-7 and BF-8, both out of one screenshot
+
+**`docs/implementation-backlog.md` 11377 → 11474.** One owner request (a 45-minute session length)
+and one defect intake found in the same image without being asked (the Intensity toggle reading
+"Full · As prescribed" above a card reading "Deload session").
+
+97 lines, and BF-7 carries most of it because three separate things stop it being a control swap: the
+on-screen minutes are derived rather than fixed, the relativity behind that is a **recorded owner
+decision that explicitly rejected the absolute ladder now being asked for**, the requested 15 minutes
+sits below a floor that a second constant is tuned to meet exactly, and a slider fires a ~2.4 s AI
+call per detent on a path that deliberately bypasses its own cooldown. Any of those discovered
+mid-implementation costs more than the paragraph that prevents it — the July decision in particular
+is a code comment nobody would think to grep for.
+
+BF-8 is short by comparison and is the reason to keep reading screenshots for what was not reported.
+
+---
+
 ## 2026-08-23 — BF-4 amended from the archived history
 
 **`docs/implementation-backlog.md` 11367 → 11390.** The owner pointed at the pre-cut repo, and its
