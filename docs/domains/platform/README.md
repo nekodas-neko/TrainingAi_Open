@@ -20,6 +20,7 @@ sleep score is not.
 | AI | `lib/ai/`, `lib/ai-chat/` |
 | Background & SW | `lib/background/`, `lib/sw/`, `app/sw.js/route.ts` |
 | Admin & ops | `lib/admin/`, `app/admin/`, `lib/export/`, `scripts/` |
+| User preferences (server-authoritative) | `packages/shared/src/user/preferences.ts`, `app/api/user/preferences/route.ts`, `users.preferences` JSONB (mig 206) |
 
 **[`docs/module-map.md`](../../module-map.md) is this pillar's real index** — §0 (there is **no cron
 layer**) through §16. Read it before building any shared helper.

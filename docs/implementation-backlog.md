@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **207** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -3003,8 +3003,9 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **✅ The owner has approved ALL the drawn variants as shippable styles** (*"I like all of these
   ones… lets keep them all as options to cycle through and choose a default"*), so this is no
   longer a pick-one decision — every layout below becomes an entry in the style registry the
-  renderer already reads. **The default is the open question, and it is a stored preference:**
-  see the Q-392 note further down before choosing where to keep it.
+  renderer already reads. **The default is a stored preference, and Q-392 has now answered where:**
+  `mealLabelStyle` in the server-backed preferences bag (`packages/shared/src/user/preferences.ts`),
+  written through `/api/user/preferences`. Not a new decision.
 - **Added:** 2026-08-18 · owner: *"could we have a small font showing the break down of the meal i.e
   Pasta / [macros] / (100g pasta, 200g mince, etc etc) so its the full summary of the meal."*
 - **Follow-up to Q-389, which shipped 2026-08-18 (v1.320.0)** — the label renderer exists
@@ -3069,7 +3070,8 @@ moving *beside* the calories rather than under them.
   style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
   straight on **Q-392** (preferences live only on the device). If a label default is written to
   `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
-  **Build the default on whatever Q-392 settles**, not beside it.
+  **Q-392 settled this on 2026-08-23** — `mealLabelStyle` in the preferences bag, seeded into
+  `ta_meal_label_style` for first paint. Nothing here is blocked any more.
 - **✅ SHIPPED 2026-08-18 (v1.323.0, Lane B) — option 1, and NOT option 2.** `square` is now a style
   in the registry: full per-serving ingredient list, code at 70 units, marked **SQUARE** in the
   picker with a standing warning under the preview that a round die crops the list. The preview also
@@ -3109,8 +3111,8 @@ moving *beside* the calories rather than under them.
   with three wrapped lines** — still above the old default's 0.369, and now the *lines* are asserted
   rather than only the code size.
   Option 2 as costed here is moot; the stacked square style stays in the picker.
-- **Still open:** **the stored default**, which stays blocked on **Q-392** exactly
-  as this entry says — the style remains picked-at-print-time and nothing was persisted.
+- **Still open:** **the stored default** — no longer blocked (Q-392's engine half shipped
+  2026-08-23) but still picked-at-print-time, so the wiring is genuinely outstanding.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
   whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
   decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
@@ -3272,70 +3274,68 @@ moving *beside* the calories rather than under them.
   [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
   (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
-### [platform][app-shell] Q-392 — preferences live only on the device, so a reinstall or a second browser starts from defaults
+### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
 
-- **Branch:** `feat/server-backed-user-preferences`
+- **Branch:** `feat/preferences-read-sites`
+- **Lane:** B
 - **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
-- **Lane:** A
-  - when i do a new install or open on computer - it loses all the saved preferences. We need to
-  make it persist across installs/etc."*
-- **Screenshot context** (Home, so it does not need to survive): the customised surface is exactly
-  what resets — the score-ring style behind Readiness / Heart Rate / Sleep / Activity, the three
-  chosen quick-log tiles (kg · Steps · Calories), card colours, and which widgets appear at all.
+  — when i do a new install or open on computer - it loses all the saved preferences. We need to
+  make it persist across installs/etc."* **Re-scoped 2026-08-23** to the half that is left.
 
-**Confirmed: these are `localStorage` only, with no server copy.** Inventory as of this trace —
+**The engine half shipped** (Lane A, `feat/server-backed-user-preferences`): `users.preferences`
+is a JSONB bag (migration 206), `GET`/`PATCH /api/user/preferences` read and merge it, proven
+cross-session against the local DB. Nothing user-visible changed — **no read site calls it yet**.
 
-| what | key | lives in |
+- **What is left is entirely in Lane B's files.** Every surface in the table below still reads its
+  `localStorage` key directly and writes only there. Each needs: read the server bag once (as
+  `hydrateGoalSeeds` does for goals), seed the same `localStorage` keys from it so first paint
+  stays synchronous, and PATCH on change.
+- **The correspondence is already written down — do not re-derive it.**
+  `PREFERENCE_STORAGE` in `packages/shared/src/user/preferences.ts` maps every preference name to
+  its `localStorage` key **and its encoding**, which is the part that bites: `ta_ss_widgets` is
+  JSON, `ta_weight_lookback` is a bare number, and the reminder toggles are `String(boolean)`
+  compared against the literal `'false'`. A test asserts the map covers every schema key.
+
+| what | preference key | storage key |
 |---|---|---|
-| Home widgets / cards | `ta_ss_widgets`, `ta_ss_cards` | `lib/home/home-prefs.ts:29-30` |
-| Pill & card colours | `ta_pill_colors`, `ta_card_colors` | `home-prefs.ts:31,40` |
-| Score-ring style (20 options) | `ta_score_ring_style` | `home-prefs.ts:159` |
-| Weight lookback | `ta_weight_lookback` | `home-prefs.ts:57` |
-| Push / meal / health / day-review / calendar toggles | `ta_pref_*` | five call sites |
-| Rest & run status chips | `ta_pref_rest_chip`, `ta_pref_run_chip` | `lib/native/*-chip.ts` |
-| Background / wallpaper | `ta_background_settings` | `lib/stores/background-settings-store.ts:36` |
-| Food region | `ta_food_region` | four component sites |
+| Home widgets / cards | `homeWidgets`, `homeCards` | `ta_ss_widgets`, `ta_ss_cards` |
+| Home section order / hidden | `homeSectionOrder`, `homeHiddenSections` | `ta_home_section_order`, `ta_home_hidden_sections` |
+| Pill & card colours | `pillColors`, `cardColors` | `ta_pill_colors`, `ta_card_colors` |
+| Score-ring style | `scoreRingStyle` | `ta_score_ring_style` |
+| Weight lookback | `weightLookback` | `ta_weight_lookback` |
+| Goals progress view | `goalsProgressView` | `ta_goals_progress_view` |
+| Brand theme / hue | `brandTheme`, `brandHue` | `ta_brand_theme`, `ta_brand_hue` |
+| Background / wallpaper | `backgroundSettings` | `ta_background_settings` (a Zustand `persist` bag) |
+| Meal label style | `mealLabelStyle` | `ta_meal_label_style` |
+| Rest duration | `restDurationSec` | `ta_rest_duration` |
+| Food region | `foodRegion` | `ta_food_region` |
+| Meal / health / day-review / calendar toggles | `mealReminders`, `healthAlerts`, `dayReviewReminders`, `calendarSync` | `ta_pref_*` |
 
-- **✅ The pattern to copy already exists and is proven — do not invent one.** **Q-241 (done
-  2026-08-14, v1.307.1)** made goals server-authoritative for exactly this reason, and left the
-  shape behind: the server owns the value, `PATCH /api/user/goals` writes it, and
-  `hydrateGoalSeeds()` (`home-prefs.ts:85`) pushes it into the same `localStorage` keys so first
-  paint stays instant. `app/api/user/` already holds `goals`, `profile`, `avatar`,
-  `equipped-title`, `bedtime-estimate`. **This item is extending that to the rest of the table
-  above**, not designing persistence from scratch.
-- **⚠ One row is already half-built, and is the cheapest possible proof.** `users.food_region`
-  **exists as a column** (`lib/data/postgres/schema.ts:31`, `NOT NULL DEFAULT 'AU'`) and **nothing
-  reads or writes it** — a grep of `app/api/**` and `lib/data/**` finds only the definition. The
-  region the app actually uses comes from `localStorage.getItem('ta_food_region') ?? 'AU'` at
-  `components/nutrition/capture-step.tsx:130,138`, `review-step.tsx:124`, and is set at
-  `components/profile/edit-profile-sheet.tsx:238`. So the column is dead, the setting is
-  device-only, and the landing spot is already in the schema. Wire this one first — it validates
-  the whole approach against a real preference for almost no work.
-- **Decisions the spec has to make:**
-  1. **A column per preference, or one JSONB blob?** Columns match `users.*` as it stands and keep
-     things queryable; a blob avoids a migration per new preference, which matters given how many
-     are listed above. **Either way the migration is Lane A's to claim, not intake's.**
-  2. **Conflict rule when two devices disagree.** Q-241 settled it for goals — server wins, local is
-     a seed — and the same rule should hold here rather than a second, different one.
-  3. **What deliberately stays device-local.** Not everything above should sync: `ta_pref_rest_chip`
-     and `ta_pref_run_chip` drive Android status-bar chips that mean nothing in a desktop browser,
-     and push-notification enablement is per-install by nature. Decide the list rather than syncing
-     the lot; a desktop browser inheriting a phone's notification state is its own bug.
+- **⚠ `backgroundSettings` is the one that is not a plain key.** It is a Zustand `persist` store
+  (`lib/stores/background-settings-store.ts`), so the value under that key is the `{ state,
+  version }` envelope, not the settings. Sync the store's `state`, not the raw string, or a
+  version bump on one device writes an unreadable bag to the other. The schema types it as an
+  opaque record on purpose — the shape belongs to that store, and a second definition here would
+  drift.
+- **⚠ `users.food_region` is a dead column** (`schema.ts`, `NOT NULL DEFAULT 'AU'`, never read or
+  written); the live value is `preferences.foodRegion`. Leave it — dropping it is a data-losing
+  migration for no gain — and do not wire a read site to it by mistake.
+- **What deliberately does NOT sync is decided and listed**, in `DEVICE_LOCAL_PREFERENCES` with a
+  reason per key: push enablement, the two Android chip toggles, the ring and scale/HR BLE pairings,
+  and light/dark. If a surface needs one of them to sync after all, move it into the schema rather
+  than writing a second path.
+- **Conflict rule, already settled:** server wins, `localStorage` is a seed written *from* the
+  server and never the reverse — the same rule Q-241 set for goals.
+- **What would count as done:** sign in on a fresh install or a different browser and the chosen
+  ring style, widgets, colours, weight lookback and food region are already applied — no
+  re-configuration; changing one on either device and reopening the other shows the new value.
+  Browser-reproducible end to end (two profiles, or one and a private window); no device needed.
 - **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
   — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
   destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
   re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
   This report establishes that reinstalls are part of the owner's normal routine, which changes
   Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
-- **What would count as done:** sign in on a fresh install or a different browser and the chosen
-  ring style, widgets, colours, weight lookback and food region are already applied — no
-  re-configuration; changing one on either device and reopening the other shows the new value; and
-  the preferences that are deliberately per-install are documented as such rather than silently
-  not syncing.
-- **Surface:** browser-reproducible end to end (two profiles, or one profile and a private window)
-  against the seeded DB — no device needed to prove the sync. Only the native chip toggles need the
-  APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
-  the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
 ### [workouts][platform] Q-403 — the Coach calls an already-applied swap a "proposal", and says it after the fact
 
