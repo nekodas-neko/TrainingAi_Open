@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { generateObject } from 'ai'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { scaleIngredientsToTargets } from '@trainingai/shared/nutrition/meal-split'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import {
@@ -100,7 +100,18 @@ export async function scaleWithTopUp(
   let extra: NutritionIngredient[]
   try {
     const result = await loggedGenerateObject(
-      { section: 'meal-plan-top-up', userId: ctx.userId, fingerprint: String(Math.round(targets.calories)) },
+      {
+        section: 'meal-plan-top-up',
+        userId: ctx.userId,
+        // Every meal in a plan tops up against a similar rounded calorie figure, so the target
+        // alone made each plan's several top-ups read as one call repeated (Q-471). The meal and
+        // what it is short of are what distinguish them.
+        fingerprint: {
+          kcal: Math.round(targets.calories),
+          meal: contentKey(ctx.mealName),
+          missing: contentKey(...missing),
+        },
+      },
       () => generateObject({
         model: aiModel(),
         schema: TopUpSchema,

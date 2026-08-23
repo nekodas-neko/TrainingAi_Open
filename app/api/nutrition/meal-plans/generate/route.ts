@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { generateObject } from 'ai'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
@@ -173,7 +173,20 @@ export async function POST(req: Request) {
   let draft: z.infer<typeof DraftSchema>
   try {
     const result = await loggedGenerateObject(
-      { section: 'meal-plan-generate', userId, fingerprint: `${mealCount}:${dayTypes.join('/')}` },
+      {
+        section: 'meal-plan-generate',
+        userId,
+        // `mealCount:dayTypes` is stable across a regenerate with different constraints, so two
+        // genuinely different plans fingerprinted alike (Q-471). The kept meals matter most —
+        // they change on every partial regenerate.
+        fingerprint: {
+          mealCount,
+          dayTypes: dayTypes.join('/'),
+          kept: contentKey(...kept.map(k => k.name)),
+          stores: contentKey(...(input.stores ?? [])),
+          excluded: contentKey(...(input.excludedFoods ?? [])),
+        },
+      },
       () => generateObject({
         model: aiModel(),
         schema: DraftSchema,
