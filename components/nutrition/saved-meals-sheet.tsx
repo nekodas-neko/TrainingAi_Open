@@ -21,6 +21,7 @@ import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 import { SavedMealCard } from './saved-meal-card'
+import { MealPhotoTile } from './meal-photo-tile'
 import { usePlanSavedMealIds } from '@/lib/hooks/use-plan-saved-meal-ids'
 import { MealLabelSheet } from './meal-label-sheet'
 import { BulkDeleteConfirm } from './bulk-delete-confirm'
@@ -77,6 +78,11 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   // Q-389's label preview. Kept here rather than per-card so only one canvas is ever mounted.
   const [labelMeal, setLabelMeal] = useState<SavedMeal | null>(null)
   const [mealName, setMealName] = useState('')
+  // Always sent explicitly, never omitted. Both write paths treat `undefined` as "leave a stored
+  // photo alone" and `null` as "remove it" (Q-396) — and this screen always knows which it means,
+  // because `openBuild` seeds it from the meal being edited. Omitting instead would be the same
+  // save with one more state to get wrong.
+  const [mealImage, setMealImage] = useState<string | null>(null)
   const [mealServings, setMealServings] = useState(1)
   const [query, setQuery] = useState('')
   const [searchResults, setSearchResults] = useState<FoodItem[]>([])
@@ -133,6 +139,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
   function openBuild(meal?: SavedMeal) {
     setEditingMeal(meal ?? null)
     setMealName(meal?.name ?? '')
+    setMealImage(meal?.imageDataUri ?? null)
     setMealServings(meal?.servings ?? 1)
     setIngredients(meal ? meal.items.map(i => ({ item: i.foodItem, qty: i.quantityMultiplier })) : [])
     setQuery('')
@@ -364,10 +371,10 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           ? (editingMeal.createdAt instanceof Date ? editingMeal.createdAt.toISOString() : String(editingMeal.createdAt))
           : now
         await store.upsertSavedMeal(
-          { id: mealId, name, servings: mealServings, createdAt, updatedAt: now, deletedAt: null, syncStatus: 'pending' },
+          { id: mealId, name, servings: mealServings, imageDataUri: mealImage, createdAt, updatedAt: now, deletedAt: null, syncStatus: 'pending' },
           items.map(it => ({ id: crypto.randomUUID(), savedMealId: mealId, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
         )
-        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(), payload: { id: mealId, name, items, servings: mealServings } })
+        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(), payload: { id: mealId, name, items, servings: mealServings, imageDataUri: mealImage } })
         await invalidateSavedMeals()
         setMeals(await store.getSavedMeals())
         pushMutations(userId!).catch(() => {})
@@ -383,7 +390,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         const res = await fetch(url, {
           method,
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: mealId, name, items, servings: mealServings }),
+          body: JSON.stringify({ id: mealId, name, items, servings: mealServings, imageDataUri: mealImage }),
         })
         if (!res.ok) throw new Error()
         await invalidateSavedMeals()
@@ -606,15 +613,20 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         ) : (
           <>
             <div className="flex-1 overflow-y-auto px-1 space-y-4 pb-2">
-              {/* Meal name */}
-              <div className="space-y-1">
-                <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Meal name</label>
-                <Input
-                  value={mealName}
-                  onChange={e => setMealName(e.target.value)}
-                  placeholder="e.g. Post-workout shake"
-                  className="rounded-xl"
-                />
+              {/* Meal name, with the photo beside it. The tile is the picker AND the preview, so
+                  there is no separate "current photo" row, and the picture rides the save that is
+                  already here rather than needing a write of its own (Q-327). */}
+              <div className="flex items-start gap-3">
+                <MealPhotoTile value={mealImage} onChange={setMealImage} disabled={saving} />
+                <div className="min-w-0 flex-1 space-y-1">
+                  <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Meal name</label>
+                  <Input
+                    value={mealName}
+                    onChange={e => setMealName(e.target.value)}
+                    placeholder="e.g. Post-workout shake"
+                    className="rounded-xl"
+                  />
+                </div>
               </div>
 
               {/* Batch size. A recipe is often not one plate — the ingredients below describe the
