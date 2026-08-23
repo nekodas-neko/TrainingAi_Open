@@ -28,6 +28,7 @@ import type { SleepSession } from '@trainingai/shared/types'
 import { sourceRank } from '@trainingai/shared/health/source-rank'
 import { aestMidnight, toAestDay, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import type { RollupIO } from './io'
+import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 
 export interface RollupOptions {
   debugDate?: string
@@ -51,6 +52,7 @@ export interface RollupOptions {
  */
 export async function runOuraRollup(
   io: RollupIO,
+  runtime: ModelRuntime,
   timezone: string,
   opts?: RollupOptions,
 ): Promise<import('@/lib/data/repository').OuraRawAggregateResult> {
@@ -407,7 +409,7 @@ export async function runOuraRollup(
       // whose synthetic fixtures aren't realistic nights for the neural model).
       if (!opts?.disableNeuralStager) {
         try {
-          const sn = await sleepNetStages5Min(snInput, modelStages.length)
+          const sn = await sleepNetStages5Min(snInput, modelStages.length, runtime)
           if (sn && sn.stages.length === modelStages.length) {
             modelStages = sn.stages
             foldedWakeBouts = 0
@@ -449,7 +451,7 @@ export async function runOuraRollup(
         // run the model (admin device-validation harness; does NOT affect the staging written
         // above). Never throw: a dump failure must not break the re-aggregate.
         try {
-          debugNight.sleepNet = await sleepNetDump(snInput)
+          debugNight.sleepNet = await sleepNetDump(snInput, runtime)
         } catch (err) {
           debugNight.sleepNet = null
           console.error('[oura-ble] sleepNet dump failed:', err)
@@ -732,6 +734,7 @@ export async function runOuraRollup(
     // that still lands in the future is skipped rather than dated forward (Q-56). Reuses the
     // same `anchors` fetched above for `toDate` (Q-71) rather than re-querying the table.
     const stepsByDay = await computeStepsByDay({
+      runtime,
       stepFrames: stepFrameRows,
       motionFrames: motionFrameRows,
       liveWindows: liveWindowRows,

@@ -82,6 +82,7 @@ import * as oura from './slices/oura'
 import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/oura-raw-frames'
 import { runOuraRollup } from '@/lib/oura-ble/rollup/run'
 import { createPostgresRollupIO } from './rollup-io'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import { packOuraRawBuckets, countPackableBuckets } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
@@ -5183,7 +5184,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       getOuraClockAnchors: id => this.getOuraClockAnchors(id),
       upsertBodyMetrics: (id, rows, source) => this.upsertBodyMetrics(id, rows, source),
       refitDaytimeHrvModel: (id, tz) => this.maybeRefitDaytimeHrvModel(id, tz),
-    }), timezone, opts)
+    }), nodeModelRuntime, timezone, opts)
   }
 
   // Read-only dry-run for the D0 historical step backfill (`allowStepsDecrease`). Mirrors the
@@ -5207,6 +5208,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // read-only DRY RUN of the write, so it must not have its own copy: the owner authorises a
     // destructive backfill from these numbers.
     const stepsByDay = await computeStepsByDay({
+      runtime: nodeModelRuntime,
       stepFrames: stepFrameRows,
       motionFrames: motionFrameRows,
       liveWindows: liveWindowRows,

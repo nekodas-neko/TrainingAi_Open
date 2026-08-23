@@ -8,7 +8,9 @@ vi.mock('@/lib/oura-models/inference/session', async importOriginal => {
   return { ...actual, getSession: makeReplayGetSession(actual.getSession) }
 })
 
-import { computeDaytimeStress, dhrvFeatures, buildDaytimeStressSeries, buildDaytimeStressSeriesFromModel, daytimeStressLevel, type DhrvBaselines } from '../daytime-stress'
+import { dhrvFeatures, buildDaytimeStressSeriesFromModel, daytimeStressLevel, type DhrvBaselines } from '../daytime-stress'
+import { computeDaytimeStress, buildDaytimeStressSeries } from '../daytime-stress-inference'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 import type { DaytimeHrvModel } from '@trainingai/shared/health/daytime-hrv-model'
 import { hasRealConstants } from '@/lib/oura-models/__fixtures__/real-constants'
 
@@ -35,7 +37,7 @@ describe('computeDaytimeStress — pinned to the .pt forward', () => {
   ]
 
   itVendor.each(cases)('$name → dhrv ≈ $dhrv', async ({ temp, met, hr, b, dhrv }) => {
-    const out = await computeDaytimeStress(temp, met, hr, b)
+    const out = await computeDaytimeStress(temp, met, hr, b, nodeModelRuntime)
     expect(out).not.toBeNull()
     expect(out!.dhrv).toBeCloseTo(dhrv, 1)
     expect(out!.stress).toBeCloseTo(dhrv - b.dhrvBaseline, 1)
@@ -43,8 +45,8 @@ describe('computeDaytimeStress — pinned to the .pt forward', () => {
 
   it('returns null on empty inputs or bad baselines', async () => {
     const b: DhrvBaselines = { dhrvBaseline: 45, hrBaseline: 60, tempBaseline: 33.5 }
-    expect(await computeDaytimeStress([], [1], [60], b)).toBeNull()
-    expect(await computeDaytimeStress([33.5], [1], [60], { ...b, dhrvBaseline: 0 })).toBeNull()
+    expect(await computeDaytimeStress([], [1], [60], b, nodeModelRuntime)).toBeNull()
+    expect(await computeDaytimeStress([33.5], [1], [60], { ...b, dhrvBaseline: 0 }, nodeModelRuntime)).toBeNull()
   })
 })
 
@@ -73,8 +75,8 @@ describe('buildDaytimeStressSeries', () => {
   const H = 3_600_000
 
   it('returns [] with no data', async () => {
-    expect(await buildDaytimeStressSeries([], [], [], b, 0, H)).toEqual([])
-    expect(await buildDaytimeStressSeries([{ tsMs: 0, valueC: 33.5 }], [], [], b, 0, H)).toEqual([])
+    expect(await buildDaytimeStressSeries([], [], [], b, 0, H, nodeModelRuntime)).toEqual([])
+    expect(await buildDaytimeStressSeries([{ tsMs: 0, valueC: 33.5 }], [], [], b, 0, H, nodeModelRuntime)).toEqual([])
   })
 
   itVendor('scores per bucket; relStress is dHRV vs the day median (calm > stressed)', async () => {
@@ -88,7 +90,7 @@ describe('buildDaytimeStressSeries', () => {
       { tsMs: 5 * 60_000, bpm: 56 }, { tsMs: 10 * 60_000, bpm: 58 }, { tsMs: 20 * 60_000, bpm: 60 },
       { tsMs: 35 * 60_000, bpm: 84 }, { tsMs: 45 * 60_000, bpm: 88 }, { tsMs: 50 * 60_000, bpm: 92 },
     ]
-    const series = await buildDaytimeStressSeries(temp, met, hr, b, 0, H)
+    const series = await buildDaytimeStressSeries(temp, met, hr, b, 0, H, nodeModelRuntime)
     expect(series.length).toBe(2)
     // calm bucket (first) has higher dHRV → above the day median → positive stressLevel (recovered);
     // stressed bucket → below median → negative.
