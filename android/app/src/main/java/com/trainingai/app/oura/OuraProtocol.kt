@@ -119,11 +119,23 @@ object OuraProtocol {
      *  is server-gated off by default and is what makes the ring emit the `0x7e`/`0x7f` step
      *  events at all — open_oura enabled it over the wire on their Ring 5 (SUCCESS). Passive
      *  (no sensor power cost, unlike the DHR burst), so it rides the AUTOMATIC connect enable
-     *  alongside HR/SpO₂. Idempotent. */
+     *  alongside HR/SpO₂. Idempotent.
+     *
+     *  The last two entries are **resets, not enables** (Q-388). `liveHrStartSequence()` puts
+     *  EXERCISE_HR into CONNECTED_LIVE and turns on BLE fast-HR mode; only `liveHrStopSequence()`
+     *  undoes them, and any live-HR session that never reaches it — app killed mid-workout, the
+     *  service killed by Samsung battery management (failure L9 in `docs/oura-ble-operations.md`),
+     *  or the admin tester's **Live HR** pressed without **Stop HR** — leaves continuous fast-HR
+     *  sampling on **permanently**. The ring holds that state across reconnects, app restarts and
+     *  service restarts, so nothing heals it. Connect is the one path guaranteed to run, which is
+     *  why the reset belongs here rather than in more stop paths. Both writes are idempotent and
+     *  cost one BLE frame each on a connection that is already sending three. */
     fun enableMeasurementSequence(): List<ByteArray> = listOf(
         reqSetFeatureMode(FeatureId.DAYTIME_HR, FeatureMode.AUTOMATIC),
         reqSetFeatureMode(FeatureId.SPO2, FeatureMode.AUTOMATIC),
         reqSetFeatureMode(FeatureId.REAL_STEPS, FeatureMode.AUTOMATIC),
+        reqSetFeatureMode(FeatureId.EXERCISE_HR, FeatureMode.AUTOMATIC),
+        reqBleFastHrMode(false),
     )
 
     /** Start a time-boxed real-time stream: `06 07 <bitmask u32 LE> <minutes u16 LE> <delay u8>`

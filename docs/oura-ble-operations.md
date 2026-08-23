@@ -86,6 +86,7 @@ Each row: what breaks → how the system handles it automatically → the manual
 | R5 | **Firmware OTA changes the protocol** | Cannot happen on our link: OTA comes from `api.ouraring.com` via the official app's OAuth — we never run it, so **firmware is frozen** | See §3 — the only drift vector is re-onboarding the official app; treat that as a protocol re-validation event | None while we stay off the official app |
 | R6 | **Ring clock epoch reset** (fully-dead battery, factory reset/re-key) | Clock anchor is persisted per user (migration 115) and only moves forward; a backwards ring clock is NOT auto-anchored | After a deliberate re-key: run the re-key flow in §3 and expect a fresh epoch — old rows keep their old anchor; per-epoch anchor rows on reset remain an open hardening item (backlog #2) | Timestamps (not samples) for post-reset rows until a fresh anchor forms |
 | R7 | **Live HR — ✅ RESOLVED (verified on-device 2026-07-09, v1.122.11).** The aggressive `liveHrStartSequence` (feature-mode CONNECTED_LIVE + BLE fast-HR) acked but emitted **zero** HR. Root cause via open_ring (static RE of the official app): "measure now" is the **DHR on-demand burst** = `SetFeatureMode(DAYTIME_HR, CONNECTED_LIVE)` **then `2f 03 26 02 02`** (sub-op `0x26`, not `0x22`). We'd only ever sent the `0x22` write — it acks but never starts the burst | **Shipped & working:** `triggerHrBurst()` sends the `0x26` sequence; `OuraRingSource` re-fires it every 10 s (ring auto-reverts ~20 s → continuous engagement) and on the manual **Measure** button. Emits `0x80`/`0x60` IBI → decoder → live HR (owner saw 68→77→64, "HR decoding OK", age 2–5 s). `drainHistory` stays a fallback | Read **still, between sets** — the PPG needs ~10 s without motion. Tester "HR burst" button + the card's diagnostic toggle show `0x80`/`0x60` counts if it ever regresses | None (all HR is also recorded to history and synced) |
+| R8 | **Live-HR levers left on forever.** `liveHrStartSequence()` puts EXERCISE_HR into CONNECTED_LIVE and turns on BLE fast-HR mode; only `liveHrStopSequence()` undid them. Any session that never reached it — app killed mid-workout, service killed by Samsung battery management (L9), or the tester's **Live HR** pressed without **Stop HR** — left continuous fast-HR sampling on permanently, healed by no reconnect, app restart or service restart | **Fixed (Q-388, 2026-08-23, native — needs an APK):** `enableMeasurementSequence()` now ends with `EXERCISE_HR → AUTOMATIC` and `reqBleFastHrMode(false)`. Connect is the one path guaranteed to run, so the reset happens whether or not any stop path did. Idempotent, two extra frames on a connection already sending three | "Feature status" in the tester reads the ring's real mode back. Before this shipped the only cure was pressing **Stop HR** | None — a power fault, not a data one. Production `ehr_trace_event` was zero 21:00–08:00 when it was found, so it was a trap waiting rather than the drain being investigated |
 
 ### BLE link layer
 
@@ -219,15 +220,16 @@ skipped):
 1. `/admin/oura-ble` → Advanced → **Full re-sync** (drains the ring's entire buffer from
    cursor 0). Loss-free and idempotent: the server dedups on
    `(user, ring_ts, tag, body)`.
-2. **The drain does not need the screen — or the app — open.** `OuraRingService` is a foreground
-   service that drains on connect, re-drains hourly, and POSTs each batch itself (v1.119.0+). Watch
-   it only if you want to see it happen; a full re-sync of a months-old backlog is thousands of
-   events at 255/batch and takes a while. What is missing is the *ending*: completion is only
-   `log()`ged, never notified (Q-533), so if you leave the screen you must come back and check.
-   Watch the drain finish (`drain complete`) with **no upload-error line**, and the
-   "service uploaded N (M new)" counter settle (uploads can finish shortly after the
-   drain). If an error shows, the cursor held — fix the cause, tap Sync now (or wait ≤5
-   min for the automatic retry).
+2. **The drain does not need the screen — or the app — open, and it now tells you when it is
+   done.** `OuraRingService` is a foreground service that drains on connect, re-drains hourly, and
+   POSTs each batch itself (v1.119.0+). A full re-sync of a months-old backlog is thousands of
+   events at 255/batch and takes a while; put the phone down. A full re-sync posts a notification
+   when it finishes (Q-533) — *"Ring re-sync complete · N batches pulled and saved"*, or *"finished
+   with errors"* if any batch failed to commit. It fires after the uploads settle, not when the BLE
+   loop ends, so it is a statement about stored data rather than about pulled frames. If you do
+   watch, the same facts are the `drain complete` line with **no upload-error line** and the
+   "service uploaded N (M new)" counter settling. On an error the cursor held — fix the cause, tap
+   Sync now (or wait ≤5 min for the automatic retry).
 3. **Compare delivered vs stored:** the Advanced frame counter (what the ring delivered
    this session) against the summary's per-event counts (what the DB holds). They should
    agree for every biometric type — `green_ibi_quality`, `ibi_and_amplitude`, `hrv_event`,
