@@ -2977,136 +2977,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
   baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
   cutting deploy frequency, not more tuning.
-### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
-
-- **Gate:** owner
-
-- **Branch:** `feat/meal-label-ingredient-breakdown`
-- **⬆ MOVED TO THE TOP OF THE QUEUE by the owner, 2026-08-18** — *"can this be added to the top
-  of the lanes queue - I will test and get back"*. Take this before the numbered items below it.
-- **✅ The owner has approved ALL the drawn variants as shippable styles** (*"I like all of these
-  ones… lets keep them all as options to cycle through and choose a default"*), so this is no
-  longer a pick-one decision — every layout below becomes an entry in the style registry the
-  renderer already reads. **The default is a stored preference, and Q-392 has now answered where:**
-  `mealLabelStyle` in the server-backed preferences bag (`packages/shared/src/user/preferences.ts`),
-  written through `/api/user/preferences`. Not a new decision.
-- **Added:** 2026-08-18 · owner: *"could we have a small font showing the break down of the meal i.e
-  Pasta / [macros] / (100g pasta, 200g mince, etc etc) so its the full summary of the meal."*
-- **Follow-up to Q-389, which shipped 2026-08-18 (v1.320.0)** — the label renderer exists
-  (`components/nutrition/meal-label-render.ts`, canvas, four styles, style passed as a parameter),
-  so this is a new layout variant inside a working system, not new machinery.
-
-**The measurement first, because it decides the shape.** On a **round** 50 × 50 mm label the usable
-area is a centred **130 × 137 px** box, and the shipped default already spends all of it:
-
-```
-band header 34 + calories 22 + macros 12 + code 46 + gaps 16  =  130 px
-                                                     leaving  =    7 px
-```
-
-**That is zero ingredient lines.** A list cannot be added to the round label without removing
-something already on it. A **square** label gets the corners back — 171 × 171 usable, **1.64× the
-area and 34 px more height** — and a full five-ingredient list fits there comfortably, with the code
-moving *beside* the calories rather than under them.
-
-- **⚠ It cannot go in the QR instead.** `packages/shared/src/nutrition/label-payload.ts:22-23` sets
-  `QR_V2_M_BYTE_CAPACITY = 26`; the shipped payload is the bare 22-char id, leaving four bytes.
-  Q-389's journal records that **a unit test asserts the length against that budget precisely so a
-  later "let's also put the name in" fails in CI rather than on paper.** An ingredient list is
-  hundreds of bytes. It goes on the paper or it does not go.
-- **Data is available and needs no new shape.** `NutritionIngredient`
-  (`packages/shared/src/types/nutrition.ts:91-97`) already carries `name` and `weightG`, which is
-  exactly "200g Beef mince". For a saved meal it comes from `saved_meal_items` →
-  `food_items`; the plumbing to get it as far as the label sheet is the only new work on the data
-  side.
-- **Three options drawn at true size in the design canvas** (ask the owner for the link):
-  1. **Square, full list** — all five ingredients, code beside the calories at 62 px / **0.656 mm per
-     module**, the roomiest code of anything drawn for this feature, because the corners paid for it.
-     Cost: the artwork does **not** survive a round die, which reverses Q-389's settled
-     "one artwork serves both".
-  2. **Round, trimmed** — three ingredients then "+2 more — scan", calories and macros merged onto
-     one line. **⚠ Forces the code down to 44 px = 0.465 mm per module, below the 0.487 that was
-     already the tightest in the set** — so it trades scan reliability for a partial list, and a
-     partial list is what the request was trying to avoid.
-  3. **Round, scan only** — no list; the code already resolves to the full breakdown in the app.
-     Keeps the code and the name at full size.
-- **The honest framing for the decision:** the printed list is only worth its cost when reading a
-  tub **without** a phone. With a phone in hand, option 3 gives the *whole* breakdown where option 2
-  gives three of five lines at 6.5 px. So the real question is not "can we fit it" but "is this label
-  read away from a phone" — and if the answer is yes, the round die is what has to give, not the code.
-- **✅ Answered 2026-08-18 — two of the owner's follow-up questions, checked against shipped code:**
-  1. **"Will the QR work?"** The shipped renderer uses a **real encoder** — `qrcode@1.5.4`,
-     `QRCode.create(encodeMealLabelToken(mealId), { errorCorrectionLevel: 'M' })`
-     (`components/nutrition/meal-label-render.ts:125`), and its own comment already reasons about
-     exactly this: *"the code is 12.2–16.4 mm on these layouts, so ink spread on a home printer is
-     the expected failure and M is the level that survives it."* EC level M tolerates ~15% damage,
-     which is the margin that absorbs spread. **What is still unproven is the print**, and nobody has
-     run one — it is one of the two physical checks Q-389 already owes. **The mockup codes are
-     placeholder patterns and will not scan; do not test with those.**
-  2. **"Can the image be saved for a label-printer app?"** **Already shipped.**
-     `meal-label-sheet.tsx` does `canvas.toBlob(…, 'image/png')` → `navigator.share({ files })`
-     behind a "Share or save" button, with `<a download>` as the browser fallback. On Android the
-     share sheet is where a label-printer app appears, which is why it was built that way rather than
-     as a Capacitor plugin. **No work needed here.**
-- **⚠ "Cycle through them and choose a default" is two requests, and the second one is new.**
-  Cycling is nearly free — the renderer already takes the style as a parameter and four styles ship,
-  so the breakdown variants are more entries in the same registry. But **Q-389 deliberately ships the
-  style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
-  straight on **Q-392** (preferences live only on the device). If a label default is written to
-  `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
-  **Q-392 settled this on 2026-08-23** — `mealLabelStyle` in the preferences bag, seeded into
-  `ta_meal_label_style` for first paint. Nothing here is blocked any more.
-- **✅ SHIPPED 2026-08-18 (v1.323.0, Lane B) — option 1, and NOT option 2.** `square` is now a style
-  in the registry: full per-serving ingredient list, code at 70 units, marked **SQUARE** in the
-  picker with a standing warning under the preview that a round die crops the list. The preview also
-  reports how many ingredients actually printed and how many were summarised, so a truncated list
-  cannot ship silently. Guarded by `e2e/meal-label.spec.ts`, mutation-checked — an earlier version of
-  that guard **passed** with the ingredient path switched off (the style fell through to the round
-  painter and still painted ink), which is why the spec now asserts the reported count.
-- **⚠️ CORRECTION, measured — every module-pitch figure in this entry and in Q-389 is ~24% too
-  optimistic.** The renderer draws the 4-module quiet zone **inside** the code box
-  (`cell = codeW / (moduleCount + 8)`), so the pitch actually printed divides by **33**, not 25:
-
-  | style | code | pitch as documented (÷25) | **pitch as drawn (÷33)** |
-  |---|---|---|---|
-  | band (default) | 12.17 mm | 0.487 mm | **0.369 mm** |
-  | editorial | 13.23 mm | 0.529 mm | **0.401 mm** |
-  | ticket | 13.76 mm | 0.550 mm | **0.417 mm** |
-  | plaque | 15.87 mm | 0.635 mm | **0.481 mm** |
-  | **square (new)** | 18.52 mm | 0.741 mm | **0.561 mm** |
-
-  The app was already showing the honest number; only the docs were wrong. This makes the print test
-  **more** important, not less, and it is why `square` was sized at 70 units — its 0.561 mm is the
-  only style above the 0.487 that everything here was assumed to have.
-- **⛔ Option 2 (round, trimmed) is NOT shipped, and needs an owner decision.** At 44 units its true
-  pitch is **0.353 mm** — below every shipped style, not merely below the "0.487 floor" this entry
-  names. It buys three of five ingredient lines at 6.5 px in exchange for the least reliable code in
-  the set. Recommendation: do not build it; the square die is the answer to wanting the list on paper.
-- **✅ SUPERSEDED AND CLOSED by Q-397, shipped 2026-08-18 (v1.324.0).** This entry's central
-  premise — that the list "does not fit on a round one" — was true only for a **stacked** list. The
-  owner's actual suggestion was an **inline wrapping run**, which spends width instead of height:
-  five ingredients become three wrapped lines rather than five, and the height handed back goes to
-  the code. The complete list now fits a **round** label with a code larger than the old default's.
-  **B2 — round-safe, inline, centred — is the new `DEFAULT_MEAL_LABEL_STYLE`**, asserted in
-  `components/nutrition/__tests__/meal-label-code-size.test.ts` per Q-397's verification note.
-  **Corrected 2026-08-19 (Q-399):** the "complete list at 0.529 mm per module" claimed here was
-  never printed. The shipped geometry left room for **zero** ingredient lines, and 0.529 was the
-  pitch of a code box the layout could not fit a list underneath. Retuned to **0.401 mm per module
-  with three wrapped lines** — still above the old default's 0.369, and now the *lines* are asserted
-  rather than only the code size.
-  Option 2 as costed here is moot; the stacked square style stays in the picker.
-- **Still open:** **the stored default** — no longer blocked (Q-392's engine half shipped
-  2026-08-23) but still picked-at-print-time, so the wiring is genuinely outstanding.
-- **What would count as done:** a saved meal's label can render its ingredient list with weights;
-  whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
-  decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
-  now **0.401** — 0.529 briefly, but that box left no room for the list, per Q-399 — and the old one
-  measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
-  clear which labels are square-only rather than letting a round die silently crop the list.
-- **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
-  layout and overflow need no device. **The two checks that matter are still physical** — print it and
-  scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
-
 ### [platform][devices] Q-476 — a schema-rejected mutation is deleted forever with no badge, no toast and no retry
 
 - **Gate: device** — the route half shipped; what is left is the write-time companion below, which
@@ -3259,6 +3129,24 @@ moving *beside* the calories rather than under them.
   (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
 ### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
+
+- **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
+  was filed as *"an ingredient breakdown on the printed label, which does not fit on a round one"*
+  and everything about the label itself has since shipped: **Q-397** (v1.324.0) refuted the premise
+  by fitting the full list on a **round** label as an inline wrapping run rather than a stacked one,
+  and **Q-399** retuned the geometry to 0.401 mm per module with three wrapped lines asserted. What
+  was left of Q-393 was one sentence — the chosen style is picked at print time and forgotten —
+  which is exactly this entry's `mealLabelStyle` → `ta_meal_label_style` row. Two entries for one
+  row is what this fold removes.
+- **⛔ OWNER DECISION 2026-08-23 — Option 2, the round trimmed label, is dead. Do not re-cost it.**
+  Q-393 carried two bullets that contradicted each other for five days, one calling Option 2 an open
+  owner decision and a later one calling it moot, and that contradiction is why the entry sat parked
+  behind `Gate: owner` at the position the owner had personally moved it to. The number that settles
+  it: at 44 units its true module pitch is **0.353 mm**, below every shipped style including the
+  0.369 the old default printed. The square die is the answer to wanting the stacked list on paper.
+- **The two physical checks Q-393 owed are already tracked** — print one and scan it — by the
+  `projectOverview.md` Known-Issues row for Q-400 (*"NOT verified on device · needs: hardware + a
+  printer"*). They were never this entry's and are not lost.
 
 - **Branch:** `feat/preferences-read-sites`
 - **Lane:** B
@@ -4906,28 +4794,6 @@ session working from a temporarily restored copy.
   distribution path.
 - **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
   than the release and tag, so the release id and tag survive the swap.
-
-### [platform][readiness] Q-453 — `/api/training-stress` silently answers for *today* when handed a malformed date; its ten siblings all reject it
-
-- **Branch:** `fix/training-stress-date-param-validation`
-- **Added:** 2026-08-17 · review sweep (failure-cells lens, **live request matrix**) ·
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
-- **Placement:** lower-mid. Wrong-day data returned as if correct, but no client is known to send a
-  malformed date today.
-- **Measured.** All 11 `app/api` routes reading a `date`/`localDate` param, hit live with a real
-  session cookie. Nine reject `?date=not-a-date` with **400**. `/api/oura/hr-window` takes
-  `start`/`end`, not `date`, and 400s throughout. **`/api/training-stress` returns 200.**
-- **Cause — `app/api/training-stress/route.ts:22`:**
-  ```ts
-  const date = (raw ? normalizeDateParamIso(raw) : null) ?? todayInTz(tz)
-  ```
-  A malformed `date` normalises to `null` and falls through to *today*. The response carries **no echo
-  of which date it answered for**, so a caller asking for the 10th with a typo gets the 17th's numbers
-  with nothing indicating the substitution.
-- **This is not the `[-/]` separator class** — that came back clean (all 11 routes accept both
-  separators; see the review). It is the adjacent one: a normaliser whose `null` return is read as
-  "use the default" rather than "reject". Worth grepping for the same
-  `normalizeDateParam*(...) ?? today…` shape elsewhere when fixing.
 
 ### [platform] Q-454 — two routes validate their params before checking auth, out of 122
 
@@ -9170,9 +9036,43 @@ first, so the output is a design discussion, not a patch:
   under `workoutActive`/`walkActive`/`activityActive` an instant #418 (see Q-73).
 
 
-### [workouts] Q-85 — a shortened session keeps full-length rest periods, which is what actually caps its exercise count
+### [workouts] Q-85 — compress accessory rest at a Quick budget, and leave the compound alone
 
-- **Gate:** owner
+- **Lane:** A — `packages/shared/src/ai-periodization/{time-budget,generate-prescription}.ts`.
+- **✅ DECIDED BY THE OWNER 2026-08-23 — option (a), with a 45-second accessory floor.** The plan's
+  §4 question is answered and this entry is startable. Build §5's shape as written.
+  - **Compress accessory and secondary rest only. The main compound keeps its full rest.** The
+    owner's reasoning is the same one the app already encodes everywhere else: *"rest was meant to
+    be determined based on PCT — a harder/higher weight compared to your 1RM should give more rest
+    than something lower… happy to have rest be a bit shorter, but it should keep that in mind, and
+    have a very solid floor."*
+  - **The floor is 45 s**, asked as a direct question (*can you rest 45 seconds between accessory
+    sets — 60–65% of 1RM, 10–12 reps*) and answered yes. Nothing may compress below it.
+  - **Option (b) — compress everything ~25%, the compound included — is rejected.** It gains the
+    most and is the only option that helps below 27 min, and it takes a 4×5 top set from 180 s to
+    135 s. It would be the single place in the app where the *protect the primary* discipline is
+    reversed, against `SET_FLOOR`, `ROLE_TRIM_BIAS` and `TRIM_ORDER`. Do not revisit it without new
+    evidence.
+- **⚠ Know what this does and does not buy, before building it.** It gains **one exercise in the
+  27–35 minute band and nothing below**, because a single main compound at 4×5×180 s costs ~19 min
+  on its own. That was measured, the owner was told it before deciding, and it is the accepted
+  outcome — not a disappointment to be discovered mid-implementation and "fixed" by reaching for (b).
+- **⚠ The catalogue's own numbers, measured 2026-08-23 across all 91 `style_sets` rows in
+  production**, because they bound what any compression can do:
+
+  | %1RM | rest |
+  |---|---|
+  | 50–65% | **60 s** |
+  | 70% | 75 s |
+  | 75–80% | 90–130 s |
+  | 85–87% | 180 s |
+  | 90–92% | 180–240 s |
+
+  Rest is monotonic in intensity, which is what makes the owner's principle already true in the
+  data — but it is **hand-authored per style, not derived**: at 75% the catalogue ranges 90 s to
+  180 s depending on whether the style is built for strength or volume, so reps matter as much as
+  percentage. **Do not replace the authored `rest_sec` with a function of `pct`.** Scale it.
+  Note the low band is already at 60 s, so a 45 s floor is what creates any room at all here.
 
 - **Branch:** `feat/preset-aware-rest-compression`
 - **Plan:** [`2026-08-15-preset-aware-rest-compression.md`](superpowers/plans/2026-08-15-preset-aware-rest-compression.md)
