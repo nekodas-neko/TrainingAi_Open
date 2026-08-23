@@ -843,8 +843,6 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
 `invalidateNutritionWrite()` on the client, same as the move.
 
 
-### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
-
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
 - **Branch:** `chore/adopt-use-cached-value`
@@ -3819,7 +3817,6 @@ ehr     0     0     0     0   648   208   128   556     0
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
 
-
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
 - **Branch:** `fix/claude-ro-owner-id-out-of-committed-migrations`
@@ -4408,7 +4405,6 @@ session working from a temporarily restored copy.
   distribution path.
 - **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
   than the release and tag, so the release id and tag survive the swap.
-
 
 ### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
 
