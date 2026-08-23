@@ -12,6 +12,12 @@
 // now runs `next build` under `--all`, which catches it properly; this is the seconds-not-minutes
 // version that runs on every PR, so the class cannot come back between dry-runs.
 //
+// **Run from the test suite, not the Custom Rules job.** That job is checkout-only — no Node setup,
+// no `pnpm install` — which is what keeps it at ~20 seconds, and this needs the TypeScript compiler
+// to be correct (see below). Installing dependencies there to buy one check would tax every PR and
+// break the property that makes the job cheap. `lib/oura-models/__tests__/constants-module-scope.test.ts`
+// runs it instead; `node scripts/check-constants-module-scope.js` still works standalone.
+//
 // **Parsed with TypeScript's own parser, not a brace counter.** The first draft counted braces and
 // flagged `const K_ = (): T => (cache ??= getAstdConstants())` — which is the A4b FIX, a memoised
 // read-on-first-use, and does not run on import at all. A checker that fails on the correct shape
@@ -69,24 +75,33 @@ function moduleScopeHits(file, src, getters) {
   return hits;
 }
 
-const getters = constantsGetters();
-if (getters.size === 0) {
-  console.error('check-constants-module-scope: found no getters to look for — the accessor module moved or changed shape.');
-  process.exit(1);
+/** Every module-scope read across the tree. Exported so the test can assert on it directly rather
+ *  than shelling out and parsing stdout. */
+function findModuleScopeReads() {
+  const getters = constantsGetters();
+  if (getters.size === 0) {
+    throw new Error('check-constants-module-scope: found no getters to look for — the accessor module moved or changed shape.');
+  }
+  const found = [];
+  for (const r of ROOTS) {
+    const dir = path.join(ROOT, r);
+    if (!fs.existsSync(dir)) continue;
+    for (const f of walk(dir)) {
+      const rel = path.relative(ROOT, f);
+      if (rel.startsWith('lib/oura-models/constants/')) continue; // where they are defined
+      const src = fs.readFileSync(f, 'utf8');
+      if (![...getters].some(g => src.includes(g))) continue;
+      for (const h of moduleScopeHits(rel, src, getters)) found.push({ file: rel, ...h });
+    }
+  }
+  return { found, getterCount: getters.size };
 }
 
-const found = [];
-for (const r of ROOTS) {
-  const dir = path.join(ROOT, r);
-  if (!fs.existsSync(dir)) continue;
-  for (const f of walk(dir)) {
-    const rel = path.relative(ROOT, f);
-    if (rel.startsWith('lib/oura-models/constants/')) continue; // where they are defined
-    const src = fs.readFileSync(f, 'utf8');
-    if (![...getters].some(g => src.includes(g))) continue;
-    for (const h of moduleScopeHits(rel, src, getters)) found.push({ file: rel, ...h });
-  }
-}
+module.exports = { findModuleScopeReads, moduleScopeHits, constantsGetters };
+
+if (require.main !== module) return;
+
+const { found, getterCount } = findModuleScopeReads();
 
 if (process.argv.includes('--print')) {
   console.log(JSON.stringify(found, null, 2));
@@ -106,4 +121,4 @@ Move the call inside the function that needs the value. The memoised shape the f
 which this check accepts, because the getter runs on first use rather than on import.`);
   process.exit(1);
 }
-console.log(`check-constants-module-scope: OK — no module-scope reads across ${getters.size} getters.`);
+console.log(`check-constants-module-scope: OK — no module-scope reads across ${getterCount} getters.`);

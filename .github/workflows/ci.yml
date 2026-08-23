@@ -381,9 +381,6 @@ jobs:
       - name: Orientation docs attribute symbols to the right file
         run: node scripts/check-module-map-symbols.js
 
-      - name: No model-constants read at module scope
-        run: node scripts/check-constants-module-scope.js
-
   migrations:
     name: Migration Check
     runs-on: ubuntu-latest

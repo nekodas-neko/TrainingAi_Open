@@ -22,7 +22,14 @@ people learn to ignore.
 **`scripts/check-constants-module-scope.js`, every PR.** The entry called this the "cheaper partial"
 and it is worth having either way: it catches the specific class in seconds, so it cannot come back
 *between* dry-runs. `tsc --noEmit` cannot see any of this — the fault is a file read at import time,
-not a type. Custom Rules is now **54 steps**.
+not a type.
+
+**It runs from the test suite, not the Custom Rules job, and CI is what settled that.** The first
+push wired it into Custom Rules and the job failed with `MODULE_NOT_FOUND` on `require('typescript')`
+— that job is **checkout-only**, with no Node setup and no `pnpm install`, which is exactly what
+keeps it at ~20 seconds. Installing dependencies there to buy one check would tax every PR and break
+the property that makes the job cheap. The script stays runnable standalone; a test calls into it,
+and gets to assert on the findings directly rather than parsing stdout.
 
 ## The checker uses TypeScript's parser, and the first draft is why
 
@@ -51,8 +58,12 @@ Three shapes, each planted in a throwaway file and the checker run:
 | `const C_ = () => (cache ??= getOtsConstants())` | accepted | accepted |
 | `export const g = () => getOtsConstants()` and a class method | accepted | accepted |
 
+Plus five tests on the checker itself — the memoised shape, a plain arrow, a function body, a class
+method, and a top-level object literal (which *does* run on import and is caught). A violation
+planted in `lib/` fails the sweep with the file and line.
+
 The conditional gate was evaluated rather than read: `--ready` composes 6 gates, `--all` composes 7
-with `build` last. `pnpm check:rules` 54 of 54.
+with `build` last. `pnpm check:rules` 53 of 53.
 
 **Not run: the dry-run itself.** `--all` now takes a full `next build` on top of the whole vitest
 suite, against a stripped copy of the tree — minutes, and it is the mode that is run rarely and
