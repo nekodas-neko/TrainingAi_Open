@@ -84,6 +84,15 @@ open items as a side effect (§6).
 
 ## 4. The blocker nobody has hit yet — verified today
 
+> **⚠️ RESOLVED 2026-08-20 — this section is kept for the record and is no longer current.**
+> `wasm-unsafe-eval` shipped in Q-546 (#259) and lives in `lib/security/csp.ts` with a test on both
+> halves (the directive is present, and production still does not carry `'unsafe-eval'`). Task 1
+> below is done. What actually blocks the neural port is one step further in: `getWebSession`
+> (`lib/oura-models/inference/session-web.ts`) **has no importers** — all seven session consumers
+> hard-import the onnxruntime-node loader, and `wasm-parity.test.ts` reaches `onnxruntime-web`
+> directly rather than through it.
+
+
 Task 6 needs WASM in the WebView. Production CSP, `next.config.ts:10`:
 
 ```
@@ -105,10 +114,14 @@ CPU **spikes with drains and falls between** → request-driven, and Task 5 remo
 plateau between drains** → a baseline leak or spin, and Task 5 will *not* fix it. **Do not size any CPU
 saving until this runs.** Cheap, decisive, owner-run.
 
-**Task 1 — add `wasm-unsafe-eval` to the production `script-src`** (§4) and assert on the S25 that a
-WASM session actually instantiates under the real prod header. Independent of everything else.
+**Task 1 — ✅ SHIPPED 2026-08-20 (Q-546, #259).** `wasm-unsafe-eval` is in the production
+`script-src`. The S25 assertion that a WASM session actually instantiates is still outstanding and
+cannot be made until the first client-side model lands — it belongs to Task 4, not here.
 
-**Task 2 — extract the rollup behind `RollupIO`** (§3), keeping the Postgres implementation
+**Task 2 — ✅ SHIPPED 2026-08-23 (#306).** `runOuraRollup(io, timezone, opts)` in
+`lib/oura-ble/rollup/run.ts`; the port is 22 store operations, not the five §3 sketches, and
+`run.ts` still reaches `onnxruntime-node` through `sleepnet-assemble`/`daytime-stress`. Original
+text: extract the rollup behind `RollupIO` (§3), keeping the Postgres implementation
 byte-identical in behaviour. **Gate: the server rollup produces identical `sleep_sessions` /
 `body_metrics` output over a sample of historical days before and after the extraction.** This task
 ships no behaviour change at all — that is the point.

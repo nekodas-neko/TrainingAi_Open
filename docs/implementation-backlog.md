@@ -2898,8 +2898,13 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 >    `inference/dhrv` → the same loader — whose own header says *"server-only: onnxruntime-node is a
 >    native addon and must never reach the client bundle"*. So the rollup's **I/O** is now portable
 >    and its **models are not**. Task 3 needs the model session injected the same way the I/O is
->    (`session-web.ts` already exists as the WASM sibling; plan Task 4), and that is gated on plan
->    Task 1, the missing `wasm-unsafe-eval` in the production CSP. A smaller one: `sourceRank`
+>    (`session-web.ts` already exists as the WASM sibling; plan Task 4). **Not gated on the CSP —
+>    that was corrected the same day:** plan §4's "no `wasm-unsafe-eval`" is stale, Q-546 added the
+>    directive on 2026-08-20 (#259). What is left of Task 4 is that **`getWebSession` has no
+>    importers**: all seven session consumers (`sleepnet`, `dhrv`, `energy`, `illness`, `awhr`,
+>    `awhr-profile-selector`, `step-counter`) hard-import the node loader, and `wasm-parity.test.ts`
+>    reaches `onnxruntime-web` directly rather than through `session-web.ts`, so the WASM loader is
+>    inert the same way the local-store bridge was. A smaller one: `sourceRank`
 >    (`lib/data/health-source.ts`) pulls `drizzle-orm` into the module graph and wants moving to a
 >    driver-free home.
 
@@ -11255,7 +11260,8 @@ and **device-verified 2026-07-30** (Full re-sync drain + kill-mid-drain, both cl
    UI-gap caveats (Q-33).
 2. **D2 Tasks 4-9** (clock anchor, rollup port, neural WASM, tier-ladder, prune,
    storage readout) — **unblocked, next up.** Neural port is SleepNet + step_counter only.
-   CSP prerequisite before Task 6: add `wasm-unsafe-eval` to the prod `script-src`.
+   ~~CSP prerequisite before Task 6: add `wasm-unsafe-eval` to the prod `script-src`.~~ ✅ shipped
+   2026-08-20 (Q-546, #259).
 3. **B3 (Track-B replace-by-day outbox) + B5 (concurrent-pool load test)** —
    D2-blocked.
 4. **D3** — silent read-flip to local-first. Needs D2 Tasks 4-9.
