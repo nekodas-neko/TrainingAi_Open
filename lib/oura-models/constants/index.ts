@@ -21,6 +21,7 @@
 import fs from 'node:fs'
 import type { StepsDecoderConstants } from './steps-decoder-types'
 import path from 'node:path'
+import { CONSTANTS_CACHE_DIR } from '../constants-delivery'
 
 /**
  * Where the constant files live at runtime.
@@ -45,8 +46,17 @@ import path from 'node:path'
 // and a const captures whatever the variable held at *import* time. That is the right answer today
 // only because nothing imports this module during instrumentation — a fragile thing to depend on,
 // and it would fail silently by reading the tree path that no longer exists.
+//
+// **The cache-directory fallback is not belt-and-braces; it is the load-bearing one in production.**
+// `OURA_CONSTANTS_DIR` is set by boot, and boot does not necessarily run in the process that serves
+// a request — measured 2026-08-23, a route handler read it as `undefined` while boot had logged a
+// successful delivery. Without this line that process falls through to the tree path, which has held
+// no `.constants.json` since Q-49 removed them, and every stress read 500s. That is what
+// `/api/body-battery` was doing in production for two hours.
 function constantsDir(): string {
-  return process.env.OURA_CONSTANTS_DIR ?? path.join(process.cwd(), 'lib', 'oura-models', 'constants')
+  if (process.env.OURA_CONSTANTS_DIR) return process.env.OURA_CONSTANTS_DIR
+  if (fs.existsSync(path.join(CONSTANTS_CACHE_DIR, 'MANIFEST.json'))) return CONSTANTS_CACHE_DIR
+  return path.join(process.cwd(), 'lib', 'oura-models', 'constants')
 }
 
 /** Parsed files, memoised for the process. Each is read at most once however many getters want it. */
