@@ -1,12 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { Check, Loader2, Plus, X } from 'lucide-react'
+import { Check, Link2, Loader2, Plus, X } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import { Button } from '@/components/ui/button'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
-import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
+import { perServing, sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import type { SavedMeal, NutritionIngredient } from '@trainingai/shared/types/nutrition'
 
 /**
@@ -25,6 +25,18 @@ export interface TypedMeal {
   failed: boolean
   /** Only a resolved meal can be kept exactly; an unresolved one still steers the generator. */
   keep: boolean
+  /** Where a recipe came from, when it came from a URL — attribution, and a reminder six months on. */
+  sourceUrl?: string
+  /**
+   * Servings the source recipe makes, when it said so. The route has ALREADY divided by this, so it
+   * is here to be shown, not to be applied again.
+   *
+   * `null` on a URL import whose page stated no yield, and that case is not cosmetic: the payload is
+   * then the WHOLE recipe (a banana-bread page measured 1,956 kcal for the loaf). The row asks how
+   * many it serves and divides, because assuming one plate is a silent multi-hundred-calorie error
+   * that looks entirely plausible.
+   */
+  recipeYield?: number | null
 }
 
 interface Props {
@@ -84,7 +96,15 @@ export function MyMealsPicker({
     if (!text || typedMeals.some(m => m.text === text)) return
     setDraftText('')
 
-    const pending: TypedMeal = { text, name: text, ingredients: [], looking: true, failed: false, keep: false }
+    // A recipe URL is a third input mode alongside image and text, resolving to the same shape —
+    // which is why this is a few lines rather than a subsystem. `https:` only, matching the route:
+    // it rejects everything else outright, and offering a mode the server refuses is worse than not
+    // offering it.
+    const url = asHttpsUrl(text)
+    const pending: TypedMeal = {
+      text, name: url ? hostOf(url) : text, ingredients: [], looking: true, failed: false, keep: false,
+      sourceUrl: url ?? undefined,
+    }
     const next = [...typedMeals, pending]
     onChangeTyped(next)
 
@@ -95,12 +115,19 @@ export function MyMealsPicker({
       const res = await fetch('/api/nutrition/scan', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify(url ? { url } : { text }),
       })
       const body = res.ok ? await res.json() : null
       const ingredients: NutritionIngredient[] = Array.isArray(body?.ingredients) ? body.ingredients : []
       resolved = ingredients.length > 0
-        ? { text, name: body.name || text, ingredients, looking: false, failed: false, keep: !atLimit }
+        ? {
+            text, name: body.name || pending.name, ingredients, looking: false, failed: false,
+            // A recipe with no stated yield is the whole batch, so it cannot be kept until the user
+            // says how many it serves — keeping it would put a tray in one meal slot.
+            keep: !atLimit && !(url && body.recipeYield == null),
+            sourceUrl: body.sourceUrl ?? url ?? undefined,
+            recipeYield: url ? (body.recipeYield ?? null) : undefined,
+          }
         : { ...pending, looking: false, failed: true }
     } catch {
       resolved = { ...pending, looking: false, failed: true }
@@ -108,6 +135,15 @@ export function MyMealsPicker({
     // Rebuilt from the caller's latest list rather than `next` — the user may have added or removed
     // another row while this was in flight.
     onChangeTyped(replaceByText(next, text, resolved))
+  }
+
+  /** Divide a whole-recipe import down to one serving, once the user has said how many it makes. */
+  function applyServes(meal: TypedMeal, serves: number) {
+    updateTyped(meal.text, {
+      ingredients: perServing(meal.ingredients, serves),
+      recipeYield: serves,
+      keep: !atLimit,
+    })
   }
 
   function updateTyped(text: string, patch: Partial<TypedMeal>) {
@@ -158,7 +194,7 @@ export function MyMealsPicker({
         <p className="mb-2 text-[11px] leading-snug text-muted-foreground">
           Type anything you eat regularly and its macros get looked up, so the plan can keep it
           exactly rather than just guessing at the style. Say the portion if it matters — “200 g
-          chicken with rice and broccoli”.
+          chicken with rice and broccoli”. A recipe link works too.
         </p>
         <div className="flex gap-2">
           <input
@@ -166,7 +202,7 @@ export function MyMealsPicker({
             value={draftText}
             onChange={e => setDraftText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); void addTyped() } }}
-            placeholder="e.g. eggs on sourdough with avocado"
+            placeholder="a meal, or a recipe link"
             className="flex-1 min-h-[48px] rounded-xl border border-border bg-muted/50 px-3 text-sm outline-none"
           />
           <Button variant="secondary" className="min-h-[48px] px-3" onClick={() => void addTyped()} disabled={!draftText.trim()}>
@@ -201,6 +237,17 @@ export function MyMealsPicker({
                           the plan suggests.
                         </span>
                       )}
+                      {/* Attribution: it says where a meal came from six months later, and it is
+                          the honest thing to do with someone else's recipe. */}
+                      {m.sourceUrl && (
+                        <span className="mt-0.5 flex items-center gap-1 text-[11px] text-muted-foreground">
+                          <Link2 className="w-3 h-3 flex-none" />
+                          <span className="truncate">{hostOf(m.sourceUrl)}</span>
+                          {m.recipeYield != null && m.recipeYield > 1 && (
+                            <span className="flex-none">· from a {m.recipeYield}-serve recipe</span>
+                          )}
+                        </span>
+                      )}
                     </span>
                     <button
                       onClick={() => onChangeTyped(typedMeals.filter(x => x.text !== m.text))}
@@ -211,7 +258,29 @@ export function MyMealsPicker({
                     </button>
                   </div>
 
-                  {totals && (
+                  {/* A page that states no yield gives back the WHOLE recipe, so this asks before
+                      anything can be kept. Assuming one plate is a 4x calorie error that reads as
+                      perfectly plausible, which is exactly why it has to be a question. */}
+                  {totals && m.sourceUrl && m.recipeYield == null && (
+                    <div className="border-t border-border/50 px-3 py-2">
+                      <p className="text-[11px] leading-snug text-muted-foreground">
+                        These are the numbers for the whole recipe. How many does it serve?
+                      </p>
+                      <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {[1, 2, 4, 6, 8, 12].map(n => (
+                          <button
+                            key={n}
+                            onClick={() => applyServes(m, n)}
+                            className="min-h-[36px] min-w-[44px] rounded-full border border-border bg-background/50 px-3 text-xs font-semibold tabular-nums active:bg-muted/30"
+                          >
+                            {n}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {totals && !(m.sourceUrl && m.recipeYield == null) && (
                     <label className="flex items-center justify-between gap-3 border-t border-border/50 px-3 py-2">
                       <span className="text-[11px] text-muted-foreground">
                         Keep this meal exactly
@@ -247,6 +316,31 @@ export function MyMealsPicker({
       </div>
     </div>
   )
+}
+
+/**
+ * The input as an `https:` URL, or null.
+ *
+ * Parsed with `new URL()` and compared on `protocol`, never matched as a prefix string — the route
+ * rejects every other scheme outright (`http:`, `file:`, `data:`), so anything else has to fall
+ * through to the text branch rather than be sent and refused.
+ */
+function asHttpsUrl(text: string): string | null {
+  try {
+    const u = new URL(text)
+    return u.protocol === 'https:' ? u.toString() : null
+  } catch {
+    return null
+  }
+}
+
+/** The site's name, as a placeholder until the recipe's own name comes back. */
+function hostOf(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '')
+  } catch {
+    return url
+  }
 }
 
 function replaceByText(list: TypedMeal[], text: string, next: TypedMeal): TypedMeal[] {

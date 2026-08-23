@@ -42,6 +42,11 @@ with `Gate: device`. **Item (3) needed no work:** battery polls have persisted s
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
 
+**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** The plan wizard's "meals you
+usually eat" step takes a URL. A page that states no yield hands back the **whole recipe** — 1,956
+kcal for a banana-bread loaf — so the row asks how many it serves and cannot be kept until answered;
+`perServing` is shared with the route so the two divides cannot drift.
+
 **Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to
 128 px WebP (~6 KB) so it fits `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because
 nothing else fails loudly when that cap slips. The storage half shipped with Q-396 and no screen
