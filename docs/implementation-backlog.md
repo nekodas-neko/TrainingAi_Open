@@ -9124,9 +9124,43 @@ first, so the output is a design discussion, not a patch:
   under `workoutActive`/`walkActive`/`activityActive` an instant #418 (see Q-73).
 
 
-### [workouts] Q-85 — a shortened session keeps full-length rest periods, which is what actually caps its exercise count
+### [workouts] Q-85 — compress accessory rest at a Quick budget, and leave the compound alone
 
-- **Gate:** owner
+- **Lane:** A — `packages/shared/src/ai-periodization/{time-budget,generate-prescription}.ts`.
+- **✅ DECIDED BY THE OWNER 2026-08-23 — option (a), with a 45-second accessory floor.** The plan's
+  §4 question is answered and this entry is startable. Build §5's shape as written.
+  - **Compress accessory and secondary rest only. The main compound keeps its full rest.** The
+    owner's reasoning is the same one the app already encodes everywhere else: *"rest was meant to
+    be determined based on PCT — a harder/higher weight compared to your 1RM should give more rest
+    than something lower… happy to have rest be a bit shorter, but it should keep that in mind, and
+    have a very solid floor."*
+  - **The floor is 45 s**, asked as a direct question (*can you rest 45 seconds between accessory
+    sets — 60–65% of 1RM, 10–12 reps*) and answered yes. Nothing may compress below it.
+  - **Option (b) — compress everything ~25%, the compound included — is rejected.** It gains the
+    most and is the only option that helps below 27 min, and it takes a 4×5 top set from 180 s to
+    135 s. It would be the single place in the app where the *protect the primary* discipline is
+    reversed, against `SET_FLOOR`, `ROLE_TRIM_BIAS` and `TRIM_ORDER`. Do not revisit it without new
+    evidence.
+- **⚠ Know what this does and does not buy, before building it.** It gains **one exercise in the
+  27–35 minute band and nothing below**, because a single main compound at 4×5×180 s costs ~19 min
+  on its own. That was measured, the owner was told it before deciding, and it is the accepted
+  outcome — not a disappointment to be discovered mid-implementation and "fixed" by reaching for (b).
+- **⚠ The catalogue's own numbers, measured 2026-08-23 across all 91 `style_sets` rows in
+  production**, because they bound what any compression can do:
+
+  | %1RM | rest |
+  |---|---|
+  | 50–65% | **60 s** |
+  | 70% | 75 s |
+  | 75–80% | 90–130 s |
+  | 85–87% | 180 s |
+  | 90–92% | 180–240 s |
+
+  Rest is monotonic in intensity, which is what makes the owner's principle already true in the
+  data — but it is **hand-authored per style, not derived**: at 75% the catalogue ranges 90 s to
+  180 s depending on whether the style is built for strength or volume, so reps matter as much as
+  percentage. **Do not replace the authored `rest_sec` with a function of `pct`.** Scale it.
+  Note the low band is already at 60 s, so a 45 s floor is what creates any room at all here.
 
 - **Branch:** `feat/preset-aware-rest-compression`
 - **Plan:** [`2026-08-15-preset-aware-rest-compression.md`](superpowers/plans/2026-08-15-preset-aware-rest-compression.md)
