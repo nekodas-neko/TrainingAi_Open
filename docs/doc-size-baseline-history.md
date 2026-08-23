@@ -1790,3 +1790,14 @@ Worth noting for whoever runs the next sweep: Current Status is now ~178 lines a
 entries, and three separate PRs today each had to trim prose to avoid tripping this check. That is
 the ratchet doing its job, but it is also the signal that the sweep is due — the older half of the
 section describes work that has been on `main` for days.
+
+## 2026-08-23 — `projectOverview.md` 7983 → 7989
+
+Six lines: a Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch.
+
+Worth recording *how* this nearly went wrong, since the Lane B baton warned about it and it happened
+anyway. Resolving the merge with a blind "keep both sides" **duplicated the ring-service paragraph**
+— main had compacted the same entry I had written, so the two sides were one entry reworded, not two
+independent ones. The tell was the arithmetic: the check reported 14 lines added by a branch whose
+own addition is 6. "Keep both" is right for genuinely independent appended entries and wrong for a
+rewritten one, and the only reliable way to tell them apart is to read the resolved text.
