@@ -61,17 +61,24 @@ test.beforeAll(async () => {
   const userId = await ensureEnergyBalanceProfile()
   await withDb(async db => {
     await cleanup(db)
-    const { rows } = await db.query<{ d: string }>(
-      `SELECT (now() AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = $1), 'Australia/Brisbane'))::date::text AS d`,
+    const { rows } = await db.query<{ d: string; tz: string }>(
+      `SELECT COALESCE((SELECT timezone FROM users WHERE id = $1), 'Australia/Brisbane') AS tz,
+              (now() AT TIME ZONE COALESCE((SELECT timezone FROM users WHERE id = $1), 'Australia/Brisbane'))::date::text AS d`,
       [userId],
     )
-    const today = rows[0].d
-    // 60 completed minutes ending an hour ago — inside today in the user's zone either way, and
-    // never in the future, which would put it outside the day window.
+    const { d: today, tz } = rows[0]
+    // 11:00→12:00 in the USER's zone on that day — not an offset from `now()`. An offset is a UTC
+    // instant, and `computeEnergyBalance` windows the session by the user's local midnight: between
+    // 00:00 and 02:00 Brisbane (14:00–16:00 UTC) `now() - 2 hours` is the PREVIOUS local day, the
+    // session falls outside the window, `earned` is 0 and all three tests fail. That is the Q-356
+    // class, and it is why both sides are anchored to the same local day here. Midday, not midnight:
+    // a boundary is where an off-by-one stops being visible.
     await db.query(
       `INSERT INTO workout_sessions (id, session_name, started_at, completed_at, user_id)
-       VALUES ($1, 'Budget spec session', now() - interval '2 hours', now() - interval '1 hour', $2)`,
-      [SESSION_ID, userId],
+       VALUES ($1, 'Budget spec session',
+               ($3::date + time '11:00') AT TIME ZONE $4,
+               ($3::date + time '12:00') AT TIME ZONE $4, $2)`,
+      [SESSION_ID, userId, today, tz],
     )
     await db.query(
       `INSERT INTO workout_hr_stats (workout_session_id, user_id, avg_bpm, readings_count, source)
