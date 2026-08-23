@@ -4,7 +4,7 @@ Paste everything below the line into a fresh session.
 
 ---
 
-**Set this session's title to `Implementation Agent (A) 🚧` — exactly, emoji included.**
+**Set this session's title to `🚧 Implementation Agent (A) 🟢` — exactly, emoji included.**
 
 **Run this session on Opus 5 at `xhigh` effort.** This lane owns migrations, sync-push
 mirroring, auth and the BLE pipeline — the failure mode is a corrective migration or a wedged
@@ -60,16 +60,17 @@ backlog entry, and a `package.json` + `changelog.ts` bump if the change is user-
 changelog conflicts by rebuilding the file from `origin/main`, never by splicing the hunks.
 
 **When your context runs long, or the owner calls a reset:** land everything first, then rewrite
-`docs/agents/state/implementation-lane-a.md` in full — not appended — and state in your closing message that the successor session must be titled `Implementation Agent (A) 🚧`, so the next Lane A session
+`docs/agents/state/implementation-lane-a.md` in full — not appended — and state in your closing message that the successor session must be titled `🚧 Implementation Agent (A) 🟢`, so the next Lane A session
 continues from it. Write a dated handoff doc as well if you closed a cluster of work. Never write
 "done" for anything not in a committed diff and observed working, and always say which failure
 surfaces you did not exercise.
 
-**Then rename yourself.** Once the baton and every PR have landed, prefix `(Old) ` to your own
-session title — `(Old) Implementation Agent (A) 🚧` — so the owner can tell you apart from your successor, which
-is created under the clean name. It goes at the **front**, not the end: session lists truncate from
-the right and are scanned down the left edge, so a marker at the end is the first thing lost. Two
-calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted** describes
-the calling session and returns your own ID in `ccr.id`, then `set_session_title` with that ID and
-the prefixed title. Do this after the work is finished, never before — a session titled `(Old)`
-that is still pushing commits is worse than an ambiguous name.
+**Then flip your light to 🔴.** Your title ends in 🟢 while you are the live session. Once the baton
+and every PR have landed, rename yourself to `🚧 Implementation Agent (A) 🔴` — same title, red light — so the owner
+reads you as handed on and archives you. Your successor comes up 🟢 under the green title on its own,
+because its first instruction is the same self-titling one yours was.
+
+Two calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted**
+describes the calling session and returns your own ID in `ccr.id`, then `set_session_title` with
+that ID and the red title. Do this **last**, after the work is finished — showing 🔴 while still
+pushing commits is worse than an ambiguous name.

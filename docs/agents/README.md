@@ -353,17 +353,17 @@ calls a reset, the agent writes its baton and a successor picks it up **under th
 ### The names are fixed — copy them exactly
 
 A successor session must be created with the **same title** as the one it replaces, character for
-character, emoji included. That title is how the owner tells five concurrent sessions apart at a
+character, emoji included. That title is how the owner tells six concurrent sessions apart at a
 glance, so a renamed successor is a lost thread even when its baton is perfect.
 
 | Session title | Baton | Prompt |
 |---|---|---|
-| **Implementation Agent (A) 🚧** | `state/implementation-lane-a.md` | `prompts/implementation-lane-a.md` |
-| **Implementation Agent (B) 🚧** | `state/implementation-lane-b.md` | `prompts/implementation-lane-b.md` |
-| **BugFix Intake Agent 🪲** | `state/bugfix.md` | `prompts/bugfix.md` |
-| **Tuning Agent 🎶** | `state/tuning.md` | `prompts/tuning.md` |
-| **Review Agent 📖** | `state/review.md` | `prompts/review.md` |
-| **Orchestrator 🪐** | `state/orchestrator.md` | `prompts/orchestrator.md` |
+| **🚧 Implementation Agent (A) 🟢** | `state/implementation-lane-a.md` | `prompts/implementation-lane-a.md` |
+| **🚧 Implementation Agent (B) 🟢** | `state/implementation-lane-b.md` | `prompts/implementation-lane-b.md` |
+| **🪲 BugFix Intake Agent 🟢** | `state/bugfix.md` | `prompts/bugfix.md` |
+| **🎶 Tuning Agent 🟢** | `state/tuning.md` | `prompts/tuning.md` |
+| **📖 Review Agent 🟢** | `state/review.md` | `prompts/review.md` |
+| **🪐 Orchestrator 🟢** | `state/orchestrator.md` | `prompts/orchestrator.md` |
 
 The two Implementation lanes deliberately share an emoji and differ only by the `(A)` / `(B)`
 suffix — they are one role in two lanes, and the suffix is the part that carries meaning. Do not
@@ -372,30 +372,45 @@ invent a per-lane emoji to tell them apart.
 Every handoff states its successor's title explicitly, rather than leaving it to be inferred from
 the baton's filename.
 
-### The outgoing session renames itself to `(Old) …`
+### The trailing light: 🟢 live, 🔴 handed on
 
-Fixed titles create one problem at the moment of handover: for as long as both sessions are in the
-list, two of them are called `Implementation Agent (A) 🚧` and nothing distinguishes them. The owner
-then has to guess which is the live one, and the guess is wrong half the time.
+A title carries two emoji, and they mean different things. **The leading emoji is the role** — 🚧 🪲
+🎶 📖 🪐, fixed forever, shared by every generation of that agent. **The trailing emoji is this
+session's own status**, and it is the only part that ever changes:
 
-So the outgoing session renames **itself** as its final act, prefixing `(Old) ` to its own title —
-`(Old) Implementation Agent (A) 🚧`. The successor is created under the clean name and needs no
-special handling. The marker goes on the outgoing session, never the incoming one.
+| | |
+|---|---|
+| 🟢 | Live. This is the session to talk to. |
+| 🔴 | Handed on. Its baton is written, its work is merged, it can be archived. |
 
-**It is a prefix, not a suffix, and that is the whole point.** Session lists truncate from the
-right and are scanned down the left edge, so a marker at the end of the title is the first thing
-lost and the last thing read. At the front it survives truncation and sorts the dead sessions
-together.
+Fixed titles otherwise create one problem at the moment of handover: for as long as both sessions
+are in the list, two of them read `🚧 Implementation Agent (A)` and nothing separates them. The owner
+then has to guess which is live, and the guess is wrong half the time.
 
-A session can do this unaided, and it takes two calls:
+**Neither light is set by hand.** Every prompt's first instruction is to self-title, so a session
+comes up 🟢 on its own; the handoff ritual's last step flips it to 🔴. The owner never types an emoji
+in either direction, which is what keeps the scheme from rotting.
+
+That gives the owner a two-pass sweep of the session list: greens are the working set, reds are
+finished and can be archived in a batch.
+
+A session sets its own light unaided, in two calls:
 
 1. `get_session` with `session_id` **omitted** — it then describes the calling session, and
    `ccr.id` is its own session ID.
-2. `set_session_title` with that ID and the suffixed title.
+2. `set_session_title` with that ID and the new title.
 
 Both are on the `claude-code-remote` MCP server. Verified working from inside a live session on
-2026-08-23, including the round trip back. Rename last, after the baton and every PR have landed —
-a session titled `(Old)` that is still pushing commits is worse than one with an ambiguous name.
+2026-08-23, round trip included. Flip to 🔴 **last**, after the baton and every PR have landed — a
+session showing 🔴 while it is still pushing commits is worse than one with an ambiguous name.
+
+**Known limit: 🟢 can go stale, and it is the one failure this scheme cannot catch.** The light is
+only true if the session got to run its closing step, and a session that hit its context limit,
+timed out, or lost its container never did — so it sits there reading 🟢 while being dead. A green
+that has not moved in a day is worth checking against the session's actual activity rather than
+trusted. This was a known trade at the time it was chosen (2026-08-23): the alternative, marking
+only retired sessions so that absent-means-live cannot go stale, gives up the positive signal the
+owner sorts on, and sorting on greens is the thing this is for.
 
 ### The baton: `docs/agents/state/<agent>.md`
 
@@ -433,8 +448,8 @@ Trigger it on context pressure, on an owner reset, or on finishing a cluster:
    index, the backlog, the journal entry.
 5. **Never write "done" for anything not in a committed diff and observed working.** State which
    failure surfaces were not exercised — device, native, safe-area, prod-data — every time.
-6. **Rename yourself to `(Old) …`**, per the subsection above, and name the successor's exact title
-   in your closing message. Do this last — after the baton and every PR have landed.
+6. **Flip your trailing light to 🔴**, per the subsection above, and name the successor's exact
+   title in your closing message. Do this last — after the baton and every PR have landed.
 
 The successor starts from the same prompt in [`prompts/`](prompts/), which tells it to read its own
 baton first. No prompt needs editing between generations; the baton carries the change.

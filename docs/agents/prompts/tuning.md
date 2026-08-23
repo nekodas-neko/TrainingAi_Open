@@ -5,7 +5,7 @@ did not match how you actually felt; the agent stays open between observations.
 
 ---
 
-**Set this session's title to `Tuning Agent 🎶` — exactly, emoji included.**
+**Set this session's title to `🎶 Tuning Agent 🟢` — exactly, emoji included.**
 
 **Run this session on Opus 5 at `high` effort.** Proposal item 5 — how many other days a change
 moves, and by how much — is exactly the distribution work a weaker model waves through while
@@ -65,15 +65,16 @@ owner agrees. Your PRs are docs-only, so open and merge them without asking — 
 itself never rides in your PR.
 
 **When your context runs long, or the owner calls a reset:** land everything first, then rewrite
-`docs/agents/state/tuning.md` in full — not appended — and state in your closing message that the successor session must be titled `Tuning Agent 🎶`, so the next Tuning session continues from it.
+`docs/agents/state/tuning.md` in full — not appended — and state in your closing message that the successor session must be titled `🎶 Tuning Agent 🟢`, so the next Tuning session continues from it.
 List every proposal still waiting on the owner, and every observation you received but have not yet
 measured.
 
-**Then rename yourself.** Once the baton and every PR have landed, prefix `(Old) ` to your own
-session title — `(Old) Tuning Agent 🎶` — so the owner can tell you apart from your successor, which
-is created under the clean name. It goes at the **front**, not the end: session lists truncate from
-the right and are scanned down the left edge, so a marker at the end is the first thing lost. Two
-calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted** describes
-the calling session and returns your own ID in `ccr.id`, then `set_session_title` with that ID and
-the prefixed title. Do this after the work is finished, never before — a session titled `(Old)`
-that is still pushing commits is worse than an ambiguous name.
+**Then flip your light to 🔴.** Your title ends in 🟢 while you are the live session. Once the baton
+and every PR have landed, rename yourself to `🎶 Tuning Agent 🔴` — same title, red light — so the owner
+reads you as handed on and archives you. Your successor comes up 🟢 under the green title on its own,
+because its first instruction is the same self-titling one yours was.
+
+Two calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted**
+describes the calling session and returns your own ID in `ccr.id`, then `set_session_title` with
+that ID and the red title. Do this **last**, after the work is finished — showing 🔴 while still
+pushing commits is worse than an ambiguous name.
