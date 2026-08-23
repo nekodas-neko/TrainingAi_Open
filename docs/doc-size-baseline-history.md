@@ -1677,7 +1677,15 @@ over a window and cannot tell "already running" from "ran a minute ago". That se
 bug existed with a rate limit already in place, and it now also has a `docs/module-map.md` row so
 the next fire-and-forget background call does not repeat it.
 
-## 2026-08-23 — `projectOverview.md` 7941 → 7957, `docs/agents/state/implementation-lane-b.md` 102 → 113
+## 2026-08-23 — `projectOverview.md` 7941 → 7948, `docs/implementation-backlog.md` 11469 → 11406
+
+Q-474 shipped; its 63-line entry leaves the queue, which is most of the backlog's shrink.
+
+Seven lines of Current Status because the durable part is not the rename but *why nobody noticed*:
+the identifier `programSessionId` meant the dead column, and a repro fixture that populated it read
+as evidence that a race did not exist. That is the kind of thing a session re-derives expensively.
+
+## 2026-08-23 — `projectOverview.md` 7948 → 7964, `docs/agents/state/implementation-lane-b.md` 102 → 113
 
 Q-415/Q-417's Known-Issues entry, which is a growth rather than a trade: both queue entries are
 removed, but they were in `docs/implementation-backlog.md`, which shrinks 78 lines and is already
@@ -1697,4 +1705,3 @@ this run time to establish: that `.click()` never lands on a screen inside a `[d
 `activeKcal` cannot be exercised through a logged activity at all, and a fixture needing a real
 earned figure has to go through the heart-rate path. Trimmed twice before raising; a baton is
 rewritten wholesale by each successor, so this number falls back on the next handover.
-

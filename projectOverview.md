@@ -27,6 +27,13 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**`workout_sessions`'s dead column owned the name the live one was used under (Q-474).** Two foreign
+keys to `program_sessions`: `session_id` is live, `program_session_id` has never been written or
+read — and the Drizzle property `programSessionId` pointed at the dead one. It had already cost a
+session, when a repro fixture populated the inert column and the run read as "the race does not
+exist". Property names only, no migration; the column is kept because dropping it is data-losing and
+owner-gated.
+
 **A rate limit is not an idempotency mechanism (Q-470).** The background prescription regeneration
 fired twice for one session-day — two call sites in one handler, and `cachedFetch` revalidates on
 every screen open, so the second GET started a second generation before the first landed. It now

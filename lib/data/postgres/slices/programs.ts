@@ -226,15 +226,15 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
     // sessions that already existed, so the recreated row keeps the same id and the
     // link can be restored by identity (see restore loop below). The position-based
     // map is kept only as a fallback for sessions saved before ids were round-tripped.
-    let orphanedWorkoutSessions: { id: string; sessionId: string | null }[] = []
+    let orphanedWorkoutSessions: { id: string; programSessionId: string | null }[] = []
     const oldByPosition = new Map(oldSessions.map(r => [r.position, r.id]))
     const oldIdSet = new Set(oldSessions.map(r => r.id))
     let savedPeriodizationRows: (typeof s.sessionPeriodization.$inferSelect)[] = []
     if (oldSessions.length) {
       const oldIds = oldSessions.map(r => r.id)
-      orphanedWorkoutSessions = await tx.select({ id: s.workoutSessions.id, sessionId: s.workoutSessions.sessionId })
+      orphanedWorkoutSessions = await tx.select({ programSessionId: s.workoutSessions.programSessionId, id: s.workoutSessions.id })
         .from(s.workoutSessions)
-        .where(inArray(s.workoutSessions.sessionId, oldIds))
+        .where(inArray(s.workoutSessions.programSessionId, oldIds))
       savedPeriodizationRows = await tx.select()
         .from(s.sessionPeriodization)
         .where(inArray(s.sessionPeriodization.programSessionId, oldIds))
@@ -323,9 +323,9 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
         if (sess.id && oldIdSet.has(sess.id)) newIdByOldId.set(sess.id, sess.id)
       }
       for (const ws of orphanedWorkoutSessions) {
-        const newId = ws.sessionId ? newIdByOldId.get(ws.sessionId) : undefined
+        const newId = ws.programSessionId ? newIdByOldId.get(ws.programSessionId) : undefined
         if (newId) {
-          await tx.update(s.workoutSessions).set({ sessionId: newId }).where(eq(s.workoutSessions.id, ws.id))
+          await tx.update(s.workoutSessions).set({ programSessionId: newId }).where(eq(s.workoutSessions.id, ws.id))
         }
       }
     }
@@ -668,7 +668,7 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
   const sessionNameLower = sql<string>`lower(${s.workoutSessions.sessionName})`
   const rows = await db
     .select({
-      sessionId: s.workoutSessions.sessionId,
+      sessionId: s.workoutSessions.programSessionId,
       sessionName: sessionNameLower,
       count: sql<number>`count(*)::int`,
     })
@@ -679,7 +679,7 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
       isNull(s.workoutSessions.deletedAt),
       sql`${s.workoutSessions.startedAt} > coalesce(${prog?.cycleAnchorAt ?? null}, ${prog?.startedAt ?? null}::timestamptz, '-infinity'::timestamptz)`,
     ))
-    .groupBy(s.workoutSessions.sessionId, sessionNameLower)
+    .groupBy(s.workoutSessions.programSessionId, sessionNameLower)
 
   const counts = new Map<string, number>()
   for (const r of rows) {

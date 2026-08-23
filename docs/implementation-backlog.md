@@ -3121,39 +3121,6 @@ moving *beside* the calories rather than under them.
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
 
-### [workouts][platform] Q-474 — `workout_sessions` has two foreign keys to `program_sessions`, and the dead one owns the name the live one is used under
-
-- **Branch:** `chore/workout-sessions-dead-program-session-id`
-- **Added:** 2026-08-18 · review sweep (write-concurrency lens) ·
-  [`docs/reviews/2026-08-18-write-concurrency.md`](reviews/2026-08-18-write-concurrency.md)
-- **Placement:** low. **Nothing is broken today** — nothing uses the dead column. File it as the
-  maintenance hazard it is, not as a bug.
-- **What.** `lib/data/postgres/schema.ts` declares both:
-  ```ts
-  sessionId:        uuid('session_id').references(() => programSessions.id, ...)          // 157 — live
-  programSessionId: uuid('program_session_id').references(() => programSessions.id, ...)  // 168 — dead
-  ```
-  `program_session_id` came from `079_ai_dynamic_periodization.sql:19` ("for prescription trigger
-  linkage"). `grep workoutSessions.programSessionId` across `lib app packages` returns **zero hits** —
-  nothing writes it, nothing reads it.
-- **Confirmed in production:** 0 of the owner's 91 `workout_sessions` rows have `program_session_id`
-  set; 45 have `session_id`. (`claude_ro` is row-scoped to one user, so that is the owner's rows —
-  but a column no code references cannot be populated for anyone else either.)
-- **The trap, which is the actual finding.** The identifier `programSessionId` means the **live**
-  column everywhere in code, while the column actually named `program_session_id` is inert:
-  - `getWorkoutSessionProgramSessionId()` — named for the dead column — selects
-    `s.workoutSessions.sessionId` (`slices/periodization.ts:299-306`).
-  - `ensureWorkoutSession(userId, sessionId, programSessionId, …)` writes its `programSessionId`
-    argument into the `sessionId` field (`adapter.ts:772-780`).
-- **It has already cost a session.** The Q-473 repro fixture populated `program_session_id`, the
-  periodization block took the `null` branch, the counter never moved, and the honest reading of that
-  run was "the race does not exist". It does. The next person to build that fixture hits the same wall.
-- **Fix shape:** rename the reader (and comment the schema) — zero-risk, removes most of the trap on
-  its own. Dropping the column is cleaner but is a **data-losing migration**, so it needs owner
-  confirmation under `CLAUDE.md` and a Lane A migration number; it is not obviously worth that on its
-  own, and would ride better alongside other schema work.
-- **Lane A owns this** — schema and migrations.
-
 ### [platform][devices] Q-476 — the worse sync failure gets the softer handling: a schema-rejected mutation is deleted forever with no badge, no toast and no retry
 
 - **Branch:** `fix/sync-push-drop-reports-error`
