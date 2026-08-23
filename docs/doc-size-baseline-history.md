@@ -1479,3 +1479,19 @@ out to be a drop-set indicator.
 
 Trimmed from 29 before raising. What stayed is the evidence; what went was a second telling of the
 mechanism already stated in the paragraph above it.
+
+## 2026-08-23 — Lane B's baton ratchets DOWN again, 134 → 97
+
+Second consecutive Lane B handoff to shrink it: 413 → 134 on 2026-08-20, now **97**. The baseline
+drops with it each time, because the shrink-only rule exists so reclaimed space cannot quietly refill
+and leaving 37 lines of headroom is an invitation.
+
+What went was the previous run's seven-PR narrative — that is what journal entries are for, and the
+baton links them. What the rewrite **added** is a `## Waiting on the owner` section, because this run
+ends with a gated entry (LB-1) and a successor needs to see that before the queue, not after it.
+
+**PS-4 is three of six, measured rather than assumed:** Lane B **96**, Orchestrator **61**, Lane A
+**149** are under the ~150-line target; BugFix **160** and Review **169** are just over; Tuning
+**581** is nearly four times it and is still the one that will not come down as a side effect of a
+routine rewrite. (A first draft of this note said "four of six" from memory and was wrong by one —
+Lane A sits one line under the line, which is not a margin worth rounding in either direction.)
