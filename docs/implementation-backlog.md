@@ -10965,6 +10965,34 @@ later) and assign to other members/users. I.e my girlfriend is using the app; an
 device and created a program - but Ideally I'd like a UI to be able to do that from my app as an
 admin/trainer."*
 
+**✅ DECIDED by the owner, 2026-08-23 — design accepted, and the population is now known.**
+Verbatim: *"Go with your reccomendation. There is about 3 users; and possibly 5 max in the future -
+all friends no outsiders - so risk woudl be accepted."*
+
+- **The recommended shape is approved:** a trainer **relationship** in its own table beside
+  `friendships`, not a boolean on `users`; and the friendship consent handshake copied as-is —
+  trainer requests, trainee accepts, trainee can revoke.
+- **Population: ~3 users today, 5 at most, all known to the owner.** That is a real scoping input and
+  it removes work: no permission matrices, no audit trail, no tenancy model, no invite-at-scale flow.
+  A trainer seeing more of a trainee's data than strictly necessary is acceptable here, so the plan
+  should not build fine-grained read scopes.
+
+**⚠️ What the accepted risk does NOT relax, stated once so the plan does not over-read it.** The
+owner's acceptance is about *who the people are*. Two things are unaffected because they are not
+threat-model questions:
+
+1. **The write-path ownership guards stay.** They exist to stop a **bug** writing to the wrong
+   account, not an attacker. With three to five people in one database, a mis-scoped write silently
+   corrupts a real person's training history — and the sync engine then propagates it to their
+   device. Trust between the users does not make a wrong `user_id` less wrong.
+2. **`isAdmin` still is not the trainer flag.** Admin is not a trainee permission, it is an
+   *operator* one: it opens `POST /api/admin/db-query` — read-only SQL over the owner's whole health
+   history — plus the error console and writes into the shared exercise catalogue. "All friends, no
+   outsiders" is an argument about trainees; it is not an argument for handing a training partner raw
+   SQL against production.
+
+Both are cheap. Neither is what the risk acceptance was aimed at.
+
 **The current workaround is the acceptance test.** Building a program for someone today means
 physically holding their phone. Done looks like: the same program, built from the trainer's own app,
 appearing on the trainee's device without anyone handing over a device.

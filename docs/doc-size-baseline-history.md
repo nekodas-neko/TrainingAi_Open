@@ -20,7 +20,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ## 2026-08-23 — BF-9, the trainer role
 
-**`docs/implementation-backlog.md` 11517 → 11571.** The owner wants to build programs for other
+**`docs/implementation-backlog.md` 11517 → 11599.** The owner wants to build programs for other
 people from his own app instead of borrowing their phone.
 
 81 lines added, 54 net. Long for an unplanned feature, and the length is almost entirely the security
@@ -35,6 +35,15 @@ The other half is what should *not* be built: `friendships` already implements t
 (only the addressee can accept), `users.friend_code` the discovery, `invited_emails` the onboarding,
 and `programs` is already in the sync delta, so delivery to the trainee's device needs no new work.
 Four things not to rebuild is worth the space it takes to name them.
+
+**Amended in the same PR** once the owner approved the shape and gave the population — ~3 users, 5 at
+most, all known to him, *"so risk woudl be accepted"*. That removes real work (no permission matrix,
+no audit trail, no tenancy model) and the entry says so. It also needed a paragraph saying what the
+acceptance does **not** cover, because the cheap misreading is "small trusted group, skip the
+guards": the ownership checks stop a *bug* writing to the wrong account, not an attacker, and with
+five people sharing one database a mis-scoped write corrupts a real person's history and then syncs
+it to their device. `isAdmin` stays off the table for the same reason — it is an operator permission,
+not a trainee one.
 
 ---
 
