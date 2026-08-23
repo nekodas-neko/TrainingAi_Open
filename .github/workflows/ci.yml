@@ -300,6 +300,9 @@ jobs:
       - name: An admin check that cannot run is not a refusal
         run: node scripts/check-admin-guard-catch.js
 
+      - name: A route that reads a request body parses it
+        run: node scripts/check-json-body-parsed.js
+
       - name: No raw error in an API response body
         run: node scripts/check-no-raw-error-in-response.js
 

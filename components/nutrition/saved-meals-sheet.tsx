@@ -21,6 +21,7 @@ import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { pushMutations } from '@/lib/local-store/sync-engine'
 import { SavedMealCard } from './saved-meal-card'
+import { usePlanSavedMealIds } from '@/lib/hooks/use-plan-saved-meal-ids'
 import { MealLabelSheet } from './meal-label-sheet'
 import { BulkDeleteConfirm } from './bulk-delete-confirm'
 import { IngredientRow, type QtyUnit } from './ingredient-row'
@@ -47,6 +48,7 @@ interface Props {
 }
 
 export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate, preselectedMealTypeId }: Props) {
+  const planSavedMealIds = usePlanSavedMealIds()
   // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
   const tz = useUserTimezone()
   const [tab, setTab] = useState<SheetTab>('meals')
@@ -596,6 +598,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
                   onEdit={() => openBuild(meal)}
                   onDelete={() => deleteMeal(meal)}
                   onLabel={() => setLabelMeal(meal)}
+                  fromPlan={planSavedMealIds.has(meal.id)}
                 />
               ))
             )}

@@ -49,6 +49,7 @@ import { TdeeAdaptationCard } from "@/components/nutrition/tdee-adaptation-card"
 import { CalorieBalanceBar } from "@/components/nutrition/calorie-balance-bar";
 import { MealPlanSection } from "@/components/nutrition/meal-plan-section";
 import { usePlanMealLogging } from "./use-plan-meal-logging";
+import { usePlanMealSaving } from "./use-plan-meal-saving";
 import { MealPlanReviewCard } from "@/components/nutrition/meal-plan-review-card";
 const MealPlanEditSheet = dynamic(
   () => import("@/components/nutrition/meal-plan-edit-sheet").then(m => m.MealPlanEditSheet),
@@ -286,6 +287,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     logMeal: handleLogPlanMeal, loggingPosition: loggingPlanPosition,
     loggedPositions: loggedPlanPositions, declinedMealIds, setDeclined: handleSetPlanMealDeclined,
   } = usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef: selectedDateRef, onLogged: handleFoodLogged })
+
+  const {
+    saveMeal: handleSavePlanMeal, saveMeals: handleSavePlanMeals, savingPositions: savingPlanPositions,
+  } = usePlanMealSaving({ mealPlan, userId, onPlanChanged: setMealPlan })
 
   const handleQuickEditSaved = useCallback((updated: FoodLogWithItem) => {
     setLogs(prev => prev.map(l => l.id === updated.id ? updated : l))
@@ -594,6 +599,9 @@ export default function NutritionContent({ userId }: { userId?: string }) {
                 loggedPositions={loggedPlanPositions}
                 declinedMealIds={declinedMealIds}
                 onSetDeclined={mealTypes.length > 0 ? handleSetPlanMealDeclined : undefined}
+                onSaveMeal={handleSavePlanMeal}
+                onSaveAllMeals={handleSavePlanMeals}
+                savingPositions={savingPlanPositions}
                 onCreate={() => setPlanSetupOpen(true)}
                 onViewPlan={() => setPlanManageOpen(true)}
               />
@@ -696,6 +704,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         open={planSetupOpen}
         onOpenChange={setPlanSetupOpen}
         onSaved={setMealPlan}
+        userId={userId}
       />
 
       <SavedMealsSheet
