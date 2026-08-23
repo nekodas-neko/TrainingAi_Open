@@ -1751,3 +1751,13 @@ the only way the decisions stay in one place. What did not get cut are the ⚠ w
 carries — the 11-section coverage list, the `Saved meals`/`My Meals`/`My Foods` rename sweep, and
 the `FoodLibrarySheet`/`SavedMealsSheet` capability diff. Those are the failure modes that make a
 rework lose a section quietly, and they have to be where the work is, not one entry away.
+
+## 2026-08-23 — `projectOverview.md` 7977 → 7983
+
+Six lines: a Known Issues row for LA-20, a live production 500 found by the session-start
+`error_events` read. It belongs in the index rather than only in the journal because what is
+outstanding is a *production* verification — the next session has to know to check `error_events`
+before believing the fault is gone, and "it stopped" is not "it was fixed".
+
+(The 7984 in the LB-4 branch and this 7983 are the same section being edited twice in one day; the
+number here is the merged count, not a second raise on top of that one.)
