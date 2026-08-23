@@ -13,6 +13,7 @@ import { invitedEmails } from './schema'
 import { resolveSyncCursor } from '@trainingai/shared/sync/cursor'
 import { isRetryableWriteError } from '@trainingai/shared/sync/retryable-error'
 import { shouldPrune } from './retention-throttle'
+import { inSequence } from './in-sequence'
 
 /** Q-481 — at most one `applied_mutations` prune per day per process. */
 const APPLIED_MUTATIONS_PRUNE_THROTTLE_MS = 24 * 60 * 60 * 1000
@@ -33,7 +34,7 @@ import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-rada
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
 import { sleepDurationTrend } from '@trainingai/shared/health/sleep-trend'
-import { DayCheckinScalesSchema, DayCheckinExtrasSchema } from '@trainingai/shared/validation/day-checkin'
+import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
@@ -3528,7 +3529,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
            foodLogs, supplements, supplementLogs, injuries,
            exerciseLogs, setLogs, personalRecords, ouraDaily, dayCheckins,
            foodItemsReferenced, foodItemsCreated, ouraDailySummary, ouraDailyDerived,
-           mealPlanRows, planMealAnswerRows] = await Promise.all([
+           mealPlanRows, planMealAnswerRows] = await inSequence([
       this.db.select().from(s.programs)
         .where(and(eq(s.programs.userId, userId), gt(s.programs.updatedAt, effectiveSince))),
       this.db.select().from(s.progressionStyles)
@@ -3716,8 +3717,11 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
         .orderBy(asc(s.mealPlans.updatedAt)).limit(pageLimit),
       // NOT filtered on deleted_at — this is the tombstone channel, same as mood_logs and food_logs
       // above. Hiding a soft-deleted answer here would mean an undo never reaches another device.
-      // (This makes the fan-out 24 queries. Q-107 already flags its width as a pool-contention
-      // suspect; noted rather than silently added to.)
+      // (This makes the fan-out 24 queries. Its width was flagged as a pool-contention suspect by
+      // Q-107; Q-308 measured it and the width is no longer the cost — `inSequence` issues these
+      // one at a time, so the whole fan-out demands ONE connection rather than 24, and is faster
+      // at p50 and p95 besides. Adding a 25th query here is now cheap; adding a `Promise.all` back
+      // is not.)
       this.db.select().from(s.planMealAnswers)
         .where(and(eq(s.planMealAnswers.userId, userId), gt(s.planMealAnswers.updatedAt, effectiveSince)))
         .orderBy(asc(s.planMealAnswers.updatedAt)).limit(pageLimit),
@@ -3731,7 +3735,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const programIds = (programs as { id: string }[]).map(p => p.id)
     const styleIds   = (progressionStyles as { id: string }[]).map(p => p.id)
 
-    const [programSessions, sessionExercises, schedules, scheduleDays, styleSets] = await Promise.all([
+    const [programSessions, sessionExercises, schedules, scheduleDays, styleSets] = await inSequence([
       programIds.length
         ? this.db.select({
             id:                s.programSessions.id,
@@ -4047,6 +4051,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // constraint would otherwise happily store an arbitrary string.
           if (p.phase !== undefined && p.phase !== 'evening' && p.phase !== 'morning') {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid day_checkins phase value' })
+            continue
+          }
+          // Q-465, mirroring the web route: a body with no answers writes a row indistinguishable
+          // from a real check-in in which the user said nothing. Rejected per-item rather than
+          // retried — a mutation carrying no information will never carry any, so retrying it
+          // forever is the poison-pill shape the outbox exists to avoid.
+          if (!dayCheckinHasAnswers(p)) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Day check-in carries no answers' })
             continue
           }
           const phase = (p.phase as 'evening' | 'morning' | undefined) ?? 'evening'

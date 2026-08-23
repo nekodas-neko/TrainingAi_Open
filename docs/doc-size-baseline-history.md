@@ -1842,6 +1842,23 @@ ring-key progress note.
 
 `docs/implementation-backlog.md` loses 335: Q-534 closed on measurement rather than implementation.
 
+## 2026-08-23 — `projectOverview.md` 7983 → 7989
+
+Six lines: a Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch.
+
+Worth recording *how* this nearly went wrong, since the Lane B baton warned about it and it happened
+anyway. Resolving the merge with a blind "keep both sides" **duplicated the ring-service paragraph**
+— main had compacted the same entry I had written, so the two sides were one entry reworded, not two
+independent ones. The tell was the arithmetic: the check reported 14 lines added by a branch whose
+own addition is 6. "Keep both" is right for genuinely independent appended entries and wrong for a
+rewritten one, and the only reliable way to tell them apart is to read the resolved text.
+
+## 2026-08-23 — `projectOverview.md` 7869 → 7879
+
+Ten lines: the Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch, restored after
+a merge. The count moved because the surrounding section shrank underneath it, not because the entry
+grew.
+
 ## 2026-08-23 — `docs/implementation-backlog.md` 11202 → 11129
 
 Removing four entries that had already shipped and were **resurrected by one of my own merge
@@ -1865,3 +1882,14 @@ One line, beside the existing `package.json`/`changelog.ts` conflict rule, becau
 class and the same place someone resolving a conflict would look: a backlog conflict is two
 deletions and keeping both resurrects two shipped entries. It belongs in the rules rather than only
 in this file's history, since this file is read after the mistake and `CLAUDE.md` before it.
+
+## 2026-08-23 — counts re-measured after the resurrected-entry removal
+
+`projectOverview.md` 7884 · `docs/implementation-backlog.md` 10972 · `CLAUDE.md` 1136, all read off
+the merged files rather than carried across from either side.
+
+A second thing learned in the same merge: **never text-merge `doc-size-baseline.json`.** "Keep both"
+on a JSON file produces two `files` blocks and an unparseable document — the same blind resolution
+that resurrected the four entries this branch removes, failing a different way. On a JSON baseline
+take main's copy and re-measure; the numbers are derived from the files, so there is nothing to
+merge.

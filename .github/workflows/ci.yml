@@ -312,6 +312,9 @@ jobs:
       - name: Dynamic route path params are validated as UUIDs
         run: node scripts/check-dynamic-route-uuid-guard.js
 
+      - name: API routes do not authorise from the stale isAdmin claim
+        run: node scripts/check-admin-claim-in-api.js
+
       - name: One canonical TTL per cache key
         run: node scripts/check-cache-ttl-divergence.js
 

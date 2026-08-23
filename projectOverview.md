@@ -34,13 +34,28 @@ entry. The engine write paths now invalidate on **both** sides of the push (`pus
 the immediate call stays because offline it is the only one that fires. Six `components/**` sites
 carry the same shape — filed as **LB-6**, audit done.
 
-**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
-(`/admin/oura-ble` → **Show key for backup**), a full re-sync that notifies on completion, and a
-connect sequence that resets the two live-HR levers a killed session left on forever. **All native —
+**Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
+Three GET routes answered a parameter or configuration question before establishing the caller was
+anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push
+configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants
+read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real
+fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row
+indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write
+paths, since the outbox reaches the same table
+([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
+
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
+backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
+the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
 inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
 with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
+
+**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** The plan wizard's "meals you
+usually eat" step takes a URL. A page that states no yield hands back the **whole recipe** — 1,956
+kcal for a banana-bread loaf — so the row asks how many it serves and cannot be kept until answered;
+`perServing` is shared with the route so the two divides cannot drift.
 
 **Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to
 128 px WebP (~6 KB) so it fits `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { isAdminUser } from '@/lib/admin'
+import { requireAdmin, adminErrorResponse } from '@/lib/admin'
 import { z } from 'zod'
 import type { MuscleAssignment } from '@trainingai/shared/types/program'
 import { reportServerError } from '@/lib/observability'
@@ -45,8 +45,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  if (!(await isAdminUser(session.user.id, session.user.isAdmin))) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  // Q-479: this used to be `isAdminUser(session.user.id, session.user.isAdmin)`, and passing the
+  // second argument makes that helper *return the JWT claim* rather than read the row. The claim is
+  // refreshed at most once a day (`ISACTIVE_RECHECK_MS`), so a revoked admin kept writing to the
+  // shared exercise catalogue for up to 24 hours — measured at 201 here against 403 from
+  // `/api/admin/errors` on the same cookie in the same instant. `requireAdmin` reads the row every
+  // call, which is what the other 61 API routes do.
+  try {
+    await requireAdmin(session.user.id)
+  } catch (err) {
+    return adminErrorResponse(err)
   }
 
   try {
