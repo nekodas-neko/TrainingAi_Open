@@ -1362,81 +1362,15 @@ whether or not anyone draws them first.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
 
-### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
-
-> **⚠️ Lane check done 2026-08-19 (Lane A) — the answer is NO schema change, so this is wholly Lane
-> B.** The entry says to check before starting and hand the half over rather than take a migration
-> number; there is no half to hand over.
->
-> - **Idempotence needs no new key.** `meal_plan_meals.saved_meal_id` already exists
->   (`schema.ts:649`, `ON DELETE SET NULL`) and `generate/route.ts` already carries it for a plan meal
->   that *came from* a saved meal. Saving stamps it; a repeat save is a no-op. That is better than the
->   proposed `(plan id, plan item id)` key because `structure/route.ts:152` already preserves it
->   across a regenerate.
-> - **The `plan` tag needs no column.** A saved meal is plan-derived iff some `meal_plan_meals` row
->   points at it — derivable by join, and the derive-don't-store rule prefers that.
-> - **No new route either.** Each plan meal carries a denormalised `ingredients` snapshot in the
->   `NutritionIngredient` shape, and `createFoodItem` (`packages/shared/src/nutrition/create-food-item.ts`)
->   is already a shared offline-first helper that mints the id, writes locally and queues the outbox
->   mutation. `POST /api/nutrition/saved-meals` takes it from there, and
->   `PATCH /api/nutrition/meal-plans/meals/[mealId]` already accepts `savedMealId`.
->
-> **The one thing to get right is `saved_meal_items.food_item_id` is NOT NULL** with
-> `ON DELETE restrict` — the copy must create or match a `food_items` row per ingredient, which is
-> what `createFoodItem` is for. Step 3 (deleting plan surface) still needs owner confirmation.
-
-
-- **Branch:** `feat/meal-plan-to-saved-meals`
-- **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
-- **Lane:** B
-  used too much; it will be created - then likely not used again. It would be good if each item from
-  the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
-  sections."*
-- **Lane B** for the UI. **Lane A** if the plan→meal copy needs a column or a sync change — check
-  before starting, and hand that half over rather than taking a migration number.
-
-**What this replaces.** The meal plan is five surfaces — `meal-plan-section`, `meal-plan-review-card`,
-`meal-plan-setup-sheet`, `meal-plan-edit-sheet`, `meal-plan-manage-sheet` — plus its own row shape,
-its own staleness banner and its own editing model. All of it exists to maintain a thing the owner
-builds once and then stops opening. That is a lot of surface earning very little.
-
-**The reframe, and it is the owner's:** a plan is not somewhere you live, it is a **batch generator**.
-Each meal it produces gets a **Save** action; saved, it becomes an ordinary `saved_meals` row and
-inherits everything that already works — the detail screen, the macro split, the printable label and
-its QR, logging in one tap. The plan can then be discarded without losing anything worth keeping.
-
-**What to build.**
-1. **A `Save` action per plan meal, and a `Save all N`.** Saving writes `saved_meals` +
-   `saved_meal_items` from the plan's own items — the same rows the meal builder writes, so there is
-   exactly one representation of a meal in the app. A saved row shows its QR affordance in place of
-   the Save button, which is also how you see at a glance what you have already kept.
-2. **A `plan` tag on the resulting My Meals row**, so provenance is visible and nothing else about
-   the row is special.
-3. **Then delete surface, do not add it.** Once meals live in My Meals, `meal-plan-section` on the
-   day screen and `meal-plan-review-card`'s staleness nag have no job — the plan is not a live thing
-   to keep fresh any more. **Confirm that with the owner before removing anything**; this entry
-   proposes the reduction, it does not authorise it.
-
-- **⚠ Do not merge the two data models.** `saved_meals` is the destination, the plan stays its own
-  tables. Copy on save; never make a plan row and a meal row the same record. A plan is a schedule of
-  suggestions and a saved meal is a recipe you own — collapsing them means editing a saved meal
-  silently rewrites a plan, or deleting a plan takes your meals with it.
-- **Idempotence matters more than it looks.** "Save all" pressed twice must not produce nine
-  duplicates. Key the copy on `(plan id, plan item id)` and make a repeat save a no-op that reports
-  what already existed.
-- **Verification:** save one plan meal, then prove the resulting row logs, prints a label, and that
-  the label's QR scans back to it — the whole claim of this entry is that a plan meal becomes
-  indistinguishable from a hand-built one, so the label path is the test that proves it.
-
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
 - **Lane:** ?
-- **Needs:** Q-398
-- **Placement:** in the nutrition cluster, after Q-398. It **depends on Q-398**: the plan's exit
-  route in this design is "Save all as meals", and until plan meals can become ordinary saved
-  meals, a conversational plan has nowhere to land and is only a nicer-looking dead end.
+- **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
+  dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
+  can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
+  was only a nicer-looking dead end.
 - **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
   work - its too step by step - Could we try implement this into an AI coach/meal builder type
   thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I

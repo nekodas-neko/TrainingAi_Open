@@ -1,10 +1,11 @@
 'use client'
 
 import { memo, useState, type CSSProperties } from 'react'
-import { ChevronDown, UtensilsCrossed, Check, Loader2, Plus, X, Undo2 } from 'lucide-react'
+import { ChevronDown, UtensilsCrossed, BookmarkPlus, Loader2 } from 'lucide-react'
 import { cn } from '@trainingai/shared/utils'
 import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { MealPlan, MealPlanVariant, MealPlanMeal, MealPlanDayType } from '@trainingai/shared/types/nutrition'
+import { PlanMealRow } from './plan-meal-row'
 
 interface Props {
   plan: MealPlan | null
@@ -25,6 +26,12 @@ interface Props {
   declinedMealIds?: Set<string>
   /** Record or undo "I didn't eat this". Absent while meal types are still loading. */
   onSetDeclined?: (meal: MealPlanMeal, declined: boolean) => void
+  /** Copy a planned meal into My Meals (Q-398). */
+  onSaveMeal?: (meal: MealPlanMeal) => void
+  /** Copy every meal that is not already saved, in one action. */
+  onSaveAllMeals?: (meals: MealPlanMeal[]) => void
+  /** Positions currently being copied, so only their own rows spin. */
+  savingPositions?: Set<number>
 }
 
 /**
@@ -59,6 +66,7 @@ const brandCardStyle: CSSProperties = {
 export const MealPlanSection = memo(function MealPlanSection({
   plan, loading, eaten, isTrainingDay, onCreate, onViewPlan,
   onLogMeal, loggingPosition, loggedPositions, declinedMealIds, onSetDeclined,
+  onSaveMeal, onSaveAllMeals, savingPositions,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
 
@@ -84,6 +92,10 @@ export const MealPlanSection = memo(function MealPlanSection({
   }
 
   const variant = pickVariant(plan, isTrainingDay)
+  // A meal with no ingredients has nothing to copy — plans generated before Q-192 stored only names
+  // and macros, and a saved meal built from those would be an empty recipe.
+  const unsaved = variant.meals.filter(m => m.savedMealId == null && m.ingredients.length > 0)
+  const busySaving = (savingPositions?.size ?? 0) > 0
   const dayLabel = variant.dayType === 'all' ? null
     : variant.dayType === 'training' ? 'Training day' : 'Rest day'
 
@@ -136,86 +148,40 @@ export const MealPlanSection = memo(function MealPlanSection({
       </button>
 
       {expanded && (
-        <ul className="mt-2 divide-y divide-border/50">
-          {variant.meals.map(meal => (
-            <li key={meal.id} className="py-2.5">
-              <div className="flex items-baseline justify-between gap-3">
-                <span className="min-w-0 flex-1 text-sm font-medium truncate">
-                  {meal.suggestedTime && (
-                    <span className="mr-1.5 tabular-nums text-muted-foreground">{meal.suggestedTime}</span>
-                  )}
-                  {meal.name}
-                </span>
-                <span className="text-xs tabular-nums text-muted-foreground flex-none">
-                  {meal.targetCalories.toLocaleString()} kcal
-                </span>
-              </div>
-              <p className="mt-0.5 text-[11px] tabular-nums text-muted-foreground">
-                {Math.round(meal.targetProteinG)}P · {Math.round(meal.targetCarbsG)}C · {Math.round(meal.targetFatG)}F
-              </p>
-              {/* Plans have stored their ingredients since Q-192; before that this card could only
-                  say a meal's name and its macros, which is not enough to go and eat it. */}
-              {meal.ingredients.length > 0 && (
-                <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/80">
-                  {meal.ingredients.map(i => `${i.name} ${Math.round(i.weightG)}g`).join(' · ')}
-                </p>
-              )}
-              {meal.notes && (
-                <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground/80">{meal.notes}</p>
-              )}
+        <>
+          <ul className="mt-2 divide-y divide-border/50">
+            {variant.meals.map(meal => (
+              <PlanMealRow
+                key={meal.id}
+                meal={meal}
+                accent={BRAND}
+                logging={loggingPosition === meal.position}
+                busyLogging={loggingPosition != null}
+                logged={loggedPositions?.has(meal.position) ?? false}
+                declined={declinedMealIds?.has(meal.id) ?? false}
+                onLog={onLogMeal}
+                onSetDeclined={onSetDeclined}
+                onSave={onSaveMeal}
+                saving={savingPositions?.has(meal.position) ?? false}
+              />
+            ))}
+          </ul>
 
-              {/* The tap IS the confirmation, which is why this needs none of the prefilled-but-
-                  unconfirmed machinery the automatic version (Q-187 phase 2) does — nothing can
-                  count toward the day's totals unless the user said they ate it. */}
-              {onLogMeal && meal.ingredients.length > 0 && (
-                declinedMealIds?.has(meal.id) ? (
-                  /* Declined. Nothing was written to the day's food, so the totals above are
-                     untouched — the answer only stops this meal asking again. One tap undoes it,
-                     because "no" is one mis-tap away from losing the meal for the day. */
-                  <button
-                    onClick={() => onSetDeclined?.(meal, false)}
-                    className="mt-1.5 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-transparent text-xs font-semibold text-muted-foreground active:bg-muted/30 transition-colors"
-                  >
-                    <Undo2 className="w-3.5 h-3.5" /> Didn&apos;t eat this — undo
-                  </button>
-                ) : (
-                  <div className="mt-1.5 flex items-center gap-1.5">
-                    <button
-                      onClick={() => onLogMeal(meal)}
-                      disabled={loggingPosition != null || loggedPositions?.has(meal.position)}
-                      className={cn(
-                        'flex-1 min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl',
-                        'text-xs font-semibold transition-colors disabled:opacity-60',
-                        loggedPositions?.has(meal.position)
-                          ? 'bg-transparent text-muted-foreground'
-                          : 'bg-muted/60 active:bg-muted/30',
-                      )}
-                    >
-                      {loggingPosition === meal.position ? (
-                        <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Logging…</>
-                      ) : loggedPositions?.has(meal.position) ? (
-                        <><Check className="w-3.5 h-3.5" style={{ color: BRAND }} /> Logged</>
-                      ) : (
-                        <><Plus className="w-3.5 h-3.5" /> I ate this</>
-                      )}
-                    </button>
-                    {/* Hidden once the meal is logged: "ate it" is derived from the food itself, so
-                        offering "no" beside a logged meal would be offering to contradict it. */}
-                    {onSetDeclined && !loggedPositions?.has(meal.position) && (
-                      <button
-                        onClick={() => onSetDeclined(meal, true)}
-                        aria-label={`Did not eat ${meal.name}`}
-                        className="min-h-[44px] w-11 flex-none flex items-center justify-center rounded-xl bg-muted/40 text-muted-foreground active:bg-muted/20 transition-colors"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                )
-              )}
-            </li>
-          ))}
-        </ul>
+          {/* One action for the whole plan, because the point of Q-398 is that the plan is a batch
+              generator — saving nine meals one at a time is the thing it exists to avoid. Hidden
+              once every meal is kept, rather than sitting there doing nothing. */}
+          {onSaveAllMeals && unsaved.length > 0 && (
+            <button
+              onClick={() => onSaveAllMeals(unsaved)}
+              disabled={busySaving}
+              className="mt-2 w-full min-h-[44px] flex items-center justify-center gap-1.5 rounded-xl bg-muted/50 text-xs font-semibold active:bg-muted/30 transition-colors disabled:opacity-60"
+            >
+              {busySaving
+                ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Saving…</>
+                : <><BookmarkPlus className="w-3.5 h-3.5" /> Save all {unsaved.length} to My Meals</>}
+            </button>
+          )}
+        </>
       )}
 
       <button

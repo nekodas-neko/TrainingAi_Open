@@ -18,6 +18,8 @@ interface Props {
   onEdit: () => void
   onDelete: () => void
   onLabel: () => void
+  /** This meal was copied from the meal plan (Q-398) — provenance, derived by join, never stored. */
+  fromPlan?: boolean
 }
 
 /**
@@ -33,7 +35,7 @@ interface Props {
  * other small icons, and the only feedback was a toast after the fact.
  */
 export const SavedMealCard = memo(function SavedMealCard({
-  meal, logging, selected, onToggleSelected, onLog, onEdit, onDelete, onLabel,
+  meal, logging, selected, onToggleSelected, onLog, onEdit, onDelete, onLabel, fromPlan,
 }: Props) {
   const [expanded, setExpanded] = useState(false)
   const [confirmingDelete, setConfirmingDelete] = useState(false)
@@ -100,7 +102,16 @@ export const SavedMealCard = memo(function SavedMealCard({
             </span>
           )}
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-semibold">{meal.name}</p>
+            <p className="text-sm font-semibold">
+              {meal.name}
+              {/* A word, not a coloured dot: provenance has to survive the colour-only-state rule
+                  and a monochrome screenshot alike. */}
+              {fromPlan && (
+                <span className="ml-1.5 align-middle rounded-full bg-muted px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">
+                  From plan
+                </span>
+              )}
+            </p>
             {servings !== 1 && (
               <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
                 Makes {servings} portions

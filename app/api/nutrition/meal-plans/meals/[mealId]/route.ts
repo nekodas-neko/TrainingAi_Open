@@ -43,14 +43,13 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
   const badId = invalidUuidResponse(mealId)
   if (badId) return badId
 
-  let raw: unknown
   const read = await readJsonLimited(req, MAX_BODY_BYTES)
   if (!read.ok) {
     return read.reason === 'too_large'
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
-  const parsed = PatchSchema.safeParse(raw)
+  const parsed = PatchSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
