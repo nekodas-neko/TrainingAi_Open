@@ -27,6 +27,12 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**The AI-usage screen's top row was an artefact of its own fingerprint (Q-471).** Three meal-plan
+sections fingerprinted on a rounded calorie target alone, so every deliberate reroll read as a
+double trip. They now carry what distinguishes a request, keyed through a new `contentKey` helper.
+**44 of the 89 redundant calls were this artefact; the other 45 are real** (Q-470, Q-469) —
+[journal](docs/overview/entries/2026-08-23-ai-fingerprint-granularity.md).
+
 **The Oura rollup now takes an I/O port (Q-545, D2 Task 2).** `aggregateOuraRawSamples` is now
 `runOuraRollup(io, timezone, opts)` (`lib/oura-ble/rollup/run.ts`) behind a 22-method `RollupIO`;
 `adapter.ts` drops 6,906 → 5,818 lines. No behaviour change — the 20 test files that drive the

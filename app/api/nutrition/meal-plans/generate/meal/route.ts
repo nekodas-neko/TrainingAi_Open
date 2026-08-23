@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { generateObject } from 'ai'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
@@ -116,7 +116,20 @@ export async function POST(req: Request) {
   let meal: z.infer<typeof MealSchema>
   try {
     const result = await loggedGenerateObject(
-      { section: rewriting ? 'meal-plan-edit-meal' : 'meal-plan-generate-meal', userId, fingerprint: String(Math.round(input.targetCalories)) },
+      {
+        section: rewriting ? 'meal-plan-edit-meal' : 'meal-plan-generate-meal',
+        userId,
+        // A rounded calorie target alone made every deliberate reroll look like a double trip
+        // (Q-471) — it is the same for every slot in a plan and does not change when the user
+        // rerolls. What actually differs is `avoidNames`, which carries the meal being replaced
+        // (see the schema), and for a rewrite the instruction and the meal it applies to.
+        fingerprint: {
+          kcal: Math.round(input.targetCalories),
+          avoid: contentKey(...(input.avoidNames ?? [])),
+          instruction: contentKey(input.instruction),
+          meal: contentKey(input.currentMeal?.name),
+        },
+      },
       () => generateObject({
         model: aiModel(),
         schema: MealSchema,

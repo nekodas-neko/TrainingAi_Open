@@ -1656,3 +1656,13 @@ form — the import-graph walk found it, a name grep did not.
 
 Two net lines because the closure also strikes the "the only thing standing between here and a
 device rollup" pointer it replaces.
+
+## 2026-08-23 — `projectOverview.md` 7928 → 7934, `docs/implementation-backlog.md` 11522 → 11497
+
+Shrink. Q-471 shipped and its entry is removed (the protocol: a finished entry must not linger in
+the queue), against six lines added to Q-545 for the `Gate: device` that its remaining tasks now
+carry.
+
+The six in `projectOverview.md` are Q-471's Current Status entry, trimmed to the finding and the
+number that matters — 44 of the 89 redundant calls were the artefact, 45 are real — with the
+measurement in the journal.

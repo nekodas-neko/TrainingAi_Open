@@ -7,13 +7,62 @@ vi.mock('@/lib/data', () => ({
   getRepository: async () => ({ insertAiCallLog }),
 }))
 
-import { aiFingerprint, AI_MODEL_ID, withAiLogging, loggedGenerateObject } from '../instrument'
+import { aiFingerprint, contentKey, AI_MODEL_ID, withAiLogging, loggedGenerateObject } from '../instrument'
 
 // The insert is fired without await (never blocks the AI call), so tests wait a
 // macrotask for it to land.
 const flush = () => new Promise(r => setTimeout(r, 0))
 
 beforeEach(() => insertAiCallLog.mockClear())
+
+describe('contentKey — free text as a key, so it can enter a fingerprint (Q-471)', () => {
+  it('is deterministic and 8 hex chars', () => {
+    expect(contentKey('Chicken rice bowl')).toBe(contentKey('Chicken rice bowl'))
+    expect(contentKey('Chicken rice bowl')).toMatch(/^[0-9a-f]{8}$/)
+  })
+
+  it('is empty for no content, so an absent optional input does not shift the key', () => {
+    expect(contentKey()).toBe('')
+    expect(contentKey(undefined, null, '')).toBe('')
+    // `stores: []` and no stores at all must fingerprint identically.
+    expect(contentKey(...[])).toBe(contentKey(undefined))
+  })
+
+  it('is order-sensitive, unlike the object-key sort in aiFingerprint', () => {
+    // Deliberate: `avoidNames` carries the plan's meals in slot order, so a reorder IS a different
+    // request. The sort in `stableStringify` applies to object keys, never to array members.
+    expect(contentKey('a', 'b')).not.toBe(contentKey('b', 'a'))
+  })
+
+  it('separates its parts, so ["ab","c"] and ["a","bc"] do not collide', () => {
+    expect(contentKey('ab', 'c')).not.toBe(contentKey('a', 'bc'))
+  })
+})
+
+describe('meal-plan fingerprints tell a reroll from a double trip (Q-471)', () => {
+  // The bug: all three meal-plan sections fingerprinted on a rounded calorie target alone, so a
+  // deliberate reroll — same target, different meal to avoid — was indistinguishable from the same
+  // call firing twice. It was the top row of the AI-usage screen: 32 redundant, 4 distinct.
+  const fp = (avoidNames: string[]) =>
+    aiFingerprint('meal-plan-generate-meal', {
+      kcal: 620,
+      avoid: contentKey(...avoidNames),
+      instruction: contentKey(undefined),
+      meal: contentKey(undefined),
+    })
+
+  it('a reroll differs, because the meal being replaced is in avoidNames', () => {
+    expect(fp(['Chicken rice bowl'])).not.toBe(fp(['Chicken rice bowl', 'Beef stir fry']))
+  })
+
+  it('a genuine repeat — identical request, twice — still fingerprints the same', () => {
+    expect(fp(['Chicken rice bowl'])).toBe(fp(['Chicken rice bowl']))
+  })
+
+  it('two slots at the same calorie target no longer collide', () => {
+    expect(fp(['Oats and berries'])).not.toBe(fp(['Salmon and potatoes']))
+  })
+})
 
 describe('aiFingerprint', () => {
   it('is deterministic for the same section + input', () => {

@@ -2898,6 +2898,12 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
 
+- **Gate: device** — added 2026-08-23, once the engine half was done. Every remaining task needs the
+  S25: Task 3's wiring is verified by the rollup producing identical output on device, Task 4's
+  WASM instantiation cannot be asserted anywhere else, Task 6 is a soak with both paths agreeing,
+  and Task 7 is the single-writer flip. The server-side work this entry named is complete and is
+  recorded below; what is left is not startable from a sandbox.
+
 > **✅ TASK 2 SHIPPED (extraction only) — the rest of the entry stands.** `aggregateOuraRawSamples`
 > is now `runOuraRollup(io, timezone, opts)` in `lib/oura-ble/rollup/run.ts`, taking a `RollupIO`
 > port (`lib/oura-ble/rollup/io.ts`); `lib/data/postgres/rollup-io.ts` holds the server
@@ -3073,37 +3079,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
   baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
   cutting deploy frequency, not more tuning.
-### [platform][nutrition] Q-471 — the double-trip metric counts deliberate rerolls as redundant, and that is the AI-usage screen's top row
-
-- **Branch:** `fix/ai-fingerprint-granularity`
-- **Added:** 2026-08-18 · review sweep from **owner-supplied production screenshots** of More →
-  Developer → AI usage · [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
-- **Placement:** above Q-470/Q-469, because it decides how those are read. A misleading diagnostic
-  sends implementers at the wrong row.
-- **What the screen shows (30d):** 268 calls, 89 of them "redundant" (33%), topped by
-  `meal-plan-generate-meal` at **32 redundant · 4 distinct**.
-- **Why the top row is an artefact.** Redundancy is `(user_id, section, fingerprint)` repeating within
-  120 s (`lib/data/postgres/adapter.ts:4489`). Three sections fingerprint on a calorie target alone:
-  ```
-  meal-plan-generate-meal   String(Math.round(input.targetCalories))
-  meal-plan-top-up          String(Math.round(targets.calories))
-  meal-plan-generate        `${mealCount}:${dayTypes.join('/')}`
-  ```
-  Rerolling a meal is the feature working — tap reroll, dislike it, tap again — and every such call
-  carries the same rounded calorie target, so **every deliberate reroll after the first counts as
-  redundant**. "32 · 4" most plausibly reads as four meal slots rerolled ~8 times each.
-- **⚠️ The reroll path is already correctly guarded — do not "fix" it.** `meal-plan-review-step.tsx`
-  sets `rerolling` before the fetch and every control carries `disabled={rerolling != null}` (reroll
-  icon, instruction submit, both reorder arrows). There is no tap-spam here. This entry exists partly
-  to stop someone being sent to that file by the screen.
-- **So 44 of the 89 redundant calls (32 + 9 + 3) are artefact; the other 45 are real** (Q-470, Q-469).
-- **Fix shape:** fingerprint on what actually distinguishes one request from another — for
-  `generate-meal` at least the meal `position` plus `avoidNames` (which already changes on every
-  successful reroll); for `meal-plan-generate`, excluded foods and stores. The instrument's rule
-  ("ids/dates/keys only, never raw prompt text or health data") still holds — these are ids and keys.
-  Alternatively mark user-initiated repeats at the call site, which is the distinction the screen is
-  actually trying to draw. **Lane A.**
-
 ### [workouts][platform] Q-470 — the background prescription regeneration has a rate limit but no in-flight guard, so a second page-load fires it again
 
 - **Branch:** `fix/prescription-regen-in-flight-guard`
