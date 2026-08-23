@@ -329,81 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [workouts] 🔴 BF-8 — nothing on screen says today is a deload, and the owner trained one believing it was a full session
-
-- Lane: B — `components/workout/use-deload-choice.ts` + `components/workout/pre-workout-screen.tsx`
-
-**Found by intake, 2026-08-23, in a screenshot the owner sent for a different request** — not reported,
-so it may be by design; the trace below says why it probably is not.
-
-**🔴 CONFIRMED BY THE OWNER, 2026-08-23 — this is lived, not theoretical.** Verbatim: *"I think you
-sre right - I was under the assumption I was doing my full session but it looks like it has been
-deload. it was what you noticed; its too hidden."* Promoted to the head of the queue: a training
-decision was made on a wrong reading of the app's own display, and the session was run before anyone
-noticed.
-
-**And it is worse than first filed — the active workout screen hides it too.** A second screenshot,
-mid-session, shows the header reading **"Accumulation · S1 · Ex 1/5 · 3:41"** with no deload marker
-anywhere. Traced to `components/workout/active-workout-screen.tsx:220–224`, which prints
-`"Deload · "` **only** when `phaseStatus.isDeloadActive`; anything else falls through to
-`${phase.name} · S${n} · `.
-
-**So both surfaces fail on the same predicate, and that is the actual root cause.**
-`isDeloadActive` answers *"is the current phase a deload week"*. Neither surface asks the question
-that matters — *"is today's session a deload"* — which is what `prescription.deload` holds:
-
-| surface | file | what it does with `isDeloadActive` |
-|---|---|---|
-| Intensity toggle | `pre-workout-screen.tsx:218` | hides the toggle (so a phase deload is handled) |
-| Session header | `active-workout-screen.tsx:220` | prints `"Deload · "` |
-
-An auto-applied deload satisfies neither, so it is invisible from the pre-workout screen through to
-the last set. **Fix the predicate once, in both places** — a fix to one surface alone leaves the
-other lying, which is the sibling-surface sweep CLAUDE.md already requires.
-
-**Consequence beyond the display:** a deload run as though it were a full session is also a
-training-load record whose intent nobody can reconstruct later. The owner's report is the evidence
-that this is not hypothetical.
-
-**What the screen shows, top to bottom:** *INTENSITY TODAY* with **Full · As prescribed** selected;
-then *TIME TODAY*; then the AI card reading **"AI Prescription · Accumulation · Auto-applied"** with
-the subtitle **"Deload session · ~48 min"**. The user is told intensity is full and as-prescribed,
-directly above a plan the app itself labels a deload.
-
-**Traced, and the two halves are genuinely unconnected:**
-- The toggle's value is `deload` from `useDeloadChoice(seedFromUrl)`
-  (`components/workout/use-deload-choice.ts`). That hook is
-  `useState(seedFromUrl)` where the seed is the `?aiDeload=1` URL param — **it never reads the
-  prescription's own `deload` flag.** Absent that param it is `false`, i.e. "Full", regardless of
-  what was actually prescribed.
-- The card's subtitle comes from `prescription.deload`
-  (`components/workout/ai-prescription-card.tsx:160`).
-- `pre-workout-screen.tsx:218` hides the toggle entirely when `phaseStatus?.isDeloadActive` — so a
-  **phase** deload is handled. A deload the prescription applied for its own reasons (readiness,
-  the "Auto-applied" case in the screenshot) has no equivalent guard, which is exactly the state
-  captured here.
-
-**Why this is worth fixing rather than explaining.** "As prescribed" is a claim about the
-prescription, and here it contradicts the prescription on the same screen. The toggle is also
-live — flipping it re-keys the workout-data cache and refetches — so a user who taps **Full**
-believing they are confirming the current state may instead be overriding an auto-applied deload
-back to full loads on a day the readiness engine asked for one.
-
-**What would confirm it:** open the pre-workout screen on a day where the prescription auto-applies
-a deload while the phase is *not* a deload week (`phaseStatus.isDeloadActive === false`), with no
-`?aiDeload=1` in the URL. The toggle should read Full while the card reads "Deload session".
-
-**Fix direction, for whoever takes it:** either seed/reflect the toggle from the prescription's own
-`deload` flag so it shows what is actually going to run, or relabel it so it reads as an override
-rather than a statement of current state. The first is better — the sublabels already say "As
-prescribed", which is only true if it reflects the prescription. Do **not** simply hide the toggle
-on an auto-applied deload: the comment at `pre-workout-screen.tsx:215` records why it must stay
-reachable — gating it on an existing prescription would leave no way to pick Deload before one
-exists.
-
-**Done looks like:** on a day with an auto-applied deload, the Intensity control and the prescription
-card agree about whether today is a deload.
-
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -3932,7 +3857,6 @@ ehr     0     0     0     0   648   208   128   556     0
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
 
-
 ### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
 
 - **Branch:** `fix/claude-ro-owner-id-out-of-committed-migrations`
@@ -3969,33 +3893,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Related, not filed separately:** `private-paths.json` protects a third party's IP well, and
   nothing plays that role for this project's own users' identifiers. Whether that wants a second list
   or a widening of the existing one is a design decision; see the review's closing section.
-
-### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
-
-- **Branch:** `fix/publish-dry-run-build-gate`
-- **Found:** 2026-08-16, while doing A4b.
-
-`scripts/publish-dry-run.js` runs six gates — typecheck, tests, private-paths, dormancy,
-inlined-constants, doc-links — and **not `next build`**. That gap is not theoretical: A3 was recorded
-as having made the model constants a runtime-only dependency, and the dry-run's green `--all` was the
-evidence. It was wrong. Six modules still read a constant at **module scope**, and `next build`
-imports every route to collect page data, so the build opened the files. Deleting them produced
-`ENOENT ... energy-expenditure-features.json` at `Failed to collect page data for /api/achievements`
-— which would have been a failed Railway deploy, not a local annoyance.
-
-A4b fixed the six modules (they read on first use now). This entry is about the *gate*: nothing stops
-the next module-scope read from re-introducing the same class, and the script that exists to answer
-"does the published tree still work" cannot currently see a build failure at all.
-
-**Do:** add `['build', 'npx', ['next', 'build']]` to `GATES`. Cost is the reason it was left out —
-a build is minutes, not seconds — so consider making it opt-in behind a flag that `--all` sets, since
-`--all` is the mode that models the end state and is run rarely. The script's existing
-baseline-re-run logic already tells a pre-existing red from a regression, so a slow gate stays
-trustworthy.
-
-**Cheaper partial:** a Custom Rules check that fails on a module-scope call to any
-`lib/oura-models/constants` getter. That catches the specific class in seconds without a build, and
-is worth having either way.
 
 ### [platform] Q-312 — the synthetic MET table is physiologically impossible, and it costs ~9 tests in CI
 
@@ -4521,7 +4418,6 @@ session working from a temporarily restored copy.
   distribution path.
 - **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
   than the release and tag, so the release id and tag survive the swap.
-
 
 ### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
 
