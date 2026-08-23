@@ -1913,10 +1913,45 @@ Ten lines: the Current Status entry for the Q-454/Q-455/Q-465 route-hardening ba
 a merge. The count moved because the surrounding section shrank underneath it, not because the entry
 grew.
 
-## 2026-08-23 — `CLAUDE.md` 1136 → 1141
+## 2026-08-23 — `CLAUDE.md` 1136 → 1142
 
 Six lines in the `CLAUDE_DB_READONLY_URL` section: the owner id has left the generated `claude_ro`
 views (Q-456) and is now set at boot from the environment. It belongs in the rules because the
 failure mode when *no* variable is set is *the views return zero rows* — and a session that reads
 `error_events` at start-up and gets nothing needs to recognise a missing setting rather than
 conclude production is quiet.
+
+## 2026-08-23 — `docs/implementation-backlog.md` 11202 → 11129
+
+Removing four entries that had already shipped and were **resurrected by one of my own merge
+resolutions**. Recorded here rather than only in a commit message, because the mechanism is the one
+this file already warned about two entries above and it still got through.
+
+Resolving a backlog conflict with "keep both sides" is wrong when each side has *deleted a different
+completed entry*: keeping both restores both. That is what happened in #334 — LB-4, Q-454, Q-455 and
+Q-465 came back into the queue after shipping, and nothing catches it, because
+`check-backlog-pointers` only fails on a queue heading that says ✅/SHIPPED and a resurrected entry
+reads exactly like an open one.
+
+The rule that follows: on `docs/implementation-backlog.md` a conflict is almost always **two
+deletions**, and the resolution is to keep neither side. On append-only files
+(`known-issues-resolved.md`, this one) it is almost always two additions, and keeping both is right.
+Read the headings before choosing — the two cases are indistinguishable from the marker alone.
+
+## 2026-08-23 — `CLAUDE.md` 1135 → 1136
+
+One line, beside the existing `package.json`/`changelog.ts` conflict rule, because it is the same
+class and the same place someone resolving a conflict would look: a backlog conflict is two
+deletions and keeping both resurrects two shipped entries. It belongs in the rules rather than only
+in this file's history, since this file is read after the mistake and `CLAUDE.md` before it.
+
+## 2026-08-23 — counts re-measured after the resurrected-entry removal
+
+`projectOverview.md` 7884 · `docs/implementation-backlog.md` 10972 · `CLAUDE.md` 1136, all read off
+the merged files rather than carried across from either side.
+
+A second thing learned in the same merge: **never text-merge `doc-size-baseline.json`.** "Keep both"
+on a JSON file produces two `files` blocks and an unparseable document — the same blind resolution
+that resurrected the four entries this branch removes, failing a different way. On a JSON baseline
+take main's copy and re-measure; the numbers are derived from the files, so there is nothing to
+merge.

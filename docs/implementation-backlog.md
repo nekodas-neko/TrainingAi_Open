@@ -843,8 +843,6 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
 `invalidateNutritionWrite()` on the client, same as the move.
 
 
-### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
-
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
 - **Branch:** `chore/adopt-use-cached-value`
@@ -3819,34 +3817,6 @@ ehr     0     0     0     0   648   208   128   556     0
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
 
-
-### [platform] Q-313 — the publish dry-run has no `next build` gate, and that is what let A4b's real blocker through
-
-- **Branch:** `fix/publish-dry-run-build-gate`
-- **Found:** 2026-08-16, while doing A4b.
-
-`scripts/publish-dry-run.js` runs six gates — typecheck, tests, private-paths, dormancy,
-inlined-constants, doc-links — and **not `next build`**. That gap is not theoretical: A3 was recorded
-as having made the model constants a runtime-only dependency, and the dry-run's green `--all` was the
-evidence. It was wrong. Six modules still read a constant at **module scope**, and `next build`
-imports every route to collect page data, so the build opened the files. Deleting them produced
-`ENOENT ... energy-expenditure-features.json` at `Failed to collect page data for /api/achievements`
-— which would have been a failed Railway deploy, not a local annoyance.
-
-A4b fixed the six modules (they read on first use now). This entry is about the *gate*: nothing stops
-the next module-scope read from re-introducing the same class, and the script that exists to answer
-"does the published tree still work" cannot currently see a build failure at all.
-
-**Do:** add `['build', 'npx', ['next', 'build']]` to `GATES`. Cost is the reason it was left out —
-a build is minutes, not seconds — so consider making it opt-in behind a flag that `--all` sets, since
-`--all` is the mode that models the end state and is run rarely. The script's existing
-baseline-re-run logic already tells a pre-existing red from a regression, so a slow gate stays
-trustworthy.
-
-**Cheaper partial:** a Custom Rules check that fails on a module-scope call to any
-`lib/oura-models/constants` getter. That catches the specific class in seconds without a build, and
-is worth having either way.
-
 ### [platform] Q-312 — the synthetic MET table is physiologically impossible, and it costs ~9 tests in CI
 
 - **Branch:** `fix/test-constants-met-floor`
@@ -4371,7 +4341,6 @@ session working from a temporarily restored copy.
   distribution path.
 - **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
   than the release and tag, so the release id and tag survive the swap.
-
 
 ### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
 
