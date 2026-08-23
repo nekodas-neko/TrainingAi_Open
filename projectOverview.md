@@ -52,6 +52,11 @@ with `Gate: device`. **Item (3) needed no work:** battery polls have persisted s
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
 
+**A deload session says so now (BF-8, v1.343.0).** The Intensity control read "Full · As
+prescribed" while the card under it read "Deload session · Auto-applied", and the workout header
+showed no marker at all — the owner trained one believing it was a full session. Both surfaces asked
+`isDeloadActive` ("is the PHASE a deload week") rather than whether TODAY's session is one.
+
 **A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** The plan wizard's "meals you
 usually eat" step takes a URL. A page that states no yield hands back the **whole recipe** — 1,956
 kcal for a banana-bread loaf — so the row asks how many it serves and cannot be kept until answered;
@@ -256,6 +261,11 @@ order.
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 
 **Fixed in v1.339.0** — the free-activity screen now carries **HR** in its primary row beside distance and pace (with the guided walk's staleness guard), plus a secondary line with the **running step total** and **elevation gained**; the guided walk got the same step readout so the two agree ([`journal`](docs/overview/entries/2026-08-23-free-activity-metrics.md)). The strap was already streaming beats — the same one feeding that screen's cadence — and the number was already being saved afterwards; it was invisible only while walking, the one time it can be acted on. **Keep: every number here comes from a Polar H10 over BLE and the sandbox has no strap** — `HrReadout` renders its `--` placeholder and `stepsEstimate` is null on every path exercised, so the thing the entry is about (a connected strap putting a live bpm on that screen) and the staleness guard are both unverified. **🟠 The Android pill is still static** and stays Lane A: the plugin exposes only `addWatcher`/`removeWatcher`/`openSettings`, `backgroundMessage` is fixed at watcher creation, and re-adding the watcher would restart location tracking mid-walk.
+
+### [workouts] ⚠️ A deload session says so on both surfaces; neither was checked on the device (BF-8, v1.343.0)
+
+**Fixed.** Both the pre-workout Intensity control and the in-workout header asked `isDeloadActive` — *"is the current PHASE a deload week"* — rather than whether today's session is a deload, which is what `prescription.deload` holds. So an auto-applied, readiness-driven deload read as a full session from the pre-workout screen to the last set, and the owner trained one that way. `sessionContextLabel` resolves the header's line in one place; `useDeloadChoice` adopts the prescription until the user chooses otherwise; "As prescribed" now sits under whichever half the engine picked, with the other labelled **Override** ([`journal`](docs/overview/entries/2026-08-24-deload-visible-on-both-surfaces.md)).
+- **Keep: not device-verified, and the active header has no end-to-end guard.** `e2e/deload-visible.spec.ts` covers the toggle against a real auto-applied prescription and is mutation-checked; the header's label is pinned by unit tests only — no spec starts a workout and reads it.
 
 ### [nutrition] ⚠️ The meal photo can be picked; the camera branch has not run (Q-327, v1.341.0)
 
@@ -983,33 +993,6 @@ order.
   server-side id and the outbox carrying a client-generated one.
 - **Not verified on:** the APK. The replay was simulated by re-posting the same envelope (what the
   client does); the client-side trigger was read from source, not induced.
-
-### [platform] ✅ The server side of the timezone problem does not exist — verified at every layer below the routes (Q-480, 2026-08-18)
-
-- **A verification sweep, written up because a clean result is a result.**
-  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md).
-  Sweep 11 concluded "the server is correct" by counting `todayInTz()` **inside route files**, which
-  is not the whole server — a blameless route can still get a Brisbane answer if the repository
-  function it calls defaults the timezone. This sweep went looking for that half. **It is not there.**
-- **Checked and clean:** every caller of the three tz-defaulting repository helpers
-  (`getCalendarData`, `getRecentTrainedDays`, `getNextSession`) passes the session timezone; all
-  **four** timezone-sensitive SQL sites in `lib/data` interpolate a parameter, with **no hardcoded
-  zone string anywhere in the repository layer**; and every call site of the shared sleep helpers
-  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend` —
-  the ones that decide which calendar day a night belongs to) passes `tz`. Zero local re-declarations
-  of `DEFAULT_TZ`.
-- **This bounds Q-477.** The wrong-timezone problem is **exclusively client-side**; its fix does not
-  need to touch `lib/data` or `packages/shared/src/health`.
-- **Q-480 is the one finding, and it is a documentation correction.** `CLAUDE.md` says *"Repo
-  day-window helpers currently **hardcode** `DEFAULT_TZ`"*. They do not — they take it as a default
-  parameter that every caller overrides. The stale line marks the repository layer as known-broken, so
-  an implementer taking Q-477 would start there and find nothing. Filed rather than edited directly,
-  because `CLAUDE.md` is the contract all five agents read.
-- **Rate limiting swept in the same pass, also clean:** all **13** routes calling
-  `generateObject`/`generateText`/`streamText` are rate-limited, and **all 104 `rateLimit` keys are
-  user- or IP-scoped** — zero global keys, so no route where one user's traffic can throttle another's.
-- **Not covered:** whether any limit is set at the right *number*, the client half of rate limiting,
-  the APK, or production.
 
 ### [app-shell][platform] 🟠 The app run as a user who is not in Brisbane: the server follows their timezone, 100 of 125 client call sites do not (Q-477, Q-478, 2026-08-18)
 

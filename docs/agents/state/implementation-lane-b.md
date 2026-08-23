@@ -6,7 +6,7 @@
 **Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-5`
 
 ## Now
-**#339** (Q-409's Lane B half) is open. Everything before it merged — #331, #332, #333, #338.
+**#347** (BF-8) is open. Everything before it merged — #331, #332, #333, #338, #346.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
@@ -26,7 +26,9 @@
 - **Q-406** (#331) — `FoodRow`; the diary row and the external-search row deliberately **not**
   converted (that would delete the only way to correct a logged food before Q-395a exists).
 - **Q-418's screen half** (#332) — HR, steps and elevation on the free walk. The pill stays Lane A.
-- **Q-409's Lane B half** (#339) — a recipe link becomes a meal; an unstated yield is ASKED about
+- **BF-8** (#347) — a deload session says so on both workout surfaces. Owner-confirmed: he trained
+  one believing it was full. Both asked `isDeloadActive` (the PHASE) rather than today's session.
+- **Q-409's Lane B half** (#346) — a recipe link becomes a meal; an unstated yield is ASKED about
   rather than assumed to be one plate.
 - **Q-327** (#338) — the meal photo tile, the half Q-396's column had been waiting for.
 - **Q-398** (#333) — plan meals become saved meals, idempotent on the existing `saved_meal_id`.
@@ -44,8 +46,8 @@ its reference, is nowhere in the tree — `docs/design/` holds cardio, score-row
 and nothing for nutrition. **Do not take Q-395a/b/c**, and do not convert Q-406's last two call
 sites, until they are committed under `docs/design/`. Raised with the owner 2026-08-23.
 
-Non-blocked candidates: **Q-407** (its `Needs: Q-398` is now cleared), **Q-486**, **Q-321**. LB-3
-sits low, as its own placement says.
+Non-blocked candidates: **BF-6** (the finished-logging control sits below everything and has been
+pressed zero times), **Q-407**, **Q-486**, **Q-321**. LB-3 sits low, as its own placement says.
 
 ## Do not re-litigate
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.

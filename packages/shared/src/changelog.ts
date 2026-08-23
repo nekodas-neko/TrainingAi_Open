@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.343.0",
+    date: "2026-08-24",
+    changes: [
+      "A deload session now says so. The Intensity control read \"Full \u00b7 As prescribed\" while the card directly under it said \"Deload session \u00b7 Auto-applied\", and the workout header showed no deload marker at all \u2014 so a lighter session could be trained believing it was a full one. Both now follow what was actually prescribed for today, and \"As prescribed\" sits under whichever option the engine chose, with the other labelled as an override.",
+    ],
+  },
+  {
     version: "1.342.0",
     date: "2026-08-24",
     changes: [

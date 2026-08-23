@@ -48,7 +48,8 @@ interface ActiveWorkoutScreenProps {
   onBack: () => void;
   onSkip: () => void;
   sessionName?: string;
-  phaseStatus?: PhaseStatus | null;
+  /** The header's phase/position/deload line, already resolved — see `sessionContextLabel`. */
+  sessionContext?: string;
   isBaseline?: boolean;
   activeInjuries?: import('@trainingai/shared/types/injury').Injury[];
   onRpeChange?: (setIdx: number, value: number) => void;
@@ -79,7 +80,7 @@ export function ActiveWorkoutScreen({
   onBack,
   onSkip,
   sessionName,
-  phaseStatus,
+  sessionContext,
   isBaseline,
   activeInjuries = [],
   onRpeChange,
@@ -218,11 +219,7 @@ export function ActiveWorkoutScreen({
             {sessionName ?? (soloMode ? "Solo log" : "Workout")}
           </p>
           <p className="text-[10px] text-muted-foreground/60 truncate">
-            {phaseStatus && !phaseStatus.isDeloadActive
-              ? phaseStatus.openEnded
-                ? `${phaseStatus.phase.name} · S${phaseStatus.phaseSessionNumber} · `
-                : `${phaseStatus.phase.name} · C${phaseStatus.cycleInPhase}/${phaseStatus.totalPhaseCycles} · `
-              : phaseStatus?.isDeloadActive ? "Deload · " : ""}
+            {sessionContext}
             {soloMode ? "Solo" : `Ex ${exerciseIndex + 1}/${totalExercises}`}
             {timerStarted && <ExerciseClock startMs={exerciseStartMs} />}
           </p>
