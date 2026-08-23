@@ -1,7 +1,7 @@
 import type { FoodLogWithItem, SavedMeal, SavedMealItem } from '@trainingai/shared/types/nutrition'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateNutritionWrite } from '@/lib/cache-groups'
 import { oneServingItems } from './saved-meal-ingredients'
 import { resolveLocalEatenAt } from './local-eaten-at'
@@ -81,8 +81,11 @@ export async function logMealItems(
         optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: eatenAt }))
       }
       await cancelMealReminder(mealTypeId)
+      // Twice, deliberately: now so this device's screens repaint at once (and because offline
+      // this is the only one that will ever fire), and again once the server has the write —
+      // otherwise the refetch this triggers re-caches the pre-log figures. See pushThenRevalidate.
       await invalidateNutritionWrite()
-      pushMutations(userId!).catch(() => {})
+      pushThenRevalidate(userId!, invalidateNutritionWrite)
       return optimistic
     } catch (sqliteErr) {
       console.error('Food log SQLite write failed, falling back to API:', sqliteErr)

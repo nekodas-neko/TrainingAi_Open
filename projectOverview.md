@@ -27,9 +27,16 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
-**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
-backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
-the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
+**Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
+correctly and too early: subscribers refetched a server that lacked the log and re-cached the
+pre-log figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one
+entry. The engine write paths now invalidate on **both** sides of the push (`pushThenRevalidate`);
+the immediate call stays because offline it is the only one that fires. Six `components/**` sites
+carry the same shape — filed as **LB-6**, audit done.
+
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
+(`/admin/oura-ble` → **Show key for backup**), a full re-sync that notifies on completion, and a
+connect sequence that resets the two live-HR levers a killed session left on forever. **All native —
 inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
 with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
@@ -224,6 +231,12 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [platform][devices] ⚠️ `/api/body-battery` was 500ing in production; the fix is unverified there (LA-20, 2026-08-23)
+
+**Fixed in this session's deploy, not yet confirmed on production.** `error_events` held 19 live faults — `daytime-stress: constants not set`, first 10:37, latest 12:27, still firing while it was read — from the Q-545 constants port. Boot injects the model constants and sets `OURA_CONSTANTS_DIR`, and **both effects are per-process**; the process that runs boot need not be the one that serves a request. A probe route read `hasDaytimeStressConstants()` as **false** in a handler while boot had logged a successful delivery. Two independent halves: the module instance the route reads is not the one boot wrote to, and where the env var is also not inherited, `constantsDir()` falls through to a tree directory that has held no `.constants.json` since Q-49. `constantsDir()` now prefers the delivered `<cwd>/.oura-constants`, and `getRepository()` injects — the one hook every path that can reach a constants read already goes through, using a non-throwing variant so an unreadable directory cannot take down every DB route ([`journal`](docs/overview/entries/2026-08-23-oura-constants-per-process.md)).
+- **Keep: production not verified.** The reproduction is a dev-server worker split, which is not proof Railway's split is identical. **The check is `error_events` after this deploys** — and *something stopping is not something fixed*: the count must be zero across a window where `/api/body-battery` was actually called, since the route is only reachable for a user with a daytime-HRV model.
+- **This was not in any backlog entry.** It was found by the session-start `error_events` read that `CLAUDE.md` mandates and I had skipped. No local gate could have caught it: `pnpm dev` never reaches the model path, because the seeded user has no daytime-HRV model and the call is guarded.
 
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 
@@ -665,35 +678,6 @@ order.
 - **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
   readers fall through to their API fallbacks and the inconsistency cannot appear there. On-device is
   the only real verification.
-
-### [platform] ✅ Both halves of the staleness test now audited — case (b) clean, and the mechanical test for it does not work (2026-08-18)
-
-- **Completes the lens.** Sweep 21 audited case (a) (`freshWithinTtl`); this audits case (b),
-  **seed-only read paths** — the worse half, because a seed-only key never revalidates at all.
-  [`docs/reviews/2026-08-18-seed-only-read-paths.md`](docs/reviews/2026-08-18-seed-only-read-paths.md).
-- **The naive test over-reports and must not be used.** Differencing `readCacheSync` keys against
-  `cachedFetch` keys (51 vs 66) yields five seed-only candidates — `achievements:<userId>`,
-  `ai-health-insight:<section>:<date>`, `mood:<date>`, and two `workout-card:*`. **All five
-  revalidate. None is seed-only.**
-- **Because revalidation happens three ways and `cachedFetch` is only one:** (1) `cachedFetch`;
-  (2) a raw `fetch(...)` then `setCached(...)` — `ai-insight-card.tsx`, `workout-screen.tsx`;
-  (3) a **local-store read** then `setCached(...)` — `session-select-content.tsx`'s `mood:` path.
-  **The third matters most:** for an offline-first domain the local store *is* the source of truth, so
-  "revalidate" correctly means reading SQLite, not the network. A test that looks for a network call
-  marks the app's most authoritative paths as stale.
-- **So the test for seed-only cannot be "`readCacheSync` without `cachedFetch`"** — it is "no
-  write-back to the key from any source after the seed", which is not greppable in one pass. Five
-  candidates had to be read individually.
-- **⚠️ Second time this run a `Q-NNN:` comment read as an open bug and was the fix.**
-  `workout-screen.tsx:272` (Q-126, lifetime XP reported as one session's gain) is the fix's rationale,
-  not a live defect — as was `session-select-content.tsx:896` (Q-117) last sweep. **In this codebase a
-  comment naming a Q number is usually why the code is shaped that way.** Worth knowing before
-  grepping `never invalidated` or a Q number and reaching for the alarm.
-- **Result: both halves of Q-262's test are audited and clean.** The most repeated bug class in this
-  project currently has no live instance that either half of the documented test can find.
-- **Not verified:** static audit and source reading; not on the APK or production. A stale-value bug
-  arising some *other* way — a write that updates the DB without touching the local store — is outside
-  what this test catches and was not looked for.
 
 ### [platform] ✅ Every load-bearing cache invalidation audited — no gap, closing an audit `CLAUDE.md` names as never done (2026-08-18)
 

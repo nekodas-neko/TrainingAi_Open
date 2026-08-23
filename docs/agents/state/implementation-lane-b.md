@@ -89,7 +89,9 @@ log-plan-meal}.ts`, one line of `lib/cache-groups.ts`, and the five meal-plan AP
   to carry steps. It fails identically on clean `main`; top the row up rather than debugging a diff.
 - **`get_check_runs` lags; the merge attempt is the reliable check.** Check the date on resume too.
 - **A backgrounded `pnpm dev` dies with its task** — `setsid nohup pnpm dev > log 2>&1 &` survives;
-  `E2E_BASE_URL=http://localhost:3000` points Playwright at it.
+  `E2E_BASE_URL=http://localhost:3000` points Playwright at it. **And a long-lived one DEGRADES**:
+  `meal-label.spec.ts` failed repeatedly, on this branch and on commits before it, until the dev
+  server was restarted — then passed first try. Restart it before believing a heavy spec's failure.
 - **`projectOverview.md` and this baton sit ON their ratchet baselines, and RAISING one costs you the
   merge race.** **Trim; do not raise** — or move a fully-resolved Known Issue to the archive, which
   is what the wrap-up rule wants anyway.

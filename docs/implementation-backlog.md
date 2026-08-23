@@ -329,6 +329,81 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
+### [workouts] 🔴 BF-8 — nothing on screen says today is a deload, and the owner trained one believing it was a full session
+
+- Lane: B — `components/workout/use-deload-choice.ts` + `components/workout/pre-workout-screen.tsx`
+
+**Found by intake, 2026-08-23, in a screenshot the owner sent for a different request** — not reported,
+so it may be by design; the trace below says why it probably is not.
+
+**🔴 CONFIRMED BY THE OWNER, 2026-08-23 — this is lived, not theoretical.** Verbatim: *"I think you
+sre right - I was under the assumption I was doing my full session but it looks like it has been
+deload. it was what you noticed; its too hidden."* Promoted to the head of the queue: a training
+decision was made on a wrong reading of the app's own display, and the session was run before anyone
+noticed.
+
+**And it is worse than first filed — the active workout screen hides it too.** A second screenshot,
+mid-session, shows the header reading **"Accumulation · S1 · Ex 1/5 · 3:41"** with no deload marker
+anywhere. Traced to `components/workout/active-workout-screen.tsx:220–224`, which prints
+`"Deload · "` **only** when `phaseStatus.isDeloadActive`; anything else falls through to
+`${phase.name} · S${n} · `.
+
+**So both surfaces fail on the same predicate, and that is the actual root cause.**
+`isDeloadActive` answers *"is the current phase a deload week"*. Neither surface asks the question
+that matters — *"is today's session a deload"* — which is what `prescription.deload` holds:
+
+| surface | file | what it does with `isDeloadActive` |
+|---|---|---|
+| Intensity toggle | `pre-workout-screen.tsx:218` | hides the toggle (so a phase deload is handled) |
+| Session header | `active-workout-screen.tsx:220` | prints `"Deload · "` |
+
+An auto-applied deload satisfies neither, so it is invisible from the pre-workout screen through to
+the last set. **Fix the predicate once, in both places** — a fix to one surface alone leaves the
+other lying, which is the sibling-surface sweep CLAUDE.md already requires.
+
+**Consequence beyond the display:** a deload run as though it were a full session is also a
+training-load record whose intent nobody can reconstruct later. The owner's report is the evidence
+that this is not hypothetical.
+
+**What the screen shows, top to bottom:** *INTENSITY TODAY* with **Full · As prescribed** selected;
+then *TIME TODAY*; then the AI card reading **"AI Prescription · Accumulation · Auto-applied"** with
+the subtitle **"Deload session · ~48 min"**. The user is told intensity is full and as-prescribed,
+directly above a plan the app itself labels a deload.
+
+**Traced, and the two halves are genuinely unconnected:**
+- The toggle's value is `deload` from `useDeloadChoice(seedFromUrl)`
+  (`components/workout/use-deload-choice.ts`). That hook is
+  `useState(seedFromUrl)` where the seed is the `?aiDeload=1` URL param — **it never reads the
+  prescription's own `deload` flag.** Absent that param it is `false`, i.e. "Full", regardless of
+  what was actually prescribed.
+- The card's subtitle comes from `prescription.deload`
+  (`components/workout/ai-prescription-card.tsx:160`).
+- `pre-workout-screen.tsx:218` hides the toggle entirely when `phaseStatus?.isDeloadActive` — so a
+  **phase** deload is handled. A deload the prescription applied for its own reasons (readiness,
+  the "Auto-applied" case in the screenshot) has no equivalent guard, which is exactly the state
+  captured here.
+
+**Why this is worth fixing rather than explaining.** "As prescribed" is a claim about the
+prescription, and here it contradicts the prescription on the same screen. The toggle is also
+live — flipping it re-keys the workout-data cache and refetches — so a user who taps **Full**
+believing they are confirming the current state may instead be overriding an auto-applied deload
+back to full loads on a day the readiness engine asked for one.
+
+**What would confirm it:** open the pre-workout screen on a day where the prescription auto-applies
+a deload while the phase is *not* a deload week (`phaseStatus.isDeloadActive === false`), with no
+`?aiDeload=1` in the URL. The toggle should read Full while the card reads "Deload session".
+
+**Fix direction, for whoever takes it:** either seed/reflect the toggle from the prescription's own
+`deload` flag so it shows what is actually going to run, or relabel it so it reads as an override
+rather than a statement of current state. The first is better — the sublabels already say "As
+prescribed", which is only true if it reflects the prescription. Do **not** simply hide the toggle
+on an auto-applied deload: the comment at `pre-workout-screen.tsx:215` records why it must stay
+reachable — gating it on an existing prescription would leave no way to pick Deload before one
+exists.
+
+**Done looks like:** on a day with an auto-applied deload, the Intensity control and the prescription
+card agree about whether today is a deload.
+
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -581,6 +656,60 @@ the payload to a standing inefficiency. Open, all Lane A's:
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
+### [nutrition] 🟠 BF-6 — "I've finished logging" sits below everything, and has been pressed zero times
+
+- Lane: B — one JSX reorder in `app/nutrition/nutrition-content.tsx`
+
+**Owner report, 2026-08-23 (verbatim):** *"id also like to move the finish logging button and swap it
+with the end of day button. end of day should be at the very bottom. finish logging should be right
+after the meals."*
+
+**This reads as a layout preference and is not one.** The button feeds Q-387's adaptive-TDEE
+calibration, which treats an unmarked day as EXCLUDED — so an unpressed button does not degrade the
+estimate, it withholds it entirely. Measured in production, 2026-08-23:
+
+> **0 of 55 `day_checkins` rows have `food_logging_completed_at` set**, across 2026-07-02 → 2026-08-24.
+
+The owner's own screenshot agrees: *"0 of 10 days marked · 10 more to calibrate your maintenance"*.
+**The feature has never received a single input since it shipped**, and the calibration it exists to
+feed has therefore never run. (Standard caveat: `claude_ro` is row-scoped to one user, so this is the
+owner's days, not the system's — which is exactly the population that matters here.)
+
+**Current order on `main`** (`app/nutrition/nutrition-content.tsx`):
+
+| line | element |
+|---|---|
+| 618 | `<MealCard>` ×N |
+| 638–646 | **End of Day** button (opens the AI chat) |
+| 649 | `<WeeklyNutritionChart>` + adherence |
+| 652 | `<SupplementsSection>` (today only) |
+| 663 | **`<FoodLoggingComplete>`** ← last element on the screen |
+
+**Requested order:** meal cards → `<FoodLoggingComplete>` → chart → supplements → **End of Day last**.
+
+That places the control immediately after the thing it is about, and puts the day-review entry point
+at the end of the day's screen, which is where a day-review action belongs.
+
+**⚠️ There is a code comment that argues against this change — it must be rewritten, not ignored.**
+At line 638:
+
+> *"End of Day deliberately stays put: it is a daily-review feature, and merging it with Home's 'Your
+> Day in Review' banner is Q-112's call, not this placement change's. Moving it halfway would be
+> worse than either end state."*
+
+That comment was defending against a *merge with Home's banner*, not against moving it down the same
+screen — and it predates the measurement above. An implementer who reads it and stops has done the
+right thing with the wrong information, so **replace it in the same diff** with what is now true: the
+owner asked for this order, and the finished-logging control leads because nothing was reaching it.
+
+**Watch for, when reordering:** `<SupplementsSection>` and `<FoodLoggingComplete>` are both
+conditional on `selectedDate === todayStr` / `isToday`, so on a past date the tail of the screen
+changes shape — check the order still reads correctly on a back-dated day, not just on today.
+
+**Done looks like:** on the Nutrition screen the finished-logging card sits directly under the last
+meal card, End of Day is the last element on the page, both still behave correctly on a past date,
+and the misleading comment is gone.
+
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -791,55 +920,289 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
 
 ### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
-- **Branch:** `fix/food-log-invalidate-after-push`
-- **Added:** 2026-08-23 · **Lane: A** — `packages/shared/src/nutrition/log-food.ts` writes the local
-  store and the outbox, which is engine, not surface.
-- **Placement:** high for a correctness item. It is a live staleness bug on the owner's own screen,
-  and it is two lines.
+### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
-**Found while closing Q-417, whose part (a) asked whether the write that logged 42 kcal actually
-invalidates `energy-balance:`. It does — at the wrong moment.**
+- **Branch:** `chore/adopt-use-cached-value`
+- **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
+- **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
+  + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
+  screens with no component-test route.
+- **What.** **36** `useEffect(() => { … cachedFetch … }, [])` blocks remain — 37 on `main` before
+  the one conversion below (see the counting correction above; this entry originally said 36, from a
+  scan that missed single-line effects). All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
+  value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
+  them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
+  The persistent tab shell is the exception, and it is where the owner found it.
+- **Do the shell ones first, and identify them rather than assuming.** Anything rendered by Home /
+  the tab shell that is not behind a route change: `components/home-day-timeline.tsx` (two),
+  `components/calendar-widget.tsx`, `components/health/*-card.tsx` where Home renders them. The
+  full list, regenerated:
+  ```
+  grep -rn -A6 'useEffect(() => {' app components --include='*.tsx' --include='*.ts' | grep -B6 cachedFetch
+  ```
+  (the count above came from a small AST-free scan for `useEffect(…, [])` blocks containing
+  `cachedFetch`; it is a starting list, not a proof of completeness).
+- **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
+  data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
+  refetches with no reader waiting for them. Judge per site; this is not a codemod.
+- **✅ THE RATCHET SHIPPED 2026-08-19 (v1.325.4). The sweep is what remains.**
+  `scripts/check-fetch-once-effects.js` freezes all 36 with a shrink-only per-file baseline: a file
+  not listed must have zero, a listed file may only shrink, and a file that reaches zero must have
+  its row deleted. Growth is stopped; each conversion is now visible in a diff.
+  [`Journal`](overview/entries/2026-08-19-fetch-once-ratchet.md).
+  **The baseline is grouped by whether the site can actually bite: 19 / 1 / 16.** Work the first
+  group. **⚠ The grouping was wrong the first time and the correction is the reusable part:** sheets
+  do NOT unmount here — the tab screens render them unconditionally with a null prop
+  (`<ActivityDetailSheet log={selectedActivity} />`), so they are permanently mounted too. Re-checked
+  by tracing each renderer up to a tab screen, the "can bite" group went from 14 to **19**. Judge a
+  site by where it is mounted, never by its filename.
+  **⚠ The count in this entry was one low, found by mutation-checking the new rule.** The scan
+  behind it required a newline before the effect's closing brace, so it **missed single-line
+  effects entirely**. Measured on `main`: **37** with the correct pattern against 36 with the old
+  one, and `nutrition-content.tsx` has **two**, not one. One conversion below leaves **36**.
+  **`useCachedValue` gained an `onError` callback** in the same change, because the first real
+  conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
+  card without it cannot tell "no data" from "the request failed".
+- **✅ SLICE 1 SHIPPED 2026-08-19 (v1.325.6) — six leaf-card files, 36 → 29.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-1.md). Converted: `home-day-timeline`
+  (2), `calendar-widget` (its keyed `calendar-data:` effect too, which the ratchet does not count
+  because its deps are not `[]` but which goes stale the same way), `activity/exercise-detected-card`,
+  `health/hr-recovery-profile-card`, `health/strength-progress-card`, `cardio/trends-section`.
+  Three results worth carrying:
+  1. **`useCachedValue` gained a `today` option.** Without it the hook could only ever convert the
+     plain-`cachedFetch` half of the sweep, and the `cachedFetchToday` half would have had to
+     *switch variant* to adopt it — the exact drift the one-variant rule forbids.
+     `lib/hooks/__tests__/use-cached-value-today-agreement.test.ts` cross-checks every literal-key
+     hook call against `sync-provider`'s warm list, and is mutation-checked both ways.
+  2. **`home-day-timeline`'s bespoke `ta:oura-ble-synced` listener is gone.** Q-91 added it because
+     that widget never refetched after a BLE drain invalidated its key — Q-402's bug with a
+     hand-built workaround for one event. The invalidation signal covers every writer instead.
+     Safe because `cache-groups.test.ts` already asserts `invalidateOuraSync` clears that key.
+     **Three sibling listeners remain** (`session-select-content`, `health-content`,
+     `sleep-content`) and should go the same way when those files are converted.
+  3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
+     19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
+- **✅ SLICE 2 SHIPPED 2026-08-19 (v1.325.7) — four more files, 29 → 25.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-2.md). `health/training-stress-line`
+  (the first real use of slice 1's `today` option), `activity/exercise-review-sheet`,
+  `activity/activity-detail-sheet` (the shared `hr-profile` key in both) and
+  `workout-select-content` (`muscle-recovery`). ~~The can-bite group is down to 8, all of them in
+  the four tab-screen orchestrators.~~ **That was wrong — see slice 3.**
+- **✅ SLICE 3 SHIPPED 2026-08-19 (v1.325.8) — and most of it was a correction, not a conversion.**
+  [`Journal`](overview/entries/2026-08-19-fetch-once-scanner-correction.md).
+  **`scripts/check-fetch-once-effects.js` was over-counting, and by a lot: 25 sites across 16 files
+  were really 15 across 12. Ten of the twenty-five never existed.** Its non-greedy regex started at
+  a `useEffect(() => {` and ran to the first `}, [])` *anywhere* after it, so when that effect had
+  real dependencies the match swallowed everything up to a later effect's close — other effects,
+  `useCallback` bodies, plain functions — and searched the lot for `cachedFetch`. Five lines
+  reproduce it, and they are in the script. It now brace-matches the effect body.
+  **What that changes about the work, which is the part worth reading:**
+  - `health-content` (2) and `nutrition-content` (2) have **no fetch-once effect at all**. Their
+    fetches sit in tab-group `useCallback`s re-run on `tabEpoch` — the shape this rule is *steering
+    people toward*. Two sessions' worth of "the hard ones, do them last" was aimed at nothing.
+  - `sync-provider` (1) the same: its warm pass is a plain function. The "deliberately fetch-once"
+    category that entry justified had no members and is gone.
+  - `workout-screen` (2) is a `[userId]` effect; `running-plan-content` was 3, not 4.
+  - **So the can-bite group was two sites, not eight.** This slice converts one —
+    `session-select-content`'s `more-user-profile`, which is load-bearing: two paths invalidate that
+    key, so changing a display name or avatar left Home's greeting stale until an app restart.
+  - ~~One can-bite site remains.~~ **Done in slice 4.**
+- **✅ SLICE 4 SHIPPED 2026-08-19 (v1.325.9) — the can-bite group is now ZERO.**
+  [`Journal`](overview/entries/2026-08-19-invalidation-refetch-hook.md). **12 sites across 10 files
+  remain and every one of them unmounts on navigate**, so what is left is latent by definition. The
+  shell-level half of this entry is finished.
+  - **A second hook was needed and is the reusable part**: `lib/hooks/use-invalidation-refetch.ts`.
+    `useCachedValue` replaces a read outright — it holds, seeds and fetches the value — which does
+    not fit a read that also seeds from the local SQLite store, wraps its fetch in `fetchWithRetry`,
+    or sets several pieces of state. `useInvalidationRefetch(keys, fn)` gives such a read the half it
+    does need: something asks for a new value when a write clears the old one.
+  - **The real bug it fixed, beyond the ratchet**: three screens listened for `ta:oura-ble-synced`
+    and refetched. `sleep-sessions` is also cleared by `invalidateBiometrics`, so a manually-edited
+    sleep row or a Health Connect ingest left all three stale until a remount — only the BLE path
+    self-healed, because it was the only writer that dispatched an event. All three converted
+    together per the sibling-surface rule.
+  - **It coalesces, and the three-key call site needs that**: `invalidateCache` fires once per key,
+    so a group clearing all of health-content's three would otherwise run its whole meta load three
+    times.
+- **What is left of Q-359, for whoever takes it next.** Twelve latent sites, none urgent, and the
+  entry stays queued only for them. Judge any future addition by where the component is **mounted** —
+  grep for its name and check the renderer against `components/shell/tabs.ts`. That rule has been got
+  wrong three times in this Q's own history.
+  - **The lesson is about the check, not the sweep:** a scanner's own baseline is evidence, and this
+    one had never been checked against a hand count. The mutation check it shipped with proved it
+    caught a *new* site; nothing proved the sites it already listed were real.
+- **Correction to slice 1's note about `lib/__tests__/q165-cache-seeded-reads.test.ts`:** it said
+  that test would red when the two sheets converted. **It did not, and the reason is worth keeping.**
+  It asserts `readCacheSync<` and `cachedFetch<` appear literally in three files; each sheet has
+  *two* fetches, and only the `hr-profile` one is a fetch-once site. The keyed `hr-window:` fetch
+  stays (its key changes per session, and `useCachedValue` has no way to express "no key yet" for a
+  sheet mounted with a null prop), so both strings survive. `coach/coach-history.tsx` has a single
+  fetch and is the one that will actually red — it is in the unmount group, so not soon.
+- **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
+- **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
+  are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's
+  six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
+  routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
+  fixture below, which still does not exist.
+- **✅ THE FIXTURE AND THE GUARD SHIPPED 2026-08-20.** `e2e/fixtures.ts` gains
+  `ensureEnergyBalanceProfile()` and `enableHomeCards(page, keys)`, and
+  `e2e/home-card-invalidation-refetch.spec.ts` drives Q-402's mechanism end to end for the first
+  time: Home stays mounted, a body-metric write from its own quick-log sheet clears
+  `energy-balance:`, and the card issues a **second** GET. Mutation-checked — restoring the
+  pre-Q-402 `useEffect(…, [])` shape makes it red with its own message.
+  [`Journal`](overview/entries/2026-08-20-home-card-invalidation-guard.md).
+  **Correction to what this bullet used to say:** the seeded user was described as missing
+  `height_cm`/`date_of_birth`/`sex`. It has height (180) and sex (male) — **only `date_of_birth`
+  was missing**, and the route names exactly one field in `missingProfileFields`. The fixture is one
+  column, not three, and `COALESCE`s the other two so it stays correct if the seed changes.
+  The second half was right: `DEFAULT_CARD_WIDGETS` is empty, so Home renders no card widgets at
+  all until `ta_ss_cards` is set.
+  **Why it asserts the request rather than the number:** a changed figure could come from a
+  remount and an unchanged one proves nothing, so only a second GET is present-only-if-working.
+- **What is still open: the twelve latent sites, and on current evidence NONE is worth converting.**
+  Judged per site 2026-08-20 and written into `scripts/check-fetch-once-effects.js` beside the
+  baseline, so the next session reads it where it is looking rather than re-deriving it. Four read
+  `hr-profile` or an HR series during or just after a run/workout, when nothing writes those keys;
+  `my-meals-picker` reads `saved-meals` and the only writer reachable from its flow runs **after**
+  `{step === 4 && …}` has unmounted it; the rest are route-level screens whose next mount refetches.
+  Converting one is not harmful but adds a refetch with no reader waiting, which this entry warns
+  against. **The limit of that judgement, stated rather than buried:** for `my-meals-picker` it is
+  "no writer found reachable", not "proven unreachable" — whether `saved-meals-sheet` can open on
+  top of the wizard was not traced. **Re-judge any site if a new writer starts clearing its key
+  while it is on screen.** The entry stays queued as the place that record lives.
+- **The check's own prose count had drifted, in the file whose lesson is about unverified counts.**
+  It read "13 sites across 11 files" against a baseline map holding **12 across 10** — a conversion
+  removed a file and left the sentence behind. Corrected, with a note to count off the map rather
+  than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
+  run line prints computed totals.
 
-`logFoodEntries` (`log-food.ts:243-244`) runs:
+### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
 
-```ts
-await invalidateNutritionWrite()
-pushMutations(userId!).catch(() => {})   // fire-and-forget
-```
+> **⚠️ NARROWED 2026-08-23 — the budget is now correct everywhere, so only the two DISPLAY changes
+> are left.** v1.335.0 pointed Home's nutrition card and the Nutrition ring at
+> `budgetProvenance(...).total` and made the ring render `macroTargets.scaled`
+> ([`journal`](overview/entries/2026-08-23-one-calorie-budget.md)), which closes the
+> "rendering `scaled` instead of the stored row" half listed below and retires Q-415/Q-417.
+> **What remains is (1) the macro ring's grey remainder and (2) the zone bar as a progress bar.**
+> The blocking order in this entry is now satisfied — the bar can be built, because the number it
+> fills toward is right. Note `barBands`/`barPosition` live in `packages/shared` but are reached
+> only from `components/`, so claim the lane in your baton before starting.
+>
+> **⚠️ THE LANE A HALF SHIPPED 2026-08-19 — what is left is Lane B**
+> ([`journal`](overview/entries/2026-08-19-macros-follow-earned-calories.md)).
+> `scaleMacrosForEarnedKcal(base, earnedKcal)` lives in
+> `packages/shared/src/nutrition/calorie-balance.ts` and **`GET /api/nutrition/energy-balance` already
+> returns the answer**: `macroTargets: { base, scaled, earnedKcal }`. Do not re-derive it client-side.
+>
+> **What is left:** the two display changes below — the macro ring's grey remainder, and the zone bar
+> as a progress bar with a short overshoot tail — plus rendering `scaled` instead of the stored row.
+> **The bar still must ship in the same PR as Q-415**, or it fills toward the wrong number.
+>
+> **One precision worth carrying:** what the split preserves is the **carbs:fat energy ratio**, not
+> each macro's share of the day — protein's share necessarily falls as the budget grows. Both are
+> pinned by test. Everything below is the original entry.
 
-The eviction lands **before** the mutation reaches the server. Every `useCachedValue` subscriber —
-Home's Energy Balance card, Home's nutrition card, both zone bars — wakes on that signal, refetches
-immediately, gets the **pre-log** payload, and re-caches it. Nothing invalidates again once the push
-completes, so the stale value then stands for the key's full TTL.
+- **Branch:** `feat/macros-follow-earned-calories`
+- **Added:** 2026-08-19 · Lane A/B split, the residual of Q-401 after both its halves landed.
+- **Lane:** B
+- **What is now true.** One TDEE model: `nutrition_targets.calories` is the **rest-day floor**, and
+  the zone bar renders `base + earned from movement`. So the calorie figure a user sees moves during
+  the day. The **macro grams do not** — they come from the same stored row and are fixed.
+- **That is deliberate for now, and it is the safer half.** Q-401's load-bearing choice was that the
+  ring keeps the SET goal, because the grams beneath it are derived from that row; pointing the ring
+  at a moving number while the bars stay fixed makes the card contradict itself internally, which is
+  worse than the gap it would close.
+- **The question this leaves.** If 300 earned kcal are added to the budget, which macro absorbs them?
+  **Not protein** — it is dosed per kg of bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`) and does not scale
+  with a day's movement. Q-401's answer was *"the earned calories belong to carbs"*, which is
+  sensible and unimplemented. Fat is currently 25% of calories, so scaling it uniformly would be a
+  third answer nobody chose.
+- **Do not scale all three uniformly.** That reintroduces the Q-401 shape in a new place: the ring
+  and the bars disagreeing, this time within one card.
+- **✅ THE PRODUCT CALL IS MADE — owner, 2026-08-19. Carbs and fat scale; protein holds.** The owner
+  asked for *"%'s to calculate the protein/fat/carbs so that when it increase due to excercise; the
+  macros increase as well"*, and after the arithmetic below was put in front of them, agreed to the
+  amended version. **This unblocks the entry — implement it.**
+  - **Protein is excluded, and the reason is arithmetic rather than taste.** It is dosed per kg of
+    bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`), so 150 g is ~2 g/kg. Express that as a share
+    (31.6% of a 1,900 kcal base) and apply it to a 2,447 kcal day and it becomes **193 g — 2.6 g/kg**:
+    a protein requirement that rises because the user went for a walk. Movement burns carbohydrate
+    and fat; it does not create protein demand.
+  - **Carbs take the majority and fat takes the rest, in their existing ratio.** Q-401's own answer
+    was *"the earned calories belong to carbs"*, and fat sitting at 25% of calories means a
+    carbs-only split makes fat's share drift downward as the day's movement grows. Splitting the
+    earned kcal between carbs and fat **in the proportion they already hold to each other** keeps
+    both percentages stable and needs no new constant.
+  - **This resolves the "do not scale all three uniformly" warning above rather than contradicting
+    it.** That warning was about the ring and the bars disagreeing inside one card. Here every
+    figure moves off the same budget, so the card stays internally consistent — which is the
+    property the warning was protecting.
+- **Lane A** for the arithmetic (`packages/shared/src/nutrition/calorie-balance.ts`), **Lane B** for
+  whatever renders it. **No longer blocked.**
 
-This matches the reported symptom exactly: Home's Energy Balance card read *"208 kcal left"* while
-the Nutrition tab's identical card read *"166"* — a 42 kcal gap that is precisely one unlogged
-entry. The Nutrition tab looked right because it appends the new log optimistically to its own
-state and never consults the cache for it.
+**Two display changes ride with this, from the same owner review, and they are the reason the entry
+is now worth doing as one piece.**
 
-**The sibling path already has the right shape.** The food-log *delete* in
-`nutrition-content.tsx:397-400` does `pushMutations(...).then(() => { invalidateNutritionWrite(); … })`
-— invalidate after the push, not before.
+**(1) The macro ring shows its remainder in grey.** *"I'd like the macro ring to show grey to
+indicate whats left."* Today the ring is a full 360° split by macro — it encodes *composition* and
+says nothing about progress. Sweep the coloured arc to `eaten / budget` of the circle and leave the
+remainder a neutral grey, so the same ring answers "what have I eaten" **and** "how much is left"
+without a number changing. At or past the budget there is no grey and the centre flips from
+`left` to `over`.
 
-**Proposed fix: invalidate twice, not later.** Keep the immediate call (local screens must repaint
-at once, and offline it is the only one that will ever fire), and add a second after the push
-resolves:
+**(2) The zone bar becomes a progress bar you finish.** *"more like Red/Orange/green; all the way
+like a progress bar with the green towards the end, and then a little orange/red bar after to depict
+going over. So it still looks like a progress bar where you want to go to the end."*
+  - The track runs **red → amber → green → amber → red** left to right, with the **green band
+    immediately before the goal notch** and only a short tail beyond it. The fill grows with intake
+    and takes the colour of the band it currently ends in.
+  - **The overshoot tail is deliberately short** — long enough to read, short enough that it does
+    not present itself as a second target to aim for.
+  - **This inverts what the bar means today**, and that is the point: it currently renders fixed
+    zones with a marker showing where you sit, which reads as a gauge. The owner wants something
+    with an end you walk toward.
+  - **Colour is not the only signal** — the remaining/over figure beside it carries the state in
+    words, per the standing rule.
+  - Drawn in three states (under, on target, over) during the 2026-08-19 review.
 
-```ts
-await invalidateNutritionWrite()
-pushMutations(userId!).then(() => invalidateNutritionWrite()).catch(() => {})
-```
+**⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
+right number.**
 
-Moving the single call after the push instead would break offline logging outright — `pushMutations`
-never resolves successfully with no network, so nothing would repaint at all.
+### [nutrition][platform][app-shell] LB-6 — six more write paths invalidate before the push, same as LB-4
 
-**Verification.** Log a food item on the Nutrition tab, then look at Home without navigating away
-and without waiting for a TTL: its Energy Balance card and nutrition card must both include the new
-calories. That is the step Q-417's own verification note said had failed.
+- **Lane:** B
+- **Branch:** `fix/invalidate-after-push-sweep`
+- **Added:** 2026-08-23, from LB-4's sibling sweep. LB-4 fixed the three engine paths
+  (`log-food`, `log-meal`, `create-food-item`) and left these, which are all `components/**`.
+- **The bug, once:** invalidating *before* a fire-and-forget `pushMutations` makes every
+  `useCachedValue` subscriber refetch while the server still holds the pre-write state, and
+  **re-cache it**. Nothing invalidates again, so the stale value stands for the key's full TTL.
+  Home's Energy Balance card read 42 kcal high for exactly this reason.
+- **The fix is one line each — the helper already exists.** Replace
+  `pushMutations(userId!).catch(() => {})` with
+  `pushThenRevalidate(userId!, <the same invalidator>)` from
+  `@/lib/local-store/push-then-revalidate`. Keep the immediate invalidation: offline it is the
+  only one that will ever fire, which is why moving the single call later would be wrong.
 
-- **Not reproduced under automation yet** — the race needs the refetch to beat the push, which a
-  local dev server against a local Postgres wins more often than a phone on mobile data does. A
-  guard likely has to stall the push rather than race it.
+| file | line | invalidator to pass |
+|---|---|---|
+| `components/activity/done-activity-screen.tsx` | 263 | the one already called above it |
+| `components/guided-walk/walk-summary.tsx` | 194 | ″ |
+| `components/fitness-tests/test-result.tsx` | 113 | ″ |
+| `components/nutrition/quick-edit-log-sheet.tsx` | 71 | `invalidateNutritionWrite` |
+| `components/nutrition/saved-meals-sheet.tsx` | 371 | `invalidateSavedMeals` |
+| `components/nutrition/saved-meals-sheet.tsx` | 462 | ″ |
+
+- **⚠ Line numbers are from 2026-08-23 and will drift.** The reliable finder is a `pushMutations(`
+  call with an `invalidate…(` within the six lines above it; `app/nutrition/nutrition-content.tsx`
+  is the shape to copy *toward*, not a hit — its delete path already invalidates after the push.
+- **⚠ Not every hit is necessarily load-bearing.** Per CLAUDE.md's "what makes an invalidation
+  load-bearing", a stale entry only *settles* where a call site passes `freshWithinTtl: true` or a
+  read path is seed-only. Convert all six anyway — the cost is one line and the condition changes
+  the moment someone adds `freshWithinTtl` — but do not report a user-visible fix for one that was
+  inert without checking which.
+- **What would count as done:** all six converted, and `grep` for the shape returns only the
+  engine's three (already converted) plus the sheets you just changed.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
@@ -10591,6 +10954,150 @@ since the CI link check (item 1) catches a botched rewrite immediately.
 > session writing a plan to `docs/superpowers/plans/` — not an implementer picking one up and
 > building from the entry.** Intake traced each against the current tree so the plan starts from what
 > the code actually does; it did not write the plans.
+
+### [workouts] 🔵 BF-7 — a 45-minute session cannot be chosen; the length picker offers three relative presets
+
+- Lane: ? — the model is `packages/shared/**` (**A**), the picker is `components/**` (**B**); engine half first
+
+**Owner request, 2026-08-23 (verbatim):** *"id like to have the ability to choose a 45min session -
+maybe we have a slider - and the default one is shown - but have the option to to slide to
+15/30/45/60/90options?"*
+
+**Screenshot described, since the image will not reach an implementer:** the Pull session's
+pre-workout screen. *TIME TODAY* shows a three-segment control — **Quick 30 min · Normal 60 min ·
+Long 90 min**, Normal selected — with "~48 min of work" to its right.
+
+**What exists today.** `DurationPreset = 'short' | 'standard' | 'long'`
+(`packages/shared/src/workout/duration-model.ts:91`), seven non-test consumers, and the on-screen
+minute figures are **derived, not fixed**:
+
+```
+budgetForPreset(sessionBudgetMin, preset)
+  standard → the session's own configured budget
+  long     → budget + DURATION_PRESET_DELTA_MIN (30)
+  short    → max(MIN_PRESET_BUDGET_MIN (20), budget − 30)
+```
+
+The 30/60/90 in the screenshot is that formula against a 60-minute session — not a fixed ladder.
+
+**✅ DECIDED by the owner, 2026-08-23 — findings 1 and 2 below are now settled.** Verbatim: *"yes I
+agree lets anchor to session; dont need 15minutes"*. So:
+- **The session's own configured length stays the anchor and the default.** The 2026-07-29 relativity
+  decision is NOT reversed — the slider offers absolute steps *around* that anchor rather than
+  replacing it with a fixed ladder. Finding 1 is resolved; keep its reasoning below for the plan.
+- **15 minutes is dropped.** `MIN_PRESET_BUDGET_MIN = 20` stands unchanged, and the
+  `WARMUP_CEILING_FRACTION` arithmetic that meets it exactly needs no re-derivation. Finding 2 is
+  resolved at zero cost — which is the cheapest possible answer to it.
+- **Finding 3 still binds**: a slider must not fire a prescription per detent. That is an
+  implementation constraint, not an open question.
+
+The requested ladder is therefore **30 / 45 / 60 / 90 around the session's configured length**, with
+45 as the value that motivated the request.
+
+**⚠️ Three things make this more than a control swap. Read all three before scoping.**
+
+**1. It reverses a recorded owner decision, and the code says so.** The comment above
+`DURATION_PRESET_DELTA_MIN` reads: *"Short/long are RELATIVE to whatever the session is configured
+for (owner call 2026-07-29: '30 mins +/- the routine's chosen amount'), not fixed 30/90 clocks…
+a 45-minute session's 'short' is 15 min of squeeze, not a 30-min increase, which is what an absolute
+floor would have quietly done."* An absolute ladder was considered and rejected. **The owner may well
+be reversing it deliberately** — *"the default one is shown"* suggests the session's own budget still
+anchors the control — but a plan must state which model it is choosing rather than discover the
+comment halfway through. **Recommended: keep the session's configured budget as the anchor and
+default, and let the slider pick absolute minutes around it** — that satisfies the request without
+throwing away the relativity that made a 45-minute program work.
+
+**2. 15 minutes is below the model's own floor.** `MIN_PRESET_BUDGET_MIN = 20`, and the comment
+states why: *"Below this the warmup carve-out and two-set role floors leave no room for a real
+session, so shortening further just produces a plan that cannot fit its own budget."* There is also a
+constant tuned to that exact number — `WARMUP_CEILING_FRACTION = 0.2` is documented as chosen so
+`0.20 × 20 = MIN_WARMUP_MIN (4)`, i.e. **the two warmup clamps meet exactly at 20 and would invert
+below it**. Offering 15 needs that arithmetic redone, or 15 dropped from the ladder. This is a
+decision for the plan, not something to clamp silently at runtime.
+
+**3. A slider regenerates an AI call per detent, and the cooldown is deliberately bypassed.**
+Changing the preset re-runs the prescription — and `generate-prescription.ts:165` passes
+`skipCooldown: durationPreset != null`, with a comment noting *"the user switching presets is exactly
+that fast"*. Measured in production: `prescription` AI calls average **2,445 ms** (n = 46, max
+4,733 ms). A segmented control fires once per tap; a slider dragged 60 → 15 crosses every stop.
+**Commit on release, never on change**, and consider whether the intermediate values should be
+requested at all. The prescription cache key already includes the preset
+(`generate-prescription.ts:160`), so widening 3 values to 5+ also multiplies cache entries per
+session per day.
+
+**One thing that is genuinely easy:** **nothing is persisted.** There is no `duration_preset` column
+in the Postgres schema, the local SQLite tables or `lib/local-store/types.ts` — the hook's own
+comment says *"the choice is never written to the program, it only tags the plan it produced"*. So
+this needs **no migration and no sync work**, which is unusual for a change this visible.
+
+**Feature request, so the next step is a planning session** writing to `docs/superpowers/plans/` —
+intake traced it and did not design it. The plan should also decide whether `DurationPreset` stays an
+enum with more members or becomes a minutes number, since seven call sites depend on the answer.
+
+**Done looks like:** a 45-minute session can be chosen for today, the session's own configured length
+is still what the control defaults to, the picked length is what the plan is trimmed against *and*
+what the warm-up countdown shows, and dragging the control does not fire a prescription per step.
+
+### [app-shell][platform] 🔵 BF-5 — the week in review should be a page, not a banner that expands
+
+- Lane: ? — the route must return its numbers (A) before a page can chart them (B); the planning session splits it
+
+**Owner request, 2026-08-23 (verbatim):** *"rather than chevron type display; id rathee its own page
+that you can get to from a banner notifcation; or a permanent link in the health tab somewhere - the
+page shohld be more indepth; kinda like the training calendar entry; but for the whole week. so it
+can visually compare the week based on the metrics its talking about."*
+
+**Screenshot described, since the image will not survive into an implementer's session:** the Home
+tab, with a dismissible banner reading *"Your week in review is ready"* carrying a chevron and an X.
+Expanded, it shows five prose bullets — Training Load (5 sessions, 21,354 kg, +21% on 17,719 kg), PR
+Performance (103 kg bench, 97 kg squat, 161 kg hip thrust "among six others"), Recovery Metrics (HRV
+56 ms, readiness 66/100 down from 71, sleep 65/100, 6.7 h), Volume Focus (14 sets hamstrings, 12
+glutes), and a Recommendation. Every one of those is a number being *described* where it could be
+*drawn*.
+
+**⚠️ The blocker is in the route, and it is the whole reason this is not just a UI job.**
+`app/api/weekly-digest/route.ts` computes all of it — recap-week vs prior-week volume and session
+counts, per-muscle weighted sets, PRs, HRV, readiness, sleep score, weight change, illness, stress,
+resilience, OTS — then **flattens every value into a text `context` string, hands that to
+`generateText`, and returns `{ digest, weekStart }` where `digest` is prose** (line ~255). The
+structured data is computed and thrown away.
+
+So the first task is to have the route **return the metrics alongside the prose**. Two consequences
+worth stating plainly:
+- **Do not parse numbers back out of the LLM's text to draw the charts.** That is the same class of
+  mistake CLAUDE.md bans as `JSON.parse` of model output — and worse here, because the prompt already
+  says *"quote its numbers, never invent or recompute"*, which is a hope, not a guarantee.
+- **Storage holds prose only.** `ai_health_insights.insight` is a `text` column and the route
+  `upsert`s the digest string into it. A page that opens *last* week therefore has no stored numbers
+  to draw. Either add a JSONB column (**migration → Lane A**) or recompute the metrics on load and
+  keep only the prose cached. Recomputing is the cheaper first cut.
+
+**The plumbing the owner asked for mostly exists already:**
+- **The notification is already there and already deep-links.** `lib/day-review-reminders.ts:99`
+  schedules a local notification titled *"Your week in review is ready"* with
+  **`extra: { route: '/' }`** — it opens Home. Pointing it at a new page is a one-line change.
+- **The page shape to copy is the one the owner named.** `app/health/day/` is `page.tsx` (15 lines) +
+  `day-detail-content.tsx` (253 lines). A `app/health/week/` alongside it is the obvious form.
+- **The banner stays useful** as the entry point — `components/weekly-recap-banner.tsx` keeps its
+  once-per-week, dismissed-in-`localStorage` behaviour; the chevron becomes navigation instead of an
+  expander. The owner also asked for a permanent link in Health, so the page needs an entry point
+  that does not depend on a dismissible banner.
+
+**Two things to carry into the design, both from the screenshot:**
+- **"visually compare the week"** means the prior week is already half the story — the route computes
+  both weeks for volume and sessions, so a two-bar or overlaid comparison is free for those. HRV,
+  readiness and sleep are currently single averages; a daily series is what makes them chartable, and
+  whether that is in scope is a scoping decision, not an assumption.
+- **The digest text ends with a stray `*`** (*"maintaining these gains.\*"*) — a markdown artifact
+  reaching the user through `<Response>`. Small, but it is the kind of thing a page makes more
+  visible, not less.
+
+**Feature request, so the next step is a planning session** writing to `docs/superpowers/plans/` —
+intake traced it, it did not design it.
+
+**Done looks like:** a week-in-review page reachable from the notification and from a permanent
+Health entry point, drawing its charts from values the route returned rather than from parsed prose,
+with the recap week visibly compared against the one before it.
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
