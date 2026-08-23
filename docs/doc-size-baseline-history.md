@@ -1948,13 +1948,20 @@ that resurrected the four entries this branch removes, failing a different way. 
 take main's copy and re-measure; the numbers are derived from the files, so there is nothing to
 merge.
 
-## 2026-08-23 — `CLAUDE.md` 1136 → 1135 (ratchet down)
+## 2026-08-23 — `CLAUDE.md` 1136 → 1148 (raise, +12)
 
-The session-titles rule gained the status-light convention (leading emoji = role, trailing =
-🟢 live / 🔴 handed on) and came out a line shorter than it went in. The detail lives in
-`docs/agents/README.md` under *The trailing light*, which is where a reader who needs the
-mechanism is already going; the index keeps only the fact that the light exists and who flips it.
+The session status light (🟢 live / 🔴 wrapped) became a rule for **every** session rather than only
+the six standing agents, and that cannot live in `docs/agents/README.md` — an ad-hoc session never
+opens it. So a Standing Instruction (7 lines) plus a fourth step in Session Wrap-Up (5 lines).
 
-Ratcheted rather than left slack, because slack in a shrink-only baseline is just a line of
-growth nobody had to argue for.
+The trigger is why it belongs in the index at all: the owner says *"wrap up this session"*, which
+lands on the Session Wrap-Up ritual, and that ritual had three steps and no mention of the light.
+Documented anywhere else, the convention would have lived in a file the sessions that most need it
+never read. The mechanism — two MCP calls — stays in `docs/agents/README.md` under *The trailing
+light*; the index carries only the rule and the trigger.
+
+Mid-branch this went 1136 → 1135 (the rewritten session-titles bullet came out a line shorter) and
+then up to 1148. Recorded as the single net change, since the branch squash-merges. The lesson kept
+from the detour: do not ratchet a baseline down while the convention it measures is still being
+worked out — it bought nothing and had to be undone within the hour.
 

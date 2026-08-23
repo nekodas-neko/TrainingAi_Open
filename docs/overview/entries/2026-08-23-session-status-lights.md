@@ -1,4 +1,4 @@
-## 2026-08-23 — Session titles carry a status light: 🟢 live, 🔴 handed on
+## 2026-08-23 — Every session title carries a status light: 🟢 live, 🔴 wrapped
 
 **Branch:** `claude/model-recommendations-ey670v` · docs-only · supersedes the marker from #352 and #354
 
@@ -38,9 +38,24 @@ green that has not moved in a day is worth checking rather than trusting. Also n
 differ only in hue, which is the shape `CLAUDE.md`'s colour-only-state rule warns about; it is
 tolerated here because the audience is one person who chose it, not app UI.
 
+**It applies to every session, not only the six agents.** That was the second half, and the gap it
+closed is the one that mattered: the light was first wired into `docs/agents/README.md`'s handoff
+ritual, but the owner's actual trigger phrase — *"wrap up this session"* — lands on `CLAUDE.md`'s
+**Session Wrap-Up**, which had three steps and no mention of a light. So the convention would have
+been documented in a file that ad-hoc sessions never open. `CLAUDE.md` now carries a Standing
+Instruction for the rule and a fourth wrap-up step for the flip; the two-call mechanism stays in the
+agents README. An ad-hoc `Token usage investigation 🟢` is the shape — the owner scans for greens to
+find the threads still needing to be closed out.
+
+`docs/doc-size-baseline.json` raises `CLAUDE.md` 1136 → 1148 for those 12 lines, with the reasoning
+in `-history.md`. Recorded there too: ratcheting the same baseline *down* earlier in this branch,
+while the convention was still being worked out, bought nothing and was undone within the hour.
+
 **Verification:** `pnpm check:rules`. All six batons are at or below their `doc-size-baseline.json`
 entries, so the shrink-only ratchet holds. Docs-only, no version or changelog bump.
 
-**Not exercised:** no app code, so no runtime, device or CI-behaviour surface. The 🟢 self-title on
-session creation is documented but has not been observed on a real agent session — the next agent
-started from one of these prompts is the first test.
+**Not exercised:** no app code, so no runtime, device or CI-behaviour surface. Setting 🟢 on an
+ad-hoc title and flipping to 🔴 were both exercised live on this session. What has **not** been
+observed is a standing agent coming up 🟢 from its own prompt at session creation — the next agent
+started from one of these prompts is the first test of that path. If it comes up without the green,
+the prompt's opening self-title line is what to look at.
