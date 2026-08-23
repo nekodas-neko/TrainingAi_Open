@@ -4,15 +4,42 @@
 // "improve" the algorithm or re-derive constants — the vendored constants (getResilienceConstants)
 // and the golden are the source of truth. Ported from the vendor's `stress_resilience_2_2_1` model
 // source (private archive).
-import { getResilienceConstants, type ResilienceConstants } from '@/lib/oura-models/constants'
+import type { ResilienceConstants } from '@/lib/oura-models/constants'
 import { daytimeStressScalingParams } from '@/lib/health/daytime-stress'
 
-// Read on FIRST USE, memoised — not at module scope. `next build` imports every route to
-// collect page data, so a module-scope read opened the constants file at build time, and the
-// directory only exists at runtime now that the vendored copies are gone (Q-49 A4b). Each
-// function below takes its own `const C = C_()` so the bodies read exactly as before.
-let cCache: ReturnType<typeof getResilienceConstants> | null = null
-const C_ = (): ReturnType<typeof getResilienceConstants> => (cCache ??= getResilienceConstants())
+// The constants are INJECTED, not read from disk here (Q-545). Importing the loader put `node:fs`
+// in this module's graph, and the Oura rollup imports this file — which is what kept a rollup that
+// is otherwise runtime-agnostic from ever running in the WebView. Same mechanism
+// `steps-motion-decoder` has used since Q-221. Each function below still takes its own
+// `const C = C_()`, so the bodies read exactly as before.
+let cCache: ResilienceConstants | null = null
+
+/** Provide the resilience constants. Server: `ensureServerOuraConstants()`. */
+export function setResilienceConstants(c: ResilienceConstants): void {
+  cCache = c
+}
+
+export function hasResilienceConstants(): boolean {
+  return cCache !== null
+}
+
+/** Test-only: forget the injected constants so a test can assert the unset behaviour. */
+export function __clearResilienceConstants(): void {
+  cCache = null
+}
+
+// Throws rather than defaulting, deliberately — the same call the disk loader used to make. This
+// port is pinned to a captured golden vector; with no constants it would emit plausible, wrong
+// resilience scores rather than fail.
+const C_ = (): ResilienceConstants => {
+  if (!cCache) {
+    throw new Error(
+      'stress-resilience: constants not set — call setResilienceConstants() first ' +
+        '(server: ensureServerOuraConstants() from lib/oura-models/constants/server-inject)',
+    )
+  }
+  return cCache
+}
 
 export interface ResilienceModelInput {
   sleepStartTimestampsMs: number[]

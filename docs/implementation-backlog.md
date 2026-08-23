@@ -2884,7 +2884,18 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 > churn only, no behaviour change: full suite 542 files / 4,470 tests green, 51 of 51 Custom Rules,
 > `pnpm build` and the rollup-worker esbuild bundle both clean.
 >
-> **So the ONLY thing standing between here and a device rollup is item 3 below — the constants.**
+> **✅ AND THE CONSTANTS ARE INJECTED TOO (2026-08-23). `run.ts` now reaches ZERO server-only
+> modules** — 45 modules, no `node:` builtin, no `onnxruntime-node`, no driver. The four ports it
+> reaches take their constants by injection (`lib/oura-models/constants-inject.ts` →
+> `ensureServerOuraConstants()`), called at boot, in the rollup worker's own realm, and at the
+> rollup composition roots. Item 3 below is done; **what remains of Task 3 is the device half** —
+> a `RollupIO` over the local store, a runtime over `getWebSession`, and a constants fetch — none
+> of which is blocked by anything in the engine any more.
+>
+> **⚠️ It was FOUR getters, not the three the table below says.** `cumulative-stress.ts` reads
+> `getCumulativeStressConstants` through a **relative** import (`from './constants'`), and the
+> scan that produced the three-row table only matched the `@/lib/…` form. The import-graph walk
+> caught it; a name-based grep did not. If you re-measure this, walk the graph.
 >
 > **Two premise corrections for whoever takes Task 3.**
 >

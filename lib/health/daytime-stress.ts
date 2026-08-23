@@ -10,7 +10,7 @@
  * (the vendor's `dhrv` model source (private archive)); the MLP runs via the golden-verified ONNX
  * (`runDhrvImputation`). Deterministic given its inputs. See the P3 plan doc.
  */
-import { getDaytimeStressConstants } from '@/lib/oura-models/constants'
+import type { DaytimeStressConstants } from '@/lib/oura-models/constants'
 import { daytimeHrvEstimatesPerBucket, type DaytimeHrvModel } from '@trainingai/shared/health/daytime-hrv-model'
 
 export interface DhrvBaselines {
@@ -71,11 +71,38 @@ export interface DaytimeStress {
 // Maps intensity = dhrv − dhrv_baseline through night-HRV-baseline-dependent saturation curves to a
 // scaled level in [−1, +1] (negative = below baseline = stressed). Pure formula, no inference.
 // Same story as the scaling stats above — these four tables are the model's own, and were inline.
-// Read on first use, memoised — same reason as the scaling stats above: a module-scope read is a
-// build-time read, because `next build` imports every route to collect page data.
-let daytimeConsts: ReturnType<typeof getDaytimeStressConstants> | null = null
-const D_ = (): ReturnType<typeof getDaytimeStressConstants> =>
-  (daytimeConsts ??= getDaytimeStressConstants())
+// The tables are INJECTED, not read from disk here (Q-545). Importing the loader put `node:fs` in
+// this module's graph, and the Oura rollup imports this file — which is what kept a rollup that is
+// otherwise runtime-agnostic from ever running in the WebView. Same mechanism `steps-motion-decoder`
+// has used since Q-221: the server injects at boot, a client would inject from a route.
+let daytimeConsts: DaytimeStressConstants | null = null
+
+/** Provide the daytime-stress tables. Server: `ensureServerOuraConstants()`. */
+export function setDaytimeStressConstants(c: DaytimeStressConstants): void {
+  daytimeConsts = c
+}
+
+export function hasDaytimeStressConstants(): boolean {
+  return daytimeConsts !== null
+}
+
+/** Test-only: forget the injected tables so a test can assert the unset behaviour. */
+export function __clearDaytimeStressConstants(): void {
+  daytimeConsts = null
+}
+
+// Throws rather than defaulting, deliberately — the same call the disk loader used to make. Every
+// number below is a saturation bound from the vendor's own model; with no table this would emit
+// plausible, wrong stress levels that flow into readiness and the body-battery chart.
+const D_ = (): DaytimeStressConstants => {
+  if (!daytimeConsts) {
+    throw new Error(
+      'daytime-stress: constants not set — call setDaytimeStressConstants() first ' +
+        '(server: ensureServerOuraConstants() from lib/oura-models/constants/server-inject)',
+    )
+  }
+  return daytimeConsts
+}
 
 function satLookup(limits: number[], vals: number[], x: number, dflt: number): number {
   for (let i = 0; i < limits.length; i++) if (x < limits[i]) return vals[i]

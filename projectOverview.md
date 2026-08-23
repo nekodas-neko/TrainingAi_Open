@@ -34,10 +34,10 @@ rollup end-to-end pass unchanged. It does **not** move the bill (the rollup stil
 server); it removes the reason a device rollup would be written twice. **The models followed the
 same day** — `sleepnet`, `step-counter` and `dhrv` take a `ModelRuntime` rather than importing
 `onnxruntime-node`, taking `run.ts`'s server-only edges from **5 to 1** (measured: 46 modules). The
-one left is the constants loader, synchronous and `node:fs` by design, and it is now the single
-thing between the D-track and a device rollup — **and it is a port, not a decision**: Q-221 already
-built the inject-and-serve mechanism, and the rollup already uses it for one of the three constants
-it reads ([journal](docs/overview/entries/2026-08-23-model-runtime-port.md)).
+the constants followed — the four ports that read them now take them by **injection**
+(Q-221's mechanism), so **`run.ts` reaches zero server-only modules**: 45, no `node:` builtin, no
+`onnxruntime-node`, no driver. What is left of Task 3 is the device half, and nothing in the engine
+blocks it ([journal](docs/overview/entries/2026-08-23-constants-injection.md)).
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is

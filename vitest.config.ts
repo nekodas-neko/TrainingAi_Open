@@ -58,6 +58,7 @@ export default defineConfig({
           name: 'rollup',
           environment: 'node',
           env: { OURA_CONSTANTS_DIR: CONSTANTS_DIR },
+          setupFiles: ['./vitest.setup.ts'],
           include: [ROLLUP_TESTS],
           // 4x the slowest solo measurement (14.6 s). Contention is what tips these over, and the
           // full suite runs them alongside ~380 other files against one shared Postgres.
@@ -71,6 +72,7 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           env: { OURA_CONSTANTS_DIR: CONSTANTS_DIR },
+          setupFiles: ['./vitest.setup.ts'],
           // `e2e/**` is Playwright's (`pnpm e2e`), not vitest's. Without this, vitest picks up the
           // browser specs, fails to run them, and reports "1 failed file / 0 failed tests" — the
           // shape that reads like a flaky hook and sends you looking in the wrong place (Q-249).
