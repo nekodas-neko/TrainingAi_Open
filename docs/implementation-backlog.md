@@ -430,13 +430,61 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and it is not the AI call
+### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 
 - Lane: B — the fix is `components/nutrition/capture-step.tsx`; the payload instrumentation below is Lane A
 
 **Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
 than it used to be; can we investigate why - from taking the photo to getting the result is much
 longer than before."*
+
+**🔁 AMENDED 2026-08-23, after the pre-cut history became available.** The owner pointed at the
+archived repo (`nekodas-neko/TrainingAI_Old`, 3,225 commits). It **corrects two claims below** — read
+this before the original analysis, which is kept so the reasoning is auditable rather than quietly
+rewritten.
+
+**Correction 1 — the measurement window is far narrower than it looked.** AI instrumentation landed
+in **#741 on 2026-07-22**; the earliest `ai_call_log` row is 2026-07-26. So "the AI call has always
+been ~4.2 s" is only true **since 2026-07-22**, and *nothing measured it before that*. The original
+wording ("NOT the regression, and that is measured") overstated what the data can support. If the
+owner's "used to be" predates late July, `ai_call_log` structurally cannot see it.
+
+**Correction 2 — the unbounded image payload is NOT the regression.** It is real and still worth
+fixing, but it cannot be what changed: `Camera.getPhoto({ resultType: Base64, source: Prompt,
+quality: 80 })` is **byte-identical since 2026-06-12**, never carried `width`/`height`, and
+`@capacitor/camera` is pinned at exactly **8.2.0 with an unchanged integrity hash** for the whole
+history. Demoted from "prime suspect" to a standing inefficiency — worth taking, but it will not
+explain a slowdown on its own.
+
+**✅ The one dated change to the scan's AI call: #112, `3219a475`, 2026-07-03** — *"AI usage batch:
+structured output, response caching, chat tools, prompt hygiene, stream robustness"*. It rewrote the
+route from **`generateText` + `JSON.parse(cleaned)`** to **`generateObject` + the Zod `ScanSchema`**,
+and added the one-shot retry (`lib/ai/retry.ts`) in the same PR. That is **19 days before
+instrumentation existed**, which is exactly why the latency table cannot see it.
+
+**This is a plausible mechanism, not a proven one, and the fix is not a revert.** `generateObject`
+constrains decoding to a schema; the schema here is not trivial (10 fields plus a nested
+`ingredients` array of 6 fields each). CLAUDE.md *requires* structured output — "never `JSON.parse` of
+free text" — so restoring the old path is not on the table. What is on the table: check which
+structured-output strategy the SDK uses for Google here, and whether a flatter schema or an explicit
+`maxOutputTokens` shortens it. There is currently **no `maxOutputTokens`, no `temperature` and no
+thinking/provider config anywhere on this call** — every one is an SDK default.
+
+**Retries are visible in the data and are not firing.** `withAiLogging` captures `started` **before**
+`withAiRetry` (`lib/ai/instrument.ts:102–105`), so `latency_ms` includes a retry *and* its 1–1.5 s
+backoff in a single row. One retry would produce roughly 9.7 s; the observed maximum is **5,013 ms**,
+so no logged scan retried. Ruled out.
+
+**Everything else that could have changed, checked and unchanged:** model (`gemini-3.1-flash-lite`
+throughout), `ScanSchema` (byte-identical since #112), `@ai-sdk/google@2.0.74` / `ai@5.0.192` (last
+moved 2026-05-23), and the route's later commits — #741 added observability, #1298 (2026-08-13) only
+surfaced failures that were previously swallowed.
+
+**How to reach the history, since this is the second entry to need it:** the archived repo is
+attachable in-session via `add_repo` (`nekodas-neko/TrainingAI_Old`), then
+`git fetch --unshallow` — a `--depth 1` clone cannot answer a "when did this change" question.
+
+---
 
 **⚠️ Read this first: the model call is NOT the regression, and that is measured, not assumed.**
 `ai_call_log` records `latency_ms` per call, so the AI half is directly observable. All 30
@@ -448,8 +496,9 @@ longer than before."*
 | text (~215 input tokens) | 12 | 1,667 ms | 1,319 | 2,135 | 2026-07-26 → 08-20 |
 
 **The earliest image scan on record (2026-07-26) took 4,545 ms — above the 18-call average.** The
-model is `gemini-3.1-flash-lite` on every row from July to now, so it did not change either. Whatever
-got slower is on the other side of that number. Do not start by tuning the prompt or the model.
+model is `gemini-3.1-flash-lite` on every row, so it did not change either. **⚠️ Per Correction 1
+above, this window opens on 2026-07-22 and says nothing before it** — it shows the AI call is stable
+*now*, not that it always was.
 
 **Also ruled out by reading the path, all cheap or absent:**
 - `rateLimit` is an in-memory `Map` (`lib/rate-limit.ts:97`) — no I/O on the request path.
@@ -458,7 +507,7 @@ got slower is on the other side of that number. Do not start by tuning the promp
 - Nothing happens after the response. `handleScanResult`
   (`components/nutrition/food-logger-sheet.tsx:115`) is pure synchronous state, then `pushStep`.
 
-**Prime suspect: the image payload is unbounded, and the upload is the only unmeasured leg.**
+**Standing inefficiency (demoted from prime suspect by Correction 2 — worth fixing, not the regression): the image payload is unbounded.**
 `Camera.getPhoto({ resultType: Base64, source: Prompt, quality: 80 })` at `capture-step.tsx:113`
 passes **no `width`/`height`**, so it returns the S25's full-resolution JPEG; base64 adds ~33% on top.
 The gallery path is equally unbounded — `handlePhoto` runs `FileReader` over the raw `File` with no
@@ -498,15 +547,15 @@ zero again.
 container spin-up ahead of everything above. Worth checking against deploy times before assuming
 payload size is the whole story.
 
-**⚠️ Why no commit is named.** This is reported as a regression, but this repository was cut fresh on
-2026-08-16 and holds **2 commits**, so `git log` cannot date the change. The archived private repo is
-where a bisect would have to happen. Treat "much slower than before" as the owner's direct
-observation — the latency table shows the AI call is flat, which narrows *where* it regressed without
-dating *when*.
+**✅ The commit is now named** — see the amendment at the top. The earlier version of this entry said
+none could be, because the public repo holds a fresh history; the archived repo answers it.
 
-**What would confirm the diagnosis, in one pass:** log the payload bytes for a scan, then run the same
-photo through downscaled and full-resolution. If wall-clock tracks payload size while `latency_ms`
-stays near 4,200 ms, it is the upload. If wall-clock is flat and large regardless, look at cold start.
+**What would confirm it, in one pass — run the same photo three ways and compare.** (a) Current
+`generateObject` path. (b) The same call with a flattened schema, or an explicit `maxOutputTokens`.
+(c) Downscaled versus full-resolution upload, with the payload bytes logged. If (b) moves the number,
+#112 is the regression and the schema is the lever. If only (c) moves it, the upload dominates after
+all. If neither moves and wall-clock stays high, look at Railway cold start on this low-traffic
+route — the one candidate that could not be tested from a sandbox session.
 
 **Done looks like:** a photo scan uploads a bounded payload sized to what the model actually consumes;
 the identification stays as accurate as it is today; and the client-side elapsed time is recorded
