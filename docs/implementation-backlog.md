@@ -3445,6 +3445,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
+- **Lane:** A
+- **Batch:** `ring-service-device-pass`
+- **This entry is why the batch is worth assembling, and it should be in the first native APK that
+  ships either way.** It is the mitigation for the hazard that makes APK delivery expensive in the
+  first place: an install that cannot upgrade in place forces an uninstall, and an uninstall
+  destroys the only copy of the ring key. Batching two more `android/…/oura/` changes onto that APK
+  is free; shipping the key backup late is not.
+
 - **Branch:** `feat/ring-key-export`
 - **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
 - **What it is.** The 32-hex ring key exists only in Android SharedPreferences
@@ -3953,6 +3961,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][app-shell] Q-533 — the drain runs unattended but only reports completion to a screen nobody should have to watch
 
+- **Lane:** A
+- **Batch:** `ring-service-device-pass`
+
 - **Branch:** `feat/drain-complete-notification`
 - **Added:** 2026-08-17, owner report during a full re-sync: *"this is very lengthy. We shouldn't do
   any testing that involves this ever again unless it can do it silently in the background."*
@@ -4041,6 +4052,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   log-set → complete-workout is the follow-on this unblocks.
 
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
+
+- **Lane:** A
+- **Batch:** `ring-service-device-pass`
+- **What the batch covers, and what it does not.** The batch exists so three `android/…/oura/`
+  changes cost **one** APK and one ring sitting instead of three. This entry contributes its two
+  do-regardless items — **(2)** resetting `EXERCISE_HR` and fast-HR mode in the connect-time
+  sequence, and **(3)** persisting the battery poll. **This entry alone survives the batch**, and
+  deliberately: its SpO₂ question is a decision waiting on the A/B that (3) makes measurable at
+  all. Shipping (3) in a PR that is already building an APK is the difference between measuring
+  the drain next week and paying another cycle for a five-line change.
+- **⚑ This is the same investigation as Q-116, filed 11 days earlier, and neither entry knew.**
+  Q-116 (2026-08-06) reports a live HR reading on the Health tab with nobody having tapped
+  *Measure now*, and suspects it explains ~15%/night of drain; this entry (2026-08-17) reports
+  ~20% overnight. **The "separate latent defect" traced above is Q-116's own leak vector**: a
+  live-HR session that never reaches `stopLiveHr()` leaves fast-HR sampling on permanently, healed
+  by no reconnect or restart. Item (2) closes that vector outright, and item (3) is the
+  observability Q-116 needs before its ~15% claim can be tested at all.
 
 - **Branch:** `fix/ring-measurement-power-budget`
 - **Added:** 2026-08-17 · owner: *"the battery life drains too fast. Stock it lasts 7 days; but with
@@ -5248,6 +5276,10 @@ session working from a temporarily restored copy.
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
 
 ### [platform][devices] Q-285 — the web-push stack has no senders and no subscribers
+
+- **Re-measured 2026-08-23: `claude_ro.push_subscriptions` still holds 0 rows**, eight days on.
+  Nothing has subscribed in the interval, so the decision below is unchanged by waiting — which is
+  itself weak evidence for (b) or (c) over (a).
 
 - **Branch:** `chore/decide-web-push`
 - **Plan:** none needed — this is a decision, then a small change either way
@@ -8910,6 +8942,12 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [activity][readiness][heart-rate] Q-204 — the HR-derived load lane (Q-137 direction B), gates now measured
 
+- **Needs:** Q-270
+- **Gate 1's failure is Q-270, and it has not moved.** The `training_load_ots` count read "0 of 42
+  days" when this was filed; **re-measured 2026-08-20 it is 0 of 96**, and Q-270 has since been
+  reopened 🔴 because the 2026-08-15 fix that was supposed to start populating it did not take.
+  Recorded as `Needs:` rather than prose so this entry parks instead of reading as startable.
+
 - **Branch:** `feat/activity-hr-load-lane`
 - **Added:** 2026-08-11 · was Q-137 direction B, held as *gated, not queued* until its two questions
   were answered. Both now are — see
@@ -9034,6 +9072,13 @@ per-field merge where an AI write has no honest source rank to claim.
   none of it.
 
 ### [devices][activity] Q-184 — `active_calories_est` is plumbed end-to-end and never written
+
+- **Needs:** Q-204
+- **The hold recommended below is now a field rather than prose.** This entry said *"hold Q-184
+  behind Q-270 and Q-204"* in a paragraph, so `next-item.js` listed it READY and an implementer
+  had to read to the bottom to learn it was not. **Re-measured 2026-08-20: `active_calories_est`
+  is populated on 0 of 96 days** — the "0 of 42" below is the count as filed, and 54 further days
+  have changed nothing.
 
 - **Branch:** `feat/ble-active-energy-estimate`
 - **Added:** 2026-08-11 · found while investigating Q-137
@@ -9222,6 +9267,21 @@ first, so the output is a design discussion, not a patch:
 
 ### [heart-rate][devices] Q-116 — Health tab's "Live HR" shows a live reading without tapping "Measure now"; likely tied to overnight ring drain
 
+- **Needs:** Q-388
+- **⚑ Q-388 is this entry, found again 11 days later and traced further — read it first.** It
+  reports the same symptom from the owner (~20% overnight against this entry's ~15%/night) and
+  **pins one of the three leak vectors below to a line**: `reqBleFastHrMode(false)` and
+  `EXERCISE_HR → AUTOMATIC` appear only in `liveHrStopSequence()`, so any live-HR session that
+  never reaches `stopLiveHr()` leaves continuous fast-HR sampling on permanently — the app killed
+  mid-workout, Samsung battery management killing the service, or the admin tester's **Live HR**
+  button without **Stop HR**. That is vector two, confirmed from source.
+- **Why this waits on Q-388 rather than merging into it.** Q-388's batch closes that vector and
+  persists the battery poll, which is what makes the drain measurable in the first place. Run this
+  entry's diagnostic capture *after* that APK: if the leak is gone the remaining vectors are what
+  is left, and if it is not, the telemetry can finally say so. **Kept separate because its leading
+  vector is a stale persisted Zustand workout store — Lane B — while Q-388 is Kotlin.** That split
+  is also why this entry carries no `Lane:`: the diagnostic decides which lane owns the fix.
+
 - **Branch:** `investigate/live-hr-leak-ring-battery`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 31
 - **Added:** 2026-08-06 · owner noticed a live (non-stale) HR reading on the Health tab without ever
@@ -9242,7 +9302,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [devices][body] Q-114 — scale "Weighing you…" progress bar has already drifted from the real native timeout; shorten both together
 
-- **Batch:** scale-weighing-ui
+- **Lane:** A
+- **Batch:** `scale-weighing-ui`
 
 - **Branch:** `fix/scale-cycle-budget-drift-and-trim`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 29
@@ -9324,7 +9385,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
-- **Batch:** scale-weighing-ui
+- **Lane:** A
+- **Batch:** `scale-weighing-ui`
 
 - **Branch:** `fix/scale-onunstablereading-ungated-recurrence`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 19
