@@ -96,7 +96,7 @@ export function DoneScreen({
   const [hrAttempted, setHrAttempted] = useState(false);
   const [hrError, setHrError] = useState(false);
   const [sessionRpe, setSessionRpe] = useState<number | null>(null);
-  const [energy, setEnergy] = useState<{ kcal: number | null; intensity: string } | null>(null);
+  const [energy, setEnergy] = useState<{ kcal: number | null; intensity: string; source: 'hr' | 'met' } | null>(null);
   const [activityId, setActivityId] = useState<number>(DEFAULT_ACTIVITY_ID);
   // In-flight guard on the POST itself — the 1-10 grid stays mounted after selection
   // (a re-tap re-POSTs, the write path already upserts session_rpe) so this replaces
@@ -140,12 +140,14 @@ export function DoneScreen({
     if (sessionRpe != null) qs.set("rpe", String(sessionRpe));
     // Keyed by the inputs that change the answer (rpe + activity), so tapping a different
     // session RPE re-fetches rather than serving the previous estimate.
-    await cachedFetch<{ kcal: number | null; intensity?: string }>(
+    await cachedFetch<{ kcal: number | null; intensity?: string; source?: 'hr' | 'met' }>(
       `workout-energy:${workoutSessionId}:${activityId}:${sessionRpe ?? 'none'}`,
       `/api/workout-sessions/${workoutSessionId}/energy?${qs}`,
       WORKOUT_ENERGY_TTL,
       (data) => {
-        if (data.kcal != null) setEnergy({ kcal: data.kcal, intensity: data.intensity ?? "moderate" });
+        if (data.kcal != null) {
+          setEnergy({ kcal: data.kcal, intensity: data.intensity ?? "moderate", source: data.source ?? "met" });
+        }
       },
       // The estimate is a nice-to-have — no error state, same as before.
       { onError: () => {} },
@@ -424,7 +426,13 @@ export function DoneScreen({
               <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <FlameIcon className="h-3 w-3" style={{ color: "var(--accent-amber)" }} />
-                  ~{energy.kcal.toLocaleString()} kcal · {energy.intensity} effort
+                  {/*
+                    "{intensity} effort" is the MET tier, and naming it beside a figure heart rate
+                    produced would credit the wrong input — the same trap the route already guards
+                    by returning a null `met` on the HR path (Q-421). So the suffix follows the
+                    basis rather than always reading as the tier.
+                  */}
+                  ~{energy.kcal.toLocaleString()} kcal · {energy.source === 'hr' ? 'from heart rate' : `${energy.intensity} effort`}
                 </span>
                 <TrainingStressBadge date={todayInTz()} />
                 <Select value={String(activityId)} onValueChange={(v) => setActivityId(Number(v))}>

@@ -31,7 +31,9 @@ function response(over: {
       workoutKcal: over.workoutKcal ?? 0,
       activityKcal: over.activityKcal ?? 0,
       stepsKcal: over.stepsKcal ?? 0,
-      workoutKcalBySession: over.bySession ?? [],
+      // `source` defaults here so the existing cases stay about kcal arithmetic. The two cases at
+      // the end of this file set it explicitly, because that is what they are about.
+      workoutKcalBySession: (over.bySession ?? []).map(r => ({ source: 'met' as const, ...r })),
     },
     goal: null,
     missingProfileFields: [],
@@ -99,7 +101,7 @@ describe('workoutKcalBySession (Q-391)', () => {
     ]
     const total = parts.reduce((n, p) => n + p.kcal, 0)
     const map = workoutKcalBySession(response({ workoutKcal: total, bySession: parts, intakeKcal: 500 }))
-    expect([...map.values()].reduce((n, k) => n + k, 0)).toBeCloseTo(total, 10)
+    expect([...map.values()].reduce((n, k) => n + k.kcal, 0)).toBeCloseTo(total, 10)
   })
 
   /**
@@ -110,9 +112,9 @@ describe('workoutKcalBySession (Q-391)', () => {
   it('leaves rounding to the caller, so the drift is bounded per card', () => {
     const parts = [{ id: 'a', kcal: 120.4 }, { id: 'b', kcal: 130.2 }, { id: 'c', kcal: 110.9 }]
     const map = workoutKcalBySession(response({ workoutKcal: 361.5, bySession: parts, intakeKcal: 500 }))
-    expect(map.get('a')).toBe(120.4)
+    expect(map.get('a')?.kcal).toBe(120.4)
 
-    const renderedSum = [...map.values()].reduce((n, k) => n + Math.round(k), 0)
+    const renderedSum = [...map.values()].reduce((n, k) => n + Math.round(k.kcal), 0)
     const renderedTotal = Math.round(361.5)
     expect(Math.abs(renderedSum - renderedTotal)).toBeLessThanOrEqual(Math.ceil(parts.length / 2))
   })
@@ -125,8 +127,8 @@ describe('workoutKcalBySession (Q-391)', () => {
       workoutKcal: 290, intakeKcal: 500,
     }))
     expect(map.size).toBe(2)
-    expect(map.get('morning')).toBe(200)
-    expect(map.get('evening')).toBe(90)
+    expect(map.get('morning')?.kcal).toBe(200)
+    expect(map.get('evening')?.kcal).toBe(90)
   })
 
   it('yields no entry rather than a zero when the estimate could not be made', () => {
@@ -140,5 +142,33 @@ describe('workoutKcalBySession (Q-391)', () => {
   it('survives a response with no balance at all', () => {
     expect(workoutKcalBySession(response({ balanceNull: true })).size).toBe(0)
     expect(workoutKcalBySession(null).size).toBe(0)
+  })
+
+  /**
+   * Q-421's remaining clause. About half the owner's sessions have no strap reading, so a day
+   * routinely holds one card produced by Keytel from heart rate and another by a MET tier over the
+   * clock — two formulas whose outputs overlap rather than agree. If the helper drops `source` the
+   * card cannot say which, and two adjacent numbers look like the same measurement.
+   */
+  it('carries each session\'s basis, because one day can hold both', () => {
+    const map = workoutKcalBySession(response({
+      bySession: [
+        { id: 'strapped', kcal: 321, source: 'hr' as const },
+        { id: 'bare', kcal: 300, source: 'met' as const },
+      ],
+      workoutKcal: 621, intakeKcal: 500,
+    }))
+    expect(map.get('strapped')?.source).toBe('hr')
+    expect(map.get('bare')?.source).toBe('met')
+  })
+
+  it('does not invent a basis it was not given', () => {
+    // Mutation guard: hardcoding either literal in the helper passes the case above for the wrong
+    // reason. Both addends here are 'hr', so a hardcoded 'met' fails and vice versa.
+    const map = workoutKcalBySession(response({
+      bySession: [{ id: 'a', kcal: 10, source: 'hr' as const }, { id: 'b', kcal: 20, source: 'hr' as const }],
+      workoutKcal: 30, intakeKcal: 500,
+    }))
+    expect([...map.values()].map(v => v.source)).toEqual(['hr', 'hr'])
   })
 })

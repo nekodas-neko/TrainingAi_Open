@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.333.3",
+    date: "2026-08-23",
+    changes: [
+      "A workout's calorie estimate now says what it was worked out from. With a heart-rate reading it reads EST. HR KCAL and responds to how hard the session actually was; without one it reads EST. MET KCAL and comes from the clock and an assumed effort, so two sessions of the same length give the same number. About half your sessions have no strap reading, so a day often shows one of each \u2014 previously both were labelled the same and there was no way to tell which figure responded to effort. The finish screen says \u201cfrom heart rate\u201d instead of naming an effort level when the heart rate produced the number.",
+    ],
+  },
+  {
     version: "1.333.2",
     date: "2026-08-23",
     changes: [
