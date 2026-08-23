@@ -102,7 +102,9 @@ never runs.
   the gate now reports real failures, so a red is information rather than noise.
 - **Owner still owes two device checks:** the deliberate Sentry error and an APK client check; and
   a Railway-dashboard reading for Q-549.
-- **#124 (Q-479) stays open and unmerged** — owner: *"leave that as a known issue for now."*
+- ~~**#124 (Q-479) stays open and unmerged**~~ — **superseded: the owner merged it on 2026-08-23**,
+  reversing that decision. Left struck rather than deleted, because this doc is a dated record and a
+  silently-edited one is the kind that gets trusted wrongly.
 
 ## Pickup prompt
 
