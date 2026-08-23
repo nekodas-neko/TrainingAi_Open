@@ -2600,6 +2600,9 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [app-shell] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
+- **Lane: B** — the fix is `onError` handlers and error states in `components/health/*.tsx`; the
+  `CLAUDE.md` wording correction rides with it.
+
 - **Branch:** `fix/card-fetch-error-states`
 - **Added:** 2026-08-18 · review sweep (three lenses) ·
   [`docs/reviews/2026-08-18-silent-card-failures.md`](reviews/2026-08-18-silent-card-failures.md)
@@ -2759,6 +2762,11 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [platform] Q-549 — Postgres holds 0.79 GB to serve 171 MB, at 0.002 vCPU
 
+- **Gate: owner** — the measurement above leaves nothing for code to change: `shared_buffers` is at
+  the default with a 99.87% hit ratio, and the one visible over-provision (`max_connections = 500`)
+  is a Railway console setting. The 0.79 GB figure also needs re-confirming over a full day, which
+  only the owner can read.
+
 > **⚠️ MEASURED against production 2026-08-19 — both named candidates are falsified. Read this before
 > starting; the entry below sends you at two dead ends.**
 >
@@ -2808,6 +2816,9 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [platform] Q-551 — OWNER DECISION: stay on Railway or leave, once the D-track has shrunk the server
 
+- **Gate: owner** · **Needs: Q-545** — the entry says both in prose ("BLOCKED: owner, and
+  deliberately **after** Q-545"); these are the fields that keep it out of an implementer's queue.
+
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 8
 - **Added:** 2026-08-18 · BLOCKED: owner, and deliberately **after** Q-545.
 - **The owner's stated goal:** *"The Goal was to move off railway if there were enough benefits"*, with
@@ -2856,6 +2867,10 @@ switching from bare `fetch` to local-delete + `queueMutation`.
   over a sample of historical days before and after. The extraction ships **no** behaviour change.
 
 ### [platform] Q-547 — ANSWERED 2026-08-18: the app CPU is spiky (so Q-545 fixes it), and much of it is deploy churn
+
+- **Gate: owner** — the remaining work is an owner measurement, not code: confirm the dashed markers
+  on the Railway charts are deploys, then take the CPU/RAM baseline during a quiet window (a sandbox
+  cannot read Railway metrics). Everything else on this entry is answered.
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md) section 1, Task 0
 - **Branch:** *(none — an owner measurement, then a finding)*
