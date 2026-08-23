@@ -37,7 +37,7 @@ export async function POST(req: Request) {
   const [sessionsToday, weekPrs, program, foodLogs, nutritionTargets, morningCheckin, userGoals, bodyMetricsToday, exerciseLibrary] = await Promise.all([
     // getDaySessionSummaries takes a slash-formatted date ("YYYY/MM/DD"), not the
     // hyphenated todayIso — matches the same conversion app/api/workout-sessions/day/route.ts uses.
-    repo.getDaySessionSummaries(userId, todayIso.replace(/-/g, '/')),
+    repo.getDaySessionSummaries(userId, todayIso.replace(/-/g, '/'), tz),
     repo.listRecentPersonalRecords(userId, new Date(todayMidnightUtc(tz).getTime()), new Date()),
     repo.getActiveProgram(userId),
     repo.listFoodLogs(userId, todayIso),

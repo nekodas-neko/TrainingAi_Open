@@ -18,14 +18,18 @@ export type { ApplyOutcome } from './domains/types'
  * `early_deload` reads it — it stamps the deload's start day — but every entry point takes it so
  * the next date-bearing domain cannot quietly reintroduce the bug.
  */
-export function handlerFor(domain: CoachPatchDomain, today: string = todayInTz(DEFAULT_TZ)): DomainHandler {
+export function handlerFor(
+  domain: CoachPatchDomain,
+  today: string = todayInTz(DEFAULT_TZ),
+  timezone: string = DEFAULT_TZ,
+): DomainHandler {
   const handlers: Record<CoachPatchDomain, DomainHandler> = {
     session_exercise: sessionExerciseHandler,
     nutrition_targets: nutritionTargetsHandler,
     user_goals: userGoalsHandler,
     injury: injuryHandler,
     program_phase: programPhaseHandler,
-    early_deload: earlyDeloadHandler(today),
+    early_deload: earlyDeloadHandler(today, timezone),
   }
   return handlers[domain]
 }
@@ -47,6 +51,7 @@ export async function applyCoachPatch(
   patch: CoachPatch,
   acceptedIds: string[],
   today?: string,
+  timezone?: string,
 ): Promise<ApplyOutcome> {
   const accepted = patch.changes.filter(c => acceptedIds.includes(c.id))
   if (accepted.length === 0) return { ok: false, reason: 'invalid', detail: 'No changes accepted' }
@@ -56,7 +61,7 @@ export async function applyCoachPatch(
     return { ok: false, reason: 'invalid', detail: 'Those fields do not belong to that domain' }
   }
 
-  const result = await handlerFor(patch.domain, today).apply(db, userId, patch, accepted)
+  const result = await handlerFor(patch.domain, today, timezone).apply(db, userId, patch, accepted)
   if (!result.ok) return result
 
   const [inserted] = await db

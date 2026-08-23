@@ -148,7 +148,7 @@ export async function logExerciseFromPayload(
   const norm = normalizeDateParam(localDate ?? todayInTz(tz));
   const rawDate = norm ?? todayInTz(tz).replace(/-/g, '/');
   const [y, m, d] = rawDate.split('/').map(Number);
-  const startOfDay = aestMidnight(y, m, d);
+  const startOfDay = aestMidnight(y, m, d, tz);
   const sessionStart = workoutStartedAt ? new Date(workoutStartedAt) : startOfDay;
 
   let wsId = workoutSessionId;
@@ -164,7 +164,7 @@ export async function logExerciseFromPayload(
       sessionIsEarlyDeload = ensured.isEarlyDeload;
     }
   } else {
-    const todaySessions = await repo.getDayLog(userId, rawDate);
+    const todaySessions = await repo.getDayLog(userId, rawDate, tz);
     const existing = todaySessions.find(ws => ws.sessionName === sessionName && !ws.completedAt);
     if (existing) {
       wsId = existing.id;
