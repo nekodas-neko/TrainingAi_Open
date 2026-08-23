@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.333.5",
+    date: "2026-08-23",
+    changes: [
+      "Deleting a meal type that has entries against it now asks where they should go instead of just refusing. Pick another meal type and everything moves across, then the old one is removed \u2014 previously the button could only fail, and the only way through was deleting every entry by hand. It says up front that past days move too: a 3 pm snack moved to Lunch reads as Lunch on every earlier day, which is the point, but it should not be a surprise.",
+    ],
+  },
+  {
     version: "1.333.4",
     date: "2026-08-23",
     changes: [

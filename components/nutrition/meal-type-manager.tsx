@@ -8,9 +8,10 @@ import { useSortable } from '@dnd-kit/react/sortable'
 import type { MealType } from '@trainingai/shared/types/nutrition'
 import { Switch } from '@/components/ui/switch'
 import { Button } from '@/components/ui/button'
-import { invalidateMealTypes } from '@/lib/cache-groups'
+import { invalidateMealTypes, invalidateNutritionWrite } from '@/lib/cache-groups'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
+import { MealTypeReassignDialog, type ReassignTarget } from './meal-type-reassign-dialog'
 import { TTL_LONG } from '@trainingai/shared/cache-ttl'
 
 function SortableMealTypeRow({
@@ -46,7 +47,9 @@ function SortableMealTypeRow({
         <button onClick={() => onEdit(mt)} aria-label="Edit meal type" className="p-4 text-muted-foreground hover:text-foreground">
           <Pencil className="w-3.5 h-3.5" />
         </button>
-        <button onClick={() => onDelete(mt.id)} disabled={deleting} aria-label="Delete meal type" className="p-4 text-muted-foreground hover:text-destructive disabled:opacity-40">
+        {/* Named, not a generic "Delete meal type" repeated once per row — six identically-labelled
+            destructive buttons give a screen-reader user no way to tell which one they are on. */}
+        <button onClick={() => onDelete(mt.id)} disabled={deleting} aria-label={`Delete ${mt.name}`} className="p-4 text-muted-foreground hover:text-destructive disabled:opacity-40">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -63,6 +66,7 @@ export function MealTypeManager() {
   const [newForm, setNewForm] = useState({ name: '', emoji: '🍽️', timeStartHour: 0, timeEndHour: 24, remindersEnabled: true, required: true })
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [reassign, setReassign] = useState<ReassignTarget | null>(null)
   const mealTypesRef = useRef(mealTypes)
   useEffect(() => { mealTypesRef.current = mealTypes }, [mealTypes])
 
@@ -105,6 +109,13 @@ export function MealTypeManager() {
     }
   }
 
+  /** Local bookkeeping shared by a plain delete and a move-then-delete. */
+  function forgetMealType(id: string) {
+    setMealTypes(prev => prev.filter(mt => mt.id !== id))
+    cancelMealReminder(id).catch(() => {})
+    invalidateMealTypes().then(load).catch(() => {})
+  }
+
   async function deleteMealType(id: string) {
     if (deletingId) return
     setDeletingId(id)
@@ -112,17 +123,56 @@ export function MealTypeManager() {
       const res = await fetch(`/api/nutrition/meal-types/${id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) {
+        // The 409 is not an error to report, it is the question to ask (Q-326). It carries
+        // `logCount`, so the dialog opens already knowing how many entries are at stake and the
+        // user never sees a button whose only outcome was a toast saying it could not work.
+        if (res.status === 409 && data.code === 'MEAL_TYPE_HAS_LOGS') {
+          const source = mealTypes.find(mt => mt.id === id)
+          if (source) {
+            setReassign({
+              source,
+              logCount: typeof data.logCount === 'number' ? data.logCount : 0,
+              options: mealTypes.filter(mt => mt.id !== id),
+            })
+            return
+          }
+        }
         toast.error(data.error ?? 'Cannot delete — food logs reference this meal type')
         return
       }
-      setMealTypes(prev => prev.filter(mt => mt.id !== id))
+      forgetMealType(id)
       toast.success('Deleted')
-      cancelMealReminder(id).catch(() => {})
-      invalidateMealTypes().then(load).catch(() => {})
     } catch {
       toast.error('Failed to delete')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  async function reassignAndDelete(toId: string) {
+    const target = reassign
+    if (!target) return
+    try {
+      const res = await fetch(
+        `/api/nutrition/meal-types/${target.source.id}?reassignTo=${encodeURIComponent(toId)}`,
+        { method: 'DELETE' },
+      )
+      const data = await res.json()
+      if (!res.ok) {
+        toast.error(data.error ?? 'Could not move those entries')
+        return
+      }
+      const moved = typeof data.moved === 'number' ? data.moved : target.logCount
+      const to = target.options.find(o => o.id === toId)
+      setReassign(null)
+      forgetMealType(target.source.id)
+      toast.success(`Moved ${moved} ${moved === 1 ? 'entry' : 'entries'}${to ? ` to ${to.name}` : ''}`)
+      // The move re-stamps every affected log's meal type and time, so every food-log-derived
+      // cache is stale — the day's list, the weekly summary, the timeline, adherence. `forgetMealType`
+      // only clears the definitions group, which would leave all of those showing the old bucketing.
+      invalidateNutritionWrite().catch(() => {})
+    } catch {
+      toast.error('Could not move those entries')
     }
   }
 
@@ -313,6 +363,12 @@ export function MealTypeManager() {
           Add meal type
         </button>
       )}
+
+      <MealTypeReassignDialog
+        target={reassign}
+        onClose={() => setReassign(null)}
+        onConfirm={reassignAndDelete}
+      />
     </div>
   )
 }
