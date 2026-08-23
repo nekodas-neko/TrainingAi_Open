@@ -1752,17 +1752,6 @@ carries — the 11-section coverage list, the `Saved meals`/`My Meals`/`My Foods
 the `FoodLibrarySheet`/`SavedMealsSheet` capability diff. Those are the failure modes that make a
 rework lose a section quietly, and they have to be where the work is, not one entry away.
 
-<<<<<<< HEAD
-## 2026-08-23 — `projectOverview.md` 7977 → 7983
-
-Six lines: a Known Issues row for LA-20, a live production 500 found by the session-start
-`error_events` read. It belongs in the index rather than only in the journal because what is
-outstanding is a *production* verification — the next session has to know to check `error_events`
-before believing the fault is gone, and "it stopped" is not "it was fixed".
-
-(The 7984 in the LB-4 branch and this 7983 are the same section being edited twice in one day; the
-number here is the merged count, not a second raise on top of that one.)
-=======
 ## 2026-08-23 — `docs/agents/state/implementation-lane-b.md` 102 → 109
 
 The Lane B baton, after a run that shipped thirteen items. Compressed three times first — the run
@@ -1780,4 +1769,12 @@ were one entry rewritten.
 
 A baton is rewritten wholesale by each successor, so this number falls back at the next handover.
 
->>>>>>> origin/main
+## 2026-08-23 — `projectOverview.md` 7977 → 7983
+
+Six lines: a Known Issues row for LA-20, a live production 500 found by the session-start
+`error_events` read. It belongs in the index rather than only in the journal because what is
+outstanding is a *production* verification — the next session has to know to check `error_events`
+before believing the fault is gone, and "it stopped" is not "it was fixed".
+
+(The 7984 in the LB-4 branch and this 7983 are the same section being edited twice in one day; the
+number here is the merged count, not a second raise on top of that one.)
