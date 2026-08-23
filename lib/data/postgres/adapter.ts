@@ -33,7 +33,7 @@ import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-rada
 import { liveReadinessForDay } from '@trainingai/shared/health/live-readiness'
 import { extractNightlyTrainingSamples, fitDaytimeHrvModel, MIN_TRAINING_SAMPLES } from '@trainingai/shared/health/daytime-hrv-model'
 import { sleepDurationTrend } from '@trainingai/shared/health/sleep-trend'
-import { DayCheckinScalesSchema, DayCheckinExtrasSchema } from '@trainingai/shared/validation/day-checkin'
+import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
 import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { FoodItemPushSchema } from '@trainingai/shared/validation/food-item'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
@@ -4047,6 +4047,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           // constraint would otherwise happily store an arbitrary string.
           if (p.phase !== undefined && p.phase !== 'evening' && p.phase !== 'morning') {
             errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Invalid day_checkins phase value' })
+            continue
+          }
+          // Q-465, mirroring the web route: a body with no answers writes a row indistinguishable
+          // from a real check-in in which the user said nothing. Rejected per-item rather than
+          // retried — a mutation carrying no information will never carry any, so retrying it
+          // forever is the poison-pill shape the outbox exists to avoid.
+          if (!dayCheckinHasAnswers(p)) {
+            errors.push({ id: mut.id, domain: mut.domain, date: mut.date, error: 'Day check-in carries no answers' })
             continue
           }
           const phase = (p.phase as 'evening' | 'morning' | undefined) ?? 'evening'

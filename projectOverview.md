@@ -27,6 +27,16 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**Three route-hardening guards, none of them a fix for an observed symptom (Q-454, Q-455, Q-465).**
+Three GET routes answered a parameter or configuration question before establishing the caller was
+anyone — no data leaked, but `GET /api/push/subscribe` disclosed whether the deployment has push
+configured to anybody who asked. `GET /api/oura-ble/decoder-constants` answered a failed constants
+read with an **empty** 500, so a client doing `res.json()` got a parse exception on top of the real
+fault. And `POST /api/day-checkin` accepted a body of `{}` with a 201, writing a row
+indistinguishable from a check-in in which the user answered nothing — guarded now on **both** write
+paths, since the outbox reaches the same table
+([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
+
 **Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
 backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
 the connect sequence resets the two live-HR levers a killed session left on forever. **All native —

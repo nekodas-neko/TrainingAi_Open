@@ -129,15 +129,19 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
   })
 
   it('day_checkins: both paths default phase to "evening" when omitted', async () => {
+    // Both bodies now carry one answer. They used to be `{}`, which this case accepted as a 201 —
+    // and Q-465 is precisely the removal of that behaviour, so an unchanged fixture would be
+    // asserting the bug. The subject here is phase defaulting; the answerless case has its own
+    // parity assertion below.
     const { POST } = await import('@/app/api/day-checkin/route')
-    const res = await POST(jsonReq('http://localhost/api/day-checkin', { date: '2026-01-02' }) as never)
+    const res = await POST(jsonReq('http://localhost/api/day-checkin', { date: '2026-01-02', hydration: 3 }) as never)
     expect(res.status).toBe(201)
     const webRow = await pool.query(`SELECT phase FROM day_checkins WHERE user_id = $1 AND log_date = '2026-01-02'`, [TEST_USER_ID])
     expect(webRow.rows[0].phase).toBe('evening')
 
     const result = await repo.pushMutations(TEST_USER_ID, [{
       id: 'mut-checkin-2', domain: 'day_checkins', date: '2026-01-03',
-      payload: {},
+      payload: { hydration: 3 },
     }])
     expect(result.processed).toBe(1)
     const pushRow = await pool.query(`SELECT phase FROM day_checkins WHERE user_id = $1 AND log_date = '2026-01-03'`, [TEST_USER_ID])
@@ -145,6 +149,27 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
 
     await pool.query(`DELETE FROM day_checkins WHERE user_id = $1`, [TEST_USER_ID])
   })
+
+  it('day_checkins: both paths refuse a body that carries no answers (Q-465)', async () => {
+    // The guard that made the case above need an answer. A row with every metric null is
+    // indistinguishable from a real check-in in which the user said nothing, and readiness is the
+    // one pillar where those must not collapse. Both write paths, because the outbox reaches the
+    // same table and a guard on one path only is how the two drift.
+    const { POST } = await import('@/app/api/day-checkin/route')
+    const res = await POST(jsonReq('http://localhost/api/day-checkin', { date: '2026-01-04' }) as never)
+    expect(res.status).toBe(400)
+    const webRows = await pool.query(`SELECT 1 FROM day_checkins WHERE user_id = $1 AND log_date = '2026-01-04'`, [TEST_USER_ID])
+    expect(webRows.rowCount).toBe(0)
+
+    const result = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-checkin-3', domain: 'day_checkins', date: '2026-01-05', payload: {},
+    }])
+    expect(result.processed).toBe(0)
+    expect(result.errors[0]?.error).toMatch(/no answers/i)
+    const pushRows = await pool.query(`SELECT 1 FROM day_checkins WHERE user_id = $1 AND log_date = '2026-01-05'`, [TEST_USER_ID])
+    expect(pushRows.rowCount).toBe(0)
+  })
+
 
   it('food_logs: both paths reject a quantityMultiplier outside [0.01, 100]', async () => {
     const { POST } = await import('@/app/api/nutrition/food-logs/route')
