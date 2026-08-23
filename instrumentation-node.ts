@@ -139,6 +139,12 @@ async function deliverConstants(): Promise<void> {
       // something.
       const say = result.source === 'fixtures' ? console.warn : console.info
       say(`[instrumentation] model constants: ${result.source} — ${result.detail}`)
+      // The ports take their constants by injection now (Q-545), so delivering the files is only
+      // half of it. Done here, at the one place that already blocks boot on the constants, rather
+      // than lazily per request — an unset table throws, and the loud version of that is a boot
+      // failure, not a scatter of 500s.
+      const { ensureServerOuraConstants } = await import('@/lib/oura-models/constants-inject')
+      ensureServerOuraConstants()
       return
     }
     detail = result.detail

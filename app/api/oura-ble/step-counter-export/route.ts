@@ -6,6 +6,7 @@ import { getRepositoryAsync } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { runStepCounterPipeline, type RawFrame } from '@/lib/oura-ble/step-counter-pipeline'
 import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
+import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { resolveDsToMs } from '@/lib/oura-ble/clock'
 
 // Admin validation console (owner-only): runs the real-data step pipeline
@@ -59,6 +60,7 @@ export async function GET(req: NextRequest) {
   const stepFrames = stepRows.map(toFrame).sort(byDs)
   const motionFrames = motionRows.map(toFrame).sort(byDs)
 
+  ensureServerOuraConstants()
   const result = await runStepCounterPipeline(stepFrames, motionFrames, (ds) => resolveDsToMs(ds, anchors) ?? 0, nodeModelRuntime)
   if (!result) {
     return NextResponse.json({ hasAnchor: true, pairedWindows: 0, message: 'No paired 0x7e/0x7f step windows in the stored frames.' })

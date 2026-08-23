@@ -1646,3 +1646,13 @@ ratchet is the wrong instrument here, and PS-4 is the fix. A baton is rewritten 
 handoff, so its number measures one session, not accretion."* Two lanes have now independently hit
 that on the same file class. The durable answer is not a lower number, it is moving the inherited
 findings to permanent homes — which is what PS-4 asks for and what neither lane has done yet.
+
+## 2026-08-23 — `docs/implementation-backlog.md` 11520 → 11522
+
+Q-545's constants item is closed, and eleven lines say so and correct the count that went with it:
+the entry claimed three getters, and there are four. `cumulative-stress.ts` reads its constants
+through a relative import, and the scan that produced the three-row table only matched the aliased
+form — the import-graph walk found it, a name grep did not.
+
+Two net lines because the closure also strikes the "the only thing standing between here and a
+device rollup" pointer it replaces.
