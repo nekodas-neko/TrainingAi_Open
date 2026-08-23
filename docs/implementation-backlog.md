@@ -789,162 +789,6 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
 `invalidateNutritionWrite()` on the client, same as the move.
 
 
-### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
-
-- **Branch:** `chore/adopt-use-cached-value`
-- **Added:** 2026-08-19 · Lane B, while fixing Q-402 · [`journal`](overview/entries/2026-08-19-cache-invalidation-signal.md)
-- **Placement:** low. **Latent, not broken.** Q-402 shipped the mechanism (`subscribeToInvalidation`
-  + `useCachedValue`); this is adoption, and adopting it everywhere at once is a large diff across
-  screens with no component-test route.
-- **What.** **36** `useEffect(() => { … cachedFetch … }, [])` blocks remain — 37 on `main` before
-  the one conversion below (see the counting correction above; this entry originally said 36, from a
-  scan that missed single-line effects). All of them evict correctly through `lib/cache-groups.ts` and none of them ask for a new
-  value afterwards. **That is only a bug where the component does not unmount**, which is why 36 of
-  them have never been reported: navigate away from a sheet or a screen and its next mount refetches.
-  The persistent tab shell is the exception, and it is where the owner found it.
-- **Do the shell ones first, and identify them rather than assuming.** Anything rendered by Home /
-  the tab shell that is not behind a route change: `components/home-day-timeline.tsx` (two),
-  `components/calendar-widget.tsx`, `components/health/*-card.tsx` where Home renders them. The
-  full list, regenerated:
-  ```
-  grep -rn -A6 'useEffect(() => {' app components --include='*.tsx' --include='*.ts' | grep -B6 cachedFetch
-  ```
-  (the count above came from a small AST-free scan for `useEffect(…, [])` blocks containing
-  `cachedFetch`; it is a starting list, not a proof of completeness).
-- **Not every one should convert.** A site that deliberately fetches once — a sheet that snapshots
-  data at open, `sync-provider`'s warm pass — is correct as it stands. Converting it would add
-  refetches with no reader waiting for them. Judge per site; this is not a codemod.
-- **✅ THE RATCHET SHIPPED 2026-08-19 (v1.325.4). The sweep is what remains.**
-  `scripts/check-fetch-once-effects.js` freezes all 36 with a shrink-only per-file baseline: a file
-  not listed must have zero, a listed file may only shrink, and a file that reaches zero must have
-  its row deleted. Growth is stopped; each conversion is now visible in a diff.
-  [`Journal`](overview/entries/2026-08-19-fetch-once-ratchet.md).
-  **The baseline is grouped by whether the site can actually bite: 19 / 1 / 16.** Work the first
-  group. **⚠ The grouping was wrong the first time and the correction is the reusable part:** sheets
-  do NOT unmount here — the tab screens render them unconditionally with a null prop
-  (`<ActivityDetailSheet log={selectedActivity} />`), so they are permanently mounted too. Re-checked
-  by tracing each renderer up to a tab screen, the "can bite" group went from 14 to **19**. Judge a
-  site by where it is mounted, never by its filename.
-  **⚠ The count in this entry was one low, found by mutation-checking the new rule.** The scan
-  behind it required a newline before the effect's closing brace, so it **missed single-line
-  effects entirely**. Measured on `main`: **37** with the correct pattern against 36 with the old
-  one, and `nutrition-content.tsx` has **two**, not one. One conversion below leaves **36**.
-  **`useCachedValue` gained an `onError` callback** in the same change, because the first real
-  conversion needed it — `cachedFetch` swallows `!res.ok` including this app's own rate limit, and a
-  card without it cannot tell "no data" from "the request failed".
-- **✅ SLICE 1 SHIPPED 2026-08-19 (v1.325.6) — six leaf-card files, 36 → 29.**
-  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-1.md). Converted: `home-day-timeline`
-  (2), `calendar-widget` (its keyed `calendar-data:` effect too, which the ratchet does not count
-  because its deps are not `[]` but which goes stale the same way), `activity/exercise-detected-card`,
-  `health/hr-recovery-profile-card`, `health/strength-progress-card`, `cardio/trends-section`.
-  Three results worth carrying:
-  1. **`useCachedValue` gained a `today` option.** Without it the hook could only ever convert the
-     plain-`cachedFetch` half of the sweep, and the `cachedFetchToday` half would have had to
-     *switch variant* to adopt it — the exact drift the one-variant rule forbids.
-     `lib/hooks/__tests__/use-cached-value-today-agreement.test.ts` cross-checks every literal-key
-     hook call against `sync-provider`'s warm list, and is mutation-checked both ways.
-  2. **`home-day-timeline`'s bespoke `ta:oura-ble-synced` listener is gone.** Q-91 added it because
-     that widget never refetched after a BLE drain invalidated its key — Q-402's bug with a
-     hand-built workaround for one event. The invalidation signal covers every writer instead.
-     Safe because `cache-groups.test.ts` already asserts `invalidateOuraSync` clears that key.
-     **Three sibling listeners remain** (`session-select-content`, `health-content`,
-     `sleep-content`) and should go the same way when those files are converted.
-  3. **The can-bite grouping was wrong again** — see the note in the check script. It was 18, not
-     19: `cardio/trends-section` is rendered only by `/cardio`, which is not one of the five tabs.
-- **✅ SLICE 2 SHIPPED 2026-08-19 (v1.325.7) — four more files, 29 → 25.**
-  [`Journal`](overview/entries/2026-08-19-fetch-once-slice-2.md). `health/training-stress-line`
-  (the first real use of slice 1's `today` option), `activity/exercise-review-sheet`,
-  `activity/activity-detail-sheet` (the shared `hr-profile` key in both) and
-  `workout-select-content` (`muscle-recovery`). ~~The can-bite group is down to 8, all of them in
-  the four tab-screen orchestrators.~~ **That was wrong — see slice 3.**
-- **✅ SLICE 3 SHIPPED 2026-08-19 (v1.325.8) — and most of it was a correction, not a conversion.**
-  [`Journal`](overview/entries/2026-08-19-fetch-once-scanner-correction.md).
-  **`scripts/check-fetch-once-effects.js` was over-counting, and by a lot: 25 sites across 16 files
-  were really 15 across 12. Ten of the twenty-five never existed.** Its non-greedy regex started at
-  a `useEffect(() => {` and ran to the first `}, [])` *anywhere* after it, so when that effect had
-  real dependencies the match swallowed everything up to a later effect's close — other effects,
-  `useCallback` bodies, plain functions — and searched the lot for `cachedFetch`. Five lines
-  reproduce it, and they are in the script. It now brace-matches the effect body.
-  **What that changes about the work, which is the part worth reading:**
-  - `health-content` (2) and `nutrition-content` (2) have **no fetch-once effect at all**. Their
-    fetches sit in tab-group `useCallback`s re-run on `tabEpoch` — the shape this rule is *steering
-    people toward*. Two sessions' worth of "the hard ones, do them last" was aimed at nothing.
-  - `sync-provider` (1) the same: its warm pass is a plain function. The "deliberately fetch-once"
-    category that entry justified had no members and is gone.
-  - `workout-screen` (2) is a `[userId]` effect; `running-plan-content` was 3, not 4.
-  - **So the can-bite group was two sites, not eight.** This slice converts one —
-    `session-select-content`'s `more-user-profile`, which is load-bearing: two paths invalidate that
-    key, so changing a display name or avatar left Home's greeting stale until an app restart.
-  - ~~One can-bite site remains.~~ **Done in slice 4.**
-- **✅ SLICE 4 SHIPPED 2026-08-19 (v1.325.9) — the can-bite group is now ZERO.**
-  [`Journal`](overview/entries/2026-08-19-invalidation-refetch-hook.md). **12 sites across 10 files
-  remain and every one of them unmounts on navigate**, so what is left is latent by definition. The
-  shell-level half of this entry is finished.
-  - **A second hook was needed and is the reusable part**: `lib/hooks/use-invalidation-refetch.ts`.
-    `useCachedValue` replaces a read outright — it holds, seeds and fetches the value — which does
-    not fit a read that also seeds from the local SQLite store, wraps its fetch in `fetchWithRetry`,
-    or sets several pieces of state. `useInvalidationRefetch(keys, fn)` gives such a read the half it
-    does need: something asks for a new value when a write clears the old one.
-  - **The real bug it fixed, beyond the ratchet**: three screens listened for `ta:oura-ble-synced`
-    and refetched. `sleep-sessions` is also cleared by `invalidateBiometrics`, so a manually-edited
-    sleep row or a Health Connect ingest left all three stale until a remount — only the BLE path
-    self-healed, because it was the only writer that dispatched an event. All three converted
-    together per the sibling-surface rule.
-  - **It coalesces, and the three-key call site needs that**: `invalidateCache` fires once per key,
-    so a group clearing all of health-content's three would otherwise run its whole meta load three
-    times.
-- **What is left of Q-359, for whoever takes it next.** Twelve latent sites, none urgent, and the
-  entry stays queued only for them. Judge any future addition by where the component is **mounted** —
-  grep for its name and check the renderer against `components/shell/tabs.ts`. That rule has been got
-  wrong three times in this Q's own history.
-  - **The lesson is about the check, not the sweep:** a scanner's own baseline is evidence, and this
-    one had never been checked against a hand count. The mutation check it shipped with proved it
-    caught a *new* site; nothing proved the sites it already listed were real.
-- **Correction to slice 1's note about `lib/__tests__/q165-cache-seeded-reads.test.ts`:** it said
-  that test would red when the two sheets converted. **It did not, and the reason is worth keeping.**
-  It asserts `readCacheSync<` and `cachedFetch<` appear literally in three files; each sheet has
-  *two* fetches, and only the `hr-profile` one is a fetch-once site. The keyed `hr-window:` fetch
-  stays (its key changes per session, and `useCachedValue` has no way to express "no key yet" for a
-  sheet mounted with a null prop), so both strings survive. `coach/coach-history.tsx` has a single
-  fetch and is the one that will actually red — it is in the unmount group, so not soon.
-- **Lane B owns this** (`app/**` ex-`app/api`, `components/**`, `lib/hooks/**`).
-- **Not verified:** static scan for the remaining 29. **No screen was observed going stale** — they
-  are inferred from the shape, and the one confirmed instance is Q-402's, which is fixed. Slice 1's
-  six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
-  routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
-  fixture below, which still does not exist.
-- **✅ THE FIXTURE AND THE GUARD SHIPPED 2026-08-20.** `e2e/fixtures.ts` gains
-  `ensureEnergyBalanceProfile()` and `enableHomeCards(page, keys)`, and
-  `e2e/home-card-invalidation-refetch.spec.ts` drives Q-402's mechanism end to end for the first
-  time: Home stays mounted, a body-metric write from its own quick-log sheet clears
-  `energy-balance:`, and the card issues a **second** GET. Mutation-checked — restoring the
-  pre-Q-402 `useEffect(…, [])` shape makes it red with its own message.
-  [`Journal`](overview/entries/2026-08-20-home-card-invalidation-guard.md).
-  **Correction to what this bullet used to say:** the seeded user was described as missing
-  `height_cm`/`date_of_birth`/`sex`. It has height (180) and sex (male) — **only `date_of_birth`
-  was missing**, and the route names exactly one field in `missingProfileFields`. The fixture is one
-  column, not three, and `COALESCE`s the other two so it stays correct if the seed changes.
-  The second half was right: `DEFAULT_CARD_WIDGETS` is empty, so Home renders no card widgets at
-  all until `ta_ss_cards` is set.
-  **Why it asserts the request rather than the number:** a changed figure could come from a
-  remount and an unchanged one proves nothing, so only a second GET is present-only-if-working.
-- **What is still open: the twelve latent sites, and on current evidence NONE is worth converting.**
-  Judged per site 2026-08-20 and written into `scripts/check-fetch-once-effects.js` beside the
-  baseline, so the next session reads it where it is looking rather than re-deriving it. Four read
-  `hr-profile` or an HR series during or just after a run/workout, when nothing writes those keys;
-  `my-meals-picker` reads `saved-meals` and the only writer reachable from its flow runs **after**
-  `{step === 4 && …}` has unmounted it; the rest are route-level screens whose next mount refetches.
-  Converting one is not harmful but adds a refetch with no reader waiting, which this entry warns
-  against. **The limit of that judgement, stated rather than buried:** for `my-meals-picker` it is
-  "no writer found reachable", not "proven unreachable" — whether `saved-meals-sheet` can open on
-  top of the wizard was not traced. **Re-judge any site if a new writer starts clearing its key
-  while it is on screen.** The entry stays queued as the place that record lives.
-- **The check's own prose count had drifted, in the file whose lesson is about unverified counts.**
-  It read "13 sites across 11 files" against a baseline map holding **12 across 10** — a conversion
-  removed a file and left the sentence behind. Corrected, with a note to count off the map rather
-  than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
-  run line prints computed totals.
-
 ### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
 - **Branch:** `fix/food-log-invalidate-after-push`
@@ -1138,69 +982,36 @@ quietly wrong". Backfill is deliberately **not** attempted: past days have no fl
 honest one, so the estimate starts from days marked after this ships and the counter shows that
 plainly.
 
-### [nutrition][app-shell] Q-406 — extract `food-row.tsx` first, so the rework has somewhere to land
+### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 - **Branch:** `refactor/nutrition-food-row`
-- **Added:** 2026-08-18, split out of **Q-395** so it can start immediately and in parallel rather than
-  waiting for the rework's turn in the queue.
-- **Lane B.** Pure extraction — no behaviour change, no schema, no route.
-
-- **✅ THE HEADROOM HALF IS DONE (2026-08-19, v1.325.3). THE ROW HALF IS RE-SCOPED — read the
-  correction below before starting it.** `nutrition-content.tsx` is **732** and
-  `saved-meals-sheet.tsx` is **753**, both well under 800, **with no new BASELINE rows**. Q-395 can
-  land. [`Journal`](overview/entries/2026-08-19-nutrition-headroom.md).
-
-**⚠ CORRECTED 2026-08-19 — the mechanism in this entry does not work, measured twice.**
-
-**1. Extracting a food row frees ZERO lines from either landing file.** Neither contains food-row
-markup. `nutrition-content.tsx` renders no rows at all — `MealCard` owns the diary row — and its
-only `foodItem` references are data mapping. `saved-meals-sheet.tsx` had already delegated both its
-lists, to `SavedMealCard` and `IngredientRow`. The two files are large for entirely different
-reasons, so the "unblocker" could not have unblocked anything.
-
-**What actually took them under**, and what was done instead: `AddFoodByHandForm` out of
-`saved-meals-sheet.tsx` (793 → 753 — a self-contained five-field form that owned its own state) and
-`useFoodLogsLoader` out of `nutrition-content.tsx` (800 → 732 — 69 lines, the file's largest and
-most self-contained function, no JSX and four inputs).
-
-**2. The four call sites are four DIFFERENT shapes, not one shape drawn four times.** Measured:
-- diary (`meal-card.tsx:82`) — calories in a fixed `w-16` right column, secondary line is **coloured
-  P/C/F chips**, trailing edit + delete buttons.
-- library (`food-library-sheet.tsx:100`) — calories right-aligned over a serving sub-line, whole row
-  is a button.
-- search/db (`ingredient-search.tsx:72`) — calories **inside** the secondary line, trailing `+` icon.
-- search/external (`ingredient-search.tsx:132`) — same, plus a macro-mismatch warning line and a
-  spinner.
-
-So a component covering all four **faithfully** needs a secondary-line node, a trailing slot and a
-calories-placement variant — at which point it is a wrapper, not a unification. And unifying them
-properly means **changing how three of the four look**, which this entry explicitly forbids
-(*"Behaviour must not change… Any visual difference belongs to Q-395"*). **The row cannot be
-extracted without first deciding what it should look like, and that decision is Q-395's.** Take the
-row after Q-395's design pass, not before it.
-
-**Why this was its own entry.** Q-395 could not start: both files it lands in were on the 800-line
-ceiling (`nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at **793**, neither
-grandfathered), so one added line failed Custom Rules. That part was right, and is now resolved.
-
-**What to build.** One component, `components/nutrition/food-row.tsx`, with the shape used by all six
-drawn screens: optional thumbnail · name · grey secondary line of *what and how much* · calories
-right-aligned in a fixed column · optional chevron. Props are **scalars**, not objects — the row
-renders inside `.map()` where hooks are unavailable, and an inline object literal at the call site
-silently defeats `React.memo` (`meal-macro-bars.tsx` is the reference this repo already keeps for
-exactly that reason).
-
-**Then convert the existing call sites, one per commit.** A food currently reads four different ways —
-diary, search, saved meal, builder. Converting them is what takes both landing files back under the
-line and makes the rest of Q-395 additive rather than blocked.
-
-- **⚠ Behaviour must not change in this entry.** It is an extraction. Any visual difference belongs to
-  Q-395, and mixing them makes the diff unreviewable and the regression unattributable.
-- **Done when:** ~~`node scripts/check-component-size.js` reports both files under 800 with **no new
-  BASELINE rows**~~ — **met 2026-08-19** (732 and 753, no new rows). What remains is the row
-  component, and its done-condition is now Q-395's: the four call sites render *the agreed* row,
-  which is a visual change, not "identically to before".
-- **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
+- **Lane B.** No schema, no route.
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
+  library sheet + the food-database search row now draw it.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
+  satisfied.**
+- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
+  row's only trailing element is a chevron.
+  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
+    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
+    yet**, so converting the diary row now removes the only way to correct a logged food. That is
+    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
+    **Convert it in Q-395a, in the same PR that adds the sheet.**
+  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
+    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
+    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
+    per-row warning goes — which belongs with Q-395's drawings.
+- **⚠ THE DRAWINGS ARE NOT IN THE REPOSITORY.** `unit-options.png`, which Q-395a names as its
+  reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
+  mockups for cardio, scores and the AI coach, none for nutrition. The row above was built from
+  Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
+  column · optional chevron"), which is complete enough for it. **The remaining phases are not so
+  lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
+  the phases will be built from prose and the visual match cannot be checked.
+- **The optional thumbnail is deferred.** No call site passes one, and an unused `<img>` costs a
+  `no-img-element` exemption for arbitrary user photo URLs. The phase that first shows a thumbnail
+  adds it, with the loader decision made where it can be seen.
+- **Unblocks:** Q-395a, and Q-398 which wants the same row for plan meals.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
@@ -1551,37 +1362,6 @@ whether or not anyone draws them first.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
 
-### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
-
-- **Branch:** `feat/retire-day-overlay-sheet`
-- **Added:** 2026-08-23 · **Lane: B**
-- **Placement:** low, and it now SITS low — it was filed into the slot LB-1 vacated, near the top,
-  which contradicted this line (queue position is priority). Moved 2026-08-23. Nothing is broken by
-  leaving it: what is here is dead code plus three capabilities gone since Q-110 (2026-08-08)
-  without a report.
-
-LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
-hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
-logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
-because deleting it silently discards three things the day screen does not have:
-
-| unreachable affordance | where it lives |
-|---|---|
-| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
-| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
-| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
-
-`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
-only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
-and `historyExercise`/`selectedActivity` can now only ever be `null` there.
-
-**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
-keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
-`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
-`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
-route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
-controls, so a third target needs a layout decision rather than another icon.
-
 ### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 
 > **⚠️ Lane check done 2026-08-19 (Lane A) — the answer is NO schema change, so this is wholly Lane
@@ -1869,6 +1649,37 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   `https://127.0.0.1`, a URL that redirects to a private address, and an oversized response must
   each be rejected. Those five cases are the acceptance criteria for this entry — the feature is
   the easy half.
+
+### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
+
+- **Branch:** `feat/retire-day-overlay-sheet`
+- **Added:** 2026-08-23 · **Lane: B**
+- **Placement:** low, and it now SITS low — it was filed into the slot LB-1 vacated, near the top,
+  which contradicted this line (queue position is priority). Moved 2026-08-23. Nothing is broken by
+  leaving it: what is here is dead code plus three capabilities gone since Q-110 (2026-08-08)
+  without a report.
+
+LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
+hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
+logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
+because deleting it silently discards three things the day screen does not have:
+
+| unreachable affordance | where it lives |
+|---|---|
+| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
+| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
+| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
+
+`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
+only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
+and `historyExercise`/`selectedActivity` can now only ever be `null` there.
+
+**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
+keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
+`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
+`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
+route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
+controls, so a third target needs a layout decision rather than another icon.
 
 ### [nutrition][app-shell] Q-327 — the meal photo needs somewhere to be picked
 

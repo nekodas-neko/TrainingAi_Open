@@ -7,10 +7,25 @@ export interface ChangelogEntry {
 export const CHANGELOG: ChangelogEntry[] = [
   {
     version: "1.339.0",
-    date: "2026-08-23",
+    date: "2026-08-24",
     changes: [
       "A free walk or run now shows your heart rate while you are walking. The strap was already streaming beats \u2014 the same one feeding the cadence reading on that screen \u2014 and the number was already being saved afterwards; it just was not shown at the one time you could act on it. It goes grey and says \"(stale)\" if the strap stops reporting, rather than freezing on the last reading.",
       "The same screen now shows a running step total and, on a hilly route, how much you have climbed. The step count is estimated from cadence and needs the strap, so it stays hidden rather than showing zero when there is nothing to count. The guided walk shows the step total too, so the two screens agree.",
+    ],
+  },
+  {
+    version: "1.338.0",
+    date: "2026-08-23",
+    changes: [
+      "Foods in the History list and in food-database search results now line up. Calories sit in their own column on the right instead of being buried in the grey line under the name in one place and stacked over a serving size in another \u2014 a list of foods was three different shapes depending on where you were looking at it.",
+    ],
+  },
+  {
+    version: "1.337.0",
+    date: "2026-08-23",
+    changes: [
+      "There is now an \"I've finished logging\" button at the end of the Nutrition day, with an Undo. Only days you mark are used to work out what you actually burn \u2014 previously a day you stopped logging halfway through looked exactly like a completed light day and pulled the estimate down with nothing to stop it. Measured on the underlying change: fourteen days at a true 2,600 maintenance, six of them stopping at 1,400, came out 514 kcal low with nothing flagged.",
+      "A counter under the button says how many days are marked and how many more the estimate needs. It ships with the button on purpose: the button feeds something that was otherwise invisible, and that invisibility is why this went unnoticed until it was asked about.",
     ],
   },
   {
