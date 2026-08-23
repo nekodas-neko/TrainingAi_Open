@@ -6,12 +6,20 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
-    version: "1.339.0",
+    version: "1.340.0",
     date: "2026-08-24",
     changes: [
       "Every meal in your plan now has a Save to My Meals button, plus Save all. A saved plan meal is an ordinary saved meal \u2014 it logs in one tap, prints a label with a QR, and can be edited ingredient by ingredient \u2014 so the plan is a thing you generate from rather than a thing you have to keep opening.",
       "Saving is remembered, so a meal already kept shows \"In My Meals\" instead of offering again, and Save all only counts what is left. Pressing it twice cannot produce duplicates. Meals kept this way carry a \"From plan\" tag in My Meals.",
       "Fixed: the whole meal-plan feature could not be written to at all. Creating a plan, renaming or activating or deleting one, changing meals per day, editing a single meal, and saving dietary restrictions all failed with \"Invalid body\" no matter what was sent. Five routes read the request and then validated a variable that was never filled in.",
+    ],
+  },
+  {
+    version: "1.339.0",
+    date: "2026-08-24",
+    changes: [
+      "A free walk or run now shows your heart rate while you are walking. The strap was already streaming beats \u2014 the same one feeding the cadence reading on that screen \u2014 and the number was already being saved afterwards; it just was not shown at the one time you could act on it. It goes grey and says \"(stale)\" if the strap stops reporting, rather than freezing on the last reading.",
+      "The same screen now shows a running step total and, on a hilly route, how much you have climbed. The step count is estimated from cadence and needs the strap, so it stays hidden rather than showing zero when there is nothing to count. The guided walk shows the step total too, so the two screens agree.",
     ],
   },
   {

@@ -1642,51 +1642,26 @@ the type, so a picker has somewhere to read from and write to.
   cheapest tripwire, and the audit view now carries `image_bytes` for the same reason.
 
 
-### [cardio][devices] Q-418 — the free walk shows no heart rate while the strap feeding it cadence is connected
+### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 
 - **Branch:** `feat/free-activity-metrics`
-- **Added:** 2026-08-19 · owner, mid-walk screenshot: *"the normal walk activity doesnt have HR - any
-  further metrics we can give the normal walk - including the android pill displaying time"*
-- **Lane B** for the screen; **Lane A** for the notification half (see below), which is Kotlin and
-  needs a new APK.
+- **Lane A** — what remains is Kotlin and needs a new APK.
+- **✅ THE SCREEN HALF SHIPPED 2026-08-23 (v1.339.0).** The free-activity screen now shows **heart
+  rate** in its primary row beside distance and pace, with the guided walk's `STALE_MS` freshness
+  guard, plus a secondary line carrying the **running step total** and **elevation gained**. The
+  guided walk got the same step readout in the same PR (Q-410's half of it), because a metric on one
+  walk screen and not the other is how the free walk became the forgotten surface in the first
+  place. [`Journal`](overview/entries/2026-08-23-free-activity-metrics.md).
+- **Average pace was NOT added**, and that was deliberate: it is one of the two *proposed* metrics
+  rather than the two the owner asked for, and the layout this entry recommends — distance · pace ·
+  HR primary, cadence · steps · elevation secondary — has no sixth slot. Four `text-2xl` figures fit
+  on 412 px; six do not.
+- **`CadenceTrackerSnapshot` gained `stepsEstimate`**, derived from `summarizeCadence` inside the
+  tracker rather than integrated again on each screen — that function is already what fills the
+  saved `steps` field (Q-230), and a second integration would be a second answer to "how far did I
+  walk".
 
-**The HR gap is the cheap one, and the screenshot proves the data is there.** The free-activity screen
-(`components/activity/active-activity-screen.tsx`, 111 lines) renders **distance · pace · cadence**
-and nothing else — there is no `bpm` anywhere in the file. Yet the same screenshot reads
-**`120 spm · strap`**, so the Polar H10 was connected and streaming at that moment. A strap that
-supplies cadence supplies heart rate; the screen simply never asks.
-- **The guided walk already does it**, from the same source: `walk-active.tsx:62` subscribes via
-  `mgr.subscribe((s: LiveHrSample) => …)` and renders `liveBpm` with a `STALE_MS` freshness guard
-  (`:126`) so a dropped strap reads *"(stale)"* rather than freezing on a stale number. **Copy that
-  shape, including the guard** — a number that silently stops updating is worse than a dash.
-- **And the data is already being persisted**: `done-activity-screen.tsx` fetches `hr-window` after
-  the fact and stores `avgHr`/`maxHr`. So HR is recorded for these walks today and is only invisible
-  *while you are walking* — the one time it is actionable.
-
-**Further metrics. Two are REQUESTED, two are proposed.** Everything here is already computed
-elsewhere in the same flow, so each is a render rather than a feature:
-1. **Heart rate — requested.** Above. The obvious gap.
-2. **Total step count — requested** (*"also a total step count would be good"*, owner, same
-   conversation). `CadenceTracker` already exposes `stepsEstimate` — it is what Q-230 used to fill
-   the saved `steps` field, so the number exists and is already trusted enough to persist.
-   **Q-410 adds the same readout to the guided walk; the two screens must show the same thing.**
-   Ship them together or the free walk becomes the surface that got forgotten, which is what this
-   entry is about. **Carry Q-410's caveat with it**: the total is *integrated cadence*, not counted
-   steps, and it is **strap-only** — with no strap it does not exist, so label it an estimate and
-   hide it rather than showing `0`.
-3. **Average pace** alongside current pace — proposed. Current pace on a 1:39 walk is noise; the
-   average is the number that means something. Distance and elapsed are both already on screen, so
-   this is division.
-4. **Elevation gain** — proposed. `computeElevationChange(rawPoints)` runs on save; running it live
-   costs one call over points already in memory. Worth it on a hilly walk, invisible on a flat one,
-   so put it behind a non-zero check rather than showing `0 m`.
-
-**Do not add all four to the metric row.** It currently holds three at `text-2xl`, centred, on a
-412 px screen. Four fits; six does not. Recommendation: **distance · pace · HR** on the primary row,
-with **cadence · steps · elevation** as a smaller secondary line — the guided-walk hierarchy, which
-is already the app's answer to this question. Both owner-requested metrics land on that layout: HR
-in the primary row where it can be acted on, steps in the secondary line where a running total
-belongs.
+**What is left is the Android pill, and it is Lane A.**
 
 **The Android pill — it exists, and it cannot show the time without native work.**
 - **There is already an ongoing notification during a free walk.** `lib/activity/gps-tracking.ts:29`
@@ -1726,6 +1701,10 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
 ### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
+
+> **⚠ The step-total readout this entry lists shipped 2026-08-23 (v1.339.0)** with Q-418 —
+> both walk screens now show it via `ActivitySecondaryMetrics`. What is left here is the speed
+> readout and pacing by cadence.
 
 - **Branch:** `feat/walk-step-goal`
 - **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk
