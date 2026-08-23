@@ -512,37 +512,64 @@ stays near 4,200 ms, it is the upload. If wall-clock is flat and large regardles
 the identification stays as accurate as it is today; and the client-side elapsed time is recorded
 somewhere, so the next "it feels slow" starts from a number.
 
-### [workouts][app-shell] Q-362b — three day surfaces group workouts by NAME, and one of them shows the wrong session's heart rate
+### [workouts][activity][app-shell] LB-1 — nothing in the app can edit or delete a logged workout, exercise or activity
 
-- **Branch:** `fix/day-surfaces-session-identity`
-- **Added:** 2026-08-20 · **Lane: B** · **Placement:** low, with Q-362a — same trigger
-- **Needs:** Q-362a
+- **Branch:** `feat/day-screen-edit-delete`
+- **Added:** 2026-08-23 · **Lane: B**
+- **Gate: owner** — the UI shape is a decision, see *the decision for the owner* below
+- **Placement:** high for a Lane B item. It is not cosmetic: the user cannot correct their own data,
+  and every wrong row is permanent from the UI's point of view.
 
-**Q-362 said this half was "one line" in one file. It is three files, and one of them carries a
-worse bug than the duration collision it was filed for.**
+**This entry was filed as "delete some dead code" and that was wrong.** Its own instruction was to
+check whether `/health/day` still lacks the affordances the unreachable sheet had **before**
+deleting, because *"if it does, this is a feature gap, not dead code"*. It does. Measured 2026-08-23.
 
-1. **`components/health/day-detail/day-sections.tsx:87`** — groups by session **id** (Q-391) and
-   looks the duration up by **name**. Two correct cards, the same duration printed on both. This is
-   the one line the entry meant, and it is the only one that is genuinely one line.
+**What is unreachable.** `DayOverlaySheet` is rendered only by `health-content.tsx`, gated on
+`dayOverlay`, which starts `null`; every `setDayOverlay` call in the repo is a
+`prev => prev ? … : null` no-op or `null`. `day-overlay-dialogs.tsx` (the edit sheet and both delete
+confirmations) is dead with it, as are `fetchDayOverlay`, `refreshDayOverlay` and four handlers.
 
-2. **`components/health/day-overlay-sheet.tsx:76-90`** — groups by **name**, so the two sessions
-   merge into one card, and `loadSessionHr(sessExercises[0]?.workoutSessionId)` then loads **one**
-   session's heart rate under a card listing both, with nothing on screen saying which. A wrong
-   number presented as the right one is worse than a missing one, and it is not what Q-362 was
-   filed about.
+**What that costs, measured repo-wide:**
 
-3. **`app/session-select/components/week-day-sheet.tsx:57-62,96`** — groups by **name** the same
-   way: one merged block, one duration chip. The shape `day-sections` had before Q-391.
+| capability | only control | only client caller of |
+|---|---|---|
+| edit a logged exercise | `day-overlay-sheet.tsx:184` | — |
+| delete a logged exercise | `:187` | `DELETE /api/workout-entry` |
+| edit a session | `:134` | — |
+| delete a session | `:147` | `DELETE /api/workout-sessions` |
+| delete an activity | the sheet's activity row | `DELETE /api/activity-logs` |
 
-**Fix.** Group by `workoutSessionId` in (2) and (3) as (1) already does, and look the duration up by
-that id in all three. **Q-362a has shipped, and it shipped additively** — the route now emits
-`workoutDurationsById` (keyed by `workout_sessions.id`) *beside* the legacy name-keyed
-`workoutDurations`, which is unchanged and still collides. So there is no coordinated-merge window:
-read the new field, and nothing breaks whenever this lands. LA-15 removes the legacy one afterwards. (2) additionally needs its `expandKey` moved off
-the name, since two cards would otherwise share one expanded state.
+The other three `/api/activity-logs` call sites are POST. `workout-review-sheet.tsx`'s trash icon is
+a **drop-set indicator**, not a delete control — check that before concluding a path exists.
 
-- **Verified:** the route's collision is reproduced (Q-362a). The three consumers are read from
-  source — **the merged-card and wrong-HR rendering is inferred, not observed on screen.**
+**Do NOT just move the handlers, and this is the reason it is gated.** `/health/day` swipes between
+days; the sheet's handlers are written against a single overlay date and call `refreshDayOverlay(date)`
+from closure. Wiring them to the wrong date on a screen whose whole purpose is changing dates
+**deletes the wrong day's data** — the one class of change `CLAUDE.md` requires confirmation for.
+
+**The decision for the owner**, since it is a UI shape on a screen they use daily rather than
+something derivable from the repo:
+
+- **Recommended: put the controls on `/health/day`**, where the calendar tap already lands — per
+  exercise row and per session card, reusing `day-overlay-dialogs.tsx` unchanged so the confirm copy
+  and the edit sheet stay the ones already written and tested. A year out this is the durable answer:
+  one screen owns a day, and the sheet stops being a second half-maintained copy of it.
+- **Alternative: re-point the calendar tap back at the sheet.** Smaller, and it restores the
+  capability in one line — but it undoes Q-110, which moved to the day screen for sleep, body
+  composition, scores and the whole-day HR trace that the sheet does not show. It trades a better
+  screen for a faster fix.
+- **Alternative: leave it and delete the sheet.** Only right if the owner does not want to correct
+  logged data from the day view at all, which the four controls existing in the first place argues
+  against.
+- **Reversal cost is low either way** — this is presentation over routes that already exist and are
+  already scoped to `user_id`.
+
+**Whichever is chosen, the sweep is the same:** the day screen's Training and Activity sections need
+the controls, `day-sections.tsx` currently has **zero** interactive elements, and the ported handlers
+must take their date from the screen's current day rather than a captured one. Device-verify: these
+are destructive actions behind confirm dialogs on a 6.9" screen, so tap targets and the confirm's
+safe-area clearance both matter.
+
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
@@ -856,60 +883,6 @@ regression window the additive shape exists to avoid.
 
 - **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
 
-### [platform] LA-16 — two shrink-only ratchets are still order-dependent
-
-- **Branch:** `chore/ratchets-order-independence`
-- **Added:** 2026-08-20 · the half of Q-424 its own text flagged and its acceptance criterion did not cover
-- **Lane: A** — `scripts/**`.
-- **Moved down 2026-08-20**, to match what this entry's own last bullet already said. It was filed at
-  the top of READY and its body says *"lower priority than Q-424 was"* — the position contradicted the
-  text, and position is what the tool reads.
-
-Q-424 made `check-doc-index-size.js` ask *"did this branch grow it"* rather than *"is it over"*, via
-`scripts/lib/base-ref.js` (`resolveBaseRef` · `lineCountAtBase` · the pure `verdict`). **Its own text
-said the class is shared and a fix should be shared too**, but its acceptance criterion named only the
-docs check, so the rest were deliberately left rather than swept in unmeasured.
-
-Still comparing a working tree against a committed absolute: `check-hex-literals`,
-`check-fetch-once-effects`, `check-component-size`, `check-memo-prop-stability`,
-`check-client-today-timezone`, and the non-strict-schema check.
-
-> **⚠️ FOUR OF SIX CONVERTED 2026-08-20, and there are now TWO patterns to choose between. Read this
-> before starting.**
->
-> **Per-file, for a ratchet whose count is a function of one file's text** —
-> `check-component-size` (lines, via `lineCountAtBase`), `check-hex-literals` and
-> `check-client-today-timezone` (occurrences, via `countAtBase` with the script's **own** counting
-> function). Never write a second regex for the base count: it would disagree with the working-tree
-> count for reasons nobody could see.
->
-> **Whole-tree, for a ratchet that is not a per-file function** — `check-memo-prop-stability` scans
-> every file to learn which components are memoised *before* counting call sites, so its base count
-> has to come from `materialiseBaseTree` + the same `scan(rootDir)` run over the base's own tree.
-> **The per-file shortcut is wrong here and wrong in the unsafe direction:** a branch that newly
-> memoises a component with pre-existing inline call sites would have those counted at the base too,
-> and read as *inherited* when the branch is exactly what made them violations. That case is pinned
-> by demonstration.
-
-**What is left:**
-
-- `check-fetch-once-effects` — a brace-matching scan like the memo check. **Decide which of the two
-  patterns above it needs** before writing anything: if its count depends only on the file's own
-  text, per-file is enough; if it depends on a tree-wide pass, it needs the base tree.
-- `check-strict-request-schemas` — **still not read.** Do not assume it matches either shape.
-
-One per PR, each proven both ways — these are gates, and a silently weakened gate is worse than an
-order-dependent one.
-
-`verdict` is reusable as-is in every case; only the counting differs.
-
-Lower priority than Q-424 was: these fire far less often, because intake adds a backlog entry on
-almost every session while a hex literal or a memo call site is added rarely.
-
-- **What would count as done:** for each script, a branch that inherits an over-baseline count from
-  `main` without adding one is green, and a branch that adds one is red — demonstrated per script,
-  not argued from the docs case.
-
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`
@@ -1092,75 +1065,6 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
   removed a file and left the sentence behind. Corrected, with a note to count off the map rather
   than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
   run line prints computed totals.
-
-### [platform] Q-324 — the first suite run against a freshly-migrated database times out two test files, which is exactly what CI does every run
-
-> **⚠️ PARTIALLY DONE 2026-08-19 — mechanism fixed, symptom unconfirmed**
-> ([`journal`](overview/entries/2026-08-19-local-migrate-bookkeeping.md)). `migrate.js` now records
-> what it applied, so `ensureSchema()` no longer re-applies ~200 files per worker; CI runs that
-> script before `pnpm test`, so this was CI's state every run. Measured: `schema_migrations` did not
-> exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
-> suite 200.19 s → 183.18 s.
->
-> **⚠️ Correction 2026-08-20 (Lane A): "3 failed … now 1, unrelated" was wrong, and they were never
-> failures.** On this session's database the count read **4** — `054`, `055`, `082`, `157` — and all
-> four raise SQLSTATEs that `ensureSchema()` classifies as *already present* and steps over. The
-> discrepancy was `migrate.js` carrying **no error classifier at all**, in the file whose own
-> docstring says it mirrors `ensureSchema()`. Worse, it returned exit 0 whatever happened, so the CI
-> job named **Migration Check** — which runs this script and nothing else — could not fail on a
-> genuinely broken migration. Both fixed; the SQLSTATE list now lives in one JSON file both runners
-> read. [`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md).
->
-> **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
-> today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
-> Keep the entry until it is seen again with this ruled out, or stays absent long enough to close on
-> evidence. Everything below is the original entry.
-
-- **Branch:** `fix/ci-fresh-db-schema-contention`
-- **Added:** 2026-08-19 · Lane A, while diagnosing a red `Tests` job on PR #195
-- **Placement:** medium. It is **not** a product defect — it is intermittent CI red on changes that
-  are fine, which costs a diagnosis every time it fires and trains people to re-run rather than read.
-
-- **Reproduced on `main`, with no change of any kind applied.** Create an empty database, run
-  `node scripts/local-db/migrate.js`, then run the suite **once**:
-  ```
-  FAIL  lib/data/postgres/__tests__/complete-workout-increment-race.test.ts
-        Error: Hook timed out in 10000ms.   (beforeAll — getPool / getRepository)
-  FAIL  app/api/admin/backfill-derived-scores/__tests__/backfill.test.ts
-        Error: Test timed out in 5000ms.
-  Test Files  2 failed | 487 passed      Tests  1 failed | 4133 passed
-  ```
-  **Run the suite a second time against the same database and it is 489/489 green.** Both files also
-  pass in isolation on the fresh database. So it is neither test's own logic.
-
-- **The mechanism.** On the first run each vitest worker calls `ensureSchema`, and against a database
-  where `migrate.js` has not recorded anything in `schema_migrations`, every worker re-applies the
-  whole migration set concurrently. The Postgres server log fills with `relation … already exists`
-  and `deadlock detected` — the noise `CLAUDE.md` already tells sessions to ignore — and while that
-  is happening the shared instance is saturated, so a `beforeAll` that only opens a pool exceeds its
-  10 s hook timeout. On the second run `ensureSchema` is a no-op and nothing is slow.
-
-- **Why it hits CI and never a local session.** CI creates a fresh `postgres:16` service for every
-  run, so **CI is always in the first-run state**. A local session's `trainingai_dev` is warm and has
-  been through this once, months ago. That asymmetry is the whole reason the failure looks
-  unreproducible from a session — running `pnpm test` locally cannot reproduce it, and re-running CI
-  usually cannot either, because it is a race rather than a determinism.
-- **Evidence it is a race, not a rule:** PR #197's `Tests` job passed at 06:53 on the same base where
-  #195's failed at 06:52.
-
-- **Fix direction — pick one, do not do all three:**
-  1. **Make `migrate.js` record what it applied** so the workers' `ensureSchema` is a no-op on the
-     first run too. Cheapest, addresses the cause rather than the symptom, and makes CI's first run
-     look like a session's warm one. **Recommended.**
-  2. Serialise `ensureSchema` across workers with the advisory lock the migration tests already use.
-     Correct but slower, and `migration-test-lock.test.ts` shows that lock has its own hazards.
-  3. Raise the two timeouts. Rejected — it hides the contention and the next slow file just moves the
-     goalposts.
-
-- **Do NOT "fix" this by re-running the job.** That is what it currently costs, and it is why the
-  entry exists. `CLAUDE.md` is explicit that a re-run is the fix only when the job died before any
-  test body ran; here the bodies run and time out.
-- **Lane A owns this** (`scripts/local-db/`, `vitest.config.ts`).
 
 ### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
 
@@ -2783,7 +2687,7 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 > [`docs/agents/README.md`](agents/README.md) where the procedure itself is documented, and the
 > narrative is in `docs/reviews/2026-08-18-*.md`. A record kept in the work queue is read as work.
 
-### [app-shell][health] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
+### [app-shell] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
 - **Branch:** `fix/card-fetch-error-states`
 - **Added:** 2026-08-18 · review sweep (three lenses) ·

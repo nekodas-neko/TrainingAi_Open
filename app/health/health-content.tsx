@@ -510,10 +510,10 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     ).finally(() => setDayOverlay(prev => (prev && prev.data === null) ? { ...prev, loading: false } : prev));
   }, []);
 
-  // Q-110: the calendar's day-tap now opens the dedicated day screen (swipeable between days,
-  // with sleep / full body composition / scores / whole-day HR) instead of the bottom sheet. The
-  // sheet and `fetchDayOverlay` are deliberately left in place — the same overlay is still opened
-  // from other surfaces, and retiring it is a separate change from repointing this entry point.
+  // Q-110: the calendar's day-tap opens the dedicated day screen, not the bottom sheet. The note
+  // here used to add "the overlay is still opened from other surfaces" — **that was wrong, and it
+  // is what kept the sheet alive**: `dayOverlay` starts null and every setter is a
+  // `prev => prev ? … : null` no-op or `null`, so nothing can open it. Retiring it is LB-1.
   const handleDayClick = useCallback((date: string) => {
     router.push(`/health/day?date=${encodeURIComponent(date)}`);
   }, [router]);

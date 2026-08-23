@@ -21,6 +21,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 
 const root = path.join(__dirname, '..');
 const DIRS = ['app', 'components', 'lib'];
@@ -112,10 +113,16 @@ const files = DIRS.filter(d => fs.existsSync(path.join(root, d)))
 const perFile = new Map();
 const detail = [];
 
-for (const abs of files) {
-  const rel = path.relative(root, abs).replace(/\\/g, '/');
-  const src = fs.readFileSync(abs, 'utf8');
-  if (!src.includes('cachedFetch')) continue;
+/**
+ * Fetch-once effects in ONE file's text (LA-16).
+ *
+ * Classified before it was written, as the entry says to: this count has no tree-wide dependency —
+ * unlike the memo check, which must learn the memoised component list first — so the base count is
+ * this same function over the base's copy of the file. Per-file, not a materialised base tree.
+ */
+function countFetchOnce(src) {
+  if (!src.includes('cachedFetch')) return { count: 0, lines: [] };
+  const lines = [];
   // `useEffect(() => { … }, [])` — an empty dependency array is the whole signal. A non-empty one
   // re-runs when its deps change, which is a different (and usually correct) shape.
   //
@@ -146,19 +153,40 @@ for (const abs of files) {
     }
     if (!/^\}\s*,\s*\[\s*\]\s*\)/.test(src.slice(j, j + 30))) continue;
     if (!src.slice(bodyStart, j).includes('cachedFetch')) continue;
-    perFile.set(rel, (perFile.get(rel) ?? 0) + 1);
-    detail.push(`${rel}:${src.slice(0, m.index).split('\n').length}`);
+    lines.push(src.slice(0, m.index).split('\n').length);
   }
+  return { count: lines.length, lines };
+}
+
+const baseRef = resolveBaseRef();
+
+for (const abs of files) {
+  const rel = path.relative(root, abs).replace(/\\/g, '/');
+  const { count, lines } = countFetchOnce(fs.readFileSync(abs, 'utf8'));
+  if (count === 0) continue;
+  perFile.set(rel, count);
+  for (const ln of lines) detail.push(`${rel}:${ln}`);
 }
 
 const failures = [];
+const inherited = [];
 for (const [rel, count] of perFile) {
   const allowed = BASELINE[rel] ?? 0;
-  if (count > allowed) {
+  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
+  const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, (c) => countFetchOnce(c).count) });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${count} fetch-once effect(s) against a baseline of ${allowed}, but the base branch is already there.`);
+  } else if (v === 'fail') {
     failures.push(allowed === 0
       ? `${rel}: ${count} fetch-once effect(s); this file is not in the baseline, so it must have zero.`
       : `${rel}: ${count} fetch-once effect(s), over its baseline of ${allowed}.`);
   }
+}
+
+// Reported whether or not the run fails, and never as a failure (Q-424).
+if (inherited.length) {
+  console.log('check-fetch-once-effects: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
 }
 for (const [rel, allowed] of Object.entries(BASELINE)) {
   const count = perFile.get(rel) ?? 0;

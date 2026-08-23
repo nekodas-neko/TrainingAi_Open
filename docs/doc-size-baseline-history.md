@@ -20,15 +20,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ## 2026-08-23 — BF-4, the photo-scan slowdown
 
-**`docs/implementation-backlog.md` 11381 → 11463.** An owner report that the nutrition photo scan got
-much slower, filed high in the queue rather than at the tail — it is a live regression on a
-daily-use flow, not a note for later.
+**`docs/implementation-backlog.md` 11381 → 11367 — a ratchet DOWN, not a raise.** An owner report that
+the nutrition photo scan got much slower, filed high in the queue rather than at the tail: it is a
+live regression on a daily-use flow, not a note for later.
 
-82 lines, and most of it is evidence that redirects the work rather than describing the symptom. The
-obvious diagnosis is the AI call, and production latency data refutes it: 18 image scans across a
-month average 4,168 ms, the *earliest* one is above that average, and the model never changed. An
-entry that only said "scan feels slow" would send an implementer straight at the prompt. The table is
-what stops that, so it stays in the entry rather than moving to a review doc nobody opens first.
+The entry adds 82 lines, and it was written expecting a raise to 11463. It merged against a `main`
+that had removed Q-362b in #297, which took out more than the entry put in — so the file ends up
+*under* its own baseline and the honest bookkeeping is to bring the number down to what the file
+actually is. Recorded this way deliberately: the first draft of this note claimed a raise that never
+happened, which is the failure mode a size log exists to prevent.
+
+82 lines is a lot for one bug, and most of it is evidence that redirects the work rather than
+describing the symptom. The obvious diagnosis is the AI call, and production latency data refutes it:
+18 image scans across a month average 4,168 ms, the *earliest* one is above that average, and the
+model never changed. An entry that only said "scan feels slow" would send an implementer straight at
+the prompt. The table is what stops that, so it stays in the entry rather than moving to a review doc
+nobody opens first.
 
 The rest is the field-name trap (`getPhoto` takes `width`/`height`, its sibling `takePhoto` takes
 `targetWidth`/`targetHeight`, and the wrong pair is silently ignored — a downscale that never
@@ -1454,3 +1461,21 @@ what paths are claimed (none), and the gotchas that cost this run time.
 BugFix 161, Review 170 and Tuning 582 are not. The entry's own thesis holds — each fell at its role's
 own handoff rather than in a compaction pass — with one exception it should expect: Tuning at 582 is
 4× the target and will not come down as a side effect of a routine rewrite.
+
+## 2026-08-23 — `projectOverview.md` 7889 → 7916, for one Known-Issues row (LB-1)
+
+**27 lines, and the check attributed all 27 to this branch** — the first raise since LA-16 gave the
+ratchets a base tree, and the message now says "27 of which this branch added" rather than leaving
+you to work out whether `main` was already over. That is the whole point of that change and it paid
+for itself immediately here.
+
+The row is a user-facing capability gap: no reachable UI can edit or delete a logged exercise, a
+workout session or an activity log, because the four controls that did live in a sheet nothing can
+open. It is longer than a typical row on purpose. Two sessions have already fixed bugs *inside* that
+unreachable sheet — the second was this lane, one PR ago — so the expensive thing is not knowing the
+defect, it is re-deriving that the surface is dead. The row carries the measurement that settles it:
+which controls exist, which routes have no reachable caller, and the one trash icon nearby that turns
+out to be a drop-set indicator.
+
+Trimmed from 29 before raising. What stayed is the evidence; what went was a second telling of the
+mechanism already stated in the paragraph above it.
