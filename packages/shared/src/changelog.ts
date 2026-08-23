@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.339.0",
+    date: "2026-08-23",
+    changes: [
+      "A free walk or run now shows your heart rate while you are walking. The strap was already streaming beats \u2014 the same one feeding the cadence reading on that screen \u2014 and the number was already being saved afterwards; it just was not shown at the one time you could act on it. It goes grey and says \"(stale)\" if the strap stops reporting, rather than freezing on the last reading.",
+      "The same screen now shows a running step total and, on a hilly route, how much you have climbed. The step count is estimated from cadence and needs the strap, so it stays hidden rather than showing zero when there is nothing to count. The guided walk shows the step total too, so the two screens agree.",
+    ],
+  },
+  {
     version: "1.336.0",
     date: "2026-08-23",
     changes: [
