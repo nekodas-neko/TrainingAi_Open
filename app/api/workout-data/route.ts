@@ -156,7 +156,7 @@ async function handleWorkoutData(req: NextRequest) {
     const [allPhases, prMap, todayExercises, sessionCounts, lastLogs, lastRealOneRm, priorLogsThisProgram, estimates] = await Promise.all([
       isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
       repo.listPersonalRecords(userId),
-      repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/')),
+      repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/'), tz),
       isAutomatic ? repo.countAllSessionsSinceStart(userId, program.id) : Promise.resolve(new Map<string, number>()),
       repo.getLastExerciseLogsBatch(userId, unionNames),
       repo.getLastRealOneRmBatch(userId, unionNames),
@@ -335,7 +335,7 @@ async function handleWorkoutData(req: NextRequest) {
     isAutomatic ? repo.listProgramPhases(userId, program.id) : Promise.resolve([] as ProgramPhase[]),
     repo.getLastExerciseLogsBatch(userId, exerciseNames),
     repo.getLastRealOneRmBatch(userId, exerciseNames),
-    repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/')),
+    repo.getDayExerciseNames(userId, todayStr.replace(/-/g, '/'), tz),
     // Reconcile first, then read: the stored counter feeds completedCycles /
     // phaseSessionNumber below and has drifted three times (SYNC-T2). Chained inside the
     // Promise.all so it still runs alongside the other five queries.

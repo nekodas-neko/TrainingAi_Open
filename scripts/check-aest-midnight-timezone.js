@@ -9,14 +9,14 @@
 // today. The test was written in the correct shape (it reads the local day back from the row); the
 // query re-derived midnight in Brisbane and disagreed.
 //
-// Measured 2026-08-23: **9 call sites pass a timezone, 13 do not.** That split is exactly what
+// Measured 2026-08-23: 9 call sites passed a timezone and 12 did not; LA-19 converted the 12. That split is exactly what
 // CLAUDE.md warns about — "a default every caller overrides is a safety net, and it is what makes
 // forgetting silent." Prose has already failed to hold this class twice (the `toISOString().slice`
 // ban needed a check; the hex-literal count grew 41 in five days while the docs called it
 // improving), so this is a ratchet rather than a paragraph.
 //
 // Shrink-only: a file listed here may only lose omitting call sites, and a file NOT listed must
-// have none. Converting the 11 is separate work (backlog), and deliberately not this script's job.
+// have none. With the list empty, that reduces to: no call site may omit the timezone.
 //
 // The count is reproducible from a shell, so the baseline is never a number only this file knows:
 //   grep -rn 'aestMidnight(' --include='*.ts' lib app packages | grep -v __tests__ | grep -v 'export function'
@@ -26,11 +26,53 @@ const path = require('path');
 const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 
 /**
+ * Blank out comments and string bodies, keeping the byte length so nothing else shifts.
+ *
+ * Without this the scanner counted prose: `app/api/day-log/route.ts` says *"Old workouts stored
+ * aestMidnight (14:00 UTC)"* in a comment, and `aestMidnight (` matched. That put a file with no
+ * call site at all into the first baseline — caught the same day, while converting the list.
+ */
+function stripCommentsAndStrings(src) {
+  let out = '';
+  let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    const two = src.slice(i, i + 2);
+    if (two === '//') {
+      const end = src.indexOf('\n', i);
+      const stop = end === -1 ? src.length : end;
+      out += ' '.repeat(stop - i);
+      i = stop;
+    } else if (two === '/*') {
+      const end = src.indexOf('*/', i + 2);
+      const stop = end === -1 ? src.length : end + 2;
+      out += src.slice(i, stop).replace(/[^\n]/g, ' ');
+      i = stop;
+    } else if (c === '"' || c === "'" || c === '`') {
+      const quote = c;
+      let j = i + 1;
+      while (j < src.length && src[j] !== quote) {
+        if (src[j] === '\\') j++;
+        j++;
+      }
+      const stop = Math.min(j + 1, src.length);
+      out += src.slice(i, stop).replace(/[^\n]/g, ' ');
+      i = stop;
+    } else {
+      out += c;
+      i++;
+    }
+  }
+  return out;
+}
+
+/**
  * Top-level argument count for each `aestMidnight(...)` call. Splitting on commas would miscount
  * `aestMidnight(y, m, d + f(a, b))`; this tracks nesting, so a nested call cannot inflate the arity
  * and make an omitting site look tz-aware.
  */
-function countOmittingCalls(src) {
+function countOmittingCalls(raw) {
+  const src = stripCommentsAndStrings(raw);
   let n = 0;
   const re = /\baestMidnight\s*\(/g;
   let m;
@@ -52,20 +94,17 @@ function countOmittingCalls(src) {
   return n;
 }
 
-// Baseline recorded 2026-08-23 — 13 omitting call sites across 6 files. Shrink-only.
-// A file that reaches zero should have its row deleted, so it is held to zero from then on.
+// Baseline: EMPTY, and that is the point — every call site passes a timezone as of 2026-08-23
+// (LA-19). A file appearing here at all is now a regression, not a debt row.
 //
-// Thirteen, not the eleven a shell audit gave: this parser counts top-level arguments, and a
-// `grep | sed` pass over the same tree missed `app/api/day-log/route.ts` entirely and read
-// `early-deload.ts` as one call rather than two. That gap is the reason the count lives in a script.
-const BASELINE = {
-  'app/api/day-log/route.ts': 1,
-  'lib/coach/domains/early-deload.ts': 2,
-  'lib/data/postgres/adapter.ts': 6,
-  'lib/data/postgres/slices/oura.ts': 1,
-  'lib/data/postgres/slices/programs.ts': 2,
-  'packages/shared/src/workout/log-exercise.ts': 1,
-};
+// It was 12 for a few hours between the ratchet landing and the conversion. The number had been
+// wrong in both directions before it settled, which is the argument for a script over a grep: a
+// `grep | sed` audit gave **11** (missing `early-deload.ts`'s second call), and this scanner's first
+// version gave **13**, counting a *comment* in `app/api/day-log/route.ts` that mentions
+// `aestMidnight (14:00 UTC)`. Comments and string bodies are blanked before scanning now, and the
+// stale-row rule is what surfaced that — the day-log row could not survive its own file having no
+// call site.
+const BASELINE = {};
 
 const root = process.cwd();
 const seen = new Set();

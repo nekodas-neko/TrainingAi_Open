@@ -737,7 +737,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async countAllSessionsSinceStart(userId: string, programId: string): Promise<Map<string, number>> { return prog.countAllSessionsSinceStart(this.db, userId, programId) }
   async autoRecalibrateCycleAnchor(userId: string, programId: string): Promise<void> { return prog.autoRecalibrateCycleAnchor(this.db, userId, programId) }
   async getActiveProgramWithPhases(userId: string) { return prog.getActiveProgramWithPhases(this.db, userId) }
-  async confirmEarlyDeload(userId: string, programId: string, today: string): Promise<void> { return prog.confirmEarlyDeload(this.db, userId, programId, today) }
+  async confirmEarlyDeload(userId: string, programId: string, today: string, timezone = DEFAULT_TZ): Promise<void> { return prog.confirmEarlyDeload(this.db, userId, programId, today, timezone) }
 
   // ── Progression Styles ────────────────────────────────────────────────────
   async listProgressionStyles(userId: string): Promise<ProgressionStyle[]> { return prog.listProgressionStyles(this.db, userId) }
@@ -1221,10 +1221,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     }))
   }
 
-  async getDayLog(userId: string, date: string): Promise<WorkoutSession[]> {
+  async getDayLog(userId: string, date: string, timezone = DEFAULT_TZ): Promise<WorkoutSession[]> {
     const [y, m, d] = date.split('/').map(Number)
-    const from = aestMidnight(y, m, d)
-    const to   = aestMidnight(y, m, d + 1)
+    const from = aestMidnight(y, m, d, timezone)
+    const to   = aestMidnight(y, m, d + 1, timezone)
     const wsRows = await this.db.select().from(s.workoutSessions)
       .where(and(
         eq(s.workoutSessions.userId, userId),
@@ -1236,10 +1236,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.buildWorkoutSessions(wsRows)
   }
 
-  async getDayExerciseNames(userId: string, date: string): Promise<{ sessionId?: string; exerciseName: string }[]> {
+  async getDayExerciseNames(userId: string, date: string, timezone = DEFAULT_TZ): Promise<{ sessionId?: string; exerciseName: string }[]> {
     const [y, m, d] = date.split('/').map(Number)
-    const from = aestMidnight(y, m, d)
-    const to   = aestMidnight(y, m, d + 1)
+    const from = aestMidnight(y, m, d, timezone)
+    const to   = aestMidnight(y, m, d + 1, timezone)
     const rows = await this.db.select({
       sessionId: s.workoutSessions.programSessionId,
       exerciseName: s.exerciseLogs.exerciseName,
@@ -1256,10 +1256,10 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return rows.map(r => ({ sessionId: r.sessionId ?? undefined, exerciseName: r.exerciseName }))
   }
 
-  async getDaySessionSummaries(userId: string, date: string): Promise<{ sessionId?: string; sessionName: string; startedAt: Date; completedAt?: Date }[]> {
+  async getDaySessionSummaries(userId: string, date: string, timezone = DEFAULT_TZ): Promise<{ sessionId?: string; sessionName: string; startedAt: Date; completedAt?: Date }[]> {
     const [y, m, d] = date.split('/').map(Number)
-    const from = aestMidnight(y, m, d)
-    const to   = aestMidnight(y, m, d + 1)
+    const from = aestMidnight(y, m, d, timezone)
+    const to   = aestMidnight(y, m, d + 1, timezone)
     const rows = await this.db.select({
       sessionId:   s.workoutSessions.programSessionId,
       sessionName: s.workoutSessions.sessionName,
@@ -5786,7 +5786,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async markOuraWorkoutReviewed(userId: string, id: string) { return oura.markOuraWorkoutReviewed(this.db, userId, id) }
   async getSetTimestampsForSession(workoutSessionId: string) { return oura.getSetTimestampsForSession(this.db, workoutSessionId) }
   async markHrSynced(workoutSessionId: string) { return oura.markHrSynced(this.db, workoutSessionId) }
-  async getUnsyncedHrSessionsForDay(userId: string, day: string) { return oura.getUnsyncedHrSessionsForDay(this.db, userId, day) }
+  async getUnsyncedHrSessionsForDay(userId: string, day: string, timezone = DEFAULT_TZ) { return oura.getUnsyncedHrSessionsForDay(this.db, userId, day, timezone) }
   async getUnsyncedHrSessions(userId: string, from: Date, to: Date) { return oura.getUnsyncedHrSessions(this.db, userId, from, to) }
   async getWorkoutSessionById(userId: string, id: string) { return oura.getWorkoutSessionById(this.db, userId, id) }
   async replaceOuraDailySummary(userId: string, rows: import('../repository').OuraDailySummaryRow[]) { return oura.replaceOuraDailySummary(this.db, userId, rows) }

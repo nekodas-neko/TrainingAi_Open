@@ -3328,40 +3328,6 @@ moving *beside* the calories rather than under them.
   [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
   (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
-### [platform][app-shell] LA-19 — 13 day windows are keyed to the owner's timezone, not the user's
-
-- **Branch:** `fix/aest-midnight-user-timezone`
-- **Added:** 2026-08-23 · found by Q-394's sweep, which was looking for something else.
-- **Placement:** low-mid. **Not a live defect for the owner** — they are in Brisbane, so the default
-  is correct for them. It is a defect for every other account, and the Canonical Runtime amendment
-  is explicit that no user-visible surface should assume the owner's own device.
-- **Measured 2026-08-23 by `scripts/check-aest-midnight-timezone.js`:** `aestMidnight(y, m, d, tz)`
-  takes a timezone and defaults it to `DEFAULT_TZ`. **9 call sites pass one; 13 do not.**
-
-  | file | omitting calls |
-  |---|---|
-  | `lib/data/postgres/adapter.ts` | 6 |
-  | `lib/coach/domains/early-deload.ts` | 2 |
-  | `lib/data/postgres/slices/programs.ts` | 2 |
-  | `app/api/day-log/route.ts` | 1 |
-  | `lib/data/postgres/slices/oura.ts` | 1 |
-  | `packages/shared/src/workout/log-exercise.ts` | 1 |
-
-- **How it surfaces, demonstrated rather than argued.** Shifting a test user's timezone into the
-  00:00–02:00 band made `getUnsyncedHrSessionsForDay` return nothing for a session inserted on that
-  user's today. The test was written in the **correct** shape — it reads the local day back from the
-  row it inserted — and still failed, because the query re-derived midnight in Brisbane.
-- **⚠️ That particular one is dead code:** `getUnsyncedHrSessionsForDay` and its sibling
-  `getUnsyncedHrSessions` have **no production caller** — only the adapter wrapper, the repository
-  interface and a test. Whoever takes this should decide whether to fix or delete them; the other
-  five files are live.
-- **Fix shape:** thread the session timezone the way `getCalendarData` / `getRecentTrainedDays` /
-  `getNextSession` already do — `timezone = DEFAULT_TZ` as a default parameter, every caller passing
-  `session.user?.timezone ?? DEFAULT_TZ`. Then delete each file's row from the check's baseline in
-  the same PR; the check fails on a stale row, so it cannot be forgotten.
-- **The count is already ratcheted**, so this can be worked file by file without the rest regrowing.
-  **Lane A.**
-
 ### [platform][app-shell] Q-392 — preferences live only on the device, so a reinstall or a second browser starts from defaults
 
 - **Branch:** `feat/server-backed-user-preferences`

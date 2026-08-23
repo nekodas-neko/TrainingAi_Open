@@ -1251,9 +1251,12 @@ export async function markHrSynced(db: Db, workoutSessionId: string) {
     .where(eq(s.workoutSessions.id, workoutSessionId))
 }
 
-export async function getUnsyncedHrSessionsForDay(db: Db, userId: string, day: string) {
+// No production caller today — only the adapter wrapper, the repository interface and a test. Kept
+// rather than deleted because that test is real soft-delete coverage; fixed rather than left wrong
+// because a window keyed to the owner's zone is what an eventual caller would inherit (LA-19).
+export async function getUnsyncedHrSessionsForDay(db: Db, userId: string, day: string, timezone = DEFAULT_TZ) {
   const [y, m, d] = day.split('-').map(Number)
-  const from = aestMidnight(y, m, d)
+  const from = aestMidnight(y, m, d, timezone)
   const to   = new Date(from.getTime() + 24 * 60 * 60 * 1000)
   return db
     .select({

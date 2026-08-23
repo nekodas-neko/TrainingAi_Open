@@ -17,7 +17,7 @@ export async function GET(req: NextRequest) {
   // Session-columns-only query — phantom sessions with no logged exercises (abandoned
   // starts / deleted workouts whose session row lingered) are already excluded in SQL,
   // so the HR chart never paints a spurious workout band for a workout that isn't there.
-  const sessions = await repo.getDaySessionSummaries(session.user.id, slashDate)
+  const sessions = await repo.getDaySessionSummaries(session.user.id, slashDate, tz)
 
   return NextResponse.json({
     date: slashDate.replace(/\//g, '-'),

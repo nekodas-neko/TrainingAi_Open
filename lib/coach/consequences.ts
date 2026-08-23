@@ -20,7 +20,8 @@ export async function previewPatch(
   userId: string,
   patch: CoachPatch,
   today?: string,
+  timezone?: string,
 ): Promise<PreviewResult> {
   if (!fieldsMatchDomain(patch)) return { consequences: [], drift: [], target: null }
-  return handlerFor(patch.domain, today).preview(db, userId, patch)
+  return handlerFor(patch.domain, today, timezone).preview(db, userId, patch)
 }

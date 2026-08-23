@@ -1714,3 +1714,9 @@ The eleven `CLAUDE.md` lines are the one part of this that belongs in a rule rat
 this class at all**. Reading does not find it. Shifting a test user's timezone into its own
 00:00–02:00 band does, on any clock. That method took two accidental discoveries and two lost PRs to
 arrive at, and it fits in a paragraph.
+
+## 2026-08-23 — `projectOverview.md` 7970 → 7971, `docs/implementation-backlog.md` 11368 → 11334
+
+Shrink. LA-19 shipped the day it was filed and its entry leaves the queue; `CLAUDE.md` and
+`projectOverview.md` are edits in place, not growth — both said "13 do not" and now say the count is
+zero.
