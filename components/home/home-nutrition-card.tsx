@@ -47,16 +47,24 @@ export function HomeNutritionCard({
   const pathname = usePathname()
   const balance = useEnergyBalanceToday()?.balance ?? null
 
-  const nutrTotalG = (nutrProtein ?? 0) + (nutrCarbs ?? 0) + (nutrFat ?? 0)
-  const proteinPct = nutrTotalG > 0 ? (nutrProtein ?? 0) / nutrTotalG : 0
-  const carbsPct = nutrTotalG > 0 ? (nutrCarbs ?? 0) / nutrTotalG : 0
-
   // Falls back to the stored goal alone, never to a self-composed sum: without the payload there
   // is no measured movement to add, and inventing one is how the third budget appeared.
   const dailyBudget = balance ? budgetProvenance(balance).total : calorieGoal
   const isWeekly = calorieType === 'weekly'
   const goalDisplay = isWeekly && dailyBudget ? dailyBudget * 7 : dailyBudget
   const consumedDisplay = isWeekly ? (weekToDate?.calories ?? 0) : nutrCalories
+  // The ring always reads TODAY, even when the header shows the weekly total — a weekly goal is a
+  // budget for seven days and sweeping it with one day's intake would read as barely started.
+  const overUnder = dailyBudget != null ? dailyBudget - (nutrCalories ?? 0) : null
+  const eatenPct = dailyBudget != null && dailyBudget > 0
+    ? Math.min(100, Math.round(((nutrCalories ?? 0) / dailyBudget) * 100))
+    : 0
+  // Over budget takes the zone's OWN colour from the payload rather than a local red: it is the
+  // same colour the bar and the "Well over"/"Over" label use, so the ring cannot disagree with
+  // them. (`--accent-red` does not exist — a `var()` that resolves to nothing paints transparent,
+  // which is the silently-undefined-utility failure this repo has shipped before.) Under budget the
+  // ring is neutral brand: it is a progress arc, not a verdict, and the centre says so in words.
+  const ringColor = overUnder != null && overUnder < 0 ? (balance?.zoneColor ?? 'var(--brand)') : 'var(--brand)'
   const ringMask = 'radial-gradient(farthest-side, transparent 60%, black 61%)'
 
   return (
@@ -73,17 +81,30 @@ export function HomeNutritionCard({
         className={cn('w-full rounded-2xl p-4 flex items-center gap-4 text-left active:scale-95 transition cursor-pointer', sectionEditMode && 'pointer-events-none')}
         style={accentCardStyle(color)}
       >
+        {/* Q-323: this was a full 360° split by macro — it encoded COMPOSITION and said nothing
+            about progress, while the three macro rows to its right already give the composition in
+            grams. It now sweeps eaten/budget and leaves the remainder grey, so the ring answers
+            "how much is left" and the centre says which way. Past the budget there is no grey and
+            the word flips to "over". */}
         <div className="relative flex-none w-[58px] h-[58px]">
+          <div
+            className="absolute inset-0 rounded-full text-muted-foreground/30"
+            style={{ background: 'currentColor', WebkitMask: ringMask, mask: ringMask }}
+          />
           <div className="absolute inset-0 rounded-full" style={{
-            background: nutrTotalG > 0
-              ? `conic-gradient(from -90deg, ${MACRO_COLORS.protein} 0deg ${(proteinPct * 360).toFixed(1)}deg, ${MACRO_COLORS.carbs} ${(proteinPct * 360).toFixed(1)}deg ${((proteinPct + carbsPct) * 360).toFixed(1)}deg, ${MACRO_COLORS.fat} ${((proteinPct + carbsPct) * 360).toFixed(1)}deg 360deg)`
-              : 'var(--border)',
+            background: eatenPct > 0
+              ? `conic-gradient(from -90deg, ${ringColor} ${eatenPct * 3.6}deg, transparent ${eatenPct * 3.6}deg)`
+              : 'transparent',
             WebkitMask: ringMask,
             mask: ringMask,
           }} />
           <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-            <span className="text-[9px] font-extrabold leading-none">{metaLoading ? '…' : nutrCalories != null ? nutrCalories : '—'}</span>
-            <span className="text-[7px] leading-none" style={{ opacity: 0.4 }}>kcal</span>
+            <span className="text-[9px] font-extrabold leading-none tabular-nums">
+              {metaLoading || overUnder == null ? '…' : Math.abs(overUnder).toLocaleString()}
+            </span>
+            <span className="text-[7px] leading-none" style={{ opacity: 0.4 }}>
+              {overUnder != null && overUnder < 0 ? 'over' : 'left'}
+            </span>
           </div>
         </div>
         <div className="flex-1 min-w-0">

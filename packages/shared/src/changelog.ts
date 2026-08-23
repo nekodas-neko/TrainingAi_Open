@@ -13,6 +13,22 @@ export const CHANGELOG: ChangelogEntry[] = [
     ],
   },
   {
+    version: "1.337.0",
+    date: "2026-08-23",
+    changes: [
+      "There is now an \"I've finished logging\" button at the end of the Nutrition day, with an Undo. Only days you mark are used to work out what you actually burn \u2014 previously a day you stopped logging halfway through looked exactly like a completed light day and pulled the estimate down with nothing to stop it. Measured on the underlying change: fourteen days at a true 2,600 maintenance, six of them stopping at 1,400, came out 514 kcal low with nothing flagged.",
+      "A counter under the button says how many days are marked and how many more the estimate needs. It ships with the button on purpose: the button feeds something that was otherwise invisible, and that invisibility is why this went unnoticed until it was asked about.",
+    ],
+  },
+  {
+    version: "1.336.0",
+    date: "2026-08-23",
+    changes: [
+      "The calorie bar is now a progress bar you fill toward the end, instead of a dial with a marker in the middle. The track runs red through amber to green just before the goal notch, with a short amber-and-red tail past it, and the fill is that same colouring clipped to what you have eaten \u2014 so the leading edge tells you where you stand without a second colour that could disagree with the words beside it.",
+      "Home's nutrition ring answers \"how much is left\" rather than \"what were my macros\". It used to be a full circle split into protein, carbs and fat \u2014 which the three rows next to it already say in grams \u2014 so it never showed progress at all. It now sweeps with what you have eaten, greys the remainder, and the centre counts down and flips to \"over\" once you pass the budget.",
+    ],
+  },
+  {
     version: "1.335.0",
     date: "2026-08-23",
     changes: [

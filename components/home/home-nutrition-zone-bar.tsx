@@ -30,8 +30,7 @@ export function HomeNutritionZoneBar() {
     <div className="mb-1.5">
       <CalorieZoneBar
         compact
-        deviationKcal={b.deviationKcal}
-        zoneColor={b.zoneColor}
+        intakeKcal={b.intakeKcal}
         restingBaseKcal={b.restingBaseKcal}
         activeKcal={b.activeKcal}
         targetNetKcal={b.targetNetKcal}
