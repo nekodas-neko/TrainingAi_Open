@@ -1538,3 +1538,15 @@ This is the queue file doing its job rather than growing: the fields are what
 `scripts/check-backlog-pointers.js` validates and what `scripts/next-item.js` sorts on, and the
 alternative to the fifteen lines is the next four implementers each re-reading four entries to
 discover the same thing.
+
+## 2026-08-23 — `docs/implementation-backlog.md` 11432 → 11447
+
+A third dependency of Q-545's Task 3, recorded on the queue entry because it changes what Task 3
+*is*: the vendored model constants cannot reach the device. `constants/index.ts` reads them
+synchronously with `node:fs` — deliberately, because two ports evaluate them at module scope — and
+they sit on the rollup's real call path twice, through the step pipeline and through
+`daytimeStressLevel`.
+
+Fifteen lines in the queue rather than the journal because the answer (async getters, cached assets,
+or an API route) is a decision to take *before* starting Task 3, and the queue entry is what the
+implementer reads first.

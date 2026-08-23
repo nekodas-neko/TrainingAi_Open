@@ -2910,9 +2910,24 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 >    native addon and must never reach the client bundle"*. So the rollup's **I/O** is now portable
 >    and its **models are not**. Task 3 needs the model session injected the same way the I/O is
 >    (`session-web.ts` already exists as the WASM sibling; plan Task 4), and that is gated on plan
->    Task 1, the missing `wasm-unsafe-eval` in the production CSP. A smaller one: `sourceRank`
+>    Task 1, the missing `wasm-unsafe-eval` in the production CSP. ~~A smaller one: `sourceRank`
 >    (`lib/data/health-source.ts`) pulls `drizzle-orm` into the module graph and wants moving to a
->    driver-free home.
+>    driver-free home.~~ ✅ done — `@trainingai/shared/health/source-rank`.
+>
+> **3. ⚠️ A third dependency the plan never named: the model CONSTANTS cannot reach the device
+>    either, and that is a design decision rather than a port.** `lib/oura-models/constants/index.ts`
+>    reads its JSON with `node:fs`, **synchronously**, and its own header states the position
+>    outright — *"SERVER-ONLY, and structurally so … if a client component ever needs one of these
+>    numbers, it belongs behind an API route, not behind a bundler shim."* The synchronicity is
+>    deliberate and load-bearing (two ports evaluate constants at module scope), which is exactly
+>    what forecloses fetching them. `constants-delivery.ts` solves delivery for the *server* only:
+>    it downloads them to disk at boot from object storage.
+>
+>    They are on the rollup's real call path in **two** places: `step-day-buckets` →
+>    `step-counter-pipeline`, and `buildDaytimeStressSeriesFromModel` → `scoreStressPoints` →
+>    `daytimeStressLevel` → `getDaytimeStressConstants()`. So a device rollup has no numbers to
+>    score with until this is answered — async getters everywhere, constants shipped as
+>    service-worker-cached assets, or an API route. Pick before starting Task 3, not during.
 
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
