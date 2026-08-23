@@ -2951,9 +2951,36 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 >
 >    They are on the rollup's real call path in **two** places: `step-day-buckets` →
 >    `step-counter-pipeline`, and `buildDaytimeStressSeriesFromModel` → `scoreStressPoints` →
->    `daytimeStressLevel` → `getDaytimeStressConstants()`. So a device rollup has no numbers to
+>    `daytimeStressLevel` → `getDaytimeStressConstants()`. ~~So a device rollup has no numbers to
 >    score with until this is answered — async getters everywhere, constants shipped as
->    service-worker-cached assets, or an API route. Pick before starting Task 3, not during.
+>    service-worker-cached assets, or an API route. Pick before starting Task 3, not during.~~
+>
+>    **✅ CORRECTED 2026-08-23, same day — it is a port, not a decision, and the pattern is already
+>    in the repo.** Q-221 hit this exact problem for the steps-decoder table and solved it:
+>    `lib/oura-models/steps-motion-decoder.ts` takes the table by **injection**
+>    (`setStepsDecoderConstants` / `hasStepsDecoderConstants`), `GET /api/oura-ble/decoder-constants`
+>    serves it (auth-gated, rate-limited, `private, no-store`) reading through the same accessor so
+>    the two paths cannot drift, and `lib/activity/steps-decoder-constants-client.ts` fetches and
+>    caches it on the device. Activity auto-detection runs on it today. The getters never had to
+>    become async — the constants are **pushed in** before use, exactly as
+>    `constants-delivery.ts` pushes them to disk on the server.
+>
+>    Q-221's comment also rules out the option that looks cheapest: a static JSON import compiles
+>    into `_next/static`, which `middleware.ts`'s matcher excludes, so the numbers were **fetchable
+>    with no session at all**. Bundling them is a publication problem the owner has already decided,
+>    not just a git-size one.
+>
+>    **Measured: the rollup reads exactly three getters, and one is already done.**
+>
+>    | getter | read by | state |
+>    |---|---|---|
+>    | `getStepsDecoderConstants` | `step-counter-pipeline.ts` | ✅ injectable, route + client exist |
+>    | `getDaytimeStressConstants` | `daytime-stress.ts` (`daytimeStressLevel`) | needs the same treatment |
+>    | `getResilienceConstants` | `stress-resilience.ts` | needs the same treatment |
+>
+>    So Task 3's constants half is: give those two the `set*`/`has*` shape, extend the route (or add
+>    siblings), and inject on the device the way `ensureStepsDecoderConstants` already does. Follow
+>    Q-221; do not invent a second mechanism.
 
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
