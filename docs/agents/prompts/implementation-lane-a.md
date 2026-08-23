@@ -65,9 +65,11 @@ continues from it. Write a dated handoff doc as well if you closed a cluster of 
 "done" for anything not in a committed diff and observed working, and always say which failure
 surfaces you did not exercise.
 
-**Then rename yourself.** Once the baton and every PR have landed, append ` (old)` to your own
-session title — `Implementation Agent (A) 🚧 (old)` — so the owner can tell you apart from your successor, which is
-created under the clean name. Two calls on the `claude-code-remote` MCP server: `get_session` with
-`session_id` **omitted** describes the calling session and returns your own ID in `ccr.id`, then
-`set_session_title` with that ID and the suffixed title. Do this after the work is finished, never
-before — a session titled `(old)` that is still pushing commits is worse than an ambiguous name.
+**Then rename yourself.** Once the baton and every PR have landed, prefix `(Old) ` to your own
+session title — `(Old) Implementation Agent (A) 🚧` — so the owner can tell you apart from your successor, which
+is created under the clean name. It goes at the **front**, not the end: session lists truncate from
+the right and are scanned down the left edge, so a marker at the end is the first thing lost. Two
+calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted** describes
+the calling session and returns your own ID in `ccr.id`, then `set_session_title` with that ID and
+the prefixed title. Do this after the work is finished, never before — a session titled `(Old)`
+that is still pushing commits is worse than an ambiguous name.
