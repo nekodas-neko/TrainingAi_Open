@@ -430,6 +430,88 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
+### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and it is not the AI call
+
+- Lane: B — the fix is `components/nutrition/capture-step.tsx`; the payload instrumentation below is Lane A
+
+**Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
+than it used to be; can we investigate why - from taking the photo to getting the result is much
+longer than before."*
+
+**⚠️ Read this first: the model call is NOT the regression, and that is measured, not assumed.**
+`ai_call_log` records `latency_ms` per call, so the AI half is directly observable. All 30
+`nutrition-scan` calls in production, split by call shape:
+
+| shape | n | avg | min | max | span |
+|---|---|---|---|---|---|
+| image (~1,275 input tokens) | 18 | **4,168 ms** | 3,498 | 5,013 | 2026-07-26 → 08-21 |
+| text (~215 input tokens) | 12 | 1,667 ms | 1,319 | 2,135 | 2026-07-26 → 08-20 |
+
+**The earliest image scan on record (2026-07-26) took 4,545 ms — above the 18-call average.** The
+model is `gemini-3.1-flash-lite` on every row from July to now, so it did not change either. Whatever
+got slower is on the other side of that number. Do not start by tuning the prompt or the model.
+
+**Also ruled out by reading the path, all cheap or absent:**
+- `rateLimit` is an in-memory `Map` (`lib/rate-limit.ts:97`) — no I/O on the request path.
+- Exactly one network call per scan. `callScan` (`capture-step.tsx:68`) does a single
+  `fetch('/api/nutrition/scan')`, and the route makes one `loggedGenerateObject` call.
+- Nothing happens after the response. `handleScanResult`
+  (`components/nutrition/food-logger-sheet.tsx:115`) is pure synchronous state, then `pushStep`.
+
+**Prime suspect: the image payload is unbounded, and the upload is the only unmeasured leg.**
+`Camera.getPhoto({ resultType: Base64, source: Prompt, quality: 80 })` at `capture-step.tsx:113`
+passes **no `width`/`height`**, so it returns the S25's full-resolution JPEG; base64 adds ~33% on top.
+The gallery path is equally unbounded — `handlePhoto` runs `FileReader` over the raw `File` with no
+resize. The server accepts up to **5 MB of base64** (`MAX_BASE64_BYTES`, `scan/route.ts:86`) under an
+8 MB body cap, so multi-megabyte uploads are not rejected, just slow.
+
+**The argument that makes a downscale free rather than a trade-off:** every image scan in the table
+above reports **~1,275 input tokens**, within a 1,275–1,298 band across a month of real photos.
+Gemini normalises an image to a fixed tile budget before the model sees it, so a 4 MB photo and a
+400 KB photo produce the same token count and the same model work. **Bytes above that budget buy no
+accuracy — they are pure upload latency.** That also explains the owner's phrasing: "taking the photo
+to getting the result" is dominated by a leg that nothing in the app times.
+
+**Field-name trap — verified against the pinned plugin source, not from memory** (per CLAUDE.md's
+external-field-names rule, and this one would fail silently):
+- The app calls `getPhoto(options: ImageOptions)`, and `ImageOptions` names the fields **`width`** and
+  **`height`**.
+- The sibling `takePhoto(options: TakePhotoOptions)` names them **`targetWidth`** / **`targetHeight`**.
+- Writing the wrong pair is accepted by TypeScript's optional fields and ignored at runtime — a
+  downscale that silently never happens, which looks exactly like "the fix did not help".
+- Noted separately: `getPhoto` carries `@deprecated` in this pinned version, pointing at
+  `takePhoto` / `chooseFromGallery`. Not urgent, but a migration would move which field names apply.
+
+**Reuse rather than invent:** the saved-meal thumbnail entry above already prescribes an on-device
+canvas downscale before upload, for the same reason on a different surface. Take that technique; the
+target size here is larger (the model still has to read a plate of food), so pick it from the token
+budget rather than copying 128 × 128.
+
+**🔴 The gap that stops this being closed from data, and should be fixed alongside it:** nothing
+times the client half. `ai_call_log.latency_ms` covers the model call only, so "photo → result" — the
+thing the owner actually reported — has **no measurement anywhere**. Log the base64 payload size and
+the client-side elapsed time as part of this work, or the next report of the same shape starts from
+zero again.
+
+**A second candidate that could not be tested from a sandbox session:** Railway container cold start.
+`/api/nutrition/scan` is a low-traffic route, and a first request after an idle period pays
+container spin-up ahead of everything above. Worth checking against deploy times before assuming
+payload size is the whole story.
+
+**⚠️ Why no commit is named.** This is reported as a regression, but this repository was cut fresh on
+2026-08-16 and holds **2 commits**, so `git log` cannot date the change. The archived private repo is
+where a bisect would have to happen. Treat "much slower than before" as the owner's direct
+observation — the latency table shows the AI call is flat, which narrows *where* it regressed without
+dating *when*.
+
+**What would confirm the diagnosis, in one pass:** log the payload bytes for a scan, then run the same
+photo through downscaled and full-resolution. If wall-clock tracks payload size while `latency_ms`
+stays near 4,200 ms, it is the upload. If wall-clock is flat and large regardless, look at cold start.
+
+**Done looks like:** a photo scan uploads a bounded payload sized to what the model actually consumes;
+the identification stays as accurate as it is today; and the client-side elapsed time is recorded
+somewhere, so the next "it feels slow" starts from a number.
+
 ### [workouts][app-shell] Q-362b — three day surfaces group workouts by NAME, and one of them shows the wrong session's heart rate
 
 - **Branch:** `fix/day-surfaces-session-identity`

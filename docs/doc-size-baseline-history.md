@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — BF-4, the photo-scan slowdown
+
+**`docs/implementation-backlog.md` 11381 → 11463.** An owner report that the nutrition photo scan got
+much slower, filed high in the queue rather than at the tail — it is a live regression on a
+daily-use flow, not a note for later.
+
+82 lines, and most of it is evidence that redirects the work rather than describing the symptom. The
+obvious diagnosis is the AI call, and production latency data refutes it: 18 image scans across a
+month average 4,168 ms, the *earliest* one is above that average, and the model never changed. An
+entry that only said "scan feels slow" would send an implementer straight at the prompt. The table is
+what stops that, so it stays in the entry rather than moving to a review doc nobody opens first.
+
+The rest is the field-name trap (`getPhoto` takes `width`/`height`, its sibling `takePhoto` takes
+`targetWidth`/`targetHeight`, and the wrong pair is silently ignored — a downscale that never
+happens, which reads as a fix that did not work), and the note that nothing times the client half at
+all, so the reported quantity has no measurement anywhere.
+
+---
+
 ## 2026-08-23 — BF-1's owner decision, and the public-repo hazard it exposes
 
 **`docs/implementation-backlog.md` 11350 → 11381.** The owner cleared BF-1's gate by choosing
