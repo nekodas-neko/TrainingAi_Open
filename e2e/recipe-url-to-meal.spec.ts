@@ -73,10 +73,13 @@ async function rowKcal(page: Page): Promise<number> {
 }
 
 test('a recipe link with no stated yield asks how many it serves before it can be kept', async ({ page }) => {
+  // Recorded here and asserted in the test body, never inside the handler. An `expect` that throws
+  // in a route handler skips `route.fulfill`, so the app's fetch fails, the row falls back to its
+  // "could not resolve" state — and the failure surfaces several assertions later as something else
+  // entirely. That is exactly how this spec failed on CI while passing locally.
+  let sent: { url?: string; text?: string } | null = null
   await page.route('**/api/nutrition/scan', async route => {
-    const body = route.request().postDataJSON() as { url?: string }
-    // Proves the picker sent the URL as a `url`, not as free text — the whole point of the mode.
-    expect(body.url, 'a recipe link must be sent as `url`').toBe(RECIPE_URL)
+    try { sent = route.request().postDataJSON() } catch { sent = null }
     await route.fulfill({ json: { ...WHOLE_RECIPE, calories: WHOLE_RECIPE_KCAL } })
   })
 
@@ -97,8 +100,17 @@ test('a recipe link with no stated yield asks how many it serves before it can b
   await input.press('Enter')
 
   // Attribution, and the ask. Neither is optional: the numbers on screen are the whole loaf.
-  await expect(dialog.getByText('example.com')).toBeVisible({ timeout: 20_000 })
+  //
+  // `.last()` because the host can legitimately appear twice — the row falls back to it as a name
+  // until the recipe's own name arrives, so a bare text match is a strict-mode violation waiting on
+  // a slow response rather than a real assertion.
+  await expect(dialog.getByText('example.com').last()).toBeVisible({ timeout: 20_000 })
   await expect(dialog.getByText(/How many does it serve\?/)).toBeVisible()
+
+  // The whole point of the mode: a link goes out as `url`, not as free text.
+  expect(sent, 'the picker must have called the scan route').not.toBeNull()
+  expect(sent!.url, 'a recipe link must be sent as `url`').toBe(RECIPE_URL)
+  expect(sent!.text, 'and not as free text').toBeUndefined()
   const whole = await rowKcal(page)
   expect(whole, 'the row shows the whole recipe until the question is answered').toBeGreaterThan(1500)
 
