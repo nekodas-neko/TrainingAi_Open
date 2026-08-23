@@ -4917,9 +4917,20 @@ session working from a temporarily restored copy.
   making it high-cardinality and awkward to group. Consider a separate `subject_id` column if this
   is touched anyway — not worth its own PR.
 
-### [platform] Q-287 — there is no self-service account deletion, and the Play Store requires one
+### [platform] Q-287 — self-service account deletion: hard delete, 14-day grace, one decision left
 
 - **Gate:** owner
+- **⚑ TWO OF FIVE PLAN DECISIONS ANSWERED 2026-08-23 — read before the plan below, which predates
+  them.**
+  1. **Hard delete, not a tombstone.** Google Play's requirement is that deletion actually removes
+     the data; a hidden-but-retained account does not satisfy it, and `oura_raw_samples` alone is
+     over a million rows for one user — a tombstone means carrying that weight forever for an
+     account nobody is coming back to.
+  2. **A 14-day grace period.** The deletion is scheduled, not immediate, and reversible until it
+     runs — so a mis-tap or a change of mind is not terminal. This is the plan's item 4
+     ("confirmation UX and a grace period") and is now settled.
+  **What is still open is item 5 below — the owner's own account, which is the sharpest case here
+  because it is currently the only admin.**
 
 - **Branch:** `feat/account-deletion`
 - **Plan:** **required before any code** — this is destructive and irreversible
