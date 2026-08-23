@@ -25,7 +25,7 @@ import { computeReadinessComposite } from '@trainingai/shared/health/readiness-c
 import { buildDaytimeStressSeriesFromModel, type DhrvBaselines } from '@/lib/health/daytime-stress'
 import { computeResilienceForDay, type DailyIndices } from '@/lib/health/stress-resilience'
 import type { SleepSession } from '@trainingai/shared/types'
-import { sourceRank } from '@/lib/data/health-source'
+import { sourceRank } from '@trainingai/shared/health/source-rank'
 import { aestMidnight, toAestDay, secondsSinceLocalMidnight } from '@trainingai/shared/date-utils'
 import type { RollupIO } from './io'
 
