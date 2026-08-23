@@ -1528,7 +1528,7 @@ queue entry is for.
 
 Both numbers were re-measured on the merged tree rather than spliced from the conflict hunks — the
 backlog baseline moved under this branch while it was open.
-## 2026-08-23 — `docs/implementation-backlog.md` 11390 → 11405
+## 2026-08-23 — `docs/implementation-backlog.md` 11417 → 11432
 
 Fifteen lines of `Lane:` / `Gate:` / `Needs:` fields on Q-499, Q-549, Q-551 and Q-547 — four entries
 that sat at the head of the Lane A queue offering work no Lane A implementer could do, each of them
