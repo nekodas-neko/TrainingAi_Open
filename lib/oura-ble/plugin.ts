@@ -53,6 +53,9 @@ export interface OuraBlePlugin {
   setKey(opts: { hex: string }): Promise<void>
   hasKey(): Promise<{ hasKey: boolean }>
   clearKey(): Promise<void>
+  /** The stored ring key, so it can be backed up (Q-537). Rejects with `no key stored` when
+   *  there is none, and on any APK built before this method existed — callers must catch. */
+  revealKey(): Promise<{ hex: string }>
   ensurePermissions(): Promise<{ granted: boolean }>
   startService(): Promise<void>
   stopService(): Promise<void>

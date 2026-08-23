@@ -106,8 +106,20 @@ class OuraProtocolTest {
     @Test fun enableMeasurementSetsHrSpo2AndStepsAutomatic() {
         // set_feature_mode(DAYTIME_HR|SPO2|REAL_STEPS, AUTOMATIC) = 2f 03 22 <feat> 01.
         // REAL_STEPS (0x0b) is what makes the ring emit the 0x7e/0x7f step events.
-        assertEquals(listOf("2f03220201", "2f03220401", "2f03220b01"),
+        assertEquals(listOf("2f03220201", "2f03220401", "2f03220b01", "2f03220301", "16010100"),
             OuraProtocol.enableMeasurementSequence().map { hex(it) })
+    }
+
+    @Test fun enableMeasurementUndoesTheLiveHrLevers() {
+        // Q-388: a live-HR session that never reaches liveHrStopSequence() leaves EXERCISE_HR in
+        // CONNECTED_LIVE and BLE fast-HR mode on, permanently — the ring keeps that state across
+        // reconnects and service restarts. Connect is the only path guaranteed to run, so the two
+        // resets have to be here. Asserted as "the connect sequence contains the stop sequence's
+        // resets" rather than as literal hex, so it still holds if either builder's bytes change.
+        val connect = OuraProtocol.enableMeasurementSequence().map { hex(it) }
+        assertTrue(connect.contains(hex(OuraProtocol.reqSetFeatureMode(
+            OuraProtocol.FeatureId.EXERCISE_HR, OuraProtocol.FeatureMode.AUTOMATIC))))
+        assertTrue(connect.contains(hex(OuraProtocol.reqBleFastHrMode(false))))
     }
 
     @Test fun enableRealStepsMatchesRustBuilder() {

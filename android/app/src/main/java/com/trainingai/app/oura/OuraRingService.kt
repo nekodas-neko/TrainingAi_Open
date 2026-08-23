@@ -3,6 +3,7 @@ package com.trainingai.app.oura
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
 import android.content.pm.ServiceInfo
@@ -13,6 +14,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.webkit.CookieManager
 import com.trainingai.app.DeviceBatteryNotifier
+import com.trainingai.app.MainActivity
 import com.trainingai.app.R
 import org.json.JSONArray
 import org.json.JSONObject
@@ -48,6 +50,8 @@ class OuraRingService : Service(), OuraGattClient.Listener {
         private const val CHANNEL_ID = "oura-ble-v2"
         private const val LEGACY_CHANNEL_ID = "oura-ble"
         private const val LOW_BATTERY_CHANNEL_ID = "oura-ble-low-battery"
+        private const val DRAIN_DONE_CHANNEL_ID = "oura-ble-drain-done"
+        private const val DRAIN_DONE_NOTIF_ID = 2003
         private const val LOW_BATTERY_NOTIF_ID = 2011
         // Runaway guard for the auto-loop drain: a full backlog is thousands of
         // events (255/batch), but a firmware that never reports bytesLeft==0 would
@@ -98,6 +102,7 @@ class OuraRingService : Service(), OuraGattClient.Listener {
     private var maxHistoryTsSeen = 0L
     private var draining = false
     private var drainBatches = 0
+    private var drainFullResync = false   // notify on completion only for a full re-sync (Q-533)
     private var drainCursor = 0L
     private val drainFrames = ArrayList<String>() // hex frames of the in-flight batch
     // @Volatile: set on the ingest thread the instant a batch fails to commit locally, read on
@@ -220,6 +225,42 @@ class OuraRingService : Service(), OuraGattClient.Listener {
                 "Oura Ring", percent, R.drawable.ic_stat_dumbbell,
             )
         }
+    }
+
+    /** A full re-sync is thousands of events at 255 per batch and takes long enough that the
+     *  owner puts the phone down. It ran unattended already — the service drains, POSTs and
+     *  commits with no screen involved — but the only report of the *ending* was a log line in
+     *  the admin console, so the only way to learn it had finished was to watch it (Q-533).
+     *
+     *  Runs on the ingest executor, after the last batch of this drain has committed. */
+    private fun notifyDrainComplete(batches: Int, ingestFailed: Boolean) {
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            nm.createNotificationChannel(NotificationChannel(
+                DRAIN_DONE_CHANNEL_ID, "Ring re-sync", NotificationManager.IMPORTANCE_DEFAULT))
+        }
+        val tap = PendingIntent.getActivity(
+            this, DRAIN_DONE_NOTIF_ID,
+            Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        // Says which of the two outcomes it was. "Finished" alone would read as success on a
+        // drain whose batches failed to commit, and the whole point of the notification is that
+        // nobody was watching the log that would have said otherwise.
+        val text = if (ingestFailed) {
+            "$batches batches pulled, but some did not save — the ring still holds them and they re-sync."
+        } else {
+            "$batches batches pulled and saved."
+        }
+        nm.notify(DRAIN_DONE_NOTIF_ID, Notification.Builder(this, DRAIN_DONE_CHANNEL_ID)
+            .setContentTitle(if (ingestFailed) "Ring re-sync finished with errors" else "Ring re-sync complete")
+            .setContentText(text)
+            .setStyle(Notification.BigTextStyle().bigText(text))
+            .setSmallIcon(R.drawable.ic_stat_dumbbell)
+            .setContentIntent(tap)
+            .setAutoCancel(true)
+            .build())
+        log("drain-complete notification posted: batches=$batches ingestFailed=$ingestFailed")
     }
 
     private fun attemptConnection() {
@@ -399,6 +440,16 @@ class OuraRingService : Service(), OuraGattClient.Listener {
             lastDrainCompletedAt = SystemClock.elapsedRealtime()
             log("drain complete: batches=$drainBatches bytesLeft=${done.bytesLeft} (uploads may still be finishing)")
             emitStatus(force = true)
+            if (drainFullResync) {
+                // Queued on the ingest executor rather than fired here. That executor is
+                // single-threaded and in order, so this task runs only after every batch this
+                // drain queued has finished committing — which is what makes "uploads settled"
+                // a fact rather than a guess. Firing at the end of the BLE loop instead would
+                // announce completion while batches were still writing, and the log line right
+                // above says exactly why that is wrong.
+                val batches = drainBatches
+                ingest.execute { notifyDrainComplete(batches, drainIngestFailed) }
+            }
         }
     }
 
@@ -632,6 +683,7 @@ class OuraRingService : Service(), OuraGattClient.Listener {
         runOnMain {
             if (draining) { log("drain already in progress (batches=$drainBatches)"); return@runOnMain }
             draining = true
+            drainFullResync = fromZero
             drainBatches = 0
             maxHistoryTsSeen = 0
             drainFrames.clear()

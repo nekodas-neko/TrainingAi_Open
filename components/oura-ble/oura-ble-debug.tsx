@@ -82,6 +82,11 @@ export function OuraBleDebug() {
   const [availability, setAvailability] = useState<Availability>('checking')
   const [hasKey, setHasKey] = useState(false)
   const [keyInput, setKeyInput] = useState('')
+  // The revealed key, held only while the section is open. Never persisted, never seeded from
+  // cache, and cleared on hide — a credential that survives a re-render is one more copy to lose
+  // track of, and the point of this affordance is to make the copy the owner keeps deliberate.
+  const [revealedKey, setRevealedKey] = useState<string | null>(null)
+  const [keyCopied, setKeyCopied] = useState(false)
   const [status, setStatus] = useState<OuraBleStatus | null>(null)
   const [lines, setLines] = useState<string[]>([])
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({})
@@ -213,6 +218,35 @@ export function OuraBleDebug() {
       setLines((prev) => [...prev, `ui error: ${err instanceof Error ? err.message : String(err)}`])
     }
   }, [])
+
+  const revealKey = useCallback(() => withPlugin(async (p) => {
+    // An APK built before `revealKey` existed rejects with a Capacitor "not implemented" error
+    // rather than something recognisable, so the message says what to do about it. This console
+    // is the one screen where an older APK is a plausible thing to be holding.
+    try {
+      setRevealedKey((await p.revealKey()).hex)
+      setKeyCopied(false)
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err)
+      setLines((prev) => [...prev, msg.includes('no key stored')
+        ? 'reveal key: no key stored on this device'
+        : `reveal key: unavailable (${msg}) — this needs an APK built after 2026-08-23`])
+    }
+  }), [withPlugin])
+
+  const copyKey = useCallback(async () => {
+    if (!revealedKey) return
+    try {
+      await navigator.clipboard.writeText(revealedKey)
+      setKeyCopied(true)
+    } catch {
+      // Clipboard can be refused outright in a WebView; the key is on screen either way, which
+      // is what actually makes the backup possible.
+      setLines((prev) => [...prev, 'copy key: clipboard refused — select the text above instead'])
+    }
+  }, [revealedKey])
+
+  const hideKey = useCallback(() => { setRevealedKey(null); setKeyCopied(false) }, [])
 
   const syncNow = useCallback(() => withPlugin(async (p) => {
     if ((status?.state ?? 'stopped') === 'stopped') {
@@ -406,10 +440,10 @@ export function OuraBleDebug() {
 
   return (
     <div className="space-y-4">
-      {/* Key setup — only shown until a key is stored */}
-      {!hasKey && (
-        <section className="space-y-2 rounded-md border border-border p-4">
-          <h2 className="flex items-center gap-2 text-sm font-medium"><KeyRound className="h-4 w-4" /> Ring key</h2>
+      {/* Key setup — entry until a key is stored, backup once it is */}
+      <section className="space-y-2 rounded-md border border-border p-4">
+        <h2 className="flex items-center gap-2 text-sm font-medium"><KeyRound className="h-4 w-4" /> Ring key</h2>
+        {!hasKey ? (
           <div className="flex gap-2">
             <input
               value={keyInput}
@@ -419,8 +453,28 @@ export function OuraBleDebug() {
             />
             <Button size="sm" onClick={() => withPlugin(async (p) => { await p.setKey({ hex: keyInput }); setKeyInput(''); setHasKey(true) })}>Save</Button>
           </div>
-        </section>
-      )}
+        ) : (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground">
+              This key exists only on this phone. Uninstalling the app destroys it, and the ring
+              becomes unreachable — recovering it through the official Oura app re-keys the ring and
+              risks a firmware update that breaks this integration. Copy it somewhere durable before
+              any uninstall or device change.
+            </p>
+            {revealedKey === null ? (
+              <Button size="sm" variant="outline" onClick={revealKey}>Show key for backup</Button>
+            ) : (
+              <div className="space-y-2">
+                <p className="break-all rounded-md border border-border bg-muted/40 px-3 py-2 font-mono text-xs">{revealedKey}</p>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="outline" onClick={copyKey}>{keyCopied ? 'Copied' : 'Copy'}</Button>
+                  <Button size="sm" variant="ghost" onClick={hideKey}>Hide</Button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
 
       {/* Connection status + primary actions */}
       <section className="space-y-3 rounded-md border border-border p-4">
