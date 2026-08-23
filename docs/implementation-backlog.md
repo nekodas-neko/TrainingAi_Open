@@ -3404,91 +3404,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Q-541's *"skip it, a packed blob is already bytea"* is clearly the right call rather than a
   close one.
 - Needs `VACUUM FULL` to reclaim (ops-doc I17).
-
-
-### [devices][platform] Q-541 — repack raw frames: ~20× smaller, byte-for-byte lossless
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
-  — full implementation plan, written 2026-08-17. Decision context in
-  [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
-- **Branch:** `perf/oura-two-tier-frame-reader` (Tasks 0–2 landed on `perf/oura-raw-frame-packing`)
-- **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
-- **Added:** 2026-08-17
-- **Lane:** A
-- ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
-  archival rule does not consider, and the only one that makes the growth curve sustainable without
-  deleting anything or depending on the phone.
-- **It is load-bearing, not polish.** Against the stock 500 MB target: `VACUUM FULL` alone re-crosses
-  500 MB in ~5 days, A+B in ~7 weeks, **C in ~3 years** (~0.37 MB/day vs ~7.5 today). C is the only
-  step that makes 500 MB a home rather than somewhere the database passes through.
-- **It also deletes the failure mode behind the Q-534 outage.** A packed table holds ~30 rows/day
-  instead of 22,910, and `measured_at` stops being a stored per-frame column — it is derived at decode
-  time from the anchor — so a clock correction re-stamps nothing at all.
-- **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
-  the standalone `text` → `bytea` migration rather than doing the work twice.
-- 🚧 **Task 4 SHIPPED 2026-08-18 — the packer.** `lib/data/postgres/slices/oura-raw-pack.ts` +
-  `GET|POST /api/oura-ble/samples/pack`, admin-gated, bounded, idempotent, resumable, never automatic.
-  **This is the first code in the project that deletes an archival frame**, and it does so only after
-  re-reading the committed blob and proving the frames equal; a refusal is returned per bucket rather
-  than thrown. Four decisions the plan left open are settled in it: the hot window anchors to
-  `max(ring_timestamp_ds)` not `now()`; a wall-clock quiet guard (`max(recorded_at) < now() - 1 day`)
-  sits on top, because ds says when the ring recorded a frame and not when we received it; and
-  `body_sha256` hashes the frame *sequence*, not the blob, so it is an independent check rather than a
-  restatement of the re-read. Verified live: 251 seeded frames → **2,800 bytes of blob (≈29×)**, and
-  the API's full dump hashes identically before and after. ⚠️ **No button yet — Q-316, Lane B.**
-- 🚧 **Task 3 SHIPPED 2026-08-18 (v1.318.12) — the two-tier reader.**
-  `lib/data/postgres/slices/oura-raw-frames.ts`: `readRawFrames` (ds range + tags, ascending) and
-  `readRecentRawFrames` (newest-first, limited), returning **exactly the shape of the `select` they
-  replace**. Eleven read sites converted — the rollup, both step-feature reads, the temp/MET and
-  battery range reads, the two tag censuses, the admin raw dump and the summary. Still inert in
-  production: nothing writes a blob yet.
-  Three findings worth not re-deriving: **(a)** an aggregate cannot use the reader's identity dedupe,
-  and the summary's per-tag counts double-counted a bucket sitting in both tiers — 80 frames read as
-  120 on the dev server — so they now anti-join on `(epoch, tag, ds_bucket)`; **(b)** `event_name` had
-  to become derived from `tag`, because a packed frame carries none and grouping on a column one tier
-  lacks splits a tag into two rows; **(c)** a tag dormant longer than the hot window needs a cold
-  fallback in three places or it reads as never having produced data.
-  Verified on `pnpm dev` by rehearsing the packer by hand over four seeded ring-days: every read is
-  byte-identical across all-hot, both-tiers and hot-rows-deleted.
-- 🚧 **Tasks 0–2 SHIPPED 2026-08-17 (v1.318.11), additively.** Task 0 answered structurally rather
-  than by counting — `epoch` is **not** in the dedup unique constraint, so a cross-epoch duplicate
-  was never insertable, and the count the plan proposed now returns "none" for the wrong reason
-  because migration 190 merged the epochs. Migration **191** creates `oura_raw_packed`; **192**
-  regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
-  with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
-  row has moved** — `oura_raw_samples` and the ingest path are untouched.
-  **Remaining: Tasks 5–7** — the backfill (run the packer over all history in bounded batches, then
-  `VACUUM FULL` **after**, not during), the hot-window prune, and the `measured_at` range-query sweep.
-  The plan's gate still stands: a verified backfill on a copy of production before the real one.
-- ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
-  plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
-  and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
-  failure mode; **(b)** every reader becomes "cold blobs ∪ hot rows", which is one shared helper rather
-  than a per-call-site rewrite, because nearly every read is already the same
-  `user_id + tag IN (…) + ds BETWEEN` shape; **(c)** the migration adds a table and moves data with a
-  packer that only deletes a hot row after re-reading its blob and proving the frames equal.
-- **Measured shape (production 2026-08-17):** **968 blobs replace 1,098,956 rows — 1,135×.** 22.5
-  blobs/day, mean 1,135 frames each, 13 MB of raw payload for all history. Projected steady state
-  **~70 MB** (hot 7 days ~52 MB + cold ~16–20 MB) growing ~117 MB/year, against ~7.5 MB/day today.
-- **The bucket key is `(user_id, epoch, tag, ring_timestamp_ds/864000)` — NOT a calendar day.** Wall
-  time is derived through anchors and that derivation changes (Q-71/I25), so a calendar-day partition
-  would need re-partitioning on every clock fix, reintroducing exactly the failure this removes.
-  `epoch` is load-bearing and the data proves it: the four epochs' ds ranges overlap heavily.
-- **Task 0 first** — check whether any rows share `(user_id, ring_timestamp_ds, tag, body_hex)` across
-  different epochs. The existing unique constraint omits `epoch`; given the overlap that is worth
-  ruling out before relying on the key. Cheap, and it could change the design.
-- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
-  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
-  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
-  difference is representation, not information.
-- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
-  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
-  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
-  50 MB.
-- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
-  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
-  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
-
+- **✅ Q-541 is COMPLETE as of 2026-08-23, so the conditional above is resolved: skip the `bytea`
+  half.** The packer now runs automatically from the ingest path, so every sealed bucket leaves
+  `oura_raw_samples` on its own and the rows a `text` → `bytea` migration would rewrite are the
+  ~7 days of hot tier that is about to be packed anyway. **What is left of this entry is the
+  `event_name` drop alone**, and that is a data-dropping migration: it needs the owner's yes before
+  it merges, even though the column is derivable from `tag` and no reader has touched it since
+  Q-541 Task 7.
 
 ### [devices][platform] Q-542 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
 

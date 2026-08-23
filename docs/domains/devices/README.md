@@ -106,9 +106,13 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
   **Tasks 0–3 have shipped** (v1.318.11 / v1.318.12): migrations 191–192, the codec
   `lib/oura-ble/frame-pack.ts`, and the two-tier reader
   `lib/data/postgres/slices/oura-raw-frames.ts` — which every raw-frame read now goes through,
-  because a hot-only read silently returns a 7-day history and looks like data loss. Still inert in
-  production: nothing writes a blob. Tasks 4–7 (packer, backfill, prune, `measured_at` sweep) remain,
-  and the packer's delete is the only destructive statement in the plan.
+  because a hot-only read silently returns a 7-day history and looks like data loss.
+  **✅ COMPLETE 2026-08-23.** The backfill ran in production on 2026-08-18 and verified clean — 764
+  blobs hold 941,233 frames in 13 MB, contiguous with the hot tier — and the packer now runs
+  automatically from the ingest path rather than on an admin button, throttled per user, with the
+  delete scoped to the row ids it verified.
+  ([`journal`](../../overview/entries/2026-08-23-feat-oura-autopack.md), ops-doc **I28**.) The
+  92 MB high-water mark does not come back without a `VACUUM FULL` — that is Q-315, still owner-gated.
 
 - [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](../../superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md)
   — **where the 464 MB actually is, and what each way of shrinking it forecloses (2026-08-17).** The
