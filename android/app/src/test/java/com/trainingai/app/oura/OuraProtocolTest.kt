@@ -106,7 +106,10 @@ class OuraProtocolTest {
     @Test fun enableMeasurementSetsHrSpo2AndStepsAutomatic() {
         // set_feature_mode(DAYTIME_HR|SPO2|REAL_STEPS, AUTOMATIC) = 2f 03 22 <feat> 01.
         // REAL_STEPS (0x0b) is what makes the ring emit the 0x7e/0x7f step events.
-        assertEquals(listOf("2f03220201", "2f03220401", "2f03220b01", "2f03220301", "16010100"),
+        // The last two are Q-388's resets: EXERCISE_HR (0x03) → AUTOMATIC, then BLE fast-HR
+        // mode off (`16 01 00`, three bytes — not four; the literal here was wrong on the first
+        // push and CI caught it, which is why the case below asserts against the builders).
+        assertEquals(listOf("2f03220201", "2f03220401", "2f03220b01", "2f03220301", "160100"),
             OuraProtocol.enableMeasurementSequence().map { hex(it) })
     }
 
