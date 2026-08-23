@@ -339,11 +339,12 @@ without a queue entry is a dropped finding.*
 the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
 **412** (its `Now` section alone is 200), Tuning **562**, Review **1,280**.
 
-**Re-measured 2026-08-20 — three of six are done, and each fell at its own role's handoff, which is
-what the entry predicted.** Orchestrator **62**, Lane A **113**, Lane B **134** (412 → 134 at the
-seventh Lane B handoff; its baseline is ratcheted down to lock the reclaim in). Still over: BugFix
-**161**, Review **170**, Tuning **582**. Tuning is the one that will not fall out of a routine
-handoff — it is 4× the target and needs its narrative moved to a dated handoff doc deliberately.
+**Re-measured 2026-08-23 — three of six, and each fell at its own role's handoff, which is what this
+entry predicted.** Lane B **96** (412 → 134 → 96 across two consecutive handoffs, baseline ratcheted
+down each time), Orchestrator **61**, Lane A **149**. Just over: BugFix **160**, Review **169** —
+both within a rewrite's reach. **Tuning 581 is the outlier** at nearly 4× the target and will not
+come down as a side effect of a routine handoff; its narrative needs moving to a dated handoff doc
+deliberately, which is the one piece of this entry that is real work rather than a by-product.
 
 This matters more than tidiness. With the lane path lists replaced by a rule, a baton's **Claimed
 paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
@@ -430,13 +431,61 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and it is not the AI call
+### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 
 - Lane: B — the fix is `components/nutrition/capture-step.tsx`; the payload instrumentation below is Lane A
 
 **Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
 than it used to be; can we investigate why - from taking the photo to getting the result is much
 longer than before."*
+
+**🔁 AMENDED 2026-08-23, after the pre-cut history became available.** The owner pointed at the
+archived repo (`nekodas-neko/TrainingAI_Old`, 3,225 commits). It **corrects two claims below** — read
+this before the original analysis, which is kept so the reasoning is auditable rather than quietly
+rewritten.
+
+**Correction 1 — the measurement window is far narrower than it looked.** AI instrumentation landed
+in **#741 on 2026-07-22**; the earliest `ai_call_log` row is 2026-07-26. So "the AI call has always
+been ~4.2 s" is only true **since 2026-07-22**, and *nothing measured it before that*. The original
+wording ("NOT the regression, and that is measured") overstated what the data can support. If the
+owner's "used to be" predates late July, `ai_call_log` structurally cannot see it.
+
+**Correction 2 — the unbounded image payload is NOT the regression.** It is real and still worth
+fixing, but it cannot be what changed: `Camera.getPhoto({ resultType: Base64, source: Prompt,
+quality: 80 })` is **byte-identical since 2026-06-12**, never carried `width`/`height`, and
+`@capacitor/camera` is pinned at exactly **8.2.0 with an unchanged integrity hash** for the whole
+history. Demoted from "prime suspect" to a standing inefficiency — worth taking, but it will not
+explain a slowdown on its own.
+
+**✅ The one dated change to the scan's AI call: #112, `3219a475`, 2026-07-03** — *"AI usage batch:
+structured output, response caching, chat tools, prompt hygiene, stream robustness"*. It rewrote the
+route from **`generateText` + `JSON.parse(cleaned)`** to **`generateObject` + the Zod `ScanSchema`**,
+and added the one-shot retry (`lib/ai/retry.ts`) in the same PR. That is **19 days before
+instrumentation existed**, which is exactly why the latency table cannot see it.
+
+**This is a plausible mechanism, not a proven one, and the fix is not a revert.** `generateObject`
+constrains decoding to a schema; the schema here is not trivial (10 fields plus a nested
+`ingredients` array of 6 fields each). CLAUDE.md *requires* structured output — "never `JSON.parse` of
+free text" — so restoring the old path is not on the table. What is on the table: check which
+structured-output strategy the SDK uses for Google here, and whether a flatter schema or an explicit
+`maxOutputTokens` shortens it. There is currently **no `maxOutputTokens`, no `temperature` and no
+thinking/provider config anywhere on this call** — every one is an SDK default.
+
+**Retries are visible in the data and are not firing.** `withAiLogging` captures `started` **before**
+`withAiRetry` (`lib/ai/instrument.ts:102–105`), so `latency_ms` includes a retry *and* its 1–1.5 s
+backoff in a single row. One retry would produce roughly 9.7 s; the observed maximum is **5,013 ms**,
+so no logged scan retried. Ruled out.
+
+**Everything else that could have changed, checked and unchanged:** model (`gemini-3.1-flash-lite`
+throughout), `ScanSchema` (byte-identical since #112), `@ai-sdk/google@2.0.74` / `ai@5.0.192` (last
+moved 2026-05-23), and the route's later commits — #741 added observability, #1298 (2026-08-13) only
+surfaced failures that were previously swallowed.
+
+**How to reach the history, since this is the second entry to need it:** the archived repo is
+attachable in-session via `add_repo` (`nekodas-neko/TrainingAI_Old`), then
+`git fetch --unshallow` — a `--depth 1` clone cannot answer a "when did this change" question.
+
+---
 
 **⚠️ Read this first: the model call is NOT the regression, and that is measured, not assumed.**
 `ai_call_log` records `latency_ms` per call, so the AI half is directly observable. All 30
@@ -448,8 +497,9 @@ longer than before."*
 | text (~215 input tokens) | 12 | 1,667 ms | 1,319 | 2,135 | 2026-07-26 → 08-20 |
 
 **The earliest image scan on record (2026-07-26) took 4,545 ms — above the 18-call average.** The
-model is `gemini-3.1-flash-lite` on every row from July to now, so it did not change either. Whatever
-got slower is on the other side of that number. Do not start by tuning the prompt or the model.
+model is `gemini-3.1-flash-lite` on every row, so it did not change either. **⚠️ Per Correction 1
+above, this window opens on 2026-07-22 and says nothing before it** — it shows the AI call is stable
+*now*, not that it always was.
 
 **Also ruled out by reading the path, all cheap or absent:**
 - `rateLimit` is an in-memory `Map` (`lib/rate-limit.ts:97`) — no I/O on the request path.
@@ -458,7 +508,7 @@ got slower is on the other side of that number. Do not start by tuning the promp
 - Nothing happens after the response. `handleScanResult`
   (`components/nutrition/food-logger-sheet.tsx:115`) is pure synchronous state, then `pushStep`.
 
-**Prime suspect: the image payload is unbounded, and the upload is the only unmeasured leg.**
+**Standing inefficiency (demoted from prime suspect by Correction 2 — worth fixing, not the regression): the image payload is unbounded.**
 `Camera.getPhoto({ resultType: Base64, source: Prompt, quality: 80 })` at `capture-step.tsx:113`
 passes **no `width`/`height`**, so it returns the S25's full-resolution JPEG; base64 adds ~33% on top.
 The gallery path is equally unbounded — `handlePhoto` runs `FileReader` over the raw `File` with no
@@ -498,15 +548,15 @@ zero again.
 container spin-up ahead of everything above. Worth checking against deploy times before assuming
 payload size is the whole story.
 
-**⚠️ Why no commit is named.** This is reported as a regression, but this repository was cut fresh on
-2026-08-16 and holds **2 commits**, so `git log` cannot date the change. The archived private repo is
-where a bisect would have to happen. Treat "much slower than before" as the owner's direct
-observation — the latency table shows the AI call is flat, which narrows *where* it regressed without
-dating *when*.
+**✅ The commit is now named** — see the amendment at the top. The earlier version of this entry said
+none could be, because the public repo holds a fresh history; the archived repo answers it.
 
-**What would confirm the diagnosis, in one pass:** log the payload bytes for a scan, then run the same
-photo through downscaled and full-resolution. If wall-clock tracks payload size while `latency_ms`
-stays near 4,200 ms, it is the upload. If wall-clock is flat and large regardless, look at cold start.
+**What would confirm it, in one pass — run the same photo three ways and compare.** (a) Current
+`generateObject` path. (b) The same call with a flattened schema, or an explicit `maxOutputTokens`.
+(c) Downscaled versus full-resolution upload, with the payload bytes logged. If (b) moves the number,
+#112 is the regression and the schema is the lever. If only (c) moves it, the upload dominates after
+all. If neither moves and wall-clock stays high, look at Railway cold start on this low-traffic
+route — the one candidate that could not be tested from a sandbox session.
 
 **Done looks like:** a photo scan uploads a bounded payload sized to what the model actually consumes;
 the identification stays as accurate as it is today; and the client-side elapsed time is recorded
@@ -3459,6 +3509,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
 
+- **Lane:** A
+- **Batch:** `ring-service-device-pass`
+- **This entry is why the batch is worth assembling, and it should be in the first native APK that
+  ships either way.** It is the mitigation for the hazard that makes APK delivery expensive in the
+  first place: an install that cannot upgrade in place forces an uninstall, and an uninstall
+  destroys the only copy of the ring key. Batching two more `android/…/oura/` changes onto that APK
+  is free; shipping the key backup late is not.
+
 - **Branch:** `feat/ring-key-export`
 - **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
 - **What it is.** The 32-hex ring key exists only in Android SharedPreferences
@@ -3967,6 +4025,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][app-shell] Q-533 — the drain runs unattended but only reports completion to a screen nobody should have to watch
 
+- **Lane:** A
+- **Batch:** `ring-service-device-pass`
+
 - **Branch:** `feat/drain-complete-notification`
 - **Added:** 2026-08-17, owner report during a full re-sync: *"this is very lengthy. We shouldn't do
   any testing that involves this ever again unless it can do it silently in the background."*
@@ -4055,6 +4116,23 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   log-set → complete-workout is the follow-on this unblocks.
 
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
+
+- **Lane:** A
+- **Batch:** `ring-service-device-pass`
+- **What the batch covers, and what it does not.** The batch exists so three `android/…/oura/`
+  changes cost **one** APK and one ring sitting instead of three. This entry contributes its two
+  do-regardless items — **(2)** resetting `EXERCISE_HR` and fast-HR mode in the connect-time
+  sequence, and **(3)** persisting the battery poll. **This entry alone survives the batch**, and
+  deliberately: its SpO₂ question is a decision waiting on the A/B that (3) makes measurable at
+  all. Shipping (3) in a PR that is already building an APK is the difference between measuring
+  the drain next week and paying another cycle for a five-line change.
+- **⚑ This is the same investigation as Q-116, filed 11 days earlier, and neither entry knew.**
+  Q-116 (2026-08-06) reports a live HR reading on the Health tab with nobody having tapped
+  *Measure now*, and suspects it explains ~15%/night of drain; this entry (2026-08-17) reports
+  ~20% overnight. **The "separate latent defect" traced above is Q-116's own leak vector**: a
+  live-HR session that never reaches `stopLiveHr()` leaves fast-HR sampling on permanently, healed
+  by no reconnect or restart. Item (2) closes that vector outright, and item (3) is the
+  observability Q-116 needs before its ~15% claim can be tested at all.
 
 - **Branch:** `fix/ring-measurement-power-budget`
 - **Added:** 2026-08-17 · owner: *"the battery life drains too fast. Stock it lasts 7 days; but with
@@ -5262,6 +5340,10 @@ session working from a temporarily restored copy.
 - **Do not "fix" this by widening the model.** A flat signal made wider is still flat.
 
 ### [platform][devices] Q-285 — the web-push stack has no senders and no subscribers
+
+- **Re-measured 2026-08-23: `claude_ro.push_subscriptions` still holds 0 rows**, eight days on.
+  Nothing has subscribed in the interval, so the decision below is unchanged by waiting — which is
+  itself weak evidence for (b) or (c) over (a).
 
 - **Branch:** `chore/decide-web-push`
 - **Plan:** none needed — this is a decision, then a small change either way
@@ -8924,6 +9006,12 @@ per-field merge where an AI write has no honest source rank to claim.
 
 ### [activity][readiness][heart-rate] Q-204 — the HR-derived load lane (Q-137 direction B), gates now measured
 
+- **Needs:** Q-270
+- **Gate 1's failure is Q-270, and it has not moved.** The `training_load_ots` count read "0 of 42
+  days" when this was filed; **re-measured 2026-08-20 it is 0 of 96**, and Q-270 has since been
+  reopened 🔴 because the 2026-08-15 fix that was supposed to start populating it did not take.
+  Recorded as `Needs:` rather than prose so this entry parks instead of reading as startable.
+
 - **Branch:** `feat/activity-hr-load-lane`
 - **Added:** 2026-08-11 · was Q-137 direction B, held as *gated, not queued* until its two questions
   were answered. Both now are — see
@@ -9048,6 +9136,13 @@ per-field merge where an AI write has no honest source rank to claim.
   none of it.
 
 ### [devices][activity] Q-184 — `active_calories_est` is plumbed end-to-end and never written
+
+- **Needs:** Q-204
+- **The hold recommended below is now a field rather than prose.** This entry said *"hold Q-184
+  behind Q-270 and Q-204"* in a paragraph, so `next-item.js` listed it READY and an implementer
+  had to read to the bottom to learn it was not. **Re-measured 2026-08-20: `active_calories_est`
+  is populated on 0 of 96 days** — the "0 of 42" below is the count as filed, and 54 further days
+  have changed nothing.
 
 - **Branch:** `feat/ble-active-energy-estimate`
 - **Added:** 2026-08-11 · found while investigating Q-137
@@ -9236,6 +9331,21 @@ first, so the output is a design discussion, not a patch:
 
 ### [heart-rate][devices] Q-116 — Health tab's "Live HR" shows a live reading without tapping "Measure now"; likely tied to overnight ring drain
 
+- **Needs:** Q-388
+- **⚑ Q-388 is this entry, found again 11 days later and traced further — read it first.** It
+  reports the same symptom from the owner (~20% overnight against this entry's ~15%/night) and
+  **pins one of the three leak vectors below to a line**: `reqBleFastHrMode(false)` and
+  `EXERCISE_HR → AUTOMATIC` appear only in `liveHrStopSequence()`, so any live-HR session that
+  never reaches `stopLiveHr()` leaves continuous fast-HR sampling on permanently — the app killed
+  mid-workout, Samsung battery management killing the service, or the admin tester's **Live HR**
+  button without **Stop HR**. That is vector two, confirmed from source.
+- **Why this waits on Q-388 rather than merging into it.** Q-388's batch closes that vector and
+  persists the battery poll, which is what makes the drain measurable in the first place. Run this
+  entry's diagnostic capture *after* that APK: if the leak is gone the remaining vectors are what
+  is left, and if it is not, the telemetry can finally say so. **Kept separate because its leading
+  vector is a stale persisted Zustand workout store — Lane B — while Q-388 is Kotlin.** That split
+  is also why this entry carries no `Lane:`: the diagnostic decides which lane owns the fix.
+
 - **Branch:** `investigate/live-hr-leak-ring-battery`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 31
 - **Added:** 2026-08-06 · owner noticed a live (non-stale) HR reading on the Health tab without ever
@@ -9256,7 +9366,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [devices][body] Q-114 — scale "Weighing you…" progress bar has already drifted from the real native timeout; shorten both together
 
-- **Batch:** scale-weighing-ui
+- **Lane:** A
+- **Batch:** `scale-weighing-ui`
 
 - **Branch:** `fix/scale-cycle-budget-drift-and-trim`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 29
@@ -9338,7 +9449,8 @@ first, so the output is a design discussion, not a patch:
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
-- **Batch:** scale-weighing-ui
+- **Lane:** A
+- **Batch:** `scale-weighing-ui`
 
 - **Branch:** `fix/scale-onunstablereading-ungated-recurrence`
 - **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 19

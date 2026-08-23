@@ -44,6 +44,11 @@ Rewrite this file **in full** — never append — before the session ends or co
   findings that way. It is the single highest-value tool this role has: on 2026-08-19 it turned "I
   can't judge session RPE" into a measured 25.6% fill rate and a 233-vs-32 correction asymmetry, in
   about four queries.
+- **To date a regression, `add_repo` the archive** — this repo was cut fresh 2026-08-16, so its
+  `git log` cannot. `nekodas-neko/TrainingAI_Old`, 3,225 commits. **Two traps:** it clones
+  `--depth 1`, so `fetch --unshallow` first or every `-S` answer is a lie by omission; and a
+  caret-ranged dep moves in `pnpm-lock.yaml` without touching `package.json`. Dated BF-4 to #112
+  on 2026-08-23, after that entry had merged saying no commit could be named.
 - The **probe pattern** for shared modules: import the real module in a scratch `.ts` inside the repo
   (so imports resolve), run it with `npx vite-node <file>`, print a table, delete before committing.
   `tsx` is not installed; `vitest run` ignores a file with no test in it.
@@ -63,11 +68,8 @@ baton still described a band.
 - **`check-doc-index-size` fails every intake PR.** Intake adds an entry per report, so it trips every
   time. Raise the baseline in the same PR, but treat the failure as a real signal first and budget
   ~30 lines per queue entry.
-- **The baselines moved on 2026-08-19 (#254) — they are in `docs/doc-size-baseline.json` now**, not in
-  comments at the top of the script. That killed the *conflict-frequency* half of this trap: the
-  script had reached 1,091 lines with 955 of them prose, and 32 of the last 40 commits touched it.
-  Anything below that says "edit the baseline in the script" is describing a file that no longer
-  exists in that form.
+- **Baselines live in `docs/doc-size-baseline.json`** (since #254), with the reasoning appended to
+  `docs/doc-size-baseline-history.md` — the check's own failure message says both.
 - **Take the count from `node scripts/check-doc-index-size.js`, never from `wc -l`** — `wc -l` reads
   **one lower**, and a baseline set from it leaves the branch red. Cost a resolution on 2026-08-19.
 - **Two parallel PRs can still each raise the baseline and collide, and `main` can still end up over
@@ -95,8 +97,6 @@ baton still described a band.
   prefills anyways"* turned out to invalidate two assumptions in an entry already written — the rated
   sets were not all judgements, and the scale floor was a clamp rather than an opinion. The remark was
   not the report and would have been easy to skim past.
-- **A feature request is still filed**, but say so in the entry and point at the planning-session
-  requirement — intake does not write implementation plans. Q-389 is the shape.
 - **A feature request is still filed**, but say so in the entry and point at the planning-session
   requirement — intake does not write implementation plans. Q-389 is the shape to copy.
 - **Do not fit to a target the owner has just told you is unreliable.** Q-420 was going to be

@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — BF-4 amended from the archived history
+
+**`docs/implementation-backlog.md` 11367 → 11390.** The owner pointed at the pre-cut repo, and its
+3,225 commits corrected two claims BF-4 had already been merged asserting: that the image payload was
+the prime suspect (the camera call is byte-identical since 2026-06-12, so it cannot be what changed),
+and that the AI call was measurably not the regression (instrumentation only landed 2026-07-22, so
+the data cannot see June at all).
+
+49 lines for a correction to an existing entry, of which the net raise is 23 — the rest is absorbed by
+what landed on `main` in parallel. The corrections sit **above** the original analysis rather than
+replacing it, which is the reason for most of the length and is deliberate: an entry that quietly
+rewrites its own conclusion teaches nobody why the first reading was wrong, and this one was wrong in
+a way that will recur — a measurement whose window is narrower than the question being asked.
+
+---
+
 ## 2026-08-23 — BF-4, the photo-scan slowdown
 
 **`docs/implementation-backlog.md` 11381 → 11367 — a ratchet DOWN, not a raise.** An owner report that
@@ -1479,3 +1495,19 @@ out to be a drop-set indicator.
 
 Trimmed from 29 before raising. What stayed is the evidence; what went was a second telling of the
 mechanism already stated in the paragraph above it.
+
+## 2026-08-23 — Lane B's baton ratchets DOWN again, 134 → 97
+
+Second consecutive Lane B handoff to shrink it: 413 → 134 on 2026-08-20, now **97**. The baseline
+drops with it each time, because the shrink-only rule exists so reclaimed space cannot quietly refill
+and leaving 37 lines of headroom is an invitation.
+
+What went was the previous run's seven-PR narrative — that is what journal entries are for, and the
+baton links them. What the rewrite **added** is a `## Waiting on the owner` section, because this run
+ends with a gated entry (LB-1) and a successor needs to see that before the queue, not after it.
+
+**PS-4 is three of six, measured rather than assumed:** Lane B **96**, Orchestrator **61**, Lane A
+**149** are under the ~150-line target; BugFix **160** and Review **169** are just over; Tuning
+**581** is nearly four times it and is still the one that will not come down as a side effect of a
+routine rewrite. (A first draft of this note said "four of six" from memory and was wrong by one —
+Lane A sits one line under the line, which is not a margin worth rounding in either direction.)
