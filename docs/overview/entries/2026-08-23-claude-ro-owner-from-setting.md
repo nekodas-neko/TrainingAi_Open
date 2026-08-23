@@ -68,16 +68,37 @@ Two mutations, each applied and reverted:
 Generated SQL contains **zero** occurrences of the owner id; 85 views, 10 columns withheld, 2 tables
 denied — unchanged from before. Full suite 559 files / 4,593 tests; `pnpm check:rules` 54 of 54.
 
-## ⚠️ This needs one command from the owner, and the audit endpoint is empty until it runs
+## It needs no command from the owner — the deploy configures itself
 
-Deploying migration 207 without `ALTER ROLE claude_readonly SET app.claude_ro_owner = '<uuid>'`
-leaves `/api/admin/db-query` returning zero rows for every query. That is the fail-closed direction
-working as designed, and it is still a break in the tool every session uses at start-up to read
-`error_events` and the database size.
+The first draft ended here asking for one manual `ALTER ROLE`. That is the wrong place to stop: the
+fail-closed direction is right, and needing a human to undo it on every fresh database is not. The
+audit endpoint is what every session reads `error_events` and the database size from at start-up, so
+"works once somebody remembers" would have been a standing trap.
 
-**So this is presented rather than merged.** It is a security-surface change that also needs an
-owner action to land cleanly — both halves of the confirm-first carve-out.
+`bootstrapClaudeRoOwner()` (`lib/data/postgres/claude-ro-owner.ts`) runs at boot beside the existing
+`bootstrapAdmin`, on the app's own connection — which already creates schemas and applies
+migrations, so it is not new authority.
 
-**Not verified: production.** The scoping is proven against the local database with the same table
-set, and the role provisioning in the test is the same SQL production uses, but no production view
-has been rebuilt.
+**Resolution order, most explicit first:** `CLAUDE_RO_OWNER_USER_ID`, then `ADMIN_EXPORT_USER_ID`,
+then `WEBHOOK_USER_ID`. The last two are the same person by construction — one is who the day-review
+export answers for, the other the fallback `CLAUDE.md` already documents for it — so **a database
+that is already configured needs nothing added**. The boot line says which variable was used,
+because a scope silently following a variable set for another purpose is the cost this ordering
+accepts in exchange for needing no action.
+
+**Unset stays fail-closed and says so:** no variable, no `ALTER ROLE`, views keep returning nothing,
+and a warning naming the three variables. A session that reads an empty audit result can tell
+"unconfigured role" from "production is quiet".
+
+**The uuid regex is a safety boundary, not validation.** `ALTER ROLE … SET` takes no bind parameter,
+so the value is interpolated — and node-postgres's simple query protocol runs multiple statements, so
+`'; DROP ROLE claude_readonly; --` would have executed. Removing the guard fails the test that plants
+exactly that string.
+
+Extracted into its own module rather than left inline in `instrumentation-node.ts` for the same
+reason as `push-then-revalidate`: a helper that can only be reached by importing the whole boot
+sequence (sentry, model constants, the schema warm) cannot be tested.
+
+**Not verified: production.** The scoping is proven against a local database with the same 87 tables,
+and the bootstrap is proven to configure a genuinely unconfigured role from the environment — but no
+production view has been rebuilt and no production boot has run this.
