@@ -6,8 +6,8 @@
 **Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-5`
 
 ## Now
-**#332** (Q-418, this branch) and **#333** (Q-398) are open. #331 and everything before it merged.
-Whichever of the two lands second re-bumps `package.json`/`changelog.ts` on the fresh base.
+**#333** (Q-398) is the only thing open, and green at the time of writing. #332 and everything
+before it merged.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
@@ -31,8 +31,8 @@ Whichever of the two lands second re-bumps `package.json`/`changelog.ts` on the 
   **It uncovered a live outage:** five `app/api/nutrition/meal-plan*` routes read the request body
   and then validated an unassigned `raw`, so the whole meal-plan write surface answered 400 to every
   request. Fixed in that PR (Lane A paths, taken deliberately) with
-  `scripts/check-json-body-parsed.js` holding the class shut — Custom Rules becomes **53** when
-  that PR lands.
+  `scripts/check-json-body-parsed.js` holding the class shut — Custom Rules becomes **53** when it
+  lands.
 
 ## Next
 `node scripts/next-item.js --lane B`, and **re-verify the premise first** — most entries taken this
