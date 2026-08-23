@@ -18,6 +18,26 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — BF-9, the trainer role
+
+**`docs/implementation-backlog.md` 11517 → 11571.** The owner wants to build programs for other
+people from his own app instead of borrowing their phone.
+
+81 lines added, 54 net. Long for an unplanned feature, and the length is almost entirely the security
+surface. Every write in this app is `user_id` scoped by design; this feature deliberately breaches
+that, and `saveProgram` is *already* parameterised by user id — so the only thing between the feature
+and one account writing into another is a guard that does not exist yet. An entry that said "add a
+trainer role" and stopped would leave a planning session to rediscover that, and the discovery order
+matters: the cheap reading is "reuse `isAdmin`", which would hand every trainer the operator console
+and the read-only SQL endpoint.
+
+The other half is what should *not* be built: `friendships` already implements the consent handshake
+(only the addressee can accept), `users.friend_code` the discovery, `invited_emails` the onboarding,
+and `programs` is already in the sync delta, so delivery to the trainee's device needs no new work.
+Four things not to rebuild is worth the space it takes to name them.
+
+---
+
 ## 2026-08-23 — the owner confirms BF-8, and settles BF-7
 
 **`docs/implementation-backlog.md` 11474 → 11517.** 43 lines across two amendments, both in place
