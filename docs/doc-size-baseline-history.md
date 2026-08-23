@@ -1852,3 +1852,9 @@ anyway. Resolving the merge with a blind "keep both sides" **duplicated the ring
 independent ones. The tell was the arithmetic: the check reported 14 lines added by a branch whose
 own addition is 6. "Keep both" is right for genuinely independent appended entries and wrong for a
 rewritten one, and the only reliable way to tell them apart is to read the resolved text.
+
+## 2026-08-23 — `projectOverview.md` 7869 → 7879
+
+Ten lines: the Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch, restored after
+a merge. The count moved because the surrounding section shrank underneath it, not because the entry
+grew.
