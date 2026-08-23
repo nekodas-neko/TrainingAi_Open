@@ -107,3 +107,77 @@ describe('POST /api/sync/push — reporting', () => {
     expect(reportServerError).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('POST /api/sync/push — a schema-rejected mutation is quarantined, not deleted (Q-476)', () => {
+  // The defect, in the entry's own measurement: three mutations with a bad one in the middle came
+  // back `{processed: 2, errors: []}`. An empty errors array is how the client is told everything
+  // succeeded, so it deleted the row that was never written — no badge, no toast, no retry.
+  it('returns an error entry for an unknown domain instead of silence', async () => {
+    pushMutations.mockResolvedValue({ processed: 2, errors: [] })
+
+    const res = await POST(req([
+      mutation('m1'),
+      { id: 'm2', domain: 'retired_domain', date: '2026-08-09', payload: {} },
+      mutation('m3'),
+    ]))
+    const body = await res.json()
+
+    expect(body.processed).toBe(2)
+    expect(body.errors).toHaveLength(1)
+    expect(body.errors[0]).toMatchObject({ id: 'm2', domain: 'retired_domain', retryable: false })
+    // Only the valid two reach the adapter — the rejection still cannot wedge the queue.
+    expect(pushMutations.mock.calls[0][1].map((m: { id: string }) => m.id)).toEqual(['m1', 'm3'])
+  })
+
+  it('returns an error entry for a malformed date', async () => {
+    pushMutations.mockResolvedValue({ processed: 0, errors: [] })
+
+    const res = await POST(req([{ id: 'm1', domain: 'body_metrics', date: '06-08-2026', payload: {} }]))
+    const body = await res.json()
+
+    expect(body.errors).toHaveLength(1)
+    expect(body.errors[0].id).toBe('m1')
+    expect(body.errors[0].error).toMatch(/date/)
+  })
+
+  // `retryable: true` means "the server could not write" (Q-475) and makes the client back off the
+  // WHOLE queue and stop draining. A schema rejection can never succeed, so it must be the per-item
+  // path: attempts++, backoff, dead-letter at MAX_MUTATION_ATTEMPTS.
+  it('marks the rejection non-retryable, so it does not read as a server outage', async () => {
+    pushMutations.mockResolvedValue({ processed: 0, errors: [] })
+    const res = await POST(req([{ id: 'm1', domain: 'body_metrics', date: '2026-02-31', payload: {} }]))
+    expect((await res.json()).errors[0].retryable).toBe(false)
+  })
+
+  it('still drops a rejection with no usable id — the client could not match it, and the domain:date fallback would fail its valid siblings', async () => {
+    pushMutations.mockResolvedValue({ processed: 1, errors: [] })
+
+    const res = await POST(req([
+      mutation('m1'),
+      { domain: 'body_metrics', date: 'not-a-date', payload: {} },
+    ]))
+
+    expect((await res.json()).errors).toEqual([])
+  })
+
+  it('keeps the adapter\'s own errors alongside the rejections', async () => {
+    pushMutations.mockResolvedValue({
+      processed: 0,
+      errors: [{ id: 'm1', domain: 'body_metrics', date: '2026-08-09', error: 'boom', retryable: true }],
+    })
+
+    const res = await POST(req([
+      mutation('m1'),
+      { id: 'm2', domain: 'retired_domain', date: '2026-08-09', payload: {} },
+    ]))
+    const ids = (await res.json()).errors.map((e: { id: string }) => e.id)
+
+    expect(ids).toEqual(['m2', 'm1'])
+  })
+
+  it('does not report a schema rejection to error_events — it is the client sending something wrong, not a server fault', async () => {
+    pushMutations.mockResolvedValue({ processed: 0, errors: [] })
+    await POST(req([{ id: 'm1', domain: 'retired_domain', date: '2026-08-09', payload: {} }]))
+    expect(reportServerError).not.toHaveBeenCalled()
+  })
+})
