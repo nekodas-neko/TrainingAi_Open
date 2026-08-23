@@ -3049,34 +3049,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
   baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
   cutting deploy frequency, not more tuning.
-### [workouts][platform] Q-470 — the background prescription regeneration has a rate limit but no in-flight guard, so a second page-load fires it again
-
-- **Branch:** `fix/prescription-regen-in-flight-guard`
-- **Added:** 2026-08-18 · review sweep from owner-supplied production screenshots ·
-  [`docs/reviews/2026-08-18-ai-double-trips.md`](reviews/2026-08-18-ai-double-trips.md)
-- **Placement:** mid. A real duplicate LLM generation for the same session-day, on the path that
-  decides prescribed load.
-- **This one is genuine, unlike Q-471's rows.** `prescription` fingerprints on
-  `{ programSessionId, today }` (`packages/shared/src/ai-periodization/generate-prescription.ts:295`)
-  — stable for one session on one day. **14 redundant across 8 distinct** is therefore the same
-  logical prescription generated twice within 120 s.
-- **Cause.** `regeneratePrescriptionInBackground` (`app/api/workout-data/route.ts:50-59`) is
-  fire-and-forget and called from **two** sites in the same `GET` handler — `:541` when
-  `reevalResult.needsRegenerate`, `:561` when `aiPrescriptionPending && !isPoll`. It carries
-  `rateLimit('prescribe:${userId}', 20, 60*60*1000)`, which caps a runaway loop but **does not
-  dedupe**:
-  - `/api/workout-data` is fetched via `cachedFetch`, which paints from cache and **then always
-    revalidates over the network** — so every open of the workout screen issues a real GET;
-  - until the first background generation lands, `needsRegenerate` / `aiPrescriptionPending` are still
-    true, so the second GET starts a second generation for the same session-day.
-- **The rate limit is not the bug and should stay** — its comment says it exists to stop "an unattended
-  poll loop" minting unlimited Gemini calls, and it does that. It was never an idempotency mechanism.
-  Note `:561` already excludes polls via `!isPoll`; `:541` has no such guard.
-- **Fix shape:** an in-flight marker keyed on `(userId, programSessionId, today)` — the same key the
-  fingerprint already uses — checked before spawning and cleared when the generation settles. A
-  process-local `Set` covers the common case; a short-lived DB marker survives multiple replicas,
-  which matters because Railway can run more than one. **Lane A.**
-
 ### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
 
 - **Gate:** owner
