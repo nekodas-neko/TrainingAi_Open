@@ -1259,69 +1259,36 @@ quietly wrong". Backfill is deliberately **not** attempted: past days have no fl
 honest one, so the estimate starts from days marked after this ships and the counter shows that
 plainly.
 
-### [nutrition][app-shell] Q-406 — extract `food-row.tsx` first, so the rework has somewhere to land
+### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 - **Branch:** `refactor/nutrition-food-row`
-- **Added:** 2026-08-18, split out of **Q-395** so it can start immediately and in parallel rather than
-  waiting for the rework's turn in the queue.
-- **Lane B.** Pure extraction — no behaviour change, no schema, no route.
-
-- **✅ THE HEADROOM HALF IS DONE (2026-08-19, v1.325.3). THE ROW HALF IS RE-SCOPED — read the
-  correction below before starting it.** `nutrition-content.tsx` is **732** and
-  `saved-meals-sheet.tsx` is **753**, both well under 800, **with no new BASELINE rows**. Q-395 can
-  land. [`Journal`](overview/entries/2026-08-19-nutrition-headroom.md).
-
-**⚠ CORRECTED 2026-08-19 — the mechanism in this entry does not work, measured twice.**
-
-**1. Extracting a food row frees ZERO lines from either landing file.** Neither contains food-row
-markup. `nutrition-content.tsx` renders no rows at all — `MealCard` owns the diary row — and its
-only `foodItem` references are data mapping. `saved-meals-sheet.tsx` had already delegated both its
-lists, to `SavedMealCard` and `IngredientRow`. The two files are large for entirely different
-reasons, so the "unblocker" could not have unblocked anything.
-
-**What actually took them under**, and what was done instead: `AddFoodByHandForm` out of
-`saved-meals-sheet.tsx` (793 → 753 — a self-contained five-field form that owned its own state) and
-`useFoodLogsLoader` out of `nutrition-content.tsx` (800 → 732 — 69 lines, the file's largest and
-most self-contained function, no JSX and four inputs).
-
-**2. The four call sites are four DIFFERENT shapes, not one shape drawn four times.** Measured:
-- diary (`meal-card.tsx:82`) — calories in a fixed `w-16` right column, secondary line is **coloured
-  P/C/F chips**, trailing edit + delete buttons.
-- library (`food-library-sheet.tsx:100`) — calories right-aligned over a serving sub-line, whole row
-  is a button.
-- search/db (`ingredient-search.tsx:72`) — calories **inside** the secondary line, trailing `+` icon.
-- search/external (`ingredient-search.tsx:132`) — same, plus a macro-mismatch warning line and a
-  spinner.
-
-So a component covering all four **faithfully** needs a secondary-line node, a trailing slot and a
-calories-placement variant — at which point it is a wrapper, not a unification. And unifying them
-properly means **changing how three of the four look**, which this entry explicitly forbids
-(*"Behaviour must not change… Any visual difference belongs to Q-395"*). **The row cannot be
-extracted without first deciding what it should look like, and that decision is Q-395's.** Take the
-row after Q-395's design pass, not before it.
-
-**Why this was its own entry.** Q-395 could not start: both files it lands in were on the 800-line
-ceiling (`nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at **793**, neither
-grandfathered), so one added line failed Custom Rules. That part was right, and is now resolved.
-
-**What to build.** One component, `components/nutrition/food-row.tsx`, with the shape used by all six
-drawn screens: optional thumbnail · name · grey secondary line of *what and how much* · calories
-right-aligned in a fixed column · optional chevron. Props are **scalars**, not objects — the row
-renders inside `.map()` where hooks are unavailable, and an inline object literal at the call site
-silently defeats `React.memo` (`meal-macro-bars.tsx` is the reference this repo already keeps for
-exactly that reason).
-
-**Then convert the existing call sites, one per commit.** A food currently reads four different ways —
-diary, search, saved meal, builder. Converting them is what takes both landing files back under the
-line and makes the rest of Q-395 additive rather than blocked.
-
-- **⚠ Behaviour must not change in this entry.** It is an extraction. Any visual difference belongs to
-  Q-395, and mixing them makes the diff unreviewable and the regression unattributable.
-- **Done when:** ~~`node scripts/check-component-size.js` reports both files under 800 with **no new
-  BASELINE rows**~~ — **met 2026-08-19** (732 and 753, no new rows). What remains is the row
-  component, and its done-condition is now Q-395's: the four call sites render *the agreed* row,
-  which is a visual change, not "identically to before".
-- **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
+- **Lane B.** No schema, no route.
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
+  library sheet + the food-database search row now draw it.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
+  satisfied.**
+- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
+  row's only trailing element is a chevron.
+  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
+    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
+    yet**, so converting the diary row now removes the only way to correct a logged food. That is
+    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
+    **Convert it in Q-395a, in the same PR that adds the sheet.**
+  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
+    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
+    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
+    per-row warning goes — which belongs with Q-395's drawings.
+- **⚠ THE DRAWINGS ARE NOT IN THE REPOSITORY.** `unit-options.png`, which Q-395a names as its
+  reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
+  mockups for cardio, scores and the AI coach, none for nutrition. The row above was built from
+  Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
+  column · optional chevron"), which is complete enough for it. **The remaining phases are not so
+  lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
+  the phases will be built from prose and the visual match cannot be checked.
+- **The optional thumbnail is deferred.** No call site passes one, and an unused `<img>` costs a
+  `no-img-element` exemption for arbitrary user photo URLs. The phase that first shows a thumbnail
+  adds it, with the loader decision made where it can be seen.
+- **Unblocks:** Q-395a, and Q-398 which wants the same row for plan meals.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 

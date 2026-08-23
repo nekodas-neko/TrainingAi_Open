@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useLayoutEffect, useState } from 'react'
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet'
@@ -8,6 +8,7 @@ import { useSheetBackDismiss } from '@/lib/hooks/use-sheet-back-dismiss'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
+import { FoodRow } from '@/components/nutrition/food-row'
 
 const ALL_ITEMS_KEY = 'nutrition-food-items-all'
 
@@ -98,20 +99,7 @@ export function FoodLibrarySheet({ open, onClose, onSelect, userId }: Props) {
           ) : (
             <div className="divide-y divide-border/30">
               {items.map(item => (
-                <button
-                  key={item.id}
-                  onClick={() => { onSelect(item); onClose() }}
-                  className="w-full flex items-center gap-3 px-4 py-3 text-left active:bg-muted/40 transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{item.name}</p>
-                    {item.brand && <p className="text-xs text-muted-foreground truncate">{item.brand}</p>}
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-sm tabular-nums">{item.calories} kcal</p>
-                    <p className="text-[10px] text-muted-foreground">{item.servingSizeG}g serving</p>
-                  </div>
-                </button>
+                <FoodRowItem key={item.id} item={item} onSelect={onSelect} onClose={onClose} />
               ))}
             </div>
           )}
@@ -120,3 +108,22 @@ export function FoodLibrarySheet({ open, onClose, onSelect, userId }: Props) {
     </Sheet>
   )
 }
+
+/**
+ * Wrapper so `FoodRow`'s `onPress` is stable inside the `.map()` above. A hook cannot live in a map
+ * body, and an inline arrow at the call site defeats `React.memo` silently — the failure this
+ * repo keeps a check for (Q-490). Moving the identity into a child is the sanctioned way out.
+ */
+const FoodRowItem = memo(function FoodRowItem(
+  { item, onSelect, onClose }: { item: FoodItem; onSelect: (i: FoodItem) => void; onClose: () => void },
+) {
+  const press = useCallback(() => { onSelect(item); onClose() }, [item, onSelect, onClose])
+  // Built with useMemo rather than inline: `FoodRow` is memoised and compares shallowly, and an
+  // array literal in a prop defeats that even when it collapses to a string (Q-490's check flags it
+  // for exactly that reason — the allocation is per-render whatever it resolves to).
+  const secondary = useMemo(() => {
+    const serving = item.servingSizeG ? `${Math.round(item.servingSizeG)} g serving` : null
+    return [item.brand, serving].filter(Boolean).join(' · ') || null
+  }, [item.brand, item.servingSizeG])
+  return <FoodRow name={item.name} secondary={secondary} calories={item.calories} onPress={press} />
+})

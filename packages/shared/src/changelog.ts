@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.338.0",
+    date: "2026-08-23",
+    changes: [
+      "Foods in the History list and in food-database search results now line up. Calories sit in their own column on the right instead of being buried in the grey line under the name in one place and stacked over a serving size in another \u2014 a list of foods was three different shapes depending on where you were looking at it.",
+    ],
+  },
+  {
     version: "1.335.0",
     date: "2026-08-23",
     changes: [
