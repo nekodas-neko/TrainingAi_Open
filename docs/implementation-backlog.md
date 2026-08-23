@@ -1202,7 +1202,18 @@ line and makes the rest of Q-395 additive rather than blocked.
   which is a visual change, not "identically to before".
 - **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
 
-### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
+### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
+
+- **Lane:** B
+- **Needs:** Q-395c
+- **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
+  269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
+  work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
+  screen) → **Q-395c** (Log Food + the `My Foods` rename). Each phase points back here rather than
+  copying the decisions, so they still live in exactly one place. **Read this before any phase.**
+- **Why it parks behind its own last phase.** It is the completion checkpoint: when Q-395c lands,
+  this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
+  never drawn, and leaves the queue. Never pick it up as a work item.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
@@ -1470,6 +1481,75 @@ whether or not anyone draws them first.
   `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
+
+### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
+
+- **Lane:** B
+- **Needs:** Q-406
+- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. Drawings:
+  `unit-options.png` column A (expanded row) and its `Full Cream Milk` row (collapsed).
+- **Split out of Q-395 on 2026-08-23.** **Read Q-395 first** — it holds the decisions and this
+  entry does not repeat them.
+- **Scope.** The quantity sheet (new), and `ingredient-row.tsx` becoming `food-row.tsx` plus an
+  expanded state. Option A is decided: the unit rides on the number as a chip, `60 g` ⇄ `2 srv` on
+  one tap, built from `components/ui/segmented-tabs`. B and C are dead. Rows collapse when not
+  edited, one at a time, and the collapsed shape *is* Q-406's row — not a second component.
+- **⚠ A diary row never expands.** Finding 12 retired the list-row editor outright: a diary or
+  search row carries no editor at all. This entry governs the quantity control *where it does
+  appear* — the sheet, and the builder. Building an expanding diary row misreads both.
+- **The sheet must say where it came from:** the tapped row stays lit under the scrim, and the sheet
+  is headed `Ingredient 1 of 5 · <meal>`. Without that it reads as an unrelated screen.
+- **Edit Meal rides along:** the meal name becomes the screen title, the batch explainer becomes
+  the subtitle *"Makes 2 portions · 278 kcal each"*, and the servings control stays real at 48 px —
+  it was demoted to a subtitle in an early draw and the owner corrected that.
+- **48 dp floor applies here first** (finding 7): srv/g segments are the app's smallest targets at
+  40 px, stepper gap 6 px against 8 dp. One systemic change, not eight.
+- **Verification.** `check-hex-literals` lower per file · `check-component-size` clean, no new
+  BASELINE rows · `pnpm check:rules` · **device smoke run in both themes** — pure UI on the
+  canonical runtime, so a green `pnpm dev` is not sufficient.
+
+### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
+
+- **Lane:** B
+- **Needs:** Q-395a
+- **Spec:** Q-395, findings 14 and 16.
+- **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
+  replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend
+  the shipped 96 px `MacroRing` with an arc **split by macro**; do not add a second ring.
+- **⚠ This entry carries the coverage checklist and checks it off in the PR.** The first draw showed
+  **3 of the 11 sections** this tab actually renders. In shipped order: ScreenHeader + date nav ·
+  CalorieBalanceBar · MacroRing · NutritionActionRow · MealPlanReviewCard · MealPlanSection ·
+  TdeeAdaptationCard · MealCard × meal types · End of Day · WeeklyNutritionChart ·
+  SupplementsSection. **A rework that quietly loses a section is the failure mode Q-395 exists to
+  prevent**, and this is the phase where it would happen.
+- **Headroom is not free.** Q-406's first half took `nutrition-content.tsx` 800 → 732; it is not on
+  the size baseline, so it is held to 800 hard. Extract before adding.
+- **Verification.** As Q-395a, plus the checklist above ticked off in the PR body.
+
+### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
+
+- **Lane:** B
+- **Needs:** Q-395b
+- **Spec:** Q-395, findings 15 and 17.
+- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
+  everything · two tabs · a bottom row of capture actions.
+- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
+  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
+  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
+  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
+  column; the label/QR and full breakdown stay inside the meal.
+- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
+  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
+  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
+  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
+  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
+  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
+  on the old name reads as a second list that is missing rows.
+- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
+  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
+  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
+- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
+  *My Meals*.
 
 ### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
 
@@ -3289,43 +3369,55 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Not a bug in the swap.** The write path works on device and that is now recorded in
   `projectOverview.md` — do not "fix" the apply logic.
 
-### [devices][platform] Q-537 — the ring key has one copy and no way to back it up
+### [devices][platform] Q-537 — the ring key can be backed up now; the backup has not been taken
 
 - **Lane:** A
-- **Batch:** `ring-service-device-pass`
-- **This entry is why the batch is worth assembling, and it should be in the first native APK that
-  ships either way.** It is the mitigation for the hazard that makes APK delivery expensive in the
-  first place: an install that cannot upgrade in place forces an uninstall, and an uninstall
-  destroys the only copy of the ring key. Batching two more `android/…/oura/` changes onto that APK
-  is free; shipping the key backup late is not.
-
-- **Branch:** `feat/ring-key-export`
-- **Added:** 2026-08-17, after an uninstall made the ring unreachable in a live session.
-- **What it is.** The 32-hex ring key exists only in Android SharedPreferences
-  (`OuraBlePlugin.kt`, `key_hex`). Deliberately — its own comment reads *"the key never leaves
-  SharedPreferences; never logged"* — and that is the right call for a credential. But it means the
-  key has **exactly one copy**, on one device, with no export, no backup, and no warning before the
-  operations that destroy it.
-- **Why it matters.** An uninstall or a device change silently makes the ring unreachable: the BLE
-  service logs `no key stored`, refuses to start, and the Devices screen keeps showing the ring as
-  healthy because that card reads server data. Worse, the intuitive recovery — re-onboarding the
-  official Oura app — re-keys the ring and can force a firmware update that changes the BLE event
-  encoding, which is precisely what the frozen firmware exists to prevent. **A recoverable
-  credential problem turns into a protocol re-validation.** This happened on 2026-08-17 and was only
-  recovered because the original `open_oura` `key.hex` still existed on the owner's machine.
-- **What to do.** The minimum is an *export* affordance in `/admin/oura-ble` — reveal the stored key
-  so it can be copied somewhere durable — plus a confirm-with-warning before `clearKey`. Consider a
-  "key present" indicator on the Devices card, so a keyless state is visible where the ring is
-  managed rather than only in the admin console.
-- **Placement, reported separately.** The owner also asks that the key field be nested behind
-  something deliberate rather than sitting in the open — *"so it cant accidently be used"*. That is
-  the same subject and is best solved with Q-531, which is re-deciding where these screens live;
-  the export/backup half below stands on its own.
+- **Gate:** device
+- **Keep:** the export affordance has **not been exercised on the ring's phone**, and until it has,
+  the key still has exactly one copy. Shipped 2026-08-23 in `feat/ring-service-device-pass`
+  (native — **needs a new APK**): `OuraBlePlugin.revealKey()` returns the stored key, and
+  `/admin/oura-ble` → Ring key now shows a **Show key for backup** control with copy, above a
+  warning that an uninstall destroys it and that recovering through the official Oura app re-keys
+  the ring and risks a firmware update. What is owed: install the APK, reveal the key, **put it
+  somewhere durable**, and confirm the revealed value matches the original `key.hex`.
+- **Two things deliberately not built.**
+  1. **A confirm-before-`clearKey` guard.** The entry asked for one; `clearKey` turns out to have
+     **no caller anywhere** in the app — not the console, not the Devices card. The destructive
+     path in practice is *uninstall*, which no in-app dialog can intercept. A guard on a method
+     nothing calls is ceremony; the warning text now sits where the key is, which is where someone
+     about to uninstall would look.
+  2. **A "key present" indicator on the Devices card** (`components/more/oura-section.tsx`) — still
+     worth having, since that card reads server data and shows the ring as healthy while the
+     service logs `no key stored`. It is a pure Lane B surface with no storage involvement, so it
+     is filed as **LB-3** rather than reached into from here.
+- **Placement, still open.** The owner also asked that the key field be nested behind something
+  deliberate — *"so it cant accidently be used"*. It is now behind a **Show key for backup** button
+  rather than an always-visible field, which is most of that; where these screens live at all is
+  Q-531's question.
 - **What NOT to do.** Do not sync the key to the server to "solve" this. It is device-only on
   purpose, and moving it server-side widens the blast radius of every other credential path in the
   app. This is a *backup and visibility* problem, not a storage-location problem.
-- **Verification:** the affordance must be shown to work while the key is present, and the warning
-  shown to fire on `clearKey`. Device-only — nothing here is verifiable from the sandbox.
+
+### [devices][app-shell] LB-5 — the Devices card calls the ring healthy while the service has no key
+
+- **Lane:** B
+- **Branch:** `fix/devices-card-ring-key-state`
+- **Added:** 2026-08-23, split out of Q-537 (whose engine half shipped the same day).
+- **What it is.** `components/more/oura-section.tsx` renders the ring's state from server data —
+  `/api/oura-ble/freshness` and the battery cache. Those keep looking fine for as long as the
+  server holds recent rows, so after an uninstall/reinstall the card shows *"Ring synced 2h ago"*
+  while the native service is logging `no key stored` and refusing to start. The one screen where
+  someone would look to find out why the ring stopped is the one screen that cannot tell them.
+- **What to do.** Call `hasKey()` on the plugin (`lib/oura-ble/plugin.ts`, already exported) and
+  show a keyless state on the card, pointing at `/admin/oura-ble` → Ring key. Catch and ignore on
+  web, where the plugin is absent — the card must not grow a web-only failure mode.
+- **⚠ Do not offer to reveal or re-enter the key from this card.** The backup affordance lives in
+  the console behind a deliberate button (Q-537); a second entry point on a routinely-visited
+  screen is the opposite of what the owner asked for (*"so it cant accidently be used"*).
+- **What would count as done:** with no key stored, the Devices card says so rather than reporting
+  a healthy ring.
+- **Surface:** device — `getOuraBle()` returns null in the web sandbox, so the keyless branch is
+  only reachable on the APK.
 
 ### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
@@ -3805,32 +3897,27 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 
 
-### [devices][app-shell] Q-533 — the drain runs unattended but only reports completion to a screen nobody should have to watch
+### [devices][app-shell] Q-533 — the drain now reports its own ending; nobody has seen it do so
 
 - **Lane:** A
-- **Batch:** `ring-service-device-pass`
-
-- **Branch:** `feat/drain-complete-notification`
-- **Added:** 2026-08-17, owner report during a full re-sync: *"this is very lengthy. We shouldn't do
-  any testing that involves this ever again unless it can do it silently in the background."*
-- **The premise is half wrong, and that is the finding.** The drain **already runs in the
-  background**: `OuraRingService` is a foreground service, it auto-drains on connect and re-drains
-  hourly (`DRAIN_INTERVAL_MS`), and since v1.119.0 it POSTs each batch itself rather than needing
-  the tester screen to forward frames. Nothing about a drain requires the UI.
-- **What is actually missing is the ending.** `onDrainBatchComplete` only `log()`s
-  `drain complete` (`OuraRingService.kt:400`). The service posts exactly one notification in its
-  whole lifetime — low battery — so a user who starts a full re-sync has no way to learn it
-  finished except by staring at the admin log. That is what makes a background operation feel like
-  a foreground one.
-- **What to do.** Notify on drain completion, at least for a full re-sync (`fromZero=true`), with
-  the batch count and whether uploads settled cleanly. Reuse the existing notification channel
-  pattern. Consider a quiet progress notification for long drains, since a full re-sync of a
-  months-old backlog is thousands of events at 255/batch.
-- **Also fix the instructions.** `docs/oura-ble-operations.md` §4 step 2 says *"watch the drain
-  finish"*, which reads as a requirement and is only a verification convenience. It should say the
-  drain continues unattended and name what to check afterwards.
-- **Verification:** device-only. Start a full re-sync, leave the screen, confirm the drain completes
-  and the notification arrives.
+- **Gate:** device
+- **Keep:** the notification has **not been observed firing**. Shipped 2026-08-23 in
+  `feat/ring-service-device-pass` (native — **needs a new APK**): a full re-sync
+  (`startDrain(fromZero=true)`) posts *"Ring re-sync complete · N batches pulled and saved"*, or
+  *"finished with errors"* when a batch failed to commit. `docs/oura-ble-operations.md` §4 step 2
+  was rewritten to match — it used to read as though the drain had to be watched.
+- **The premise was half wrong, and that stays the finding.** The drain always ran unattended;
+  `OuraRingService` is a foreground service that drains on connect, re-drains hourly, and POSTs
+  each batch itself. Only the *ending* was missing.
+- **The one design decision worth not re-litigating.** The notification is queued on the ingest
+  executor rather than fired when the BLE loop ends. That executor is single-threaded and in
+  order, so the task runs only after every batch this drain queued has committed — which is what
+  makes "and saved" a fact. Firing at the end of the BLE loop would announce completion while
+  batches were still writing, which is exactly what the `uploads may still be finishing` log line
+  beside it warns about.
+- **What is owed:** start a full re-sync, leave the screen, confirm the notification arrives and
+  its batch count matches the `drain complete` log line. Incremental drains deliberately do not
+  notify — hourly is too often to be worth a notification, and nobody is waiting on one.
 
 ### [app-shell][devices] Q-531 — Q-234 moved the device consoles out of /admin, and in use that made them worse
 
@@ -3900,14 +3987,24 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 ### [devices][heart-rate] Q-388 — the ring runs SpO₂ and daytime-HR recording permanently, nobody chose it, and it is ~3.5× stock drain
 
 - **Lane:** A
-- **Batch:** `ring-service-device-pass`
-- **What the batch covers, and what it does not.** The batch exists so three `android/…/oura/`
-  changes cost **one** APK and one ring sitting instead of three. This entry contributes its two
-  do-regardless items — **(2)** resetting `EXERCISE_HR` and fast-HR mode in the connect-time
-  sequence, and **(3)** persisting the battery poll. **This entry alone survives the batch**, and
-  deliberately: its SpO₂ question is a decision waiting on the A/B that (3) makes measurable at
-  all. Shipping (3) in a PR that is already building an APK is the difference between measuring
-  the drain next week and paying another cycle for a five-line change.
+- **✅ Item (2) shipped 2026-08-23** in `feat/ring-service-device-pass` (native — **needs an APK**):
+  `enableMeasurementSequence()` now ends with `EXERCISE_HR → AUTOMATIC` and `reqBleFastHrMode(false)`,
+  so the fast-HR trap closes on every connect. Recorded as **R8** in
+  [`docs/oura-ble-operations.md`](oura-ble-operations.md) §1.
+- **⚠ Item (3) was already done before this entry was written, and the entry's central claim is
+  therefore false.** *"the keepalive already polls it every 5 min and `parseBattery` decodes it,
+  but it is never stored, so drain cannot be measured at all today"* — it **is** stored:
+  `OuraRingService.postBatteryPoll` fires on every keepalive tick into
+  `POST /api/oura-ble/battery-poll` → `oura_ble_battery_poll` (migration 133). Production holds
+  **6,346 polls from 2026-07-19 onward**, still arriving. So the evidence this entry says is
+  missing has existed the whole time, and **the A/B in (b) is runnable now** rather than blocked on
+  a native change.
+- **The drain is measured, not argued (2026-08-23).** Overnight, 22:00→08:00 Brisbane, nights with
+  no charging in the window: **−22, −24, −22, −38, −15 percentage points** over ~9.8 h. That
+  confirms the owner's ~20%/night report with the ring's own telemetry, and it means an SpO₂ A/B
+  needs only two nights of wear and this same query — no code, no APK.
+- **What still remains here** is the SpO₂ decision itself (item 1) and the cadence knobs (item 4),
+  both owner-gated. The batch no longer holds anything for this entry.
 - **⚑ This is the same investigation as Q-116, filed 11 days earlier, and neither entry knew.**
   Q-116 (2026-08-06) reports a live HR reading on the Health tab with nobody having tapped
   *Measure now*, and suspects it explains ~15%/night of drain; this entry (2026-08-17) reports
@@ -3979,10 +4076,10 @@ ehr     0     0     0     0   648   208   128   556     0
   healed by no reconnect, app restart or service restart. Production says it is not firing now
   (`ehr_trace_event` is zero 21:00–08:00), so it is a trap waiting, not the current drain. Fix
   regardless: add both resets to the connect-time sequence, the one path guaranteed to run.
-- **Evidence that would settle it** (device-only, none reachable from the sandbox): (a) persist the
-  ring's battery telemetry — the keepalive already polls it every 5 min and `parseBattery` decodes
-  it, but **it is never stored**, so drain cannot be measured at all today; (b) A/B two nights, SPO2
-  `OFF` vs unchanged, same wear pattern, compare overnight % — that prices the feature directly;
+- **Evidence that would settle it:** (a) ~~persist the ring's battery telemetry~~ — **done since
+  2026-07-19**, see the correction above; (b) A/B two nights, SPO2 `OFF` vs unchanged, same wear
+  pattern, compare overnight % — that prices the feature directly, **and (a) means this is now a
+  wear-pattern question rather than an engineering one**;
   (c) confirm whether the owner had blood-oxygen sensing enabled in the stock Oura app before the
   re-key. If it was off there and on here, that alone is most of the gap.
 - **Fix directions (undecided — measurement first):** (1) make SpO₂ a user setting defaulting off,
@@ -3995,9 +4092,10 @@ ehr     0     0     0     0   648   208   128   556     0
   doc's rule against touching the 5-min keepalive still stands: it is the drop detector.
 - **What would count as fixed:** overnight drop back near stock (~14%/day), proven by (a) rather
   than a subjective "feels better", and nothing power-hungry enabled that the owner did not choose.
-- **Surface: device required.** Every claim here is code-traced or from ingested-event counts;
-  **no ring power draw has been measured, because nothing records it.** The sandbox cannot run BLE
-  and Kotlin only compile-checks in Android CI, so a fix needs an APK and a wear cycle.
+- **Surface: device required for a fix, not for the measurement.** The sandbox cannot run BLE and
+  Kotlin only compile-checks in Android CI, so any *change* needs an APK and a wear cycle. But the
+  power draw **is** recorded and readable from here — the line above that said otherwise was wrong
+  for a month.
 
 ### [body][app-shell] Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
 

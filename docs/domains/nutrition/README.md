@@ -107,6 +107,15 @@ grep -n '\[nutrition\]' docs/implementation-backlog.md   # Q-187, Q-191, Q-196�
 
 Live at the time of writing (2026-07-30):
 
+- 🎨 **The nutrition rework is specified and phased (Q-395, split 2026-08-23).** Sixteen screens are
+  drawn at true S25 size in this app's own tokens, the owner has reviewed them twice and answered
+  every blocking question, and the coverage audit is done — so the design is not the bottleneck.
+  **Q-395 is now the spec and the final checkpoint, not a work item.** The work is **Q-406** (one
+  shared `food-row.tsx`, replacing four shapes for one thing) → **Q-395a** (quantity sheet + Edit
+  Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (Log Food as
+  one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
+  before starting any phase; the phases point back rather than copying its decisions.
+
 - ⚠️ **Q-323 turned the calorie bar into a progress bar and Home's donut into a progress ring**
   (2026-08-23, v1.336.0). `barPosition`/`barBands` are gone; `barProgress()` replaces them. **Not
   device-verified** — [`journal`](../../overview/entries/2026-08-23-calorie-progress-bar.md).

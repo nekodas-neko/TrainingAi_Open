@@ -27,6 +27,14 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
+backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
+the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
+inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
+with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
+(6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
+points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
+
 **Preferences have a server home; nothing reads it yet (Q-392, engine half).**
 `users.preferences` JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, which **merges**
 under a row lock — the unlocked version demonstrably drops the other device's key when a write
@@ -206,8 +214,7 @@ order.
 
 **Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
 - **🟠 LB-4 — logging food invalidates BEFORE its push,** so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path.
-- **v1.336.0 finished Q-323's display half.** The zone bar is now a progress bar filling toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), and Home's donut became a progress ring with a grey remainder — it was a 360° macro split, which the rows beside it already give in grams ([`journal`](docs/overview/entries/2026-08-23-calorie-progress-bar.md)). **`barPosition`/`barBands` are deleted**; `barProgress` replaces them. Note the entry said "the macro ring" but described Home's donut — the Nutrition ring already did the asked-for thing.
-- **Keep: not device-verified.** The sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here — only the heart-rate contribution ran. The bar and ring are purely visual and were judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair.
+- **v1.336.0 finished Q-323's display half** — the bar fills toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), Home's donut became a progress ring, and **`barPosition`/`barBands` are deleted** for `barProgress`. The entry said "the macro ring" but described Home's donut; the Nutrition ring already did the asked-for thing ([`journal`](docs/overview/entries/2026-08-23-calorie-progress-bar.md)). **Keep: not device-verified** — the sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here and only the heart-rate contribution ran; the bar and ring are purely visual, judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair.
 
 ### [workouts][activity][app-shell] ⚠️ Editing and deleting logged training is back, but has not been checked on the device (LB-1, 2026-08-23)
 
