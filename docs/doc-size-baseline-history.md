@@ -1581,3 +1581,20 @@ reconstruct which of the five measured edges are closed.
 The three in `projectOverview.md` say the same thing in the Current Status entry the extraction
 already had, because that entry's closing sentence named `onnxruntime-node` as the blocker and it no
 longer is.
+
+## 2026-08-23 — `projectOverview.md` 7927 → 7928, `docs/implementation-backlog.md` 11474 → 11501
+
+Twenty-seven lines retracting a claim this entry made earlier the same day. I wrote that the model
+constants "cannot reach the device" and that answering it was "a design decision rather than a port"
+to be taken before Task 3 starts. It is a port: **Q-221 already built the mechanism** — inject the
+table, serve it from an auth-gated route through the same accessor, fetch and cache it on the device
+— and the rollup already depends on it for the steps-decoder table.
+
+The lines are queue material, not journal material, because they are the difference between the next
+implementer opening a design question and following an existing pattern. They also carry the
+three-row measurement of exactly which getters are involved (one done, two to do), which is the
+scope of the work.
+
+The one line in `projectOverview.md` is the same retraction in the Current Status entry, which had
+called the constants loader the blocker without saying which kind of blocker it is. "Port" and
+"decision" send an implementer to different places.
