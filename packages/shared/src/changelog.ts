@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.333.4",
+    date: "2026-08-23",
+    changes: [
+      "Photos for the food scan are now shrunk on your phone before they are sent. A full-resolution capture was going up whole \u2014 measured at 4000\u00d73000, that is about 2.2 MB of upload; it is now about 300 KB, an 87% cut. Nothing is lost: the model normalises every image to the same size before it reads it, so the extra pixels were never looked at. This should shorten the wait between taking the photo and seeing the result, though it does not rule out other causes.",
+    ],
+  },
+  {
     version: "1.333.3",
     date: "2026-08-23",
     changes: [

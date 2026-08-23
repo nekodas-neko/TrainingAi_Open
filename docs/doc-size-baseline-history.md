@@ -1570,3 +1570,18 @@ because it is the scope of the next task: three of the five want the same inject
 split, and one is a `sourceRank` move. Without it the next implementer re-walks the graph — and is
 likely to walk it wrong, since following type-only imports too makes the answer look like "the whole
 Postgres layer".
+
+## 2026-08-23 — `docs/implementation-backlog.md` 11463 → 11482, of which 8 lines are this branch's
+
+**The new base-tree ratchet made this a two-line decision instead of an investigation.** It reported
+*"over by 19 — 8 of which this branch added"*: `main` was already 11 over its own baseline, and
+`fix/bounded-scan-photo-payload` contributed 8. Before LA-16 that would have read as one number and
+the honest options would have been to trim someone else's landed work or raise blind.
+
+The 8 are BF-4's shipped/still-open annotation. That entry stays queued — the payload bound is Lane
+B's half and it merged; the named dated change (#112's structured-output conversion), the
+client-elapsed-time sink and the Railway cold-start check are all Lane A's and all open. An entry
+that shipped half of itself has to say which half, or the next session re-derives the split.
+
+Trimmed from 19 to 8 before raising: what went was a second telling of the field-name trap and of
+why the payload was demoted, both of which the entry already states above the annotation.

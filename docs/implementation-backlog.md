@@ -562,6 +562,25 @@ route — the one candidate that could not be tested from a sandbox session.
 the identification stays as accurate as it is today; and the client-side elapsed time is recorded
 somewhere, so the next "it feels slow" starts from a number.
 
+---
+
+**✅ THE PAYLOAD BOUND SHIPPED 2026-08-23 (v1.333.4, Lane B). The rest of this entry is open and it
+is all Lane A's.** [Journal](overview/entries/2026-08-23-bounded-scan-photo-payload.md).
+
+Both client paths bounded to a 1024 px longest edge — `getPhoto` gains `width`/`height` (the
+`ImageOptions` pair, verified against pinned `@capacitor/camera` 8.2.0, **not** `takePhoto`'s
+`targetWidth`/`targetHeight`), gallery via the new `lib/media/downscale-image.ts`. **Measured:
+4000 × 3000 → 1024 × 768, base64 2,266,776 → 302,944 chars, −86.6%.**
+
+**⚠️ Not closed, and NOT shown to be the owner's regression** — Correction 2 above already demoted
+the payload to a standing inefficiency. Open, all Lane A's:
+- **#112 is untouched.** The schema / `maxOutputTokens` experiment is a route change.
+- **Client elapsed time is still recorded nowhere.** It needs a sink — `reportClientError` writes to
+  `error_events`, which session-start reads for faults, so timing rows do not belong there.
+- **Railway cold start** — still untestable from a sandbox.
+- **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
+  never, which looks exactly like "the fix did not help".
+
 ### [workouts][activity][app-shell] LB-1 — nothing in the app can edit or delete a logged workout, exercise or activity
 
 - **Branch:** `feat/day-screen-edit-delete`
