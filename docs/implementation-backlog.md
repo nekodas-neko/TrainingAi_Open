@@ -1615,33 +1615,6 @@ keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchD
 route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
 controls, so a third target needs a layout decision rather than another icon.
 
-### [nutrition][app-shell] Q-327 — the meal photo needs somewhere to be picked
-
-- **Branch:** `feat/saved-meal-thumbnail-ui`
-- **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-396 once the column shipped.
-- **Lane:** B
-- **Lane B** (`components/nutrition/`). The storage half is done and merged —
-  see [`entries/2026-08-19-saved-meal-thumbnail.md`](overview/entries/2026-08-19-saved-meal-thumbnail.md).
-
-**What already exists, so it is not rebuilt.** `saved_meals.image_data_uri` (Postgres migration 204,
-local SQLite **v28**), carried by both saved-meal routes and by the offline `pushMutations` replay,
-mirrored locally, and hydrated back. `POST`/`PUT /api/nutrition/saved-meals` accept `imageDataUri`:
-**omit it to leave a stored photo alone, send `null` to remove it.** `SavedMeal.imageDataUri` is on
-the type, so a picker has somewhere to read from and write to.
-
-**What is left — the pick, and the downscale that makes the cap true.**
-- **A 64 px tile to the left of the meal-name field in Edit Meal**, tapping to camera/gallery, with a
-  clear action to remove. Edit Meal already owns the meal and already saves it, so the image rides
-  the existing write; the tile doubles as the preview, so there is no separate "current photo" row.
-  Prototype: <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6> (screen 4).
-- **Downscale on-device with a canvas BEFORE upload — 128 × 128 WebP, ~6 KB.** The server rejects
-  anything over **16 KB** (`SAVED_MEAL_IMAGE_MAX_BYTES`), so without the downscale a normal phone
-  photo is a 400 every time and the feature reads as broken.
-- **Show the byte size on the tile after a pick.** This feature's whole risk is the cap slipping, and
-  nothing fails loudly when it does — the outbox just gets slower. A number the user can see is the
-  cheapest tripwire, and the audit view now carries `image_bytes` for the same reason.
-
-
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 
 - **Branch:** `feat/free-activity-metrics`

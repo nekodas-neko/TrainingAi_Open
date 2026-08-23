@@ -6,8 +6,7 @@
 **Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-5`
 
 ## Now
-**#333** (Q-398) is the only thing open, and green at the time of writing. #332 and everything
-before it merged.
+**#334** (Q-327) is open. Everything before it merged — #331, #332, #333 this run.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
@@ -27,12 +26,12 @@ before it merged.
 - **Q-406** (#331) — `FoodRow`; the diary row and the external-search row deliberately **not**
   converted (that would delete the only way to correct a logged food before Q-395a exists).
 - **Q-418's screen half** (#332) — HR, steps and elevation on the free walk. The pill stays Lane A.
+- **Q-327** (#334) — the meal photo tile, the half Q-396's column had been waiting for.
 - **Q-398** (#333) — plan meals become saved meals, idempotent on the existing `saved_meal_id`.
   **It uncovered a live outage:** five `app/api/nutrition/meal-plan*` routes read the request body
   and then validated an unassigned `raw`, so the whole meal-plan write surface answered 400 to every
   request. Fixed in that PR (Lane A paths, taken deliberately) with
-  `scripts/check-json-body-parsed.js` holding the class shut — Custom Rules becomes **53** when it
-  lands.
+  `scripts/check-json-body-parsed.js` holding the class shut. Custom Rules is **53**.
 
 ## Next
 `node scripts/next-item.js --lane B`, and **re-verify the premise first** — most entries taken this
@@ -43,9 +42,8 @@ its reference, is nowhere in the tree — `docs/design/` holds cardio, score-row
 and nothing for nutrition. **Do not take Q-395a/b/c**, and do not convert Q-406's last two call
 sites, until they are committed under `docs/design/`. Raised with the owner 2026-08-23.
 
-Non-blocked candidates: **Q-327** (meal photo picker), **Q-409** (recipe URL import — read its
-security notes first), **Q-407** (its `Needs: Q-398` is now cleared). LB-3 sits low, as its own
-placement says.
+Non-blocked candidates: **Q-409** (recipe URL import — read its security notes first), **Q-407**
+(its `Needs: Q-398` is now cleared). LB-3 sits low, as its own placement says.
 
 ## Do not re-litigate
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.
@@ -68,8 +66,9 @@ placement says.
 - A **drain run** confirming `/admin/oura-ble` holds still while the log streams (Q-532).
 - **Q-450's device path** — the E2E run took the web fallback, not SQLite + outbox.
 - **Q-421's MET card**, **BF-4's `getPhoto` bound**, **Q-326's reassign dialog**.
-- **LB-1's four controls**, **#320's two cards**, **Q-398's copy** — all take the web fallback here,
-  so every local-store mirror and outbox mutation in them is verified by reading only.
+- **LB-1's four controls**, **#320's two cards**, **Q-398's copy**, **Q-327's camera branch** — all
+  take the web fallback here, so every local-store mirror and outbox mutation in them, and the
+  native camera prompt, are verified by reading only.
 - **Q-418's whole point** — every number on that screen needs a Polar H10, and the sandbox has none.
 
 ## Claimed paths

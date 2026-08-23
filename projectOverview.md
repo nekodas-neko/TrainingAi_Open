@@ -35,6 +35,11 @@ with `Gate: device`. **Item (3) needed no work:** battery polls have persisted s
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
 
+**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to
+128 px WebP (~6 KB) so it fits `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because
+nothing else fails loudly when that cap slips. The storage half shipped with Q-396 and no screen
+could reach it.
+
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
 routes — create/rename/activate/delete a plan, restructure it, edit one meal, save dietary
 restrictions — read the request body and then validated a variable nothing had assigned, so every
@@ -223,6 +228,11 @@ order.
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 
 **Fixed in v1.339.0** — the free-activity screen now carries **HR** in its primary row beside distance and pace (with the guided walk's staleness guard), plus a secondary line with the **running step total** and **elevation gained**; the guided walk got the same step readout so the two agree ([`journal`](docs/overview/entries/2026-08-23-free-activity-metrics.md)). The strap was already streaming beats — the same one feeding that screen's cadence — and the number was already being saved afterwards; it was invisible only while walking, the one time it can be acted on. **Keep: every number here comes from a Polar H10 over BLE and the sandbox has no strap** — `HrReadout` renders its `--` placeholder and `stepsEstimate` is null on every path exercised, so the thing the entry is about (a connected strap putting a live bpm on that screen) and the staleness guard are both unverified. **🟠 The Android pill is still static** and stays Lane A: the plugin exposes only `addWatcher`/`removeWatcher`/`openSettings`, `backgroundMessage` is fixed at watcher creation, and re-adding the watcher would restart location tracking mid-walk.
+
+### [nutrition] ⚠️ The meal photo can be picked; the camera branch has not run (Q-327, v1.341.0)
+
+**Shipped.** `MealPhotoTile` beside the meal-name field in Edit Meal — picker and preview in one tile, so the image rides the save that was already there. `downscaleToDataUrl` gained a `mimeType`, and **requests** WebP rather than assuming it: `toDataURL` answers an unsupported type with a PNG and no error, several times the bytes the 16 KB cap was sized against, so it checks what came back. Guarded by `e2e/meal-photo-picker.spec.ts`, which asserts the **stored** row is a WebP under the cap after feeding it a photo four times past it ([`journal`](docs/overview/entries/2026-08-24-saved-meal-photo-picker.md)).
+- **Keep: not device-verified.** `Capacitor.isNativePlatform()` is false in a browser, so every run took the `<input type=file>` branch — the camera/gallery prompt, the tile's tap target on the S25, and the local-store mirror of the image column are all verified by reading only.
 
 ### [nutrition] ⚠️ Plan meals become saved meals; the copy has not run on the device (Q-398, v1.340.0)
 

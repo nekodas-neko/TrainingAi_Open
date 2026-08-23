@@ -115,6 +115,11 @@ Live at the time of writing (2026-07-30):
   Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (Log Food as
   one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
   before starting any phase; the phases point back rather than copying its decisions.
+- ⚠️ **Saved meals can carry a photo at last** (Q-327, 2026-08-24, v1.341.0) — a 64 px tile in
+  Edit Meal, downscaling to 128 px WebP so the picture fits `SAVED_MEAL_IMAGE_MAX_BYTES`. The
+  storage half had shipped with Q-396 and nothing could reach it. **Not device-verified**: the
+  native camera branch never runs in a browser —
+  [`journal`](../../overview/entries/2026-08-24-saved-meal-photo-picker.md).
 - 🔴 **The whole meal-plan write surface was dead, and is fixed** (Q-398, 2026-08-24, v1.340.0).
   Five routes guarded the request body and then validated a variable nothing assigned, so creating a
   plan, renaming/activating/deleting one, restructuring it, editing a meal and saving dietary
