@@ -19,7 +19,14 @@ export async function GET(req: Request) {
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const raw = new URL(req.url).searchParams.get('date')
-  const date = (raw ? normalizeDateParamIso(raw) : null) ?? todayInTz(tz)
+  // Q-453: `(raw ? normalize(raw) : null) ?? today` reads a normaliser's `null` as "use the
+  // default", but `null` here means two different things — *absent* (default to today, which the
+  // caller asked for by omitting it) and *present but malformed* (a caller who asked for a specific
+  // day and mistyped it). This route was the only one of eleven that conflated them: nine siblings
+  // 400, and the response carries no echo of which date it answered for, so a caller asking for the
+  // 10th with a typo got the 17th's numbers with nothing indicating the substitution.
+  const date = raw ? normalizeDateParamIso(raw) : todayInTz(tz)
+  if (!date) return NextResponse.json({ error: 'Invalid date' }, { status: 400 })
 
   if (!rateLimit(`${userId}:training-stress`, 30, 60_000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })

@@ -4990,28 +4990,6 @@ session working from a temporarily restored copy.
 - **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
   than the release and tag, so the release id and tag survive the swap.
 
-### [platform][readiness] Q-453 — `/api/training-stress` silently answers for *today* when handed a malformed date; its ten siblings all reject it
-
-- **Branch:** `fix/training-stress-date-param-validation`
-- **Added:** 2026-08-17 · review sweep (failure-cells lens, **live request matrix**) ·
-  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
-- **Placement:** lower-mid. Wrong-day data returned as if correct, but no client is known to send a
-  malformed date today.
-- **Measured.** All 11 `app/api` routes reading a `date`/`localDate` param, hit live with a real
-  session cookie. Nine reject `?date=not-a-date` with **400**. `/api/oura/hr-window` takes
-  `start`/`end`, not `date`, and 400s throughout. **`/api/training-stress` returns 200.**
-- **Cause — `app/api/training-stress/route.ts:22`:**
-  ```ts
-  const date = (raw ? normalizeDateParamIso(raw) : null) ?? todayInTz(tz)
-  ```
-  A malformed `date` normalises to `null` and falls through to *today*. The response carries **no echo
-  of which date it answered for**, so a caller asking for the 10th with a typo gets the 17th's numbers
-  with nothing indicating the substitution.
-- **This is not the `[-/]` separator class** — that came back clean (all 11 routes accept both
-  separators; see the review). It is the adjacent one: a normaliser whose `null` return is read as
-  "use the default" rather than "reject". Worth grepping for the same
-  `normalizeDateParam*(...) ?? today…` shape elsewhere when fixing.
-
 ### [platform] Q-454 — two routes validate their params before checking auth, out of 122
 
 - **Branch:** `fix/auth-before-param-validation`
