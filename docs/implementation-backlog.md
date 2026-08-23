@@ -1979,6 +1979,10 @@ route from a logged exercise to its 1RM trend outside Stats. Note the row alread
 controls, so a third target needs a layout decision rather than another icon.
 
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
+- **Gate: device** — and the gate is the entry's own instruction, not a formality: it says
+  *verify before adding metrics*, because background tracking with the screen off has never been
+  confirmed. That check is a 20-minute pocketed walk, and the pill work is a native plugin patch
+  needing an APK, so neither half is reachable from a session.
 
 - **Branch:** `feat/free-activity-metrics`
 - **Lane A** — what remains is Kotlin and needs a new APK.
@@ -3493,6 +3497,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   dump hashing identically before and after). This item is the affordance only.
 
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
+- **Gate: owner** — the route shipped; what is left is a press, and it needs an admin session
+  cookie against production. A session has read-only DB access (`claude_readonly`, which cannot
+  `VACUUM` by design) and no way to obtain one, so this cannot leave the queue from here.
 
 - **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
 - **Added:** 2026-08-18 (found while measuring production for Q-541)
@@ -3531,120 +3538,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   territory (`components/**`, Lane B) — so until then it is a curl with an admin session cookie.
   The same route is what reclaims the space after Q-541's backfill and after migration 193's index
   drop, which is why it was generalised rather than copied.
-
-### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
-
-- **Branch:** `fix/oura-raw-samples-index-and-vacuum`
-- **Added:** 2026-08-17, from the live `disk_full` incident (see the `projectOverview.md`
-  Known-Issues row for the measurements).
-- **This is deliberately the non-destructive half.** The retention question — what `body_hex` is
-  for and how long the server must keep it — is a separate, owner-gated decision with an
-  irreversible edge. Everything here reclaims space **without deleting a single row**, and should be
-  done first, because it may be sufficient on its own.
-- **Three findings, in order of likely payoff:**
-  1. **The dedup index stores the payload a second time.** It covers
-     `(user_id, ring_timestamp_ds, tag, body_hex)`, so `body_hex` is in both the heap and the
-     index — which is why indexes are **291 MB against a 175 MB heap**. Indexing a hash of the
-     payload instead (generated column, or an expression index) preserves the dedup guarantee on a
-     fraction of the bytes. **Verify the uniqueness semantics survive** before proposing it: a hash
-     collision would silently drop a distinct event, which is exactly the loss the dedup exists to
-     prevent, so the column must remain part of the equality check even if it leaves the index.
-  2. **Autovacuum has never run on this table.** `last_autovacuum` and `last_analyze` are both
-     null and `n_live_tup` reads 0. Find out why — the default thresholds scale with table size,
-     so a table that grew fast from empty can outrun them. No statistics also means the planner has
-     been guessing on the largest table in the database; the `DISTINCT ON` that triggered the
-     incident takes 6.5 s even with disk available.
-  3. **`work_mem` is 4 MB** and the failing query sorts 1.1M rows. Raising it for that path, or
-     giving the query an index that avoids the sort, removes the temp-disk dependency that turned a
-     full volume into a user-visible error.
-> **⚠️ The 500 MB target is withdrawn — 2026-08-18, and this is settled rather than deferred.**
-> Railway **cannot shrink a volume**: *"Down-sizing a volume is not currently supported, but
-> increasing size is supported."* And it does not need to, because Railway bills *"only … the amount
-> of storage used by your volumes,"* not the provisioned size — so the 5 GB volume costs exactly what
-> a 500 MB one would at the same usage. Reverting would mean a dump/restore onto a fresh volume,
-> i.e. real downtime and risk on the database holding the ring archive, to save nothing. **Do not
-> attempt it.** Treat every "return to stock 500 MB" line below as historical context for why the
-> work was prioritised, not as an outstanding action.
->
-> What was genuinely lost is the tripwire: 500 MB is what made the bloat scream rather than creep, and
-> 5 GB is ~30 years of headroom at the post-packing rate. Replace it deliberately — a database-size
-> line in the session-start orientation read, beside the existing `error_events` check.
-
-- **The target is concrete:** the owner raised the volume 500 MB → 5 GB as a temporary mitigation
-  and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
-  estimating, and say whether 500 MB is reachable without touching retention.
-- **Do not run a Full re-sync while this is open** — that is what triggered the incident.
-
-- **⚠️ Finding 2 above is a measurement artifact — do not chase it.** Re-measured at 08:04 and 08:45
-  UTC, `oura_raw_samples` reads `last_autovacuum = 2026-08-17T07:57:35Z` and
-  `n_live_tup = 1,097,626`. **Autovacuum has run, twice, today.** The null/zero reading was taken
-  while the statistics were still empty: an unclean shutdown makes Postgres discard the stats file
-  on recovery, and `stats_reset` stays `NULL` because only an explicit `pg_stat_reset()` sets it —
-  so freshly-zeroed counters are indistinguishable from "never" unless you know the crash happened.
-  The same artifact showed on `error_events`, which read `n_live_tup = 0` while really holding 6,222
-  rows. **Every counter on this table is "since ~07:42 recovery", not lifetime** — which matters for
-  finding 1, since index `idx_scan` counts are now a ~1-hour window, not evidence of disuse.
-- **What actually consumed the space, proven:** `n_tup_ins = 0`, `n_tup_upd = 681,005`,
-  **`n_tup_hot_upd = 0`**. A full-table `measured_at` re-stamp — the Full re-sync was the *trigger*,
-  a catch-up drain, and the re-stamp it prompts (ops-doc I14/I25) is the *mechanism*. The table went
-  360 → 666 MB while live rows went **down** by 557 and `body_hex`/`event_name` did not move at all.
-  Zero new data; ~306 MB of pure bloat.
-- **This makes a fourth finding, and it is the one with leverage.** `measured_at` is indexed, so **no
-  update that changes it can ever be HOT** — each rewrites a heap tuple plus an entry in all four
-  indexes. `measured_at` is also the *only* indexed column such a re-stamp changes. **Dropping
-  `idx_oura_raw_samples_user_measured` (117 MB, and it exists to serve range queries that can be
-  expressed as ds ranges instead) makes the whole operation HOT-eligible** — so it is both a space
-  win and the fix for the mechanism. Q-46's `IS DISTINCT FROM` guard is present and correct at
-  `adapter.ts:4954`; **it is not the bug and must not be "re-fixed"** — it can only skip a re-stamp
-  writing back the same value, and the Q-71/I25 clock correction changed every row's derived value.
-- **Two more, for sequencing:** (a) the owner must run `VACUUM FULL` (existing admin button) once the
-  re-stamp is confirmed finished — it reclaims the ~306 MB and gets the DB to ~465 MB, under stock;
-  (b) **do not revert the volume to 500 MB until the `measured_at` index is dropped**, or the next
-  prescribed re-stamp refills it. Add a pre-flight free-space guard to the redecode route: the
-  operations manual prescribes Redecode as the remedy for five failure modes (I12, I14, I19, I20,
-  I25), so the documented fix procedure is itself a disk-fill hazard.
-- **⚠️ Finding 4 is NOT a drop-in index drop — measured 2026-08-17 (Lane A).**
-  `idx_oura_raw_samples_user_measured` (118 MB, `idx_scan` 14 in the ~1 h since crash recovery) has
-  **two live consumers**, and both break into a sequential scan of the largest table in the DB if it
-  goes:
-  1. `getLatestOuraBleMeasuredAt` (`slices/oura.ts:173`) — `WHERE user_id AND measured_at IS NOT
-     NULL ORDER BY measured_at DESC LIMIT 1`. Without the index this is a full scan per call.
-  2. `getOuraRawSamplesForTags` (`adapter.ts:6446`) — `WHERE user_id AND tag IN (…) AND measured_at
-     >= now() - N days ORDER BY measured_at`.
-  This entry's *"it exists to serve range queries that can be expressed as ds ranges instead"* is a
-  **plan, not a fact**: expressing them as ds ranges means converting the window bound through the
-  clock anchors at both call sites, and `getOuraRawSamplesForTags` is on a read path. So the order is
-  **rewrite both call sites to be ds-keyed, prove equivalence, then drop the index** — three steps,
-  not one. Do not drop it first and measure afterwards.
-- ✅ **Finding 4 is DONE, 2026-08-18 (Lane A), in that order.** Both consumers now convert their
-  wall-clock window through the anchors and read ds-keyed and two-tier; migration **193** drops the
-  index (**136 MB** by then, on a 699 MB table whose indexes were 443 MB). Three consequences the
-  entry did not anticipate, recorded so they are not re-derived:
-  (a) **the stored `measured_at` and `event_name` columns are now dead**, so the redecode's re-stamp
-  loop — *the mechanism of the outage* — was writing values nothing reads, and is a documented no-op;
-  the pre-flight free-space guard this entry asks for is therefore moot, because the operation it
-  guards no longer exists;
-  (b) **`/api/oura/stats` read `connected` off "we can name a last-measured time"**, which stopped
-  being the same question once the time became derived — split into `hasOuraBleSamples`, or a ring
-  with frames but no resolvable anchor would have silently taken the Health tab's whole Ring section;
-  (c) **dropping the now-dead columns is NOT done** — that is a data-dropping migration and
-  owner-gated, whereas the index drop is reversible with one `CREATE INDEX`. Findings 1–3
-  (payload-in-index, autovacuum, `work_mem`) are untouched and still open.
-- **The redecode's own cost, since this entry gates it.** `POST /api/oura-ble/samples/redecode`
-  re-stamps `measured_at` over every row (its own opening comment says so), which is exactly the
-  non-HOT full-table rewrite that produced the ~306 MB of bloat. Measured 2026-08-17 **after** the
-  incident: DB **786 MB**, `oura_raw_samples` **667 MB** (245 MB heap / 422 MB indexes). On the
-  temporarily-raised **5 GB** volume a redecode has ample headroom; on the stock 500 MB it does not.
-  **So the sequencing is: redecode now while the volume is large, and do not revert to 500 MB until
-  the index work above has landed** — otherwise the next prescribed redecode refills it.
-- **Answering this entry's own closing question — is 500 MB reachable without touching retention?
-  Yes, and it is now measured rather than estimated.** `VACUUM FULL` → ~465 MB; + the index work
-  → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB. **No retention change is
-  needed, and the owner has chosen none** (Q-542). The one caveat is that *reaching* 500 MB and
-  *holding* it differ: vacuum alone re-crosses it in ~5 days, this entry plus Q-540 in ~7 weeks, and
-  **Q-541 (repack) in ~3 years**. Full analysis:
-  [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
-
 
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
@@ -3735,8 +3628,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
 - **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
   from `tag`** — the Kotlin/TS cross-language parity test already pins that mapping. `text` → `bytea`
-  is a lossless re-encoding that halves `body_hex` (26 MB → ~13 MB) and shrinks the 78 MB dedup index
-  with it. Together: ~45–50 MB, and ~328 B/row → ~270 B/row.
+  is a lossless re-encoding that halves `body_hex` and shrinks the dedup index with it.
+- **⚠ The sizes above are pre-packing and are now much smaller — re-measured 2026-08-23.** The table
+  is **315k rows / 87 MB** (41 MB heap, 46 MB indexes), not the 1.1M / 666 MB this entry was costed
+  against, and the dedup index is **22 MB**, not 78. `body_hex` averages **24 characters**, 7.3 MB
+  across every row. So the `bytea` half is worth roughly **4 MB of index and 4 MB of heap**, not
+  ~25 MB. Take the `event_name` half on its own merits; the `bytea` half is now small enough that
+  Q-541's *"skip it, a packed blob is already bytea"* is clearly the right call rather than a
+  close one.
 - Needs `VACUUM FULL` to reclaim (ops-doc I17).
 
 
