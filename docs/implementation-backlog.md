@@ -581,6 +581,60 @@ the payload to a standing inefficiency. Open, all Lane A's:
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
+### [nutrition] 🟠 BF-6 — "I've finished logging" sits below everything, and has been pressed zero times
+
+- Lane: B — one JSX reorder in `app/nutrition/nutrition-content.tsx`
+
+**Owner report, 2026-08-23 (verbatim):** *"id also like to move the finish logging button and swap it
+with the end of day button. end of day should be at the very bottom. finish logging should be right
+after the meals."*
+
+**This reads as a layout preference and is not one.** The button feeds Q-387's adaptive-TDEE
+calibration, which treats an unmarked day as EXCLUDED — so an unpressed button does not degrade the
+estimate, it withholds it entirely. Measured in production, 2026-08-23:
+
+> **0 of 55 `day_checkins` rows have `food_logging_completed_at` set**, across 2026-07-02 → 2026-08-24.
+
+The owner's own screenshot agrees: *"0 of 10 days marked · 10 more to calibrate your maintenance"*.
+**The feature has never received a single input since it shipped**, and the calibration it exists to
+feed has therefore never run. (Standard caveat: `claude_ro` is row-scoped to one user, so this is the
+owner's days, not the system's — which is exactly the population that matters here.)
+
+**Current order on `main`** (`app/nutrition/nutrition-content.tsx`):
+
+| line | element |
+|---|---|
+| 618 | `<MealCard>` ×N |
+| 638–646 | **End of Day** button (opens the AI chat) |
+| 649 | `<WeeklyNutritionChart>` + adherence |
+| 652 | `<SupplementsSection>` (today only) |
+| 663 | **`<FoodLoggingComplete>`** ← last element on the screen |
+
+**Requested order:** meal cards → `<FoodLoggingComplete>` → chart → supplements → **End of Day last**.
+
+That places the control immediately after the thing it is about, and puts the day-review entry point
+at the end of the day's screen, which is where a day-review action belongs.
+
+**⚠️ There is a code comment that argues against this change — it must be rewritten, not ignored.**
+At line 638:
+
+> *"End of Day deliberately stays put: it is a daily-review feature, and merging it with Home's 'Your
+> Day in Review' banner is Q-112's call, not this placement change's. Moving it halfway would be
+> worse than either end state."*
+
+That comment was defending against a *merge with Home's banner*, not against moving it down the same
+screen — and it predates the measurement above. An implementer who reads it and stops has done the
+right thing with the wrong information, so **replace it in the same diff** with what is now true: the
+owner asked for this order, and the finished-logging control leads because nothing was reaching it.
+
+**Watch for, when reordering:** `<SupplementsSection>` and `<FoodLoggingComplete>` are both
+conditional on `selectedDate === todayStr` / `isToday`, so on a past date the tail of the screen
+changes shape — check the order still reads correctly on a back-dated day, not just on today.
+
+**Done looks like:** on the Nutrition screen the finished-logging card sits directly under the last
+meal card, End of Day is the last element on the page, both still behave correctly on a past date,
+and the misleading comment is gone.
+
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -10583,6 +10637,67 @@ since the CI link check (item 1) catches a botched rewrite immediately.
 > session writing a plan to `docs/superpowers/plans/` — not an implementer picking one up and
 > building from the entry.** Intake traced each against the current tree so the plan starts from what
 > the code actually does; it did not write the plans.
+
+### [app-shell][platform] 🔵 BF-5 — the week in review should be a page, not a banner that expands
+
+- Lane: ? — the route must return its numbers (A) before a page can chart them (B); the planning session splits it
+
+**Owner request, 2026-08-23 (verbatim):** *"rather than chevron type display; id rathee its own page
+that you can get to from a banner notifcation; or a permanent link in the health tab somewhere - the
+page shohld be more indepth; kinda like the training calendar entry; but for the whole week. so it
+can visually compare the week based on the metrics its talking about."*
+
+**Screenshot described, since the image will not survive into an implementer's session:** the Home
+tab, with a dismissible banner reading *"Your week in review is ready"* carrying a chevron and an X.
+Expanded, it shows five prose bullets — Training Load (5 sessions, 21,354 kg, +21% on 17,719 kg), PR
+Performance (103 kg bench, 97 kg squat, 161 kg hip thrust "among six others"), Recovery Metrics (HRV
+56 ms, readiness 66/100 down from 71, sleep 65/100, 6.7 h), Volume Focus (14 sets hamstrings, 12
+glutes), and a Recommendation. Every one of those is a number being *described* where it could be
+*drawn*.
+
+**⚠️ The blocker is in the route, and it is the whole reason this is not just a UI job.**
+`app/api/weekly-digest/route.ts` computes all of it — recap-week vs prior-week volume and session
+counts, per-muscle weighted sets, PRs, HRV, readiness, sleep score, weight change, illness, stress,
+resilience, OTS — then **flattens every value into a text `context` string, hands that to
+`generateText`, and returns `{ digest, weekStart }` where `digest` is prose** (line ~255). The
+structured data is computed and thrown away.
+
+So the first task is to have the route **return the metrics alongside the prose**. Two consequences
+worth stating plainly:
+- **Do not parse numbers back out of the LLM's text to draw the charts.** That is the same class of
+  mistake CLAUDE.md bans as `JSON.parse` of model output — and worse here, because the prompt already
+  says *"quote its numbers, never invent or recompute"*, which is a hope, not a guarantee.
+- **Storage holds prose only.** `ai_health_insights.insight` is a `text` column and the route
+  `upsert`s the digest string into it. A page that opens *last* week therefore has no stored numbers
+  to draw. Either add a JSONB column (**migration → Lane A**) or recompute the metrics on load and
+  keep only the prose cached. Recomputing is the cheaper first cut.
+
+**The plumbing the owner asked for mostly exists already:**
+- **The notification is already there and already deep-links.** `lib/day-review-reminders.ts:99`
+  schedules a local notification titled *"Your week in review is ready"* with
+  **`extra: { route: '/' }`** — it opens Home. Pointing it at a new page is a one-line change.
+- **The page shape to copy is the one the owner named.** `app/health/day/` is `page.tsx` (15 lines) +
+  `day-detail-content.tsx` (253 lines). A `app/health/week/` alongside it is the obvious form.
+- **The banner stays useful** as the entry point — `components/weekly-recap-banner.tsx` keeps its
+  once-per-week, dismissed-in-`localStorage` behaviour; the chevron becomes navigation instead of an
+  expander. The owner also asked for a permanent link in Health, so the page needs an entry point
+  that does not depend on a dismissible banner.
+
+**Two things to carry into the design, both from the screenshot:**
+- **"visually compare the week"** means the prior week is already half the story — the route computes
+  both weeks for volume and sessions, so a two-bar or overlaid comparison is free for those. HRV,
+  readiness and sleep are currently single averages; a daily series is what makes them chartable, and
+  whether that is in scope is a scoping decision, not an assumption.
+- **The digest text ends with a stray `*`** (*"maintaining these gains.\*"*) — a markdown artifact
+  reaching the user through `<Response>`. Small, but it is the kind of thing a page makes more
+  visible, not less.
+
+**Feature request, so the next step is a planning session** writing to `docs/superpowers/plans/` —
+intake traced it, it did not design it.
+
+**Done looks like:** a week-in-review page reachable from the notification and from a permanent
+Health entry point, drawing its charts from values the route returned rather than from parsed prose,
+with the recap week visibly compared against the one before it.
 
 ### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
 
