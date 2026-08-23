@@ -10441,6 +10441,115 @@ since the CI link check (item 1) catches a botched rewrite immediately.
 > building from the entry.** Intake traced each against the current tree so the plan starts from what
 > the code actually does; it did not write the plans.
 
+### [platform][workouts] 🔵 BF-9 — a trainer role: build a program for someone else and assign it to them
+
+- Lane: ? — new tables + authorization + routes are **A** (needs migrations); the trainer UI is **B**. The planning session splits it.
+
+**Owner request, 2026-08-23 (verbatim):** *"I want to be able to train people; which means assigning
+myself as a 'trainer' and being able to create workout and/or meal plans (meals can be deferred till
+later) and assign to other members/users. I.e my girlfriend is using the app; and I went onto her
+device and created a program - but Ideally I'd like a UI to be able to do that from my app as an
+admin/trainer."*
+
+**✅ DECIDED by the owner, 2026-08-23 — design accepted, and the population is now known.**
+Verbatim: *"Go with your reccomendation. There is about 3 users; and possibly 5 max in the future -
+all friends no outsiders - so risk woudl be accepted."*
+
+- **The recommended shape is approved:** a trainer **relationship** in its own table beside
+  `friendships`, not a boolean on `users`; and the friendship consent handshake copied as-is —
+  trainer requests, trainee accepts, trainee can revoke.
+- **Population: ~3 users today, 5 at most, all known to the owner.** That is a real scoping input and
+  it removes work: no permission matrices, no audit trail, no tenancy model, no invite-at-scale flow.
+  A trainer seeing more of a trainee's data than strictly necessary is acceptable here, so the plan
+  should not build fine-grained read scopes.
+
+**⚠️ What the accepted risk does NOT relax, stated once so the plan does not over-read it.** The
+owner's acceptance is about *who the people are*. Two things are unaffected because they are not
+threat-model questions:
+
+1. **The write-path ownership guards stay.** They exist to stop a **bug** writing to the wrong
+   account, not an attacker. With three to five people in one database, a mis-scoped write silently
+   corrupts a real person's training history — and the sync engine then propagates it to their
+   device. Trust between the users does not make a wrong `user_id` less wrong.
+2. **`isAdmin` still is not the trainer flag.** Admin is not a trainee permission, it is an
+   *operator* one: it opens `POST /api/admin/db-query` — read-only SQL over the owner's whole health
+   history — plus the error console and writes into the shared exercise catalogue. "All friends, no
+   outsiders" is an argument about trainees; it is not an argument for handing a training partner raw
+   SQL against production.
+
+Both are cheap. Neither is what the risk acceptance was aimed at.
+
+**The current workaround is the acceptance test.** Building a program for someone today means
+physically holding their phone. Done looks like: the same program, built from the trainer's own app,
+appearing on the trainee's device without anyone handing over a device.
+
+**More exists than expected — four pieces, none of which should be rebuilt:**
+
+| piece | where | what it gives |
+|---|---|---|
+| Consent handshake | `friendships` (`requesterId`/`addresseeId`/`status`), `lib/data/postgres/slices/social.ts` | `pending → accepted`, and **only the addressee can accept** (the accept is scoped `addresseeId = userId`) |
+| Discovery | `users.friend_code` (UNIQUE) | how one user names another without knowing their email |
+| Onboarding | `invited_emails` | how a new trainee gets an account |
+| Authorization pattern | `requireAdmin` (`lib/admin.ts:16`) | reads the row **every call** and ignores the JWT claim, because the claim can be 30 days stale |
+
+**The write layer needs no change, and that is the good news and the hazard in one sentence.**
+`saveProgram(db, userId, program)` (`lib/data/postgres/slices/programs.ts:155`) is **already
+parameterised by user id** — `app/api/workout-templates/route.ts:79` simply passes the session's own.
+So a trainer route is "call the same function with a different id". Which means **the only thing
+between this feature and one user writing into another's account is the guard the new route puts in
+front of it.** That is precisely the write-path-ownership class CLAUDE.md records recurring across
+three domains. Non-negotiable, from those rules: check the affected-row count before any dependent
+child write, Zod-whitelist the request body (never pass it into Drizzle `.set()` — `userId` is a
+settable column key and the TypeScript `Omit<>` is compile-time only), and ownership-verify every
+client-supplied row id.
+
+**Delivery to the trainee's device is already solved.** `programs` is one of the domains in
+`getSyncDelta(userId, …)`, so a program written under the trainee's id reaches their device on their
+next pull with no new sync work. Note the corollary: it will **not** appear on the trainer's own
+device, because it is not their data — the trainer UI reads it over the network, and that is correct.
+
+**🔴 The one design line that must not be crossed: `isAdmin` is not the trainer flag.** Admin is a
+*system* role — it gates `POST /api/admin/db-query` (read-only SQL over the owner's whole health
+history), the error console, and writes into `exercise_library`, the catalogue every user reads.
+Reusing it for "trainer" hands every trainer the operator console. Trainer is a **relationship**
+between two users, not a property of one, and it belongs in its own table alongside `friendships`
+rather than as a boolean on `users`.
+
+**And the consent must be the trainee's.** Copy the friendship handshake exactly: the trainer
+requests, **the trainee accepts**, and the trainee can revoke. A trainer must never be able to claim
+a client unilaterally. The owner's own case makes this easy to under-think — the trainee is his
+partner and consent is obviously present — but the mechanism has to hold for the case where it is not.
+
+**⚠️ Ask the owner before merging any of it.** This is an auth/authorization change, which CLAUDE.md
+puts in the confirm-first carve-out, and unlike most entries the carve-out is the whole feature rather
+than one migration inside it.
+
+**Related and currently open: PR #124** (`fix/exercises-route-admin-db-check`) tightens
+`isAdminUser` so an API route can no longer authorize from the stale JWT claim, and adds
+`scripts/check-admin-claim-in-api.js` to keep it that way. It has been green and awaiting the owner's
+word since **2026-08-18**. A trainer feature raises the stakes on exactly that check — landing #124
+first is the cheaper order.
+
+**Scope, per the owner:** workout programs first, **meal plans deferred**. Say so in the plan so the
+deferral is a decision rather than an omission.
+
+**Two things intake could not measure, stated rather than guessed:** how many real accounts exist
+(`claude_ro` is row-scoped to one user, and `pg_stat_user_tables.n_live_tup` read **0** for `users`,
+which is the planner-estimate artifact CLAUDE.md warns about, not a real count); and whether
+`friendships` has ever been used in production, for the same reason. The owner has stated there is at
+least one other active user.
+
+**This is the multi-user amendment becoming real work.** CLAUDE.md's Canonical Runtime section
+already records that other people use the app, that every write stays `user_id` scoped, and that the
+sync engine is *maintained and extended rather than reduced*, pointing at
+[`docs/device-agnostic-source-architecture.md`](device-agnostic-source-architecture.md). Read that
+before scoping — this entry is the first feature that depends on it being true.
+
+**Feature request, so the next step is a planning session** writing to `docs/superpowers/plans/`.
+Intake traced it; it did not design it. The plan owns: the relationship table and its states, which
+routes gain a trainer path, what a trainer may read about a trainee (a program is a write; progress
+is a much larger consent question), and how revocation behaves for programs already assigned.
+
 ### [workouts] 🔵 BF-7 — a 45-minute session cannot be chosen; the length picker offers three relative presets
 
 - Lane: ? — the model is `packages/shared/**` (**A**), the picker is `components/**` (**B**); engine half first
