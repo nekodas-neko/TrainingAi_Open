@@ -1323,7 +1323,18 @@ line and makes the rest of Q-395 additive rather than blocked.
   which is a visual change, not "identically to before".
 - **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
 
-### [nutrition][app-shell] Q-395 — the nutrition surface needs a visual pass, and three of the reasons it looks unfinished are measurable
+### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
+
+- **Lane:** B
+- **Needs:** Q-395c
+- **⚑ SPLIT INTO PHASES 2026-08-23 — this entry is now the specification, not the work.** It was a
+  269-line item describing sixteen screens, listed as one thing an implementer could pick up. The
+  work is **Q-406** (the shared row) → **Q-395a** (quantity sheet + Edit Meal) → **Q-395b** (the day
+  screen) → **Q-395c** (Log Food + the `My Foods` rename). Each phase points back here rather than
+  copying the decisions, so they still live in exactly one place. **Read this before any phase.**
+- **Why it parks behind its own last phase.** It is the completion checkpoint: when Q-395c lands,
+  this confirms the drawn screens match what shipped, sweeps the ~11 sheets finding 18 lists as
+  never drawn, and leaves the queue. Never pick it up as a work item.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
@@ -1591,6 +1602,76 @@ whether or not anyone draws them first.
   `pnpm check:rules`. Then the **on-device smoke run** — this is pure UI on the canonical runtime,
   in both themes, so a green `pnpm dev` is not sufficient evidence and a Known-Issues row is the
   fallback if no device is available.
+
+### [nutrition][app-shell] Q-395a — phase 2: the quantity sheet and Edit Meal's collapsing rows
+
+- **Lane:** B
+- **Needs:** Q-406
+- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. Drawings:
+  `unit-options.png` column A (expanded row) and its `Full Cream Milk` row (collapsed).
+- **Split out of Q-395 on 2026-08-23.** **Read Q-395 first** — it holds the decisions and this
+  entry does not repeat them.
+- **Scope.** The quantity sheet (new), and `ingredient-row.tsx` becoming `food-row.tsx` plus an
+  expanded state. Option A is decided: the unit rides on the number as a chip, `60 g` ⇄ `2 srv` on
+  one tap, built from `components/ui/segmented-tabs`. B and C are dead. Rows collapse when not
+  edited, one at a time, and the collapsed shape *is* Q-406's row — not a second component.
+- **⚠ A diary row never expands.** Finding 12 retired the list-row editor outright: a diary or
+  search row carries no editor at all. This entry governs the quantity control *where it does
+  appear* — the sheet, and the builder. Building an expanding diary row misreads both.
+- **The sheet must say where it came from:** the tapped row stays lit under the scrim, and the sheet
+  is headed `Ingredient 1 of 5 · <meal>`. Without that it reads as an unrelated screen.
+- **Edit Meal rides along:** the meal name becomes the screen title, the batch explainer becomes
+  the subtitle *"Makes 2 portions · 278 kcal each"*, and the servings control stays real at 48 px —
+  it was demoted to a subtitle in an early draw and the owner corrected that.
+- **48 dp floor applies here first** (finding 7): srv/g segments are the app's smallest targets at
+  40 px, stepper gap 6 px against 8 dp. One systemic change, not eight.
+- **Verification.** `check-hex-literals` lower per file · `check-component-size` clean, no new
+  BASELINE rows · `pnpm check:rules` · **device smoke run in both themes** — pure UI on the
+  canonical runtime, so a green `pnpm dev` is not sufficient.
+
+### [nutrition][app-shell] Q-395b — phase 3: the day screen, against the 11-section coverage list
+
+- **Lane:** B
+- **Needs:** Q-395a
+- **Spec:** Q-395, findings 14 and 16.
+- **Scope.** `nutrition-content.tsx` and its cards. Grouped sections with full-bleed dividers
+  replace gapped cards — that is most of the vertical space this screen spends on nothing. Extend
+  the shipped 96 px `MacroRing` with an arc **split by macro**; do not add a second ring.
+- **⚠ This entry carries the coverage checklist and checks it off in the PR.** The first draw showed
+  **3 of the 11 sections** this tab actually renders. In shipped order: ScreenHeader + date nav ·
+  CalorieBalanceBar · MacroRing · NutritionActionRow · MealPlanReviewCard · MealPlanSection ·
+  TdeeAdaptationCard · MealCard × meal types · End of Day · WeeklyNutritionChart ·
+  SupplementsSection. **A rework that quietly loses a section is the failure mode Q-395 exists to
+  prevent**, and this is the phase where it would happen.
+- **Headroom is not free.** Q-406's first half took `nutrition-content.tsx` 800 → 732; it is not on
+  the size baseline, so it is held to 800 hard. Extract before adding.
+- **Verification.** As Q-395a, plus the checklist above ticked off in the PR body.
+
+### [nutrition][app-shell] Q-395c — phase 4: Log Food becomes one screen, and `My Foods` becomes one name
+
+- **Lane:** B
+- **Needs:** Q-395b
+- **Spec:** Q-395, findings 15 and 17.
+- **Scope.** The capture step's six scattered entry points collapse to one screen: search across
+  everything · two tabs · a bottom row of capture actions.
+- **The decided details, all owner-set:** tabs are **`Recent` and `My Foods`**, two not four
+  (`Frequent` was a second ordering of what `Recent` already shows). Action row ordered **Photo ·
+  Barcode · Describe or enter**. Describe and manual entry are one sheet with the fields always
+  visible, so neither is a hidden mode. `My Foods` rows carry their P/C/F split beside the calorie
+  column; the label/QR and full breakdown stay inside the meal.
+- **⚠ The merge is a RENAME as well as a merge, and the rename must be swept in one pass.** Saved
+  meals and My Foods become one list. The owner caught the half-done version immediately — *"So im
+  picking up a discrepancy between My Meals and My foods? Whats the difference"* — and there is no
+  difference, which is the point. **Two names for one list is the defect.** Grep every user-facing
+  occurrence of *Saved meals*, *My Meals* and *My Foods* — sheet titles, tab labels, empty states,
+  toasts, `+ Add food` destinations, nav copy — and land on the single name together. A surface left
+  on the old name reads as a second list that is missing rows.
+- **⚠ Diff `FoodLibrarySheet` against `SavedMealsSheet` before merging them.** Carry every action
+  across — bulk delete, meal-plan linkage, the label path — or say in the PR which was dropped.
+  Order `My Foods` most-recently-used first so the merge does not bury saved meals.
+- **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
+  *My Meals*.
+
 
 ### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 
