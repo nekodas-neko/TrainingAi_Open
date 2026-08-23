@@ -10,6 +10,8 @@ interface DeloadToggleProps {
   /** Set when the readiness engine is asking for a deload today, so the toggle can say why it is
    *  worth using rather than sitting there unexplained. */
   recommended?: boolean;
+  /** Whether the live prescription is itself a deload, so "As prescribed" lands on the right half. */
+  prescribedDeload?: boolean;
   onChange: (next: boolean) => void;
 }
 
@@ -24,7 +26,7 @@ interface DeloadToggleProps {
  * Flipping it re-keys the workout-data cache and refetches, which is what the old navigation to
  * `?aiDeload=1` did; the difference is that it is now reversible without leaving the screen.
  */
-export function DeloadToggle({ value, disabled = false, recommended = false, onChange }: DeloadToggleProps) {
+export function DeloadToggle({ value, disabled = false, recommended = false, prescribedDeload = false, onChange }: DeloadToggleProps) {
   // Always one of Full/Deload, so `hasSelection` is unconditionally true.
   const intensityGroup = useRovingRadioGroup(true);
   return (
@@ -45,9 +47,12 @@ export function DeloadToggle({ value, disabled = false, recommended = false, onC
         aria-label="Intensity for today"
         className="grid grid-cols-2 gap-1 rounded-xl bg-muted/60 p-1"
       >
+        {/* "As prescribed" follows the prescription rather than sitting permanently under Full.
+            When the engine has already applied a deload, Full is an OVERRIDE of it — and saying "as
+            prescribed" there is how the screen came to contradict the card below it (BF-8). */}
         {[
-          { on: false, label: "Full", sub: "As prescribed" },
-          { on: true, label: "Deload", sub: "Lighter loads" },
+          { on: false, label: "Full", sub: prescribedDeload ? "Override" : "As prescribed" },
+          { on: true, label: "Deload", sub: prescribedDeload ? "As prescribed" : "Lighter loads" },
         ].map((opt, i) => {
           const active = opt.on === value;
           return (

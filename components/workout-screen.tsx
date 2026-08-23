@@ -21,6 +21,7 @@ import {
   defaultRpeFromPct,
   applyDeloadReverts,
   exerciseSetCount,
+  sessionContextLabel,
 } from "@/components/workout/utils";
 import { estimateOneRm } from "@trainingai/shared/1rm";
 import type { ExerciseSummaryData, SessionLogEntry } from "@/components/workout/types";
@@ -105,7 +106,6 @@ interface WorkoutScreenProps {
 
 export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverride }: WorkoutScreenProps) {
   const tz = useUserTimezone();
-  const { deload, setDeload, recommended: deloadRecommended } = useDeloadChoice(!!aiDeload);
   // Subscribe with a shallow selector picking exactly the members used below, so
   // the orchestrator only re-renders when one of these changes — not on every
   // unrelated store mutation. Actions have stable identity (no re-render cost).
@@ -217,6 +217,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
     signals: { exercises: Array<{ sessionExerciseId: string; name: string; current1rm: number | null; role: string; rm1Trend: 'up' | 'flat' | 'down'; rm1ChangeKg: number }> };
   } | null>(null);
   const [periodizationLoading, setPeriodizationLoading] = useState(false);
+  const { deload, setDeload, recommended: deloadRecommended, prescribedDeload } = useDeloadChoice(!!aiDeload, periodization?.state);
   // Guards the stale-session-id self-heal (below) against a loop: records the id we've already
   // tried to re-resolve after an AI 404, so we re-resolve each dead id at most once.
   const staleSessionIdRecoveredRef = useRef<string | null>(null);
@@ -1808,7 +1809,7 @@ export default function WorkoutScreen({ sessionType, userId, aiDeload, wasOverri
       onBack={handleBack}
       onSkip={advance}
       sessionName={sessionDisplayName || sessionType}
-      phaseStatus={phaseStatus}
+      sessionContext={sessionContextLabel(phaseStatus, deload)}
       isBaseline={phaseStatus?.isBaseline ?? false}
       activeInjuries={activeInjuries}
       onRpeChange={store.setRpeValue}

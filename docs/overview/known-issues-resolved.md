@@ -1642,3 +1642,34 @@ still stand. Re-measured that morning it is **819 MB**, up from 786 the day befo
 `measured_at` sweep — are what reclaim the space. One cheap win was found and filed rather than
 taken: **Q-315**, `error_events` holding 4 live rows in 49 MB, reclaimable by a single `VACUUM FULL`
 with nothing at risk.
+
+### [platform] ✅ The server side of the timezone problem does not exist — verified at every layer below the routes (Q-480, 2026-08-18)
+
+- **A verification sweep, written up because a clean result is a result.**
+  [`docs/reviews/2026-08-18-server-tz-and-rate-limit-verification.md`](../reviews/2026-08-18-server-tz-and-rate-limit-verification.md).
+  Sweep 11 concluded "the server is correct" by counting `todayInTz()` **inside route files**, which
+  is not the whole server — a blameless route can still get a Brisbane answer if the repository
+  function it calls defaults the timezone. This sweep went looking for that half. **It is not there.**
+- **Checked and clean:** every caller of the three tz-defaulting repository helpers
+  (`getCalendarData`, `getRecentTrainedDays`, `getNextSession`) passes the session timezone; all
+  **four** timezone-sensitive SQL sites in `lib/data` interpolate a parameter, with **no hardcoded
+  zone string anywhere in the repository layer**; and every call site of the shared sleep helpers
+  (`nightSessions`, `isNightWindow`, `sleepScoreBaselines`, `sleepDurationTrend`, `sleepScoreTrend` —
+  the ones that decide which calendar day a night belongs to) passes `tz`. Zero local re-declarations
+  of `DEFAULT_TZ`.
+- **This bounds Q-477.** The wrong-timezone problem is **exclusively client-side**; its fix does not
+  need to touch `lib/data` or `packages/shared/src/health`.
+- **Q-480 is the one finding, and it is a documentation correction.** `CLAUDE.md` says *"Repo
+  day-window helpers currently **hardcode** `DEFAULT_TZ`"*. They do not — they take it as a default
+  parameter that every caller overrides. The stale line marks the repository layer as known-broken, so
+  an implementer taking Q-477 would start there and find nothing. Filed rather than edited directly,
+  because `CLAUDE.md` is the contract all five agents read.
+- **Rate limiting swept in the same pass, also clean:** all **13** routes calling
+  `generateObject`/`generateText`/`streamText` are rate-limited, and **all 104 `rateLimit` keys are
+  user- or IP-scoped** — zero global keys, so no route where one user's traffic can throttle another's.
+- **Not covered:** whether any limit is set at the right *number*, the client half of rate limiting,
+  the APK, or production.
+
+> Moved out of `projectOverview.md` on 2026-08-24: a verification sweep that came back clean, whose
+> single finding — a stale `CLAUDE.md` line about the repo day-window helpers — has since been
+> corrected in that file. Nothing owed.
