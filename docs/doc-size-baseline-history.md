@@ -1571,12 +1571,30 @@ split, and one is a `sourceRank` move. Without it the next implementer re-walks 
 likely to walk it wrong, since following type-only imports too makes the answer look like "the whole
 Postgres layer".
 
-## 2026-08-23 — `docs/implementation-backlog.md` 11463 → 11482, of which 8 lines are this branch's
+## 2026-08-23 — `projectOverview.md` 7924 → 7927, `docs/implementation-backlog.md` 11463 → 11474
 
-**The new base-tree ratchet made this a two-line decision instead of an investigation.** It reported
-*"over by 19 — 8 of which this branch added"*: `main` was already 11 over its own baseline, and
-`fix/bounded-scan-photo-payload` contributed 8. Before LA-16 that would have read as one number and
-the honest options would have been to trim someone else's landed work or raise blind.
+Eleven lines on Q-545 recording that the model half of the rollup port shipped, and — the reason it
+belongs in the queue rather than only in the journal — that the entry's remaining blocker is now
+**exactly one** thing: the constants loader. An implementer opening this entry should not have to
+reconstruct which of the five measured edges are closed.
+
+The three in `projectOverview.md` say the same thing in the Current Status entry the extraction
+already had, because that entry's closing sentence named `onnxruntime-node` as the blocker and it no
+longer is.
+
+## 2026-08-23 — `docs/implementation-backlog.md` → 11492, all 19 lines this branch's
+
+**Corrected while resolving a merge, and the correction is the point.** Before merging `main` the
+ratchet read *"over by 19 — 8 of which this branch added"*, and a first draft of this note recorded
+8. After merging, `git diff origin/main --numstat` says **19 added, 0 removed** — the 8 was measured
+against a merge-base that `main` had since moved past, so it undercounted this branch's own share.
+The diff against current `main` is the number that survives; the ratchet's attribution is only as
+current as the base it was computed from.
+
+**Still much better than before LA-16**, which is worth saying plainly: the pre-merge reading
+correctly separated `main`'s own overage from this branch's, and without it the options would have
+been to trim someone else's landed work or raise blind. The lesson is to re-read it **after** the
+final merge, not to distrust it.
 
 The 8 are BF-4's shipped/still-open annotation. That entry stays queued — the payload bound is Lane
 B's half and it merged; the named dated change (#112's structured-output conversion), the
@@ -1585,3 +1603,4 @@ that shipped half of itself has to say which half, or the next session re-derive
 
 Trimmed from 19 to 8 before raising: what went was a second telling of the field-name trap and of
 why the payload was demoted, both of which the entry already states above the annotation.
+

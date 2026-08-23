@@ -7,7 +7,7 @@
  * the vendor's `step_counter_1_3_0` model source (private archive) (app.py forward + steps.py core). The core is
  * server-only (onnxruntime-node); returns null on any inference failure so callers can fall back.
  */
-import { getSession } from './session'
+import type { ModelRuntime } from './runtime'
 
 const MODEL_FILE = 'step_counter_1_3_0_core.onnx'
 // Vendored model constants (step_counter_1_3_0.pt attributes).
@@ -59,16 +59,15 @@ function mergeOnTimestamp(smTs: number[], smData: number[][], moTs: number[], mo
   return merged
 }
 
-async function runCore(merged: number[][]): Promise<number[] | null> {
-  const session = await getSession(MODEL_FILE)
+async function runCore(merged: number[][], runtime: ModelRuntime): Promise<number[] | null> {
+  const session = await runtime.session(MODEL_FILE)
   if (!session) return null
   try {
     const n = merged.length
     const f = merged[0]?.length ?? 0
     const flat = new Float32Array(n * f)
     for (let i = 0; i < n; i++) for (let c = 0; c < f; c++) flat[i * f + c] = merged[i][c]
-    const ort = await import('onnxruntime-node')
-    const out = await session.run({ merged_features: new ort.Tensor('float32', flat, [n, f]) })
+    const out = await session.run({ merged_features: session.float32(flat, [n, f]) })
     return Array.from(out.steps.data as Float32Array)
   } catch (err) {
     console.warn('[step-counter] inference failed:', err)
@@ -138,13 +137,13 @@ function resampleSteps(
  * neural core (ONNX) → resample into windows. Returns null if the ONNX core is unavailable (caller
  * falls back). Each window is [startMs, endMs, steps].
  */
-export async function runStepCounter(input: StepCounterInput): Promise<StepWindow[] | null> {
+export async function runStepCounter(input: StepCounterInput, runtime: ModelRuntime): Promise<StepWindow[] | null> {
   const smData = select(input.stepmotionData, SELECTED_STEPMOTION_COLUMNS)
   const moData = select(input.motionData, SELECTED_MOTION_COLUMNS)
   const merged = mergeOnTimestamp(input.stepmotionTimestamps, smData, input.motionTimestamps, moData)
   const endTimestamps = input.stepmotionTimestamps.slice()
 
-  const steps = await runCore(merged)
+  const steps = await runCore(merged, runtime)
   if (steps == null) return null
 
   const startTimestamps = getStartTimestamps(endTimestamps, CURRENT_SAMPLING_INTERVAL_MS)
