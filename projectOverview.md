@@ -198,41 +198,17 @@ order.
 
 ### [nutrition][app-shell] ⚠️ The three calorie budgets are now one, but a food log still evicts its caches too early (Q-415/Q-417 fixed, LB-4 open, 2026-08-23)
 
-**Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read
-`budgetProvenance(...).total` — the expression the provenance line under the bar already prints —
-instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced
-burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which
-is how one card said "Goal reached" while the card two rows above said "166 kcal left". The macro
-bars now use `macroTargets.scaled` (Q-323's render half) and the label says "from movement"
-([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
-
-- **🟠 LB-4 — logging food invalidates BEFORE its push,** so every subscriber refetches a payload the
-  server has not got yet and caches it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's
-  identical cards. Lane A: it is the local-store/outbox path.
-- **Keep: not device-verified.** The sandbox serves the MET table as synthetic fixtures, so the
-  **activity** contribution to the budget is 0 here — only the heart-rate contribution ran.
+**Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
+- **🟠 LB-4 — logging food invalidates BEFORE its push,** so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path.
+- **Keep: not device-verified.** The sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here — only the heart-rate contribution ran.
 
 ### [workouts][activity][app-shell] ⚠️ Editing and deleting logged training is back, but has not been checked on the device (LB-1, 2026-08-23)
 
-**Fixed in v1.334.0** — `/health/day` now carries edit + delete on every exercise row, delete on
-every session card, delete on every activity, reusing `day-overlay-dialogs.tsx` unchanged. The four
-handlers moved into `lib/hooks/use-day-entry-mutations.ts`, called by the day screen *and*
-`health-content.tsx`, so there is one write path per domain rather than a second copy.
-Guarded by `e2e/day-entry-edit-delete.spec.ts` — four cases, each asserting on the **database**, not
-on the row disappearing: every handler toasts and closes *before* its request resolves, so a control
-wired to nothing looks identical on screen
-([`journal`](docs/overview/entries/2026-08-23-day-screen-edit-delete.md)).
+**Fixed in v1.334.0** — `/health/day` carries edit + delete on every exercise row, delete on every session card and every activity, reusing `day-overlay-dialogs.tsx` unchanged. The four handlers moved into `lib/hooks/use-day-entry-mutations.ts`, called by the day screen *and* `health-content.tsx`, so there is one write path per domain. Guarded by `e2e/day-entry-edit-delete.spec.ts` — four cases asserting on the **database**, not on the row disappearing: every handler toasts and closes *before* its request resolves, so a control wired to nothing looks identical on screen ([`journal`](docs/overview/entries/2026-08-23-day-screen-edit-delete.md)).
 
-**For the record:** Q-110 (2026-08-08, v1.270.0) repointed the calendar day-tap from `DayOverlaySheet`
-to `/health/day` and the controls stayed on the sheet, which nothing else opened — so the app's only
-Edit/Delete controls, and the only client callers of the three DELETE routes, sat unreachable.
-
-- **Keep: not device-verified.** The 48dp targets and the dialogs' safe-area clearance were built to
-  the rule but the sandbox renders insets as 0, and the local-store mirroring in all four handlers
-  never ran (`getLocalStore` is null on web) — so the offline half is verified by reading only.
-- **Follow-up: LB-3** — `day-overlay-sheet.tsx` is still unreachable in the tree, deliberately:
-  deleting it discards three affordances the day screen has not got (exercise-name tap →
-  `ExerciseHistorySheet`, activity tap → `ActivityDetailSheet`, per-session HR expander).
+**For the record:** Q-110 (2026-08-08, v1.270.0) repointed the calendar day-tap from `DayOverlaySheet` to `/health/day` and the controls stayed on the sheet, which nothing else opened — so the app's only Edit/Delete controls, and the only client callers of the three DELETE routes, sat unreachable.
+- **Keep: not device-verified.** The 48dp targets and the dialogs' safe-area clearance were built to the rule but the sandbox renders insets as 0, and the local-store mirroring in all four handlers never ran (`getLocalStore` is null on web) — so the offline half is verified by reading only.
+- **Follow-up: LB-3** — `day-overlay-sheet.tsx` is still unreachable in the tree, deliberately: deleting it discards three affordances the day screen has not got (exercise-name tap → `ExerciseHistorySheet`, activity tap → `ActivityDetailSheet`, per-session HR expander).
 
 ### [workouts][platform][nutrition] 🟠 Three write paths accept another user's progression-style id; the PUT twin of one of them rejects it (RV-32…RV-34, 2026-08-20)
 
