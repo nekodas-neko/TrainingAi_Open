@@ -118,10 +118,14 @@ const storedImage = () => withDb(async db => {
 async function openEditMeal(page: Page) {
   await page.goto('/nutrition')
   await settleRouteBoundary(page)
+  // Re-tap only while the sheet is still closed. Retrying the tap unconditionally deadlocks: the
+  // first one opens the dialog, the dialog then covers the "Saved Meals" button, and every later
+  // attempt fails on a button that is no longer visible — which is what a slow list under a full
+  // suite run turned into a hard failure, while the file passed alone every time.
   await expect(async () => {
-    await tap(page, /^Saved Meals$/)
-    await expect(page.getByText(MEAL_NAME)).toBeVisible({ timeout: 3_000 })
-  }).toPass({ timeout: 60_000 })
+    if (await page.getByRole('dialog').count() === 0) await tap(page, /^Saved Meals$/)
+    await expect(page.getByText(MEAL_NAME)).toBeVisible({ timeout: 5_000 })
+  }).toPass({ timeout: 90_000 })
   await tap(page, `Edit ${MEAL_NAME}`)
   // `Add`/`Change`, depending on whether this meal already has one — and never the Remove button,
   // which also matches "meal photo" and made this a strict-mode violation.
