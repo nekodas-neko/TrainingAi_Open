@@ -18,6 +18,22 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — BF-4 amended from the archived history
+
+**`docs/implementation-backlog.md` 11367 → 11390.** The owner pointed at the pre-cut repo, and its
+3,225 commits corrected two claims BF-4 had already been merged asserting: that the image payload was
+the prime suspect (the camera call is byte-identical since 2026-06-12, so it cannot be what changed),
+and that the AI call was measurably not the regression (instrumentation only landed 2026-07-22, so
+the data cannot see June at all).
+
+49 lines for a correction to an existing entry, of which the net raise is 23 — the rest is absorbed by
+what landed on `main` in parallel. The corrections sit **above** the original analysis rather than
+replacing it, which is the reason for most of the length and is deliberate: an entry that quietly
+rewrites its own conclusion teaches nobody why the first reading was wrong, and this one was wrong in
+a way that will recur — a measurement whose window is narrower than the question being asked.
+
+---
+
 ## 2026-08-23 — BF-4, the photo-scan slowdown
 
 **`docs/implementation-backlog.md` 11381 → 11367 — a ratchet DOWN, not a raise.** An owner report that
