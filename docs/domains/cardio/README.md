@@ -63,6 +63,12 @@ grep -n '\[cardio\]' docs/implementation-backlog.md   # 2 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **The free walk shows heart rate, steps and elevation** (Q-418 screen half, 2026-08-23,
+  v1.339.0) — it rendered distance, pace and cadence only, while the same strap streamed beats.
+  **No device has seen it**: the sandbox has no strap, so the live reading and the staleness guard
+  are both unverified. The Android pill stays static and is Lane A —
+  [`journal`](../../overview/entries/2026-08-23-free-activity-metrics.md).
+
 - 🟡 **Ring cadence is octave-ambiguous, not flat** — still gated off; the strap path is
   validated end to end (64 → 150 spm) but the ring path is not.
 - ⚠️ **D-2 is not closed** — the ×60 scale factor was indicated by a single window and an earlier

@@ -1752,6 +1752,7 @@ carries — the 11-section coverage list, the `Saved meals`/`My Meals`/`My Foods
 the `FoodLibrarySheet`/`SavedMealsSheet` capability diff. Those are the failure modes that make a
 rework lose a section quietly, and they have to be where the work is, not one entry away.
 
+<<<<<<< HEAD
 ## 2026-08-23 — `projectOverview.md` 7977 → 7983
 
 Six lines: a Known Issues row for LA-20, a live production 500 found by the session-start
@@ -1761,3 +1762,22 @@ before believing the fault is gone, and "it stopped" is not "it was fixed".
 
 (The 7984 in the LB-4 branch and this 7983 are the same section being edited twice in one day; the
 number here is the merged count, not a second raise on top of that one.)
+=======
+## 2026-08-23 — `docs/agents/state/implementation-lane-b.md` 102 → 109
+
+The Lane B baton, after a run that shipped thirteen items. Compressed three times first — the run
+list rewritten to one or two lines per PR, the stale "do not re-litigate" entries cut (Q-359's is now
+in the entry's own removal), and four gotchas folded — and it still needs seven more lines than the
+old baseline.
+
+What the seven carry, none of it derivable from the code: the **blocker** that Q-395's drawings are
+not in the repository, which parks the largest contiguous chunk of the queue and needs the owner;
+why Q-406's last two call sites are deliberately unconverted (converting the diary row before
+Q-395a's sheet exists deletes the only way to correct a logged food); that `toBeVisible()` does not
+mean in-viewport, which read exactly like a dead button for two debugging rounds; and that on a doc
+conflict "keep both" is right only for *independent* entries — it duplicated Q-406 when the two sides
+were one entry rewritten.
+
+A baton is rewritten wholesale by each successor, so this number falls back at the next handover.
+
+>>>>>>> origin/main
