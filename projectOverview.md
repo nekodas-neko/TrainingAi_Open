@@ -25,7 +25,15 @@
 ## 🔖 Current Status
 
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-20.
+**Last updated:** 2026-08-23.
+
+**The Oura rollup now takes an I/O port (Q-545, D2 Task 2).** `aggregateOuraRawSamples` is now
+`runOuraRollup(io, timezone, opts)` (`lib/oura-ble/rollup/run.ts`) behind a 22-method `RollupIO`;
+`adapter.ts` drops 6,906 → 5,818 lines. No behaviour change — the 20 test files that drive the
+rollup end-to-end pass unchanged. It does **not** move the bill (the rollup still runs on the
+server); it removes the reason a device rollup would be written twice. Two premise corrections and
+the remaining blocker — `run.ts` still reaches `onnxruntime-node` — are in
+[the journal entry](docs/overview/entries/2026-08-23-oura-rollup-io-port.md).
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is
