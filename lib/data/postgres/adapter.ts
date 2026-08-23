@@ -7,6 +7,7 @@ import { getDb } from './client'
 import { estWorkoutKcal } from '@trainingai/shared/health/workout-energy'
 import { ouraIdForActivityType } from '@trainingai/shared/health/daily-energy'
 import { ageFromDob } from '@trainingai/shared/date-utils'
+import { mergePreferences, type UserPreferences } from '@trainingai/shared/user/preferences'
 import * as s from './schema'
 import { invitedEmails } from './schema'
 import { resolveSyncCursor } from '@trainingai/shared/sync/cursor'
@@ -2865,6 +2866,32 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     if (goals.targetBfPct     !== undefined) set.targetBfPct     = goals.targetBfPct
     if (Object.keys(set).length === 0) return
     await this.db.update(s.users).set(set).where(eq(s.users.id, userId))
+  }
+
+  async getUserPreferences(userId: string): Promise<UserPreferences> {
+    const [row] = await this.db
+      .select({ preferences: s.users.preferences })
+      .from(s.users)
+      .where(eq(s.users.id, userId))
+    return (row?.preferences ?? {}) as UserPreferences
+  }
+
+  async updateUserPreferences(userId: string, patch: Record<string, unknown>): Promise<UserPreferences> {
+    // Read-modify-write under a row lock, not a bare read then update: the whole point of this
+    // feature is two devices holding the same account, and an unlocked read-modify-write there
+    // silently drops whichever device's key lost the race — the exact failure the feature exists
+    // to remove. The lock is held for one merge of a small object.
+    return this.db.transaction(async tx => {
+      const [row] = await tx
+        .select({ preferences: s.users.preferences })
+        .from(s.users)
+        .where(eq(s.users.id, userId))
+        .for('update')
+      if (!row) throw new Error('User not found')
+      const merged = mergePreferences((row.preferences ?? {}) as UserPreferences, patch)
+      await tx.update(s.users).set({ preferences: merged }).where(eq(s.users.id, userId))
+      return merged
+    })
   }
 
   // ── Mood ──────────────────────────────────────────────────────────────────
