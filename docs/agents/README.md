@@ -372,15 +372,20 @@ invent a per-lane emoji to tell them apart.
 Every handoff states its successor's title explicitly, rather than leaving it to be inferred from
 the baton's filename.
 
-### The outgoing session renames itself to `… (old)`
+### The outgoing session renames itself to `(Old) …`
 
 Fixed titles create one problem at the moment of handover: for as long as both sessions are in the
 list, two of them are called `Implementation Agent (A) 🚧` and nothing distinguishes them. The owner
 then has to guess which is the live one, and the guess is wrong half the time.
 
-So the outgoing session renames **itself** as its final act, appending ` (old)` to its own title —
-`Implementation Agent (A) 🚧 (old)`. The successor is created under the clean name and needs no
-special handling. The suffix goes on the outgoing session, never the incoming one.
+So the outgoing session renames **itself** as its final act, prefixing `(Old) ` to its own title —
+`(Old) Implementation Agent (A) 🚧`. The successor is created under the clean name and needs no
+special handling. The marker goes on the outgoing session, never the incoming one.
+
+**It is a prefix, not a suffix, and that is the whole point.** Session lists truncate from the
+right and are scanned down the left edge, so a marker at the end of the title is the first thing
+lost and the last thing read. At the front it survives truncation and sorts the dead sessions
+together.
 
 A session can do this unaided, and it takes two calls:
 
@@ -390,7 +395,7 @@ A session can do this unaided, and it takes two calls:
 
 Both are on the `claude-code-remote` MCP server. Verified working from inside a live session on
 2026-08-23, including the round trip back. Rename last, after the baton and every PR have landed —
-a session titled `(old)` that is still pushing commits is worse than one with an ambiguous name.
+a session titled `(Old)` that is still pushing commits is worse than one with an ambiguous name.
 
 ### The baton: `docs/agents/state/<agent>.md`
 
@@ -428,7 +433,7 @@ Trigger it on context pressure, on an owner reset, or on finishing a cluster:
    index, the backlog, the journal entry.
 5. **Never write "done" for anything not in a committed diff and observed working.** State which
    failure surfaces were not exercised — device, native, safe-area, prod-data — every time.
-6. **Rename yourself to `… (old)`**, per the subsection above, and name the successor's exact title
+6. **Rename yourself to `(Old) …`**, per the subsection above, and name the successor's exact title
    in your closing message. Do this last — after the baton and every PR have landed.
 
 The successor starts from the same prompt in [`prompts/`](prompts/), which tells it to read its own
