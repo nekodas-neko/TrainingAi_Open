@@ -1467,3 +1467,117 @@ claim that the fault stopped, which the "stopped is not fixed" rule says to hold
 that here the stop coincides exactly with a shipped fix whose mechanism predicts it, which is the
 one case where a silence is evidence. The app was in use throughout: `set_hr_stats` rows were
 computed on 08-15, 08-16, 08-17 and 08-19.
+
+
+### [platform][devices] ✅ Production hit `disk_full` during a full re-sync — and the indexes, not the data, were the bulk (2026-08-17, resolved 2026-08-23)
+
+**Live fault, mitigated by raising the volume; the underlying sizing is unresolved.** During the
+2026-08-17 ring re-sync, `/admin/oura-ble` returned a Server Components render error and two API
+routes failed with **`[pg 53100]`** — PostgreSQL's `disk_full`. Both failing queries read
+`oura_raw_samples`; one is a `SELECT DISTINCT ON (tag)` over 1.1M rows, which must sort, and with
+`work_mem` at 4 MB it spills to temp disk. There was no room. Confirmed in `error_events`
+(`GET /api/oura-ble/device-metrics`, `GET /api/oura-ble/samples/summary`).
+
+**Measured at the time of failure:**
+
+| | |
+|---|---|
+| Database total | **583 MB**, up ~110 MB in one hour |
+| `oura_raw_samples` heap | 175 MB |
+| `oura_raw_samples` **indexes** | **291 MB** — 1.66× the heap |
+| That one table | **80% of the database** |
+| `last_autovacuum` / `last_analyze` | **never** — `n_live_tup` reads 0 |
+
+**Three things stack, and only one of them is the archival data.**
+1. The volume was full. Owner raised it 500 MB → 5 GB as a temporary mitigation. **That raise is now
+   permanent and correct — the "return to stock 500 MB" target is WITHDRAWN (2026-08-18).** Railway
+   cannot shrink a volume (*"Down-sizing a volume is not currently supported"*), and bills *"only …
+   the amount of storage used,"* not the provisioned size — so 5 GB costs what 500 MB would. Reverting
+   would mean a dump/restore onto a fresh volume: real downtime and risk on the database holding the
+   ring archive, to save nothing. **Do not attempt it.** What is genuinely lost is the tripwire — 500 MB
+   is what made this bloat scream rather than creep — so add a DB-size line to the session-start
+   orientation read beside the `error_events` check.
+2. **Indexes exceed the table.** The dedup index covers
+   `(user_id, ring_timestamp_ds, tag, body_hex)` — it indexes the raw payload itself, so it grows
+   faster than the rows do. **291 MB of the 466 MB is index, not data.**
+3. **Autovacuum has never run on this table**, so there are no statistics either. The planner has
+   been working blind on the largest table in the database; that same `DISTINCT ON` takes 6.5 s
+   even with disk available.
+
+**Why (2) matters more than it looks.** Reclaiming index space is *non-destructive* — it does not
+touch `body_hex`, so it does not collide with the rule that the server archive is the source of
+truth and must never be pruned. Replacing the payload in that index with a hash would preserve
+dedup semantics on a fraction of the bytes. That may get under 500 MB without deleting anything,
+which is a very different proposition from the retention question.
+
+**⚠️ Correction to (3), measured after recovery — do not chase an autovacuum misconfiguration.** At
+08:04 and 08:45 UTC this table reads `last_autovacuum = 2026-08-17T07:57:35Z` and
+`n_live_tup = 1,097,626`. **Autovacuum has run, twice, today.** The never/0 reading was taken while
+the statistics were still empty: an unclean shutdown makes Postgres discard the stats file on
+recovery, and `stats_reset` stays `NULL` because only an explicit `pg_stat_reset()` sets it — so
+freshly-zeroed counters look exactly like "never". `error_events` showed the same artifact, reading
+`n_live_tup = 0` while holding 6,222 rows. **Every counter on this table is now "since ~07:42", not
+lifetime** — which also means index `idx_scan` counts are a short window, not evidence of disuse.
+
+**What actually consumed the space, proven.** `n_tup_ins = 0`, `n_tup_upd = 681,005`,
+**`n_tup_hot_upd = 0`**. The re-sync was the *trigger* (a catch-up drain, whose re-POSTed events all
+dedup to zero inserts); the *mechanism* is the full-table `measured_at` re-stamp that ops-doc I14/I25
+tells the owner to run after one. The table went 360 → 666 MB — and the DB 464 → 771 MB — while live
+rows went **down** by 557 and `body_hex`/`event_name` did not move at all. **Zero new data; ~306 MB
+of pure bloat.**
+
+**The fourth finding, and the one with leverage.** `measured_at` is indexed, so **no update that
+changes it can ever be HOT** — each rewrites a heap tuple plus an entry in all four indexes — and it
+is the *only* indexed column such a re-stamp changes. **Dropping `idx_oura_raw_samples_user_measured`
+makes the whole operation HOT-eligible**, so it is both a space win and the fix for the mechanism.
+Q-46's `IS DISTINCT FROM` guard is present and correct (`adapter.ts:4954`) and **is not the bug** —
+it can only skip a re-stamp writing back the same value, and the Q-71/I25 clock fix changed every
+row's derived value. The durable hazard: the operations manual prescribes Redecode as the remedy for
+**five** failure modes (I12, I14, I19, I20, I25), so the documented fix procedure is a disk-fill
+hazard until that index goes and the route gains a free-space pre-flight check.
+
+**Is 500 MB reachable without touching retention? Yes — measured, not estimated.** `VACUUM FULL`
+→ ~465 MB; + the index work → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB.
+**The owner chose A+B+C on 2026-08-17 and declined both irreversible options** (Q-542), so the
+archival rule stands unchanged. Caveat worth keeping separate: *reaching* 500 MB and *holding* it
+differ — vacuum alone re-crosses it in ~5 days, with the index+row work ~7 weeks, and **with Q-541
+(repack) ~3 years**. Sequencing, and the owner's own runbook, in
+[`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](../superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0/§0a.
+
+**Owed:** the sizing work (see the storage research item) must now be framed as *how to get back
+under 500 MB safely*, not *whether growth will eventually matter* — it already does. Separately,
+**do not run another Full re-sync until this is resolved**; that is what triggered it.
+
+**Resolved on measurement, 2026-08-23 — the database is 210 MB and Q-534 is closed.** Not by
+building findings 1–3, but by measuring them against a production that no longer resembles the one
+they were written about: 819 MB → **210 MB**, `oura_raw_samples` 1.1M rows / 666 MB → 315k / 87 MB,
+indexes 443 MB → 46 MB, **dead tuples zero**, and `n_tup_upd = 0` — direct evidence that finding 4's
+fix removed the re-stamp mechanism rather than merely mitigating it. **Finding 1 was wrong:**
+`body_hex` averages **24 characters** (7.3 MB across every row), so a SHA-256 digest is *larger* than
+the value it would replace and MD5 buys ~11% of a 22 MB index in exchange for a collision hazard on
+the dedup that exists to stop a distinct ring event vanishing. **Finding 3 is no longer live:** the
+`DISTINCT ON` that took 6.5 s at 1.1M rows runs in **246 ms** at 315k. Finding 2 was already marked a
+statistics artifact and autovacuum last ran 2026-08-22. What remains is elsewhere: the `VACUUM FULL`
+press is **Q-315** (now `Gate: owner` — it needs an admin cookie a session cannot obtain), and the
+`bytea` win is Q-540's, superseded by Q-541's packing
+([`journal`](entries/2026-08-23-q534-closed-on-measurement.md)).
+
+**Progress, 2026-08-18 — part 2.** Q-534's **finding 4 is done**: both readers of the stored
+`measured_at` were rewritten to convert their window through the clock anchors and read ds-keyed, and
+migration **193** drops `idx_oura_raw_samples_user_measured` — **136 MB**, the single largest
+reclaim available without moving a row. It also **removes the outage's mechanism rather than
+mitigating it**: with every reader deriving the time, the stored column is dead, so the redecode's
+re-stamp — the non-HOT full-table rewrite that filled the disk — is now a no-op. Findings 1–3 of
+Q-534 (payload-in-index, autovacuum never having run, `work_mem`) were still open at the time; all
+three are closed on measurement — see the 2026-08-23 note above. ⚠️ The 136 MB is
+the measured size in production, **not a reclaim that has happened** — the drop runs on the next
+deploy's `ensureSchema`, and the space returns to the file only after a `VACUUM FULL`.
+
+**Progress, 2026-08-18.** Q-541 Tasks 0–3 have shipped (v1.318.11–12) — the `oura_raw_packed` table,
+the codec, and the two-tier reader every raw-frame read now goes through. **⚠️ None of it has moved a
+row**: nothing writes a blob yet, so the database has not shrunk by a byte and the size numbers above
+still stand. Re-measured that morning it is **819 MB**, up from 786 the day before, with
+`oura_raw_samples` at 699 MB (255 MB heap, **443 MB indexes**). Tasks 4–7 — packer, backfill, prune,
+`measured_at` sweep — are what reclaim the space. One cheap win was found and filed rather than
+taken: **Q-315**, `error_events` holding 4 live rows in 49 MB, reclaimable by a single `VACUUM FULL`
+with nothing at risk.
