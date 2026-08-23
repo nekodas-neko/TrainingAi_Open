@@ -24,7 +24,29 @@
 //     entry flagged this for `sync/push`; it applies to EVERY schema the push path parses, which is
 //     a wider set than the entry named.
 //   * Routes with an external client — `health-connect/ingest` is fed by the owner's Tasker profile,
-//     whose exact payload is not in this repo and cannot be checked from here.
+//     whose exact payload is not in this repo and cannot be checked from here. `scale-ble/samples`
+//     is the same shape for a different reason: its client is the APK's Kotlin service, and the APK
+//     does NOT update with a Railway deploy, so an old build can send a field a new schema does not
+//     name — the outbox hazard again, wearing native clothes.
+//   * Schemas whose client is a third-party SDK's wire format. **Measured 2026-08-23**, not guessed:
+//     `/api/coach` is driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts
+//     `{ id, messages, trigger, messageId }` (`node_modules/ai/dist/index.mjs` — the `body` it
+//     builds when `prepareSendMessagesRequest` is not supplied). The route's schema names only
+//     `messages`, so `.strict()` there would **400 every coach message**. Read the installed SDK's
+//     source before tightening any route it drives; the wire format is not in our repo and changes
+//     with the dependency.
+//   * `generateObject`/`generateText` RESPONSE schemas, which this checker cannot tell apart from
+//     request schemas — `builder-chat` has four `z.object`s and only one is a request. Strictness
+//     there governs the model's output, not a client's input, and is a different decision. Check
+//     what a schema is FOR before counting it as a conversion candidate.
+//
+// **The sweep is per-schema client verification, and there is no shortcut.** Four were converted on
+// 2026-08-23 (89 → 85), each after reading the one client that posts to it and confirming the keys
+// match: `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. The
+// general argument that in-repo JS clients ship with the server (the APK is a WebView loading
+// Railway, so JS and server always deploy together) is TRUE and still not sufficient — it says a
+// mismatch is a bug, not that there is no mismatch, and a silent 400 on a rarely-exercised route is
+// exactly the kind of bug a codemod would introduce and no test would catch.
 //
 // Reproduce the count: node scripts/check-strict-request-schemas.js --print
 'use strict';
@@ -45,12 +67,10 @@ const BASELINE = {
   'app/api/admin/fix-exercise-units/route.ts': 1,
   'app/api/admin/generate-exercise-media/route.ts': 1,
   'app/api/admin/mirror-dataset-gifs/route.ts': 1,
-  'app/api/admin/timing-baseline/route.ts': 1,
   'app/api/ai-periodization/baseline/complete/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/prescribe/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/respond/route.ts': 1,
   'app/api/ai-periodization/session/[sessionId]/transition/route.ts': 1,
-  'app/api/ai/health-insight/route.ts': 1,
   'app/api/builder-chat/route.ts': 4,
   'app/api/coach/apply/route.ts': 1,
   'app/api/coach/options/route.ts': 1,
@@ -85,8 +105,6 @@ const BASELINE = {
   'app/api/oura-ble/step-counter-export/route.ts': 1,
   'app/api/push/subscribe/route.ts': 1,
   'app/api/running-plan/explain/route.ts': 1,
-  'app/api/running-plan/override/route.ts': 1,
-  'app/api/running-plan/route.ts': 1,
   'app/api/scale-ble/samples/route.ts': 1,
   'app/api/sync/push/route.ts': 1,
   'app/api/user/goals/route.ts': 1,

@@ -24,7 +24,9 @@ export async function GET() {
 }
 
 // Both separators — see Q-130; localDateString() emits slashes.
-const bodySchema = z.object({ date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).nullable() })
+// `.strict()` (Q-464): the one client, `components/admin/time-audit-card.tsx`, sends exactly
+// `{ date }`. A mistyped key here would otherwise be dropped and answered `200`.
+const bodySchema = z.object({ date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).nullable() }).strict()
 
 export async function POST(req: NextRequest) {
   const session = await auth()

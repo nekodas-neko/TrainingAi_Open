@@ -1829,3 +1829,15 @@ Worth noting for whoever runs the next sweep: Current Status is now ~178 lines a
 entries, and three separate PRs today each had to trim prose to avoid tripping this check. That is
 the ratchet doing its job, but it is also the signal that the sweep is due — the older half of the
 section describes work that has been on `main` for days.
+
+
+## 2026-08-23 — `projectOverview.md` 7977 → 7886, `docs/implementation-backlog.md` 11310 → 10975
+
+Both shrink, and both ratchets are tightened to lock the gain in rather than left at the old number.
+
+`projectOverview.md` loses 91 net: the 112-line `disk_full` Known-Issues entry moved whole to
+`known-issues-resolved.md` — the database is 210 MB with zero dead tuples and the re-stamp mechanism
+is gone, so nothing was still owed on it — against 21 lines added for the resolution note and a
+ring-key progress note.
+
+`docs/implementation-backlog.md` loses 335: Q-534 closed on measurement rather than implementation.
