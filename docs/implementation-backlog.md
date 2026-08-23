@@ -329,6 +329,81 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
+### [workouts] 🔴 BF-8 — nothing on screen says today is a deload, and the owner trained one believing it was a full session
+
+- Lane: B — `components/workout/use-deload-choice.ts` + `components/workout/pre-workout-screen.tsx`
+
+**Found by intake, 2026-08-23, in a screenshot the owner sent for a different request** — not reported,
+so it may be by design; the trace below says why it probably is not.
+
+**🔴 CONFIRMED BY THE OWNER, 2026-08-23 — this is lived, not theoretical.** Verbatim: *"I think you
+sre right - I was under the assumption I was doing my full session but it looks like it has been
+deload. it was what you noticed; its too hidden."* Promoted to the head of the queue: a training
+decision was made on a wrong reading of the app's own display, and the session was run before anyone
+noticed.
+
+**And it is worse than first filed — the active workout screen hides it too.** A second screenshot,
+mid-session, shows the header reading **"Accumulation · S1 · Ex 1/5 · 3:41"** with no deload marker
+anywhere. Traced to `components/workout/active-workout-screen.tsx:220–224`, which prints
+`"Deload · "` **only** when `phaseStatus.isDeloadActive`; anything else falls through to
+`${phase.name} · S${n} · `.
+
+**So both surfaces fail on the same predicate, and that is the actual root cause.**
+`isDeloadActive` answers *"is the current phase a deload week"*. Neither surface asks the question
+that matters — *"is today's session a deload"* — which is what `prescription.deload` holds:
+
+| surface | file | what it does with `isDeloadActive` |
+|---|---|---|
+| Intensity toggle | `pre-workout-screen.tsx:218` | hides the toggle (so a phase deload is handled) |
+| Session header | `active-workout-screen.tsx:220` | prints `"Deload · "` |
+
+An auto-applied deload satisfies neither, so it is invisible from the pre-workout screen through to
+the last set. **Fix the predicate once, in both places** — a fix to one surface alone leaves the
+other lying, which is the sibling-surface sweep CLAUDE.md already requires.
+
+**Consequence beyond the display:** a deload run as though it were a full session is also a
+training-load record whose intent nobody can reconstruct later. The owner's report is the evidence
+that this is not hypothetical.
+
+**What the screen shows, top to bottom:** *INTENSITY TODAY* with **Full · As prescribed** selected;
+then *TIME TODAY*; then the AI card reading **"AI Prescription · Accumulation · Auto-applied"** with
+the subtitle **"Deload session · ~48 min"**. The user is told intensity is full and as-prescribed,
+directly above a plan the app itself labels a deload.
+
+**Traced, and the two halves are genuinely unconnected:**
+- The toggle's value is `deload` from `useDeloadChoice(seedFromUrl)`
+  (`components/workout/use-deload-choice.ts`). That hook is
+  `useState(seedFromUrl)` where the seed is the `?aiDeload=1` URL param — **it never reads the
+  prescription's own `deload` flag.** Absent that param it is `false`, i.e. "Full", regardless of
+  what was actually prescribed.
+- The card's subtitle comes from `prescription.deload`
+  (`components/workout/ai-prescription-card.tsx:160`).
+- `pre-workout-screen.tsx:218` hides the toggle entirely when `phaseStatus?.isDeloadActive` — so a
+  **phase** deload is handled. A deload the prescription applied for its own reasons (readiness,
+  the "Auto-applied" case in the screenshot) has no equivalent guard, which is exactly the state
+  captured here.
+
+**Why this is worth fixing rather than explaining.** "As prescribed" is a claim about the
+prescription, and here it contradicts the prescription on the same screen. The toggle is also
+live — flipping it re-keys the workout-data cache and refetches — so a user who taps **Full**
+believing they are confirming the current state may instead be overriding an auto-applied deload
+back to full loads on a day the readiness engine asked for one.
+
+**What would confirm it:** open the pre-workout screen on a day where the prescription auto-applies
+a deload while the phase is *not* a deload week (`phaseStatus.isDeloadActive === false`), with no
+`?aiDeload=1` in the URL. The toggle should read Full while the card reads "Deload session".
+
+**Fix direction, for whoever takes it:** either seed/reflect the toggle from the prescription's own
+`deload` flag so it shows what is actually going to run, or relabel it so it reads as an override
+rather than a statement of current state. The first is better — the sublabels already say "As
+prescribed", which is only true if it reflects the prescription. Do **not** simply hide the toggle
+on an auto-applied deload: the comment at `pre-workout-screen.tsx:215` records why it must stay
+reachable — gating it on an existing prescription would leave no way to pick Deload before one
+exists.
+
+**Done looks like:** on a day with an auto-applied deload, the Intensity control and the prescription
+card agree about whether today is a deload.
+
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -1902,33 +1977,6 @@ keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchD
 `health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
 route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
 controls, so a third target needs a layout decision rather than another icon.
-
-### [nutrition][app-shell] Q-327 — the meal photo needs somewhere to be picked
-
-- **Branch:** `feat/saved-meal-thumbnail-ui`
-- **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-396 once the column shipped.
-- **Lane:** B
-- **Lane B** (`components/nutrition/`). The storage half is done and merged —
-  see [`entries/2026-08-19-saved-meal-thumbnail.md`](overview/entries/2026-08-19-saved-meal-thumbnail.md).
-
-**What already exists, so it is not rebuilt.** `saved_meals.image_data_uri` (Postgres migration 204,
-local SQLite **v28**), carried by both saved-meal routes and by the offline `pushMutations` replay,
-mirrored locally, and hydrated back. `POST`/`PUT /api/nutrition/saved-meals` accept `imageDataUri`:
-**omit it to leave a stored photo alone, send `null` to remove it.** `SavedMeal.imageDataUri` is on
-the type, so a picker has somewhere to read from and write to.
-
-**What is left — the pick, and the downscale that makes the cap true.**
-- **A 64 px tile to the left of the meal-name field in Edit Meal**, tapping to camera/gallery, with a
-  clear action to remove. Edit Meal already owns the meal and already saves it, so the image rides
-  the existing write; the tile doubles as the preview, so there is no separate "current photo" row.
-  Prototype: <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6> (screen 4).
-- **Downscale on-device with a canvas BEFORE upload — 128 × 128 WebP, ~6 KB.** The server rejects
-  anything over **16 KB** (`SAVED_MEAL_IMAGE_MAX_BYTES`), so without the downscale a normal phone
-  photo is a 400 every time and the feature reads as broken.
-- **Show the byte size on the tile after a pick.** This feature's whole risk is the cap slipping, and
-  nothing fails loudly when it does — the outbox just gets slower. A number the user can see is the
-  cheapest tripwire, and the audit view now carries `image_bytes` for the same reason.
-
 
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 
@@ -10884,6 +10932,89 @@ since the CI link check (item 1) catches a botched rewrite immediately.
 > session writing a plan to `docs/superpowers/plans/` — not an implementer picking one up and
 > building from the entry.** Intake traced each against the current tree so the plan starts from what
 > the code actually does; it did not write the plans.
+
+### [workouts] 🔵 BF-7 — a 45-minute session cannot be chosen; the length picker offers three relative presets
+
+- Lane: ? — the model is `packages/shared/**` (**A**), the picker is `components/**` (**B**); engine half first
+
+**Owner request, 2026-08-23 (verbatim):** *"id like to have the ability to choose a 45min session -
+maybe we have a slider - and the default one is shown - but have the option to to slide to
+15/30/45/60/90options?"*
+
+**Screenshot described, since the image will not reach an implementer:** the Pull session's
+pre-workout screen. *TIME TODAY* shows a three-segment control — **Quick 30 min · Normal 60 min ·
+Long 90 min**, Normal selected — with "~48 min of work" to its right.
+
+**What exists today.** `DurationPreset = 'short' | 'standard' | 'long'`
+(`packages/shared/src/workout/duration-model.ts:91`), seven non-test consumers, and the on-screen
+minute figures are **derived, not fixed**:
+
+```
+budgetForPreset(sessionBudgetMin, preset)
+  standard → the session's own configured budget
+  long     → budget + DURATION_PRESET_DELTA_MIN (30)
+  short    → max(MIN_PRESET_BUDGET_MIN (20), budget − 30)
+```
+
+The 30/60/90 in the screenshot is that formula against a 60-minute session — not a fixed ladder.
+
+**✅ DECIDED by the owner, 2026-08-23 — findings 1 and 2 below are now settled.** Verbatim: *"yes I
+agree lets anchor to session; dont need 15minutes"*. So:
+- **The session's own configured length stays the anchor and the default.** The 2026-07-29 relativity
+  decision is NOT reversed — the slider offers absolute steps *around* that anchor rather than
+  replacing it with a fixed ladder. Finding 1 is resolved; keep its reasoning below for the plan.
+- **15 minutes is dropped.** `MIN_PRESET_BUDGET_MIN = 20` stands unchanged, and the
+  `WARMUP_CEILING_FRACTION` arithmetic that meets it exactly needs no re-derivation. Finding 2 is
+  resolved at zero cost — which is the cheapest possible answer to it.
+- **Finding 3 still binds**: a slider must not fire a prescription per detent. That is an
+  implementation constraint, not an open question.
+
+The requested ladder is therefore **30 / 45 / 60 / 90 around the session's configured length**, with
+45 as the value that motivated the request.
+
+**⚠️ Three things make this more than a control swap. Read all three before scoping.**
+
+**1. It reverses a recorded owner decision, and the code says so.** The comment above
+`DURATION_PRESET_DELTA_MIN` reads: *"Short/long are RELATIVE to whatever the session is configured
+for (owner call 2026-07-29: '30 mins +/- the routine's chosen amount'), not fixed 30/90 clocks…
+a 45-minute session's 'short' is 15 min of squeeze, not a 30-min increase, which is what an absolute
+floor would have quietly done."* An absolute ladder was considered and rejected. **The owner may well
+be reversing it deliberately** — *"the default one is shown"* suggests the session's own budget still
+anchors the control — but a plan must state which model it is choosing rather than discover the
+comment halfway through. **Recommended: keep the session's configured budget as the anchor and
+default, and let the slider pick absolute minutes around it** — that satisfies the request without
+throwing away the relativity that made a 45-minute program work.
+
+**2. 15 minutes is below the model's own floor.** `MIN_PRESET_BUDGET_MIN = 20`, and the comment
+states why: *"Below this the warmup carve-out and two-set role floors leave no room for a real
+session, so shortening further just produces a plan that cannot fit its own budget."* There is also a
+constant tuned to that exact number — `WARMUP_CEILING_FRACTION = 0.2` is documented as chosen so
+`0.20 × 20 = MIN_WARMUP_MIN (4)`, i.e. **the two warmup clamps meet exactly at 20 and would invert
+below it**. Offering 15 needs that arithmetic redone, or 15 dropped from the ladder. This is a
+decision for the plan, not something to clamp silently at runtime.
+
+**3. A slider regenerates an AI call per detent, and the cooldown is deliberately bypassed.**
+Changing the preset re-runs the prescription — and `generate-prescription.ts:165` passes
+`skipCooldown: durationPreset != null`, with a comment noting *"the user switching presets is exactly
+that fast"*. Measured in production: `prescription` AI calls average **2,445 ms** (n = 46, max
+4,733 ms). A segmented control fires once per tap; a slider dragged 60 → 15 crosses every stop.
+**Commit on release, never on change**, and consider whether the intermediate values should be
+requested at all. The prescription cache key already includes the preset
+(`generate-prescription.ts:160`), so widening 3 values to 5+ also multiplies cache entries per
+session per day.
+
+**One thing that is genuinely easy:** **nothing is persisted.** There is no `duration_preset` column
+in the Postgres schema, the local SQLite tables or `lib/local-store/types.ts` — the hook's own
+comment says *"the choice is never written to the program, it only tags the plan it produced"*. So
+this needs **no migration and no sync work**, which is unusual for a change this visible.
+
+**Feature request, so the next step is a planning session** writing to `docs/superpowers/plans/` —
+intake traced it and did not design it. The plan should also decide whether `DurationPreset` stays an
+enum with more members or becomes a minutes number, since seven call sites depend on the answer.
+
+**Done looks like:** a 45-minute session can be chosen for today, the session's own configured length
+is still what the control defaults to, the picked length is what the plan is trimmed against *and*
+what the warm-up countdown shows, and dragging the control does not fire a prescription per step.
 
 ### [app-shell][platform] 🔵 BF-5 — the week in review should be a page, not a banner that expands
 
