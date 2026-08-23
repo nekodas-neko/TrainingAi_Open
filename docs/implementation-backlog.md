@@ -329,6 +329,81 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
+### [workouts] 🔴 BF-8 — nothing on screen says today is a deload, and the owner trained one believing it was a full session
+
+- Lane: B — `components/workout/use-deload-choice.ts` + `components/workout/pre-workout-screen.tsx`
+
+**Found by intake, 2026-08-23, in a screenshot the owner sent for a different request** — not reported,
+so it may be by design; the trace below says why it probably is not.
+
+**🔴 CONFIRMED BY THE OWNER, 2026-08-23 — this is lived, not theoretical.** Verbatim: *"I think you
+sre right - I was under the assumption I was doing my full session but it looks like it has been
+deload. it was what you noticed; its too hidden."* Promoted to the head of the queue: a training
+decision was made on a wrong reading of the app's own display, and the session was run before anyone
+noticed.
+
+**And it is worse than first filed — the active workout screen hides it too.** A second screenshot,
+mid-session, shows the header reading **"Accumulation · S1 · Ex 1/5 · 3:41"** with no deload marker
+anywhere. Traced to `components/workout/active-workout-screen.tsx:220–224`, which prints
+`"Deload · "` **only** when `phaseStatus.isDeloadActive`; anything else falls through to
+`${phase.name} · S${n} · `.
+
+**So both surfaces fail on the same predicate, and that is the actual root cause.**
+`isDeloadActive` answers *"is the current phase a deload week"*. Neither surface asks the question
+that matters — *"is today's session a deload"* — which is what `prescription.deload` holds:
+
+| surface | file | what it does with `isDeloadActive` |
+|---|---|---|
+| Intensity toggle | `pre-workout-screen.tsx:218` | hides the toggle (so a phase deload is handled) |
+| Session header | `active-workout-screen.tsx:220` | prints `"Deload · "` |
+
+An auto-applied deload satisfies neither, so it is invisible from the pre-workout screen through to
+the last set. **Fix the predicate once, in both places** — a fix to one surface alone leaves the
+other lying, which is the sibling-surface sweep CLAUDE.md already requires.
+
+**Consequence beyond the display:** a deload run as though it were a full session is also a
+training-load record whose intent nobody can reconstruct later. The owner's report is the evidence
+that this is not hypothetical.
+
+**What the screen shows, top to bottom:** *INTENSITY TODAY* with **Full · As prescribed** selected;
+then *TIME TODAY*; then the AI card reading **"AI Prescription · Accumulation · Auto-applied"** with
+the subtitle **"Deload session · ~48 min"**. The user is told intensity is full and as-prescribed,
+directly above a plan the app itself labels a deload.
+
+**Traced, and the two halves are genuinely unconnected:**
+- The toggle's value is `deload` from `useDeloadChoice(seedFromUrl)`
+  (`components/workout/use-deload-choice.ts`). That hook is
+  `useState(seedFromUrl)` where the seed is the `?aiDeload=1` URL param — **it never reads the
+  prescription's own `deload` flag.** Absent that param it is `false`, i.e. "Full", regardless of
+  what was actually prescribed.
+- The card's subtitle comes from `prescription.deload`
+  (`components/workout/ai-prescription-card.tsx:160`).
+- `pre-workout-screen.tsx:218` hides the toggle entirely when `phaseStatus?.isDeloadActive` — so a
+  **phase** deload is handled. A deload the prescription applied for its own reasons (readiness,
+  the "Auto-applied" case in the screenshot) has no equivalent guard, which is exactly the state
+  captured here.
+
+**Why this is worth fixing rather than explaining.** "As prescribed" is a claim about the
+prescription, and here it contradicts the prescription on the same screen. The toggle is also
+live — flipping it re-keys the workout-data cache and refetches — so a user who taps **Full**
+believing they are confirming the current state may instead be overriding an auto-applied deload
+back to full loads on a day the readiness engine asked for one.
+
+**What would confirm it:** open the pre-workout screen on a day where the prescription auto-applies
+a deload while the phase is *not* a deload week (`phaseStatus.isDeloadActive === false`), with no
+`?aiDeload=1` in the URL. The toggle should read Full while the card reads "Deload session".
+
+**Fix direction, for whoever takes it:** either seed/reflect the toggle from the prescription's own
+`deload` flag so it shows what is actually going to run, or relabel it so it reads as an override
+rather than a statement of current state. The first is better — the sublabels already say "As
+prescribed", which is only true if it reflects the prescription. Do **not** simply hide the toggle
+on an auto-applied deload: the comment at `pre-workout-screen.tsx:215` records why it must stay
+reachable — gating it on an existing prescription would leave no way to pick Deload before one
+exists.
+
+**Done looks like:** on a day with an auto-applied deload, the Intensity control and the prescription
+card agree about whether today is a deload.
+
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -634,52 +709,6 @@ changes shape — check the order still reads correctly on a back-dated day, not
 **Done looks like:** on the Nutrition screen the finished-logging card sits directly under the last
 meal card, End of Day is the last element on the page, both still behave correctly on a past date,
 and the misleading comment is gone.
-
-### [workouts] 🟠 BF-8 — the Intensity toggle reads "Full · As prescribed" while the plan below it is a deload
-
-- Lane: B — `components/workout/use-deload-choice.ts` + `components/workout/pre-workout-screen.tsx`
-
-**Found by intake, 2026-08-23, in a screenshot the owner sent for a different request** — not reported,
-so it may be by design; the trace below says why it probably is not.
-
-**What the screen shows, top to bottom:** *INTENSITY TODAY* with **Full · As prescribed** selected;
-then *TIME TODAY*; then the AI card reading **"AI Prescription · Accumulation · Auto-applied"** with
-the subtitle **"Deload session · ~48 min"**. The user is told intensity is full and as-prescribed,
-directly above a plan the app itself labels a deload.
-
-**Traced, and the two halves are genuinely unconnected:**
-- The toggle's value is `deload` from `useDeloadChoice(seedFromUrl)`
-  (`components/workout/use-deload-choice.ts`). That hook is
-  `useState(seedFromUrl)` where the seed is the `?aiDeload=1` URL param — **it never reads the
-  prescription's own `deload` flag.** Absent that param it is `false`, i.e. "Full", regardless of
-  what was actually prescribed.
-- The card's subtitle comes from `prescription.deload`
-  (`components/workout/ai-prescription-card.tsx:160`).
-- `pre-workout-screen.tsx:218` hides the toggle entirely when `phaseStatus?.isDeloadActive` — so a
-  **phase** deload is handled. A deload the prescription applied for its own reasons (readiness,
-  the "Auto-applied" case in the screenshot) has no equivalent guard, which is exactly the state
-  captured here.
-
-**Why this is worth fixing rather than explaining.** "As prescribed" is a claim about the
-prescription, and here it contradicts the prescription on the same screen. The toggle is also
-live — flipping it re-keys the workout-data cache and refetches — so a user who taps **Full**
-believing they are confirming the current state may instead be overriding an auto-applied deload
-back to full loads on a day the readiness engine asked for one.
-
-**What would confirm it:** open the pre-workout screen on a day where the prescription auto-applies
-a deload while the phase is *not* a deload week (`phaseStatus.isDeloadActive === false`), with no
-`?aiDeload=1` in the URL. The toggle should read Full while the card reads "Deload session".
-
-**Fix direction, for whoever takes it:** either seed/reflect the toggle from the prescription's own
-`deload` flag so it shows what is actually going to run, or relabel it so it reads as an override
-rather than a statement of current state. The first is better — the sublabels already say "As
-prescribed", which is only true if it reflects the prescription. Do **not** simply hide the toggle
-on an auto-applied deload: the comment at `pre-workout-screen.tsx:215` records why it must stay
-reachable — gating it on an existing prescription would leave no way to pick Deload before one
-exists.
-
-**Done looks like:** on a day with an auto-applied deload, the Intensity control and the prescription
-card agree about whether today is a deload.
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
@@ -10977,6 +11006,20 @@ budgetForPreset(sessionBudgetMin, preset)
 ```
 
 The 30/60/90 in the screenshot is that formula against a 60-minute session — not a fixed ladder.
+
+**✅ DECIDED by the owner, 2026-08-23 — findings 1 and 2 below are now settled.** Verbatim: *"yes I
+agree lets anchor to session; dont need 15minutes"*. So:
+- **The session's own configured length stays the anchor and the default.** The 2026-07-29 relativity
+  decision is NOT reversed — the slider offers absolute steps *around* that anchor rather than
+  replacing it with a fixed ladder. Finding 1 is resolved; keep its reasoning below for the plan.
+- **15 minutes is dropped.** `MIN_PRESET_BUDGET_MIN = 20` stands unchanged, and the
+  `WARMUP_CEILING_FRACTION` arithmetic that meets it exactly needs no re-derivation. Finding 2 is
+  resolved at zero cost — which is the cheapest possible answer to it.
+- **Finding 3 still binds**: a slider must not fire a prescription per detent. That is an
+  implementation constraint, not an open question.
+
+The requested ladder is therefore **30 / 45 / 60 / 90 around the session's configured length**, with
+45 as the value that motivated the request.
 
 **⚠️ Three things make this more than a control swap. Read all three before scoping.**
 
