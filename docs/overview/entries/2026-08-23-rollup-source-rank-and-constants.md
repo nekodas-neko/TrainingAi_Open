@@ -57,10 +57,27 @@ They are on the rollup's real call path in two places — `step-day-buckets` →
 `step-counter-pipeline`, and `buildDaytimeStressSeriesFromModel` → `scoreStressPoints` →
 `daytimeStressLevel` → `getDaytimeStressConstants()`.
 
-So D2 Task 3 has a third dependency the plan never named, and unlike the other two it is not a port:
-it is a choice between making the getters async everywhere, shipping the constants as
-service-worker-cached assets, or putting them behind a route. It belongs on the Q-545 entry as a
-decision to take before Task 3 starts, which is where I have put it.
+So D2 Task 3 has a third dependency the plan never named.
+
+> **Correction, same day: it is a port, and the pattern is already in this repo.** I called this "a
+> choice between making the getters async everywhere, shipping the constants as
+> service-worker-cached assets, or putting them behind a route" and said it was a decision to take
+> before Task 3 starts. It is none of those — **Q-221 already solved this exact problem** for the
+> steps-decoder table. `steps-motion-decoder.ts` takes the table by *injection*
+> (`setStepsDecoderConstants`), `GET /api/oura-ble/decoder-constants` serves it through the same
+> accessor so the two paths cannot drift, and `lib/activity/steps-decoder-constants-client.ts`
+> fetches and caches it on the device, where activity auto-detection uses it today. The getters
+> never had to become async: the constants are pushed in before use, the same shape
+> `constants-delivery.ts` uses to push them to disk on the server.
+>
+> Q-221's comment also kills the cheapest-looking option outright: a static JSON import lands in
+> `_next/static`, which `middleware.ts`'s matcher excludes, so the numbers were **fetchable with no
+> session**. That is a publication problem the owner has already ruled on.
+>
+> And the scope is small. The rollup reads exactly **three** getters —
+> `getStepsDecoderConstants` (done), `getDaytimeStressConstants`, `getResilienceConstants` — so two
+> need the `set*`/`has*` shape and a way onto the device. Follow Q-221; do not invent a second
+> mechanism.
 
 ## Verification
 

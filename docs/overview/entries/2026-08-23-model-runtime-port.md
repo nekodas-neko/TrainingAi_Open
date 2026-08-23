@@ -50,8 +50,12 @@ no edge, which is why the previous PR skipped it; combined with the injection it
 | **now** | **46** | **1** |
 
 The one left is `lib/oura-models/constants` — `node:fs`, synchronous, and by its own header
-"SERVER-ONLY, and structurally so". That is a decision, not a port, and it is the single thing
-between here and a device rollup.
+"SERVER-ONLY, and structurally so". It is the single thing between here and a device rollup, and
+**it is a port rather than a decision**: Q-221 already built the mechanism (inject the table,
+serve it from an auth-gated route through the same accessor, fetch and cache it on the device) for
+the steps-decoder constants, which the rollup already uses. Two more getters —
+`getDaytimeStressConstants` and `getResilienceConstants` — want the same treatment, and the
+measurement says that is the whole list.
 
 ## Verification
 

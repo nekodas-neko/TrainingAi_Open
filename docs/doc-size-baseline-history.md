@@ -1582,7 +1582,8 @@ The three in `projectOverview.md` say the same thing in the Current Status entry
 already had, because that entry's closing sentence named `onnxruntime-node` as the blocker and it no
 longer is.
 
-## 2026-08-23 — `docs/implementation-backlog.md` → 11492, all 19 lines this branch's
+<<<<<<< HEAD
+## 2026-08-23 — `docs/implementation-backlog.md` → 11520, all 19 lines this branch's
 
 **Corrected while resolving a merge, and the correction is the point.** Before merging `main` the
 ratchet read *"over by 19 — 8 of which this branch added"*, and a first draft of this note recorded
@@ -1596,6 +1597,12 @@ correctly separated `main`'s own overage from this branch's, and without it the 
 been to trim someone else's landed work or raise blind. The lesson is to re-read it **after** the
 final merge, not to distrust it.
 
+**Recomputed twice more before the PR opened** — 11482, then 11492, now **11520** — because `main`
+landed three times while this branch was in review. Every one of those was resolved by taking
+`origin/main`'s file whole and re-measuring the merged tree, never by splicing the conflicting line.
+The branch's own contribution held at **19** across all three, which is the check confirming it is
+attributing correctly rather than drifting with the base.
+
 The 8 are BF-4's shipped/still-open annotation. That entry stays queued — the payload bound is Lane
 B's half and it merged; the named dated change (#112's structured-output conversion), the
 client-elapsed-time sink and the Railway cold-start check are all Lane A's and all open. An entry
@@ -1604,3 +1611,21 @@ that shipped half of itself has to say which half, or the next session re-derive
 Trimmed from 19 to 8 before raising: what went was a second telling of the field-name trap and of
 why the payload was demoted, both of which the entry already states above the annotation.
 
+=======
+## 2026-08-23 — `projectOverview.md` 7927 → 7928, `docs/implementation-backlog.md` 11474 → 11501
+
+Twenty-seven lines retracting a claim this entry made earlier the same day. I wrote that the model
+constants "cannot reach the device" and that answering it was "a design decision rather than a port"
+to be taken before Task 3 starts. It is a port: **Q-221 already built the mechanism** — inject the
+table, serve it from an auth-gated route through the same accessor, fetch and cache it on the device
+— and the rollup already depends on it for the steps-decoder table.
+
+The lines are queue material, not journal material, because they are the difference between the next
+implementer opening a design question and following an existing pattern. They also carry the
+three-row measurement of exactly which getters are involved (one done, two to do), which is the
+scope of the work.
+
+The one line in `projectOverview.md` is the same retraction in the Current Status entry, which had
+called the constants loader the blocker without saying which kind of blocker it is. "Port" and
+"decision" send an implementer to different places.
+>>>>>>> origin/main

@@ -35,8 +35,9 @@ server); it removes the reason a device rollup would be written twice. **The mod
 same day** — `sleepnet`, `step-counter` and `dhrv` take a `ModelRuntime` rather than importing
 `onnxruntime-node`, taking `run.ts`'s server-only edges from **5 to 1** (measured: 46 modules). The
 one left is the constants loader, synchronous and `node:fs` by design, and it is now the single
-thing between the D-track and a device rollup —
-[journal](docs/overview/entries/2026-08-23-model-runtime-port.md).
+thing between the D-track and a device rollup — **and it is a port, not a decision**: Q-221 already
+built the inject-and-serve mechanism, and the rollup already uses it for one of the three constants
+it reads ([journal](docs/overview/entries/2026-08-23-model-runtime-port.md)).
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is
