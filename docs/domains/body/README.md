@@ -12,7 +12,7 @@ others (energy balance, bodyweight 1RM, readiness) and shouldn't be buried insid
 
 | Area | Where |
 |---|---|
-| Composition maths | `lib/health/body-composition.ts` |
+| Composition maths | `packages/shared/src/health/body-composition.ts` |
 | Scale capture (border with `devices`) | `lib/scale-ble/` |
 | Ingest clock | `lib/validation/ingest-clock.ts` — `resolveMeasuredAt` decides the day a weigh-in belongs to |
 | Tables | `body_metrics` (weight, body fat, and the rest of the daily metric row) |

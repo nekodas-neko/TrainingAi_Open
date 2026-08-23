@@ -16,6 +16,26 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — three owner feature notes (BF-1, BF-2, BF-3)
+
+**`docs/implementation-backlog.md` 11610 → 11794.** Three feature requests the owner sent as one
+message, filed by BugFix intake at the tail of the queue: the DEXA calibration filter for the
+scale's body-fat estimate, dosed-substance tracking (GLP-1s, creatine), and blood-panel import.
+
+184 lines for three entries is above the ~30-lines-per-entry budget intake normally works to, and
+it is deliberate rather than drift. Each of these is a *feature* heading for a planning session
+rather than a defect for an implementer, so the entry has to carry the trace that stops the plan
+re-deriving it: for BF-2 that is the six-step chain from the BIA estimator to the calorie and
+protein goals plus the measured 15.4 kcal/day-per-body-fat-point sensitivity; for BF-3 the three
+specific schema facts that rule the existing supplements model out; for BF-1 the finding that the
+app's own AI logging is already clean and the exposure is the provider call itself. Dropping any of
+that would move the work into a planning session instead of removing it.
+
+Whoever writes those plans should take the corresponding entry back down to a pointer at the plan
+doc in the same PR — that is the ratchet-down this raise is anticipating.
+
+---
+
 ## 2026-08-20 — the Orchestrator role
 
 **CLAUDE.md 1107 → 1115.** A sixth standing agent, owning queue and docs hygiene: clearing entries
