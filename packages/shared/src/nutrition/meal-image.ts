@@ -26,6 +26,21 @@ const ALLOWED_MIME = ['image/webp', 'image/jpeg', 'image/png']
 export type MealImageRejection = 'not_a_data_uri' | 'unsupported_type' | 'too_large'
 
 /**
+ * Decoded size of a base64 data URI, without decoding it — base64 is 4 characters per 3 bytes.
+ *
+ * Exported because the picker shows this number on the tile (Q-327): the cap slipping is this
+ * feature's whole risk and nothing fails loudly when it does — the outbox just gets slower — so a
+ * figure the user can see is the cheapest tripwire there is. It has to be the **same** arithmetic
+ * the server rejects on, or the tile would reassure about a number that is not the one being
+ * checked. Returns 0 for an absent or malformed URI.
+ */
+export function mealImageBytes(dataUri: string | null | undefined): number {
+  if (!dataUri) return 0
+  const match = /^data:([^;,]+);base64,([\s\S]*)$/.exec(dataUri)
+  return match ? Math.ceil(match[2].length * 0.75) : 0
+}
+
+/**
  * Validate a thumbnail on the way in. Returns `null` when it is fine.
  *
  * **Server-side, always** — the client downscales before upload, but a client-side cap is not a cap.
@@ -37,8 +52,7 @@ export function rejectMealImage(dataUri: string | null | undefined): MealImageRe
   const match = /^data:([^;,]+);base64,([\s\S]*)$/.exec(dataUri)
   if (!match) return 'not_a_data_uri'
   if (!ALLOWED_MIME.includes(match[1].toLowerCase())) return 'unsupported_type'
-  // base64 is 4 characters per 3 bytes; this is the decoded size without decoding it.
-  if (Math.ceil(match[2].length * 0.75) > SAVED_MEAL_IMAGE_MAX_BYTES) return 'too_large'
+  if (mealImageBytes(dataUri) > SAVED_MEAL_IMAGE_MAX_BYTES) return 'too_large'
   return null
 }
 

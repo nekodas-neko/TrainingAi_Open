@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.341.0",
+    date: "2026-08-24",
+    changes: [
+      "Saved meals can have a photo. Edit a meal and there is a tile beside the name: tap it for the camera or gallery, tap the corner to remove it. The picture is shrunk on the phone before it is saved \u2014 a normal camera photo is far too big to store against a meal, so it becomes a small thumbnail around 6 KB, and the tile shows you the size so you can see it stayed small.",
+    ],
+  },
+  {
     version: "1.340.1",
     date: "2026-08-24",
     changes: [
