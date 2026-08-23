@@ -1435,3 +1435,21 @@ what paths are claimed (none), and the gotchas that cost this run time.
 BugFix 161, Review 170 and Tuning 582 are not. The entry's own thesis holds — each fell at its role's
 own handoff rather than in a compaction pass — with one exception it should expect: Tuning at 582 is
 4× the target and will not come down as a side effect of a routine rewrite.
+
+## 2026-08-23 — `projectOverview.md` 7889 → 7916, for one Known-Issues row (LB-1)
+
+**27 lines, and the check attributed all 27 to this branch** — the first raise since LA-16 gave the
+ratchets a base tree, and the message now says "27 of which this branch added" rather than leaving
+you to work out whether `main` was already over. That is the whole point of that change and it paid
+for itself immediately here.
+
+The row is a user-facing capability gap: no reachable UI can edit or delete a logged exercise, a
+workout session or an activity log, because the four controls that did live in a sheet nothing can
+open. It is longer than a typical row on purpose. Two sessions have already fixed bugs *inside* that
+unreachable sheet — the second was this lane, one PR ago — so the expensive thing is not knowing the
+defect, it is re-deriving that the surface is dead. The row carries the measurement that settles it:
+which controls exist, which routes have no reachable caller, and the one trash icon nearby that turns
+out to be a drop-set indicator.
+
+Trimmed from 29 before raising. What stayed is the evidence; what went was a second telling of the
+mechanism already stated in the paragraph above it.

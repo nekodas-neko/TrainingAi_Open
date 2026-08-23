@@ -86,6 +86,19 @@ for (let i = 0; i < queue.length; i++) {
       const gate = line.match(/^\s*[-*]\s*\*{0,2}Gate:\*{0,2}\s*([a-z]+)/i);
       if (gate) meta.get(currentId).gates.push(gate[1].toLowerCase());
 
+      // A field written INLINE — `- **Added:** … · **Gate: owner**` — is not a field. The two
+      // matchers above anchor at the start of a bullet, so an inline one is silently ignored and
+      // the entry stays READY, which is the exact opposite of what writing it was meant to do.
+      // Filed after making this mistake twice in two days: `Needs:` on 2026-08-20 and `Gate:` on
+      // 2026-08-23, both by appending to the `Added:` line. Only the **bolded** form is flagged, so
+      // prose that merely mentions the word is untouched.
+      if (/\*\*(Gate|Needs):/i.test(line) && !needs && !gate) {
+        failures.push(
+          `${currentId}: a \`Gate:\`/\`Needs:\` field is written inline and will be IGNORED — it ` +
+            `must start its own bullet, or the entry stays READY:\n    ${line.trim().slice(0, 120)}`,
+        );
+      }
+
       const batch = line.match(/^\s*[-*]\s*\*{0,2}Batch:\*{0,2}\s*`?([^`\s]+)`?/i);
       if (batch && !meta.get(currentId).batch) meta.get(currentId).batch = batch[1];
 
