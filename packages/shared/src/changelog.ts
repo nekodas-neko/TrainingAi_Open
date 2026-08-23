@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.333.2",
+    date: "2026-08-23",
+    changes: [
+      "If you train the same session twice in one day \u2014 two Push days, say \u2014 the day screen and the week-day sheet now show each one's own start, finish and length. Both were showing the later workout's times against both entries, so a 32-minute morning session read as the 82-minute evening one, and the earlier one's times were not shown anywhere.",
+    ],
+  },
+  {
     version: "1.333.1",
     date: "2026-08-20",
     changes: [

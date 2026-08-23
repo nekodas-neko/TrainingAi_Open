@@ -107,6 +107,18 @@ for (let i = 0; i < queue.length; i++) {
         `per-pillar sweep:\n    ${line.slice(0, 120)}`,
     );
   }
+  // An UNKNOWN tag beside a valid one used to pass silently, and that is worse than an untagged
+  // entry: the heading looks tagged, `grep '\[health\]'` finds it, and there is no `health` pillar
+  // for that sweep to belong to. Two entries had `[app-shell][health]` when this was added — one of
+  // them written the same hour, by someone who had just read the pillar list.
+  const unknown = tags.filter((t) => !PILLARS.has(t));
+  if (unknown.length > 0) {
+    failures.push(
+      `Unknown [domain] tag ${unknown.map((t) => `[${t}]`).join(' ')} — not one of the eleven ` +
+        `pillars in docs/domains/README.md, so no per-pillar sweep will ever look at it:\n    ` +
+        `${line.slice(0, 120)}`,
+    );
+  }
 
   const q = line.match(/\b(LA|LB|BF|RV|TN|PS|Q)-(\d+)([a-z]?)\b/);
   if (!q) continue;
