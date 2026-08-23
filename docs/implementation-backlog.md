@@ -8166,9 +8166,22 @@ measured, not the ~3,300-test full suite.
   rollup queries do not select, so every frame resolves against the *current* epoch. Not a regression
   (behaviour across a ring reset is unchanged), but it is the honest completion of this work.
 
-### [sleep][readiness] 🔴 Q-72 — the Sleep Score cannot tell a good night from a bad one (MEASURED, needs an owner decision)
+### [sleep][readiness] Q-72 — the Sleep Score's model is retuned; a partial-data flag is what's left
 
-- **Gate:** owner
+- **Lane:** A — the coverage-ratio formula belongs in
+  `packages/shared/src/health/sleep-score.ts` (one formula, one place), and this reaches
+  `components/health/**` display code too, which the §3 rule puts in Lane A whole ("Both → Lane A,
+  engine half first"). The display half is a small, obvious follow-on once the formula exists.
+- **⚑ NO OWNER GATE REMAINS as of 2026-08-23. Both decisions this entry ever needed are made.**
+  Read the two `✅ ANSWERED` bullets below before anything else — the rest of this entry is the
+  history that got there and is not itself blocking.
+  1. **2026-08-12: re-tune the stuck contributors, not a global rescale.** Shipped as v1.319.0
+     (2026-08-18) — mean sleep score 87 → 70, range 86–92 → 32–99.
+  2. **2026-08-23: flag a partial night, scaled to how much is missing** (below).
+- **⏳ One thing is still time-gated, not owner-gated, and does not block starting the flag work.**
+  The rank-based re-validation against the owner's morning ratings needs ~3 weeks of nights scored
+  under the new v1.319.0 model to accumulate (history is not back-filled) — due around
+  **2026-09-08**. Nobody is waiting on a decision; the clock is the whole blocker.
 
 - **Added:** 2026-08-04. Started as *"put the sleep rating on the morning check-in"* (the owner's
   idea). **That turned out to be already built** — `MorningCheckinSheet` has collected
@@ -8270,10 +8283,21 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   `schedule` and `latency` so they stop sitting at their ceiling and diluting the six that already
   track the owner's experience. The owner was told their nightly number will change and that bad
   nights will start scoring genuinely low, and accepted that.
-- **Open sub-question the implementer must still resolve (do not guess):** `hr` and `hrv` are
-  present on only **39 of 56** scored nights, so the score already means something different on the
-  other 17. Down-weighting them changes that asymmetry rather than fixing it — decide and document
-  what a night with neither contributor should score before shipping.
+- **✅ ANSWERED BY THE OWNER 2026-08-23 — show when data is missing, scaled to how much.** Do not
+  silently score a partial night the same as a full one. *"If its missing data it shouldnt
+  [score] differently [without saying so]. Depending on how much is missing."*
+  - **The denominator, so "how much" is a number and not a feel:** `hr` and `hrv` together carry
+    **28 of the model's 110 weight points — 25%**. A night missing both is missing a quarter of the
+    model, not a rounding error; a night missing only `latency` (6 points, 5%) is not the same case
+    and should not be flagged the same way.
+  - **Shape, for whoever builds this — not a further owner decision, a design note:** a coverage
+    ratio (`present weight / 110`) with two or three bands is enough — full data, a light
+    "partial data" note, and a clearer flag once missing weight crosses roughly the `hr`+`hrv`
+    threshold. Do not invent a fourth band or a numeric confidence score; the owner asked for
+    something that says *this number is less complete*, not a second metric to interpret.
+  - **This is additive to the 2026-08-12 decision, not a new gate.** It changes how the score is
+    *presented* on a partial night, not how it is computed. It can ship independently of the
+    ~3-week rank-based re-validation below.
 
 - **⚑ 2026-08-19 — the yardstick question is answered, and the obvious next move was the wrong one.**
   [`docs/reviews/2026-08-19-sleep-validation-targets.md`](reviews/2026-08-19-sleep-validation-targets.md).
