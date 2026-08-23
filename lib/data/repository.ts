@@ -503,7 +503,7 @@ export interface WorkoutRepository {
   countAllSessionsSinceStart(userId: string, programId: string): Promise<Map<string, number>>
   autoRecalibrateCycleAnchor(userId: string, programId: string): Promise<void>
   getActiveProgramWithPhases(userId: string): Promise<{ program: Program; phases: ProgramPhase[] } | null>
-  confirmEarlyDeload(userId: string, programId: string, today: string): Promise<void>
+  confirmEarlyDeload(userId: string, programId: string, today: string, timezone?: string): Promise<void>
 
   // ── Workout Logging ────────────────────────────────────────────────────────
   createWorkoutSession(userId: string, sessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean): Promise<WorkoutSession>
@@ -622,15 +622,17 @@ export interface WorkoutRepository {
   // Rolling-window trained-day map (not month-aligned) for streak/week-strip
   // widgets that must not lose data at calendar-month boundaries.
   getRecentTrainedDays(userId: string, days: number, timezone?: string): Promise<Record<string, string[]>>
-  getDayLog(userId: string, date: string): Promise<WorkoutSession[]>
+  /** `timezone` defaults to DEFAULT_TZ, which is right for the owner and wrong for anyone else —
+   *  pass `session.user?.timezone` (LA-19). */
+  getDayLog(userId: string, date: string, timezone?: string): Promise<WorkoutSession[]>
   // Lightweight alternative to getDayLog for "already logged today" checks —
   // single join, no nested exercises/sets.
-  getDayExerciseNames(userId: string, date: string): Promise<{ sessionId?: string; exerciseName: string }[]>
+  getDayExerciseNames(userId: string, date: string, timezone?: string): Promise<{ sessionId?: string; exerciseName: string }[]>
   // Lightweight alternative to getDayLog for the HR-chart "Workout" overlay band —
   // session-columns-only, no nested exercise/set trees. Excludes sessions with zero
   // logged exercises (abandoned starts) via an EXISTS check, matching getDayLog's
   // existing consumer-side filter.
-  getDaySessionSummaries(userId: string, date: string): Promise<{ sessionId?: string; sessionName: string; startedAt: Date; completedAt?: Date }[]>
+  getDaySessionSummaries(userId: string, date: string, timezone?: string): Promise<{ sessionId?: string; sessionName: string; startedAt: Date; completedAt?: Date }[]>
   // Batched ownership lookups for sync-time IDOR checks — returns a map of
   // row id -> owning userId for whichever of the given ids already exist.
   getWorkoutSessionOwners(sessionIds: string[]): Promise<Map<string, string>>
@@ -1011,7 +1013,7 @@ export interface WorkoutRepository {
   markOuraWorkoutReviewed(userId: string, id: string): Promise<void>
   getSetTimestampsForSession(workoutSessionId: string): Promise<{ exerciseName: string; setNumber: number; setStartMs: number | null; setEndMs: number | null; loggedAt: Date | null }[]>
   markHrSynced(workoutSessionId: string): Promise<void>
-  getUnsyncedHrSessionsForDay(userId: string, day: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
+  getUnsyncedHrSessionsForDay(userId: string, day: string, timezone?: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   getUnsyncedHrSessions(userId: string, from: Date, to: Date): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   getWorkoutSessionById(userId: string, id: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null } | null>
   // Full session detail (exercises + sets) for a single workout session — used by the

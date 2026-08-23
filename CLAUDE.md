@@ -462,6 +462,17 @@ The timezone rule covers "today"; this covers **ranges and construction**, which
   window — pick a fixed-offset zone (`Etc/GMT±N`) whose local time is *currently* near 01:00 and run
   the case there, so it fires on every CI run. `faketime` does not help: it shifts node's clock, not
   Postgres's.
+- **`aestMidnight(y, m, d)` without its fourth argument keys the window to Brisbane, for every
+  user.** The parameter exists and defaults to `DEFAULT_TZ`, which is right for the owner and wrong
+  for everyone else — the same "a default every caller overrides is a safety net" shape as the repo
+  day-window helpers below. It was **9 of 22** on 2026-08-23; all 22 pass one now (LA-19), and
+  `scripts/check-aest-midnight-timezone.js` holds that at zero in the Custom Rules job — its
+  baseline is **empty**, so an omitting call site is a regression rather than a debt row. It surfaced from a test that was written correctly — it read the local day
+  back from the row it had inserted — and still failed, because the query re-derived midnight in
+  Brisbane. **To find this class, do not read: shift a test user's timezone into its own 00:00–02:00
+  band** (an `Etc/GMT±N` computed from the current UTC hour, as
+  `local-day-fixture-anchoring.test.ts` does) and re-run. That reproduces the hazard on any clock,
+  which is the whole reason it survives otherwise.
 - **Client code has two "today" sources** — `todayInTz()` vs the device's own timezone. Pick one per feature and don't mix them for keys that must match server bucketing. Repo day-window helpers (`getCalendarData`, `getRecentTrainedDays`, `getNextSession`) take `timezone = DEFAULT_TZ` as a **default parameter** and every current caller passes the session tz — they are the pattern to copy, not a known-broken area (Q-480). Keep threading it when touching them: a default every caller overrides is a safety net, and it is what makes forgetting silent. Never re-declare `DEFAULT_TZ` locally.
 
 ---

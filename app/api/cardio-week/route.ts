@@ -66,7 +66,7 @@ export async function GET() {
     // "No dedicated workout today" (Q-88 lazy-day credit) reuses the same lightweight
     // lifting check progress-summary's trainedToday uses, plus any logged cardio/guided-walk
     // activity for today — either one means today isn't a lazy day.
-    repo.getDayExerciseNames(userId, today.replace(/-/g, '/')).catch(() => []),
+    repo.getDayExerciseNames(userId, today.replace(/-/g, '/'), tz).catch(() => []),
     repo.listActivityLogs(userId, today, today).catch(() => []),
   ])
   const trainedToday = dayExercises.length > 0 || todayActivityLogs.length > 0

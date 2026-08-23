@@ -33,6 +33,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Can only early-deload the active program" }, { status: 403 });
   }
 
-  await repo.confirmEarlyDeload(userId, programId, today);
+  await repo.confirmEarlyDeload(userId, programId, today, tz);
   return NextResponse.json({ ok: true, earlyDeloadWeekStart: today, programId });
 }

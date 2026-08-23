@@ -47,6 +47,7 @@ export async function POST(req: Request) {
       userId,
       parsed.data,
       todayInTz(session.user?.timezone ?? DEFAULT_TZ),
+      session.user?.timezone ?? DEFAULT_TZ,
     )
     if (!result.target) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(result)

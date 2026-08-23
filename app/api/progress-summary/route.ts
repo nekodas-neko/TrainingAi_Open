@@ -33,7 +33,7 @@ export async function GET() {
   const [sleepSessions, program, dayExercises, nextSession, bodyBaseline, weekSessionsAll, weightHistory] = await Promise.all([
     repo.listSleepSessions(userId, sevenDaysAgo, today),
     repo.getActiveProgram(userId),
-    repo.getDayExerciseNames(userId, today.replace(/-/g, '/')),
+    repo.getDayExerciseNames(userId, today.replace(/-/g, '/'), tz),
     repo.getNextSession(userId, tz),
     repo.getBodyMetricsBaseline(userId),
     repo.getWorkoutSessionsFrom(userId, mondayUtc),

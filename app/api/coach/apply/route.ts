@@ -55,6 +55,7 @@ export async function POST(req: Request) {
       parsed.data.patch,
       parsed.data.acceptedChangeIds,
       todayInTz(session.user?.timezone ?? DEFAULT_TZ),
+      session.user?.timezone ?? DEFAULT_TZ,
     )
 
     if (!result.ok) {

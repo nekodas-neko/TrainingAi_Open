@@ -124,7 +124,8 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const repo = await getRepository();
-  const workoutSessions = await repo.getDayLog(userId, date);
+  const userTz = session.user?.timezone ?? DEFAULT_TZ;
+  const workoutSessions = await repo.getDayLog(userId, date, userTz);
 
   const exercises: DayExercise[] = workoutSessions.flatMap(ws =>
     ws.exercises.map(el => ({

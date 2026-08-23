@@ -8,7 +8,7 @@ import type {
   ProgressionStyle, StyleSet,
 } from '@trainingai/shared/types'
 import type { ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseRole } from '@trainingai/shared/types/program'
-import { aestMidnight, toAestDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { aestMidnight, toAestDateStr, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { buildOwnedPhaseSetName } from '@trainingai/shared/phase-set-naming'
 import { isUuid } from '@trainingai/shared/validation/uuid'
 
@@ -710,10 +710,10 @@ export async function getActiveProgramWithPhases(db: Db, userId: string) {
   return { program: prog, phases }
 }
 
-export async function confirmEarlyDeload(db: Db, userId: string, programId: string, today: string): Promise<void> {
+export async function confirmEarlyDeload(db: Db, userId: string, programId: string, today: string, timezone = DEFAULT_TZ): Promise<void> {
   const [y, m, d] = today.split('-').map(Number)
-  const dayStart = aestMidnight(y, m, d)
-  const dayEnd   = aestMidnight(y, m, d + 1)
+  const dayStart = aestMidnight(y, m, d, timezone)
+  const dayEnd   = aestMidnight(y, m, d + 1, timezone)
   await db.transaction(async tx => {
     await tx.update(s.programs)
       .set({ earlyDeloadWeekStart: today })
