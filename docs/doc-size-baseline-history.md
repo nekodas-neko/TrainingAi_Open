@@ -1553,7 +1553,7 @@ or an API route) is a decision to take *before* starting Task 3, and the queue e
 implementer reads first.
 
 
-## 2026-08-23 — `docs/implementation-backlog.md` 11432 → 11453
+## 2026-08-23 — `docs/implementation-backlog.md` 11447 → 11463
 
 Six lines correcting a claim this queue file had carried for five days and that #306 repeated:
 plan Task 1's "the production CSP has no `wasm-unsafe-eval`" was true when it was written and
