@@ -9,6 +9,19 @@ import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
 import { decodeMealLabelToken } from '@trainingai/shared/nutrition/label-payload'
+import { downscaleToJpegDataUrl, base64FromDataUrl } from '@/lib/media/downscale-image'
+
+/**
+ * Longest edge of an uploaded food photo, in pixels (BF-4).
+ *
+ * **Chosen from the token budget, not from taste.** Every image scan in a month of production
+ * reports 1,275–1,298 input tokens regardless of the photo's size, because Gemini normalises an
+ * image to a fixed tile budget before the model sees it. A 4 MB photo and a 400 KB photo therefore
+ * do the same model work — the extra bytes buy no accuracy and are pure upload latency. 1024 sits
+ * comfortably above the tiles that budget covers while bounding an S25's 12 MP capture, which is
+ * otherwise ~4000 px wide plus base64's ~33%.
+ */
+const SCAN_IMAGE_MAX_DIM = 1024
 
 interface Props {
   onScanResult: (result: NutritionScanResult) => void
@@ -90,16 +103,17 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, onSavedMeals, p
   async function handlePhoto(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0]
     if (!file) return
-    const reader = new FileReader()
-    reader.onload = () => {
-      const dataUrl = reader.result as string
-      const base64 = dataUrl.split(',')[1]
-      setError(null)
-      setPendingPhoto({ base64, mimeType: file.type, previewUrl: dataUrl })
-      setPhotoNote('')
-    }
-    reader.readAsDataURL(file)
     e.target.value = ''
+    try {
+      // Downscaled before it becomes a payload, not after (BF-4). This used to `FileReader` the raw
+      // File, so a phone photo went up at full resolution plus base64's ~33%.
+      const dataUrl = await downscaleToJpegDataUrl(file, { maxDim: SCAN_IMAGE_MAX_DIM })
+      setError(null)
+      setPendingPhoto({ base64: base64FromDataUrl(dataUrl), mimeType: 'image/jpeg', previewUrl: dataUrl })
+      setPhotoNote('')
+    } catch {
+      setError('That image could not be read. Try another photo.')
+    }
   }
 
   async function handleCapturePhoto() {
@@ -114,6 +128,14 @@ export function CaptureStep({ onScanResult, onManual, onMyFoods, onSavedMeals, p
         resultType: CameraResultType.Base64,
         source: CameraSource.Prompt,
         quality: 80,
+        // `width`/`height`, NOT `targetWidth`/`targetHeight` — those belong to the sibling
+        // `takePhoto(TakePhotoOptions)`. Both pairs are optional, so the wrong one type-checks and is
+        // ignored at runtime: a downscale that silently never happens (verified against the pinned
+        // @capacitor/camera 8.2.0 source, per CLAUDE.md's external-field-names rule).
+        // These are maxima with the aspect ratio respected, so a landscape photo comes back
+        // 1024 × 768 rather than being squashed to a square.
+        width: SCAN_IMAGE_MAX_DIM,
+        height: SCAN_IMAGE_MAX_DIM,
       })
       if (!photo.base64String) return
       const mimeType = `image/${photo.format}`
