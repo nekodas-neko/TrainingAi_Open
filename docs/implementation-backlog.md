@@ -2888,6 +2888,33 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [devices][platform] Q-545 — OWNER-DIRECTED FOCUS: move the Oura rollup onto the device (D2 Task 5) — the D-track's missing middle
 
+> **✅ TASK 2 SHIPPED (extraction only) — the rest of the entry stands.** `aggregateOuraRawSamples`
+> is now `runOuraRollup(io, timezone, opts)` in `lib/oura-ble/rollup/run.ts`, taking a `RollupIO`
+> port (`lib/oura-ble/rollup/io.ts`); `lib/data/postgres/rollup-io.ts` holds the server
+> implementation and the adapter method is a 10-line wrapper. No behaviour change: all **20** test
+> files that exercise `aggregateOuraRawSamples` pass unchanged, which is the extraction gate this
+> entry named. `adapter.ts` 6,906 → 5,818 lines.
+>
+> **Two premise corrections for whoever takes Task 3.**
+>
+> 1. **`RollupIO` has 22 methods, not the 5 the plan sketches.** The "17 lines touch `this.db` /
+>    `.select(` / an `oura.*` slice helper" measurement counted lines, not operations: there are
+>    **28 touchpoints across 22 distinct store operations** — nine reads (anchors ×2, watermark,
+>    raw frames, step live-windows, existing steps, workout windows, latest daily summary, daytime
+>    HRV model, daily derived) and thirteen writes. Sizing the device implementation off "five
+>    methods" under-scopes it about four-fold.
+> 2. **⚠️ The neural dependencies are still server-only, and the extraction did not touch them.**
+>    `run.ts` reaches `onnxruntime-node` transitively — `@/lib/oura-models/sleepnet-assemble` →
+>    `inference/sleepnet` → `inference/session.ts`, and `@/lib/health/daytime-stress` →
+>    `inference/dhrv` → the same loader — whose own header says *"server-only: onnxruntime-node is a
+>    native addon and must never reach the client bundle"*. So the rollup's **I/O** is now portable
+>    and its **models are not**. Task 3 needs the model session injected the same way the I/O is
+>    (`session-web.ts` already exists as the WASM sibling; plan Task 4), and that is gated on plan
+>    Task 1, the missing `wasm-unsafe-eval` in the production CSP. A smaller one: `sourceRank`
+>    (`lib/data/health-source.ts`) pulls `drizzle-orm` into the module graph and wants moving to a
+>    driver-free home.
+
+
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
 - **Branch:** `feat/device-rollup-port`
 - **Added:** 2026-08-18. **Owner-directed: "do the D-track first, that should have a lot of focus."**
