@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.342.0",
+    date: "2026-08-24",
+    changes: [
+      "Paste a recipe link into \"meals you usually eat\" when building a plan and it becomes a meal, with the site it came from shown beside it. If the page says how many the recipe serves, the numbers are already for one serving. If it does not, you are asked \u2014 the figures until then are for the whole batch, and a loaf counted as one meal is a mistake that looks entirely normal on screen.",
+    ],
+  },
+  {
     version: "1.341.0",
     date: "2026-08-24",
     changes: [

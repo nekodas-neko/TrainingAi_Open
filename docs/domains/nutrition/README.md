@@ -115,6 +115,11 @@ Live at the time of writing (2026-07-30):
   Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (Log Food as
   one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
   before starting any phase; the phases point back rather than copying its decisions.
+- ⚠️ **A recipe link becomes a meal** (Q-409's Lane B half, 2026-08-24, v1.342.0) — the plan
+  wizard's "meals you usually eat" step takes a URL. **A page that states no yield hands back the
+  WHOLE recipe**, so the row asks how many it serves and refuses to be kept until answered;
+  `perServing` is shared with the route so the two divides cannot drift —
+  [`journal`](../../overview/entries/2026-08-24-recipe-url-to-meal-ui.md).
 - ⚠️ **Saved meals can carry a photo at last** (Q-327, 2026-08-24, v1.341.0) — a 64 px tile in
   Edit Meal, downscaling to 128 px WebP so the picture fits `SAVED_MEAL_IMAGE_MAX_BYTES`. The
   storage half had shipped with Q-396 and nothing could reach it. **Not device-verified**: the
