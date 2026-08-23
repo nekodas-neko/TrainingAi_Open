@@ -176,6 +176,18 @@ Live at the time of writing (2026-07-30):
 - Handoffs: `ls docs/handoff-*-nutrition-*.md`
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
 
+## Decided, and deliberately not built
+
+- **A meal type's entries can be MOVED, never bulk-deleted (owner, 2026-08-23 — LB-2, removed from
+  the queue).** Q-326's delete dialog offers *"move them"* and no *"delete them instead"*, and the
+  server has no `deleteFoodLogsByMealType` to back one — the button was never built rather than
+  built dead. **Keep it that way.** The move is already the escape, so nobody is stuck; the meal
+  type can be deleted the moment it is empty. What the second option would buy is one tap, and what
+  it would cost is a single irreversible action that discards real logged history — which feeds the
+  calorie trends, the adaptive-TDEE calibration, and the burn-estimate fitting in Q-422. It would
+  also be the only bulk destructive action in the app. Revisit only if the move itself becomes a
+  real annoyance; building it later is a repository function and a route parameter.
+
 ## Gotchas specific to this domain
 
 - **`food_logs` storing only a `food_item_id` was the #1 data-loss bug.** A log table must hold

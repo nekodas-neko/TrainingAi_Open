@@ -1,6 +1,6 @@
-# BugFix Intake Agent 🪲 — baton
+# 🪲 BugFix Intake Agent — baton
 
-> **Successor sessions are titled `BugFix Intake Agent 🪲`** — exactly, emoji included. The title is
+> **Successor sessions are titled `🪲 BugFix Intake Agent 🟢`** — exactly, emoji included. The title is
 > how five concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
