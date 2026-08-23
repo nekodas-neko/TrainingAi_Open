@@ -21,9 +21,15 @@ import { SEED_EMAIL, settleRouteBoundary } from './fixtures'
 
 // Fixed ids so the fixture is idempotent, and a fixed past date so nothing here depends on a
 // rolling window — both sides of every comparison are pinned (CLAUDE.md, Date Arithmetic).
+//
+// The day is deliberately a YEAR back, not last week. `scripts/local-db/seed.sql` dates its
+// workouts RELATIVE to the day it runs, so any recent fixed date eventually collides with a seeded
+// session — and CI reseeds every run, so the collision arrives without anything in the diff
+// changing. It arrived as `getByText('Bench Press') resolved to 2 elements`, which reads like a
+// duplicate-rendering bug rather than a fixture that drifted into the seed's window.
 const MORNING_ID = '11111111-1111-4111-8111-111111111111'
 const EVENING_ID = '22222222-2222-4222-8222-222222222222'
-const DAY = '2026-08-19'
+const DAY = '2025-05-14'
 
 async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
   const connectionString = process.env.DATABASE_URL
@@ -35,8 +41,12 @@ async function withDb<T>(fn: (db: Client) => Promise<T>): Promise<T> {
 
 test.beforeAll(async () => {
   await withDb(async db => {
-    const { rows } = await db.query<{ id: string }>('SELECT id FROM users WHERE email = $1', [SEED_EMAIL])
+    const { rows } = await db.query<{ id: string; tz: string }>(
+      `SELECT id, COALESCE(timezone, 'Australia/Brisbane') AS tz FROM users WHERE email = $1`,
+      [SEED_EMAIL],
+    )
     const userId = rows[0]?.id
+    const tz = rows[0]?.tz
     expect(userId, `${SEED_EMAIL} is not seeded — run pnpm db:local`).toBeTruthy()
 
     await db.query('DELETE FROM exercise_logs WHERE workout_session_id = ANY($1)', [[MORNING_ID, EVENING_ID]])
@@ -45,8 +55,8 @@ test.beforeAll(async () => {
     // 08:00→08:32 and 17:00→18:22 Brisbane on DAY. The two windows are deliberately far apart so a
     // collision shows up as one duration on both cards rather than as a near-miss.
     for (const [id, startedAt, completedAt, exercise, loggedAt] of [
-      [MORNING_ID, '2026-08-18 22:00:00+00', '2026-08-18 22:40:00+00', 'Bench Press', '2026-08-18 22:30:00+00'],
-      [EVENING_ID, '2026-08-19 07:00:00+00', '2026-08-19 08:30:00+00', 'Overhead Press', '2026-08-19 08:20:00+00'],
+      [MORNING_ID, '2025-05-13 22:00:00+00', '2025-05-13 22:40:00+00', 'Bench Press', '2025-05-13 22:30:00+00'],
+      [EVENING_ID, '2025-05-14 07:00:00+00', '2025-05-14 08:30:00+00', 'Overhead Press', '2025-05-14 08:20:00+00'],
     ] as const) {
       await db.query(
         `INSERT INTO workout_sessions (id, session_name, started_at, completed_at, user_id)
@@ -59,6 +69,17 @@ test.beforeAll(async () => {
         [id, exercise, loggedAt],
       )
     }
+
+    // The two the fixture just wrote, and nothing else. Without this a seeded session sharing the
+    // day fails the assertions below as a strict-mode violation naming an exercise, which says
+    // nothing about the collision that caused it.
+    const { rows: onDay } = await db.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM workout_sessions
+        WHERE user_id = $1
+          AND (started_at AT TIME ZONE $3)::date = $2::date`,
+      [userId, DAY, tz],
+    )
+    expect(Number(onDay[0].n), `${DAY} must hold only this fixture's two sessions`).toBe(2)
   })
 })
 

@@ -841,69 +841,177 @@ calories. That is the step Q-417's own verification note said had failed.
   local dev server against a local Postgres wins more often than a phone on mobile data does. A
   guard likely has to stall the push rather than race it.
 
-### [nutrition][app-shell] Q-406 — extract `food-row.tsx` first, so the rework has somewhere to land
+### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
+
+- **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
+  Done: `day_checkins.food_logging_completed_at` (migration **201**, local SQLite **v27**, both sync
+  directions, `claude_ro` views **202**), `POST /api/food-logging-complete` with its Undo, and
+  `estimateMaintenance` filtering on the flag instead of `intakeKcal > 0`. The partial-day case the
+  module had **zero** coverage of now has five tests, plus an end-to-end pair through
+  `computeEnergyBalance`. [`Journal`](overview/entries/2026-08-19-tdee-day-completeness.md).
+- **⚠️ Until the button ships, the calibration cannot engage** — no day can be marked, so every day
+  is excluded and `source` stays `'formula'`. That is the intended failure mode ("the estimate
+  waits", not "the estimate is quietly wrong") and it costs nothing today, because per Q-302 **0 of
+  the last 30 rolling windows** cleared `MIN_LOGGED_DAYS` anyway. It does mean the feature is inert
+  until Lane B lands.
+- **Still open — Lane B:** the *"Complete Today's Logging"* button as the last element in the day's
+  scroll (not the header, not beside the ring), the copy beneath it, the receipt-with-Undo it
+  becomes, and the **"N of 10 days" counter shipped with it, not after** — the button feeds
+  something invisible, and that invisibility is why this bug survived. `POST /api/food-logging-complete`
+  takes `{ date?, complete }` and answers `{ date, complete, completedAt }`; sending
+  `complete: false` is the Undo.
+
+- **Branch:** `fix/tdee-partial-day-completeness`
+- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
+  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
+  the rest? does it assume thats all I had for the day and tune around that? Need some control
+  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
+  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
+  that the owner's suspicion is correct.
+- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
+  There is no completeness concept anywhere in the path.
+
+**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
+"logged day" is with a bare non-zero test:
+
+```ts
+const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
+```
+
+A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
+*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
+(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
+`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
+
+**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
+miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
+in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
+comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
+in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
+the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
+abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
+fixed the version that self-corrects by evening, and left the version that never does.
+
+**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
+eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
+1400, dinner never logged):
+
+```
+partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
+0            14          2600        2600         medium      null
+6            14          2086        2086         medium      null
+14           14          1400        1400         medium      null
+```
+
+Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
+`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
+as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
+"plausible" 1400.
+
+**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
+`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
+inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
+under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
+module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
+too, so the Balance card's "burned" figure is dragged down in step.
+
+- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
+  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
+  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
+  presents protections (1) and (2) as the complete story — the claim this corrects.
+- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
+  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
+  this question is about: logs consistently enough to switch tuning on.
+- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
+  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
+  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
+  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
+
+**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
+
+1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
+   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
+   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
+   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
+   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
+   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
+2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
+   "expected" is the calorie target, derived *from* maintenance, which is the number being
+   estimated, so a low estimate lowers the threshold and admits more partial days next window.
+   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
+   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
+   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
+3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
+   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
+   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
+   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
+   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
+
+- **What would count as fixed:** a day the user did not finish logging can no longer enter
+  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
+  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
+  rather than toward a confident wrong number. Whichever mechanism is chosen,
+  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
+  module is well-tested for empty days and has never been tested for half-full ones.
+- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
+  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
+  control, if option 1 is chosen, would need a device check.
+
+
+**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
+meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
+one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
+option 3 (silent inference) cannot be corrected by the person who knows the answer.
+
+**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
+— not in the header, not beside the ring. It is a statement about a day that has finished, and its
+position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
+is everything you ate. Only completed days are used to work out your maintenance calories."*
+Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
+must be reversible, since the whole point is that a wrong day poisons the estimate.
+
+**Ship the counter with it, not after it.** The button feeds something invisible today, and that
+invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
+had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
+for, so the two land together rather than one inventing a second version of the other.
+
+**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
+`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
+assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
+quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
+honest one, so the estimate starts from days marked after this ships and the counter shows that
+plainly.
+
+### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 - **Branch:** `refactor/nutrition-food-row`
-- **Added:** 2026-08-18, split out of **Q-395** so it can start immediately and in parallel rather than
-  waiting for the rework's turn in the queue.
-- **Lane B.** Pure extraction — no behaviour change, no schema, no route.
-
-- **✅ THE HEADROOM HALF IS DONE (2026-08-19, v1.325.3). THE ROW HALF IS RE-SCOPED — read the
-  correction below before starting it.** `nutrition-content.tsx` is **732** and
-  `saved-meals-sheet.tsx` is **753**, both well under 800, **with no new BASELINE rows**. Q-395 can
-  land. [`Journal`](overview/entries/2026-08-19-nutrition-headroom.md).
-
-**⚠ CORRECTED 2026-08-19 — the mechanism in this entry does not work, measured twice.**
-
-**1. Extracting a food row frees ZERO lines from either landing file.** Neither contains food-row
-markup. `nutrition-content.tsx` renders no rows at all — `MealCard` owns the diary row — and its
-only `foodItem` references are data mapping. `saved-meals-sheet.tsx` had already delegated both its
-lists, to `SavedMealCard` and `IngredientRow`. The two files are large for entirely different
-reasons, so the "unblocker" could not have unblocked anything.
-
-**What actually took them under**, and what was done instead: `AddFoodByHandForm` out of
-`saved-meals-sheet.tsx` (793 → 753 — a self-contained five-field form that owned its own state) and
-`useFoodLogsLoader` out of `nutrition-content.tsx` (800 → 732 — 69 lines, the file's largest and
-most self-contained function, no JSX and four inputs).
-
-**2. The four call sites are four DIFFERENT shapes, not one shape drawn four times.** Measured:
-- diary (`meal-card.tsx:82`) — calories in a fixed `w-16` right column, secondary line is **coloured
-  P/C/F chips**, trailing edit + delete buttons.
-- library (`food-library-sheet.tsx:100`) — calories right-aligned over a serving sub-line, whole row
-  is a button.
-- search/db (`ingredient-search.tsx:72`) — calories **inside** the secondary line, trailing `+` icon.
-- search/external (`ingredient-search.tsx:132`) — same, plus a macro-mismatch warning line and a
-  spinner.
-
-So a component covering all four **faithfully** needs a secondary-line node, a trailing slot and a
-calories-placement variant — at which point it is a wrapper, not a unification. And unifying them
-properly means **changing how three of the four look**, which this entry explicitly forbids
-(*"Behaviour must not change… Any visual difference belongs to Q-395"*). **The row cannot be
-extracted without first deciding what it should look like, and that decision is Q-395's.** Take the
-row after Q-395's design pass, not before it.
-
-**Why this was its own entry.** Q-395 could not start: both files it lands in were on the 800-line
-ceiling (`nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at **793**, neither
-grandfathered), so one added line failed Custom Rules. That part was right, and is now resolved.
-
-**What to build.** One component, `components/nutrition/food-row.tsx`, with the shape used by all six
-drawn screens: optional thumbnail · name · grey secondary line of *what and how much* · calories
-right-aligned in a fixed column · optional chevron. Props are **scalars**, not objects — the row
-renders inside `.map()` where hooks are unavailable, and an inline object literal at the call site
-silently defeats `React.memo` (`meal-macro-bars.tsx` is the reference this repo already keeps for
-exactly that reason).
-
-**Then convert the existing call sites, one per commit.** A food currently reads four different ways —
-diary, search, saved meal, builder. Converting them is what takes both landing files back under the
-line and makes the rest of Q-395 additive rather than blocked.
-
-- **⚠ Behaviour must not change in this entry.** It is an extraction. Any visual difference belongs to
-  Q-395, and mixing them makes the diff unreviewable and the regression unattributable.
-- **Done when:** ~~`node scripts/check-component-size.js` reports both files under 800 with **no new
-  BASELINE rows**~~ — **met 2026-08-19** (732 and 753, no new rows). What remains is the row
-  component, and its done-condition is now Q-395's: the four call sites render *the agreed* row,
-  which is a visual change, not "identically to before".
-- **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
+- **Lane B.** No schema, no route.
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
+  library sheet + the food-database search row now draw it.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
+  satisfied.**
+- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
+  row's only trailing element is a chevron.
+  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
+    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
+    yet**, so converting the diary row now removes the only way to correct a logged food. That is
+    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
+    **Convert it in Q-395a, in the same PR that adds the sheet.**
+  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
+    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
+    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
+    per-row warning goes — which belongs with Q-395's drawings.
+- **⚠ THE DRAWINGS ARE NOT IN THE REPOSITORY.** `unit-options.png`, which Q-395a names as its
+  reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
+  mockups for cardio, scores and the AI coach, none for nutrition. The row above was built from
+  Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
+  column · optional chevron"), which is complete enough for it. **The remaining phases are not so
+  lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
+  the phases will be built from prose and the visual match cannot be checked.
+- **The optional thumbnail is deferred.** No call site passes one, and an unused `<img>` costs a
+  `no-img-element` exemption for arbitrary user photo URLs. The phase that first shows a thumbnail
+  adds it, with the loader decision made where it can be seen.
+- **Unblocks:** Q-395a, and Q-398 which wants the same row for plan meals.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
