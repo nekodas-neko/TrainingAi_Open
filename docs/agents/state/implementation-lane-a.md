@@ -4,7 +4,7 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-20 (later) · **By:** the sixth session to run as Lane A · **Next ID:** `LA-18`
+**Updated:** 2026-08-23 · **By:** the sixth session to run as Lane A · **Next ID:** `LA-18`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
 **Migrations:** through 206; next free is **207**. Local SQLite **v28**, untouched this session.
 
@@ -16,14 +16,14 @@
 **But read this before taking the top item: the Lane A queue is thin right now, and the top three are
 each blocked in a way the tool cannot show.** Checked 2026-08-20:
 
-- **LA-16** (top) is real work and is mine — three ratchets converted, three left. The two remaining
-  script conversions are a brace-matching refactor each, and `check-strict-request-schemas` is
-  **unread**. One per PR, each proven both ways; these are gates.
-- **Q-324** has nothing to build. Its mechanism half shipped; the timeout it was filed for did not
-  reproduce. It is waiting on *evidence*, and the useful contribution is a fresh-DB suite run recorded
-  on the entry — not a fix.
+- **LA-16 is CLOSED** (#288, #291, #292) — all seven ratchets now ask whether *this branch* grew the
+  thing. One of the seven, the memo check, needed a materialised base tree because its count is not a
+  function of a single file; the rest are per-file. `scripts/lib/base-ref.js` is the shared piece.
+- **Q-324 is CLOSED on evidence** — 30 consecutive fresh-database CI runs post-fix, and the causal
+  chain verifiably removed. **If it recurs, the migration-recording fix is ruled out.**
 - **Q-555** is **undiagnosed by its own text** (*"whether the no-op is Next's router aborting a failed
-  RSC fetch or the click handler swallowing it"*) and needs a device check. Do not build it blind.
+  RSC fetch or the click handler swallowing it"*) and needs a device check. Do not build it blind —
+  it is now the top Lane A item and it is not startable as written.
 
 Below those: **Q-499**, then the nutrition cluster — most of which is Lane B's, correctly, as of #289.
 
