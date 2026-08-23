@@ -1731,3 +1731,15 @@ and the module-map row; this is the pointer to it.
 
 `docs/implementation-backlog.md` held at its 11334 baseline exactly — the re-scoped Q-392 entry
 gained a fourteen-row key table and shed the prose the journal and module map now carry.
+
+## 2026-08-23 — `projectOverview.md` 7977 → 7984
+
+Seven lines: one Current Status entry for LB-4, a user-visible staleness fix. The section is
+supposed to grow by one entry per shipped change and shrink on the compaction sweep, and this is
+that growth rather than detail that belongs elsewhere — the mechanism, the mutation results and the
+six deferred call sites are all in the journal entry and the LB-6 backlog entry.
+
+Worth noting for whoever runs the next sweep: Current Status is now ~178 lines across a dozen
+entries, and three separate PRs today each had to trim prose to avoid tripping this check. That is
+the ratchet doing its job, but it is also the signal that the sweep is due — the older half of the
+section describes work that has been on `main` for days.

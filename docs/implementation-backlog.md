@@ -1066,57 +1066,41 @@ going over. So it still looks like a progress bar where you want to go to the en
 **⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
 right number.**
 
-### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
+### [nutrition][platform][app-shell] LB-6 — six more write paths invalidate before the push, same as LB-4
 
-- **Branch:** `fix/food-log-invalidate-after-push`
-- **Added:** 2026-08-23 · **Lane: A** — `packages/shared/src/nutrition/log-food.ts` writes the local
-  store and the outbox, which is engine, not surface.
-- **Placement:** high for a correctness item. It is a live staleness bug on the owner's own screen,
-  and it is two lines.
+- **Lane:** B
+- **Branch:** `fix/invalidate-after-push-sweep`
+- **Added:** 2026-08-23, from LB-4's sibling sweep. LB-4 fixed the three engine paths
+  (`log-food`, `log-meal`, `create-food-item`) and left these, which are all `components/**`.
+- **The bug, once:** invalidating *before* a fire-and-forget `pushMutations` makes every
+  `useCachedValue` subscriber refetch while the server still holds the pre-write state, and
+  **re-cache it**. Nothing invalidates again, so the stale value stands for the key's full TTL.
+  Home's Energy Balance card read 42 kcal high for exactly this reason.
+- **The fix is one line each — the helper already exists.** Replace
+  `pushMutations(userId!).catch(() => {})` with
+  `pushThenRevalidate(userId!, <the same invalidator>)` from
+  `@/lib/local-store/push-then-revalidate`. Keep the immediate invalidation: offline it is the
+  only one that will ever fire, which is why moving the single call later would be wrong.
 
-**Found while closing Q-417, whose part (a) asked whether the write that logged 42 kcal actually
-invalidates `energy-balance:`. It does — at the wrong moment.**
+| file | line | invalidator to pass |
+|---|---|---|
+| `components/activity/done-activity-screen.tsx` | 263 | the one already called above it |
+| `components/guided-walk/walk-summary.tsx` | 194 | ″ |
+| `components/fitness-tests/test-result.tsx` | 113 | ″ |
+| `components/nutrition/quick-edit-log-sheet.tsx` | 71 | `invalidateNutritionWrite` |
+| `components/nutrition/saved-meals-sheet.tsx` | 371 | `invalidateSavedMeals` |
+| `components/nutrition/saved-meals-sheet.tsx` | 462 | ″ |
 
-`logFoodEntries` (`log-food.ts:243-244`) runs:
-
-```ts
-await invalidateNutritionWrite()
-pushMutations(userId!).catch(() => {})   // fire-and-forget
-```
-
-The eviction lands **before** the mutation reaches the server. Every `useCachedValue` subscriber —
-Home's Energy Balance card, Home's nutrition card, both zone bars — wakes on that signal, refetches
-immediately, gets the **pre-log** payload, and re-caches it. Nothing invalidates again once the push
-completes, so the stale value then stands for the key's full TTL.
-
-This matches the reported symptom exactly: Home's Energy Balance card read *"208 kcal left"* while
-the Nutrition tab's identical card read *"166"* — a 42 kcal gap that is precisely one unlogged
-entry. The Nutrition tab looked right because it appends the new log optimistically to its own
-state and never consults the cache for it.
-
-**The sibling path already has the right shape.** The food-log *delete* in
-`nutrition-content.tsx:397-400` does `pushMutations(...).then(() => { invalidateNutritionWrite(); … })`
-— invalidate after the push, not before.
-
-**Proposed fix: invalidate twice, not later.** Keep the immediate call (local screens must repaint
-at once, and offline it is the only one that will ever fire), and add a second after the push
-resolves:
-
-```ts
-await invalidateNutritionWrite()
-pushMutations(userId!).then(() => invalidateNutritionWrite()).catch(() => {})
-```
-
-Moving the single call after the push instead would break offline logging outright — `pushMutations`
-never resolves successfully with no network, so nothing would repaint at all.
-
-**Verification.** Log a food item on the Nutrition tab, then look at Home without navigating away
-and without waiting for a TTL: its Energy Balance card and nutrition card must both include the new
-calories. That is the step Q-417's own verification note said had failed.
-
-- **Not reproduced under automation yet** — the race needs the refetch to beat the push, which a
-  local dev server against a local Postgres wins more often than a phone on mobile data does. A
-  guard likely has to stall the push rather than race it.
+- **⚠ Line numbers are from 2026-08-23 and will drift.** The reliable finder is a `pushMutations(`
+  call with an `invalidate…(` within the six lines above it; `app/nutrition/nutrition-content.tsx`
+  is the shape to copy *toward*, not a hit — its delete path already invalidates after the push.
+- **⚠ Not every hit is necessarily load-bearing.** Per CLAUDE.md's "what makes an invalidation
+  load-bearing", a stale entry only *settles* where a call site passes `freshWithinTtl: true` or a
+  read path is seed-only. Convert all six anyway — the cost is one line and the condition changes
+  the moment someone adds `freshWithinTtl` — but do not report a user-visible fix for one that was
+  inert without checking which.
+- **What would count as done:** all six converted, and `grep` for the shape returns only the
+  engine's three (already converted) plus the sheets you just changed.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 

@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.335.1",
+    date: "2026-08-23",
+    changes: [
+      "Logging food updates Home straight away. The calorie figures were being refreshed a moment too early \u2014 before the log had reached the server \u2014 so the app fetched the old totals back and kept them. Home showed 208 kcal left while the Nutrition tab showed 166, a gap of exactly one unlogged item, and it stayed wrong until the cached figure aged out on its own.",
+    ],
+  },
+  {
     version: "1.335.0",
     date: "2026-08-23",
     changes: [

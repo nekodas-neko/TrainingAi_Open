@@ -27,9 +27,16 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
-**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
-backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
-the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
+**Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
+correctly and too early: subscribers refetched a server that lacked the log and re-cached the
+pre-log figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one
+entry. The engine write paths now invalidate on **both** sides of the push (`pushThenRevalidate`);
+the immediate call stays because offline it is the only one that fires. Six `components/**` sites
+carry the same shape — filed as **LB-6**, audit done.
+
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
+(`/admin/oura-ble` → **Show key for backup**), a full re-sync that notifies on completion, and a
+connect sequence that resets the two live-HR levers a killed session left on forever. **All native —
 inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
 with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
