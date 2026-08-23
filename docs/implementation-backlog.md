@@ -3123,6 +3123,9 @@ moving *beside* the calories rather than under them.
 
 ### [platform][devices] Q-476 — a schema-rejected mutation is deleted forever with no badge, no toast and no retry
 
+- **Gate: device** — the route half shipped; what is left is the write-time companion below, which
+  sits on the local store and is only verifiable on the S25.
+
 - **✅ THE ROUTE HALF SHIPPED 2026-08-23.** `app/api/sync/push` returns a per-item error entry for a
   mutation its `MutationSchema` rejects, so the row is kept, badged, and dead-lettered at
   `MAX_MUTATION_ATTEMPTS` instead of being silently deleted. The entry's own measurement now reads
@@ -3188,6 +3191,9 @@ moving *beside* the calories rather than under them.
 - **Lane A owns this** — `app/api/sync/push` and `lib/local-store/**`.
 
 ### [app-shell][platform] Q-472 — the Coach's write capability has never once been used in production
+
+- **Gate: owner** — the entry's own words: *"Keep and drive adoption, or narrow? **Owner's call,
+  not Lane A's.**"* There is nothing for an implementer to do until that is answered.
 
 - **Branch:** `docs/coach-write-usage-decision`
 - **Added:** 2026-08-18 · review sweep (this run's findings checked against production) ·
@@ -3265,45 +3271,6 @@ moving *beside* the calories rather than under them.
   not exist yet. See **Q-472** and
   [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
   (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
-
-### [workouts][platform] Q-468 — `undo` restores its captured state without checking the target still holds what the change set
-
-- **Branch:** `fix/coach-undo-drift-check`
-- **Added:** 2026-08-18 · review sweep (the Coach write path) ·
-  [`docs/reviews/2026-08-18-coach-apply-path.md`](reviews/2026-08-18-coach-apply-path.md)
-- **Placement:** directly with Q-467. **Latent today** (nothing can call undo) and **exactly what
-  Q-467 would expose** the moment a button is wired.
-- **The asymmetry.** `applyCoachPatch` refuses to write over a moved target — every domain runs
-  `driftAgainst(...)` and returns `stale` → 409 with a per-field drift report. `undoCoachChange` has
-  no equivalent: it reads `beforeState` and writes it back. The route's guard asks *"have you trained
-  since?"*, not *"has this row changed since?"*.
-- **Measured live, entirely within the Coach's own flow — no external edit needed:**
-
-  | Step | Action | `session_exercises.exercise_name` |
-  |---|---|---|
-  | 0 | initial | `Barbell Bench Press` |
-  | 1 | Coach change **A**: Barbell → Dumbbell | `Dumbbell Bench Press` |
-  | 2 | Coach change **B**: Dumbbell → Incline | `Incline Bench Press` |
-  | 3 | **Undo A** → `200` | **`Barbell Bench Press`** |
-  | 4 | **Undo B** → `200` | **`Dumbbell Bench Press`** |
-
-- **Two things are wrong.** After step 3 `coach_changes` shows A struck through and B as `NOT UNDONE`
-  — the history claims "Swapped Dumbbell → Incline" is in effect while the row says `Barbell Bench
-  Press`, so the screen that exists to report what the Coach did is wrong. And after step 4 — undoing
-  **everything** — the exercise is `Dumbbell Bench Press` when it started as `Barbell Bench Press`:
-  undoing every Coach change does not return the programme to where it began, and leaves it holding a
-  value the user never chose.
-- **All five domains share the gap.** No `undo()` in any handler checks current state; only
-  `session-exercise` re-verifies ownership on the way back. (The lone `drift` string in `goals.ts` is
-  a comment about a drifting local-storage copy, not a check.)
-- **Fix shape:** run `driftAgainst` on the way back too — compare the target's current values against
-  what the change **set** (`to`) and refuse with 409 + drift when they disagree, exactly as apply
-  does. The data is already there: `coach_changes.patch` holds the `to` values. A weaker but simpler
-  alternative is to allow undo only on the most recent un-undone change per `target_id`. **Lane A.**
-- **🔎 AMENDED 2026-08-18 from production — zero live instances.** Production has **not one
-  `target_id` with more than one change** (`coach_changes` is empty entirely), so the stacked-change
-  scenario that triggers this has never occurred. The defect reproduces locally and is real; its
-  exposure today is nil. Re-priced alongside Q-467 and Q-472.
 
 ### [readiness][platform] Q-394 — sweep the other tests that anchor a fixture to a UTC offset and query a user-local day window
 

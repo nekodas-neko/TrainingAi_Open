@@ -46,6 +46,10 @@ function makeHandler(
   read: (db: Db, userId: string) => Promise<Record<string, unknown>>,
 ): DomainHandler {
   return {
+    async currentState(db, userId) {
+      return read(db, userId)
+    },
+
     async preview(db, userId, patch): Promise<PreviewResult> {
       const current = await read(db, userId)
       const drift = driftAgainst(patch.changes, current)

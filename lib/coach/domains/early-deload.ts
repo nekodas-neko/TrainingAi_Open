@@ -76,6 +76,11 @@ async function loadState(db: Db, userId: string, today: string): Promise<DeloadS
 
 export function earlyDeloadHandler(today: string): DomainHandler {
   return {
+    async currentState(db, userId) {
+      const state = await loadState(db, userId, today)
+      return state ? { deloadNow: state.deloadNow } : null
+    },
+
     async preview(db, userId, patch): Promise<PreviewResult> {
       const state = await loadState(db, userId, today)
       if (!state) return { consequences: [], drift: [], target: null }

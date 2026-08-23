@@ -27,6 +27,13 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**Coach undo wrote over whatever was there (Q-468).** Apply refuses a moved target; undo read its
+captured `beforeState` and wrote it back. Two stacked changes on one exercise: undoing the *first*
+returned the row to its original value while the history still showed the second in effect, and
+undoing both left a value the user never chose. `driftAgainst` now takes a side — `from` for apply,
+`to` for undo — and the check runs once centrally rather than five times. Latent: nothing calls the
+undo route yet (Q-467), and production's `coach_changes` is empty.
+
 **The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
 schema was deleted forever — no badge, no toast, no retry — while one that failed a layer later got
 all three. It returns a per-item error now, so the row is kept and dead-letters normally. **The fix

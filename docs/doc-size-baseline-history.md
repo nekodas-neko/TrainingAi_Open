@@ -1696,7 +1696,16 @@ flag a specific meaning — "the server could not write" — under which it woul
 queue for a mutation that can never succeed. An implementer following the entry as written would
 have built the wedge the route exists to prevent.
 
-## 2026-08-23 — `projectOverview.md` 7956 → 7972, `docs/agents/state/implementation-lane-b.md` 102 → 113
+## 2026-08-23 — `projectOverview.md` 7956 → 7963, `docs/implementation-backlog.md` 11424 → 11391
+
+Q-468 shipped and leaves the queue; Q-472 and Q-476 gain a `Gate:` line each. Net shrink on the
+backlog.
+
+The seven status lines carry the measurement rather than the fix — two stacked changes, undo the
+first, and the row goes back to its original value while the history says otherwise. That table is
+the reason the entry existed, and it is the thing a reader needs to recognise the shape again.
+
+## 2026-08-23 — `projectOverview.md` 7963 → 7979, `docs/agents/state/implementation-lane-b.md` 102 → 113
 
 Q-415/Q-417's Known-Issues entry, which is a growth rather than a trade: both queue entries are
 removed, but they were in `docs/implementation-backlog.md`, which shrinks 78 lines and is already

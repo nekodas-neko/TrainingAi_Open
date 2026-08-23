@@ -57,24 +57,56 @@ export interface DomainHandler {
     targetId: string,
     beforeState: Record<string, unknown>,
   ): Promise<{ ok: true } | Exclude<ApplyOutcome, { ok: true }>>
+  /**
+   * The target's current values, keyed by patch field — what `undoCoachChange` compares against
+   * the change's `to` before restoring (Q-468).
+   *
+   * **The map's keys are the check's scope.** A change whose field is absent is not scalar state
+   * on the target and is not compared — `removed`, `newExerciseMuscles` and the rest of the
+   * create-on-swap fields describe an action, not a value that can have moved. That is the same
+   * distinction apply draws with its per-domain `skip` predicates, expressed once instead of
+   * five times.
+   *
+   * `null` means there is nothing to compare — the target is gone, or was never a row. Undo still
+   * runs: a removal's undo re-inserts precisely the row that is missing, so "gone" is the expected
+   * state there rather than a reason to refuse.
+   */
+  currentState(
+    db: Db,
+    userId: string,
+    targetId: string,
+  ): Promise<Record<string, unknown> | null>
 }
 
-/** Shared drift check for scalar fields: compare each accepted change's `from` against the value
- *  actually stored. Kept in one place so every domain refuses a moved base the same way. */
+/**
+ * Shared drift check for scalar fields. Kept in one place so every domain refuses a moved base the
+ * same way — and, since Q-468, so that undo refuses one by exactly the same rule.
+ *
+ * `side` is which end of the change the stored value is compared against:
+ *
+ * - **`'from'`** (apply) — "is the target still where this suggestion was written against?"
+ * - **`'to'`** (undo) — "does the target still hold what this change set?" Without it, undo read
+ *   its `beforeState` and wrote it back over whatever was there. Measured entirely inside the
+ *   Coach's own flow: change A (Barbell→Dumbbell), change B (Dumbbell→Incline), then undo A →
+ *   200 and the row became `Barbell` while the history still claimed B was in effect. Undoing
+ *   everything afterwards left `Dumbbell` — a value the user never chose.
+ */
 export function driftAgainst(
   accepted: PatchChange[],
   current: Record<string, unknown>,
   skip: (c: PatchChange) => boolean = () => false,
+  side: 'from' | 'to' = 'from',
 ): Drift[] {
   const out: Drift[] = []
   for (const c of accepted) {
     if (skip(c)) continue
     const actual = current[c.field]
-    if (String(actual ?? '') !== String((c as { from?: unknown }).from ?? '')) {
+    const expected = (c as Record<string, unknown>)[side]
+    if (String(actual ?? '') !== String(expected ?? '')) {
       out.push({
         changeId: c.id,
         field: c.field,
-        expected: String((c as { from?: unknown }).from ?? '—'),
+        expected: String(expected ?? '—'),
         actual: String(actual ?? '—'),
       })
     }

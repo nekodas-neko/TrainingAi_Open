@@ -134,6 +134,11 @@ async function createMissingExercise(
 }
 
 export const sessionExerciseHandler: DomainHandler = {
+  async currentState(db, userId, targetId) {
+    const row = await loadTarget(db, userId, targetId)
+    return row ? (row as unknown as Record<string, unknown>) : null
+  },
+
   async preview(db, userId, patch): Promise<PreviewResult> {
     if (!patch.targetId) return { consequences: [], drift: [], target: null }
     const row = await loadTarget(db, userId, patch.targetId)
