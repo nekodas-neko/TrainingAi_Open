@@ -13,29 +13,30 @@ shipped in v1.334.0.
 ## This run (2026-08-23, eighth) — each has a journal entry in `docs/overview/entries/2026-08-23-*`
 
 - **Q-362b** (v1.333.2, #296) — day surfaces group by session **id**; its guard asserts on the
-  **durations, not the card count** (two cards appeared before the fix too, both showing 82 min).
+  **durations, not the card count** (two cards appeared before the fix, both showing 82 min).
 - **Q-421** (v1.333.3, #300) — a workout's kcal names its basis: `Est. HR kcal` / `Est. MET kcal`.
 - **BF-4's Lane B half** (v1.333.4, #311) — scan photo bounded to 1024 px, **−86.6%**. **NOT shown
   to be the owner's slowdown**; #112 and the cold-start check stay open, and are Lane A's.
-- **Q-326** (v1.333.5, #313) — deleting a meal type with entries offers the move, not a refusal.
+  **Q-326** (v1.333.5, #313) — deleting a meal type with entries offers the move, not a refusal.
 - **LB-1** (v1.334.0, #316) — edit/delete for logged training, back on `/health/day`; four handlers
-  now shared with `health-content.tsx` via `lib/hooks/use-day-entry-mutations.ts`.
+  shared with `health-content.tsx` via `lib/hooks/use-day-entry-mutations.ts`.
   `day-overlay-sheet.tsx` deliberately **not** deleted — filed as **LB-3**.
 - **Q-415/Q-417 + Q-323's render half** (v1.335.0, #320) — one calorie budget on both surfaces, from
   `budgetProvenance(...).total`. Q-417 proposed tracking which source last wrote; reading the budget
   from the payload was better — `activeEnergyKcalToday` then has no consumer, so the unsequenced
   optimistic paint was **deleted** rather than ordered. Found **LB-4** on the way.
-- **Q-323's display half** (v1.336.0) — the bar fills toward a goal notch instead of marking a
-  centred gauge; Home's donut became a progress ring. `barPosition`/`barBands` deleted for
-  `barProgress`. Its item (1) said "the macro ring" but described **Home's** donut.
+- **Q-323's display half** (v1.336.0, #326) — the bar fills toward a goal notch, not a centred
+  gauge; Home's donut became a progress ring. `barPosition`/`barBands` deleted for `barProgress`.
+  Its item (1) said "the macro ring" but described **Home's** donut.
+- **Q-387's Lane B half** (v1.337.0) — "I've finished logging" + Undo + the N-of-10 counter, so the
+  calibration can engage at all. **Q-359 closed out with it** (can-bite group zero since v1.325.9).
 
 ## Next
-`node scripts/next-item.js --lane B`, and **re-verify the premise first** — across the last two runs
-**five of seven entries taken had a wrong premise**. The tool says what is startable, never whether
-it is true. **BF-4 reads as top and its Lane B half is done** (the rest is Lane A's); **Q-326, the
-`calorie-budget-surface` batch and Q-323 are all shipped**. So the queue's real head is **Q-359**,
-then **Q-387**, then **Q-406 before Q-395** — `food-row.tsx` is extracted first. LB-3 was moved down
-to match its own "Placement: low" (it had been filed into the slot LB-1 vacated).
+`node scripts/next-item.js --lane B`, and **re-verify the premise first** — **six of eleven entries
+taken this run had a wrong premise**. The tool says what is startable, never whether it is true.
+BF-4 reads as top and its Lane B half is done (the rest is Lane A's); Q-326, the
+`calorie-budget-surface` batch, Q-323, Q-387 and Q-359 are shipped or closed. Head is **Q-406 before
+Q-395** — `food-row.tsx` is extracted first. LB-3 was moved down to match its "Placement: low".
 
 ## Do not re-litigate
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.
@@ -43,12 +44,11 @@ to match its own "Placement: low" (it had been filed into the slot LB-1 vacated)
   `round`; the review also records why that entry's own acceptance criterion picks the wrong mapping.
 - **`DayOverlaySheet` is unreachable** — measured twice; do not fix bugs inside it. LB-1 took its
   edit/delete controls to `/health/day`; **LB-3** decides its remaining three and deletes the file.
-- **`Q-354` is why a spec must tap, not click.** LB-1's first run read exactly like the new controls
-  were wired to nothing — button found, `.click()` clean, no dialog; `el.click()` via `evaluate`
-  opened it, which separated harness from product. `page.touchscreen.tap()` for anything inside a
-  `[data-swipe-carousel]`.
-- **The seeded user is missing only `date_of_birth`**; `height_cm` and `sex` are present. Still
-  standing: `FactorBar` is not a colour-only violation; absent scores are handled correctly on
+- **`Q-354` is why a spec must tap, not click**, and **`toBeVisible()` does not mean in-viewport**.
+  Both read exactly like a dead control: `.click()` never lands on these screens, and a
+  `touchscreen.tap()` on an off-screen box hits whatever is at those coordinates.
+  `scrollIntoViewIfNeeded()` before taking the box; tap, never click, inside `[data-swipe-carousel]`.
+- **Seeded user missing only `date_of_birth`**. Still standing: `FactorBar` is not a colour-only violation; absent scores are handled correctly on
   all 14 surfaces; Q-309 is refuted as a user-facing bug while Q-354 (mouse clicks on Nutrition) is
   real and parked; `radiogroup` beat `group` + `aria-pressed`; `coach-content.tsx`'s `scrollIntoView`
   is correct; none of Q-359's twelve latent fetch-once sites is worth converting.
@@ -76,19 +76,19 @@ None held. This run touched `scripts/check-backlog-pointers.js` and `app/health/
   the next merge dies with *"refusing to merge unrelated histories"*. Nothing is wrong with the repo.
   **`git fetch --unshallow origin` immediately before every merge**; `test -f .git/shallow` tells you
   in one line. Confirm against GitHub (`list_commits`) before believing the history is gone.
-- **Check the actual date on resume** (`TZ=Australia/Brisbane date`) — this one resumed three days on.
 - **The aged local seed bites `goal-invalidation.spec.ts`** — it needs **today's** `body_metrics` row
   to carry steps, and `order by date desc limit 1` is not "today" once the container has aged. It
   fails identically on clean `main`; top the row up rather than debugging the diff.
-- **`get_check_runs` lags; attempting the merge is the reliable check.** The ratchets say whether
-  YOUR branch grew the file (LA-16) — re-read them AFTER the final merge.
+- **`get_check_runs` lags; attempting the merge is the reliable check.** The ratchets say whether YOUR
+  branch grew the file (LA-16) — re-read AFTER the final merge.
 - **A `Gate:`/`Needs:` field written inline is ignored** — it must start its own bullet. Cost this lane
   twice; `check-backlog-pointers.js` now fails on it, and on an unknown `[domain]` tag.
 - **A backgrounded `pnpm dev` dies with its task** — `setsid nohup pnpm dev > log 2>&1 &` survives;
   launch it as its own step. `E2E_BASE_URL=http://localhost:3000` points Playwright at it.
 - **`pnpm check:rules` ran 52 of 52 on 2026-08-23.** Quote the count, never "pass".
-- **`packages/shared/src/nutrition/calorie-balance.ts` was edited by this lane** (Q-323's
-  `barProgress`) on the import-trace rule: it is reached only from `components/`. Released.
+- **Two Lane A paths edited and released**: `packages/shared/.../calorie-balance.ts` (Q-323's
+  `barProgress`, reached only from `components/`) and one line in `lib/cache-groups.ts` registering
+  `day-checkin:` (Q-387 — that write is the flag's only writer).
 - **`projectOverview.md` and this baton sit ON their ratchet baselines, and RAISING one costs you the
   merge race.** Every agent edits `doc-size-baseline.json` and the history log, so a raise conflicts
   on every parallel merge — #320 lost three races that way and only landed once the entries were

@@ -6,6 +6,14 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.337.0",
+    date: "2026-08-23",
+    changes: [
+      "There is now an \"I've finished logging\" button at the end of the Nutrition day, with an Undo. Only days you mark are used to work out what you actually burn \u2014 previously a day you stopped logging halfway through looked exactly like a completed light day and pulled the estimate down with nothing to stop it. Measured on the underlying change: fourteen days at a true 2,600 maintenance, six of them stopping at 1,400, came out 514 kcal low with nothing flagged.",
+      "A counter under the button says how many days are marked and how many more the estimate needs. It ships with the button on purpose: the button feeds something that was otherwise invisible, and that invisibility is why this went unnoticed until it was asked about.",
+    ],
+  },
+  {
     version: "1.336.0",
     date: "2026-08-23",
     changes: [

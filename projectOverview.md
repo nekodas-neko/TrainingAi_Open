@@ -202,6 +202,12 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition] ⚠️ The maintenance calibration can finally engage — the "finished logging" control shipped (Q-387, 2026-08-23)
+
+**Fixed in v1.337.0.** Q-387's Lane A half (2026-08-19) taught `estimateMaintenance` to count only days flagged complete, but **nothing could set the flag**, so every day was excluded and `source` was stuck on `'formula'`. The Nutrition day now ends with an "I've finished logging" button, its Undo, and the "N of 10 days" counter that makes the flag visible ([`journal`](docs/overview/entries/2026-08-23-food-logging-complete.md)). Q-359 is closed out with it: its can-bite group has been zero since v1.325.9 and the remaining twelve sites are latent by definition, frozen shrink-only by `check-fetch-once-effects.js`.
+
+- **Keep: not device-verified,** and **the write has no outbox domain** — marking a day complete with no network fails visibly rather than queueing. Acceptable for a once-a-day action whose value is in the calibration window rather than the moment, but it is a deliberate gap, not an oversight.
+
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
 **Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).

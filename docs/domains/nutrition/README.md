@@ -107,6 +107,10 @@ grep -n '\[nutrition\]' docs/implementation-backlog.md   # Q-187, Q-191, Q-196�
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **The maintenance calibration can engage at last** (Q-387, 2026-08-23, v1.337.0) — the
+  "I've finished logging" button + counter shipped, so days can be flagged complete. **Not
+  device-verified, and the write has no outbox domain** —
+  [`journal`](../../overview/entries/2026-08-23-food-logging-complete.md).
 - ⚠️ **Q-323 turned the calorie bar into a progress bar and Home's donut into a progress ring**
   (2026-08-23, v1.336.0). `barPosition`/`barBands` are gone; `barProgress()` replaces them. **Not
   device-verified** — [`journal`](../../overview/entries/2026-08-23-calorie-progress-bar.md).
