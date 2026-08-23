@@ -1676,3 +1676,25 @@ Seven lines rather than three because the reusable part is the *reason*: a rate 
 over a window and cannot tell "already running" from "ran a minute ago". That sentence is why the
 bug existed with a rate limit already in place, and it now also has a `docs/module-map.md` row so
 the next fire-and-forget background call does not repeat it.
+
+## 2026-08-23 — `projectOverview.md` 7941 → 7957, `docs/agents/state/implementation-lane-b.md` 102 → 113
+
+Q-415/Q-417's Known-Issues entry, which is a growth rather than a trade: both queue entries are
+removed, but they were in `docs/implementation-backlog.md`, which shrinks 78 lines and is already
+below its baseline.
+
+Sixteen lines because the entry carries three things a future session needs and cannot get from the
+backlog once the entries are gone: what the correct budget expression is
+(`budgetProvenance(...).total`, not `nutrition_targets.calories` plus a burn — the first is
+`restingBase + targetNet`, the second is the rest-day floor, and confusing them is what put three
+budgets on one screen); the open Lane A follow-up LB-4; and the device gate, whose reason is
+specific and non-obvious — the sandbox serves the MET table as synthetic fixtures, so the activity
+half of the budget estimates to 0 here and only the heart-rate half was ever exercised.
+
+The eleven on the Lane B baton are two more shipped PRs in the run summary and two gotchas that cost
+this run time to establish: that `.click()` never lands on a screen inside a `[data-swipe-carousel]`
+(use `page.touchscreen.tap()`), and that the sandbox serves the MET table as synthetic fixtures — so
+`activeKcal` cannot be exercised through a logged activity at all, and a fixture needing a real
+earned figure has to go through the heart-rate path. Trimmed twice before raising; a baton is
+rewritten wholesale by each successor, so this number falls back on the next handover.
+

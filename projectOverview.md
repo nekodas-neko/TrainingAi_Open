@@ -166,6 +166,22 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [nutrition][app-shell] ⚠️ The three calorie budgets are now one, but a food log still evicts its caches too early (Q-415/Q-417 fixed, LB-4 open, 2026-08-23)
+
+**Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read
+`budgetProvenance(...).total` — the expression the provenance line under the bar already prints —
+instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced
+burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which
+is how one card said "Goal reached" while the card two rows above said "166 kcal left". The macro
+bars now use `macroTargets.scaled` (Q-323's render half) and the label says "from movement"
+([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
+
+- **🟠 LB-4 — logging food invalidates BEFORE its push,** so every subscriber refetches a payload the
+  server has not got yet and caches it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's
+  identical cards. Lane A: it is the local-store/outbox path.
+- **Keep: not device-verified.** The sandbox serves the MET table as synthetic fixtures, so the
+  **activity** contribution to the budget is 0 here — only the heart-rate contribution ran.
+
 ### [workouts][activity][app-shell] ⚠️ Editing and deleting logged training is back, but has not been checked on the device (LB-1, 2026-08-23)
 
 **Fixed in v1.334.0** — `/health/day` now carries edit + delete on every exercise row, delete on

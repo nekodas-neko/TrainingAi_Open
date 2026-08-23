@@ -8,6 +8,7 @@ import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
 import { Settings, ChevronLeft, ChevronRight, MoonIcon } from "lucide-react";
 import { MacroRing } from "@/components/nutrition/macro-ring";
+import { budgetProvenance } from "@trainingai/shared/nutrition/calorie-balance";
 import { MealCard } from "@/components/nutrition/meal-card";
 import { FoodLoggerSheet } from "@/components/nutrition/food-logger-sheet";
 import { QuickEditLogSheet } from "@/components/nutrition/quick-edit-log-sheet";
@@ -109,7 +110,6 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const [targets, setTargets] = useState<NutritionTargets | null>(null);
   const [weeklyData, setWeeklyData] = useState<{ date: string; calories: number; proteinG: number; carbsG: number; fatG: number }[]>([]);
   const [adherence, setAdherence] = useState<NutritionAdherenceResponse | null>(null);
-  const [activeEnergyKcalToday, setActiveEnergyKcalToday] = useState<number | null>(null);
   const [todayWaterMl, setTodayWaterMl] = useState<number | null>(null);
   const [waterLogOpen, setWaterLogOpen] = useState(false);
   const [energyBalance, setEnergyBalance] = useState<EnergyBalanceResponse | null>(null);
@@ -144,9 +144,8 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     if (weekly) setWeeklyData(Array.isArray(weekly) ? weekly : []);
     const cachedAdherence = readCacheSync<NutritionAdherenceResponse>('nutrition-adherence');
     if (cachedAdherence) setAdherence(cachedAdherence);
-    const meta = readCacheSync<{ today: BodyMetaRow | null; activeEnergyKcalToday?: number | null }>('body-metadata');
+    const meta = readCacheSync<{ today: BodyMetaRow | null }>('body-metadata');
     if (meta && isBodyMetadataFresh(meta, tz)) {
-      if (meta.activeEnergyKcalToday != null) setActiveEnergyKcalToday(meta.activeEnergyKcalToday);
       if (meta.today?.waterMl != null) setTodayWaterMl(meta.today.waterMl);
     }
     const supps = readTodayCacheSync<SupplementWithStatus[]>('supplements');
@@ -198,21 +197,13 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     const today = date ?? selectedDateRef.current;
     setLoading(true);
     try {
-      const store = userId ? getLocalStore(userId) : null;
-      if (store) {
-        try {
-          // Optimistic local paint only, ahead of the mount-scoped body-metadata network fetch
-          // (which sets the authoritative activeEnergyKcalToday). NOTE: still narrower than that
-          // fetch — activity_logs carries only logged walk/run/cycle activities (and a Guided Walk
-          // writes caloriesBurned:null, same as the Q-96 root cause), never strength workouts. A
-          // full computeActiveEnergy port to the local store would be needed to close that gap;
-          // out of scope here since the network fetch corrects it moments later.
-          const acts = (await store.getActivityLogs(today)).filter(a => a.date === today);
-          if (acts.length) {
-            setActiveEnergyKcalToday(acts.reduce((sum, a) => sum + (a.caloriesBurned ?? 0), 0));
-          }
-        } catch { /* local store unavailable — server/cache path below still runs */ }
-      }
+      // Q-417: an optimistic local paint of today's burn used to sit here, summing
+      // `activity_logs.caloriesBurned` ahead of the `body-metadata` fetch that would correct it.
+      // Nothing sequenced the two, so whichever resolved last won — and the local sum is much
+      // narrower (no strength sessions, no steps, and a Guided Walk writes `caloriesBurned: null`),
+      // which is how the ring came to show a budget 179 kcal below the bar on the same card. It is
+      // deleted rather than sequenced because nothing reads that value on this screen any more:
+      // the budget comes from `/api/nutrition/energy-balance`.
       // Date-scoped, so it belongs here rather than in the mount-scoped block below. Seeded
       // synchronously from the same key in the layout effect, so a revisit paints last-known
       // numbers instead of a skeleton.
@@ -225,7 +216,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       ]);
     } catch { /* non-fatal */ }
     finally { setLoading(false); }
-  }, [loadFoodLogs, userId]);
+  }, [loadFoodLogs]);
 
   // Mount-scoped (PERF-5) — these seven fetches don't depend on selectedDate, so they
   // previously all re-ran on every date-swipe (≈40 requests browsing back 5 days).
@@ -270,13 +261,10 @@ export default function NutritionContent({ userId }: { userId?: string }) {
           'nutrition-adherence', '/api/nutrition/adherence', TTL_MEDIUM,
           d => setAdherence(d),
         ),
-        cachedFetch<{ today: BodyMetaRow | null; activeEnergyKcalToday?: number | null }>(
+        cachedFetch<{ today: BodyMetaRow | null }>(
           'body-metadata', '/api/body-metadata', TTL_MEDIUM,
           d => {
-            if (isBodyMetadataFresh(d, tz)) {
-              setActiveEnergyKcalToday(d.activeEnergyKcalToday ?? null);
-              setTodayWaterMl(d.today?.waterMl ?? null);
-            }
+            if (isBodyMetadataFresh(d, tz)) setTodayWaterMl(d.today?.waterMl ?? null);
           },
         ),
       ]);
@@ -431,15 +419,43 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     refreshAffected();
   }, [confirmDeleteLogId, loadFoodLogs, userId]);
 
-  // activeEnergyKcalToday genuinely only ever holds *today's* burn (the mount-scoped
-  // body-metadata fetch is today-scoped) — never apply it to a past day's ring/goal, or
-  // yesterday's macros read against an inflated target.
-  const burnedForSelectedDate = selectedDate === todayStr ? activeEnergyKcalToday : null;
-  const effectiveCalorieGoal = targets?.calories != null && burnedForSelectedDate != null && burnedForSelectedDate > 0
-    ? targets.calories + Math.round(burnedForSelectedDate)
-    : targets?.calories ?? null;
-  const effectiveTargets = targets != null && effectiveCalorieGoal != null
-    ? { ...targets, calories: effectiveCalorieGoal }
+  /**
+   * The day's budget and macro grams, both taken from `/api/nutrition/energy-balance` (Q-417/Q-323).
+   *
+   * **This used to be `targets.calories + activeEnergyKcalToday`, and it produced a third budget.**
+   * Measured on the owner's screen: the zone bar two rows below said 2,180, Home's donut said
+   * 2,451, and this ring said 2,001 — so the same card printed "Goal reached" against 2,014 eaten
+   * while the card above it said "166 kcal left". Two separate faults fed it, and reading the
+   * budget from the payload removes both at once:
+   *
+   *  - `nutrition_targets.calories` is the **rest-day floor**, not `restingBase + targetNet`, so
+   *    adding movement to it was never the same quantity the rest of the app shows.
+   *  - `activeEnergyKcalToday` is painted optimistically from the local store ahead of the
+   *    `body-metadata` fetch, and **nothing sequences the two**. Whichever resolved last won; here
+   *    the local one did, at 101 against the server's 551, because the local sum sees neither
+   *    strength sessions nor steps and a Guided Walk writes `caloriesBurned: null` (Q-96).
+   *
+   * The date guard stays and is load-bearing for a different reason than before: the payload is
+   * fetched per selected date, so a response for another day must not be read against this one.
+   */
+  const balanceForDate = energyBalance?.date === selectedDate ? energyBalance : null;
+  const budget = balanceForDate?.balance ? budgetProvenance(balanceForDate.balance) : null;
+  // Falls back to the stored goal alone rather than composing one: with no payload there is no
+  // measured movement to add, and inventing an addend is what produced the third number.
+  const effectiveCalorieGoal = budget?.total ?? targets?.calories ?? null;
+  const earnedForSelectedDate = budget?.earned ?? null;
+  // Q-323's remaining half: `scaled` is already computed server-side by `scaleMacrosForEarnedKcal`
+  // (carbs and fat absorb the earned kcal in their existing ratio; protein is dosed per kg of
+  // bodyweight and holds). The ring rendered `base`, so a day with 551 earned reported fat *over*
+  // when it was well under. Never re-derive it here — that is the second implementation the
+  // one-formula rule exists to stop.
+  const scaledMacros = balanceForDate?.macroTargets?.scaled ?? null;
+  const effectiveTargets = targets != null
+    ? {
+        ...targets,
+        calories: effectiveCalorieGoal ?? targets.calories,
+        ...(scaledMacros ?? {}),
+      }
     : targets;
 
   const bindDateSwipe = useDrag(
@@ -532,7 +548,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
               carbsG={totals.carbsG}
               fatG={totals.fatG}
               targets={effectiveTargets}
-              calsBurnedToday={burnedForSelectedDate}
+              earnedKcal={earnedForSelectedDate}
             />
 
             {/* Actions sit here, directly under the ring, rather than being reached by scroll depth

@@ -976,6 +976,16 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
 
 ### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
 
+> **⚠️ NARROWED 2026-08-23 — the budget is now correct everywhere, so only the two DISPLAY changes
+> are left.** v1.335.0 pointed Home's nutrition card and the Nutrition ring at
+> `budgetProvenance(...).total` and made the ring render `macroTargets.scaled`
+> ([`journal`](overview/entries/2026-08-23-one-calorie-budget.md)), which closes the
+> "rendering `scaled` instead of the stored row" half listed below and retires Q-415/Q-417.
+> **What remains is (1) the macro ring's grey remainder and (2) the zone bar as a progress bar.**
+> The blocking order in this entry is now satisfied — the bar can be built, because the number it
+> fills toward is right. Note `barBands`/`barPosition` live in `packages/shared` but are reached
+> only from `components/`, so claim the lane in your baton before starting.
+>
 > **⚠️ THE LANE A HALF SHIPPED 2026-08-19 — what is left is Lane B**
 > ([`journal`](overview/entries/2026-08-19-macros-follow-earned-calories.md)).
 > `scaleMacrosForEarnedKcal(base, earnedKcal)` lives in
@@ -1053,126 +1063,60 @@ going over. So it still looks like a progress bar where you want to go to the en
     words, per the standing rule.
   - Drawn in three states (under, on target, over) during the 2026-08-19 review.
 
-**⚠ Do this in the same PR as the Q-415 budget fix below, or the bar will fill toward the wrong
-number.**
+**⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
+right number.**
 
-### [nutrition][app-shell] Q-417 — a THIRD calorie budget, 179 low, because the Nutrition ring keeps its optimistic local paint
+### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
-- **Batch:** calorie-budget-surface
+- **Branch:** `fix/food-log-invalidate-after-push`
+- **Added:** 2026-08-23 · **Lane: A** — `packages/shared/src/nutrition/log-food.ts` writes the local
+  store and the outbox, which is engine, not surface.
+- **Placement:** high for a correctness item. It is a live staleness bug on the owner's own screen,
+  and it is two lines.
 
-- **Branch:** `fix/nutrition-ring-active-energy`
-- **Added:** 2026-08-19 · owner, from three screenshots taken at 9:57: *"these nutrition values dont
-  look like they are lining up"*
-- **Lane B** (`app/nutrition/nutrition-content.tsx`). No schema, no route.
-- **Ship with Q-415.** That entry fixes the Home donut's base; this fixes the Nutrition ring's
-  *earned*. Fixing one and not the other leaves the screens disagreeing, just differently.
+**Found while closing Q-417, whose part (a) asked whether the write that logged 42 kcal actually
+invalidates `energy-balance:`. It does — at the wrong moment.**
 
-**Three budgets were on screen at the same moment, from the same data.**
+`logFoodEntries` (`log-food.ts:243-244`) runs:
 
-| surface | expression | value |
-|---|---|---|
-| zone bar · both Energy Balance cards | `restingBase + targetNet + activeKcal` | 1,629 + 551 = **2,180** ✅ |
-| Home nutrition donut | `calorieGoal + activeEnergyKcalToday` | 1,900 + 551 = **2,451** (Q-415, +271) |
-| **Nutrition tab ring** | `targets.calories + burnedForSelectedDate` | 1,900 + **101** = **2,001** (−179) |
+```ts
+await invalidateNutritionWrite()
+pushMutations(userId!).catch(() => {})   // fire-and-forget
+```
 
-The ring is **179 kcal low**, and the visible consequence is on the same card: it printed
-**"Goal reached"** against 2,014 eaten, because 2,014 clears its 2,001. The real budget is 2,180 and
-the Energy Balance card two rows above said *"166 kcal left today · Under so far"*. **One screen,
-both "you are done" and "you are under", 179 apart.**
+The eviction lands **before** the mutation reaches the server. Every `useCachedValue` subscriber —
+Home's Energy Balance card, Home's nutrition card, both zone bars — wakes on that signal, refetches
+immediately, gets the **pre-log** payload, and re-caches it. Nothing invalidates again once the push
+completes, so the stale value then stands for the key's full TTL.
 
-**Where the 101 comes from, and why it wins.** `nutrition-content.tsx:200-214` paints
-`activeEnergyKcalToday` optimistically from the local store — `activity_logs.caloriesBurned` summed
-— and its own comment says this is *"still narrower than that fetch"* and is expected to be
-corrected by the mount-scoped `body-metadata` network call *"moments later"*. **Nothing sequences the
-two.** The local read is `await store.getActivityLogs(today)`; the network read is a separate
-`cachedFetch` (`:273`). Whichever resolves last wins, and here the local one did — the ring still
-read 101 while the Energy Balance card on the same screen had the server's 551.
-- **The server figure is `computeActiveEnergy`** (`app/api/body-metadata/route.ts:148-156`): strength
-  sessions **+** logged activities **+** pedometer steps. The local sum has none of the first, none
-  of the third, **and a Guided Walk writes `caloriesBurned: null`** — the Q-96 root cause, called out
-  in that same comment. So 101 is not "cardio" either; it is "whatever activity rows happened to
-  carry a non-null number".
-- **Fix: never let the optimistic value overwrite a server value that has already arrived.** Track
-  which source last wrote — a ref, a discriminated state, or simply only applying the local paint
-  when the current value is still `null`. Do **not** "fix" it by deleting the optimistic paint: it
-  exists so the ring is not blank on a cold offline open, which is the instant-paint rule.
+This matches the reported symptom exactly: Home's Energy Balance card read *"208 kcal left"* while
+the Nutrition tab's identical card read *"166"* — a 42 kcal gap that is precisely one unlogged
+entry. The Nutrition tab looked right because it appends the new log optimistically to its own
+state and never consults the cache for it.
 
-**The label is wrong even when the number is right.** `macro-ring.tsx:51` renders
-`+${calsBurnedToday} from cardio`. Strength sessions and steps are both in the server figure, so at
-551 the card would claim 551 kcal "from cardio" on a day whose largest contributor was a leg
-session. **Say "from movement"** — the wording the zone bar already uses for the same quantity.
+**The sibling path already has the right shape.** The food-log *delete* in
+`nutrition-content.tsx:397-400` does `pushMutations(...).then(() => { invalidateNutritionWrite(); … })`
+— invalidate after the push, not before.
 
-**Two more mismatches in the same three screenshots, both worth fixing here.**
+**Proposed fix: invalidate twice, not later.** Keep the immediate call (local screens must repaint
+at once, and offline it is the only one that will ever fire), and add a second after the push
+resolves:
 
-**(a) Home's Energy Balance card was 42 kcal stale.** It read **"208 kcal left"** while the Nutrition
-tab's identical card read **"166"**, with both printing the same *"1,629 base + 551 earned"* line.
-Same budget, so the difference is entirely in *eaten*: 2,180 − 208 implies **1,972**, against the
-2,014 the Nutrition tab showed. **The Home donut on that same screen had 2,014 correct**, so this is
-not a screen-wide staleness — it is the `energy-balance:` payload specifically, while
-`body-metadata` was current. `useEnergyBalanceToday` already uses `useCachedValue` (Q-402), so the
-subscription exists; **check that the write which logged those 42 kcal actually invalidates
-`energy-balance:`**, per the cache-groups rule. This is the "which half of the rule is protecting
-you" case from CLAUDE.md — the hook is fine, the eviction is the suspect.
+```ts
+await invalidateNutritionWrite()
+pushMutations(userId!).then(() => invalidateNutritionWrite()).catch(() => {})
+```
 
-**(b) Q-323's scaled macros are computed and not rendered.** #218 shipped
-`scaleMacrosForEarnedKcal` and `energy-balance-service` now returns `macroTargets.scaled` — but the
-ring still shows the stored base: **Protein 161/150, Carbs 179/190, Fat 68/60**. With 551 earned the
-scaled targets are **carbs 271 g and fat 85 g**, so the card reports fat *over* when it is well
-under, and carbs near-complete when they are two-thirds done. **This is Q-323's remaining Lane B
-half** — it is not a new defect, but it is now visibly wrong on the owner's screen and belongs in
-the same PR as the ring's budget fix, since both are the same card telling the user the wrong thing
-about the same day.
+Moving the single call after the push instead would break offline logging outright — `pushMutations`
+never resolves successfully with no network, so nothing would repaint at all.
 
-- **Verification.** On a day with a logged strength session and steps, the Nutrition ring, the Home
-  donut, the Home Energy Balance card and the Nutrition Energy Balance card must show **one** budget.
-  Then log a food item and confirm all four move together — that second step is what (a) failed.
+**Verification.** Log a food item on the Nutrition tab, then look at Home without navigating away
+and without waiting for a TTL: its Energy Balance card and nutrition card must both include the new
+calories. That is the step Q-417's own verification note said had failed.
 
-### [nutrition][app-shell] Q-415 — Home shows two calorie budgets 271 apart; Q-401's sweep missed the donut
-
-- **Batch:** calorie-budget-surface
-
-- **Branch:** `fix/home-donut-budget-source`
-- **Added:** 2026-08-19 · owner, from a Home screenshot: *"explain this widget what ars those
-  nutrition numbers"*
-- **Lane B** (`components/home/home-card-widget.tsx`). One expression. No schema, no route.
-- **Placement: with Q-323**, whose bar and ring changes fill toward this number. Landing those
-  first would draw a progress bar pointing at the wrong total.
-
-**Measured from the owner's screenshot, and the arithmetic is the whole report.** The Home nutrition
-card reads **`1458 / 2447 kcal`** and prints **"1,629 base + 547 earned from movement"** directly
-underneath it. **1,629 + 547 = 2,176.** The card contradicts its own subtitle by **271 kcal**.
-
-**Two budgets are live on one screen:**
-
-| surface | expression | today |
-|---|---|---|
-| Home nutrition donut | `calorieGoal + activeEnergyKcalToday` (`home-card-widget.tsx:121-125`) | 1,900 + 547 = **2,447** |
-| zone bar · Home Energy Balance · Nutrition tab | `budgetProvenance()` → `restingBaseKcal + targetNetKcal + activeKcal` | 1,629 + 547 = **2,176** |
-
-The donut adds movement to the **stored** `calorieGoal`; everything else adds it to the **derived**
-baseline. That the Energy Balance card two rows below says **"718 kcal left"** — exactly
-`2,176 − 1,458` — is the confirmation: the two cards are visibly disagreeing on the same screen at
-the same moment.
-
-**This is Q-401's defect in a surface its sweep did not reach.** Q-401 retired the second TDEE model
-so one baseline feeds every calorie figure, and it shipped (#175). `home-card-widget.tsx` was not
-converted and still reads the stored goal. Grepped the backlog: **no entry mentions this widget**, so
-it was missed rather than deferred.
-
-**The fix.** Feed the donut the same `budgetProvenance()` total the zone bar and Energy Balance card
-already use, rather than `calorieGoal + activeEnergyKcalToday`. The stored goal keeps its job as the
-rest-day floor that the derived baseline is built from; it is simply not the number to render.
-
-- **Sibling sweep, per the standing rule — do not fix only the one surface the owner photographed.**
-  Grep for every other read of `calorieGoal` that renders a *displayed* budget, and convert or
-  justify each in this PR. The weekly branch in the same component (`isWeekly`, `boostedGoal * 7`)
-  multiplies the same wrong base by seven and needs the same treatment.
-- **Check the macro grams while you are there.** They come from the stored row too; Q-323 makes them
-  shares of the budget, so both entries must agree on which budget that is. **They are one PR.**
-- **Verification.** On one day with movement logged, the Home donut, the Home Energy Balance card and
-  the Nutrition tab must show the **same** total, and `donut total − eaten` must equal the Energy
-  Balance card's "left" figure exactly. That equality is the test — it is what failed here, and it
-  is checkable at a glance on the running app.
+- **Not reproduced under automation yet** — the race needs the refetch to beat the push, which a
+  local dev server against a local Postgres wins more often than a phone on mobile data does. A
+  guard likely has to stall the push rather than race it.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
