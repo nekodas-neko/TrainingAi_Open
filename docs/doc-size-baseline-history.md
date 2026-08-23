@@ -1530,7 +1530,7 @@ Both numbers were re-measured on the merged tree rather than spliced from the co
 backlog baseline moved under this branch while it was open.
 <<<<<<< HEAD
 
-## 2026-08-23 — `docs/implementation-backlog.md` 11417 → 11438
+## 2026-08-23 — `docs/implementation-backlog.md` 11432 → 11453
 
 Six lines correcting a claim this queue file had carried for five days and that #306 repeated:
 plan Task 1's "the production CSP has no `wasm-unsafe-eval`" was true when it was written and
