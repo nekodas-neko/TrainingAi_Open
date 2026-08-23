@@ -30,6 +30,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 
 const ROOTS = ['app/api', 'packages/shared/src/validation'];
 
@@ -138,10 +139,17 @@ if (process.argv.includes('--print')) {
   process.exit(0);
 }
 
+const baseRef = resolveBaseRef();
 const failures = [];
+const inherited = [];
 for (const [file, n] of Object.entries(found)) {
   const limit = BASELINE[file];
-  if (limit === undefined) {
+  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. `countNonStrict` is
+  // already a pure per-file counter, so the base is that same function over the base's copy.
+  const v = verdict({ count: n, limit: limit ?? 0, atBase: countAtBase(baseRef, file, countNonStrict) });
+  if (v === 'inherited') {
+    inherited.push(`${file}: ${n} non-strict request schema(s) against a baseline of ${limit ?? 0}, but the base branch is already there.`);
+  } else if (limit === undefined) {
     failures.push(
       `${file} has ${n} non-strict request schema(s) and is not in the baseline.\n` +
       `      Add .strict() so an unknown key is a 400 instead of a silent drop — or, if this schema\n` +
@@ -160,6 +168,12 @@ for (const file of Object.keys(BASELINE)) {
       `${file} is down to ${found[file]} from ${BASELINE[file]} — lower its number here so the\n` +
       `      improvement is locked in.`);
   }
+}
+
+// Reported whether or not the run fails, and never as a failure (Q-424).
+if (inherited.length) {
+  console.log('check-strict-request-schemas: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
 }
 
 if (failures.length) {

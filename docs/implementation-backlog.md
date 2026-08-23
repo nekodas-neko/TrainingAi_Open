@@ -767,60 +767,6 @@ regression window the additive shape exists to avoid.
 
 - **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
 
-### [platform] LA-16 — two shrink-only ratchets are still order-dependent
-
-- **Branch:** `chore/ratchets-order-independence`
-- **Added:** 2026-08-20 · the half of Q-424 its own text flagged and its acceptance criterion did not cover
-- **Lane: A** — `scripts/**`.
-- **Moved down 2026-08-20**, to match what this entry's own last bullet already said. It was filed at
-  the top of READY and its body says *"lower priority than Q-424 was"* — the position contradicted the
-  text, and position is what the tool reads.
-
-Q-424 made `check-doc-index-size.js` ask *"did this branch grow it"* rather than *"is it over"*, via
-`scripts/lib/base-ref.js` (`resolveBaseRef` · `lineCountAtBase` · the pure `verdict`). **Its own text
-said the class is shared and a fix should be shared too**, but its acceptance criterion named only the
-docs check, so the rest were deliberately left rather than swept in unmeasured.
-
-Still comparing a working tree against a committed absolute: `check-hex-literals`,
-`check-fetch-once-effects`, `check-component-size`, `check-memo-prop-stability`,
-`check-client-today-timezone`, and the non-strict-schema check.
-
-> **⚠️ FOUR OF SIX CONVERTED 2026-08-20, and there are now TWO patterns to choose between. Read this
-> before starting.**
->
-> **Per-file, for a ratchet whose count is a function of one file's text** —
-> `check-component-size` (lines, via `lineCountAtBase`), `check-hex-literals` and
-> `check-client-today-timezone` (occurrences, via `countAtBase` with the script's **own** counting
-> function). Never write a second regex for the base count: it would disagree with the working-tree
-> count for reasons nobody could see.
->
-> **Whole-tree, for a ratchet that is not a per-file function** — `check-memo-prop-stability` scans
-> every file to learn which components are memoised *before* counting call sites, so its base count
-> has to come from `materialiseBaseTree` + the same `scan(rootDir)` run over the base's own tree.
-> **The per-file shortcut is wrong here and wrong in the unsafe direction:** a branch that newly
-> memoises a component with pre-existing inline call sites would have those counted at the base too,
-> and read as *inherited* when the branch is exactly what made them violations. That case is pinned
-> by demonstration.
-
-**What is left:**
-
-- `check-fetch-once-effects` — a brace-matching scan like the memo check. **Decide which of the two
-  patterns above it needs** before writing anything: if its count depends only on the file's own
-  text, per-file is enough; if it depends on a tree-wide pass, it needs the base tree.
-- `check-strict-request-schemas` — **still not read.** Do not assume it matches either shape.
-
-One per PR, each proven both ways — these are gates, and a silently weakened gate is worse than an
-order-dependent one.
-
-`verdict` is reusable as-is in every case; only the counting differs.
-
-Lower priority than Q-424 was: these fire far less often, because intake adds a backlog entry on
-almost every session while a hex literal or a memo call site is added rarely.
-
-- **What would count as done:** for each script, a branch that inherits an over-baseline count from
-  `main` without adding one is green, and a branch that adds one is red — demonstrated per script,
-  not argued from the docs case.
-
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`
@@ -10974,6 +10920,221 @@ since the CI link check (item 1) catches a botched rewrite immediately.
   specifically" caveat is now answered — it is fine, as are the other three. **The rule at the top
   of this file still stands** (claim a number against the directory *and* open PRs/plan docs): this
   closes the four that exist, it does not make future collisions safe.
+
+## Owner feature notes, filed 2026-08-23 — each needs a planning session before implementation
+
+> Three requests the owner sent as *"a loose note to put more effort into later when we have a
+> chance"*. Placed at the tail of the queue deliberately: that phrasing is the priority signal, and
+> none of them is a defect. **All three are feature requests, so the next step for each is a planning
+> session writing a plan to `docs/superpowers/plans/` — not an implementer picking one up and
+> building from the entry.** Intake traced each against the current tree so the plan starts from what
+> the code actually does; it did not write the plans.
+
+### [body][nutrition] 🔵 BF-2 — the "DEXA filter": calibrate the scale's body-fat estimate against a real DEXA, and correct history
+
+- Lane: ? — the planning session splits it (new table + calibration maths = A; the entry/review UI = B)
+
+**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to upload a dexa scan/RMR values;
+and 1- have a filter that aligns our scales values to a dexa scan; will call it 'dexa filter' so if
+our scale says 15% BF but dexa says 20% we will keep that ratio in mind when giving values; as well
+as fixing previous values."*
+
+**This is not a cosmetic display fix — the scale's body-fat % is an input to the calorie and protein
+goals.** Traced chain:
+
+| Step | Where |
+|---|---|
+| BIA estimate from impedance | `lib/scale-ble/composition.ts` → `computeBodyComposition()` |
+| Stored | `body_metrics.body_fat_pct`, `source_map->>'body_fat_pct' = 'scale_ble'` |
+| Lean mass → BMR (Cunningham, `ffm·21.6 + 370`) | `packages/shared/src/health/body-composition.ts:24` |
+| → calorie + protein goal | `packages/shared/src/nutrition/goal-recommendation.ts:166,178` |
+| → energy balance / TDEE | `lib/health/energy-balance-service.ts:193` |
+| → stored `body_comp` snapshot | `lib/data/postgres/slices/oura.ts:1680` |
+| → display panel | `app/health/health-sections.tsx:285` |
+
+**Measured leverage, against the owner's real current numbers** (71.25 kg, 25.2 % BF, 2026-08-23,
+every row `scale_ble`; last 10 readings sit in a tight 24.9–25.3 band). BMR is linear in body-fat %,
+so the error is exact rather than estimated: **`d(BMR)/d(BF point) = −weightKg × 0.216 = −15.4
+kcal/day per percentage point`**, and the calorie goal carries that through `SEDENTARY_MULTIPLIER`
+(1.2) as **−18.5 kcal/day per point**. The owner's own 5-point example is therefore worth **≈92
+kcal/day on the calorie goal and ≈8 g/day on the protein goal** (protein is dosed per kg of *lean*
+mass, `PROTEIN_G_PER_KG_BY_GOAL`, 2.2 for recomp). A DEXA gap does not just change a number on a
+card; it moves the budget the app tells the owner to eat to.
+
+**The premise is already documented as true — this is not speculative.** `lib/scale-ble/composition.ts`
+opens by saying it is *"a GENERIC single-frequency BIA estimator (Deurenberg-style … ), NOT Renpho's
+own proprietary algorithm"* and that its numbers *"will be close to, but not numerically identical
+to"* a reference. So there is a known, unquantified offset and no mechanism to measure it. A DEXA is
+exactly the measurement that quantifies it.
+
+**Design question the plan must answer — do not let it get decided by accident.** "Fixing previous
+values" can mean two very different things:
+- **(a) correct at read time** — store the DEXA reading plus a derived calibration (offset or ratio),
+  leave `body_metrics.body_fat_pct` holding the raw scale value, apply the correction wherever it is
+  consumed. Reversible; the raw reading stays archival, mirroring the `body_hex` rule.
+- **(b) re-stamp the stored column** — a corrective migration over history. Irreversible, needs a
+  migration number (**Lane A only**), and destroys the ability to re-derive if a later DEXA disagrees.
+
+  Recommended: **(a)**. It gives the owner everything asked for, including retroactive correction,
+  without a data-dropping migration, and a second DEXA then just updates the constant.
+
+**Two traps for whoever scopes this:**
+1. **`body_fat_pct` is not the only BIA-derived column.** `muscle_mass_kg`, `bone_mass_kg`,
+   `body_water_pct`, `visceral_fat_index`, `subcutaneous_fat_pct`, `protein_pct` and `metabolic_age`
+   all come out of the same `computeBodyComposition()` call. Correcting body fat alone leaves the row
+   internally inconsistent (fat % and muscle mass disagreeing about the same body). Decide whether
+   the filter is one scalar on body fat or a whole-panel re-derivation.
+2. **Ratio vs offset is an empirical question with one data point.** With a single DEXA you cannot
+   tell a multiplicative bias from an additive one; they only diverge as weight changes. The owner's
+   phrasing says "keep that ratio in mind", but a plan should say which it picked and why, and prefer
+   the one that degrades safely as the owner's weight moves.
+
+**RMR is the separate half of this request, and it is simpler.** Nothing in the tree reads a measured
+RMR — BMR is *always* estimated (Cunningham when body fat is known, Mifflin-St Jeor otherwise,
+`goal-recommendation.ts:166–169`). A measured RMR from a metabolic cart would override the estimate at
+exactly those two call sites. Worth filing as its own task inside the plan; it needs no calibration
+maths at all, just a stored value and a precedence rule.
+
+**Provenance note:** `HEALTH_SOURCES` in `lib/data/health-source.ts:18` ranks
+`manual(5) > scale_ble(4) > oura_ble(3) > oura_cloud(2) > health_connect(1)`. A DEXA is a clinical
+measurement and outranks all of them; adding a source is a code change in that file **plus** the
+inlined SQL `CASE` at line 45 — both must move together or the SQL and TS ladders diverge.
+
+**Done looks like:** a DEXA reading (date, body fat %, and ideally lean/fat mass) can be entered; the
+app states the measured offset against the scale for the same period; corrected body fat feeds the
+calorie and protein goals; and history reads corrected without the raw scale values having been
+overwritten.
+
+### [nutrition][body] 🔵 BF-3 — track dosed substances (GLP-1s, creatine) — the supplements model cannot represent a titrating or weekly drug
+
+- Lane: ? — schema + sync push is A, the logging surface is B; needs a migration (**Lane A**)
+
+**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to track GLP1 such as retatrutide;
+or any susbtance such as creatine etc. whatever best way to do this would be."*
+
+**The good news first:** `supplements` + `supplement_logs` already exist and are one of the app's
+better-built domains — fully offline-first, with a local table, outbox mutations, a sync-push branch
+and reminders. `app/nutrition/nutrition-content.tsx` is the repo's *reference* offline-first read
+pattern and it reads supplements. Nothing needs inventing; the question is whether the existing model
+stretches, and traced against the schema it does not.
+
+**Three concrete gaps** (`lib/data/postgres/schema.ts:809–831`):
+
+1. **Dose is a free-text field on the *definition*, not on the *log*.** `supplements.dose` is
+   `text`, and `supplement_logs` carries only `(supplementId, logDate)`. So editing the dose
+   **rewrites history**: titrate retatrutide 2 mg → 4 mg → 8 mg and every past log retroactively
+   reads 8 mg. For a drug whose entire clinical story is the escalation schedule, that is the one
+   thing you cannot lose. Dose (amount + unit) has to be stamped on the log.
+2. **One log per day, maximum.** `unique().on(t.supplementId, t.logDate)` makes a log a daily
+   checkbox. Creatine taken morning and evening cannot be recorded twice, and there is no
+   time-of-day on the log at all.
+3. **No cadence — a weekly injection has no representation.** `reminderEnabled` + `reminderTime`
+   (a time-of-day string) is the whole scheduling model, so it is implicitly daily. A weekly GLP-1
+   would either fire a reminder every day or get none, and there is no "next dose due" concept
+   because nothing knows the interval.
+
+**Recommended shape for the planning session, stated so it is not re-derived:** keep one substance
+domain rather than building a parallel "medications" feature beside supplements — the two would
+duplicate the entire offline-first chain (local table, outbox, push branch, pull mapping, reminders)
+for what is the same act of recording that a dose was taken. Extend in place: numeric `amount` +
+`unit` on the **log**, an optional time, and a schedule (interval + anchor date) on the definition.
+Free-text `dose` stays as the display fallback for existing rows.
+
+**Whoever builds it must follow the full offline-first chain in one pass**, per CLAUDE.md — local
+table columns = server payload = `getSyncDelta` output = `pullDelta` mapping = `applyDelta` upsert
+columns, plus the `pushMutations` branch mirroring the web route. Touch points already known:
+`lib/local-store/sqlite-backend.ts:1870`, `lib/local-store/sync-engine.ts:489`,
+`app/api/supplements/route.ts`, `components/nutrition/manage-supplements-sheet.tsx`.
+
+**Out of scope until asked, and worth saying out loud:** the app should record what the owner took,
+not advise on it. No dosing guidance, no interaction checking, no titration schedule generation.
+
+**Done looks like:** a weekly injectable and a twice-daily powder can both be logged with the amount
+actually taken on the day it was taken; changing today's dose leaves last month's logs reading what
+they read before; and a weekly substance's reminder fires weekly.
+
+### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
+
+- Lane: ? — new table + extraction route is A, the upload/review surface is B; needs a migration (**Lane A**)
+
+**Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to import some blood scan results and
+de-identify myself/user etc to have a baseline - should help with reccomendations for nutrition etc."*
+
+**Nothing like this exists.** Grepped the schema for blood/biomarker/lab/analyte names: zero hits.
+(`oura_daily.illness_biomarkers` is Oura's illness-detection JSONB and is unrelated — do not overload
+it.) So this is a new table, a new ingest path, and a new consumer.
+
+**The extraction pattern already exists and should be copied, not reinvented:**
+`app/api/nutrition/scan/route.ts` is a working vision→structured-data route — `generateObject` with a
+Zod schema (never `JSON.parse` of model text, per CLAUDE.md), `isAllowedImageMime` and
+`readJsonLimited` from `@trainingai/shared/http/request-guards`, and a `rateLimit` call. A pathology
+report is the same problem shape as a nutrition label.
+
+**⚠️ The de-identification requirement is the hard part, and it is not a storage problem — it is a
+transmission one.** Two things are true and they point in opposite directions:
+- **The app's own logging is already clean.** `lib/ai/instrument.ts` says in its own comments
+  *"Pass ids/dates/keys only, never raw prompt text or health data"* and *"Metadata only (tokens +
+  fingerprint hash), no prompt bodies"* — `ai_call_log` will not capture the report.
+- **The extraction call itself sends the document to Google.** A real pathology report carries full
+  name, date of birth, address, Medicare/patient reference, and the requesting doctor. Redacting
+  *after* extraction is too late, and redacting *before* extraction is circular, because reading the
+  pixels is the extraction.
+
+  **✅ DECIDED by the owner, 2026-08-23 — route (a), crop before upload.** Verbatim: *"Yes we can
+  crop the report; if its a document that gets uploaded; we can choose where the crop should be; or
+  it can be pre-cropped. I have an example one ready so we should be able to go with that for
+  testing."* The gate is cleared; this entry is buildable once planned. Two requirements come out of
+  that answer and both are binding:
+  - **The crop is chosen, not fixed.** An in-app crop step where the owner picks the region, because
+    lab layouts differ between providers and a hardcoded header height would silently leak on the
+    first report that does not match it.
+  - **An already-cropped file must be accepted as-is.** The crop step is offered, never forced —
+    the owner may arrive with the redaction already done.
+
+  Route (b), typing analytes by hand, stays as the always-available fallback: it needs no AI call at
+  all and is the honest answer when a report will not extract cleanly. Route (c) — sending the whole
+  report — is rejected and should not be revisited without a new owner decision.
+
+  Under every route: **do not persist the document.** Store the extracted analytes and discard the
+  image, which makes the de-identification durable rather than a promise about a retention policy.
+
+**Three things the crop decision surfaces, all verified 2026-08-23:**
+
+1. **The upload pipeline is image-only, and a pathology report is usually a PDF.**
+   `ALLOWED_IMAGE_MIME` (`packages/shared/src/http/request-guards.ts:34`) is exactly
+   `['image/jpeg', 'image/png', 'image/webp']` — no PDF, and nothing in the tree renders one. The
+   owner's words were *"a document that gets uploaded"*, so the plan must pick one: add a
+   PDF→raster step (a new dependency, and it must run **on-device** or the un-cropped PDF reaches
+   the server, defeating the whole decision), or accept only images and let the owner photograph or
+   screenshot the report. **Recommended: images only for v1.** `@capacitor/camera` with
+   `CameraSource.Prompt` already gives camera-or-gallery in one call
+   (`components/nutrition/capture-step.tsx:113`), so photographing a printed report or picking a
+   screenshot works today with no new plumbing.
+2. **No crop UI exists anywhere in the app** — grepped `components/`, `app/` and `lib/`; the only
+   hits are unrelated (voice logging, meal-label rendering, the GIF creator). So the crop is new
+   work. **The cheap path is `Camera.getPhoto({ allowEditing: true })`**, which hands off to
+   Android's own crop screen — no new dependency, and it satisfies "we can choose where the crop
+   should be". Evaluate that before reaching for a React cropper library.
+3. **🔴 The example report must never be committed — this repository is PUBLIC.** Confirmed via the
+   API on 2026-08-23: `"private": false`, `"visibility": "public"`. The owner has *"an example one
+   ready"* for testing, and the obvious next move — dropping it in as a test fixture — would publish
+   a real pathology report, with the identifiers the entire feature exists to remove, to a public
+   repository and to anyone who has ever cloned it. **Git history makes that effectively permanent.**
+   Test against a **synthetic** report built to match the layout, keep the real one outside the
+   repository entirely, and treat any local copy as untracked. If the real report is ever needed to
+   validate extraction, run it through a local dev server by hand and commit nothing.
+
+**What it would feed — worth scoping before building, because "helps with nutrition" is not yet a
+consumer.** The honest position is that no code reads a biomarker today. The realistic first consumers
+are `app/api/ai/health-insight/route.ts` (already assembles a metric-line profile from
+`body_metrics` + Oura and would take biomarker lines naturally) and the goal recommendation in
+`packages/shared/src/nutrition/goal-recommendation.ts`. **Name two or three specific markers and what
+they would change** — the failure mode here is a table of 40 analytes that nothing ever reads, which
+is the same shape as the two structurally-dead nutrition trend views already recorded in this file.
+
+**Done looks like:** a blood panel can be entered or imported without identifying details leaving the
+device; the analytes are stored with their date, units and reference range; and at least one
+recommendation surface visibly changes because of a value in it.
 
 ---
 
