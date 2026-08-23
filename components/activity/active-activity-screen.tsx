@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { PauseIcon, PlayIcon, StopIcon } from '@phosphor-icons/react'
 import { useActivityStore } from '@/lib/stores/activity-store'
@@ -9,6 +9,9 @@ import { startGpsWatcher, type GpsWatcher } from '@/lib/activity/gps-tracking'
 import { useCadenceTracking } from '@/lib/activity/use-cadence-tracking'
 import { ActivityElapsedClock } from './activity-elapsed-clock'
 import { CadenceReadout } from './cadence-readout'
+import { HrReadout } from './hr-readout'
+import { ActivitySecondaryMetrics } from './activity-secondary-metrics'
+import { computeElevationChange } from '@/lib/activity/activity-metrics'
 
 const ActivityRouteMap = dynamic(
   () => import('./activity-route-map').then(m => m.ActivityRouteMap),
@@ -49,6 +52,13 @@ export function ActiveActivityScreen() {
     }
   }, [isDistanceBased, isPaused])
 
+  // Runs over points already in memory, and only once there are enough to have a gradient at all.
+  // Hidden rather than shown as `0 m` — see ActivitySecondaryMetrics.
+  const elevationGainM = useMemo(
+    () => (rawPoints.length > 1 ? computeElevationChange(rawPoints).gainM : null),
+    [rawPoints],
+  )
+
   const paceLabel = currentPaceSecPerKm
     ? `${Math.floor(currentPaceSecPerKm / 60)}:${String(Math.round(currentPaceSecPerKm % 60)).padStart(2, '0')} /km`
     : '--:-- /km'
@@ -64,21 +74,28 @@ export function ActiveActivityScreen() {
           pauseStartMs={pauseStartMs}
         />
 
+        {/* Q-418: distance · pace · HR on the primary row, cadence and the running totals below it.
+            Heart rate belongs up here because it is the one you act on mid-walk; it was missing
+            entirely while the same strap supplying cadence was streaming beats. */}
         {(isDistanceBased || cadenceEnabled) && (
-          <div className="flex w-full max-w-xs justify-around text-center">
-            {isDistanceBased && (
-              <>
-                <div>
-                  <p className="text-2xl font-bold tabular-nums">{distanceKm.toFixed(2)}</p>
-                  <p className="text-xs text-muted-foreground">km</p>
-                </div>
-                <div>
-                  <p className="text-2xl font-bold tabular-nums">{paceLabel}</p>
-                  <p className="text-xs text-muted-foreground">pace</p>
-                </div>
-              </>
-            )}
-            {cadenceEnabled && <CadenceReadout tracker={cadenceTracker} />}
+          <div className="flex w-full max-w-xs flex-col items-center gap-3">
+            <div className="flex w-full justify-around text-center">
+              {isDistanceBased && (
+                <>
+                  <div>
+                    <p className="text-2xl font-bold tabular-nums">{distanceKm.toFixed(2)}</p>
+                    <p className="text-xs text-muted-foreground">km</p>
+                  </div>
+                  <div>
+                    <p className="text-2xl font-bold tabular-nums">{paceLabel}</p>
+                    <p className="text-xs text-muted-foreground">pace</p>
+                  </div>
+                </>
+              )}
+              <HrReadout />
+              {cadenceEnabled && <CadenceReadout tracker={cadenceTracker} />}
+            </div>
+            <ActivitySecondaryMetrics tracker={cadenceTracker} elevationGainM={elevationGainM} />
           </div>
         )}
 
