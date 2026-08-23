@@ -1,6 +1,6 @@
-# Implementation Agent (A) 🚧 — baton
+# 🚧 Implementation Agent (A) — baton
 
-> **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title
+> **Successor sessions are titled `🚧 Implementation Agent (A) 🟢`** — exactly, emoji included. The title
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 

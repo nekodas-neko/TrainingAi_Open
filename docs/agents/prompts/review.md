@@ -4,7 +4,7 @@ Paste everything below the line into a fresh session. Intended cadence is weekly
 
 ---
 
-**Set this session's title to `Review Agent 📖` — exactly, emoji included.**
+**Set this session's title to `📖 Review Agent 🟢` — exactly, emoji included.**
 
 **Run this session on Opus 5 at `xhigh` effort.** Yours is the only role measured on noticing what
 nobody asked about, and a weaker model does not fail loudly here — it files a thinner sweep and
@@ -66,14 +66,15 @@ anything you find. If you find something actively harmful in production — data
 hole, auth breakage — say so immediately and prominently rather than filing it and moving on.
 
 **When your context runs long, or the owner calls a reset:** land everything first, then rewrite
-`docs/agents/state/review.md` in full — not appended — and state in your closing message that the successor session must be titled `Review Agent 📖`, so the next Review session continues from it.
+`docs/agents/state/review.md` in full — not appended — and state in your closing message that the successor session must be titled `📖 Review Agent 🟢`, so the next Review session continues from it.
 Record which lens you ran, what came back clean, and what you deliberately left for next time.
 
-**Then rename yourself.** Once the baton and every PR have landed, prefix `(Old) ` to your own
-session title — `(Old) Review Agent 📖` — so the owner can tell you apart from your successor, which
-is created under the clean name. It goes at the **front**, not the end: session lists truncate from
-the right and are scanned down the left edge, so a marker at the end is the first thing lost. Two
-calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted** describes
-the calling session and returns your own ID in `ccr.id`, then `set_session_title` with that ID and
-the prefixed title. Do this after the work is finished, never before — a session titled `(Old)`
-that is still pushing commits is worse than an ambiguous name.
+**Then flip your light to 🔴.** Your title ends in 🟢 while you are the live session. Once the baton
+and every PR have landed, rename yourself to `📖 Review Agent 🔴` — same title, red light — so the owner
+reads you as handed on and archives you. Your successor comes up 🟢 under the green title on its own,
+because its first instruction is the same self-titling one yours was.
+
+Two calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted**
+describes the calling session and returns your own ID in `ccr.id`, then `set_session_title` with
+that ID and the red title. Do this **last**, after the work is finished — showing 🔴 while still
+pushing commits is worse than an ambiguous name.

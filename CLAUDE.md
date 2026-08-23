@@ -121,11 +121,11 @@ and never write code — which is what keeps the collision surface to Lane A aga
   similar; the 17 that already did are baselined shrink-only, and clearing them is Orchestrator's
   first sweep. An entry genuinely still owing an owner or device check states so with
   `- **Keep:** <what is owed>` rather than being deleted or left to look finished.
-- **The session titles are fixed, and a successor reuses its predecessor's exactly** — `Implementation
-  Agent (A) 🚧` · `Implementation Agent (B) 🚧` · `BugFix Intake Agent 🪲` · `Tuning Agent 🎶` ·
-  `Review Agent 📖` · `Orchestrator 🪐`. The title is how the owner tells six concurrent sessions apart, so a renamed
-  successor is a lost thread even when its baton is perfect. Every handoff states its successor's
-  title outright rather than leaving it to be inferred.
+- **The session titles are fixed, and a successor reuses its predecessor's exactly** — `🚧 Implementation
+  Agent (A) 🟢` · `🚧 Implementation Agent (B) 🟢` · `🪲 BugFix Intake Agent 🟢` · `🎶 Tuning Agent 🟢` ·
+  `📖 Review Agent 🟢` · `🪐 Orchestrator 🟢`. Leading emoji = role; **trailing = this session's status, and
+  the outgoing session flips 🟢 to 🔴 as its last act** so the owner archives the reds. A renamed successor
+  is a lost thread even with a perfect baton; every handoff states its successor's title outright.
 - **Handing over:** land everything first — the container is ephemeral, so an uncommitted baton is a
   lost baton — then **rewrite** `docs/agents/state/<agent>.md` in full. Never append; a baton that is
   half last week's is worse than none, because it gets trusted. The dated

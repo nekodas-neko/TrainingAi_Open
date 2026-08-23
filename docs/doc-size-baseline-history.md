@@ -1947,3 +1947,14 @@ on a JSON file produces two `files` blocks and an unparseable document — the s
 that resurrected the four entries this branch removes, failing a different way. On a JSON baseline
 take main's copy and re-measure; the numbers are derived from the files, so there is nothing to
 merge.
+
+## 2026-08-23 — `CLAUDE.md` 1136 → 1135 (ratchet down)
+
+The session-titles rule gained the status-light convention (leading emoji = role, trailing =
+🟢 live / 🔴 handed on) and came out a line shorter than it went in. The detail lives in
+`docs/agents/README.md` under *The trailing light*, which is where a reader who needs the
+mechanism is already going; the index keeps only the fact that the light exists and who flips it.
+
+Ratcheted rather than left slack, because slack in a shrink-only baseline is just a line of
+growth nobody had to argue for.
+
