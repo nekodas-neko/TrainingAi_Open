@@ -115,6 +115,10 @@ Live at the time of writing (2026-07-30):
   Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (Log Food as
   one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
   before starting any phase; the phases point back rather than copying its decisions.
+- ⚠️ **The finished-logging control was never reached** (BF-6, 2026-08-24, v1.344.0) — last on the
+  page, **zero presses in seven weeks**, while the calibration it feeds excludes an unmarked day
+  rather than treating it as light. Now directly under the meals, End of Day last. **Not
+  device-verified** — [`journal`](../../overview/entries/2026-08-24-finish-logging-above-end-of-day.md).
 - ⚠️ **A recipe link becomes a meal** (Q-409's Lane B half, 2026-08-24, v1.342.0) — the plan
   wizard's "meals you usually eat" step takes a URL. **A page that states no yield hands back the
   WHOLE recipe**, so the row asks how many it serves and refuses to be kept until answered;

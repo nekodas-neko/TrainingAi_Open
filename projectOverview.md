@@ -52,6 +52,11 @@ with `Gate: device`. **Item (3) needed no work:** battery polls have persisted s
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
 
+**The finished-logging control moved above End of Day (BF-6, v1.344.0).** It had taken **zero
+presses in seven weeks** — 0 of 55 `day_checkins` rows carried `food_logging_completed_at` — and the
+maintenance calibration excludes an unmarked day rather than treating it as light, so a control
+nobody reached was withholding the feature outright.
+
 **A deload session says so now (BF-8, v1.343.0).** The Intensity control read "Full · As
 prescribed" while the card under it read "Deload session · Auto-applied", and the workout header
 showed no marker at all — the owner trained one believing it was a full session. Both surfaces asked

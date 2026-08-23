@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.344.0",
+    date: "2026-08-24",
+    changes: [
+      "\"Finished logging\" now sits directly under the meals instead of at the very bottom of the Nutrition screen, and End of Day moved to the end. The button had never been pressed since it shipped, and the maintenance estimate it feeds ignores any day that is not marked \u2014 so a control nobody reached was withholding the whole feature rather than just degrading it.",
+    ],
+  },
+  {
     version: "1.343.0",
     date: "2026-08-24",
     changes: [
