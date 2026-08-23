@@ -1720,3 +1720,14 @@ arrive at, and it fits in a paragraph.
 Shrink. LA-19 shipped the day it was filed and its entry leaves the queue; `CLAUDE.md` and
 `projectOverview.md` are edits in place, not growth — both said "13 do not" and now say the count is
 zero.
+
+## 2026-08-23 — `projectOverview.md` 7971 → 7977
+
+Six lines, and they are a Current Status entry rather than material that belongs elsewhere: Q-392's
+engine half shipped and the index has to say so, including the part a later session would otherwise
+re-litigate — that the merge is locked because the unlocked version loses the other device's key,
+and that the entry was re-scoped to Lane B rather than closed. The detail is in the journal entry
+and the module-map row; this is the pointer to it.
+
+`docs/implementation-backlog.md` held at its 11334 baseline exactly — the re-scoped Q-392 entry
+gained a fourteen-row key table and shed the prose the journal and module map now carry.

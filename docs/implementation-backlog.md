@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **206** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **207** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -976,6 +976,16 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
 
 ### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
 
+> **⚠️ NARROWED 2026-08-23 — the budget is now correct everywhere, so only the two DISPLAY changes
+> are left.** v1.335.0 pointed Home's nutrition card and the Nutrition ring at
+> `budgetProvenance(...).total` and made the ring render `macroTargets.scaled`
+> ([`journal`](overview/entries/2026-08-23-one-calorie-budget.md)), which closes the
+> "rendering `scaled` instead of the stored row" half listed below and retires Q-415/Q-417.
+> **What remains is (1) the macro ring's grey remainder and (2) the zone bar as a progress bar.**
+> The blocking order in this entry is now satisfied — the bar can be built, because the number it
+> fills toward is right. Note `barBands`/`barPosition` live in `packages/shared` but are reached
+> only from `components/`, so claim the lane in your baton before starting.
+>
 > **⚠️ THE LANE A HALF SHIPPED 2026-08-19 — what is left is Lane B**
 > ([`journal`](overview/entries/2026-08-19-macros-follow-earned-calories.md)).
 > `scaleMacrosForEarnedKcal(base, earnedKcal)` lives in
@@ -1053,126 +1063,60 @@ going over. So it still looks like a progress bar where you want to go to the en
     words, per the standing rule.
   - Drawn in three states (under, on target, over) during the 2026-08-19 review.
 
-**⚠ Do this in the same PR as the Q-415 budget fix below, or the bar will fill toward the wrong
-number.**
+**⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
+right number.**
 
-### [nutrition][app-shell] Q-417 — a THIRD calorie budget, 179 low, because the Nutrition ring keeps its optimistic local paint
+### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
-- **Batch:** calorie-budget-surface
+- **Branch:** `fix/food-log-invalidate-after-push`
+- **Added:** 2026-08-23 · **Lane: A** — `packages/shared/src/nutrition/log-food.ts` writes the local
+  store and the outbox, which is engine, not surface.
+- **Placement:** high for a correctness item. It is a live staleness bug on the owner's own screen,
+  and it is two lines.
 
-- **Branch:** `fix/nutrition-ring-active-energy`
-- **Added:** 2026-08-19 · owner, from three screenshots taken at 9:57: *"these nutrition values dont
-  look like they are lining up"*
-- **Lane B** (`app/nutrition/nutrition-content.tsx`). No schema, no route.
-- **Ship with Q-415.** That entry fixes the Home donut's base; this fixes the Nutrition ring's
-  *earned*. Fixing one and not the other leaves the screens disagreeing, just differently.
+**Found while closing Q-417, whose part (a) asked whether the write that logged 42 kcal actually
+invalidates `energy-balance:`. It does — at the wrong moment.**
 
-**Three budgets were on screen at the same moment, from the same data.**
+`logFoodEntries` (`log-food.ts:243-244`) runs:
 
-| surface | expression | value |
-|---|---|---|
-| zone bar · both Energy Balance cards | `restingBase + targetNet + activeKcal` | 1,629 + 551 = **2,180** ✅ |
-| Home nutrition donut | `calorieGoal + activeEnergyKcalToday` | 1,900 + 551 = **2,451** (Q-415, +271) |
-| **Nutrition tab ring** | `targets.calories + burnedForSelectedDate` | 1,900 + **101** = **2,001** (−179) |
+```ts
+await invalidateNutritionWrite()
+pushMutations(userId!).catch(() => {})   // fire-and-forget
+```
 
-The ring is **179 kcal low**, and the visible consequence is on the same card: it printed
-**"Goal reached"** against 2,014 eaten, because 2,014 clears its 2,001. The real budget is 2,180 and
-the Energy Balance card two rows above said *"166 kcal left today · Under so far"*. **One screen,
-both "you are done" and "you are under", 179 apart.**
+The eviction lands **before** the mutation reaches the server. Every `useCachedValue` subscriber —
+Home's Energy Balance card, Home's nutrition card, both zone bars — wakes on that signal, refetches
+immediately, gets the **pre-log** payload, and re-caches it. Nothing invalidates again once the push
+completes, so the stale value then stands for the key's full TTL.
 
-**Where the 101 comes from, and why it wins.** `nutrition-content.tsx:200-214` paints
-`activeEnergyKcalToday` optimistically from the local store — `activity_logs.caloriesBurned` summed
-— and its own comment says this is *"still narrower than that fetch"* and is expected to be
-corrected by the mount-scoped `body-metadata` network call *"moments later"*. **Nothing sequences the
-two.** The local read is `await store.getActivityLogs(today)`; the network read is a separate
-`cachedFetch` (`:273`). Whichever resolves last wins, and here the local one did — the ring still
-read 101 while the Energy Balance card on the same screen had the server's 551.
-- **The server figure is `computeActiveEnergy`** (`app/api/body-metadata/route.ts:148-156`): strength
-  sessions **+** logged activities **+** pedometer steps. The local sum has none of the first, none
-  of the third, **and a Guided Walk writes `caloriesBurned: null`** — the Q-96 root cause, called out
-  in that same comment. So 101 is not "cardio" either; it is "whatever activity rows happened to
-  carry a non-null number".
-- **Fix: never let the optimistic value overwrite a server value that has already arrived.** Track
-  which source last wrote — a ref, a discriminated state, or simply only applying the local paint
-  when the current value is still `null`. Do **not** "fix" it by deleting the optimistic paint: it
-  exists so the ring is not blank on a cold offline open, which is the instant-paint rule.
+This matches the reported symptom exactly: Home's Energy Balance card read *"208 kcal left"* while
+the Nutrition tab's identical card read *"166"* — a 42 kcal gap that is precisely one unlogged
+entry. The Nutrition tab looked right because it appends the new log optimistically to its own
+state and never consults the cache for it.
 
-**The label is wrong even when the number is right.** `macro-ring.tsx:51` renders
-`+${calsBurnedToday} from cardio`. Strength sessions and steps are both in the server figure, so at
-551 the card would claim 551 kcal "from cardio" on a day whose largest contributor was a leg
-session. **Say "from movement"** — the wording the zone bar already uses for the same quantity.
+**The sibling path already has the right shape.** The food-log *delete* in
+`nutrition-content.tsx:397-400` does `pushMutations(...).then(() => { invalidateNutritionWrite(); … })`
+— invalidate after the push, not before.
 
-**Two more mismatches in the same three screenshots, both worth fixing here.**
+**Proposed fix: invalidate twice, not later.** Keep the immediate call (local screens must repaint
+at once, and offline it is the only one that will ever fire), and add a second after the push
+resolves:
 
-**(a) Home's Energy Balance card was 42 kcal stale.** It read **"208 kcal left"** while the Nutrition
-tab's identical card read **"166"**, with both printing the same *"1,629 base + 551 earned"* line.
-Same budget, so the difference is entirely in *eaten*: 2,180 − 208 implies **1,972**, against the
-2,014 the Nutrition tab showed. **The Home donut on that same screen had 2,014 correct**, so this is
-not a screen-wide staleness — it is the `energy-balance:` payload specifically, while
-`body-metadata` was current. `useEnergyBalanceToday` already uses `useCachedValue` (Q-402), so the
-subscription exists; **check that the write which logged those 42 kcal actually invalidates
-`energy-balance:`**, per the cache-groups rule. This is the "which half of the rule is protecting
-you" case from CLAUDE.md — the hook is fine, the eviction is the suspect.
+```ts
+await invalidateNutritionWrite()
+pushMutations(userId!).then(() => invalidateNutritionWrite()).catch(() => {})
+```
 
-**(b) Q-323's scaled macros are computed and not rendered.** #218 shipped
-`scaleMacrosForEarnedKcal` and `energy-balance-service` now returns `macroTargets.scaled` — but the
-ring still shows the stored base: **Protein 161/150, Carbs 179/190, Fat 68/60**. With 551 earned the
-scaled targets are **carbs 271 g and fat 85 g**, so the card reports fat *over* when it is well
-under, and carbs near-complete when they are two-thirds done. **This is Q-323's remaining Lane B
-half** — it is not a new defect, but it is now visibly wrong on the owner's screen and belongs in
-the same PR as the ring's budget fix, since both are the same card telling the user the wrong thing
-about the same day.
+Moving the single call after the push instead would break offline logging outright — `pushMutations`
+never resolves successfully with no network, so nothing would repaint at all.
 
-- **Verification.** On a day with a logged strength session and steps, the Nutrition ring, the Home
-  donut, the Home Energy Balance card and the Nutrition Energy Balance card must show **one** budget.
-  Then log a food item and confirm all four move together — that second step is what (a) failed.
+**Verification.** Log a food item on the Nutrition tab, then look at Home without navigating away
+and without waiting for a TTL: its Energy Balance card and nutrition card must both include the new
+calories. That is the step Q-417's own verification note said had failed.
 
-### [nutrition][app-shell] Q-415 — Home shows two calorie budgets 271 apart; Q-401's sweep missed the donut
-
-- **Batch:** calorie-budget-surface
-
-- **Branch:** `fix/home-donut-budget-source`
-- **Added:** 2026-08-19 · owner, from a Home screenshot: *"explain this widget what ars those
-  nutrition numbers"*
-- **Lane B** (`components/home/home-card-widget.tsx`). One expression. No schema, no route.
-- **Placement: with Q-323**, whose bar and ring changes fill toward this number. Landing those
-  first would draw a progress bar pointing at the wrong total.
-
-**Measured from the owner's screenshot, and the arithmetic is the whole report.** The Home nutrition
-card reads **`1458 / 2447 kcal`** and prints **"1,629 base + 547 earned from movement"** directly
-underneath it. **1,629 + 547 = 2,176.** The card contradicts its own subtitle by **271 kcal**.
-
-**Two budgets are live on one screen:**
-
-| surface | expression | today |
-|---|---|---|
-| Home nutrition donut | `calorieGoal + activeEnergyKcalToday` (`home-card-widget.tsx:121-125`) | 1,900 + 547 = **2,447** |
-| zone bar · Home Energy Balance · Nutrition tab | `budgetProvenance()` → `restingBaseKcal + targetNetKcal + activeKcal` | 1,629 + 547 = **2,176** |
-
-The donut adds movement to the **stored** `calorieGoal`; everything else adds it to the **derived**
-baseline. That the Energy Balance card two rows below says **"718 kcal left"** — exactly
-`2,176 − 1,458` — is the confirmation: the two cards are visibly disagreeing on the same screen at
-the same moment.
-
-**This is Q-401's defect in a surface its sweep did not reach.** Q-401 retired the second TDEE model
-so one baseline feeds every calorie figure, and it shipped (#175). `home-card-widget.tsx` was not
-converted and still reads the stored goal. Grepped the backlog: **no entry mentions this widget**, so
-it was missed rather than deferred.
-
-**The fix.** Feed the donut the same `budgetProvenance()` total the zone bar and Energy Balance card
-already use, rather than `calorieGoal + activeEnergyKcalToday`. The stored goal keeps its job as the
-rest-day floor that the derived baseline is built from; it is simply not the number to render.
-
-- **Sibling sweep, per the standing rule — do not fix only the one surface the owner photographed.**
-  Grep for every other read of `calorieGoal` that renders a *displayed* budget, and convert or
-  justify each in this PR. The weekly branch in the same component (`isWeekly`, `boostedGoal * 7`)
-  multiplies the same wrong base by seven and needs the same treatment.
-- **Check the macro grams while you are there.** They come from the stored row too; Q-323 makes them
-  shares of the budget, so both entries must agree on which budget that is. **They are one PR.**
-- **Verification.** On one day with movement logged, the Home donut, the Home Energy Balance card and
-  the Nutrition tab must show the **same** total, and `donut total − eaten` must equal the Energy
-  Balance card's "left" figure exactly. That equality is the test — it is what failed here, and it
-  is checkable at a glance on the running app.
+- **Not reproduced under automation yet** — the race needs the refetch to beat the push, which a
+  local dev server against a local Postgres wins more often than a phone on mobile data does. A
+  guard likely has to stall the push rather than race it.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
@@ -3059,8 +3003,9 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **✅ The owner has approved ALL the drawn variants as shippable styles** (*"I like all of these
   ones… lets keep them all as options to cycle through and choose a default"*), so this is no
   longer a pick-one decision — every layout below becomes an entry in the style registry the
-  renderer already reads. **The default is the open question, and it is a stored preference:**
-  see the Q-392 note further down before choosing where to keep it.
+  renderer already reads. **The default is a stored preference, and Q-392 has now answered where:**
+  `mealLabelStyle` in the server-backed preferences bag (`packages/shared/src/user/preferences.ts`),
+  written through `/api/user/preferences`. Not a new decision.
 - **Added:** 2026-08-18 · owner: *"could we have a small font showing the break down of the meal i.e
   Pasta / [macros] / (100g pasta, 200g mince, etc etc) so its the full summary of the meal."*
 - **Follow-up to Q-389, which shipped 2026-08-18 (v1.320.0)** — the label renderer exists
@@ -3125,7 +3070,8 @@ moving *beside* the calories rather than under them.
   style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
   straight on **Q-392** (preferences live only on the device). If a label default is written to
   `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
-  **Build the default on whatever Q-392 settles**, not beside it.
+  **Q-392 settled this on 2026-08-23** — `mealLabelStyle` in the preferences bag, seeded into
+  `ta_meal_label_style` for first paint. Nothing here is blocked any more.
 - **✅ SHIPPED 2026-08-18 (v1.323.0, Lane B) — option 1, and NOT option 2.** `square` is now a style
   in the registry: full per-serving ingredient list, code at 70 units, marked **SQUARE** in the
   picker with a standing warning under the preview that a round die crops the list. The preview also
@@ -3165,8 +3111,8 @@ moving *beside* the calories rather than under them.
   with three wrapped lines** — still above the old default's 0.369, and now the *lines* are asserted
   rather than only the code size.
   Option 2 as costed here is moot; the stacked square style stays in the picker.
-- **Still open:** **the stored default**, which stays blocked on **Q-392** exactly
-  as this entry says — the style remains picked-at-print-time and nothing was persisted.
+- **Still open:** **the stored default** — no longer blocked (Q-392's engine half shipped
+  2026-08-23) but still picked-at-print-time, so the wiring is genuinely outstanding.
 - **What would count as done:** a saved meal's label can render its ingredient list with weights;
   whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
   decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
@@ -3328,70 +3274,68 @@ moving *beside* the calories rather than under them.
   [`docs/reviews/2026-08-18-production-verification.md`](reviews/2026-08-18-production-verification.md).
   (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
-### [platform][app-shell] Q-392 — preferences live only on the device, so a reinstall or a second browser starts from defaults
+### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
 
-- **Branch:** `feat/server-backed-user-preferences`
+- **Branch:** `feat/preferences-read-sites`
+- **Lane:** B
 - **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
-- **Lane:** A
-  - when i do a new install or open on computer - it loses all the saved preferences. We need to
-  make it persist across installs/etc."*
-- **Screenshot context** (Home, so it does not need to survive): the customised surface is exactly
-  what resets — the score-ring style behind Readiness / Heart Rate / Sleep / Activity, the three
-  chosen quick-log tiles (kg · Steps · Calories), card colours, and which widgets appear at all.
+  — when i do a new install or open on computer - it loses all the saved preferences. We need to
+  make it persist across installs/etc."* **Re-scoped 2026-08-23** to the half that is left.
 
-**Confirmed: these are `localStorage` only, with no server copy.** Inventory as of this trace —
+**The engine half shipped** (Lane A, `feat/server-backed-user-preferences`): `users.preferences`
+is a JSONB bag (migration 206), `GET`/`PATCH /api/user/preferences` read and merge it, proven
+cross-session against the local DB. Nothing user-visible changed — **no read site calls it yet**.
 
-| what | key | lives in |
+- **What is left is entirely in Lane B's files.** Every surface in the table below still reads its
+  `localStorage` key directly and writes only there. Each needs: read the server bag once (as
+  `hydrateGoalSeeds` does for goals), seed the same `localStorage` keys from it so first paint
+  stays synchronous, and PATCH on change.
+- **The correspondence is already written down — do not re-derive it.**
+  `PREFERENCE_STORAGE` in `packages/shared/src/user/preferences.ts` maps every preference name to
+  its `localStorage` key **and its encoding**, which is the part that bites: `ta_ss_widgets` is
+  JSON, `ta_weight_lookback` is a bare number, and the reminder toggles are `String(boolean)`
+  compared against the literal `'false'`. A test asserts the map covers every schema key.
+
+| what | preference key | storage key |
 |---|---|---|
-| Home widgets / cards | `ta_ss_widgets`, `ta_ss_cards` | `lib/home/home-prefs.ts:29-30` |
-| Pill & card colours | `ta_pill_colors`, `ta_card_colors` | `home-prefs.ts:31,40` |
-| Score-ring style (20 options) | `ta_score_ring_style` | `home-prefs.ts:159` |
-| Weight lookback | `ta_weight_lookback` | `home-prefs.ts:57` |
-| Push / meal / health / day-review / calendar toggles | `ta_pref_*` | five call sites |
-| Rest & run status chips | `ta_pref_rest_chip`, `ta_pref_run_chip` | `lib/native/*-chip.ts` |
-| Background / wallpaper | `ta_background_settings` | `lib/stores/background-settings-store.ts:36` |
-| Food region | `ta_food_region` | four component sites |
+| Home widgets / cards | `homeWidgets`, `homeCards` | `ta_ss_widgets`, `ta_ss_cards` |
+| Home section order / hidden | `homeSectionOrder`, `homeHiddenSections` | `ta_home_section_order`, `ta_home_hidden_sections` |
+| Pill & card colours | `pillColors`, `cardColors` | `ta_pill_colors`, `ta_card_colors` |
+| Score-ring style | `scoreRingStyle` | `ta_score_ring_style` |
+| Weight lookback | `weightLookback` | `ta_weight_lookback` |
+| Goals progress view | `goalsProgressView` | `ta_goals_progress_view` |
+| Brand theme / hue | `brandTheme`, `brandHue` | `ta_brand_theme`, `ta_brand_hue` |
+| Background / wallpaper | `backgroundSettings` | `ta_background_settings` (a Zustand `persist` bag) |
+| Meal label style | `mealLabelStyle` | `ta_meal_label_style` |
+| Rest duration | `restDurationSec` | `ta_rest_duration` |
+| Food region | `foodRegion` | `ta_food_region` |
+| Meal / health / day-review / calendar toggles | `mealReminders`, `healthAlerts`, `dayReviewReminders`, `calendarSync` | `ta_pref_*` |
 
-- **✅ The pattern to copy already exists and is proven — do not invent one.** **Q-241 (done
-  2026-08-14, v1.307.1)** made goals server-authoritative for exactly this reason, and left the
-  shape behind: the server owns the value, `PATCH /api/user/goals` writes it, and
-  `hydrateGoalSeeds()` (`home-prefs.ts:85`) pushes it into the same `localStorage` keys so first
-  paint stays instant. `app/api/user/` already holds `goals`, `profile`, `avatar`,
-  `equipped-title`, `bedtime-estimate`. **This item is extending that to the rest of the table
-  above**, not designing persistence from scratch.
-- **⚠ One row is already half-built, and is the cheapest possible proof.** `users.food_region`
-  **exists as a column** (`lib/data/postgres/schema.ts:31`, `NOT NULL DEFAULT 'AU'`) and **nothing
-  reads or writes it** — a grep of `app/api/**` and `lib/data/**` finds only the definition. The
-  region the app actually uses comes from `localStorage.getItem('ta_food_region') ?? 'AU'` at
-  `components/nutrition/capture-step.tsx:130,138`, `review-step.tsx:124`, and is set at
-  `components/profile/edit-profile-sheet.tsx:238`. So the column is dead, the setting is
-  device-only, and the landing spot is already in the schema. Wire this one first — it validates
-  the whole approach against a real preference for almost no work.
-- **Decisions the spec has to make:**
-  1. **A column per preference, or one JSONB blob?** Columns match `users.*` as it stands and keep
-     things queryable; a blob avoids a migration per new preference, which matters given how many
-     are listed above. **Either way the migration is Lane A's to claim, not intake's.**
-  2. **Conflict rule when two devices disagree.** Q-241 settled it for goals — server wins, local is
-     a seed — and the same rule should hold here rather than a second, different one.
-  3. **What deliberately stays device-local.** Not everything above should sync: `ta_pref_rest_chip`
-     and `ta_pref_run_chip` drive Android status-bar chips that mean nothing in a desktop browser,
-     and push-notification enablement is per-install by nature. Decide the list rather than syncing
-     the lot; a desktop browser inheriting a phone's notification state is its own bug.
+- **⚠ `backgroundSettings` is the one that is not a plain key.** It is a Zustand `persist` store
+  (`lib/stores/background-settings-store.ts`), so the value under that key is the `{ state,
+  version }` envelope, not the settings. Sync the store's `state`, not the raw string, or a
+  version bump on one device writes an unreadable bag to the other. The schema types it as an
+  opaque record on purpose — the shape belongs to that store, and a second definition here would
+  drift.
+- **⚠ `users.food_region` is a dead column** (`schema.ts`, `NOT NULL DEFAULT 'AU'`, never read or
+  written); the live value is `preferences.foodRegion`. Leave it — dropping it is a data-losing
+  migration for no gain — and do not wire a read site to it by mistake.
+- **What deliberately does NOT sync is decided and listed**, in `DEVICE_LOCAL_PREFERENCES` with a
+  reason per key: push enablement, the two Android chip toggles, the ring and scale/HR BLE pairings,
+  and light/dark. If a surface needs one of them to sync after all, move it into the schema rather
+  than writing a second path.
+- **Conflict rule, already settled:** server wins, `localStorage` is a seed written *from* the
+  server and never the reverse — the same rule Q-241 set for goals.
+- **What would count as done:** sign in on a fresh install or a different browser and the chosen
+  ring style, widgets, colours, weight lookback and food region are already applied — no
+  re-configuration; changing one on either device and reopening the other shows the new value.
+  Browser-reproducible end to end (two profiles, or one and a private window); no device needed.
 - **⚠ Related, and more urgent than it looks now that the owner has said they reinstall:** **Q-537
   — the ring key has one copy and no way to back it up.** `CLAUDE.md` is explicit that an uninstall
   destroys the Oura ring key irrecoverably (it lives only in Android SharedPreferences) and that
   re-onboarding the official app to recover risks a firmware update that breaks the BLE protocol.
   This report establishes that reinstalls are part of the owner's normal routine, which changes
   Q-537 from a latent risk to a live one. **Not this entry's work — but worth re-prioritising.**
-- **What would count as done:** sign in on a fresh install or a different browser and the chosen
-  ring style, widgets, colours, weight lookback and food region are already applied — no
-  re-configuration; changing one on either device and reopening the other shows the new value; and
-  the preferences that are deliberately per-install are documented as such rather than silently
-  not syncing.
-- **Surface:** browser-reproducible end to end (two profiles, or one profile and a private window)
-  against the seeded DB — no device needed to prove the sync. Only the native chip toggles need the
-  APK, and those are the ones likely to stay local anyway. Spans a migration + route (Lane A) and
-  the read sites (Lane B); **route to Lane A**, the schema half is the gating piece.
 
 ### [workouts][platform] Q-403 — the Coach calls an already-applied swap a "proposal", and says it after the fact
 

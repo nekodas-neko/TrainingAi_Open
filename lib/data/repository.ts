@@ -1,3 +1,4 @@
+import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
@@ -584,6 +585,14 @@ export interface WorkoutRepository {
   incrementWaterLogOnce(userId: string, date: string, ml: number, mutationId: string): Promise<boolean>
   getUserGoals(userId: string): Promise<UserGoals>
   updateUserGoals(userId: string, goals: Partial<UserGoals>): Promise<void>
+
+  /** Q-392 — the server-authoritative preferences bag. Absent keys mean "never set"; the read
+   *  sites keep their own defaults. */
+  getUserPreferences(userId: string): Promise<UserPreferences>
+  /** Merge a patch over the stored bag and return the merged result, so the caller never has to
+   *  re-read. An explicit `null` clears a key. Merge, never replace — a device that only knows the
+   *  keys it uses must not blank the ones another device set. */
+  updateUserPreferences(userId: string, patch: Record<string, unknown>): Promise<UserPreferences>
 
   // ── Personal Records ───────────────────────────────────────────────────────
   getPersonalRecord(userId: string, exerciseName: string): Promise<{ estimated1rm: number } | null>

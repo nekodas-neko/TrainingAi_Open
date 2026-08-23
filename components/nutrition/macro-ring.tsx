@@ -9,10 +9,12 @@ interface Props {
   carbsG: number
   fatG: number
   targets: NutritionTargets | null
-  calsBurnedToday?: number | null
+  /** Kcal earned from today's movement, from `budgetProvenance(...)` — the same addend the zone
+   *  bar names, so the ring and the bar cannot disagree about it (Q-417). */
+  earnedKcal?: number | null
 }
 
-export function MacroRing({ calories, proteinG, carbsG, fatG, targets, calsBurnedToday }: Props) {
+export function MacroRing({ calories, proteinG, carbsG, fatG, targets, earnedKcal }: Props) {
   const calTarget = targets?.calories ?? 2000
   const remaining = Math.max(0, calTarget - calories)
   const pct = Math.min(100, Math.round((calories / calTarget) * 100))
@@ -48,7 +50,10 @@ export function MacroRing({ calories, proteinG, carbsG, fatG, targets, calsBurne
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline justify-between mb-3">
             <span className="text-xs text-muted-foreground">
-              {calsBurnedToday != null && calsBurnedToday > 0 ? `+${Math.round(calsBurnedToday)} from cardio` : 'Daily goal'}
+              {/* "movement", not "cardio": the figure is strength sessions + logged activities +
+                  steps (`computeActiveEnergy`), so on a leg day it would have credited a whole
+                  session to cardio. Same wording the zone bar uses for the same quantity. */}
+              {earnedKcal != null && earnedKcal > 0 ? `+${Math.round(earnedKcal)} from movement` : 'Daily goal'}
             </span>
             <span className="text-xs font-semibold tabular-nums">{remaining > 0 ? `${remaining} left` : 'Goal reached'}</span>
           </div>
