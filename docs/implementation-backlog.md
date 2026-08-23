@@ -4917,54 +4917,41 @@ session working from a temporarily restored copy.
   making it high-cardinality and awkward to group. Consider a separate `subject_id` column if this
   is touched anyway — not worth its own PR.
 
-### [platform] Q-287 — self-service account deletion: hard delete, 14-day grace, one decision left
+### [platform] Q-287 — self-service account deletion, all seven plan decisions resolved
 
-- **Gate:** owner
-- **⚑ TWO OF FIVE PLAN DECISIONS ANSWERED 2026-08-23 — read before the plan below, which predates
-  them.**
-  1. **Hard delete, not a tombstone.** Google Play's requirement is that deletion actually removes
-     the data; a hidden-but-retained account does not satisfy it, and `oura_raw_samples` alone is
-     over a million rows for one user — a tombstone means carrying that weight forever for an
-     account nobody is coming back to.
-  2. **A 14-day grace period.** The deletion is scheduled, not immediate, and reversible until it
-     runs — so a mis-tap or a change of mind is not terminal. This is the plan's item 4
-     ("confirmation UX and a grace period") and is now settled.
-  **What is still open is item 5 below — the owner's own account, which is the sharpest case here
-  because it is currently the only admin.**
-
-- **Branch:** `feat/account-deletion`
-- **Plan:** **required before any code** — this is destructive and irreversible
-- **Added:** 2026-08-15 · from the uncovered-lenses review §4
+- **Lane:** A
+- **Needs:** Q-288
+- **✅ ALL SEVEN DECISIONS IN THE PLAN ARE RESOLVED 2026-08-23 — see
+  [§11 of the plan](superpowers/plans/2026-08-16-account-deletion.md#11-where-each-decision-landed-2026-08-23)
+  for the table. This entry is startable; only `Q-288` (fixing the export the deletion flow offers
+  first) blocks it, and that is a `Needs:`, not an owner gate.**
+  - **Owner-decided:** hard delete (not a tombstone); a **14-day grace period**, executed on the
+    next authenticated request rather than a schedule — this repo has no cron layer, and Q-270
+    already solved the identical gap the same way, by checking once per app launch rather than
+    inventing a scheduler; and the last remaining admin's own deletion is **refused outright**, so
+    `/api/admin/*` — including `db-query`, which every review session depends on — cannot be
+    self-locked-out.
+  - **Decided without going back to the owner, because each was cheap, reversible, and a mechanical
+    call rather than a preference:** the big `oura_raw_samples` delete is measured against the
+    indexed `user_id` path first, falling back to a chunked delete only if that proves too slow; a
+    deleted user's `friendships` rows are deleted outright, on both sides, since a friendship with
+    a deleted account is meaningless; and the web-accessible deletion path Google Play requires is
+    a route on the existing sign-in flow, not a new email process.
+  - **This entry remains destructive/irreversible per `CLAUDE.md`'s carve-out.** The seven
+    decisions unblock *building the plan into code* — the resulting PR still needs sign-off before
+    merge, same as any auth/data-dropping change.
 - **Confirmed:** account deletion exists only under `app/api/admin/users`. There is no user-facing
   path, in-app or web. Google Play has required both since 2024, and `CLAUDE.md` names the Play
   Store listing as the goal (alongside the privacy policy, data-safety declarations, and the Health
   Connect declared-use-case review, which are separate gates).
-- **📋 PLAN DRAFTED 2026-08-16 — [`docs/superpowers/plans/2026-08-16-account-deletion.md`](superpowers/plans/2026-08-16-account-deletion.md).**
-  Still ⛔ blocked: the plan is a set of **seven marked owner decisions**, not an implementation.
-  Key findings it records so an implementer does not re-derive them:
-  - **The user-scoping map is already solved** — `scripts/generate-claude-ro-views.js` classifies all
-    ~80 tables (`user_id` / 17-table `VIA` FK paths / `GLOBAL` / `DENIED`) and **fails loudly on an
-    unclassified table**. Generate the delete from that map with the same default-deny failure mode;
-    a hand-written list is how a later table survives a deletion request.
-  - **`oura_raw_samples` is 341 MB / ~1M rows for one user** — a synchronous delete will exceed
-    `statement_timeout: 15_000`. Measure before designing around it.
-  - **Q-288 is a hard dependency**: if deletion offers export-first, an export covering 27 of 80
-    tables is the user's last chance at data it does not include.
-  - **Last-admin lockout** — deleting the only admin removes access to `/api/admin/*`, including the
-    `db-query` endpoint every review depends on.
-- **⛔ Do not implement without the owner's explicit sign-off on the semantics.** Per *Safety &
-  Reversibility*, this is exactly the destructive/irreversible class that stays confirm-first. The
-  deliverable of the first PR is a **plan**, not a route.
-- **What the plan must settle:**
-  1. **Hard delete vs. tombstone**, per table. 80 tables, and `oura_raw_samples` alone is 1M rows.
-  2. **The user-scoping map already exists — reuse it.** `scripts/generate-claude-ro-views.js`
-     had to solve exactly this problem (which tables are user-scoped, which are FK-reachable, which
-     are global) and **fails rather than guessing** on an unclassifiable table. That failure mode is
-     the right one here too, and rebuilding the map by hand would be the mistake.
-  3. **FK order.** `CLAUDE.md` records that `ON DELETE SET NULL` once wiped session identity across
-     four deploys — deletion order is a known hazard in this schema.
-  4. **Confirmation UX and a grace period** — a mis-tap must not be terminal.
-  5. **What the owner's own account does.** Deleting the only admin has obvious consequences.
+- **Branch:** `feat/account-deletion`
+- **Added:** 2026-08-15 · from the uncovered-lenses review §4
+- **The plan** (`docs/superpowers/plans/2026-08-16-account-deletion.md`) already carries the two
+  findings worth keeping without re-deriving them: `scripts/generate-claude-ro-views.js`'s ~80-table
+  classification is the deletion routine's user-scoping map — generate or validate against it, never
+  hand-write a second list — and deletion order must follow the FK path explicitly (`CLAUDE.md`
+  records `ON DELETE SET NULL` wiping session identity across four deploys once already; do not
+  rely on cascade behaviour here).
 - **Verify the current Play policy wording** before building; this entry asserts the 2024
   requirement from knowledge, not from a fetch of Google's current page.
 
