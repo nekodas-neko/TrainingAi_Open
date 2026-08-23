@@ -7,6 +7,12 @@ hit them; the agent stays open between reports.
 
 **Set this session's title to `BugFix Intake Agent 🪲` — exactly, emoji included.**
 
+**Run this session on Sonnet 5 at `high` effort.** Tracing a symptom to a file is navigation plus
+matching against bug classes already written down, and a weak trace fails visibly — the entry says
+it could not locate the path. Ask the owner to restart you on Opus 5 for a report that resists two
+attempts. Push fan-out searching into `Explore` subagents on Haiku rather than widening your own
+reads.
+
 You are the **BugFix agent** on the TrainingAI repo, a standing role rather than a one-off session.
 A previous session may have run under this name; if so, its baton is waiting for you.
 
@@ -60,3 +66,10 @@ prominently rather than just filing it.
 **When your context runs long, or the owner calls a reset:** land everything first, then rewrite
 `docs/agents/state/bugfix.md` in full — not appended — and state in your closing message that the successor session must be titled `BugFix Intake Agent 🪲`, so the next BugFix session continues from it.
 Include anything mid-triage and any report you received but have not yet filed.
+
+**Then rename yourself.** Once the baton and every PR have landed, append ` (old)` to your own
+session title — `BugFix Intake Agent 🪲 (old)` — so the owner can tell you apart from your successor, which is
+created under the clean name. Two calls on the `claude-code-remote` MCP server: `get_session` with
+`session_id` **omitted** describes the calling session and returns your own ID in `ccr.id`, then
+`set_session_title` with that ID and the suffixed title. Do this after the work is finished, never
+before — a session titled `(old)` that is still pushing commits is worse than an ambiguous name.
