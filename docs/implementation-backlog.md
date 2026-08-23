@@ -433,7 +433,11 @@ design decision. See the correction at the top of that entry.
 
 ### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 
-- Lane: B — the fix is `components/nutrition/capture-step.tsx`; the payload instrumentation below is Lane A
+- Lane: A — **the Lane B half SHIPPED 2026-08-23 (v1.331.0)**: `capture-step.tsx` bounds the photo to
+  1024 px, a **-86.6%** payload cut
+  ([`journal`](overview/entries/2026-08-23-bounded-scan-photo.md)). **It was NOT shown to be the
+  owner's slowdown** — #112 and the cold-start check are the open half, and both are Lane A's, which
+  is why this entry's lane is now A. Nothing here is startable by Lane B.
 
 **Owner report, 2026-08-23 (verbatim):** *"Ive noticed the nutrition scan for images is alot slower
 than it used to be; can we investigate why - from taking the photo to getting the result is much
@@ -999,98 +1003,6 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
   than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
   run line prints computed totals.
 
-### [nutrition][app-shell] Q-323 — the calorie budget grows with activity; the macro grams under it do not
-
-> **⚠️ NARROWED 2026-08-23 — the budget is now correct everywhere, so only the two DISPLAY changes
-> are left.** v1.335.0 pointed Home's nutrition card and the Nutrition ring at
-> `budgetProvenance(...).total` and made the ring render `macroTargets.scaled`
-> ([`journal`](overview/entries/2026-08-23-one-calorie-budget.md)), which closes the
-> "rendering `scaled` instead of the stored row" half listed below and retires Q-415/Q-417.
-> **What remains is (1) the macro ring's grey remainder and (2) the zone bar as a progress bar.**
-> The blocking order in this entry is now satisfied — the bar can be built, because the number it
-> fills toward is right. Note `barBands`/`barPosition` live in `packages/shared` but are reached
-> only from `components/`, so claim the lane in your baton before starting.
->
-> **⚠️ THE LANE A HALF SHIPPED 2026-08-19 — what is left is Lane B**
-> ([`journal`](overview/entries/2026-08-19-macros-follow-earned-calories.md)).
-> `scaleMacrosForEarnedKcal(base, earnedKcal)` lives in
-> `packages/shared/src/nutrition/calorie-balance.ts` and **`GET /api/nutrition/energy-balance` already
-> returns the answer**: `macroTargets: { base, scaled, earnedKcal }`. Do not re-derive it client-side.
->
-> **What is left:** the two display changes below — the macro ring's grey remainder, and the zone bar
-> as a progress bar with a short overshoot tail — plus rendering `scaled` instead of the stored row.
-> **The bar still must ship in the same PR as Q-415**, or it fills toward the wrong number.
->
-> **One precision worth carrying:** what the split preserves is the **carbs:fat energy ratio**, not
-> each macro's share of the day — protein's share necessarily falls as the budget grows. Both are
-> pinned by test. Everything below is the original entry.
-
-- **Branch:** `feat/macros-follow-earned-calories`
-- **Added:** 2026-08-19 · Lane A/B split, the residual of Q-401 after both its halves landed.
-- **Lane:** B
-- **What is now true.** One TDEE model: `nutrition_targets.calories` is the **rest-day floor**, and
-  the zone bar renders `base + earned from movement`. So the calorie figure a user sees moves during
-  the day. The **macro grams do not** — they come from the same stored row and are fixed.
-- **That is deliberate for now, and it is the safer half.** Q-401's load-bearing choice was that the
-  ring keeps the SET goal, because the grams beneath it are derived from that row; pointing the ring
-  at a moving number while the bars stay fixed makes the card contradict itself internally, which is
-  worse than the gap it would close.
-- **The question this leaves.** If 300 earned kcal are added to the budget, which macro absorbs them?
-  **Not protein** — it is dosed per kg of bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`) and does not scale
-  with a day's movement. Q-401's answer was *"the earned calories belong to carbs"*, which is
-  sensible and unimplemented. Fat is currently 25% of calories, so scaling it uniformly would be a
-  third answer nobody chose.
-- **Do not scale all three uniformly.** That reintroduces the Q-401 shape in a new place: the ring
-  and the bars disagreeing, this time within one card.
-- **✅ THE PRODUCT CALL IS MADE — owner, 2026-08-19. Carbs and fat scale; protein holds.** The owner
-  asked for *"%'s to calculate the protein/fat/carbs so that when it increase due to excercise; the
-  macros increase as well"*, and after the arithmetic below was put in front of them, agreed to the
-  amended version. **This unblocks the entry — implement it.**
-  - **Protein is excluded, and the reason is arithmetic rather than taste.** It is dosed per kg of
-    bodyweight (`PROTEIN_G_PER_KG_BY_GOAL`), so 150 g is ~2 g/kg. Express that as a share
-    (31.6% of a 1,900 kcal base) and apply it to a 2,447 kcal day and it becomes **193 g — 2.6 g/kg**:
-    a protein requirement that rises because the user went for a walk. Movement burns carbohydrate
-    and fat; it does not create protein demand.
-  - **Carbs take the majority and fat takes the rest, in their existing ratio.** Q-401's own answer
-    was *"the earned calories belong to carbs"*, and fat sitting at 25% of calories means a
-    carbs-only split makes fat's share drift downward as the day's movement grows. Splitting the
-    earned kcal between carbs and fat **in the proportion they already hold to each other** keeps
-    both percentages stable and needs no new constant.
-  - **This resolves the "do not scale all three uniformly" warning above rather than contradicting
-    it.** That warning was about the ring and the bars disagreeing inside one card. Here every
-    figure moves off the same budget, so the card stays internally consistent — which is the
-    property the warning was protecting.
-- **Lane A** for the arithmetic (`packages/shared/src/nutrition/calorie-balance.ts`), **Lane B** for
-  whatever renders it. **No longer blocked.**
-
-**Two display changes ride with this, from the same owner review, and they are the reason the entry
-is now worth doing as one piece.**
-
-**(1) The macro ring shows its remainder in grey.** *"I'd like the macro ring to show grey to
-indicate whats left."* Today the ring is a full 360° split by macro — it encodes *composition* and
-says nothing about progress. Sweep the coloured arc to `eaten / budget` of the circle and leave the
-remainder a neutral grey, so the same ring answers "what have I eaten" **and** "how much is left"
-without a number changing. At or past the budget there is no grey and the centre flips from
-`left` to `over`.
-
-**(2) The zone bar becomes a progress bar you finish.** *"more like Red/Orange/green; all the way
-like a progress bar with the green towards the end, and then a little orange/red bar after to depict
-going over. So it still looks like a progress bar where you want to go to the end."*
-  - The track runs **red → amber → green → amber → red** left to right, with the **green band
-    immediately before the goal notch** and only a short tail beyond it. The fill grows with intake
-    and takes the colour of the band it currently ends in.
-  - **The overshoot tail is deliberately short** — long enough to read, short enough that it does
-    not present itself as a second target to aim for.
-  - **This inverts what the bar means today**, and that is the point: it currently renders fixed
-    zones with a marker showing where you sit, which reads as a gauge. The owner wants something
-    with an end you walk toward.
-  - **Colour is not the only signal** — the remaining/over figure beside it carries the state in
-    words, per the standing rule.
-  - Drawn in three states (under, on target, over) during the 2026-08-19 review.
-
-**⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
-right number.**
-
 ### [nutrition][platform][app-shell] LB-6 — six more write paths invalidate before the push, same as LB-4
 
 - **Lane:** B
@@ -1127,151 +1039,16 @@ right number.**
 - **What would count as done:** all six converted, and `grep` for the shape returns only the
   engine's three (already converted) plus the sheets you just changed.
 
-### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
-
-- **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
-  Done: `day_checkins.food_logging_completed_at` (migration **201**, local SQLite **v27**, both sync
-  directions, `claude_ro` views **202**), `POST /api/food-logging-complete` with its Undo, and
-  `estimateMaintenance` filtering on the flag instead of `intakeKcal > 0`. The partial-day case the
-  module had **zero** coverage of now has five tests, plus an end-to-end pair through
-  `computeEnergyBalance`. [`Journal`](overview/entries/2026-08-19-tdee-day-completeness.md).
-- **⚠️ Until the button ships, the calibration cannot engage** — no day can be marked, so every day
-  is excluded and `source` stays `'formula'`. That is the intended failure mode ("the estimate
-  waits", not "the estimate is quietly wrong") and it costs nothing today, because per Q-302 **0 of
-  the last 30 rolling windows** cleared `MIN_LOGGED_DAYS` anyway. It does mean the feature is inert
-  until Lane B lands.
-- **Still open — Lane B:** the *"Complete Today's Logging"* button as the last element in the day's
-  scroll (not the header, not beside the ring), the copy beneath it, the receipt-with-Undo it
-  becomes, and the **"N of 10 days" counter shipped with it, not after** — the button feeds
-  something invisible, and that invisibility is why this bug survived. `POST /api/food-logging-complete`
-  takes `{ date?, complete }` and answers `{ date, complete, completedAt }`; sending
-  `complete: false` is the Undo.
-
-- **Branch:** `fix/tdee-partial-day-completeness`
-- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
-  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
-  the rest? does it assume thats all I had for the day and tune around that? Need some control
-  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
-  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
-  that the owner's suspicion is correct.
-- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
-  There is no completeness concept anywhere in the path.
-
-**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
-"logged day" is with a bare non-zero test:
-
-```ts
-const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
-```
-
-A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
-*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
-(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
-`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
-
-**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
-miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
-in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
-comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
-in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
-the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
-abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
-fixed the version that self-corrects by evening, and left the version that never does.
-
-**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
-eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
-1400, dinner never logged):
-
-```
-partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
-0            14          2600        2600         medium      null
-6            14          2086        2086         medium      null
-14           14          1400        1400         medium      null
-```
-
-Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
-`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
-as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
-"plausible" 1400.
-
-**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
-`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
-inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
-under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
-module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
-too, so the Balance card's "burned" figure is dragged down in step.
-
-- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
-  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
-  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
-  presents protections (1) and (2) as the complete story — the claim this corrects.
-- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
-  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
-  this question is about: logs consistently enough to switch tuning on.
-- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
-  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
-  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
-  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
-
-**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
-
-1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
-   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
-   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
-   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
-   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
-   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
-2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
-   "expected" is the calorie target, derived *from* maintenance, which is the number being
-   estimated, so a low estimate lowers the threshold and admits more partial days next window.
-   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
-   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
-   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
-3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
-   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
-   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
-   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
-   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
-
-- **What would count as fixed:** a day the user did not finish logging can no longer enter
-  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
-  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
-  rather than toward a confident wrong number. Whichever mechanism is chosen,
-  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
-  module is well-tested for empty days and has never been tested for half-full ones.
-- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
-  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
-  control, if option 1 is chosen, would need a device check.
-
-
-**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
-meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
-one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
-option 3 (silent inference) cannot be corrected by the person who knows the answer.
-
-**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
-— not in the header, not beside the ring. It is a statement about a day that has finished, and its
-position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
-is everything you ate. Only completed days are used to work out your maintenance calories."*
-Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
-must be reversible, since the whole point is that a wrong day poisons the estimate.
-
-**Ship the counter with it, not after it.** The button feeds something invisible today, and that
-invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
-had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
-for, so the two land together rather than one inventing a second version of the other.
-
-**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
-`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
-assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
-quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
-honest one, so the estimate starts from days marked after this ships and the counter shows that
-plainly.
-
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 - **Branch:** `refactor/nutrition-food-row`
 - **Lane B.** No schema, no route.
+- **Gate: owner**
+- **⛔ BLOCKED on the owner, 2026-08-24: Q-395's reference drawings are not in the repository.**
+  `unit-options.png`, which Q-395a names as its reference, is nowhere in the tree — `docs/design/`
+  holds cardio, score-row and AI-coach mockups and nothing for nutrition. The two remaining call
+  sites wait on Q-395a's quantity sheet, which cannot be built to a drawing nobody can open. Raised
+  2026-08-23; clears when the drawings land under `docs/design/`.
 - **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
   library sheet + the food-database search row now draw it.
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
