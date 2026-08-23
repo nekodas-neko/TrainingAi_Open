@@ -329,71 +329,6 @@ below threshold and left in place for next time.
 because none of them is the change that review was for, and per **No orphaned findings** a finding
 without a queue entry is a dropped finding.*
 
-### [platform] PS-1 — `docs/agents/README.md` §3 lists `lib/coach/` as Lane A while a queue entry says it belongs to neither lane
-
-- **Branch:** `docs/lane-coach-contradiction`
-- **Added:** 2026-08-19 · found while replacing the lane path lists with a rule
-- **Lane: B** — a docs-only reconciliation, no code.
-
-`docs/agents/README.md:124` lists `lib/coach/` under Lane A. Q-407's `Lane.` paragraph tells whoever
-takes it that **`lib/coach/**` belongs to neither lane's declared paths** and to claim it in a baton
-first. Both cannot be true, and the entry is the one an implementer reads.
-
-The path rule added in this branch settles it — `lib/coach/` is reached by `app/api/coach/route.ts`,
-so it is Lane A — but **Q-407's paragraph still says otherwise** and will be read before the README
-is. Correct the entry to match, or say explicitly why the rule does not apply to it.
-
-**Why this is worth an entry rather than a drive-by edit:** the same shape may exist on other
-entries written while the enumeration was the authority. Grep the queue for `neither lane` and
-`belongs to neither` before closing this.
-
-### [platform] PS-2 — the doc-size baseline history contains two verbatim-duplicated blocks and two contradictory figures
-
-- **Branch:** `docs/baseline-history-dedupe`
-- **Added:** 2026-08-19 · found while extracting the baselines out of the check script
-- **Lane: B** — docs only.
-
-`docs/doc-size-baseline-history.md` is the 955 comment lines lifted verbatim out of
-`scripts/check-doc-index-size.js`. It was extracted unedited **on purpose**, so the extraction is
-reviewable as a pure move — but it carries known corruption from the conflict-splicing that motivated
-the move in the first place:
-
-- The **Q-553** block appears **twice, byte-identical** (it was at lines 30 and 35 of the old script).
-- Two blocks record the same change with different figures: one says `projectOverview -> 7785`, the
-  other `7805 -> 7785`.
-
-Dedupe the exact repeats and reconcile the contradictory pair against `git log` for the commits that
-raised them. **Do not summarise or prune the rest** — Q-543 was explicit that several of those notes
-are the only record of why a number moved, and one documents a near-miss where a splice would have
-reverted another lane's raise.
-
-### [platform] PS-3 — four migrations are never recorded and re-fail on every local session start
-
-- **Branch:** `fix/non-idempotent-migrations`
-- **Added:** 2026-08-19 · observed in this session's own start-up hook output
-- **Lane: A** — `lib/data/postgres/migrations/`, and migration numbers are Lane A's alone.
-
-`scripts/local-db/migrate.js` reports `applied 0, skipped 200 already recorded, 4 failed` on every
-run of an already-migrated database. The four never reach the recorded set, so they are retried
-forever:
-
-```
-054_users_email_unique.sql        relation "users_email_unique" already exists
-055_friends_and_titles.sql        relation "users_friend_code_unique" already exists
-082_exercise_library_expand_2.sql duplicate key value violates unique constraint "exercise_library_name_key"
-157_scale_ble.sql                 relation "scale_raw_samples" already exists
-```
-
-**These are distinct from the three (`038`, `040`, `041`) Lane A's baton records as known and
-ignorable** — do not assume the baton already covers them.
-
-Locally this is noise: the objects exist, so nothing is broken. **What needs establishing before any
-fix is whether the same four are unrecorded in production**, because `ensureSchema` tracks by
-filename and an unrecorded migration is one that re-runs on every cold start. Answer that first via
-the admin query endpoint; the fix (make each idempotent — `IF NOT EXISTS`, `ON CONFLICT DO NOTHING`)
-is small and uninteresting by comparison, and per this repo's own rule a seed that never corrects a
-drifted production row is the trap to check for.
-
 ### [platform] PS-4 — the batons are the cross-lane coordination mechanism and none of them fits on a screen
 
 - **Branch:** `docs/baton-compaction`
@@ -403,6 +338,12 @@ drifted production row is the trap to check for.
 `docs/agents/state/README.md` says a baton is *"state, not narrative"* and *"if it is over a screen,
 the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
 **412** (its `Now` section alone is 200), Tuning **562**, Review **1,280**.
+
+**Re-measured 2026-08-20 — three of six are done, and each fell at its own role's handoff, which is
+what the entry predicted.** Orchestrator **62**, Lane A **113**, Lane B **134** (412 → 134 at the
+seventh Lane B handoff; its baseline is ratcheted down to lock the reclaim in). Still over: BugFix
+**161**, Review **170**, Tuning **582**. Tuning is the one that will not fall out of a routine
+handoff — it is 4× the target and needs its narrative moved to a dated handoff doc deliberately.
 
 This matters more than tidiness. With the lane path lists replaced by a rule, a baton's **Claimed
 paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
@@ -489,110 +430,37 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [workouts][app-shell] Q-362 — `workoutDurations` is keyed by session NAME, so two same-named sessions in a day collide
+### [workouts][app-shell] Q-362b — three day surfaces group workouts by NAME, and one of them shows the wrong session's heart rate
 
-- **Branch:** `fix/day-log-durations-by-id`
-- **Added:** 2026-08-20 · Lane B, found while wiring Q-391's per-session calories
-- **Placement:** low. Real but narrow — it needs the same session logged twice in one day.
+- **Branch:** `fix/day-surfaces-session-identity`
+- **Added:** 2026-08-20 · **Lane: B** · **Placement:** low, with Q-362a — same trigger
+- **Needs:** Q-362a
 
-**What.** `/api/day-log` returns `workoutDurations` as `Record<sessionName, {start, end, minutes}>`
-(`route.ts:144-163`), so a second session with the same name **overwrites the first**. The day
-screen's Training card then shows one duration against both cards — whichever session was written
-last.
+**Q-362 said this half was "one line" in one file. It is three files, and one of them carries a
+worse bug than the duration collision it was filed for.**
 
-**Why it surfaced now.** Q-391 moved the Training card's grouping from name to session **id**,
-because the calories join has to be on identity. The card now groups correctly and still looks its
-duration up by name, so the collision is visible in one place rather than two. **That is not a
-regression this introduced** — the same overwrite existed when the grouping was name-keyed, it was
-simply invisible because the two sessions were already merged into one card.
+1. **`components/health/day-detail/day-sections.tsx:87`** — groups by session **id** (Q-391) and
+   looks the duration up by **name**. Two correct cards, the same duration printed on both. This is
+   the one line the entry meant, and it is the only one that is genuinely one line.
 
-**Fix.** Key it by `workout_sessions.id`, as the exercises already are (`workoutSessionId` is on
-every row). `/api/day-log` is **Lane A's**; the consumer change in
-`components/health/day-detail/day-sections.tsx` is Lane B's and is one line.
+2. **`components/health/day-overlay-sheet.tsx:76-90`** — groups by **name**, so the two sessions
+   merge into one card, and `loadSessionHr(sessExercises[0]?.workoutSessionId)` then loads **one**
+   session's heart rate under a card listing both, with nothing on screen saying which. A wrong
+   number presented as the right one is worse than a missing one, and it is not what Q-362 was
+   filed about.
 
-- **Not verified:** not reproduced. Inferred from the route's own `Record<string, …>` keyed on
-  `ws.sessionName` — establish it with two same-named sessions on one day before fixing, so the fix
-  is aimed at something observed.
+3. **`app/session-select/components/week-day-sheet.tsx:57-62,96`** — groups by **name** the same
+   way: one merged block, one duration chip. The shape `day-sections` had before Q-391.
 
+**Fix.** Group by `workoutSessionId` in (2) and (3) as (1) already does, and look the duration up by
+that id in all three. **Q-362a has shipped, and it shipped additively** — the route now emits
+`workoutDurationsById` (keyed by `workout_sessions.id`) *beside* the legacy name-keyed
+`workoutDurations`, which is unchanged and still collides. So there is no coordinated-merge window:
+read the new field, and nothing breaks whenever this lands. LA-15 removes the legacy one afterwards. (2) additionally needs its `expandKey` moved off
+the name, since two cards would otherwise share one expanded state.
 
-### [workouts] Q-331 — the done screen and the day agree on a session's kcal, but only a measurement says so, not a test
-
-- **Branch:** `test/session-energy-cross-surface-parity`
-- **Added:** 2026-08-20 · Lane A, filed closing Q-330 · [`journal`](overview/entries/2026-08-20-session-energy-weight-source.md)
-- **Placement:** low. Nothing is broken — this is the one clause of Q-419's acceptance criterion
-  (*"a test pins the three surfaces to one number"*) that its own PR could not close.
-
-Q-419 and Q-330 between them made `GET /api/workout-sessions/[id]/energy` and
-`computeActiveEnergy`'s `workoutKcalBySession` agree for the same session. **Verified by measurement
-against the running app on 2026-08-20** — a session completed that minute, RPE 9, both surfaces
-reporting **106** where they previously read 107 and 106. No test holds them there.
-
-- **Why the obvious test cannot be written yet.** Both surfaces estimate strength as activity **8**,
-  and the committed fixture constants list it as `met_moderate: 0.6` — below `estWorkoutKcal`'s
-  `met - 1.5` floor, so in CI and the sandbox **both sides are 0**. An equality assertion between two
-  zeroes passes whatever the inputs are: it is the Q-391 vacuity trap, one surface wider. Picking a
-  different activity is not available either — the day path hardcodes 8.
-- **What would actually work:** inject the MET table (or the estimator) into both paths for the test,
-  so parity is asserted at a MET the formula responds to. That is a testability change to
-  `daily-energy.ts` / the energy route, not a fixture change — **do not "fix" this by unscrubbing the
-  fixtures**, which is Q-312 and deliberate.
-- **Surface:** `packages/shared/**`, `app/api/**` — Lane A. No device, no production data.
-- **What would count as done:** one test computes a session's kcal through both surfaces at a MET
-  above the floor and asserts the same rounded number, and fails if either side changes its weight,
-  duration or intensity source.
-
-
-### [workouts] Q-423 — the per-set RPE prefill is measurably low, and it is the input every derived effort number will average
-
-- **Branch:** `fix/default-rpe-from-pct-rounding`
-- **Added:** 2026-08-19 · found while settling Q-420's derivation. Not a report — a measurement that
-  fell out of checking the owner's remark that set RPE *"auto prefills anyways"*.
-
-Every set's RPE arrives pre-filled from the planned intensity percentage:
-
-```
-defaultRpeFromPct(pct) = clamp(floor(pct / 10), 6, 10)      // components/workout/utils.ts:81-84
-```
-
-called from four sites in `components/workout-screen.tsx` (856, 898, 936, 1084), with `7` as the
-bodyweight fallback. **`floor` truncates**, so 79% and 70% both prefill as 7, and 89% and 80% both
-prefill as 8.
-
-**Measured in production against each set's own `planned_pct`** (the owner's rows, 625 rated sets):
-
-| | sets |
-|---|---|
-| left at the prefilled value | 360 (57.6%) |
-| **raised by hand** | **233** |
-| lowered by hand | 32 |
-
-Mean RPE **7.97** where it was changed, **7.11** where it was not, **+0.41** mean shift overall. The
-owner raises the default **7.3× more often** than they lower it — on 233 separate occasions. A default
-that gets corrected upward that lopsidedly is not a neutral starting point.
-
-- **Why it matters beyond the strip itself:** Q-420 derives a session's effort by averaging these
-  values, and Q-419 turns that into an intensity tier that scales a calorie figure. A prefill biased
-  low propagates all the way to the day's energy budget — **fix this before Q-420 fits anything to the
-  pool**, or the average is of a known-skewed sample.
-- **The likely fix is one line**, `floor` → `round`, which turns 75–79% into 8 rather than 7. **Do not
-  ship it on that reasoning alone** — round(8.5) = 9 pushes 85% up a point too, and the measured shift
-  is +0.41, not +1. Bracket it against the 625 rated sets: pick the mapping that minimises the
-  raise/lower asymmetry, not the one that looks tidiest.
-- **⚠ It is a calibration change, so the Tuning rule binds.** State how many past sets and sessions
-  move before it lands. It does **not** re-score history on its own — stored `set_logs.rpe` values are
-  untouched, only future prefills change — which makes it the safest item in this cluster and worth
-  doing first for that reason alone.
-- **⚠ The 6 floor is also the reason `'easy'` is unreachable.** `clamp(…, 6, 10)` and a strip that
-  offers 6–10 (`components/workout/rpe-strip.tsx:30`) mean no set can be rated below 6, which Q-420
-  concluded is acceptable for strength. Keep the floor; this entry is about the truncation, not the
-  clamp.
-- **Surface:** `components/workout/**` — **Lane B**, unlike Q-419/Q-420/Q-421, which are Lane A. The
-  measurement above is reproducible from the read-only endpoint; the UI change is browser-verifiable at
-  the S25 viewport.
-- **What would count as done:** the prefill's mapping is chosen against the 625 observed ratings rather
-  than by inspection, the raise/lower asymmetry narrows, and the chosen mapping is written down with
-  the number it was fitted against.
-
+- **Verified:** the route's collision is reproduced (Q-362a). The three consumers are read from
+  source — **the merged-card and wrong-HR rendering is inferred, not observed on screen.**
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
@@ -628,6 +496,8 @@ that gets corrected upward that lopsidedly is not a neutral starting point.
 > place and losing the ability to tell them apart.
 
 
+- **Gate: owner** — needs a decision on the 6–10 → 1–10 scale mapping before anything is fitted;
+  see the re-measurement note above. Added 2026-08-20 for the same reason as Q-422's.
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
@@ -706,9 +576,16 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   | └ raised | 233 | |
   | └ lowered | 32 | |
 
-  Mean RPE is **7.97** where the owner changed it, **7.11** where they did not, **7.48** overall —
-  a mean shift of **+0.41**. They raise the prefill **7.3× more often** than they lower it, which
-  says the default is systematically low (filed separately as **Q-423**, Lane B).
+  > **⚠️ CORRECTED 2026-08-20 — this table is computed on the wrong basis, and Q-423, which it
+  > filed, is refuted.** `planned_pct` has only been written since **July 2026**: 312 of these 625
+  > sets have none, and the table filled them from `intensity_pct`, the *achieved* intensity rather
+  > than the planned percentage the prefill reads. On the **313** sets that do carry a
+  > `planned_pct`, the split is **288 unchanged / 25 raised / 0 lowered**, a mean shift of
+  > **+0.125**, and `floor(pct/10)` is the modal rating at all sixteen observed percentages —
+  > [`docs/reviews/2026-08-20-rpe-prefill-mapping-fit.md`](reviews/2026-08-20-rpe-prefill-mapping-fit.md).
+  > **This bites the derivation below**: recomputing `defaultRpeFromPct(planned_pct)` at read time
+  > recovers which sets were touched for 313 of 625 and returns nothing for the rest, so a
+  > touched-vs-untouched weighting cannot be evaluated on sets logged before July.
 - **The derivation to build: the plain mean of the session's rated set RPEs, rounded to nearest,
   written as the prefilled session RPE and overridable.** One sentence the owner can check against
   their own memory — *"your sets averaged 7.5, so the session is an 8"*. Explicitly rejected: a
@@ -760,8 +637,21 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 > data (max 104) and should not be quoted as a prediction. That over-read is exactly what the ONNX
 > model exists to fix.
 >
-> **Still open in this entry:** route (b), and the "store which basis was used and label it" note —
-> the basis is currently chosen silently per session. Surfacing it is a UI decision (Lane B).
+> **⚠️ RE-CHECKED 2026-08-20 (Lane A) — nothing here is Lane A's any more. Retagged, not removed.**
+>
+> Adding it up: route **(a) shipped** 2026-08-19. Route **(b) is owner-rejected** — *"I dont want to
+> use oura models"* — and is retained below as the record of why, not as work. That left one clause,
+> *"store which basis was used and label it"*, and **the storing half is now done on both surfaces**:
+> `estSessionKcal` returns `source: 'hr' | 'met'`, `GET /api/workout-sessions/[id]/energy` returns it
+> (Q-331), and `computeActiveEnergy`'s `workoutKcalBySession` now carries it per addend.
+>
+> **What is left is the label**, on whichever per-session figures are shown — a UI decision, and Lane
+> B's. The lane tag below is changed to match; the entry keeps its number and its record.
+>
+> Worth surfacing rather than leaving implicit: **roughly half the owner's sessions have no strap
+> reading** (42 of 78 have `avg_bpm`), so two sessions side by side on the same screen are routinely
+> produced by two different formulas whose outputs overlap rather than agree. That is the case for
+> labelling it, and it is permanent — the strap is not always worn.
 
 
 - **Branch:** `feat/hr-based-workout-energy`
@@ -816,11 +706,16 @@ never written.
   The ONNX heads are the models. Replacing the MET/Schofield port as well would be a much larger
   question about where the numbers come from at all, and **the owner has not asked for that** — do not
   read it into this decision. Ask before widening it.
-- **Surface:** `packages/shared/**` and `app/api/**` — **Lane A**. `lib/oura-models/**` is no longer in
-  scope for this item, which is the practical effect of the decision above.
+- **Surface: Lane B** as of 2026-08-20 — the remaining work is the label on a per-session figure.
+  `packages/shared/**` and `app/api/**` are done and `lib/oura-models/**` was never in scope after the
+  owner's decision above.
+- **Lane: B**
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
+- **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
+  2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
+  further down the entry, and prose is exactly what the `Gate:` field replaced.
 - **Branch:** `feat/calibrated-active-energy-multiplier`
 - **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
   calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app
@@ -862,79 +757,82 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [platform] Q-424 — a shrink-only ratchet can leave `main` red, and nothing in this repo looks
+### [platform] LA-15 — remove the name-keyed `workoutDurations` once its consumers have moved
 
-- **Branch:** `fix/doc-index-baseline-order-independence`
-- **Added:** 2026-08-19 · not a report. Found by walking into it: a branch cut from pristine
-  `origin/main` failed `pnpm check:rules` on a change that had nothing to do with the failure.
+- **Branch:** `chore/day-log-drop-legacy-durations`
+- **Added:** 2026-08-20 · the contract half of Q-362a's expand/contract
+- **Lane: A** — `app/api/day-log/route.ts`.
+- **Needs:** Q-362b
 
-> **⚠️ RE-CHECKED 2026-08-20 against `main` after #254 landed — the entry survives, but half of what it
-> described is already fixed. Read this first.**
+Q-362a keyed workout durations by `workout_sessions.id` **additively**: `workoutDurationsById` is the
+correct record, and the colliding name-keyed `workoutDurations` is still emitted beside it so the
+three Lane B surfaces keep rendering until Q-362b moves them. It carries a `@deprecated` on the type.
+
+Once Q-362b has landed, delete the legacy record, its loop writes and the `@deprecated` field, and
+grep for any consumer added in the meantime. **Do not do this before Q-362b merges** — that is the
+regression window the additive shape exists to avoid.
+
+- **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
+
+### [platform] LA-16 — two shrink-only ratchets are still order-dependent
+
+- **Branch:** `chore/ratchets-order-independence`
+- **Added:** 2026-08-20 · the half of Q-424 its own text flagged and its acceptance criterion did not cover
+- **Lane: A** — `scripts/**`.
+- **Moved down 2026-08-20**, to match what this entry's own last bullet already said. It was filed at
+  the top of READY and its body says *"lower priority than Q-424 was"* — the position contradicted the
+  text, and position is what the tool reads.
+
+Q-424 made `check-doc-index-size.js` ask *"did this branch grow it"* rather than *"is it over"*, via
+`scripts/lib/base-ref.js` (`resolveBaseRef` · `lineCountAtBase` · the pure `verdict`). **Its own text
+said the class is shared and a fix should be shared too**, but its acceptance criterion named only the
+docs check, so the rest were deliberately left rather than swept in unmeasured.
+
+Still comparing a working tree against a committed absolute: `check-hex-literals`,
+`check-fetch-once-effects`, `check-component-size`, `check-memo-prop-stability`,
+`check-client-today-timezone`, and the non-strict-schema check.
+
+> **⚠️ FOUR OF SIX CONVERTED 2026-08-20, and there are now TWO patterns to choose between. Read this
+> before starting.**
 >
-> #254 moved the baselines out of the script and into `docs/doc-size-baseline.json`, with the
-> rationale in `docs/doc-size-baseline-history.md`. That was the right fix for a **different** problem
-> — the script had reached 1,091 lines with 955 of them prose, and *32 of the last 40 commits touched
-> it*. Conflict **frequency** is solved; every branch no longer collides on a shared prose region.
+> **Per-file, for a ratchet whose count is a function of one file's text** —
+> `check-component-size` (lines, via `lineCountAtBase`), `check-hex-literals` and
+> `check-client-today-timezone` (occurrences, via `countAtBase` with the script's **own** counting
+> function). Never write a second regex for the base count: it would disagree with the working-tree
+> count for reasons nobody could see.
 >
-> **The order-dependence is untouched.** Two PRs can still each raise the same JSON number, each be
-> green against the value as it stood when its own job ran, and produce a merged `main` that is over
-> its own baseline. Nothing detects that, because CI still has no `push: [main]` trigger. The scenario
-> below is unchanged by #254 — only the file it happens in has moved.
->
-> **So the remaining item is narrower than the original text implies:** make the check
-> order-independent, per direction (a). Do not re-litigate where the baselines live.
+> **Whole-tree, for a ratchet that is not a per-file function** — `check-memo-prop-stability` scans
+> every file to learn which components are memoised *before* counting call sites, so its base count
+> has to come from `materialiseBaseTree` + the same `scan(rootDir)` run over the base's own tree.
+> **The per-file shortcut is wrong here and wrong in the unsafe direction:** a branch that newly
+> memoises a component with pre-existing inline call sites would have those counted at the base too,
+> and read as *inherited* when the branch is exactly what made them violations. That case is pinned
+> by demonstration.
 
-**`main` was red on Custom Rules at commit `39e948b`, and had been since it was created.**
-`docs/implementation-backlog.md` stood 31 lines over its own `check-doc-index-size` baseline. Two
-docs PRs merged in parallel: **#246** tightened the baseline to a zero-slack 11127 while **#245** was
-already open against the looser 11259. Each was genuinely green when its own CI ran. Their **sum**
-was not.
+**What is left:**
 
-**Nothing detects this, by design.** `.github/workflows/ci.yml:8-12` states the reasoning outright:
+- `check-fetch-once-effects` — a brace-matching scan like the memo check. **Decide which of the two
+  patterns above it needs** before writing anything: if its count depends only on the file's own
+  text, per-file is enough; if it depends on a tree-wide pass, it needs the base tree.
+- `check-strict-request-schemas` — **still not read.** Do not assume it matches either shape.
 
-> *"There is deliberately no `push: [main]` trigger. `main` is protected and only reached through an
-> already-green PR, so re-running the full suite on the post-merge push is pure redundancy."*
+One per PR, each proven both ways — these are gates, and a silently weakened gate is worse than an
+order-dependent one.
 
-**That premise is false for an order-dependent check.** A per-PR green certifies the branch against
-the baseline *as it stood when the job ran*; it certifies nothing about the merged result when the
-other half of the comparison is itself editable and another PR is editing it. The cost is not
-theoretical: **four separate baseline resolutions in one session** (2026-08-19), across #247, #249,
-#250 and the pre-existing breakage, each one a merge-conflict-resolve-remeasure cycle on a docs-only
-change.
+`verdict` is reusable as-is in every case; only the counting differs.
 
-- **⚠ Do NOT fix this by adding `push: [main]`.** The comment's cost figure is right — roughly 11
-  billed minutes per merge to recompute a result the PR run already produced, for every merge,
-  forever. That trade was made deliberately and should stand.
-- **The defect is that the check is order-dependent at all.** A ratchet whose pass/fail depends on
-  *which* of two independently-green PRs merged first is measuring merge order, not the thing it
-  claims to measure. Cheaper directions, in rough order of preference:
-  **(a)** have the check derive the baseline from `origin/main` at run time and assert only that the
-  branch does not grow it, so two additive PRs compose instead of colliding;
-  **(b)** allow a small slack band, accepting that it weakens the ratchet;
-  **(c)** keep it exact but auto-write the baseline in a pre-commit hook so it is never hand-set.
-  **(a) is the one that actually removes the class** — (b) and (c) reduce how often it fires.
-- **⚠ The same argument applies to every shrink-only baseline in Custom Rules**, not just this one —
-  `check-hex-literals`, `check-fetch-once-effects`, `check-component-size`,
-  `check-memo-prop-stability`, `check-client-today-timezone` and the non-strict-schema check all
-  compare against a committed number. This one fires most because intake adds an entry per report,
-  but the class is shared and a fix should be shared too.
-- **⚠ And the failure is maximally misleading.** It surfaces on an unrelated branch as an unrelated
-  file being over an unrelated limit, which reads as "your change was too big" when the change was
-  eleven lines. Whatever the fix, the message should distinguish *"your branch grew this"* from
-  *"`main` is already over"* — the second is not the branch author's problem and should say so.
-- **One measurement trap worth keeping** (cost a resolution tonight): `wc -l` reports **one lower**
-  than the check does, so a baseline set from `wc -l` is still red. Take the number from
-  `node scripts/check-doc-index-size.js`, which prints it.
-- **Surface:** `scripts/**` and `.github/workflows/**` — **Lane A**. Fully reproducible in the
-  sandbox; no device, no production data.
-- **What would count as done:** two independently-green additive docs PRs can merge in either order
-  without the second one, or `main`, going red — demonstrated, not argued.
+Lower priority than Q-424 was: these fire far less often, because intake adds a backlog entry on
+almost every session while a hex literal or a memo call site is added rarely.
 
+- **What would count as done:** for each script, a branch that inherits an over-baseline count from
+  `main` without adding one is green, and a branch that adds one is red — demonstrated per script,
+  not argued from the docs case.
 
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`
 - **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-412 once the endpoint shipped
+- **Lane:** B
 - **Lane B** (`components/nutrition/meal-type-manager.tsx`). The server half is done and merged —
   see [`entries/2026-08-19-meal-type-reassign.md`](overview/entries/2026-08-19-meal-type-reassign.md).
 
@@ -1081,13 +979,37 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
   six files were exercised on `pnpm dev` (Home, Health and `/cardio` render clean and fetch their
   routes) but **the refetch-on-invalidation half was not driven end to end** — that needs the Home
   fixture below, which still does not exist.
-- **A guard needs a fixture that does not exist, and this is the reusable part.** Q-402's fix could
-  not be driven end to end because the seeded user has no `height_cm`/`date_of_birth`/`sex` (so the
-  energy card shows "add your details") **and** `DEFAULT_CARD_WIDGETS` is empty, so Home renders no
-  card widgets at all until one is turned on. Three probes measured zero
-  `/api/nutrition/energy-balance` requests. Whoever takes this should build that fixture first —
-  a seeded body plus `ta_ss_cards` via `page.addInitScript` — because every Home-card guard needs
-  it, and its absence is part of why a shell-only staleness bug reached a user report.
+- **✅ THE FIXTURE AND THE GUARD SHIPPED 2026-08-20.** `e2e/fixtures.ts` gains
+  `ensureEnergyBalanceProfile()` and `enableHomeCards(page, keys)`, and
+  `e2e/home-card-invalidation-refetch.spec.ts` drives Q-402's mechanism end to end for the first
+  time: Home stays mounted, a body-metric write from its own quick-log sheet clears
+  `energy-balance:`, and the card issues a **second** GET. Mutation-checked — restoring the
+  pre-Q-402 `useEffect(…, [])` shape makes it red with its own message.
+  [`Journal`](overview/entries/2026-08-20-home-card-invalidation-guard.md).
+  **Correction to what this bullet used to say:** the seeded user was described as missing
+  `height_cm`/`date_of_birth`/`sex`. It has height (180) and sex (male) — **only `date_of_birth`
+  was missing**, and the route names exactly one field in `missingProfileFields`. The fixture is one
+  column, not three, and `COALESCE`s the other two so it stays correct if the seed changes.
+  The second half was right: `DEFAULT_CARD_WIDGETS` is empty, so Home renders no card widgets at
+  all until `ta_ss_cards` is set.
+  **Why it asserts the request rather than the number:** a changed figure could come from a
+  remount and an unchanged one proves nothing, so only a second GET is present-only-if-working.
+- **What is still open: the twelve latent sites, and on current evidence NONE is worth converting.**
+  Judged per site 2026-08-20 and written into `scripts/check-fetch-once-effects.js` beside the
+  baseline, so the next session reads it where it is looking rather than re-deriving it. Four read
+  `hr-profile` or an HR series during or just after a run/workout, when nothing writes those keys;
+  `my-meals-picker` reads `saved-meals` and the only writer reachable from its flow runs **after**
+  `{step === 4 && …}` has unmounted it; the rest are route-level screens whose next mount refetches.
+  Converting one is not harmful but adds a refetch with no reader waiting, which this entry warns
+  against. **The limit of that judgement, stated rather than buried:** for `my-meals-picker` it is
+  "no writer found reachable", not "proven unreachable" — whether `saved-meals-sheet` can open on
+  top of the wizard was not traced. **Re-judge any site if a new writer starts clearing its key
+  while it is on screen.** The entry stays queued as the place that record lives.
+- **The check's own prose count had drifted, in the file whose lesson is about unverified counts.**
+  It read "13 sites across 11 files" against a baseline map holding **12 across 10** — a conversion
+  removed a file and left the sentence behind. Corrected, with a note to count off the map rather
+  than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
+  run line prints computed totals.
 
 ### [platform] Q-324 — the first suite run against a freshly-migrated database times out two test files, which is exactly what CI does every run
 
@@ -1097,6 +1019,15 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 > script before `pnpm test`, so this was CI's state every run. Measured: `schema_migrations` did not
 > exist at all, 3 migrations failed during local setup because of it (now 1, unrelated), fresh-DB
 > suite 200.19 s → 183.18 s.
+>
+> **⚠️ Correction 2026-08-20 (Lane A): "3 failed … now 1, unrelated" was wrong, and they were never
+> failures.** On this session's database the count read **4** — `054`, `055`, `082`, `157` — and all
+> four raise SQLSTATEs that `ensureSchema()` classifies as *already present* and steps over. The
+> discrepancy was `migrate.js` carrying **no error classifier at all**, in the file whose own
+> docstring says it mirrors `ensureSchema()`. Worse, it returned exit 0 whatever happened, so the CI
+> job named **Migration Check** — which runs this script and nothing else — could not fail on a
+> genuinely broken migration. Both fixed; the SQLSTATE list now lives in one JSON file both runners
+> read. [`journal`](overview/entries/2026-08-20-migrate-classifies-idempotent.md).
 >
 > **Still open:** the timeout this was filed for **did not reproduce** on a fresh unrecorded database
 > today (516 files green), so it is load-dependent and removing this load is not proof of a fix.
@@ -1167,6 +1098,7 @@ malformed one, **404** for a target that is not yours, and nothing is changed in
 
 - **Branch:** `feat/macros-follow-earned-calories`
 - **Added:** 2026-08-19 · Lane A/B split, the residual of Q-401 after both its halves landed.
+- **Lane:** B
 - **What is now true.** One TDEE model: `nutrition_targets.calories` is the **rest-day floor**, and
   the zone bar renders `base + earned from movement`. So the calorie figure a user sees moves during
   the day. The **macro grams do not** — they come from the same stored row and are fixed.
@@ -1557,6 +1489,7 @@ line and makes the rest of Q-395 additive rather than blocked.
 
 - **Branch:** `feat/nutrition-visual-uplift`
 - **Added:** 2026-08-18 · owner: *"can we backlog a UI uplift for the nutrition side. I think it
+- **Lane:** B
   could have a bit of a design uplift"*, with screenshots of **Saved Meals** and **Edit Meal**.
 - **What this entry is for.** A taste request cannot be implemented from as written, so this
   separates the part that is objectively wrong (findings 1–3, each with a CI check that already
@@ -1847,6 +1780,7 @@ whether or not anyone draws them first.
 
 - **Branch:** `feat/meal-plan-to-saved-meals`
 - **Added:** 2026-08-18 · owner, asked how much the meal plan is really used: *"The meal plan wont be
+- **Lane:** B
   used too much; it will be created - then likely not used again. It would be good if each item from
   the Meal plan was saved as a 'saved Meal' with its own QR code - so a good spot to combine these
   sections."*
@@ -1890,6 +1824,8 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
+- **Lane:** ?
+- **Needs:** Q-398
 - **Placement:** in the nutrition cluster, after Q-398. It **depends on Q-398**: the plan's exit
   route in this design is "Save all as meals", and until plan meals can become ordinary saved
   meals, a conversational plan has nowhere to land and is only a nicer-looking dead end.
@@ -1999,8 +1935,10 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   the conversation has been used on-device for a plan the owner actually keeps. A conversational
   flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
 
-- **Lane.** Split, and **`lib/coach/**` belongs to neither lane's declared paths** — whoever takes
-  it claims that path in their baton first (`docs/agents/README.md` §"A path neither lane lists").
+- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
+  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
+  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
+  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
   `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
   prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
   `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
@@ -2034,6 +1972,7 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 - **Branch:** `feat/recipe-url-to-meal`
 - **Added:** 2026-08-19 · BugFix Intake, from the owner
+- **Lane:** B
 - **Placement:** in the nutrition cluster, immediately after Q-407 — it extends the same step, and
   in the conversational shape it is one more thing you can hand the coach. It does **not** depend on
   Q-407: the stepper's "Yours" step can take a URL today, and shipping it there first is fine.
@@ -2107,6 +2046,7 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
 
 - **Branch:** `feat/saved-meal-thumbnail-ui`
 - **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-396 once the column shipped.
+- **Lane:** B
 - **Lane B** (`components/nutrition/`). The storage half is done and merged —
   see [`entries/2026-08-19-saved-meal-thumbnail.md`](overview/entries/2026-08-19-saved-meal-thumbnail.md).
 
@@ -2216,6 +2156,7 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
 
 - **Branch:** `feat/walk-step-goal`
 - **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk
+- **Lane:** ?
 - **Owner's words:** *"for the walking section I'd it to show the speed and total step count.
   rather than a HR goal we should be looking at a step goal; we should enough data on how to do
   this."*
@@ -2458,6 +2399,7 @@ this fits without an extraction.
 
 - **Branch:** `feat/push-coercion-per-field-policy`
 - **Added:** 2026-08-19 · Lane A, the deliberately-deferred third step of Q-485.
+- **Lane:** B
 - **What Q-485 did and did not do.** It made the discard *visible* — a named `warnings[]` entry per
   mutation and one `error_events` row per push, so a value the web route refuses with a message is no
   longer dropped without a trace. It did **not** change which values are dropped, and that was on
@@ -2628,6 +2570,7 @@ this fits without an extraction.
 
 - **Branch:** `feat/activity-log-delete-outbox`
 - **Added:** 2026-08-19 · Lane A, found while reconciling Q-556 · [`journal`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md)
+- **Lane:** B
 - **Placement:** immediately above Q-556, which it gates. Small on its own; it is the prerequisite
   that makes Q-556's 404 half safe.
 
@@ -2690,6 +2633,7 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 
 - **Branch:** `fix/activity-log-delete-affected-rows`
+- **Needs:** Q-328
 - **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
   [`docs/reviews/2026-08-18-cross-user-isolation.md`](reviews/2026-08-18-cross-user-isolation.md)
 - **Placement:** low. **Not a leak — verified, not assumed.** As user B, deleting user A's activity
@@ -2868,6 +2812,7 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 - **Branch:** `fix/client-today-uses-user-timezone`
 - **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
+- **Lane:** B
   [`docs/reviews/2026-08-18-timezone-non-default-user.md`](reviews/2026-08-18-timezone-non-default-user.md)
 - **Placement:** upper-mid. **Latent today** — every user row is `Australia/Brisbane`, so nothing is
   broken in production — but the app ships the button that triggers it, and the fix wants a ratchet
@@ -3436,7 +3381,13 @@ moving *beside* the calories rather than under them.
   scenario that triggers this has never occurred. The defect reproduces locally and is real; its
   exposure today is nil. Re-priced alongside Q-467 and Q-472.
 
-### [readiness][platform] ✅ Q-394 — RESOLVED: `anchor-source.test.ts` was red on `main`, fixed by Q-356's fixture change
+### [readiness][platform] Q-394 — sweep the other tests that anchor a fixture to a UTC offset and query a user-local day window
+
+- **✅ The symptom itself is closed** — re-run 2026-08-20 on `f23b327`, `anchor-source.test.ts`
+  passes 3/3. What is left is the sweep Q-356 flagged and this entry inherited: **any other test
+  that inserts at a UTC offset (`now() - interval '…'`) and queries a user-local day window has
+  the same hole**, and fires only inside the hours where the two disagree. Two tests have hit it
+  by accident; nobody has looked for the third.
 
 - **✅ Resolved 2026-08-18, and NOT by this entry.** Verified after merging `main` at `74efac6`:
   the test passes 3/3 locally where it failed 3/3 an hour earlier on the same tree plus docs.
@@ -3491,6 +3442,7 @@ moving *beside* the calories rather than under them.
 
 - **Branch:** `feat/server-backed-user-preferences`
 - **Added:** 2026-08-18 · owner: *"I would like the app/settings to remember the settings we choose
+- **Lane:** A
   - when i do a new install or open on computer - it loses all the saved preferences. We need to
   make it persist across installs/etc."*
 - **Screenshot context** (Home, so it does not need to survive): the customised surface is exactly
@@ -3628,6 +3580,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
   Lane A's and already shipped (Q-314).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Lane:** B
 - **Why it matters more than a convenience.** The whole point of Q-314 is that a re-key is
   **declared** rather than inferred, because inferring it from counter shape re-timed the owner's
   entire sleep history twice. A declaration nobody can make in the app is a declaration that will be
@@ -3649,6 +3602,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Branch:** `fix/redecode-async-job`
 - **Added:** 2026-08-17, after a redecode reported `redecode failed: 502` while in fact completing.
+- **Lane:** ?
 - **What happens.** `POST /api/oura-ble/samples/redecode` hardcodes `fullHistory: true` — there is
   no scoped variant — so it walks all 1.1M rows and then rebuilds **every** daily summary. Q-213
   moved that work off the event loop into the rollup worker, which is why the rest of the process
@@ -3695,6 +3649,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Lane B.** `components/oura-ble/oura-ble-debug.tsx` and `components/oura-ble/step-backfill-console.tsx`
   only — the job store, the route and the reaper are Lane A's and already shipped (Q-535).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Lane:** B
 - **Why the default was not flipped for you.** `?async=1` exists and works, but both consoles read
   the synchronous response shape and report completion from it. Switched blind, `oura-ble-debug.tsx`
   falls back to *"redecode ran (response was slow to return) — data refreshed"* and
@@ -3724,6 +3679,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Lane B.** `components/oura-ble/db-footprint-card.tsx` only — the route, the repository method and
   the slice all exist and are Lane A's, already shipped.
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
+- **Lane:** B
 - **What exists already:** `GET /api/oura-ble/samples/pack` returns `{ buckets, sealBelowDs }` — how
   many sealed buckets are packable right now, touching nothing. `POST` (optional body
   `{ maxBuckets }`, default 25, cap 200) packs that many and returns
@@ -3748,6 +3704,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 - **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
 - **Added:** 2026-08-18 (found while measuring production for Q-541)
+- **Lane:** A
 - **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
   12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
   database** held by four rows.
@@ -3999,6 +3956,7 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 - **Branch:** `perf/oura-two-tier-frame-reader` (Tasks 0–2 landed on `perf/oura-raw-frame-packing`)
 - **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
 - **Added:** 2026-08-17
+- **Lane:** A
 - ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
   archival rule does not consider, and the only one that makes the growth curve sustainable without
   deleting anything or depending on the phone.
@@ -4306,6 +4264,7 @@ ehr     0     0     0     0   648   208   128   556     0
 
 - **Branch:** `fix/strict-request-schemas`
 - **Added:** 2026-08-18 · review sweep (ingest + input validation) ·
+- **Lane:** A
   [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
 - **Placement:** mid-low. **Not a live bug** — the app's own clients send the right keys. Filed because
   the failure mode is silent data misplacement and this repo has already paid for the class once.
@@ -4666,7 +4625,13 @@ session working from a temporarily restored copy.
   reports how many such sites it skipped, which is the number to reconcile against.
 
 
-### [workouts] Q-298 — RESOLVED: a phase-level deload zeroed the 1RM and never stamped `exercise_deloaded`
+### [workouts] Q-298 — a phase-level deload zeroes the 1RM and never stamps `exercise_deloaded` (diagnosed 2026-08-16, still unfixed)
+
+- **⚠️ Re-checked 2026-08-20 against `f23b327`: NOT fixed.** `log-exercise.ts:196` still zeroes
+  the estimate on `exerciseDeloaded === true || (isAnyDeload && !isBaseline)` while line 264 still
+  stores `exerciseDeloaded ?? false`. The heading said RESOLVED because the *cause* was found, not
+  because the two-line fix shipped — which is precisely how a finished-looking entry outlives its
+  work. The work below is unchanged and still owed.
 
 - **Branch:** `fix/zero-estimated-1rm`
 - **Plan:** none needed for the guard; the backfill wants a decision first
@@ -5828,7 +5793,13 @@ session working from a temporarily restored copy.
   snapshots are **partial days** (two of 14 carry under 3% of their available samples), and since rest
   is back-loaded into the evening this biases the ratio upward — treat 5.6× as an upper bound.
 
-### [readiness] ✅ Q-500 — SHIPPED v1.320.0: Recovery Index anchor 6 h → 5 h
+### [readiness] Q-500 — re-derive the Recovery Index anchor on BLE-era nights (the 5 h constant is live, v1.320.0)
+
+- **The constant shipped and is verified in source** (`RECOVERY_INDEX_OPTIMAL_HOURS = 5`,
+  `READINESS_MODEL_VERSION = 'v3:ri5:2026-08-18'`, checked 2026-08-20). **This entry is now only
+  its own follow-up:** the fit is Cloud-era, over 15 pre-re-key nights, and BLE overnight HR is
+  ~2× noisier — so re-derive the anchor once ~15 BLE-era nights exist. Not blocking; the current
+  anchor errs toward under-scoring, which is the safe direction.
 
 - **Shipped 2026-08-18** after the owner approved it (*"we will go with whatever your recommendation
   is"*). One constant in `packages/shared/src/health/readiness-composite.ts`.
@@ -6884,24 +6855,22 @@ session working from a temporarily restored copy.
   read.
 - **Caveats:** one night, one athlete, `claude_ro` row-scoped.
 
-### [devices][platform] Q-528 — a full-history rollup can wipe every stored daily summary, and the guard is on the wrong side of the delete
+### [devices][platform] Q-528 — the daily-summary replace deletes before it checks for emptiness (latent: it has NOT fired)
 
 - **Branch:** `fix/daily-summary-replace-guard` · **Lane:** A
-- **Plan:** none needed for the guard — it is one reordering. **The rebuild after it is the real work.**
-  Evidence: [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](reviews/2026-08-19-daily-summary-replace-wipe.md).
-- **Added:** 2026-08-19 · Tuning agent, found while running Q-525's first action.
-- **Measured via `pg_stat_user_tables` — whole-database counts, not row-scoped:**
-
-  | table | live rows |
-  |---|---|
-  | `oura_raw_samples` | **198,223** |
-  | **`oura_daily_summary`** | **1** |
-  | `oura_bucket` | **0** |
-  | `step_live_windows` | **0** |
-
-  For contrast `oura_daily_derived` holds 96 rows, **46 with illness scores computed from the very
-  `summaryRows` array `oura_daily_summary` is the persisted copy of.**
-- **Mechanism.** `replaceOuraDailySummary` deletes unconditionally and *then* checks for emptiness:
+- **Plan:** none needed — it is one reordering. **There is nothing to rebuild.**
+  Evidence: [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md),
+  which retracts the original [`2026-08-19-daily-summary-replace-wipe.md`](reviews/2026-08-19-daily-summary-replace-wipe.md).
+- **Added:** 2026-08-19 · Tuning agent. **Rewritten 2026-08-20 by Tuning: the wipe never happened.**
+- **⚠️ THE ORIGINAL MEASUREMENT WAS WRONG — read this before acting.** This entry said
+  `oura_daily_summary` held **1 row** and that a full-history pass had wiped the history. It holds
+  **45 rows**, of which **43 were created 2026-08-17 07:50** and have existed continuously since —
+  straddling the 2026-08-19 measurement that reported one. The count came from
+  `pg_stat_user_tables.n_live_tup`, which is a **planner estimate, not a count**; `last_analyze` and
+  `last_autovacuum` are NULL on every table here, and the same field reads **0** against
+  `oura_raw_packed`'s **764** real rows. **To ask whether a table is empty, run `count(*)`.**
+- **What is still real — the code shape.** `replaceOuraDailySummary`
+  (`lib/data/postgres/slices/oura.ts:1345`) deletes unconditionally and *then* checks for emptiness:
 
   ```ts
   await db.delete(s.ouraDailySummary).where(eq(s.ouraDailySummary.userId, userId))
@@ -6909,24 +6878,18 @@ session working from a temporarily restored copy.
   await db.insert(...)
   ```
 
-  A full-history pass producing few or zero rows replaces the whole history and **returns
-  successfully** — no error, no log. The windowed path (`upsertOuraDailySummary`, per-day
-  `onConflictDoUpdate`) is safe, which is why this survived: **only the rarely-taken `fullHistory`
-  branch can do it.** Illness scores survived the same pass because they write to
-  `oura_daily_derived` through a COALESCE upsert — same input, different durability, and that
-  asymmetry is the evidence the input existed.
-- **First action:** move the guard above the delete, or make it a transactional
-  delete-and-insert so an empty computation cannot commit a wipe. **Then rebuild the summaries from
-  `oura_raw_samples`**, which still holds 198,223 rows and is the archival source of truth
-  (`CLAUDE.md`: never prune or mutate the server copy of `body_hex` — this is why).
-- **Do the guard BEFORE the rebuild.** Rebuilding into a function that can wipe on the next
-  full-history pass buys nothing.
-- **Pass test:** a full-history pass over a deliberately narrow input leaves prior rows intact; a
-  pass over the full archive produces a summary row per night with raw data.
-- **Caveats:** the mechanism is **read from source and matches the observed state; it is not
-  reproduced.** A dev-DB repro — populate, run full-history over one night, count rows — would settle
-  it. The alternative, that a full-history pass has simply never run over more than one night, is not
-  excluded.
+  A pass producing zero rows would replace the whole history and **return successfully** — no error,
+  no log. Its only production call site is `adapter.ts:6080`, reached **only** under `fullHistory`;
+  routine ingest takes `upsertOuraDailySummary` (per-day `onConflictDoUpdate`), which is safe.
+- **So this is a latent hazard on a hand-triggered path, not an incident.** Priority drops
+  accordingly, but it does not reach zero: `fullHistory` is also the **only** path that can ever
+  produce a chronic-stress score (TN-1), so this guard sits directly in front of the fix for a
+  dormant score.
+- **First action:** move the guard above the delete, or make it a transactional delete-and-insert so
+  an empty computation cannot commit a wipe. **Do not rebuild anything** — the table is intact.
+- **Pass test:** a `fullHistory` pass over a deliberately narrow input leaves prior rows intact.
+- **Caveats:** the mechanism is read from source and **not** reproduced. A dev-DB repro — populate,
+  run `fullHistory` over one night, count rows — would settle it, and is cheap.
 
 ### [devices][readiness] Q-525 — chronic stress has never produced a value, and an incremental rollup can never make it
 
@@ -6946,23 +6909,66 @@ session working from a temporarily restored copy.
   pass covering ≥21 nights of real ring data (owner/device-gated)."* **It is not enough for 21 good
   nights to exist — they must be present in ONE pass**, so a nightly incremental rollup can never
   satisfy it however long it runs.
-- **⚠️ DIAGNOSIS CORRECTED 2026-08-19 — do not check the summary table to answer this.**
-  `oura_daily_summary` holds **1 row** system-wide against 198,223 raw samples (**Q-528** — a
-  full-history pass deletes unconditionally before checking for emptiness). So **nothing can be
-  concluded from stored data about whether 21 qualifying nights exist**: the gate may be fine and the
-  history adequate, and the evidence was destroyed rather than never created. The "21 nights in one
-  pass" reading below still describes the gate accurately, but it was too confident as a *cause*.
-  **Do Q-528 first, rebuild the summaries, then ask this question again.**
-- **First action:** confirm whether ≥21 qualifying nights exist in the data at all before touching the
-  gate. If they do, this is a *trigger* problem (run the wide pass) and needs no code. If they do not,
-  it is a coverage problem and belongs with Q-510, which found daytime-stress coverage is not
-  persisted anywhere.
+- **✅ THE 2026-08-19 SUSPENSION IS WITHDRAWN — this entry is live again.** It said the summary table
+  held 1 row so nothing could be concluded, and that Q-528 had to be done first. **The table holds 45
+  rows and always did**; the "1" was a stale planner estimate. See
+  [`2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md).
+  Do **not** wait on Q-528 or on a rebuild.
+- **✅ MEASURED 2026-08-20 — the two countable gates both PASS, so neither is the cause.**
+  1. `summaryRows.length < 21` returns early on every routine pass (window ≈ 3 nights, because the
+     watermark advances hourly) — the incremental reading below is right. **But the 2026-08-17
+     `fullHistory` pass built 43 rows and cleared it.**
+  2. Summary-field completeness over the trailing 31 nights (2026-07-18 → 08-17): **27 of 31
+     complete** — six nights clear of the 21 needed.
+
+  That pass wrote **23** derived rows, illness scored on all 23, chronic stress on **0**. **The
+  refusal is inside the granular layer** (`signalsByDate` → `computeNightIntermediates`), which is
+  recomputed in memory by design and **persists no reason for a null**. Follow-up filed as **TN-1**.
+- **First action:** **instrument, do not relax.** Log the count of complete granular nights the pass
+  actually assembled. Relaxing `CHRONIC_STRESS_MIN_DAYS` without that is Q-504's mistake — loosening a
+  threshold whose input has not been checked.
 - **Do NOT merge with Q-507.** That is `STRESS_HIGH_DAY_THRESHOLD_MIN` — *daytime* stress minutes
   driving the session override, which does fire, on the wrong days. This is the separate vendored
   *cumulative* model. They share a word and nothing else.
 - **Caveats:** a dormant score is not a broken one — the gate may be correctly refusing to score on
   insufficient data, which is what the first action distinguishes. Do not relax a gate before knowing
   which.
+
+### [devices][readiness] TN-1 — chronic stress refuses inside the granular layer, and records no reason why
+
+- **Branch:** `feat/chronic-stress-null-reason` · **Lane:** A
+- **Plan:** none needed — it is a count and a log line. Evidence:
+  [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](reviews/2026-08-20-daily-summary-wipe-retracted.md) §4.
+- **Added:** 2026-08-20 · Tuning agent.
+- **The question this closes.** `chronic_stress_score` is NULL on all 96 `oura_daily_derived` rows and
+  always has been (Q-525). Both gates that can be counted from stored data have now been measured and
+  **both pass**: a `fullHistory` pass built **43** summary rows against a threshold of 21, and **27 of
+  31** nights in the trailing window are complete at the summary level. The 2026-08-17 pass wrote 23
+  derived rows, scored illness on all 23, and chronic stress on **0**. So the refusal is in the
+  granular layer — `signalsByDate` (`adapter.ts:5706`) feeding `computeNightIntermediates` — and
+  **there is no way to see it from outside**, because those intermediates are recomputed in memory by
+  design (*"no stored intermediate that could drift"*) and no reason-for-null is persisted.
+- **First action:** inside the `chronic_stress` step, count the nights in the 31-night window whose
+  granular signals are actually usable (non-empty hypnogram, non-empty rMSSD series, non-empty
+  skin-temp run) and record that count — a log line is enough; a nullable column beside
+  `chronic_stress_score` is better, and matches what readiness already does with its `provisional`
+  flags. **Do not relax `CHRONIC_STRESS_MIN_DAYS` in this change.**
+- **Why not just relax the gate.** The gate may be correctly refusing to score. Loosening a threshold
+  before checking the distribution of its input is the Q-504 mistake, and Q-506 is the same class:
+  there, a two-point threshold nudge would have hidden a biomarker whose baseline was 18.7× wrong.
+  Once the count exists, whether to relax is a **calibration question and comes back to Tuning**, and
+  any change to the scoring behaviour itself is the owner's call.
+- **Sequencing — do this with Q-528, not after it.** `fullHistory` is the **only** path that can ever
+  reach this model (a routine pass builds ~3 summary rows and returns early), and it is the same flag
+  that arms Q-528's unconditional delete. One branch should reorder that guard and add this count.
+- **Pass test:** a `fullHistory` pass leaves behind a number saying how many granular nights it found.
+  If that number is ≥ 21 and the score is still null, the fault is inside the vendored model and this
+  entry has done its job by proving it.
+- **Caveats:** whether the chronic-stress wiring was even deployed during the 2026-08-17 pass is
+  **unknown** — repo history was cut at the public-repo migration (50 commits, oldest 2026-08-19), so
+  no file can be dated before it. That makes the 08-17 pass weak evidence, not proof; the instrument
+  is what replaces it. **Do NOT merge with Q-507** — that is `STRESS_HIGH_DAY_THRESHOLD_MIN`, daytime
+  stress minutes, a different mechanism sharing a word.
 
 ### [body][platform] Q-527 — one corrupt body-composition row, and it becomes load-bearing the moment Body Battery uses BMR
 
@@ -7935,7 +7941,14 @@ session working from a temporarily restored copy.
 - **Do not file this as closing "device verification"** — it closes a named minority of it. The
   BLE gate stays exactly where `CLAUDE.md` puts it: with the owner.
 
-### [platform][app-shell] Q-254 — strike the device-verification rows an E2E spec can now cover (re-tagging DONE 2026-08-15, striking remains)
+### [platform][app-shell] Q-254 — strike the device-verification rows an E2E spec can now cover (re-tagging landed 2026-08-15; the striking half remains)
+
+- **Needs:** Q-297
+- **Re-measured 2026-08-20:** **85 rows still match the device-verification pattern, and 3 of them
+  carry no `needs:` tag at all** — `projectOverview.md:1209` (Q-281 colour-only-state),
+  `:1272` (Q-532) and `:1577` (Q-260/Q-258). Tag census across the file: browser 31 · android 27 ·
+  data 11 · hardware 15. The striking half has not moved since 2026-08-15 and cannot until Q-297
+  writes the specs.
 
 - **Half of this is done. 2026-08-15: all 83 rows now carry a `· needs:` tag** naming the capability
   each is actually waiting on — **browser 32 · android 26 · data 11 · hardware 13**
@@ -8097,85 +8110,15 @@ session working from a temporarily restored copy.
 > anywhere. See
 > [`docs/overview/overview/history-2026-08-08.md`](overview/history-2026-08-08.md).
 
-### [platform] ✅ Q-213 — production stalls: all three stages SHIPPED 2026-08-13 (entry kept only until the production numbers confirm it)
+### [platform] Q-219 — re-measure `oura_raw_samples`’s 183 MB of indexes (the `oura_heartrate` REINDEX is behind us)
 
-- **Branch:** `fix/pool-starvation-workout-data-fanout`
-- **Handoff:** [`docs/handoff-2026-08-13-platform-production-connection-starvation.md`](../docs/handoff-2026-08-13-platform-production-connection-starvation.md) — full evidence; read it before touching this.
-- **Added:** 2026-08-13 · owner ("everything that needs a network connection is landing very slow",
-  then Railway logs showing `[rate-limit] shared store unavailable, memory-only: …timeout exceeded
-  when trying to connect`).
-- **Measured, from outside the container:** `/api/version` — a route that touches nothing — went
-  0.47 s → 3–14 s → **seven minutes of no response at all** (23:31–23:38 UTC) → 5–11 s. It recovers
-  on its own and re-degrades. An admin query whose DB time was **353 ms** took **14 s** end to end.
-  `pg_stat_database.numbackends` = **10**, exactly the pool's `max`. Postgres is healthy; the app is
-  the bottleneck.
-- **`claude_ro.error_events` cannot see this** — the app must reach the DB to write an error row,
-  which is the thing failing. 13 rows across the 90 minutes covering the worst of it. Do not read a
-  quiet `error_events` as a quiet production.
-- **✅ DIAGNOSED 2026-08-13 from the Railway deploy logs — the hypothesis above is refuted.** Plan:
-  [`docs/superpowers/plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md`](superpowers/plans/2026-08-13-oura-ble-rollup-incremental-and-off-loop.md).
-  Evidence: [`docs/handoff-2026-08-13-platform-production-event-loop-starvation.md`](../docs/handoff-2026-08-13-platform-production-event-loop-starvation.md).
-- **It is event-loop starvation, and the pool exhaustion is a symptom of it.** `aggregateOuraRawSamples`
-  decodes a 35-day window of `oura_raw_samples` in main-thread JS on every BLE sync. The table holds
-  **984,862 rows** against ~37 days of ring history, so that window covers effectively the whole
-  table, and one run outlasts the gap between syncs — so runs go back-to-back and the single Node
-  main thread stays pegged for 15–30 minutes. Measured: CPU sustained **1.0–1.6** of an 8-core limit
-  against an idle 0.001, memory 0.9–2.1 GB against an idle 0.38 GB.
-- **Why the connection errors are downstream of it:** `pg`'s connect timeout is a JS `setTimeout`. On
-  a blocked loop it fires late and kills healthy connections, which is exactly why the logs read
-  `Connection terminated due to connection timeout` while the database answers in milliseconds. The
-  `numbackends = 10` reading is the pool being unable to hand out connections, not the DB struggling.
-- **The `/api/version` observation above was the decisive clue and is now quantified**: it touches no
-  DB, its one outbound call is bounded to 5 s and cached for 300 s, and it measured **122,044 ms**
-  (mean 24,723 ms over 25 requests) during the window against 5 ms healthy. Nothing but a blocked
-  loop explains that — the 5 s abort is itself a JS timer and could not fire either.
-- **The workout-data fan-out is refuted, and #1287 is not the cause.** A fan-out of DB queries shows
-  CPU near zero while blocked on I/O and cannot make a DB-free route take two minutes. Both
-  predictions fail. **Do not ship the fan-out change** — it would have changed nothing. (Bounding the
-  fan-out may still be worth doing on its own merits; it is not this bug.)
-- **It is chronic, not new.** Seven days of CPU history show **1–3.5 hours a day** of a pegged core,
-  with *higher* peaks on 08-06…08-11 than on 08-13. The three PRs that merged during the owner's
-  morning are why it was noticed, not why it happens — a rollback fixes nothing.
-- **✅ Stage 1 SHIPPED 2026-08-13 (v1.303.0).** `aggregateOuraRawSamples` takes an optional `sinceDs`
-  and re-derives only the span an ingest touched; `hrSeriesCutoffDs` is clamped to the read cutoff so
-  the HR-series delete can never outrun what the pass can rebuild. The route accumulates the oldest
-  un-rolled timestamp per user (a coalesced batch is skipped, never dropped), restores it on failure,
-  and forces a full-window pass once per process so a cold start cannot inherit a gap.
-  **Measured 10,560 ms → 930 ms (11.4×)** on a seeded 35-day table; production has ~40× the rows and
-  the narrowed cost does not scale with history. Journal:
-  [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
-  ⚠️ Not device-verified. **The cold-start full-window pass this originally left in place cost six
-  minutes of a pegged thread per deploy and is fixed in v1.303.2** — the watermark is persisted in
-  `oura_rollup_state` (migration 184) rather than held in process memory.
-- **✅ Stage 2 SHIPPED 2026-08-13.** `POST /api/oura-ble/samples` dispatches through
-  `runRollupOffLoop` (`lib/oura-ble/rollup-worker.ts`) into a `worker_threads` realm with its own
-  `pg` pool (`PG_POOL_MAX=2`, so a replica running a rollup holds 12 connections, not 20). The worker
-  needs its own esbuild bundle (`scripts/build-rollup-worker.mjs` → `.rollup-worker/`, built by both
-  `pnpm build` and `pnpm dev`) because the repository reaches `onnxruntime-node`, which webpack
-  cannot bundle — there is no Next output to point a `Worker` at. **A missing or unstartable bundle
-  falls back to in-process, i.e. to the previous behaviour**, proven by deleting the bundle and
-  watching the correctness test still pass. Measured: main-thread lag during a rollup **185 ms of a
-  262 ms in-process run → 4 ms of a 439 ms worker run**. Journal:
-  [`docs/overview/overview/history-2026-08-12.md`](overview/history-2026-08-12.md).
-  ⚠️ **Production is where this claim settles** — watch Railway CPU for the sustained 1.0–1.6
-  plateaus and `/api/version` latency. Both of the outage session's confident cost predictions were
-  wrong, and only production caught them.
-- **✅ The admin redecode route moved too, 2026-08-13.** Both phases of
-  `app/api/oura-ble/samples/redecode/route.ts` now go through `runRedecodeOffLoop`, keeping the
-  route's per-phase results and errors — a redecode failure still cannot prevent the re-aggregate.
-  Verified on dev: 200 in 0.9 s with both phases populated and both errors null.
-- **✅ Stage 3 SHIPPED 2026-08-13.** `isFinalOrSmallBatch` (`frames.length < 255`) was written to
-  mean "the drain's LAST batch" and meant "any batch" — §2 of `docs/oura-ble-operations.md` says a
-  routine drain is 1–2 batches and almost always under 255 frames, so it bypassed its own 8 s window
-  nearly every time. Replaced by a trailing-edge debounce with a max-wait
-  (`lib/oura-ble/rollup-debounce.ts`, 3 s / 20 s, injected clock + timer so it is testable at its
-  boundaries; the timer is `unref`'d and a skipped run is safe because the watermark persists).
-  Three mutations verified the tests, including reintroducing the old predicate (5 of 6 fail).
-  Dev: three batches in quick succession → three 200s and **one** rollup.
-- `lib/data/postgres/client.ts`'s pool error handler and both timeouts are load-bearing (CLAUDE.md) —
-  do not weaken them to paper over this.
-
-### [platform] ✅ Q-219 — over half the database was indexes; the worst one is REINDEXed (owner, 2026-08-13)
+- **Needs:** Q-30
+- **The REINDEX half is behind us** — the owner ran it 2026-08-13 and it returned 49 MB. **Only
+  the re-measure remains**, and it is deliberately parked: D4 (Q-30) may move the raw archive off
+  the server entirely, which would make this table moot. Re-measured 2026-08-20:
+  `oura_raw_samples` is now **63 MB total / 30 MB heap / 32 MB index over 221,499 rows** — the
+  packing work took it down from the 146 MB heap + 183 MB of indexes quoted below, so the size
+  case for this entry is much weaker than when it was filed.
 
 - **✅ DONE 2026-08-13 — owner ran `REINDEX INDEX CONCURRENTLY oura_heartrate_user_updated`.**
   Measured after: **52 MB → 2.75 MB** (19×), database **484 MB → 435 MB**, indexes **261 MB → 212 MB**.
@@ -8272,44 +8215,6 @@ session working from a temporarily restored copy.
   does not run in the sandbox**, so none of it is verifiable here. It needs the on-device smoke run
   in the same session, not a Known-Issues row.
 
-### [platform] ✅ Q-217 — the TOKEN_ENC_KEY boot log was crying wolf; measured and fixed 2026-08-13 (owner still has one optional call)
-
-- **Branch:** not started
-- **Added:** 2026-08-13 · found in the Railway deploy logs while confirming Q-213. **Numbered 217,
-  not 215** — Q-215 was already taken by the hr-ingest cardinality bug on PR #1292's branch, which
-  was unmerged and therefore invisible to a `grep` of this file. Claim a number against open PR
-  *contents*, not just the queue and the PR list.
-- Every container start logs `[token-crypto] TOKEN_ENC_KEY unset — token writes will fail closed`,
-  twice, at `error` severity, on every deploy examined.
-- **✅ MEASURED AND ANSWERED 2026-08-13. The variable is genuinely unset; the message is accurate
-  about the mechanism and overstates the situation.** Three facts settle it:
-  1. **`encryptToken` is reachable from exactly two callers** — `saveOuraPat` and
-     `saveOuraOAuthTokens` (`slices/oura.ts:63,80-81`). Both mean *connecting an Oura Cloud
-     credential*, a surface that gets no new data since the 2026-07-07 BLE re-key. Nothing else in
-     the app writes a token.
-  2. **Production's stored tokens cannot be affected.** The row was written **2026-06-22** and never
-     updated; `token-crypto.ts` landed **2026-08-11**, seven weeks later. So the stored values are
-     unprefixed plaintext, and `decryptToken` returns them unchanged with or without a key.
-  3. **`has_pat` is `false`** — there is no PAT at all, only OAuth access+refresh. The bullet below
-     said "PAT"; it is the OAuth pair.
-- **The `error` severity was a red herring:** it was a `console.warn`, and Railway labels anything on
-  stderr as error. Nobody escalated it.
-- **✅ Fixed:** the import-time warning is gone (it fired on every container start, twice, on a
-  deployment where nothing was wrong), and the case that was actually silent now reports —
-  `decryptToken` returning a `v1:` ciphertext because the key vanished, which a caller then uses as a
-  bearer token and Oura rejects as "malformed", sending you to look at the credential instead of the
-  key. Both changes are mutation-verified.
-- **⚠️ Owner call, now optional rather than blocking:** setting `TOKEN_ENC_KEY` in Railway
-  (`openssl rand -hex 32`) is only needed to connect an Oura *Cloud* credential again. Leave it unset
-  and nothing breaks; the logs are quiet either way now.
-- **Still open, separate — the dead Oura Cloud token is still called on every workout completion.**
-  `syncAndAttributeSessionHr` (`lib/workout/post-completion-hr.ts:32`) calls `syncHrForSession`,
-  which hits the Oura Cloud and 401s every time, logging a warn per completion. **Do not just delete
-  the call** — another user with live Cloud credentials would lose HR sync; the app is no longer
-  safely single-user (see `docs/device-agnostic-source-architecture.md`). The fix is to skip or
-  quiet it when the stored credential is known-dead, which needs a decision about whether a 401
-  should auto-disconnect the Cloud integration. Filed here rather than fixed.
-
 ### [workouts] Q-211 — a deload week reduces a BASELINE lift, which the rest of the app treats as a real max test
 
 - **Branch:** `fix/baseline-exempt-from-deload`
@@ -8394,13 +8299,6 @@ session working from a temporarily restored copy.
   snapshot Q-192 added. It delivers most of the daily value and leaves the automatic prefill — the
   part that needs the unconfirmed state — as a genuinely separate decision.
 
-### [nutrition] ✅ Q-207 — SHIPPED 2026-08-12 (v1.292.0): a saved meal declares how many servings it makes
-
-> `saved_meals.servings` (mig 182, default 1), one shared `oneServingItems()` used by both the log
-> path and the meal-plan conversion, local SQLite v25. Slice A of
-> [`plans/2026-08-12-meal-plan-portions-and-editing.md`](superpowers/plans/2026-08-12-meal-plan-portions-and-editing.md).
-> Still needs the on-device check of the v25 upgrade — see the `projectOverview.md` Known-Issues row.
-
 ### [nutrition][platform] Q-201 — a plan meal's suggested time is stored, shown, and never used for anything
 
 - **Gate:** owner
@@ -8432,189 +8330,6 @@ session working from a temporarily restored copy.
   second reminder source — two sources for one notification is the trap here, and the existing
   `computeMealReminderActions` is the place that should keep deciding. Needs the notification
   permission story checked on-device; reminders are one of the surfaces the sandbox cannot verify.
-
-### [platform][app-shell] ✅ Q-170 — FIXED 2026-08-09: Coach latency was reasoning tokens, 10.0 s → 3.5 s
-
-- **Kept only as the record of how it was found**, and of two plausible fixes that made it worse.
-- **The measurement that settled it.** `ai_call_log` for two turns:
-
-  | turn | input tok | **output tok** | latency |
-  |---|---|---:|---|
-  | picker, 9 options | 10,832 | **2,204** | 10.0 s |
-  | short text answer | 9,636 | **348** | 3.1 s |
-
-  Two points, one line: **~1.8 s fixed overhead, then ~270 output tokens/sec.** Latency is output
-  generation, nothing else. And a 9-option choice list is only ~400 tokens of actual JSON — so
-  **~1,800 tokens were reasoning the user never sees.**
-- **The fix is one line:** `providerOptions.google.thinkingConfig.thinkingLevel = 'minimal'` on the
-  Coach route. Same turn: **554 output tokens, 3.5 s.** Five-run wall-clock **2.2–3.4 s** against a
-  baseline median of 8.2 s.
-- **Quality checked on the hardest flows, not assumed:** the three-turn swap (list →
-  `findSwapCandidates` → correct `proposeChange`), create-an-exercise-with-muscles (correct
-  `Hamstrings, Lower back` + `Barbell`), and a six-tool progression analysis that still returned real
-  numbers. `low` is the fallback if a regression appears — it measured 1,305 tokens / 6.5 s.
-- **Two levers were measured FIRST and both made it worse. Do not re-try without new evidence:**
-  - *Inlining the program into the system prompt* — removed the `getProgramStructure` round trip and
-    still came out **~1.1 s slower** (9.7 s vs 8.6 s mean). A bigger prompt on every turn costs more
-    than the call it saves. `lib/coach/program-brief.ts` was written, measured and deleted.
-  - *A sentence before every tool call* — first text at ~4.2 s instead of ~9 s, but the widget slipped
-    to ~12 s. Earlier reassurance is not worth a later button.
-- **The lesson worth keeping:** the first two attempts were guesses at *where* the time went. The
-  token log answered it in one query. **Measure the output-token count before optimising an LLM
-  route** — wall-clock alone cannot tell reasoning from generation.
-
-> **Q-141 removed 2026-08-11 — the bug was real, the route was not.** The entry targets
-> `/api/ai-chat` and `components/chat.tsx`, which **no UI links to any more**: every entry point now
-> goes to `/coach` (`overview-screen`, `coach-fab`, `done-screen`), and `/sheet/[id]/chat` only
-> redirects to the orphaned `/chat`. Re-checking before implementing found something worse on the
-> live surface, which was fixed instead (v1.281.0): **Coach's system prompt instructed a chart it had
-> no way to draw.** Asked "show my body weight progression over time on a chart", it emitted no chart
-> and a `renderChoiceList` of colour-keyed date ranges — the prompt's chart-pairing rule firing with
-> the chart half missing, so the user got a *legend for a chart that does not exist*, as tappable rows
-> that do nothing. Coach now has a `renderChart` widget; measured on the same prompt, it returns a
-> real line series. See
-> [`docs/overview/overview/history-2026-08-08.md`](overview/history-2026-08-08.md).
-> **Not covered by that fix, and deliberately not filed as a new entry:** the dead `/chat` surface
-> itself. It is unreachable rather than broken, and deleting it belongs with the "old pair is
-> deleted" cleanup already described in `app/api/coach/route.ts`.
-
-### [activity][devices][platform] ✅ Q-139 — `resolveDsToMs` compresses ring time by up to 18× during a backlog drain — FIXED FORWARD 2026-08-08
-
-**Status: SHIPPED (option 2 — fix forward, no backfill; owner decision 2026-08-08).** `resolveDsToMs`
-no longer interpolates between anchors: it applies the fixed 100 ms/ds slope with one robust
-(p10-of-lag) offset per epoch, which removes the compression outright and makes the mapping
-monotonic in `ds` — something the interpolating version could not promise. The sibling gap named
-below shipped with it: `mergeStepCounterWithLive` now applies `isPlausibleStepWindow` to **model**
-windows too, not just live ones. **Stored history was deliberately NOT rewritten**, so the last ~35
-days read inconsistently with everything after the deploy — that is the accepted cost of option 2,
-and the read-only `previewStepsBackfill` is still there if the owner ever wants to see the size of
-the drift. Original analysis kept below, because Q-71 shares the anchor model and will want it.
-
-**Superseded framing:** Found 2026-08-07 investigating an owner report that app steps read higher than the
-Samsung Health phone count. **The step gap was not the bug** — see "What this does NOT fix". This is.
-
-#### The defect
-
-A clock anchor is `(batch max ds, server receive time)`, so its *lag*
-(`anchorUtcMs − anchorDs × 100`) is however long that batch took to reach the server.
-`resolveDsToMs` (`lib/oura-ble/clock.ts:70`) interpolates linearly between the two anchors
-bracketing a ds, so the local time-scale it applies is `Δutc / Δds`. While the ring drains buffered
-history, ds advances far faster than the wall clock and that ratio collapses. Ring time is squeezed;
-the steps inside it pile up.
-
-**⚑ MEASURED 2026-08-07 on real production frames.** The reproduction is exact — replaying the
-rollup's own `computeStepsByDay` over the same anchors and frames returns **4,178** against the
-stored **4,176**, so nothing below is inferred.
-
-| | value |
-|---|---|
-| anchor-lag spread over the day's ds range (n=99 anchors) | **56.2 min** |
-| lag p0 → p10 | 1.4 min — a sharp lower edge with a long upper tail |
-| worst observed compression | Δds 17,094 (**28.5 min** of ring time) → **95 s** of wall clock (~18×) |
-| paired windows landing in one 60 s block (should be 2 at the 30 s cadence) | 79 @ 11:42 · 70 @ 10:41 · 66 @ 14:01 · 60 @ 17:11 |
-| resulting 60 s step windows | **1,555** · 664 · 268 steps — the top one is 26 steps *per second* |
-
-`resampleSteps` folds per-sample steps into fixed 60 s wall-clock blocks, so every window squeezed
-into a block sums there. That is the mechanism turning a compressed timeline into an impossible
-step rate.
-
-#### Blast radius — steps only (corrected 2026-08-07)
-
-An earlier draft of this entry said the fix would move sleep boundaries and HR bins. **It will
-not.** The two converters are separate and only one of them compresses:
-
-| Converter | Used by | Failure mode |
-|---|---|---|
-| `resolveDsToMs` (interpolates between anchors) | `lib/oura-ble/step-day-buckets.ts` (→ the steps rollup write **and** `previewStepsBackfill`), `app/api/oura-ble/step-counter-export` (admin console) | **This bug** — local time-scale collapses during a drain |
-| `measuredAtMs` (fixed 100 ms/ds slope from one anchor) | everything else the rollup writes — sleep session start/end, HR bins, temperature, and its own `dayForDs` | Q-71 — whole timeline offset by that one anchor's lag. Cannot compress: the slope is constant |
-
-So fixing `resolveDsToMs` touches **the step total and the admin step console, and nothing else.**
-That is a materially smaller and safer change than Q-71, which is the one that moves sleep.
-
-#### What this fixes
-
-1. **Physically impossible step windows stop being produced.** With a corrected clock, 2026-08-07
-   goes from three implausible windows to **zero**.
-2. **The intra-day step timeline becomes true.** Steps currently land up to ~28 minutes from when
-   they happened, and cluster into false bursts. Any surface reading step *timing* rather than the
-   daily total is wrong today — hourly movement, the step sparkline's shape, and anything that
-   correlates steps against the HR chart.
-3. **Day-boundary assignment gets more reliable.** `dayForDs` derives the local day from this same
-   conversion, so a distorted clock can file a step window under the wrong date near midnight.
-4. **It unblocks a correct Q-71.** The right fix here — a robust, non-interpolating offset — is also
-   the right fix for Q-71's paths, which would let one converter serve both instead of trading
-   Q-71's offset error for this compression error.
-
-#### What this does NOT fix
-
-- **It does not close the gap to Samsung Health, and moves the ring further from it.** Corrected,
-  2026-08-07 reads **4,652** against the phone's 3,376 (uncorrected: 4,178). That direction is
-  expected — a finger-worn sensor counts movement a pocketed phone never sees — and the owner has
-  already said the difference is acceptable. **No step tuning or scale factor is warranted**; the day
-  is 100 % `step_counter` over ring frames (`body_metrics.source_map->>'steps'` = `oura_ble`, and
-  `step_live_windows` has held no row since 2026-07-28), so no phone or Health Connect value is even
-  in the mix. If a calibration is ever wanted, collect several days of paired ring/phone counts
-  first — one day is not a calibration.
-- **It does not correct already-stored inflated days.** See the monotonic guard below.
-- **It does not touch sleep, HR or temperature.** Those are Q-71.
-
-#### What happens if we don't
-
-- **The daily step number stays roughly right.** This is the honest reason it is not urgent:
-  compression redistributes steps in time far more than it changes the total. Measured on two days,
-  correcting moved 2026-08-07 by +474 (4,178 → 4,652) and 2026-08-06 by +13 (1,232 → 1,245). Only
-  two days were measured — the spread across a wider window is unknown.
-- **The step timeline stays wrong, every day.** This is not a rare event tied to one bad sync: on
-  2026-08-07 the crowding appears at 10:41, 11:42, 14:01 and 17:11. Any drain of buffered history
-  reproduces it, so it recurs whenever the ring is out of range for a while and then re-syncs.
-- **Impossible values keep reaching the database**, and the monotonic guard makes some of them
-  permanent (below). Each one is a day that can only be repaired by an owner-gated backfill.
-- **Q-71 stays booby-trapped.** Anyone who implements Q-71 as currently written — swap the
-  sleep/HR/temperature paths onto `resolveDsToMs` — will spread this compression to sleep boundaries
-  and HR bins while believing they are fixing an accuracy bug. That is the most expensive outcome of
-  leaving this unrecorded, and it is why Q-71 now carries a pointer here.
-
-#### Interaction with the monotonic step guard (read before choosing an option)
-
-The rollup recomputes a **35-day** window (`ROLLUP_WINDOW_DAYS`), but the write is guarded by
-`mergedSteps > existingSteps` (`lib/data/postgres/adapter.ts`) — it can only ever *raise* a stored
-value. So a clock fix is **not** "future days only":
-
-- Days where the corrected total is **higher** are silently raised, across the whole 35-day window.
-- Days where the corrected total is **lower** keep the old inflated value forever, unless the fix
-  ships with `allowStepsDecrease` — which is the destructive, owner-gated backfill path.
-
-Both measured days moved *upward*, so the likely outcome is a batch of recent days drifting up on
-the first rollup after deploy. That should be expected and communicated, not discovered.
-
-#### The decision (owner)
-
-| | Pros | Cons |
-|---|---|---|
-| **1. Leave it** (status quo) | Zero risk. Daily totals are approximately right. Nothing to verify on device. | The timeline stays wrong daily; impossible values keep landing; Q-71 stays booby-trapped. |
-| **2. Fix forward, no backfill** *(recommended)* | Correct timeline from deploy onward. Blast radius is steps + the admin console only — **sleep and HR are untouched**. No destructive migration. | The last 35 days drift upward wherever the corrected number is higher, so recent history reads inconsistently with older history. Days that should come *down* stay inflated. |
-| **3. Fix + `allowStepsDecrease` backfill** | Internally consistent throughout; the already-open "three days hold inflated step totals" issue could close in the same pass. | Destructive and irreversible — it rewrites stored step history. Needs an explicit preview-then-authorise step (`previewStepsBackfill` already exists and shares `computeStepsByDay`, so preview and write cannot drift). |
-
-**Recommended: option 2**, with the preview from option 3 run first as read-only evidence so the
-size of the 35-day drift is known before deploy rather than after.
-
-#### Implementation direction (not yet decided in detail)
-
-- The lag distribution's **sharp lower edge** (p0 → p10 is 1.4 min against a 56.2 min full spread) is
-  why a minimum-lag offset is the right estimator: an event cannot be received before it happened, so
-  the floor of the distribution is the honest clock offset and the tail is pure receive latency.
-- Use a **robust low percentile** (not the raw minimum) over a sliding ds window, so one glitched
-  anchor cannot define the offset for a whole span.
-- **Do not interpolate between two anchors whose lags disagree.** The slope between anchors is not
-  information — the ring's ds ticks at exactly 100 ms by construction. Only the offset is unknown.
-- **Fold in the sibling gap while here:** `mergeStepCounterWithLive`
-  (`packages/shared/src/health/step-estimate.ts`) applies `isPlausibleStepWindow` to **live** windows
-  only — model windows go through unfiltered, which is what let the three impossible windows above
-  reach the daily total. Worth closing as a backstop even though a correct clock would not have
-  tripped it on 2026-08-07.
-- **Verification:** the analysis above is server-side only — replaying production frames through the
-  real pipeline. **Nothing was checked on device.** Steps are an offline-first domain, so the
-  device-verification gate applies before this can be called done.
 
 ### [platform] ⏳ Q-181 — a schema per vitest worker: WATCH ONLY, deferral re-confirmed by measurement
 
@@ -8889,7 +8604,14 @@ measured, not the ~3,300-test full suite.
   against that route with the evidence. If it is still zero, delete this entry; Q-73 closed the class
   and this was a misattribution.
 
-### [devices][platform][sleep] 🟡 Q-71 — the rest of the ring rollup still converts ring time from one anchor — CODE SHIPPED 2026-08-12, historical redecode still owed
+### [devices][platform][sleep] 🟡 Q-71 — the historical redecode that rewrites stored ring history has not been run
+
+- **Keep:** the historical redecode. The 2026-08-12 code fix corrects **future** rollups only;
+  already-stored `sleep_sessions` rows still carry the single-anchor times. Closing this means
+  running `POST /api/oura-ble/samples/redecode` with no `date` param (forcing `fullHistory: true`)
+  in production. It is session-auth-gated with no bearer path, so only the owner — or a session
+  holding their login — can trigger it.
+- **Gate:** owner
 
 - **⚑ Re-scope condition from below is now satisfied.** This entry was blocked pending Q-139's
   decision on whether `resolveDsToMs` should interpolate or use a robust offset. **Q-139 shipped
@@ -9330,7 +9052,19 @@ per-field merge where an AI write has no honest source rank to claim.
   `active_calories_est` weakens considerably — a calorie estimate and an HR load term measure much
   the same thing, and Q-184's own entry already says to check this first.
 
-### [readiness][devices] ✅ Q-270 — FIXED FORWARD 2026-08-15: the route is warmed on launch
+### [readiness][devices] 🔴 Q-270 — `training_load_ots` is still 0 of 96 days: the 2026-08-15 warm-list fix did not take
+
+- **🔴 Re-measured in production 2026-08-20 — the fix did not take.** `claude_ro.oura_daily_derived`
+  holds **96 days**, `training_load_ots` populated on **0** of them and `active_calories_est` on
+  **0**, latest day 2026-08-22. That is five days after the 2026-08-15 warm-list entry shipped,
+  against this entry’s own re-check condition: *"Re-read `training_load_ots` in a day or two; if
+  it is still 0, the diagnosis was incomplete."* **It is still 0, so the diagnosis was
+  incomplete** — all four gates were measured passing, so the remaining suspects are the warm-list
+  entry not firing, the route erroring before the write, or the persist itself (which the entry
+  already flags as unproven locally, since the seed carries no `ble-derived` readiness).
+- **Start by proving the route is called at all**, not by re-measuring the four gates — those were
+  measured 2026-08-15 and re-measuring them is the trap this entry has already fallen into once.
+- **This still gates Q-204**, whose design assumes this column is most of its input.
 
 > **The column was empty because nothing called the route.** All four gates were measured and all
 > four pass — readiness `ble-derived` (31 days), `n_history` 40 vs 14, RHR on 30 of 30 days, and a
@@ -9689,177 +9423,6 @@ first, so the output is a design discussion, not a patch:
   so it's strictly narrower than pull-to-sync, not merely redundant with it. Supports removing it and
   reusing the header slot, though discoverability of a gesture vs. a visible button is a real
   counter-consideration — flagged as a decision to make, not resolved here.
-
-### [platform] ✅ Q-107 — MEASURED 2026-08-14: the batching half is superseded by Q-213, and the fault has stopped
-
-- **⚑ Read `error_events` first — done 2026-08-14, and it settles this.** The entry's own instruction
-  was to read production before building the batching half, because #1149 made the Postgres codes
-  visible. Doing that changes the answer.
-- **The dominant production fault was never this one.** Grouped over the retained window, the largest
-  signature by an order of magnitude is **`[pg 21000]` cardinality violations on `oura_heartrate`
-  inserts — 5,771 events**. That is Q-215's batch-dedupe fault, not pool contention.
-- **The pool/connect signature is real but small, and it has stopped.** Counting the two connect
-  fingerprints (`timeout exceeded when trying to connect`, `Connection terminated due to connection
-  timeout`) per day:
-
-  | day | cardinality (21000) | connect-timeout | total events |
-  |---|---|---|---|
-  | 08-09 | 2,568 | 33 | 2,615 |
-  | 08-10 | 0 | 16 | 31 |
-  | 08-11 | 0 | 20 | 38 |
-  | 08-12 | 2,472 | 39 | 2,556 |
-  | 08-13 | 731 | 16 | 757 |
-  | 08-14 | **0** | **0** | **0** |
-  | 08-15 | **0** | **0** | 1 |
-
-- **Both families stop dead after 2026-08-13**, which is when Q-213 stage 1 (v1.303.0, the
-  incremental off-loop rollup) and the HR batch-dedupe fix shipped.
-- **The batching fix should NOT be built.** Q-213 diagnosed the pool exhaustion as a *symptom of
-  event-loop starvation*, not a cause — `pg`'s connect timeout is a JS `setTimeout`, so on a blocked
-  loop it fires late and kills healthy connections while the database answers in milliseconds. That
-  is why the entry's own 2026-08-08 update already found **79% of failures were a lone query failing
-  while everything else in flight succeeded** — the wrong shape for pool exhaustion. Chunking the
-  fan-out would have changed nothing, exactly as Q-213 concluded for the workout-data fan-out it
-  explicitly refuted.
-- **Corollary, recorded because it was acted on:** `getSyncDelta` went from 23 to **24** queries on
-  2026-08-14 (Q-187's `plan_meal_answers`). That is safe on this evidence, not merely tolerated.
-- **⚠️ Stopped is not fixed.** Two quiet days is not proof, and 08-14 shows *zero* events of any
-  kind, which is as consistent with a quiet day as with a fix. **Re-read `error_events` at the next
-  session start** — if either family returns, the diagnosis reopens as Q-213's, not as this entry's.
-  The `/api/readiness-score` and `/api/body-battery` Known-Issues rows share this fault and should be
-  struck only on the same evidence.
-- Entry closed as superseded rather than implemented. Original text follows for context.
-
-#### [platform] (original) Q-107 — `/api/sync/pull` intermittently fails, likely DB-pool contention from `getSyncDelta`'s 21-query fan-out
-
-- **Branch:** `fix/sync-delta-query-batching`
-- **Plan:** [`docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md`](../docs/superpowers/plans/2026-08-05-owner-ui-bug-batch.md) Task 22
-- **Added:** 2026-08-05/06 · owner-reported the client symptom (pull-to-sync toast: "Sync is backing
-  off after an earlier error"); traced to a real production fault via `claude_ro.error_events`, not
-  just a copy question. See the `[platform]` Known-Issues row added the same session for the full
-  evidence writeup.
-- **⚑ Real, evidenced production fault — not cosmetic.** The owner's account hit `/api/sync/pull`
-  server failures 2026-07-30 → 2026-08-01, a different domain table each time, all sharing the exact
-  same stuck `since` cursor across 4+ days — meaning this device's pull was retrying the same page
-  without fully succeeding over that window. Quiet since in the 7-day window checked, which is not
-  proof it's resolved.
-- **Leading theory, not yet confirmed against Railway's own Postgres logs:** `getSyncDelta`
-  (`adapter.ts:3211-3235`) fires ~21 queries in one flat `Promise.all` per pull — against a
-  deliberately-capped `max: 10` connection pool. A single pull call alone can want more connections
-  than the pool has; the query left waiting under any concurrent load is the one that errors. Matches
-  the observed fingerprint (near-random table each time, not a deterministic 100%-repro query bug).
-- **Fix direction:** chunk the 21-query fan-out into smaller concurrent batches to cut peak
-  connection demand; separately, capture the underlying Postgres error cause in the server
-  error-report path (currently only Drizzle's generic wrapper message is stored, which is why this
-  took a manual DB dig to diagnose). Check Railway's actual Postgres logs first if reachable, to
-  confirm the pool-contention theory before committing to the batching fix.
-
-- **⚑ Updated 2026-08-07** — [`docs/reviews/2026-08-07-full-app-review.md`](reviews/2026-08-07-full-app-review.md) §2.9.
-  Three corrections and one escalation:
-  1. **The fan-out is 22, not 21.** `adapter.ts:3246-3249` destructures 22 results from the single
-     `Promise.all`. Pool is `max: 10`, `connectionTimeoutMillis: 5_000` (`client.ts:20-24`), so 12
-     queries queue behind 10 slots on every pull.
-  2. **It is NOT sync-specific — the scope is wider than this entry assumes.** `/api/readiness-score`
-     (2026-08-06) and `/api/body-battery` (2026-08-05) fail with the *identical* `Failed query`
-     signature; they lose the connection race while a pull is in flight. Fixing only `getSyncDelta`
-     reduces the pressure but does not close the class. Both routes already have their own ⚠️
-     Known-Issues row ("cause NOT diagnosed") — that row and this entry are the **same fault**.
-  3. **✅ The "capture the underlying cause" half SHIPPED 2026-08-08 (v1.270.10, PR #1149).**
-     `summariseCause` in `lib/observability.ts` now lifts the Postgres `code` into a message
-     **prefix** (a suffix would sit past the `left(message,120)` the standing session-start query
-     groups by) and records severity/code/message/detail/constraint/table in the stack. Verified
-     against a live driver: `57014` and `42P01` both come through. **The batching half below is
-     what remains** — and the next session should read `error_events` in production FIRST, since
-     the codes are there now. Original specification, kept for context:
-     `lib/observability.ts:9-10` records `err.message` and `err.stack` but never `err.cause` —
-     and `DrizzleQueryError` assigns the real Postgres error (carrying `code`, `severity`, `detail`)
-     to exactly that field (`node_modules/drizzle-orm/errors.js:41`, verified). That single omission
-     is why every `Failed query` row in `error_events` is undiagnosable. It is a one-line change and
-     it converts this entry from "leading theory" to a measurable fact (`57014 query_canceled`
-     = `statement_timeout`; a pool acquisition timeout = the `connectionTimeoutMillis` path).
-     **Do this before the batching work** — otherwise the batching fix cannot be proven to have
-     worked.
-  4. Still live: a `/api/sync/pull` failure was recorded 2026-08-06 02:00, so this has **not** gone
-     quiet as the note above hoped.
-
-- **⚑ Updated 2026-08-08** — [`docs/reviews/2026-08-08-db-scalability-and-tooling-review.md`](reviews/2026-08-08-db-scalability-and-tooling-review.md) §1.2.
-  **The failure distribution argues against pool contention being the main cause, so measure before
-  building the batching half.** Widening the query from `/api/sync/pull` to all **98** `Failed query`
-  events across every route and grouping by the second they landed in:
-
-  | failures in the same second | occurrences | total errors |
-  |---|---|---|
-  | 1 | 77 | 77 |
-  | 2 | 6 | 12 |
-  | 4 | 1 | 4 |
-  | 5 | 1 | 5 |
-
-  **79% are a lone query failing while every other query in flight succeeded.** Pool exhaustion
-  fails everything competing for a connection at once — that is the shape of the two bursts (21 of
-  98 errors), not of the 77. An isolated single-query failure fits a per-connection drop or
-  `statement_timeout: 15_000` better than a 22-query fan-out starving a 10-slot pool.
-
-- **⚑ Updated 2026-08-13/14 — much sharper burst evidence, found investigating an unrelated sleep-data
-  report, and a candidate downstream consequence.** Queried `error_events` for the last 3 days while
-  chasing why a stored sleep session read 2.5h later than the ring's real data supports (see the new
-  `[sleep]` Known-Issues row / backlog entry). Found:
-  - **A low, chronic background rate (1–9 `timeout`/`connection terminated`/`aborted` errors per
-    hour) sustained continuously for 3+ days**, not an isolated blip — this has been running the
-    whole time this entry has been open.
-  - **Two much sharper bursts on top of that background rate: 23 errors in the 23:00–23:59 UTC hour
-    of 2026-08-12, and 15 in the 02:00–02:59 UTC hour of 2026-08-13.** Unlike the 2026-08-08
-    measurement (max burst size 5), these bursts span a wide, unrelated set of routes hit within
-    the same few minutes — `/api/oura-ble/samples`, `/api/next-session`, `/api/oura/hr-day`,
-    `/api/supplements`, `/api/workout-sessions/day`, `/api/nutrition/food-logs`, `/api/sync/pull`,
-    `/api/body-battery`, `/api/readiness-score`, `/api/nutrition/meal-types`,
-    `/api/oura-ble/freshness`, `/api/nutrition/targets`, `/api/nutrition/meal-plans`,
-    `/api/weekly-stats`, `/api/nutrition/weekly-summary`, `/api/user/bedtime-estimate`,
-    `/api/weekly-muscle-sets`, `/api/progress-summary`, `/api/injuries`,
-    `/api/ai-periodization/session/...`, `/api/body-metadata`, `/api/sleep-sessions` — all within a
-    ~20-minute window each time. That is the shape pool exhaustion predicts (everything competing for
-    a connection fails together), not the lone-query-drop shape the 2026-08-08 measurement mostly
-    found. The two theories are not mutually exclusive — this reads as both failure modes being real,
-    at different times.
-  - **The captured `cause` (shipped 2026-08-08, point 3 above) confirms the mechanism directly now**:
-    messages read `[cause: timeout exceeded when trying to connect]` and `[cause: Connection
-    terminated due to connection timeout]` on the anchor/session-lookup queries specifically — i.e.
-    the app's own `pool.max: 10` (`client.ts:19`) is the thing being exhausted, not a
-    `statement_timeout` query-cancellation. Checked Postgres's own side: `max_connections = 500`,
-    only 11 connections in use at the time of checking (quiet), so there is no database-side capacity
-    problem — the constraint is entirely the app-side pool size relative to concurrent demand during
-    a burst.
-  - **Not confirmed as ongoing right now** — 0 matching errors in the last hour as of this check.
-    Confirms the "stopped ≠ fixed" rule: this has gone quiet before (per the 2026-08-05 entry) and
-    come back.
-  - **Candidate downstream consequence, not fully proven:** the sleep-session row investigated in the
-    new `[sleep]` entry was last (re)written at 2026-08-13T12:11:50Z — a few hours *after* the second
-    burst above ended (08:49 UTC) — with a stale/narrow sleep window that a fresh recomputation
-    against the same real raw data does NOT reproduce (verified via a full local repro of
-    `aggregateOuraRawSamples`, see that entry). The timing is close enough to be worth recording as a
-    lead, not close enough to call proven; a rollup run succeeding overall while one of its internal
-    queries silently returned a partial result during pool contention is a plausible mechanism, but
-    unconfirmed.
-  - **Not done this session:** reducing `getSyncDelta`'s fan-out, raising `pool.max` (500-connection
-    Postgres ceiling leaves large headroom — even `max: 25–30` per replica stays comfortably under
-    it, but this is the file CLAUDE.md marks load-bearing/"do not weaken", so a size change should go
-    through the same review discipline as the timeout/error-handler settings next to it, not be
-    changed opportunistically). Both remain candidate fixes for a focused session.
-
-  This does not refute item 2's "wider than sync" correction — the bursts are real and the fan-out is
-  a genuine peak-demand risk. It means the **batching fix may address the smaller half of the
-  problem**. Now that #1149/#1150 have landed the `code` capture, one production `error_events` read
-  settles it: a `57014` majority means `statement_timeout` and the batching fix is aimed correctly;
-  a spread of connection-acquisition failures with no code means something else is dropping
-  connections. **Read the codes before writing the batching PR.**
-
-> **Q-105-followup DECIDED and removed, 2026-08-15 (v1.308.0).** The entry was blocked only on
-> having no channel to ask the owner. Measured first: the owner is at **40 nights** and crossed 30
-> around 2026-08-05, so the sub-30 state affects only a new account or a baseline reset — which
-> reframed the question and made it cheap to answer. **Owner chose to show the progress.** The
-> explainer now says how far along the baseline is, as its own line rather than as a deload
-> *reason* — `temperatureBaselineProgress` returns `number | null`, not a `Signal`, so it cannot
-> join that list. Journal:
-> [`docs/overview/overview/history-2026-08-15.md`](overview/history-2026-08-15.md).
 
 ### [devices][body] Q-104 — "Weighing you…" toast still fires on a plain Home-tab visit, despite the 2026-08-01 fix
 
@@ -10486,7 +10049,16 @@ passes and the inventory is explicit rather than forgotten.
 - **Scope:** the bearer-token client + an `apiUrl()` indirection so every fetch can target either
   origin. **Not** the workspace split, **not** `output: 'export'` — those are Q-1b.
 
-### [app-shell] ⛔ Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — **DROPPED 2026-08-04, measurement says it is not worth it**
+### [app-shell] ⛔ Q-1b — native ("Swift-like") feel: Phase 3 (bundle the shell into the APK) — measurement says drop it, the owner has not said so
+
+- **Keep:** the two halves of this entry contradict each other and only the owner can resolve it.
+  **2026-08-02:** the owner deferred Phase 3 explicitly *"not cancelled"* — *"we can push it till
+  we HAVE to do it"* — and said not to retire the entry. **2026-08-04:** the gating measurement
+  came back at 472 ms to paint Home, of which 439 ms is the document round trip, against the 1.5 s
+  threshold the owner’s own Q-51 set for "already fine, do not bundle". Evidence says drop it;
+  the owner has never been shown that evidence against their deferral. **Q-31 and Q-32 no longer
+  wait on this** — Q-49 released those gates and the public cut has since happened.
+- **Gate:** owner
 
 > **The gating measurement was taken (Q-51 Task 3, owner on the S25, 2026-08-04) and it does not
 > support this.** Home paints in **472 ms**, of which **439 ms is the document round trip to
@@ -10893,34 +10465,6 @@ means no public server deploy: their asset files move to `.gitignore` and stay o
 private build machine. Implement in the new public repo once it exists, per owner preference — this
 repo's production path is unaffected until then.
 
-### [platform] ➡️ Q-32 — cut the public GitHub repo — SUPERSEDED by Q-49, gates released
-
-> **🆕 2026-08-02 — the Q-1 + Q-30 + Q-31 gates on this entry are RELEASED, and the mechanics moved
-> to [Q-49](#platform--q-49--public-repo-migration-phase-a-model-delivery--phase-b-the-cut).** None
-> of the three was a technical dependency: Q-1 (Phase 3) is deferred by the owner and unrelated to a
-> repo cut, Q-30's remainder is two Railway-console actions, and Q-31's *implementation* is not
-> required once a gitignored asset can still reach production (Q-49 Phase A1). The real dependency
-> — server-side model **delivery** — is what Q-49 supplies. **Take Q-49; do not work this entry
-> directly.** The notes below stay because Q-49's Phase B references them.
-
-Full context:
-[`docs/handoff-2026-07-30-platform-public-repo-migration-gated-on-apk-offline-build.md`](../docs/handoff-2026-07-30-platform-public-repo-migration-gated-on-apk-offline-build.md)
-(on branch `claude/github-public-migration-0u4r7m`, not yet merged — the plan/backlog content is
-folded into this file and `docs/offline-first-target-architecture.md`; that branch's own copies of
-these entries are superseded by this one, do not duplicate).
-
-When unblocked: cut a **fresh, history-free snapshot** (not a `git filter-repo` scrub — too easy to
-miss a trace of vendored weights across ~900 commits); exclude `lib/oura-models/` +
-`scripts/oura-models/` wholesale; gitignore (don't delete) SleepNet/`step_counter`'s asset files,
-keeping them only on the owner's private build machine; strip model-provenance comments/docs even
-for the gitignored files (the loader code is fine to publish, text describing "extracted from
-Oura's decrypted `.pt`, sha256 X" is not); rewrite the BLE-protocol docs
-(`lib/oura-ble/`, `android/.../oura/*.kt`, `docs/oura-ble-*.md`) in our own words for public
-consumption; fix `lib/data/postgres/migrations/006_admin_flag.sql`, which hardcodes the owner's
-real email; delete the orphaned `docs/preserve-pt-originals-and-goldens` remote branch (holds the
-raw decrypted `.pt` originals, 52MB, unmerged). New public repo name + which GitHub account: asked,
-never answered — needed before this step, not urgent before then.
-
 ### [readiness] 🟡 Q-3b — awakenings-calibrated restfulness + the chronic-stress two-scale column
 
 > **⚑ The data gate is CLEARED (2026-08-04).** This entry says *"No code without that data. ⛔
@@ -11168,7 +10712,13 @@ indefinitely.
   pipeline's own derived score (`oura_daily_derived.sleep_score`, 25/82) is the other candidate
   source. Neither makes the column complete.
 
-### [heart-rate][workouts] ✅ Q-149 — `rest_adequate` was true for every set ever recorded — FIXED 2026-08-08
+### [heart-rate][workouts] Q-149 — is 15 bpm the right HRR bar for this user?
+
+- **The shipped half is verified in source** (`hr-analysis.ts:94` — `adequate = hrr1 != null ?
+  hrr1 >= ADEQUATE_HRR1_BPM : null`; the `bpmAtLog < 120` shortcut is gone, checked 2026-08-20).
+  **What is left is the calibration question the fix deliberately left open:** 15 bpm of
+  1-minute heart-rate recovery is a textbook number, not one fitted to this user or this sensor.
+  Tuning’s call, and it now applies to something real rather than to a constant `true`.
 
 - **Decision:** the owner handed the call back ("make the call for the more data-driven and accurate
   response that sets up a better structure for future"), so: **the `bpmAtLog < 120 → true` shortcut is
@@ -11189,7 +10739,13 @@ indefinitely.
   the right bar for this user — it now at least applies to something real.
 - Journal: [`2026-08-08-rest-adequate-requires-hrr.md`](overview/history-2026-08-07.md).
 
-### [heart-rate][workouts] 🟡 Q-11 — per-set HR attribution only runs when the recap is opened (Defect B FIXED 2026-08-05, one item remains)
+### [heart-rate][workouts] 🟡 Q-11 — 22 of 78 completed sessions still hold no per-set HR attribution, and only the owner can backfill them
+
+- **Keep:** the one-off backfill over pre-fix sessions. Measured 2026-08-20: **56 of 78 completed
+  workout sessions have `set_hr_stats` rows, so 22 have none**, and no bulk `computed_at` batch
+  has landed since the 2026-07-22 run — the Defect B fix prevents *new* gaps and does not close
+  old ones. Admin → Tools → "Backfill per-set HR stats" is the button; only the owner can press it.
+- **Gate:** owner
 
 > **⚑ 2026-08-05 — this now BLOCKS an analysis, which raises its value.** The
 > [data-analysis review](reviews/2026-08-05-data-analysis-opportunities.md) §4 B2 went looking for

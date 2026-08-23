@@ -755,6 +755,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── Progression Styles ────────────────────────────────────────────────────
   async listProgressionStyles(userId: string): Promise<ProgressionStyle[]> { return prog.listProgressionStyles(this.db, userId) }
+  async progressionStyleIdsOwned(userId: string, ids: (string | null | undefined)[]): Promise<boolean> { return prog.progressionStyleIdsOwned(this.db, userId, ids) }
   async saveProgressionStyle(userId: string, style: ProgressionStyle): Promise<ProgressionStyle> { return prog.saveProgressionStyle(this.db, userId, style) }
   async deleteProgressionStyle(userId: string, styleId: string): Promise<void> { return prog.deleteProgressionStyle(this.db, userId, styleId) }
 

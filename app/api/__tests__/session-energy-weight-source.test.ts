@@ -4,6 +4,7 @@
 // converges. It must read the LATEST confirmed weight.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { estWorkoutKcal, metForActivity } from '@trainingai/shared/health/workout-energy'
+import { ageFromDob } from '@trainingai/shared/date-utils'
 
 const BASELINE_KG = 60
 const CURRENT_KG = 100
@@ -32,6 +33,8 @@ vi.mock('@/lib/data', () => ({
     getUserById: vi.fn(async () => ({ dateOfBirth: AGE_DOB, sex: 'male' })),
     getBodyMetricsBaseline,
     getMostRecentConfirmedWeightKg,
+    // No HR for this session, so the route takes the MET path this file is about (Q-331).
+    getAvgBpmBySession: vi.fn(async () => new Map<string, number>()),
   })),
 }))
 
@@ -42,7 +45,7 @@ const call = () =>
     params: Promise.resolve({ id: SESSION_ID }),
   })
 
-const ageYears = (Date.now() - new Date(AGE_DOB).getTime()) / (365.25 * 24 * 3600 * 1000)
+const ageYears = ageFromDob(AGE_DOB, new Date())!
 const kcalAt = (weightKg: number) =>
   estWorkoutKcal({ durationMin: DURATION_MIN, ageYears, weightKg, sex: 'male', activityId: ACTIVITY_ID, intensity: 'moderate' })!
 

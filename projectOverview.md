@@ -11,7 +11,7 @@
 
 | Kind of work | Where it lives |
 |---|---|
-| **Who does what** | [`docs/agents/README.md`](docs/agents/README.md) — the four standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
+| **Who does what** | [`docs/agents/README.md`](docs/agents/README.md) — the six standing agents, their authority, and the two-lane file-ownership contract. Read this before starting a session. |
 | **Upcoming — ready to build** | [`docs/implementation-backlog.md`](docs/implementation-backlog.md) — a priority-ordered queue; implementer sessions take the top item per the protocol in that file |
 | **Upcoming — ideas/findings** | [`docs/planned_upgrades.md`](docs/planned_upgrades.md) — open uplift ideas; they graduate to the backlog once a session writes their implementation plan |
 | **Completed — session journal** | `docs/overview/entries/` (current window, one file per PR) then the batched `docs/overview/history-*.md` |
@@ -25,16 +25,16 @@
 ## 🔖 Current Status
 
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-17.
+**Last updated:** 2026-08-20.
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is
 reference only — nothing lands there.
 
-**Work runs through four standing agents.** Two Implementation lanes split the backlog by file
-ownership, plus a BugFix, a Tuning and a Review agent. Their roles, authority limits, lane contract
-and cold-start prompts are in [`docs/agents/README.md`](docs/agents/README.md). Start there rather
-than picking an item straight off the queue.
+**Work runs through six standing agents.** Two Implementation lanes split the backlog by file
+ownership, plus an Orchestrator owning the queue and docs, and a BugFix, a Tuning and a Review
+agent. Their roles, authority limits, lane contract and cold-start prompts are in
+[`docs/agents/README.md`](docs/agents/README.md). Start there, not straight off the queue.
 
 **Entry IDs come from your agent's own prefix now, not a reserved band** (2026-08-19). `LA-` Lane A ·
 `LB-` Lane B · `BF-` BugFix · `RV-` Review · `TN-` Tuning · `PS-` one-off sessions, counting up with
@@ -45,11 +45,74 @@ Legacy `Q-` numbers stay valid and are not renumbered. **An implementer's first 
 `Needs:` and `Gate: owner|device` fields — the queue file cannot show you which of its top entries
 are actually startable.
 
+**Session handoff:** [`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)
+— the CI job named **Migration Check** could not fail on a broken migration, and fixing that
+immediately caught one: `142_claude_ro_views.sql` creates a view over a table `143` creates, so on
+every fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
+the CSP's missing `'wasm-unsafe-eval'`, and the done screen estimating calories from the first
+weight ever logged. **PS-3 closed on top of it (2026-08-20):** the four migrations that failed on a
+database already holding their objects — and so were retried on every cold start — are idempotent,
+and the dev database now records 206 of 206
+([journal](docs/overview/entries/2026-08-20-non-idempotent-migrations.md)).
+
+**Q-331 closed on top of that (2026-08-20, v1.333.1):** the done screen and the day screen were
+estimating the same workout with **different formulas** — Q-421 gave the day path a heart-rate
+estimate and left the done screen's route on the MET fallback, so the 42 of 78 sessions carrying an
+`avg_bpm` were reported twice, differently. Both now call one `estSessionKcal`, and a
+mutation-verified parity test fails if either side drifts again
+([journal](docs/overview/entries/2026-08-20-session-energy-cross-surface-parity.md)).
+
+**RV-32 and RV-34 closed (2026-08-20)** — the program-config write surface took two client-supplied
+FKs on trust. Three of four write paths accepted a `progression_styles` id belonging to another user
+(the fourth refused it), and `listPhaseSets` joined the style **name** in unscoped, so another user's
+words reached a screen and an LLM prompt. A foreign `program_sessions.id` was a raw duplicate-key 500
+with the failed SQL in `error_events`. All guarded, refusals verified live with two accounts, and
+production shows no row that was ever mis-linked — though `claude_ro` is row-scoped to the owner, so
+that is *no evidence*, not *has not happened*
+([journal](docs/overview/entries/2026-08-20-program-write-fk-ownership.md)).
+
+**RV-33 closed alongside it** — `POST /api/progression-styles` and
+`PATCH /api/nutrition/food-logs/[id]` answered a *correct* ownership refusal with an empty-bodied 500
+and filed it as a server fault, because the `NotFoundError` escaped an unguarded handler. Both are
+404s with a body now, and `updateMealType` — the only repository writer that passed its argument into
+`.set()` wholesale — is whitelisted column by column
+([journal](docs/overview/entries/2026-08-20-ownership-refusal-status.md)).
+
+**Q-362a closed (2026-08-20)** — `/api/day-log` keyed workout durations by session **name**, so two
+`Push` sessions in one day left a single window and the earlier one vanished. Now keyed by
+`workout_sessions.id`, and shipped **additively**: the colliding name-keyed record is still emitted
+so the three Lane B surfaces that read it keep working until Q-362b moves them, with LA-15 to remove
+it afterwards ([journal](docs/overview/entries/2026-08-20-day-log-duration-session-identity.md)).
+
+**Q-424 closed (2026-08-20)** — the doc-size ratchet compared the tree against a committed number, so
+two independently-green PRs could merge into a red `main` and the failure then landed on an unrelated
+branch as an unrelated file over an unrelated limit. It now asks whether **this branch** grew the
+file, reports an inherited overage instead of failing it, and says how many lines the branch itself
+added. Custom Rules is **51 steps** now — a base fetch was added
+([journal](docs/overview/entries/2026-08-20-doc-size-ratchet-order-independence.md)).
+
+**Q-421 is Lane B's now (2026-08-20)** — route (a) shipped, route (b) is owner-rejected, and the
+per-session estimator basis (`source: 'hr' | 'met'`) is stored on both surfaces. Only the on-screen
+label remains. Retagging it exposed that **`next-item.js` let an entry's prose outrank its own lane
+tag** — Q-529 had been served to Lane A for days while its field said B
+([journal](docs/overview/entries/2026-08-20-energy-basis-and-lane-resolution.md)).
+
+**LA-13 closed (2026-08-20)** — `Migration Check` ran only against a **fresh** database, where a
+non-idempotent migration cannot fail; it now replays every file against the schema it just built.
+The first version was green with a migration deliberately broken, because the "already there"
+SQLSTATEs that are benign on an ordinary run are precisely the failure signal under replay
+([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
+
 **Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
-— the model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is CLOSED
-(2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread as a
-clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short daytime
-fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
+— the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
+from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
+were built by Lane A within hours of being filed.
+
+**Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
+— the agent model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is
+CLOSED (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread
+as a clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short
+daytime fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
 
 **Open at the time of writing:** PR #6 (session notes the public cut did not carry), PR #10 (the
 public-repo migration handoff). Check `list_pull_requests` rather than trusting this line — it is a
@@ -77,6 +140,41 @@ order.
 > An entry only leaves when **nothing is still owed**: no open work, no pending owner or device
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
+
+### [workouts][platform][nutrition] 🟠 Three write paths accept another user's progression-style id; the PUT twin of one of them rejects it (RV-32…RV-34, 2026-08-20)
+
+- **The non-workout write surface, probed live with two signed-in accounts**, closing the top item on
+  the Review baton's "Next" list since sweep 3.
+  [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](docs/reviews/2026-08-20-non-workout-write-surface-ownership.md).
+- **🟠 RV-32 — `POST /api/phase-sets`, `POST /api/workout-templates` and `POST /api/log-exercise` all
+  persist a `progression_styles` id owned by another user.** `PUT /api/phase-sets/[id]` refuses the
+  **identical value** with `400 Invalid primaryStyleId` — same resource, same session. The check exists
+  fourteen lines away in the sibling file and was never copied into the create twin. Each accepted row
+  was read back out of Postgres with a join proving a different owner.
+- **What it costs, measured rather than assumed.** `listPhaseSets` joins the style name in **without a
+  user scope**, so `GET /api/phase-sets` returned **the other account's style name**, and that field
+  renders in the workout-builder review and goes into an LLM prompt. It stops there: every other read of
+  `progression_styles` is `user_id`-scoped, so the borrowed style's set structure never reaches the
+  borrower. Separately, all three FKs are `ON DELETE SET NULL` — **deleting your own style nulls a column
+  in another user's program and workout history.**
+- **🟡 RV-34 — a client-supplied `program_sessions.id` that is not yours is a raw `pg 23505` 500** plus an
+  `error_events` row. It fails closed, but by accident of a primary-key constraint rather than by design.
+- **🟡 RV-33 — two routes answer a correct ownership refusal with an empty-bodied 500** (`POST
+  /api/progression-styles`, `PATCH /api/nutrition/food-logs/[id]`), each filing it into `error_events` as
+  a server fault. The Q-462/Q-463 class, on two routes that fix missed. **Neither is a leak or an outbox
+  wedge** — both were checked.
+- **✅ `CLAUDE.md` write-path ownership rule (b) — a raw request body into Drizzle `.set()` — is audited
+  for the first time and is clean.** 116 mutating routes, 325 `.set()` sites, the 21 taking a bare
+  identifier or spread each traced to source: every one built field by field. Confirmed live —
+  `PATCH /api/user/profile` sent `isAdmin`, `id` and `passwordHash` and changed none of them. **Rule (a)
+  is now the only one of the three with no evidence behind it.**
+- **Not exploited in the data available:** production shows 0 of 46 phase rows, 0 of 82 styled
+  `session_exercises` and 0 of 280 styled `exercise_logs` pointing outside the owner's styles. `claude_ro`
+  is row-scoped to the owner and **the victim's rows are the ones it cannot show** — that is "no evidence",
+  not "has not happened".
+- **Not exercised:** web build only (`getLocalStore()` is null), local DB for the writes, two accounts.
+  The 23 other FK edges into user-scoped tables are inventoried in the write-up and unprobed.
+
 
 ### [platform][devices] 🟡 The CSP now permits WASM, and dropped two dead hosts — neither checked on the device (Q-546, 2026-08-20)
 
@@ -249,70 +347,6 @@ order.
   has still passes. That half remains unmeasured.
 
 
-### [platform] 🟢 The orientation indexes named paths that do not exist, one of them never built (Q-554, 2026-08-18)
-
-- **Filed and fixed in the same PR**, kept as the record of the class.
-  [`docs/reviews/2026-08-18-orientation-index-paths.md`](docs/reviews/2026-08-18-orientation-index-paths.md).
-- **`CLAUDE.md` has had a path check since Q-153; `docs/module-map.md` and the eleven domain indexes
-  had none** — though sessions are told to read them before building a helper or working in a pillar.
-- **⚠️ `module-map.md:232` described a module that has never existed** — `lib/oura-ble/steps-motion-decoder.ts`
-  → `decodeStepsPacket`, **zero references tree-wide**. The real port is the row below
-  (`lib/oura-models/…`), itself flagged there as **"NOT yet wired"**. So the map presented *planned
-  wiring* as existing infrastructure, in the table read specifically **to avoid re-implementing what
-  already exists**. Marked `⚠️ NOT BUILT`.
-- **Three stale rows fixed** — `app/history/` (workouts), `docs/oura-models/` (devices), `app/overview/`
-  (app-shell); none exist. **Plus 49 malformed display paths** (`docs/../overview/…`) across all eleven
-  indexes: link targets were correct, the visible labels were not.
-- **Now enforced:** `scripts/check-index-doc-paths.js`, step **42 of 42**, covering **748 paths across 12
-  docs**. Its first pass reported 59 of 787 — nearly all noise — and the fixes then re-triggered it,
-  since naming a path as *absent* still names it; four `DELIBERATE` entries carry their reasons.
-- **Not exercised:** existence only. It does **not** check that the description beside a path is true —
-  a row naming a real file while describing behaviour it lacks still passes.
-
-
-### [platform] 🟢 A Known Issue was in both the live list and the resolved archive; nothing checked (Q-553, 2026-08-18)
-
-- **Filed and fixed in the same PR**, kept as the record of the class.
-  [`docs/reviews/2026-08-18-known-issue-duplication.md`](docs/reviews/2026-08-18-known-issue-duplication.md).
-- **Q-139 read `🔴 OPEN` here and `✅ fixed` in the archive, for ten days** — 69 lines describing a bug
-  fixed 2026-08-08 in v1.270.25. **Every session's mandated orientation read showed a red,
-  highest-severity open issue for a ten-day-old fix.** Both halves verified fixed **in source**
-  (`packages/shared/src/health/step-estimate.ts:176`), not taken on the archive's word. **Q-81** was a
-  byte-identical 31-line entry in both files.
-- **⚠️ Both were also archived early.** The rule allows a move only when nothing is owed, *including a
-  pending device check* — and both entries name one. So: **copied rather than moved, and moved before
-  it was allowed.** Resolution: cut the premature archive copies, keep the live entries (where an owed
-  check belongs), fold in anything unique first.
-- **Now enforced:** `scripts/check-known-issue-duplication.js`, step **41 of 41** in Custom Rules. Its
-  first version reported 4 of which 2 were real, so it skips **range** headings and identifies an entry
-  by its **first** Q number — both narrowings documented in the script itself.
-- **Not exercised:** static reconciliation. Q-139 still owes an on-device check after the next history
-  drain; Q-81 owes a production check. Neither is possible in this harness.
-
-
-### [platform] 🟢 Two sources of truth for the next Q band; the prose one was wrong (Q-552, 2026-08-18)
-
-- **Review's band 450–499 was exhausted by Q-499.** `docs/agents/README.md` says *"claim the next block
-  of 50 above 529"* — which literally gives **530–579** and collides with **fourteen numbers already
-  in use**. The predecessor baton had already written 530–579 into the handover.
-- **The ledger recorded 530–537, 538–542 and 543; `544–551` were also live** across two platform
-  handoffs, `docs/overview/history-2026-08-15.md`, the devices domain index and the backlog, and
-  appeared nowhere in it.
-- **⚠️ Correcting this row's first draft: the ledger is NOT the only defence, and the truth is more
-  interesting.** Two sources exist for the same fact — the backlog's *Live pointers* row said
-  **552** and is **CI-enforced** (`scripts/check-backlog-pointers.js`); the README's prose ledger and
-  its *"next block of 50 above 529"* said **530** and was stale. **The machine-checked pointer was
-  right the whole time**, and the collision was reachable only by following the prose instruction —
-  which is what the README tells you to do, and what the Review baton had copied.
-- **The check earns its place:** claiming 552 without updating the band table **failed Custom Rules**
-  in this very PR (*"a band was used without being recorded"*).
-- **Third confirmed instance of Q-492's thesis** — *a count in prose is a claim with a decay date; a
-  count in a script is a fact* — and the first where the checked copy was silently right while the
-  prose copy was silently wrong.
-- **Fixed in the same PR:** claimed **552–601**, recorded 544–551, bumped the pointer to **602**, and
-  pointed the instruction at the checked source. Kept as the record of why the procedure changed.
-
-
 ### [app-shell][health] 🟢 Three lenses — two clean, and cards that cannot tell "no data" from "the fetch failed" (Q-499, 2026-08-18)
 
 - **Two lenses came up clean and are recorded so nobody re-runs them.**
@@ -346,122 +380,6 @@ order.
   "can't reproduce" dismissal the report-invalidation rule exists to prevent.
 - **Still not exercised:** on device and offline (where `cachedFetch` cannot revalidate at all). **One**
   card proven; the other eleven remain a worklist.
-
-
-### [platform] 🟡 Three unauthenticated routes buffer an unbounded request body; one parses it before any check (Q-498, 2026-08-18)
-
-- **Lens taken from sweep 31's method note** — *find bounds declared one way and enforced another*.
-  [`docs/reviews/2026-08-18-unbounded-request-bodies.md`](docs/reviews/2026-08-18-unbounded-request-bodies.md).
-- **The shared guard is correct and is not the defect.** `readJsonLimited` uses `Content-Length` only
-  as a fast path and streams with a real byte counter. Measured: 20 MB to `/api/client-error` (16 KB
-  cap) was **cut off at 2,949,120 bytes**.
-- **Coverage:** 113 routes take a body, **7** are guarded, **93** are not — and of those 93 exactly
-  **3** are reachable without a session: `auth/register`, `auth/exchange-mobile-token`,
-  `health-connect/ingest`. **The seven guarded routes are all *less* exposed than these three.**
-  Measured: the two tested each accepted the **full 20,000,048 bytes**, then returned 400.
-- **⚠️ Ordering separates them.** `auth/register` and `exchange-mobile-token` rate-limit **before**
-  parsing, so the rate is bounded. **`health-connect/ingest` reads at line 35 and Zod-parses at 40 but
-  rate-limits at 53 and checks the secret at 58** — a caller **holding no secret** makes the server
-  buffer and fully parse an arbitrary body, unthrottleable because the limiter runs after.
-- **Compounds with Q-493:** all three limiters key on the spoofable `x-forwarded-for` leftmost hop, so
-  the ordering that protects the two auth routes is itself bypassable. Two independent defects that
-  remove each other's mitigation.
-- **Fix:** route the three through `readJsonLimited`, **and** move the limiter + secret check above the
-  body read on the ingest route — the second is the larger win and is independent of the first.
-- **Not exercised:** the actual ceiling was **not** probed (20 MB proved there is no cap; going further
-  risked destabilising the server for no extra information). Railway's edge may impose its own limit —
-  not checked. No device, no production.
-
-
-### [platform] 🟡 A 31-day range that passes every guard makes two admin routes loop forever (Q-497, 2026-08-18)
-
-- **Applied sweep 30's lesson to the *other* secret-gated route.** `admin/day-review` is gated by
-  `ADMIN_EXPORT_SECRET`; sweep 30 had just shown that "needs configuration" was never a real barrier.
-  [`docs/reviews/2026-08-18-admin-range-loop-termination.md`](docs/reviews/2026-08-18-admin-range-loop-termination.md).
-- **All three of `CLAUDE.md`'s claims about the route hold** — GET-only, fail-closed on either unset
-  var, and `requireAdmin` on the token path so the token widens *transport* not authority. Checked,
-  not assumed.
-- **🟡 Q-497 — the day loop compares strings, and `shiftDateStr` does not pad the year.** One day after
-  `9999-12-31` is `10000-01-01`, and `'10000-01-01' <= '9999-12-31'` is **true** (`'1' < '9'`).
-  `from=9999-12-01&to=9999-12-31` passes `normalizeDateParamIso`, passes `end < start`, and spans
-  **exactly 31 = `MAX_RANGE_DAYS`** — then runs forever. Measured: still looping at iteration 5000, at
-  year 10013; the control range terminates at 31. Each iteration is a `buildDayAudit` (~12 queries)
-  against a `max: 10` pool.
-- **The comment directly above the loop** explains the days run sequentially rather than concurrently
-  because fanning out *"would starve the rest of the app (the failure mode that took production down
-  in session 165)"*. The sequential loop avoids that — and then never stops.
-- **Two sites; the second writes.** `admin/backfill-derived-scores:80` has the identical loop and
-  identical guards, and `dryRun=false` commits — unbounded writes, not just a hang.
-  `energy-balance-service.ts:152` is safe (start derived by shifting back from today).
-- **Severity: medium — admin-only.** Weigh it as *"one mistyped year takes the app down"*, not an
-  attack. **Fix:** pad the year in `shiftDateStr`, the single place producing the malformed value.
-- **Also corroborates Q-496 directly:** `2026-13-45` / `2026-02-31` / `0000-00-00` return **400** here
-  via `normalizeDateParamIso` and **500** on `health-connect/ingest` via its raw regex. Same inputs,
-  opposite outcomes, one directory apart — the correct behaviour is already demonstrated next door.
-- **Not exercised:** the loop was reproduced verbatim in isolation, not by hitting the route — driving
-  it against a running server *is* the hang. No device, no production.
-
-
-### [devices][platform][body] 🔴 The Health Connect ingest route, driven for real — the brute-force gate is bypassable and a far-future date poisons "latest" permanently (Q-493…Q-496, 2026-08-18)
-
-- **The only unauthenticated write into `body_metrics`, exercised for the first time.** It has sat on
-  the Review baton as untested since sweep 1 because it needs `HEALTH_CONNECT_INGEST_SECRET` set. All
-  four findings are **reproduced against a running server**:
-  [`docs/reviews/2026-08-18-health-connect-ingest.md`](docs/reviews/2026-08-18-health-connect-ingest.md).
-- **🔴 Q-493 — the SEC-I3 brute-force gate is bypassed by rotating one request header.** The limiter
-  keys on `x-forwarded-for`'s **leftmost** hop, which is the value the *client* supplies. Measured, 30
-  wrong-secret attempts each way: **fixed** header → 1 key at count 20, gate engaged; **rotating** →
-  **30 keys at count 1, all 30 reached the secret compare.** **Seven sites** share the pattern,
-  including `admin/day-review` (bearer path to the owner's full health history). Nothing in the docs
-  records it, and the R1 security-hardening plan *propagated* it as "the existing pattern".
-  **⚠️ Unverified: whether Railway's proxy sanitises the header** — not determinable from the sandbox,
-  and production's limiter was not probed. The fix does not depend on the answer.
-- **🔴 Q-494 — one far-future date permanently captures every `ORDER BY date DESC LIMIT 1` read.**
-  `POST {"date":"9999/12/30","weightKg":499}` took `getMostRecentConfirmedWeightKg` from **81 kg to
-  499 kg**, and no later write can outrank it. Feeds the BLE-scale confirmation path and
-  `deriveActivityKcal`. **The ranked source merge is orthogonal to this, not weak against it** —
-  ranking is per column *per date*, and a row on a date nothing else writes has no competitor.
-  **⚠️ And it is not a novel class:** `packages/shared/src/validation/ingest-clock.ts` exists for
-  exactly this and guards `scale-ble/samples`; `oura-ble/samples` is guarded downstream; the workout
-  path got `resolveCompletedAt` at **Q-24 §7**, whose comment uses the same phrase — *"accepted
-  unbounded and uncompared"*. **`health-connect/ingest` is the only health-write ingest path with no
-  clock bound anywhere in its chain** — the sibling-surface rule missed twice. The fix is to route the
-  date through `ingest-clock`, not to add a bespoke range check.
-- **🟡 Q-496** — `2026-13-45` / `2026-02-31` / `0000-00-00` pass the shape regex and return **HTTP 500**
-  plus an `error_events` row each. The class `normalizeDateParam` exists to prevent; this route never
-  got the guard. **🟢 Q-495** — `z.coerce.number()` turns `[]`→0, `true`→1, `""`→0 kg; the route's own
-  comment names two garbage inputs and both are correctly rejected, these three are not named.
-- **What the route gets right, stated because three findings are refinements of it:** the gate runs
-  *before* the compare and returns an identical 401 on trip; `safeCompare` is constant-time and
-  length-safe; the date regex accepts both separators (the Q-130 lesson); both garbage examples its
-  comment names are rejected.
-- **Not exercised:** local dev server, seeded DB. Not on device, not against production, not against
-  Railway's real proxy — the one unknown Q-493 turns on. All test rows, `error_events` and
-  `rate_limits` rows were deleted and the 81 kg reading verified restored.
-
-
-### [platform] 🟡 Seven of nine hand-typed counts in `CLAUDE.md` are stale; every script-backed one is current (Q-492, 2026-08-18)
-
-- **The lens was the file every session must read first.** Three sweeps this week each found a stale
-  `CLAUDE.md` number by accident (Q-480, Q-490, Q-491). This one enumerated **every** checkable count
-  and re-derived it against `main` at `63fb89c`:
-  [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](docs/reviews/2026-08-18-claude-md-prose-counts.md).
-- **Script-backed: 3 of 3 current.** Sparkline (3 inline / 6 exempt), `Ran 40 of 40` custom rules, the
-  rollup vitest glob. **Prose: 7 of 9 stale** — hex literals **471 → 428**; the >800-line hotspot list
-  still names `more/profile-tab.tsx` (**476 lines**); "22 of 33" → **29 of 40**; `READINESS_SCORE_TTL`
-  "four sites" → **6**; suite "448 files" → **504**; plus the two already filed. **Two prose counts are
-  right** (score-band 17, "11 inline grep rules") — the correlation is strong, not absolute.
-- **Two items are more than drift.** `more/profile-tab.tsx` **should already have been struck** — the
-  same paragraph mandates it and cites `health-sections.tsx` as the precedent. And the rollup-glob
-  maintenance command at `CLAUDE.md:976` is scoped to the directory the glob covers, so it **can only
-  confirm the glob against itself** — a rollup test written elsewhere is invisible to the check that
-  exists to find it. **Both defects are latent:** no test outside the glob calls the rollup today.
-- **One ratchet with slack.** `check-component-size.js` is shrink-only; `components/workout-screen.tsx`
-  is pinned at **1850** against an actual **1831** — 19 lines of regrowth that would pass silently.
-- **The fix is not correcting seven numbers** — that buys a week. Cite the command, or delete the
-  number and keep the rule. The file already contains the model in its own sparkline paragraph.
-  *A count in prose is a claim with a decay date; a count in a script is a fact.*
-- **Not exercised:** static verification only — no runtime, no device.
 
 
 ### [platform][app-shell][readiness] 🟢 This run's own findings checked against production — one refuted, two re-scoped, one new (Q-472, 2026-08-18)
@@ -2519,7 +2437,7 @@ consistent, and it is not proof: a barcode request was never recorded either way
 
 **Do not close this from the recovery.** If it recurs, `error_events` will now hold the reason.
 
-### [platform][devices] ⚠️ Production stalls — all three Q-213 stages shipped 2026-08-13; production has NOT yet confirmed it
+### [platform][devices] ⚠️ Production stalls — all three Q-213 stages shipped 2026-08-13; production has now confirmed them, the device has not · needs: android
 
 **Stage 1 shipped.** `aggregateOuraRawSamples` re-read, hex-decoded and re-derived a 35-day window of
 `oura_raw_samples` on every BLE sync — **984,862 rows against ~37 days of history**, i.e. the whole
@@ -2580,6 +2498,40 @@ and only production caught them.
 
 Keep watching Railway CPU: the sustained 1.0–1.6 plateaus should stop recurring. `/api/version`
 latency is the cheapest ongoing probe — it should stay in milliseconds.
+
+
+**✅ RESOLVED — production has now confirmed it, 2026-08-20.** The whole retained `error_events`
+window (2026-07-20 → 2026-08-19; the table prunes at 30 days and is row-scoped to the owner) grouped
+by day, counting the two connect fingerprints, this route, and the two fan-out routes:
+
+| day | connect-timeout | `/api/sync/pull` | body-battery + readiness-score | all events |
+|---|---:|---:|---:|---:|
+| 08-19 | 0 | 0 | 0 | 1 |
+| 08-18 | 0 | 0 | 0 | 1 |
+| 08-17 | **1** | 0 | 0 | 8 |
+| 08-16 | 0 | 0 | 0 | 1 |
+| 08-15 | 0 | 0 | 0 | 1 |
+| 08-13 | 16 | 1 | 2 | 757 |
+| 08-12 | 39 | 0 | 2 | 2,556 |
+| 08-11 | 20 | 1 | 0 | 38 |
+| 08-10 | 16 | 1 | 0 | 31 |
+| 08-09 | 33 | 1 | 3 | 2,615 |
+
+**Every one of the three families stops dead on 2026-08-13**, the day Q-213's stages shipped. The
+single connect-timeout since then landed on 2026-08-17, inside the unrelated `disk_full` outage that
+day (the same date carries two `[pg 53100]` rows). Six days, one event.
+
+**Two limits on this, stated rather than left implicit.** `claude_ro.error_events` is scoped to the
+owner's rows, so this is a claim about the owner's account and not about anyone else's; and it is a
+claim that the fault stopped, which the "stopped is not fixed" rule says to hold loosely — except
+that here the stop coincides exactly with a shipped fix whose mechanism predicts it, which is the
+one case where a silence is evidence. The app was in use throughout: `set_hr_stats` rows were
+computed on 08-15, 08-16, 08-17 and 08-19.
+
+**This row stays ⚠️ rather than moving to the archive** for the one gate that is left: none of the
+three stages has been exercised on the S25. The BLE plugin does not run in the sandbox, so the
+ingest path was only ever driven through the route and the repository, against a seeded table 40×
+smaller than production.
 
 ### [platform][readiness] A check-in tapped during the local-store init window was silently lost (fixed v1.302.1, 2026-08-13) — NOT verified on device · needs: hardware
 
@@ -3840,83 +3792,6 @@ Full/Deload/Rest choice moved off Home (now Rest/Full only) onto the pre-workout
 Quick/Normal/Long duration picker, so choosing Deload happens at the point that actually determines
 the session.
 
-### [platform] 🟠 `/api/sync/pull` intermittently fails one of its ~21 parallel per-domain queries — likely DB-pool contention, cursor stuck for 4+ days on one device (found 2026-08-05/06, NOT fixed)
-
-Owner reported the client-side symptom: pull-to-sync on Home surfaces "Sync is backing off after an
-earlier error — retrying shortly" (the deliberate Q-37 backoff-copy branch,
-`session-select-content.tsx:660` — see `docs/overview/entries/2026-08-02-local-sqlite-init-recovery.md`).
-That toast only means *a prior pull already failed and set the backoff window* — it doesn't say why.
-Queried `claude_ro.error_events` for the real cause (per the session-start orientation rule) and
-found a live, ongoing, evidenced production fault, not just a copy question.
-
-**What the evidence shows:** the same user (`fe481797-...`) hit `/api/sync/pull` server errors
-repeatedly from 2026-07-30 through 2026-08-01 (quiet since in the 7-day window checked, which per
-the "stopped ≠ fixed" rule is not proof it's resolved) — a different table each time (`programs`,
-`day_checkins`, `injuries`, `mood_logs`, `food_logs`, `set_logs`, `progression_styles`,
-`prescribed_runs`), Drizzle's generic `"Failed query: select ..."` wrapper with no underlying
-Postgres cause captured in either `message` or `stack`. **Every one of these errors carries the
-exact same `since` cursor param, `2026-07-28T01:09:17.285Z`, unchanged across 4+ days of failures**
-— strong evidence this device's local sync cursor was stuck retrying the same page repeatedly
-without ever fully succeeding over that window (a partial/first-page pull failure never advances
-`lastSyncAt`, so this is consistent with `pullDelta`'s existing backoff design, not a mystery — the
-mystery is why the underlying query kept failing).
-
-**Root-cause theory, not yet confirmed against Railway's own logs:** `getSyncDelta`
-(`lib/data/postgres/adapter.ts:3211-3235`) fires **~21 queries in one `Promise.all`** per pull call.
-The app's own DB-pool rule (`lib/data/postgres/client.ts`, documented in this file's Database
-section) keeps `max: 10` connections deliberately modest — a single sync pull alone can want more
-connections than the whole pool has, and the moment any other concurrent request on the same pool
-also needs a connection, one of the 21 queries is the one left waiting and is the one that times out
-or errors — which matches the observed fingerprint exactly (a different, effectively-random table
-failing each time, same user, repeated occurrences, not a deterministic query bug that would fail
-100% of the time for every user). CLAUDE.md's own Database section already flags this class of risk
-for "a heavy sync domain" — this reads as that risk materialising, not a new category of bug.
-
-**Not yet done:** confirming the pool-contention theory against Railway's actual Postgres logs
-(connection-acquire timeouts / `statement_timeout` hits, not just the app's own truncated error
-report); reducing `getSyncDelta`'s query parallelism (chunk the 21 queries instead of one flat
-`Promise.all`) to cut peak connection demand; capturing the underlying Postgres error `cause` in the
-server error-report path so this class of failure doesn't need a manual query dig next time; and
-confirming whether today's live toast (2026-08-06, screenshot) is the same fault recurring or a
-distinct client-side network blip that never reached the server (which would produce no
-`error_events` row at all). Backlog entry: **Q-107** (`docs/implementation-backlog.md`).
-
-**🆕 Amended 2026-08-08 — the pool-contention theory above is weakly supported, and the "capture the
-`cause`" item is now its own top-priority entry.** ([review §1.1, §1.2](docs/reviews/2026-08-08-db-scalability-and-tooling-review.md))
-Widening the query from `/api/sync/pull` to **all 98 `Failed query` events across every route** and
-grouping them by the second they landed in: **77 are a lone query failing while every other query in
-flight succeeded**, 12 in pairs, and 4+5 in two bursts. Pool exhaustion fails everything competing
-for a connection at once — that is the shape of the two bursts, covering 21 of 98, not of the 77. An
-isolated single-query failure fits a per-connection drop or `statement_timeout: 15_000` better. The
-theory above is not refuted (the bursts are real, and `getSyncDelta`'s ~21-query `Promise.all` is
-still a genuine peak-demand risk) but it should **not** be the first thing built. The `cause`-capture
-item this row already listed under "Not yet done" is now **Q-142** with a written scope — it is the
-smallest diff available and it makes the next occurrence self-diagnosing. Take it first, read one
-real Postgres error, then decide whether to chunk `getSyncDelta`.
-
-**🆕 Amended 2026-08-13/14 — much sharper burst evidence, found investigating an unrelated sleep-data
-report (see the new `[sleep]` Q-225 row below), plus a candidate downstream consequence.** A 3-day
-`error_events` pull found a **chronic background rate (1–9 timeout/connection-terminated/aborted
-errors per hour) sustained continuously the whole time this entry has been open**, with two much
-sharper bursts on top: **23 errors in the 23:00 UTC hour of 2026-08-12, 15 in the 02:00 UTC hour of
-2026-08-13** — each spanning 15-20+ unrelated routes (`oura-ble/samples`, `next-session`,
-`workout-sessions/day`, `sync/pull`, `body-battery`, `readiness-score`, `hr-ingest`, several
-`nutrition/*` routes, and more) within the same ~20-minute window. That is a much cleaner
-pool-exhaustion signature than the 2026-08-08 measurement found (max burst there was 5). The now-live
-`cause` capture (Q-142, shipped) confirms it directly: `[cause: timeout exceeded when trying to
-connect]` / `[cause: Connection terminated due to connection timeout]` on the app's own
-`pool.max: 10` (`client.ts:19`) — not a `statement_timeout` cancellation. Checked Postgres's own
-side: `max_connections = 500`, only 11 in use at check time, so there is headroom on the database;
-the constraint is the app pool size relative to burst demand. **Not confirmed ongoing right now**
-(0 matches in the last hour checked) — consistent with "stopped ≠ fixed," since this went quiet
-before and came back. **Candidate downstream consequence, not proven:** Q-225's stale sleep-session
-row was last written a few hours after the second burst ended; a fresh recomputation from the same
-raw data does not reproduce it. Plausible mechanism (a rollup succeeding overall while one internal
-query silently saw a partial result during contention), not confirmed. Neither the `getSyncDelta`
-batching fix nor a `pool.max` increase (500-connection ceiling leaves large headroom, but this file
-is CLAUDE.md's load-bearing pool config — a size change should get the same review as the
-timeout/error-handler settings next to it) was done this session.
-
 ### [sleep][devices][platform] 🟠 A sleep session can get stuck on a stale, narrower window with no self-heal (Q-225, found 2026-08-13/14)
 
 Owner reported the previous night's displayed bedtime (1:15am) looked far too late. Not the
@@ -4648,35 +4523,6 @@ breaks the parse fails loudly instead of passing vacuously.
 - A `BeginTransactionAlready in transaction` error also appeared. Most likely a cascade from the
   above (a failed statement leaves the transaction open and the next `applyDelta` cannot begin), but
   that is reasoning, not evidence — re-check on device once the arity fix ships.
-
-### [platform] ⚠️ `/api/body-battery` and `/api/readiness-score` 500'd in production, cause NOT diagnosed (reporting added 2026-08-04)
-
-Seen in the owner's device console on 2026-08-03, ~23:04–23:13 UTC. **Not reproduced and not
-explained.** What is actually established:
-
-- **It is transient, not deterministic.** `body_battery_daily` carries a row for 2026-08-04 with
-  `updated_at = 2026-08-03T23:19:53Z` — the route completed successfully six minutes after the 500s,
-  from the same data. A data-shape fault would not self-heal.
-- **Nothing was logged.** Neither route had a `catch`, so no row reached `error_events`. Confirmed
-  by query: the only rows in that window are ten React #418 hydration errors, none server-side.
-- Both return **200 locally** against the seeded DB.
-
-**What changed (this PR):** both handlers are now thin — auth + rate-limit, then a `try` around an
-extracted `buildBodyBattery` / `buildReadinessScore`, with `reportServerError({ userId, url })` and a
-JSON 500 in the `catch`. Proven end-to-end locally by injecting a throw: 500 body returned *and* a
-row with the full stack landed in `error_events`. **The next occurrence is readable remotely** via
-`POST /api/admin/db-query`.
-
-**Leading hypothesis — connection-pool acquisition timeout. Unproven; do not record it as cause.**
-The pool is `max: 10` with `connectionTimeoutMillis: 5_000` (`lib/data/postgres/client.ts`), and a
-failed acquire *throws*, which in an unwrapped handler is exactly a bare 500. These two routes have
-the largest single-request fan-out in the codebase — `readiness-score` issues **11** concurrent
-`repo.*` queries and `body-battery` **8** (`day-timeline` is next at 10) — so they are the first to
-starve under contention, and the arity bug above was making the device retry sync pulls in a loop at
-the same time. That is a coherent mechanism, not evidence. One logged stack settles it.
-
-**Systemic, filed separately as backlog Q-58:** only **11 of 200** API route files call
-`reportServerError` at all, so a 500 in any of the other 189 is invisible the same way these two were.
 
 ### [app-shell][platform] ⚠️ The APK's version was frozen at 1.30.0, so "Update available" was always on (fixed v1.252.7, 2026-08-03) — needs the next APK
 

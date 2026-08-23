@@ -27,6 +27,16 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-20-rpe-prefill-mapping-fit.md`](../../reviews/2026-08-20-rpe-prefill-mapping-fit.md)
+  — **Q-423 REFUTED, 2026-08-20.** `defaultRpeFromPct`'s `clamp(floor(pct/10), 6, 10)` is the
+  **modal rating at all sixteen observed `planned_pct` values**, covering 313 of 313 sets; `round`
+  misses five of them and inverts the asymmetry (25 raises / 0 lowers becomes 19 / **82**). Q-423's
+  headline — 233 raised against 32 lowered, +0.41 — was computed over 625 sets of which **312 have
+  no `planned_pct` at all** (the column only exists since July 2026) and were filled from
+  `intensity_pct`, the *achieved* intensity rather than the planned percentage the prefill reads. On
+  the 313 that do carry one: **288 unchanged, 25 raised, 0 lowered, +0.125**. Also records why the
+  entry's own acceptance criterion picks the wrong mapping — 92% of the ratings were never touched,
+  so they *are* the prefill, and any statistic over all of them is the prefill agreeing with itself.
 - [`docs/reviews/2026-08-18-orientation-index-paths.md`](../../reviews/2026-08-18-orientation-index-paths.md) — **the orientation indexes named paths that do not exist, 2026-08-18** (Q-554 — `module-map.md:232` carried a row for `lib/oura-ble/steps-motion-decoder.ts` → `decodeStepsPacket`, **neither of which has ever existed**; the real port is the row below and is itself flagged "NOT yet wired", so the map presented planned work as existing infrastructure. Plus three stale domain rows — `app/history/`, `docs/oura-models/`, `app/overview/` — and 49 malformed history display labels (a stray `../` made them resolve to a non-existent root `overview/`).) Now enforced by `scripts/check-index-doc-paths.js`, step 42 of 42, over **748 paths**.
 - [`docs/reviews/2026-08-16-deferred-measurements.md`](../../reviews/2026-08-16-deferred-measurements.md)
   — the measurements four entries deferred. **Rest is NOT the confound behind Q-289** (the error
@@ -103,6 +113,7 @@ Mode flow and the orchestrator pattern are documented in [`CLAUDE.md`](../../../
 - [`docs/reviews/2026-08-18-rpe-autoregulation-calibration.md`](../../reviews/2026-08-18-rpe-autoregulation-calibration.md) — **RPE autoregulation calibrated, 2026-08-18** (Q-514 — `RPE_DEAD_BAND = 1.5` is correctly placed and must not move; the bias is in the input. `expectedRpe`'s **floor** clamp binds on 6.5% of sets — ordinary 50–67% × 7–13-rep accessory work, not warm-ups — giving them a **+1.89** mean delta against **−0.34** for everything else. Excluding them removes **64% of back-off triggers and zero push triggers**, so two thirds of the engine's 5–10% load cuts were a clamp artefact. Also: `calcAmrap1RM`/`amrapScaleFactor` have **no production call site**).
 
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-460 cannot be adjudicated from production — 74% of completed sessions lack an RPE, which is consistent with both a dropped write and a skipped prompt). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
+- [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](../../reviews/2026-08-20-non-workout-write-surface-ownership.md) — **the non-workout write surface, probed live with two accounts, 2026-08-20** (RV-32 — `POST /api/phase-sets`, `POST /api/workout-templates` and `POST /api/log-exercise` all persist a **progression-style id owned by another user**, while the `PUT` twin of the first rejects the identical value 400; the unscoped join at `programs.ts:427` then returns the other user's style *name*. RV-34 — a client-supplied `program_sessions.id` that is not yours is a raw `pg 23505` 500). **Rule (b) came back clean** — 325 `.set()` sites, zero raw request bodies. Six more clean results recorded, including Q-129's guard verified live.
 
 ## Open issues
 
@@ -166,7 +177,7 @@ Live at the time of writing (2026-07-30):
 ## History
 
 - **[`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](../../handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)**
-  — 🆕 the workout-energy intake cluster (Q-391 · Q-419 · Q-423 · Q-420 · Q-421 · Q-422), from one
+  — 🆕 the workout-energy intake cluster (Q-391 · Q-419 · ~~Q-423~~ · Q-420 · Q-421 · Q-422), from one
   owner question about making the burn estimate more accurate. Records that `computeActiveEnergy`
   **already** calls the estimator per strength session and discards the split; that the done screen
   re-estimates on every RPE tap while the day budget hardcodes `'moderate'`; that per-set RPE is

@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
 import { isIdempotentMigrationError } from '../client'
+import sqlstates from '../idempotent-sqlstates.json'
 
 /**
  * `ensureSchema` re-runs every migration that is not in `schema_migrations`, so on any live
@@ -62,5 +65,33 @@ describe('isIdempotentMigrationError', () => {
     expect(isIdempotentMigrationError(null)).toBe(false)
     expect(isIdempotentMigrationError(undefined)).toBe(false)
     expect(isIdempotentMigrationError('boom')).toBe(false)
+  })
+})
+
+/**
+ * `scripts/local-db/migrate.js` is the other half of this: plain CommonJS, deliberately no ts-node,
+ * and the runner the CI job named **Migration Check** invokes. Its docstring said it mirrored
+ * `ensureSchema()` and it did not — it carried no classifier at all, so against a database that
+ * already held the objects it called four already-applied migrations *failures*, while
+ * `ensureSchema()` read the same four as benign (2026-08-20).
+ *
+ * The list now lives in one JSON file both read. These two cases are what stop someone re-inlining
+ * a second copy of it, which is the only way the runners can disagree again.
+ */
+describe('the two migration runners classify by the same list', () => {
+  const migrateJs = readFileSync(join(__dirname, '../../../../scripts/local-db/migrate.js'), 'utf8')
+
+  it('the standalone runner reads the shared list rather than its own copy', () => {
+    expect(migrateJs).toContain('idempotent-sqlstates.json')
+    // A hardcoded SQLSTATE in that file would be a second source of truth by definition.
+    expect(migrateJs).not.toMatch(/'[0-9][0-9A-Z]{4}'/)
+  })
+
+  it('every code in the shared list is one `isIdempotentMigrationError` accepts', () => {
+    const codes = Object.keys(sqlstates.codes)
+    expect(codes.length).toBeGreaterThan(0)
+    for (const code of codes) {
+      expect(isIdempotentMigrationError(Object.assign(new Error('x'), { code })), code).toBe(true)
+    }
   })
 })

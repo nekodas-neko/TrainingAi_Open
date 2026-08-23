@@ -16,6 +16,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, materialiseBaseTree, cleanupBaseTree, verdict } = require('./lib/base-ref');
 
 const root = path.join(__dirname, '..');
 const DIRS = ['app', 'components'];
@@ -43,23 +44,30 @@ function walk(dir, out) {
   return out;
 }
 
-const files = DIRS.flatMap(d => walk(path.join(root, d), []));
+/**
+ * The whole check, over one root. Run twice — the working tree, and the base branch materialised into
+ * a temp directory — so the base is measured by its OWN memoised-component list rather than this
+ * branch's (LA-16). A branch that newly memoises a component with existing inline call sites is
+ * exactly the case a shared component list would mis-report, and mis-report as passing.
+ */
+function scan(rootDir) {
+  const files = DIRS.flatMap(d => walk(path.join(rootDir, d), []));
 
-// Every component wrapped in memo(...), by the name it is rendered under.
-const memoised = new Set();
-for (const abs of files) {
-  const src = fs.readFileSync(abs, 'utf8');
-  for (const m of src.matchAll(/(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:React\.)?memo\s*\(/g)) memoised.add(m[1]);
-  for (const m of src.matchAll(/(?:React\.)?memo\s*\(\s*function\s+(\w+)/g)) memoised.add(m[1]);
-}
+  // Every component wrapped in memo(...), by the name it is rendered under.
+  const memoised = new Set();
+  for (const abs of files) {
+    const src = fs.readFileSync(abs, 'utf8');
+    for (const m of src.matchAll(/(?:const|let)\s+(\w+)\s*(?::[^=]+)?=\s*(?:React\.)?memo\s*\(/g)) memoised.add(m[1]);
+    for (const m of src.matchAll(/(?:React\.)?memo\s*\(\s*function\s+(\w+)/g)) memoised.add(m[1]);
+  }
 
-const perFile = new Map();
-const detail = [];
+  const perFile = new Map();
+  const detail = [];
 
-for (const abs of files) {
-  const rel = path.relative(root, abs).replace(/\\/g, '/');
-  const src = fs.readFileSync(abs, 'utf8');
-  for (const name of memoised) {
+  for (const abs of files) {
+    const rel = path.relative(rootDir, abs).replace(/\\/g, '/');
+    const src = fs.readFileSync(abs, 'utf8');
+    for (const name of memoised) {
     const re = new RegExp('<' + name + '(?=[\\s/>])', 'g');
     let m;
     while ((m = re.exec(src))) {
@@ -80,19 +88,44 @@ for (const abs of files) {
         const line = src.slice(0, m.index).split('\n').length;
         const kinds = [inlineObject && 'object', inlineArray && 'array', inlineArrow && 'arrow'].filter(Boolean);
         detail.push(`${rel}:${line}  <${name}> — inline ${kinds.join(' + ')} in a prop`);
+        }
       }
     }
   }
+  return { perFile, detail, memoised };
+}
+
+const { perFile, detail, memoised } = scan(root);
+
+const baseRef = resolveBaseRef();
+const baseDir = materialiseBaseTree(baseRef, DIRS);
+let basePerFile = null;
+try {
+  if (baseDir) basePerFile = scan(baseDir).perFile;
+} finally {
+  cleanupBaseTree(baseDir);
 }
 
 const failures = [];
+const inherited = [];
 for (const [rel, count] of perFile) {
   const allowed = BASELINE[rel] ?? 0;
-  if (count > allowed) {
+  // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over.
+  const atBase = basePerFile === null ? null : (basePerFile.get(rel) ?? 0);
+  const v = verdict({ count, limit: allowed, atBase });
+  if (v === 'inherited') {
+    inherited.push(`${rel}: ${count} inline-prop call site(s) against a baseline of ${allowed}, but the base branch is already there.`);
+  } else if (v === 'fail') {
     failures.push(allowed === 0
       ? `${rel}: ${count} memoised call site(s) with an inline prop; this file is not in the baseline, so it must have zero.`
       : `${rel}: ${count} memoised call site(s) with an inline prop, over its baseline of ${allowed}.`);
   }
+}
+
+// Reported whether or not the run fails, and never as a failure (Q-424).
+if (inherited.length) {
+  console.log('check-memo-prop-stability: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
 }
 for (const [rel, allowed] of Object.entries(BASELINE)) {
   const count = perFile.get(rel) ?? 0;

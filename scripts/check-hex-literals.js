@@ -26,8 +26,12 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, countAtBase, verdict } = require('./lib/base-ref');
 
 const HEX = /#[0-9a-fA-F]{3,8}\b/g;
+
+/** The one counting expression, so the working tree and the base branch are measured identically. */
+const countHex = (src) => (src.match(HEX) || []).length;
 
 // Baseline recorded 2026-08-15 — 471 literals across 95 files. Shrink-only.
 // A file that reaches zero should have its row deleted, so it is held to zero from then on.
@@ -122,6 +126,7 @@ const BASELINE = {
 
 const root = path.join(__dirname, '..');
 const failures = [];
+const inherited = [];
 const stale = [];
 let total = 0;
 const seen = new Set();
@@ -136,20 +141,36 @@ function walk(dir) {
     }
     if (!entry.name.endsWith('.tsx')) continue;
     const rel = path.relative(root, full).split(path.sep).join('/');
-    const count = (fs.readFileSync(full, 'utf8').match(HEX) || []).length;
+    const count = countHex(fs.readFileSync(full, 'utf8'));
     total += count;
     seen.add(rel);
     const allowed = BASELINE[rel] ?? 0;
-    if (count > allowed) failures.push({ rel, count, allowed });
+    // LA-16 / Q-424: whether THIS BRANCH added one, not whether the file is over. The base count
+    // runs the SAME matcher over the base content — never a second regex, which would disagree with
+    // the working-tree count for reasons nobody could see.
+    const v = verdict({ count, limit: allowed, atBase: countAtBase(baseRef, rel, countHex) });
+    if (v === 'inherited') {
+      inherited.push(`${rel}: ${count} against a baseline of ${allowed}, but the base branch already has ${count}. Not this branch's growth.`);
+    } else if (v === 'fail') {
+      failures.push({ rel, count, allowed });
+    }
     if (count === 0 && rel in BASELINE) stale.push(rel);
   }
 }
+
+const baseRef = resolveBaseRef();
 
 for (const top of ['app', 'components']) walk(path.join(root, top));
 
 // A row for a file that is now clean (or gone) has to come out, or the list rots into an allowlist
 // that permits hex to come back to a file that had been fixed. Same rule the sibling checks use.
 for (const rel of Object.keys(BASELINE)) if (!seen.has(rel)) stale.push(`${rel} (deleted)`);
+
+// Reported whether or not the run fails, and never as a failure (Q-424).
+if (inherited.length > 0) {
+  console.log('check-hex-literals: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
+}
 
 if (failures.length > 0 || stale.length > 0) {
   if (failures.length > 0) {

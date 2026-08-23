@@ -7,9 +7,11 @@ check — it exists so the reasoning survives without living in the script.
 It was extracted on 2026-08-19 from `scripts/check-doc-index-size.js`, which had reached 1,091
 lines of which 955 were these comments. Every PR that added a documentation line had to prepend
 a paragraph here, in the same region of the same file, which made it the most frequent merge
-conflict in the repository — touched by 32 of the last 40 commits. Two blocks had already been
-duplicated verbatim by conflict splicing, and two more recorded contradictory figures for the
-same change.
+conflict in the repository — touched by 32 of the last 40 commits. **Eight records had already
+been duplicated by conflict splicing** — deduped 2026-08-20, see the dated section at the bottom
+of this file. The figure of "two blocks, duplicated verbatim" recorded here at extraction time
+was an undercount and wrong about the shape: no copy was byte-identical, which is exactly why a
+headline-matching scan found a quarter of them.
 
 **Raising a baseline no longer edits a script.** Change the number in the JSON, and add a dated
 section here saying why. Conflicts in an append-only log resolve by keeping both.
@@ -18,12 +20,13 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ## 2026-08-23 — three owner feature notes (BF-1, BF-2, BF-3)
 
-**`docs/implementation-backlog.md` 11610 → 11794.** Three feature requests the owner sent as one
+**`docs/implementation-backlog.md` 11328 → 11350.** Three feature requests the owner sent as one
 message, filed by BugFix intake at the tail of the queue: the DEXA calibration filter for the
 scale's body-fat estimate, dosed-substance tracking (GLP-1s, creatine), and blood-panel import.
 
-184 lines for three entries is above the ~30-lines-per-entry budget intake normally works to, and
-it is deliberate rather than drift. Each of these is a *feature* heading for a planning session
+The branch adds 184 lines; the net raise is 22 because the queue-hygiene work that landed on `main`
+the same day trimmed 162. 184 for three entries is above the ~30-lines-per-entry budget intake
+normally works to, and it is deliberate rather than drift. Each of these is a *feature* heading for a planning session
 rather than a defect for an implementer, so the entry has to carry the trace that stops the plan
 re-deriving it: for BF-2 that is the six-step chain from the BIA estimator to the calorie and
 protein goals plus the measured 15.4 kcal/day-per-body-fat-point sensitivity; for BF-3 the three
@@ -36,6 +39,203 @@ doc in the same PR — that is the ratchet-down this raise is anticipating.
 
 ---
 
+## 2026-08-20 — Lane A's baton, second raise in one day (`fix/queue-blockers-as-fields`)
+
+**docs/agents/state/implementation-lane-a.md 124 → 150.** 113 → 124 → 150 in a single day, and a
+ratchet raised twice by the same author on the same file is exactly the erosion these baselines exist
+to prevent. So: what it bought, and what should happen instead.
+
+The growth is four more traps (a helper extracted for testability but never wired to its caller;
+green not proving a CI-only path ran; a check that adds a network call adds a way to fail) and a
+**Now** section that says why each of the top three queue items is not startable — which is the single
+most useful thing a successor can be told, and it cannot be derived from the queue.
+
+**The honest conclusion is that the ratchet is the wrong instrument here, and PS-4 is the fix.** A
+baton is rewritten in full at every handoff, so its number measures one session, not accretion; 150 is
+PS-4's own ceiling, and I trimmed twice to reach it rather than raising to whatever fell out. The
+durable part — inherited findings none of which is recorded elsewhere — should move to permanent homes
+(the Oura ones to `docs/oura-ble-operations.md`) at the next handoff, which is the real reduction. The
+baton now says so in place.
+
+## 2026-08-20 — LA-13 closed (`feat/migration-replay-check`)
+
+**projectOverview.md 7883 → 7889.**
+
+Six lines, and four of them are carrying the near-miss rather than the feature: the first version of
+the check was **green with a migration deliberately broken**, because the SQLSTATEs that are benign on
+an ordinary run are the failure signal under replay. A reader who takes "CI now catches non-idempotent
+migrations" at face value would not know how narrowly that became true, or why the acceptance
+criterion said *demonstrated, not argued*.
+
+## 2026-08-20 — Lane A's baton, rewritten mid-session (`docs/lane-a-baton-refresh`)
+
+**docs/agents/state/implementation-lane-a.md 113 → 124.** A raise, and it is worth saying why rather
+than quietly taking it.
+
+The predecessor's 113 covered a session that shipped three items; this one covers six, and most of the
+growth is a **Traps** section — `reset --soft` does not merge, a rebase replays conflict resolutions
+as new content, a count that moves further than your change explains is the bug. That is the part a
+successor cannot re-derive.
+
+**The ratchet is an awkward fit on this one file and the number should be read with that in mind.** A
+baton is *rewritten in full* at every handoff, so its size measures one session's state rather than
+accretion — which is what the ratchet exists to catch everywhere else. PS-4 (baton compaction) sets
+the real target at **~150 lines**, and 124 is comfortably under it. Trimmed from 126 first; the
+remainder is content, not padding.
+
+## 2026-08-20 — Q-421 handed to Lane B (`feat/migration-replay-check`)
+
+**projectOverview.md 7877 → 7883.**
+
+Six lines, and the first raise made under the new rule — which now names the branch's own contribution
+in the failure message (*"6 of which this branch added"*), so the number is no longer something to
+work out by subtraction.
+
+The lines are carrying two facts a reader cannot reconstruct: that Q-421 is finished as far as Lane A
+is concerned, and that the queue tool was routing an entry to the wrong lane. The second is the kind
+of thing that silently wastes a session.
+
+## 2026-08-20 — Q-424 closed: this file's own failure mode, fixed (`fix/doc-index-baseline-order-independence`)
+
+**projectOverview.md 7870 → 7877.**
+
+The last raise made under the old rule, and the one that explains why nine of the entries below exist.
+The ratchet compared the tree against a committed number, so it was answering *"is this file over"* —
+a fact about `main` as much as about the branch — and two independently-green PRs could merge into a
+red `main`. It now asks whether **this branch** grew the file, and an inherited overage is reported
+rather than failed.
+
+**Expect this log to get shorter.** Most of the recent entries are re-measurements forced by the base
+moving mid-PR, not decisions about documentation. Those stop being necessary: a branch that did not
+grow a file no longer has to touch its number at all.
+
+## 2026-08-20 — Q-362a closed (`fix/day-log-workout-durations-key`)
+
+**projectOverview.md 7864 → 7870.**
+
+Six lines, and half of them are carrying the *shape* rather than the fix: this shipped additively, so
+the index has to say that the old colliding record is still being emitted on purpose. A reader who
+takes "closed" to mean the name-keyed record is gone would go looking for a consumer bug that does
+not exist — and would not know LA-15 is what finishes it.
+
+## 2026-08-20 — RV-33 closed (`fix/ownership-refusal-status-two-routes`)
+
+**projectOverview.md 7857 → 7864.**
+
+Seven lines. The index needs the *shape* of this one because it recurs: the refusal was already
+correct and the repository was already throwing the right error — what was missing was the handler
+guard, so a 404 arrived as an empty 500 and filed itself as a server fault. Naming the two routes and
+the `updateMealType` hardening is what stops the next reader assuming the ownership check itself was
+absent.
+
+## 2026-08-20 — RV-32 and RV-34 closed (`fix/style-id-ownership-on-create-paths`)
+
+**projectOverview.md 7848 → 7857.**
+
+Nine lines for a security batch, and the length is carrying one specific thing: production shows no
+row that was ever mis-linked, **and** `claude_ro` is row-scoped to the owner, so the victim's rows are
+exactly the ones that query cannot see. Recording the clean count without that caveat would read as
+"this never happened", which the data cannot support. The rest — which paths, which FK, what the
+unscoped join leaked — is the shortest form that lets a reader decide whether to open the journal.
+
+Measured at the end, on the base this actually merges into, which is the lesson from the entry below.
+
+## 2026-08-20 — Q-331 closed (`test/session-energy-cross-surface-parity`)
+
+**projectOverview.md 7838 → 7848.**
+
+Ten lines, because the entry was filed as a hardening item and closed as a live defect: the done
+screen and the day screen were estimating the same workout with two different formulas, for 42 of 78
+sessions. A reader of the index needs the *defect*, not the test — so the index says which sessions
+were affected and that a mutation-verified test now holds the two together, and the journal entry
+carries the measurement and the vacuity trap the test had to get past.
+
+**This number was drafted three times before it was right** — 8058, then 7885, then no raise at all,
+as two compactions and four other PRs moved the base underneath it. Only the last one was measured on
+the tree this PR actually merges into. Draft the prose when the lines are written; take the number at
+the end, on the final base, or it is a figure that looks deliberate and is stale.
+
+## 2026-08-20 — PS-3 closed (`fix/non-idempotent-migrations`)
+
+**No raise — recorded because one was drafted twice and both figures went stale.**
+
+Three lines went onto the existing migration-gate handoff paragraph, recording that the four
+migrations retried on every cold start are now idempotent and the dev database records 206 of 206.
+Against `main` at the time that needed 8055 → 8058; a compaction landed mid-PR and it became
+7875 → 7878; a second compaction landed and the file now sits at **7806**, comfortably under the
+7875 already on `main`. So the raise was withdrawn rather than carried.
+
+Worth a block despite raising nothing: a baseline drafted against a `main` that then compacts is a
+number that *looks* deliberate and is stale. Re-measure on the merged tree at the end, not when the
+lines are written.
+
+## 2026-08-20 — re-measured a third time, after #263 (`fix/migrate-classifies-idempotent`)
+
+**projectOverview.md → 8055 · docs/implementation-backlog.md → 11647 ·
+docs/agents/state/implementation-lane-a.md → 113.**
+
+Three PRs landed on `main` while this one was open — #261, #263 — and a parallel session pushed its
+own merge onto this same branch. Each time both numbers were rebuilt from `origin/main` and
+re-measured on the merged tree rather than spliced.
+
+**Correcting the entry below:** the baton ratcheted to **113**, not 103. The 103 was measured before
+the wrap-up added its `next-item.js` guidance, and the number that shipped is the later one. Left as
+a correction rather than an edit, because this log is append-only and a silently-edited figure is
+exactly what makes the other entries untrustworthy.
+
+## 2026-08-20 — re-measured after #261 landed mid-PR (`fix/migrate-classifies-idempotent`)
+
+**projectOverview.md → 8055 · docs/implementation-backlog.md → 11647.**
+
+Both numbers were rebuilt from `origin/main` and re-measured on the merged tree, not spliced from
+either side of the conflict — the two sessions had each raised the same two numbers for different
+reasons, which is precisely the case where taking one side loses the other's growth.
+
+**And the conflict itself had already been mis-resolved once, on `main`.** The BugFix session's
+wrap-up replaced the `Session handoff:` link in `projectOverview.md` but left the *previous*
+handoff's description attached to it — so the index credited the 2026-08-20 energy-intake handoff
+with "six findings from a live APK reinstall and Oura re-sync" and Q-536's closure, which belong to
+the 2026-08-17 one. Fixed here by rebuilding the block so each of the three links carries its own
+description. Worth knowing because it is the same splice failure this history file exists to
+prevent, one file over.
+
+## 2026-08-20 — session wrap-up (`fix/migrate-classifies-idempotent`)
+
+**projectOverview.md 8043 → 8050 · docs/implementation-backlog.md 11573 → 11578 ·
+docs/agents/state/implementation-lane-a.md 163 → 113 (a net ratchet DOWN of 50).**
+
+- **projectOverview +7**: the session-handoff pointer, which is part of the wrap-up ritual.
+- **backlog +5**: a `Gate: owner` field added to Q-420 and Q-422. Both listed as **READY** under
+  `scripts/next-item.js` while each says in its own body that it waits on the owner — the blocker
+  was in prose, which is exactly what the `Gate:` field replaced. Expect more of these; the tool can
+  only see the field.
+- **the baton −50**: rewritten in full rather than appended to, which is the rule. Its size is a
+  direct read of whether that rule was followed, so the number goes down with it.
+
+## 2026-08-20 — Lane A's baton, ratcheted down (`fix/migrate-classifies-idempotent`)
+
+**docs/agents/state/implementation-lane-a.md 163 → 103.**
+
+A ratchet *down*, not a raise. The baton is rewritten in full at every handoff rather than appended
+to — that is the rule that stops it accreting — so its size is a direct read of whether the rule was
+followed. Lowering the number is what makes the next drift visible.
+
+## 2026-08-20 — PS-3's open question, answered against production (`fix/migrate-classifies-idempotent`)
+
+**docs/implementation-backlog.md 11559 → 11573.**
+
+Fourteen lines annotating PS-3, and every one of them is a measurement or a scope reduction rather
+than narrative:
+
+- **The question the entry says to answer first is answered.** `claude_ro.schema_migrations` holds
+  206 of 206 filenames, the four among them. Production skips all four; this is local-only. Without
+  that on the entry, the next session repeats the query — and it is a production read, not a
+  grep.
+- **They were never failures.** The four raise SQLSTATEs `ensureSchema()` treats as *already
+  present*; `migrate.js` had no classifier. Recorded because the entry's own framing ("4 failed") is
+  what a reader would otherwise carry forward.
+- **What is left is smaller than the entry implies**, and the note says so outright so the item is
+  judged on quiet rather than on the original framing.
 ## 2026-08-20 — the Orchestrator role
 
 **CLAUDE.md 1107 → 1115.** A sixth standing agent, owning queue and docs hygiene: clearing entries
@@ -128,16 +328,11 @@ One queue entry and its row. Both keep the module-map specifics (row 232, decode
 references) because "a doc named a path that does not exist" is forgettable while "the map read to
 avoid re-implementing things listed something never built" is the reason the check exists.
 
-2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
-projectOverview SHRANK by ~70 lines here even after adding an entry: Q-139's stale 69-line
-"OPEN" body was replaced with a compact device-check row, and Q-81's duplicate archive copy was
-cut. Baselines are shrink-only, so this ratchets down and the space cannot be reclaimed silently.
-
-2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview -> 7785.
-projectOverview RATCHETS DOWN here (7805 -> 7785) even though an entry was added: Q-139's stale
-69-line "OPEN" body became a compact device-check row and Q-81's duplicate archive copy was cut.
-The baseline is shrink-only, so locking the lower number in is the point -- reclaimed space
-cannot quietly refill.
+2026-08-18 (Review, Q-553 known-issue duplication): backlog -> 9841, projectOverview 7805 -> 7785.
+projectOverview RATCHETS DOWN here even though an entry was added: Q-139's stale 69-line "OPEN"
+body became a compact device-check row and Q-81's duplicate archive copy was cut, so the removals
+outweigh the addition and the net is -20. The baseline is shrink-only, so locking the lower number
+in is the point -- reclaimed space cannot quietly refill.
 
 Raised 2026-08-18 (Review, Q-499 reproduced + Q-552 ledger): backlog -> 9809, projectOverview -> 7805.
 Q-499's entry grew rather than a new one being added: it was filed on static reading and is now
@@ -485,10 +680,6 @@ filed — the bare catch that made a DB outage read as 403, Postgres holding 0.7
 oura_heartrate index ratio, and the owner decision on leaving Railway (deliberately deferred behind
 Q-545 so it is not decided on a pre-fix, deploy-inflated baseline).
 
-Raised 2026-08-18 (session wrap-up, Q-548..Q-551): four entries the session measured but had not
-filed — the bare catch that made a DB outage read as 403, Postgres holding 0.79 GB for 171 MB, the
-oura_heartrate index ratio, and the owner decision on leaving Railway (deferred behind Q-545 so it
-is not decided on a pre-fix, deploy-inflated baseline).
 Raised again the same day for Q-310's Known-Issues row: a shipped fix that still owes a device
 check, so it belongs here rather than in the resolved archive, which only takes an entry when
 nothing is still owed. The evidence lives in the journal entry; only what is owed is here.
@@ -618,15 +809,10 @@ owner choosing between them, and an implementer must not have to open the review
 Recomputed from the MERGED file; this is the third same-day ratchet collision on this branch.
 
 Recomputed 2026-08-18 (Q-541 task 4, Lane A) from the MERGED files — all three numbers rebuilt,
-not spliced, because both files moved on both sides of this merge. Lane A's own delta was the
+no hunk spliced, because both files moved on both sides of this merge. Lane A's own delta was the
 Q-541 status block for the packer plus the new Q-316 entry (the packer has no button, because
 components/** belongs to the other lane, and the entry carries the warning that its confirm copy
 must not read like the lossless VACUUM beside it).
-
-Recomputed 2026-08-18 (Q-541 task 4, Lane A) from the MERGED files — every number rebuilt, no
-hunk spliced. Lane A's own delta was the Q-541 packer status block plus the new Q-316 entry
-(the packer has no button, because components/** belongs to the other lane, and the entry
-carries the warning that its confirm copy must not read like the lossless VACUUM beside it).
 
 Raised 2026-08-18 (Q-315 route, Lane A): 7144 -> 7156. Twelve lines splitting Q-315 into the half
 that shipped and the half that has not: the route exists and is verified, and nobody has pressed
@@ -635,38 +821,27 @@ reclaimed. Carries the one thing an implementer must not get wrong — the allow
 boundary because the table name is interpolated, and `in` accepts `toString` where
 `hasOwnProperty` does not.
 
-Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files. Lane A's
-own deltas: +10 on projectOverview, carrying the distinction that item most needs — the outage's
-MECHANISM is gone, not merely mitigated, because with every reader deriving the timestamp the
-re-stamp that rewrote 681,005 rows is a no-op — plus the caveat that keeps the 136 MB honest (it
-is the measured index size, not a reclaim that has happened). On the backlog, finding 4 is
-struck in place with the three consequences the entry did not anticipate, so the next session
-does not re-derive them or assume findings 1-3 went with it.
+Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files, on each of the
+two merges this branch took. Lane A's own delta: +10 on projectOverview, carrying the distinction
+that item most needs — the outage's MECHANISM is gone, not merely mitigated, because with every
+reader deriving the timestamp the re-stamp that rewrote 681,005 rows is a no-op — plus the caveat
+that keeps the 136 MB honest (it is the measured index size, not a reclaim that has happened). On
+the backlog, finding 4 is struck in place with the three consequences the entry did not anticipate,
+so the next session does not re-derive them or assume findings 1-3 went with it.
+
 Raised 2026-08-18: 1010 -> 1044. The "Decisions That Come Back To Me" section, which sets the
-default shape for anything gated on an owner decision — recommendation first, alternatives with
-what each is better at, reversal cost, plain English — and pushes cheap reversible choices back
-down to the session rather than surfacing them. It belongs in the index: it governs every
-session's behaviour rather than recording one session's work. Drafted at 49 lines and cut to 34
-before raising, since a rule about brevity that arrives verbose argues against itself.
-Recomputed from the MERGED file after three same-day collisions with concurrent raises.
+default shape for anything gated on an owner decision — recommendation first, alternatives with what
+each is better at, reversal cost, plain English — and pushes cheap reversible choices back down to
+the session rather than surfacing them. It belongs in the index: it governs every session's
+behaviour rather than recording one session's work. Drafted at 49 lines and cut to 34 before
+raising, since a rule about brevity that arrives verbose argues against itself. Recomputed from the
+MERGED file after three same-day collisions with concurrent raises.
 
-Recomputed 2026-08-18 (Q-534 finding 4 / Q-541 task 7, Lane A) from the MERGED files, on each of
-the two merges this branch took. Lane A's delta: +10 on projectOverview carrying the one
-distinction that item needs — the outage's MECHANISM is gone rather than mitigated, because with
-every reader deriving the timestamp the re-stamp that rewrote 681,005 rows is a no-op — plus the
-caveat that keeps the 136 MB honest (measured index size, not a reclaim that has happened). On
-the backlog, finding 4 is struck in place with the three consequences the entry did not
-anticipate, so the next session neither re-derives them nor assumes findings 1-3 went with it.
+Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch took.
+Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has not: the
+route exists and is verified, and nobody has pressed it against production. Without that split the
+entry reads as done and the 49 MB never gets reclaimed.
 
-Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file. Lane A's delta was +12,
-splitting Q-315 into the half that shipped and the half that has not: the route exists and is
-verified, and nobody has pressed it against production. Without that split the entry reads as
-done and the 49 MB never gets reclaimed.
-
-Recomputed 2026-08-18 (Q-315 route, Lane A) from the MERGED file, on each merge this branch
-took. Lane A's delta was +12, splitting Q-315 into the half that shipped and the half that has
-not: the route exists and is verified, and nobody has pressed it against production. Without
-that split the entry reads as done and the 49 MB never gets reclaimed.
 Raised 2026-08-18 (owner-directed session, Q-543): -> 7257. One entry for the doc-index BASELINE
 object being the repo's most reliable merge conflict — three of the four CI rounds on #69 were
 base collisions on THIS object, none on the content being changed, and filing the entry hit it a
@@ -695,15 +870,17 @@ anchor-vs-input ratio table because that ratio IS the finding — strip it and t
 "refit says 3.31, ship 3.31", which is the exact conclusion readiness-composite.ts pre-registered
 against.
 
-Raised 2026-08-18 (Q-356, Lane A): 1044 -> 1056. The date-arithmetic section already said "never
-hardcode one side of a rolling window"; it did not cover the shape that broke every branch for
-two hours a day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines
-for the mechanism, the two correct fixture shapes, and the one thing a regression test for this
-class must do (construct the failure band rather than wait for it, because faketime cannot move
-Postgres's clock). This is the file every session reads before it can start, and the rule it
-sits beside is the reason this bug was filed rather than repeated.
+Raised 2026-08-18 (Q-356, Lane A): 1044 -> 1056, recomputed from the merged file on each merge this
+branch took. The date-arithmetic section already said "never hardcode one side of a rolling window";
+it did not cover the shape that broke every branch for two hours a day — both sides derived from the
+clock, but from DIFFERENT timezones. Twelve lines for the mechanism, the two correct fixture shapes,
+and the one thing a regression test for this class must do (construct the failure band rather than
+wait for it, because faketime cannot move Postgres's clock). This is the file every session reads
+before it can start, and the rule it sits beside is the reason this bug was filed rather than
+repeated.
 
-Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file. Lane A's delta was +29:
+Recomputed 2026-08-18 (Q-535 Lane A half, Lane A) from the MERGED file, on each merge this branch
+took. Lane A's delta was +29:
 Q-535 now states the 502 is NOT gone yet and why the default was left alone, that half its own
 premise expired the same day (the row-walking phase became a no-op, so its scanned figures are
 historical), and a new Q-318 carrying the exact response contract so the other lane need not
@@ -714,16 +891,6 @@ a consumer of the sleep scale?" (it did not) turned up that the Body Battery anc
 PROTECT-THIS warning: the obvious future "fix" of lifting sleep scores back re-opens an
 owner-reported bug in another pillar, and that only lands with the numbers attached.
 
-Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
-side of a rolling window"; it did not cover the shape that broke every branch for two hours a
-day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
-mechanism, the two correct fixture shapes, and the one thing a regression test for this class
-must do: construct the failure band rather than wait for it, because faketime cannot move
-Postgres's clock. Recomputed from the merged file.
-
-Recomputed 2026-08-18 (Q-535 Lane A half) from the MERGED file, on each merge this branch took.
-Lane A's delta: Q-535 now says the 502 is NOT gone yet and why the default was left alone, that
-half its own premise expired the same day, and a new Q-318 carrying the exact response contract.
 Raised 2026-08-18 (Q-395, BugFix intake) from the merged file. Net +18 after Q-390's entry
 left with #81. Q-395 is an owner-requested visual uplift of the nutrition surface, and a
 bare "make it nicer" is not implementable — the length is the three findings that carry a
@@ -751,21 +918,15 @@ that the two landing files are already on the 800-line limit. Q-396 is the new e
 meal thumbnails — it exists mostly to write down why the users.avatar precedent (a 5 MB
 data URI) must not be copied onto a row that syncs, and what the cap has to be instead.
 
-Raised 2026-08-18 (Q-464 ratchet, Lane A): 8257 -> 8310. Two blocks, both carrying measurements
-a successor would otherwise have to re-derive. Q-464 gains the two corrections found while
+Raised 2026-08-18 (Q-464 ratchet, Lane A): 8257 -> 8310, recomputed from the MERGED file — Lane
+A's delta was +53. Two blocks, both carrying measurements a successor would otherwise have to
+re-derive. Q-464 gains the two corrections found while
 implementing it — that it IS a live bug after all, and that its `sync/push` caveat applies to
 every schema pushMutations parses rather than one route — plus what the 89 remaining schemas
 still need. And a new Q-472 for the live one: the Water widget's web fallback posts a key no
 schema names, so the value was discarded behind a 200, and since Q-464 shipped it now fails
 loudly instead — which is the intended improvement but makes it user-visible.
 
-Raised 2026-08-18 (Q-464 ratchet, Lane A): 8257 -> 8310. Two blocks, both carrying measurements
-a successor would otherwise re-derive. Q-464 gains the two corrections found while implementing
-it — that it IS a live bug after all, and that its `sync/push` caveat applies to every schema
-pushMutations parses rather than one route — plus what the 89 remaining schemas still need. And
-a new Q-472 for the live one: the Water widget's web fallback posts a key no schema names, so
-the value was discarded behind a 200, and since Q-464 shipped it fails loudly instead — the
-intended improvement, but it makes the bug user-visible.
 Raised 2026-08-18 (Q-397, Lane B): backlog 8257 -> 8573. `main` was **376 lines over this
 baseline on its own**, so the Custom Rules job was failing on every branch, not just this one —
 several entries landed without the raise that should have ridden with them. Recomputed from the
@@ -797,17 +958,6 @@ design questions were answered: the completeness control is an explicit button a
 the log (Q-387 options 2 and 3 closed with reasons), the meal plan becomes a generator of
 saved meals (Q-398), targets stay in Profile with a shortcut, and the pass covers the full journey.
 
-Raised 2026-08-18 (Q-356, Lane A). The date-arithmetic section already said "never hardcode one
-side of a rolling window"; it did not cover the shape that broke every branch for two hours a
-day — both sides derived from the clock, but from DIFFERENT timezones. Twelve lines for the
-mechanism, the two correct fixture shapes, and the one thing a regression test for this class
-must do: construct the failure band rather than wait for it, because faketime cannot move
-Postgres's clock. Recomputed from the merged file on each merge this branch took.
-
-Recomputed 2026-08-18 (Q-464 ratchet, Lane A) from the MERGED file. Lane A's delta was +53: the
-two corrections found while implementing Q-464 — that it IS a live bug, and that its sync/push
-caveat applies to every schema pushMutations parses rather than one route — plus a new Q-472 for
-the live one, which since Q-464 shipped fails loudly instead of silently.
 Raised 2026-08-18 (Lane B, Q-478 shipped). Five lines on an existing row rather
 than a new one. Two of them are corrections to the original finding that a striking-through
 would have destroyed: the "loading state never clears" consequence was overstated (a second
@@ -1118,3 +1268,151 @@ tracks how much state the role is carrying rather than accumulating. This rewrit
 cost time in the session — the `wc -l` off-by-one, the baseline conflict procedure, `total_count: 0`
 having two causes — and one superseded decision recorded with its correction, which is worth more
 lines than the decision was.
+
+## 2026-08-20 — Review session wrap-up (sweeps 29–39)
+
+**`projectOverview.md` 8043 → 7863, a ratchet DOWN of 180 lines.** Eight Known-Issues rows were
+struck to `known-issues-resolved.md` because their findings had shipped — each verified in source on
+`main` first, not inferred from the queue's silence. The shrink-only baseline exists so reclaimed
+space cannot quietly refill, so the lower number is the point of the exercise rather than a side
+effect.
+
+**`docs/agents/state/review.md` 1281 → 1308, a raise of 27 lines.** A "session closed — read this
+first" block at the top of the Review baton: which of the previous run's thirteen findings shipped
+(ten) with the evidence, which three remain open so a successor does not re-file them, the one probe
+that never reached its ownership check and is therefore **unknown rather than clean**, and where to
+start given that four consecutive documentation sweeps had already covered that seam. It sits in the
+baton rather than the handoff because the baton is what a cold successor reads as state; the handoff
+is the narrative behind it.
+
+## 2026-08-20 — `claude/tuning-agent-0q9yl7`
+
+**CLAUDE.md (+9):** the session-start database read told sessions to trust `pg_stat_user_tables`
+because it is not row-scoped — true, and silent on the difference between its size columns (exact,
+read from the filesystem) and its row counters (planner estimates, with `last_analyze` NULL on every
+table here). A Tuning session read `n_live_tup = 1` off an `oura_daily_summary` holding 45 rows and
+filed a data-loss incident that had never happened. Nine lines naming the split, giving the two
+measured counter-examples, and saying to run `count(*)`.
+
+**Backlog (+19):** one entry, TN-1 — chronic stress refuses inside its granular layer and persists no
+reason why. It replaces the retracted half of Q-528: both of that score's countable gates were
+measured this session and both pass, which moves the question from "is the history there" to "why does
+the model refuse", and nothing outside the pass can currently see the answer. Q-528 and Q-525 were
+rewritten in place rather than added to, so the entry is most of the growth.
+
+**Tuning baton (+19, after trimming a superseded note):** the session retracted a finding this baton
+itself carried, so the correction has to sit *above* the claim it replaces while the original bullet
+stays legible as the record of the misread — a successor who reads only the new block learns the fact
+but not the failure mode. The rule that produced it is rewritten in place with its counter-examples
+rather than deleted, for the same reason.
+
+## 2026-08-20 — the extracted history is deduped (PS-2, `docs/baseline-history-dedupe`)
+
+**No baseline moved.** This is the one deliberate exception to the append-only rule, authorised by
+PS-2: eight records inside the fenced *Extracted history* block had been duplicated by conflict
+splicing before the extraction, and the block is no longer byte-verbatim as a result. Everything
+else in it is untouched — nothing summarised, nothing pruned.
+
+**The entry's own three premises were wrong, which is the finding worth keeping.** PS-2 said one
+block (Q-553) was duplicated **twice, byte-identical**, and that two blocks recorded contradictory
+figures. Measured:
+
+| PS-2 said | Actually |
+|---|---|
+| one duplicated block | **eight** duplicated records |
+| duplicated twice | **two** of them appear **three** times — Q-356 and the Q-464 ratchet |
+| byte-identical | **none** was; every copy had been reworded on the merge that re-landed it |
+| `projectOverview -> 7785` contradicts `7805 -> 7785` | not a contradiction — one states the prior value, the other does not |
+
+**Why the undercount happened, and it will happen again to anyone who repeats the method.** Three of
+the eight groups differ in their *first line* — `… from the MERGED file.` against `… from the MERGED
+file, on each merge this branch took.` — so a scan that groups records by their opening line finds
+five of eight, and a scan for byte-identical blocks finds none. What actually finds them is a
+similarity sweep over whole records: at a 0.70 ratio the file now reports zero pairs, and every one
+of the eight sat above 0.80.
+
+**Deduping is a merge, not a delete.** Each copy had drifted, so each carried something the others
+did not, and dropping either side loses a fact. Every surviving record is the union: Q-356 keeps its
+`1044 -> 1056` figure from one copy and its "recomputed on each merge" note from another; the Q-464
+ratchet keeps `8257 -> 8310` from two copies and Lane A's `+53` delta from the third; Q-553 keeps the
+prior value `7805` and states the net (−20) outright, since one copy's loose "shrank by ~70 lines"
+was Q-139's removed body rather than the net. A sentence-level audit before and after confirms every
+distinct sentence survives once.
+
+**Two records were rescued from being lost to the dedupe**, because they had been glued to a
+duplicate with no blank line between them: the Q-310 Known-Issues raise (inside the second
+Q-548..Q-551 copy) and the `1010 -> 1044` "Decisions That Come Back To Me" raise (inside the Q-534
+copy). Both are now records in their own right. **This is the real hazard in a file like this** — a
+lost separator makes an independent record invisible to any per-record tool, and it would have been
+deleted as part of the duplicate that swallowed it.
+
+**`git log` could not be used, and PS-2 assumed it could.** The entry says to reconcile the
+figures "against `git log` for the commits that raised them". This repository's history begins
+**2026-08-19**, with no commit earlier than that, and every record in the extracted block is dated
+2026-08-18 or before. The commits that raised those numbers are in the archived private repo, not
+here. The reconciliation above is therefore from the copies' own content, and says so rather than
+implying a provenance it does not have.
+
+## 2026-08-20 — `projectOverview.md` 7875 → 7838, `docs/implementation-backlog.md` 11666 → 11328, `docs/agents/state/review.md` 1308 → 170
+
+Review sweep 40 — the non-workout write surface and the first audit of ownership rule (b).
+
+**Backlog (+94 from this branch, net −358 after merging `main`'s archive sweep):** three entries. RV-32 and RV-34 batch as one PR over the program-config write path;
+RV-33 is the Q-462/Q-463 status class on two routes that fix missed. RV-32 carries a measured
+impact-bound (the leak stops at the style *name*) because the entry is otherwise easy to size as either
+much larger or much smaller than it is.
+
+**projectOverview (+35 from this branch, net −37 after the same merge):** one Known-Issues row. It is here rather than queue-only because a write path
+accepting another account's row id is the kind of thing every session's orientation read should see, and
+because the clean result beside it — rule (b) audited and sound — is what stops the next sweep re-running it.
+
+**Review baton (−1,138):** rewritten from 1,307 lines to 169, which is PS-4's complaint discharged for one
+of the batons. The 24 lines the wrap-up session added on the same day — what shipped from sweeps
+29–39, the three findings still open, and the one route left unverified — are carried across, since
+that is state and not history. Nothing was lost: all 39 earlier sweeps have their own `docs/reviews/` write-up, each
+linked with a summary from the pillar indexes, and every finding is already a Known-Issues row or a queue
+entry. What the baton keeps is state — next ID, current lens, what is blocked, and the method notes that
+cost a session each to learn. **The baseline is lowered to 170 in the same PR**, so the shrink ratchets
+rather than leaving 1,138 lines of headroom for it to grow back into.
+
+## 2026-08-20 — `projectOverview.md` 7838 → 7841, and `main` was the one over it (superseded the same hour)
+
+**Raised from a PR that touches neither `projectOverview.md` nor this baseline.**
+`feat/home-card-invalidation-guard` is a test-only change — a Playwright spec and two `e2e/fixtures.ts`
+helpers. Merging current `origin/main` into it turned Custom Rules red, and the file it named was one
+this branch never edited: `origin/main`'s own `projectOverview.md` is **7841** against a stored
+**7838**. So the job is failing on every open branch, not this one, and the three lines are somebody
+else's landed content rather than growth to justify.
+
+Raised to main's actual number rather than trimming, for the same reason as the 2026-08-18 Q-397
+entry: reverting three lines of another lane's just-landed work to satisfy a counter is the wrong
+trade, and **the second time a shared ratchet is quietly exceeded is when people start assuming it is
+broken instead of binding**. Recorded here so the raise is attributable to a merge rather than read
+back later as this branch's own growth.
+
+This is the failure mode **Q-424** is queued for — a shrink-only ratchet can leave `main` red and
+nothing in the repo notices until the next branch merges main in. Third recorded occurrence.
+
+**Superseded within the hour, and the resolution is the point.** By the time this branch merged
+`main` again to open its PR, another lane had raised the same number to **7848**. The conflict fell
+on that one line. Resolved by taking `origin/main`'s file whole and **re-measuring the merged tree**
+— 7847 lines, which the script counts as 7848 — rather than splicing either side's hunk. Two same-day
+raises spliced together silently drop one side, which is the accident this log exists to prevent, and
+7841 was only ever the number `main` happened to carry when it was read.
+
+## 2026-08-20 — Lane B's baton ratchets DOWN, 413 → 134
+
+**A shrink, not a raise.** The seventh Lane B handoff rewrote `docs/agents/state/implementation-lane-b.md`
+in full, as the handoff ritual requires, and it came out at **134** lines against a stored 413. The
+baseline is shrink-only precisely so reclaimed space cannot quietly refill, so the lower number is
+locked in here in the same PR rather than left as headroom for the narrative to leak back into.
+
+What went: six runs of accumulated "This run" sections and their per-item detail, which is what
+journal entries and the linked reviews are for. What stayed is what a cold successor needs as state —
+what is in flight (nothing), what was refuted and must not be re-proposed, what is owed on the device,
+what paths are claimed (none), and the gotchas that cost this run time.
+
+**PS-4 is now three of six.** Orchestrator 62, Lane A 113, Lane B 134 are under the ~150-line target;
+BugFix 161, Review 170 and Tuning 582 are not. The entry's own thesis holds — each fell at its role's
+own handoff rather than in a compaction pass — with one exception it should expect: Tuning at 582 is
+4× the target and will not come down as a side effect of a routine rewrite.

@@ -19,6 +19,8 @@
 const fs = require('fs');
 const path = require('path');
 
+const { laneFromLines } = require('./lib/lane');
+
 const ROOT = path.resolve(__dirname, '..');
 const BACKLOG = path.join(ROOT, 'docs/implementation-backlog.md');
 
@@ -47,7 +49,7 @@ for (const line of lines.slice(queueStart)) {
     const id = line.match(/\b((?:LA|LB|BF|RV|TN|PS|Q)-\d+[a-z]?)\b/);
     const title = line.replace(/^###\s*/, '');
     current = id
-      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false }
+      ? { id: id[1], title, tags: [...line.matchAll(/\[([a-z-]+)\]/g)].map((m) => m[1]), lane: null, laneLines: [], needs: [], gates: [], batch: null, legacyBlocked: null, schemaRisk: false }
       : null;
     if (current) entries.push(current);
     continue;
@@ -74,8 +76,12 @@ for (const line of lines.slice(queueStart)) {
   if (/\bmigration\b|schema change|ADD COLUMN|local SQLite version/i.test(line)) current.schemaRisk = true;
 
   // `Lane: ?` is a deliberate "I could not tell" — it must reach a human, not be filtered away.
-  const lane = line.match(/\*{0,2}Lane:?\*{0,2}\s*\*{0,2}(A\b|B\b|\?)/);
-  if (lane && !current.lane) current.lane = lane[1].trim();
+  //
+  // The lane rule lives in `lib/lane.js` and is applied over the whole entry once it is collected —
+  // NOT re-implemented here. It was, briefly, and the two copies drifted within a day: the lib
+  // learned to refuse an ambiguous entry and this file went on guessing, so the unit test was
+  // testing a function the tool did not call.
+  current.laneLines.push(line);
 
   // Entries not yet migrated off the prose marker. Treated as parked, and named as unmigrated so
   // the remaining ones stay visible instead of quietly reading as ready.
@@ -83,6 +89,8 @@ for (const line of lines.slice(queueStart)) {
     current.legacyBlocked = line.replace(/^\s*[-*]?\s*/, '').slice(0, 90);
   }
 }
+
+for (const e of entries) e.lane = laneFromLines(e.laneLines);
 
 const inQueue = new Set(entries.map((e) => e.id));
 // An absent target means shipped — the protocol removes a completed entry from the queue.

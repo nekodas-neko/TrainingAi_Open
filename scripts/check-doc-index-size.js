@@ -18,6 +18,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, lineCountAtBase, verdict } = require('./lib/base-ref');
 
 const root = path.join(__dirname, '..');
 const config = JSON.parse(fs.readFileSync(path.join(root, 'docs/doc-size-baseline.json'), 'utf8'));
@@ -50,6 +51,13 @@ function linkedEntryNames(rootDir, entriesAbs) {
 }
 
 const failures = [];
+const inherited = [];
+
+// Q-424: the ratchet asks whether THIS BRANCH grew the file, not whether the file is over its number.
+// Those are different questions the moment two PRs are open at once, and only the first one has an
+// answer the branch author can act on. `null` when there is no base to compare against — a shallow
+// clone with no remote — in which case the absolute baseline is all we have and is used alone.
+const baseRef = resolveBaseRef();
 
 for (const [rel, limit] of Object.entries(BASELINE)) {
   const abs = path.join(root, rel);
@@ -58,14 +66,24 @@ for (const [rel, limit] of Object.entries(BASELINE)) {
     continue;
   }
   const lines = fs.readFileSync(abs, 'utf8').split('\n').length;
-  if (lines > limit) {
-    failures.push(
-      `${rel} is ${lines} lines, over its ${limit}-line baseline by ${lines - limit}.\n` +
-        `      Move the new material to where it belongs — a journal entry, an archive, a reference\n` +
-        `      doc — or raise the baseline in docs/doc-size-baseline.json in the same PR, with a note\n` +
-        `      in docs/doc-size-baseline-history.md, if the growth is genuinely part of the index.`,
-    );
+  if (lines <= limit) continue;
+
+  const atBase = lineCountAtBase(baseRef, rel);
+  if (verdict({ count: lines, limit, atBase }) === 'inherited') {
+    // Over the number, but no bigger than what the base already holds — so the branch did not do
+    // this, and failing it would be reporting someone else's merge as this author's oversized change.
+    inherited.push(`${rel} is ${lines} lines against a ${limit}-line baseline, but the base branch is already ${atBase}. Not this branch's growth.`);
+    continue;
   }
+
+  const grew = atBase === null ? null : lines - atBase;
+  failures.push(
+    `${rel} is ${lines} lines, over its ${limit}-line baseline by ${lines - limit}` +
+      (grew === null ? '.' : ` — ${grew} of which this branch added.`) + `\n` +
+      `      Move the new material to where it belongs — a journal entry, an archive, a reference\n` +
+      `      doc — or raise the baseline in docs/doc-size-baseline.json in the same PR, with a note\n` +
+      `      in docs/doc-size-baseline-history.md, if the growth is genuinely part of the index.`,
+  );
 }
 
 const entriesAbs = path.join(root, ENTRIES_DIR);
@@ -98,6 +116,14 @@ if (fs.existsSync(entriesAbs)) {
         `threshold. Not a failure; sweep it when convenient.`,
     );
   }
+}
+
+// Reported whether or not the run fails, and never as a failure: `main` being over its own baseline
+// is real and worth fixing, but it is not the current branch's to fix, and answering it with a red
+// check on an unrelated change is what made this class so misleading (Q-424).
+if (inherited.length) {
+  console.log('check-doc-index-size: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
 }
 
 if (failures.length) {

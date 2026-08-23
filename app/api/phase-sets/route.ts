@@ -37,10 +37,21 @@ export async function POST(req: NextRequest) {
   }
 
   const repo = await getRepository()
+
+  // RV-32: the PUT twin at `[id]/route.ts` has refused a style id the caller does not own since
+  // Q-129; this create path never got the same check, so the identical body was a 400 on PUT and a
+  // 201 here. `progression_styles.user_id` is NOT NULL and there is no shared style, so a foreign id
+  // is always wrong — and the FK is `ON DELETE SET NULL`, which means the owner deleting their own
+  // style silently nulls a column in someone else's program.
+  const phasesIn = body.phases ?? []
+  if (!(await repo.progressionStyleIdsOwned(userId, phasesIn.flatMap(p => [p.primaryStyleId, p.secondaryStyleId])))) {
+    return NextResponse.json({ error: 'Invalid styleId' }, { status: 400 })
+  }
+
   const phaseSet = await repo.createPhaseSet(
     userId,
     body.name.trim(),
-    (body.phases ?? []).map((p, i) => ({
+    phasesIn.map((p, i) => ({
       position: i,
       name: p.name,
       durationCycles: p.durationCycles,
