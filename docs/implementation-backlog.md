@@ -430,37 +430,30 @@ already stale when written. What remains of Q-406 is the row component itself, a
 Q-395 rather than blocking it: the four call sites are four different shapes, so unifying them is a
 design decision. See the correction at the top of that entry.
 
-### [workouts][app-shell] Q-362b — three day surfaces group workouts by NAME, and one of them shows the wrong session's heart rate
+### [app-shell][workouts] LB-1 — `DayOverlaySheet` is unreachable, and a comment said it wasn't
 
-- **Branch:** `fix/day-surfaces-session-identity`
-- **Added:** 2026-08-20 · **Lane: B** · **Placement:** low, with Q-362a — same trigger
-- **Needs:** Q-362a
+- **Branch:** `chore/retire-day-overlay-sheet`
+- **Added:** 2026-08-23 · **Lane: B** · found while fixing Q-362b's three consumers
+- **Placement:** low. Nothing is broken for a user — the code cannot run. It is a maintenance cost
+  and a trap: two sessions have now spent effort fixing bugs in a surface nobody can reach.
 
-**Q-362 said this half was "one line" in one file. It is three files, and one of them carries a
-worse bug than the duration collision it was filed for.**
+**Measured, not inferred.** `dayOverlay` starts `null` (`health-content.tsx:151`) and **every**
+`setDayOverlay` call in the repo is either a `prev => prev ? … : null` updater — a no-op while the
+state is null — or `null` itself. There is no call that constructs a non-null value, so the sheet
+never renders. Q-110 repointed the calendar's day-tap at `/health/day` and left a comment saying
+*"the same overlay is still opened from other surfaces"*; that was already false when written, and
+it is what kept the file alive. The comment is corrected in the Q-362b PR.
 
-1. **`components/health/day-detail/day-sections.tsx:87`** — groups by session **id** (Q-391) and
-   looks the duration up by **name**. Two correct cards, the same duration printed on both. This is
-   the one line the entry meant, and it is the only one that is genuinely one line.
+**Dead with it:** `components/health/day-overlay-sheet.tsx` (~300 lines), `fetchDayOverlay`,
+`refreshDayOverlay`, and the `editEx` / `deleteEx` / `deleteSession` / `deleteActivity` handlers in
+`health-content.tsx` that exist only to serve it.
 
-2. **`components/health/day-overlay-sheet.tsx:76-90`** — groups by **name**, so the two sessions
-   merge into one card, and `loadSessionHr(sessExercises[0]?.workoutSessionId)` then loads **one**
-   session's heart rate under a card listing both, with nothing on screen saying which. A wrong
-   number presented as the right one is worse than a missing one, and it is not what Q-362 was
-   filed about.
+**Check before deleting, because the same trap applies in reverse.** `health-content.tsx` is a
+listed 800-line hotspot, so the deletion helps that baseline — but confirm nothing else grew a
+dependency on those handlers first, and check whether the day screen (`/health/day`) still lacks an
+edit/delete affordance the sheet had. **If it does, this is a feature gap, not dead code**, and the
+entry becomes "port the affordance", not "delete the file".
 
-3. **`app/session-select/components/week-day-sheet.tsx:57-62,96`** — groups by **name** the same
-   way: one merged block, one duration chip. The shape `day-sections` had before Q-391.
-
-**Fix.** Group by `workoutSessionId` in (2) and (3) as (1) already does, and look the duration up by
-that id in all three. **Q-362a has shipped, and it shipped additively** — the route now emits
-`workoutDurationsById` (keyed by `workout_sessions.id`) *beside* the legacy name-keyed
-`workoutDurations`, which is unchanged and still collides. So there is no coordinated-merge window:
-read the new field, and nothing breaks whenever this lands. LA-15 removes the legacy one afterwards. (2) additionally needs its `expandKey` moved off
-the name, since two cards would otherwise share one expanded state.
-
-- **Verified:** the route's collision is reproduced (Q-362a). The three consumers are read from
-  source — **the merged-card and wrong-HR rendering is inferred, not observed on screen.**
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
@@ -2647,7 +2640,7 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 > [`docs/agents/README.md`](agents/README.md) where the procedure itself is documented, and the
 > narrative is in `docs/reviews/2026-08-18-*.md`. A record kept in the work queue is read as work.
 
-### [app-shell][health] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
+### [app-shell] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
 - **Branch:** `fix/card-fetch-error-states`
 - **Added:** 2026-08-18 · review sweep (three lenses) ·

@@ -71,9 +71,9 @@ export const TrainingSection = memo(function TrainingSection(
 ) {
   if (data.exercises.length === 0) return null;
   // Grouped by session **id**, not name (Q-391). A name is not identity: repeat the same session
-  // twice in a day and the two cards would collide on the key. `workoutDurations` is still
-  // name-keyed upstream, so its two entries would still collide — pre-existing, and out of this
-  // change's scope, but the calories join is on the id that actually identifies the session.
+  // twice in a day and the two cards would collide on the key. The duration now comes from the
+  // id-keyed record too (Q-362b) — until then this grouped correctly and then printed the same
+  // duration on both cards, because it looked the value up by name.
   const bySession = new Map<string, { name: string; exercises: typeof data.exercises }>();
   for (const ex of data.exercises) {
     const group = bySession.get(ex.workoutSessionId) ?? { name: ex.sessionName, exercises: [] };
@@ -84,7 +84,7 @@ export const TrainingSection = memo(function TrainingSection(
     <div>
       <SectionLabel>Training</SectionLabel>
       {[...bySession.entries()].map(([sessionId, { name: sessionName, exercises }]) => {
-        const dur = data.workoutDurations[sessionName];
+        const dur = data.workoutDurationsById[sessionId];
         const kcal = kcalBySession?.get(sessionId);
         // Derived here rather than server-side: the route already returns every set's weight and
         // rep count, so a second source of truth for volume would be a formula in two places.
