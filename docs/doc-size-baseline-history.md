@@ -1528,6 +1528,7 @@ queue entry is for.
 
 Both numbers were re-measured on the merged tree rather than spliced from the conflict hunks — the
 backlog baseline moved under this branch while it was open.
+
 ## 2026-08-23 — `docs/implementation-backlog.md` 11417 → 11432
 
 Fifteen lines of `Lane:` / `Gate:` / `Needs:` fields on Q-499, Q-549, Q-551 and Q-547 — four entries
@@ -1550,3 +1551,22 @@ they sit on the rollup's real call path twice, through the step pipeline and thr
 Fifteen lines in the queue rather than the journal because the answer (async getters, cached assets,
 or an API route) is a decision to take *before* starting Task 3, and the queue entry is what the
 implementer reads first.
+
+
+## 2026-08-23 — `docs/implementation-backlog.md` 11447 → 11463
+
+Six lines correcting a claim this queue file had carried for five days and that #306 repeated:
+plan Task 1's "the production CSP has no `wasm-unsafe-eval`" was true when it was written and
+stopped being true on 2026-08-20 (Q-546, #259).
+
+Kept in the queue rather than pushed to the journal because it is what an implementer would
+otherwise act on: the stale line said the neural port was blocked behind a one-line security header,
+and the real remaining gap — `getWebSession` has no importers, all seven session consumers
+hard-import the node loader — is a different and larger piece of work.
+
+The larger half of the +21 is a five-row table measuring exactly which value imports carry `run.ts`
+into server-only code, and what each one needs. It is queue material rather than journal material
+because it is the scope of the next task: three of the five want the same injection, one is a file
+split, and one is a `sourceRank` move. Without it the next implementer re-walks the graph — and is
+likely to walk it wrong, since following type-only imports too makes the answer look like "the whole
+Postgres layer".

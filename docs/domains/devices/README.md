@@ -91,9 +91,10 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
   [the journal entry](../../overview/entries/2026-08-23-oura-rollup-io-port.md). Note the plan's "17
   DB-coupled lines" is a **line** count: the port is **22 store operations**, and `run.ts` still
   reaches `onnxruntime-node`, so the rollup's I/O is portable and its models are not.
-  Two blockers verified today: production `script-src` has **no `wasm-unsafe-eval`**, so WASM cannot
-  instantiate on the device at all; and the app's 0.22 vCPU is **unexplained** after three refuted
-  hypotheses. Backlog Q-545 / Q-546 / Q-547.
+  Two blockers were verified when it was written and **both have since been answered**: the missing
+  `wasm-unsafe-eval` shipped 2026-08-20 (Q-546, #259), and the 0.22 vCPU turned out to be spiky and
+  largely deploy churn (Q-547, measured 2026-08-18). The plan's §4 still reads as current on the
+  first and is not. Backlog Q-545 / Q-546 / Q-547.
 
 - [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](../../superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
   — **Q-541 implementation plan (2026-08-17).** Two tiers: `oura_raw_samples` stays exactly as it is

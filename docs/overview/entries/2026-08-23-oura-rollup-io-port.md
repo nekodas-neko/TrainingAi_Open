@@ -43,8 +43,26 @@ device implementation off "five methods" would be out by about four-fold.
 → `inference/session.ts`, and `daytime-stress` → `inference/dhrv` → the same loader — a file whose
 own header reads *"server-only: onnxruntime-node is a native addon and must never reach the client
 bundle."* So Task 3 needs the model session injected the same way the I/O now is. `session-web.ts`
-already exists as the WASM sibling, which is plan Task 4, and that is gated on plan Task 1: the
-production CSP has no `wasm-unsafe-eval`, so WASM cannot instantiate on the device at all today.
+already exists as the WASM sibling, which is plan Task 4.
+
+> **Correction, same day.** This entry first said Task 4 was "gated on plan Task 1: the production
+> CSP has no `wasm-unsafe-eval`". **That gate is gone** — Q-546 added the directive on 2026-08-20
+> (#259) and `lib/security/csp.ts` carries it with a test on both halves. The plan's §4, which is
+> where the claim came from, still reads as current and is not. What is actually left of Task 4 is
+> narrower and worth stating plainly: **`getWebSession` has no importers.** All seven consumers of a
+> model session (`sleepnet`, `dhrv`, `energy`, `illness`, `awhr`, `awhr-profile-selector`,
+> `step-counter`) hard-import the node loader, and `wasm-parity.test.ts` reaches `onnxruntime-web`
+> directly rather than through `session-web.ts`. So the WASM loader is inert in exactly the way the
+> local-store bridge was — written, device-shaped, and called by nothing.
+>
+> **And the reach-through is smaller than "the models are not portable" makes it sound.** Walking
+> `run.ts`'s import graph following **value** imports only — a type-only import is erased and reaches
+> no bundle, and counting them drags in the entire Postgres layer through one `import type` in
+> `daytime-hrv-model.ts` — gives 50 modules and four edges: the step pipeline reaches both the
+> disk-reading constants loader and the node session; `sleepnet-assemble` reaches the node session;
+> `daytime-stress` reaches it **only through the module graph**, because the rollup calls just
+> `buildDaytimeStressSeriesFromModel`, which is synchronous and runs no model. That last one needs a
+> file split, not an injection. The table is on the Q-545 queue entry.
 
 A smaller one, worth doing when Task 3 lands: `sourceRank` (`lib/data/health-source.ts`) drags
 `drizzle-orm` into the module graph for what is a rank lookup.
