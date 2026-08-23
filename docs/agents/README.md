@@ -4,13 +4,15 @@ Five agent roles run against this repo, one of them in two parallel lanes — si
 sessions at full strength. This file is the contract between them. Read it before starting a
 session, and read it again if you are about to touch a path you do not own.
 
-| Agent | Sessions | Takes input from | Produces | Touches code? |
-|---|---|---|---|---|
-| **Implementation** | 2 (Lane A, Lane B) | `docs/implementation-backlog.md` | Shipped changes | **Yes** |
-| **BugFix** | 1 | The owner — screenshots, reports, "this looks wrong" | Triaged backlog entries | No |
-| **Tuning** | 1 | The owner — lived experience against what a score said | Calibration evidence + proposals | No |
-| **Review** | 1, weekly | The app itself | Review write-ups + backlog entries | No |
-| **Orchestrator** | 1, weekly | The queue and the docs | Sweeps: completions cleared, batches assigned, lanes resolved | No |
+| Agent | Sessions | Model | Takes input from | Produces | Touches code? |
+|---|---|---|---|---|---|
+| **Implementation** | 2 (Lane A, Lane B) | Opus 5 · `xhigh` (A) / `high` (B) | `docs/implementation-backlog.md` | Shipped changes | **Yes** |
+| **BugFix** | 1 | Sonnet 5 · `high` | The owner — screenshots, reports, "this looks wrong" | Triaged backlog entries | No |
+| **Tuning** | 1 | Opus 5 · `high` | The owner — lived experience against what a score said | Calibration evidence + proposals | No |
+| **Review** | 1, weekly | Opus 5 · `xhigh` | The app itself | Review write-ups + backlog entries | No |
+| **Orchestrator** | 1, weekly | Sonnet 5 · `medium` | The queue and the docs | Sweeps: completions cleared, batches assigned, lanes resolved | No |
+
+The model column is not arbitrary and is not a cost ranking — §6 gives the reasoning per role.
 
 **Only the two Implementation lanes write code.** The other four are intake and analysis roles
 that end at a docs-only PR. That is the single most important property of this arrangement: it
@@ -370,6 +372,26 @@ invent a per-lane emoji to tell them apart.
 Every handoff states its successor's title explicitly, rather than leaving it to be inferred from
 the baton's filename.
 
+### The outgoing session renames itself to `… (old)`
+
+Fixed titles create one problem at the moment of handover: for as long as both sessions are in the
+list, two of them are called `Implementation Agent (A) 🚧` and nothing distinguishes them. The owner
+then has to guess which is the live one, and the guess is wrong half the time.
+
+So the outgoing session renames **itself** as its final act, appending ` (old)` to its own title —
+`Implementation Agent (A) 🚧 (old)`. The successor is created under the clean name and needs no
+special handling. The suffix goes on the outgoing session, never the incoming one.
+
+A session can do this unaided, and it takes two calls:
+
+1. `get_session` with `session_id` **omitted** — it then describes the calling session, and
+   `ccr.id` is its own session ID.
+2. `set_session_title` with that ID and the suffixed title.
+
+Both are on the `claude-code-remote` MCP server. Verified working from inside a live session on
+2026-08-23, including the round trip back. Rename last, after the baton and every PR have landed —
+a session titled `(old)` that is still pushing commits is worse than one with an ambiguous name.
+
 ### The baton: `docs/agents/state/<agent>.md`
 
 One file per agent, at a stable path, **overwritten** at every handoff. This is the first thing a
@@ -406,6 +428,8 @@ Trigger it on context pressure, on an owner reset, or on finishing a cluster:
    index, the backlog, the journal entry.
 5. **Never write "done" for anything not in a committed diff and observed working.** State which
    failure surfaces were not exercised — device, native, safe-area, prod-data — every time.
+6. **Rename yourself to `… (old)`**, per the subsection above, and name the successor's exact title
+   in your closing message. Do this last — after the baton and every PR have landed.
 
 The successor starts from the same prompt in [`prompts/`](prompts/), which tells it to read its own
 baton first. No prompt needs editing between generations; the baton carries the change.
@@ -453,3 +477,37 @@ Paste the matching prompt from [`prompts/`](prompts/):
 
 Each prompt is written to be pasted verbatim into a cold session. None of them reference a
 conversation, and none need editing between generations.
+
+### Which model, and at what effort
+
+Set both when the session is created; each prompt restates its own pair so a pasted prompt is
+self-contained.
+
+| Agent | Model | Effort | Why this one |
+|---|---|---|---|
+| **Implementation Lane A** 🚧 | Opus 5 | `xhigh` | Migrations, sync-push mirroring, auth, the BLE pipeline. The failure mode is a corrective migration or a wedged outbox — things that cost more to undo than the session cost to run. Never downgrade this lane. |
+| **Implementation Lane B** 🚧 | Opus 5 | `high` | Carries the cache-group, memo-stability, safe-area and instant-paint rules, which are the bug classes `CLAUDE.md` records recurring most. Reversible by a revert, though, which is what buys `high` instead of `xhigh`. |
+| **Review** 📖 | Opus 5 | `xhigh` | The only role measured on noticing what nobody asked about. A weaker model does not fail loudly here — it files a thinner sweep and nothing reveals what it walked past. The least safe place in this set to economise. |
+| **Tuning** 🎶 | Opus 5 | `high` | Proposal item 5 — how many other days a change moves, and by how much — is exactly the distribution work a weaker model waves through while sounding certain. Owner sign-off catches a bad proposal; it does not catch a wrong number inside a plausible one. |
+| **BugFix** 🪲 | Sonnet 5 | `high` | Tracing a symptom to a file is navigation plus matching against bug classes already written down. A weak trace fails visibly — the entry says it could not locate the path — rather than silently. Escalate to Opus for a report that resists two attempts. |
+| **Orchestrator** 🪐 | Sonnet 5 | `medium` | Four mechanical sweeps against scripts that already compute the answer (`next-item.js`, `check-backlog-pointers.js`). Bookkeeping under explicit guardrails. |
+
+**Effort is the bigger dial than the model.** Opus 5 defaults to `xhigh` in Claude Code. Dropping a
+role to `high` or `medium` keeps Opus's judgement while cutting spend, and that is usually the better
+trade than moving to Sonnet at high effort — the thing being bought from Opus is the judgement, not
+the token count.
+
+**Haiku 4.5 is not viable for any standing role here**, for a structural reason rather than a
+capability one: its context window is 200K, and the cold-start orientation read every prompt
+mandates — `CLAUDE.md`, `projectOverview.md`, this file, the backlog, a pillar index — consumes a
+serious fraction of that before any work begins. Haiku belongs in `Explore` subagents doing fan-out
+greps, which return a conclusion instead of file dumps and keep the expensive main-loop context for
+reasoning. Both Review and BugFix should push their search breadth there.
+
+**`claude-fable-5` is an escalation, not a standing assignment.** Reach for it on a specific
+session — a bug that has survived two Lane A attempts, or a Review lens on a scoring pillar where the
+model itself is suspect — never as a role default. Its turns run long.
+
+The Opus/Sonnet gap is narrower than it used to be (roughly 1.7× on API list price, not 5×), so the
+split above is not really about money. With six sessions able to run at once, the constraint is the
+shared rate limit, and these are the two roles where spending less costs least.

@@ -53,6 +53,24 @@ drafted raise has evaporated because parallel work shrank the file underneath it
 treat the number as provisional until the merge lands, not to skip the note.
 
 ---
+## 2026-08-23 — Q-479 shipped; four docs still said it never would (`docs/q479-shipped`)
+
+**projectOverview.md 7879 → 7897 · docs/agents/state/implementation-lane-a.md 150 → 152.**
+
+The owner merged #124 on 2026-08-23, reversing their own 2026-08-18 decision to carry Q-479 as an
+accepted risk. Four places still asserted the opposite, and one of them is the first thing every
+session reads:
+
+- **projectOverview +13**, across the two Q-479 rows. The Lane A row led with *"ACCEPTED RISK …
+  deliberately unmerged"* about a fix that is now on `main`; Review's row still read as open. Both
+  now name the merge, and the Lane A row states the one thing still owed — production and the
+  24-hour window were **not** exercised end to end, so it stays in the live list rather than being
+  archived.
+- **the Lane A baton +2**: it instructed successors that #124 *"must NOT be merged"*. That line had
+  been carried forward through three batons after the decision it described was made, which is the
+  argument for the rewrite-in-full rule rather than against it — a copied line outlives its reason.
+
+Both figures are the script's own, measured on the merged tree.
 
 ## 2026-08-23 — the owner confirms BF-8, and settles BF-7
 
