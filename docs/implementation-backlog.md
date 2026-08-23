@@ -710,7 +710,7 @@ changes shape — check the order still reads correctly on a back-dated day, not
 meal card, End of Day is the last element on the page, both still behave correctly on a past date,
 and the misleading comment is gone.
 
-### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
+### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
 > evaporated, and the real case is a different one. Read this before starting.**
@@ -744,8 +744,56 @@ and the misleading comment is gone.
 > place and losing the ability to tell them apart.
 
 
-- **Gate: owner** — needs a decision on the 6–10 → 1–10 scale mapping before anything is fitted;
-  see the re-measurement note above. Added 2026-08-20 for the same reason as Q-422's.
+- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`,
+  `app/api/body-metadata`; the prompt removal is `components/workout/done-screen.tsx`.
+- **✅ DECIDED BY THE OWNER 2026-08-23. The gate is cleared and the scope changed — read this
+  before the older notes below, which were written against a narrower question.**
+  1. **Delete the user-facing prompt.** *"Get rid of the user facing 'how hard was the session'."*
+     `done-screen.tsx:398` — *How hard was that session?* — goes. The owner has said twice that they
+     cannot judge a session as one number and can judge a set, and the 26% fill rate agrees.
+  2. **Derive a background session intensity from the set RPEs instead.** Because it stops being a
+     value anyone types, **the scale question that gated this entry dissolves** — the owner's words:
+     *"it doesnt matter what number we use. You could even use 1-5 and map 6→1 and 10→5."*
+     **Keep the stored field on 1–10** and do the mapping internally: four call sites already read
+     `sessionRpe` on that scale, so this avoids a migration for no behavioural gain. The internal
+     mapping is free to change later without touching them.
+  3. **Store derived separately from self-reported**, so the 20 real ratings in history stay
+     distinguishable and a re-fit only recomputes the derived ones.
+  4. **The training-load chart keeps its line, labelled as derived.** It goes from 20 points to 44,
+     which is what makes the trend readable; the label costs nothing.
+- **⚠ THE BIGGER CORRECTION, AND IT IS THE REASON THIS ENTRY MATTERS.** This entry and Q-421 both
+  said heart rate had made RPE redundant for energy. **The owner rejected that and was right:**
+  *"HR only depicts cardio/heart rate, not CNS."*
+  - **What the code does today is a hard override, not a blend.** `estSessionKcal`
+    (`packages/shared/src/health/workout-energy.ts:196`): if an `avgBpm` exists, Keytel produces the
+    kcal and **RPE contributes nothing**; RPE only picks a MET tier when HR is missing.
+  - **Measured 2026-08-23 over the 44 sessions carrying both an `avg_bpm` and rated sets:
+    `corr(avgBpm, mean set RPE) = +0.083`.** They are uncorrelated. Whatever heart rate is
+    measuring on a lifting day, it is not how hard the session was.
+  - **Two structural reasons, both checked in source.** `summariseWorkoutHr`
+    (`packages/shared/src/workout/hr-summary.ts:25`) takes a **flat mean over every reading in the
+    session, rest periods included** — so a heavy day with long rests averages *low* precisely when
+    it was hardest. And Keytel's equation was fitted on steady-state aerobic exercise; it carries no
+    anaerobic term and nothing for neuromuscular cost.
+  - **What that does to real numbers** (male, 70.9 kg, 33 — the owner's own profile):
+
+    | session | avg HR | mean set RPE | Keytel |
+    |---|---:|---:|---:|
+    | **74 min**, mean pct 74.4, one set at RPE 9 | 73 | 7.27 | **207 kcal** |
+    | 48 min | 104 | 7.67 | **359 kcal** |
+    | 45 min deload at 50% 1RM | 76 | 6.00 | 146 kcal |
+
+    **The longer, harder session is credited with 40% fewer calories**, at 2.8 kcal/min — barely
+    above sitting. The ordering is inverted, and inverted against the heaviest work.
+  - **So HR and the derived intensity must COMBINE — HR as the base, RPE as a correction on top.**
+    Not RPE overriding HR either; that is the same mistake mirrored. A zero correlation is what
+    makes each one worth having.
+- **The correction formula is NOT picked here.** It is a scoring change (Tuning proposes, the owner
+  signs off, Lane A implements) and it has to be **fitted, not designed** — the fitting target is
+  **Q-422**'s adaptive-TDEE back-solve, which recovers true maintenance from paired intake and
+  weight and is the only ground truth this app has for a day's energy. **Q-420 supplies the input
+  Q-422 needs; Q-422 is how anyone knows the combination is right.** They are one project in two
+  parts, and this entry is the part that can start now.
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
@@ -859,6 +907,14 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 - **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
   2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
   further down the entry, and prose is exactly what the `Gate:` field replaced.
+- **Needs:** Q-420
+- **⚑ THE DIRECTION IS SETTLED (owner, 2026-08-23) — what is still gated is the fitted numbers.**
+  Q-420 records the measurement that decides it: across 44 sessions with both signals,
+  `corr(avgBpm, mean set RPE) = +0.083`, and a 74-minute session the owner rated 7.27 is credited
+  **207 kcal** against 359 for a 48-minute one, because `avgBpm` is a flat mean over rest periods
+  and Keytel has no neuromuscular term. **Heart rate is the base and the derived intensity is a
+  correction on it — neither overrides the other.** What this entry owes is the correction fitted
+  against the adaptive-TDEE back-solve, not a formula chosen for looking reasonable.
 - **Branch:** `feat/calibrated-active-energy-multiplier`
 - **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
   calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app
