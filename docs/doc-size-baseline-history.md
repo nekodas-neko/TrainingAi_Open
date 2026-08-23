@@ -1769,3 +1769,24 @@ were one entry rewritten.
 
 A baton is rewritten wholesale by each successor, so this number falls back at the next handover.
 
+## 2026-08-23 — `projectOverview.md` 7977 → 7983
+
+Six lines: a Known Issues row for LA-20, a live production 500 found by the session-start
+`error_events` read. It belongs in the index rather than only in the journal because what is
+outstanding is a *production* verification — the next session has to know to check `error_events`
+before believing the fault is gone, and "it stopped" is not "it was fixed".
+
+(The 7984 in the LB-4 branch and this 7983 are the same section being edited twice in one day; the
+number here is the merged count, not a second raise on top of that one.)
+
+## 2026-08-23 — `projectOverview.md` 7977 → 7984
+
+Seven lines: one Current Status entry for LB-4, a user-visible staleness fix. The section is
+supposed to grow by one entry per shipped change and shrink on the compaction sweep, and this is
+that growth rather than detail that belongs elsewhere — the mechanism, the mutation results and the
+six deferred call sites are all in the journal entry and the LB-6 backlog entry.
+
+Worth noting for whoever runs the next sweep: Current Status is now ~178 lines across a dozen
+entries, and three separate PRs today each had to trim prose to avoid tripping this check. That is
+the ratchet doing its job, but it is also the signal that the sweep is due — the older half of the
+section describes work that has been on `main` for days.
