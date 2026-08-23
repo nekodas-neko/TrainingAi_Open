@@ -86,8 +86,11 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 - [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](../../superpowers/plans/2026-08-18-device-primary-compute.md)
   — **closing D2 Task 5/6 and D3 (2026-08-18, owner-directed focus).** The phone drains, stores and
   cursors correctly and then **nothing consumes it** — a repo-wide grep finds no caller for
-  `getUnrolledRaw` or `markRolledUp`. Measured: `aggregateOuraRawSamples` is 1,110 lines with only **17
-  DB-coupled lines**, so the device rollup is a port behind a `RollupIO` interface, not a rewrite.
+  `getUnrolledRaw` or `markRolledUp`. The device rollup is a port behind a `RollupIO` interface, not a
+  rewrite — **Task 2 shipped 2026-08-23**, see
+  [the journal entry](../../overview/entries/2026-08-23-oura-rollup-io-port.md). Note the plan's "17
+  DB-coupled lines" is a **line** count: the port is **22 store operations**, and `run.ts` still
+  reaches `onnxruntime-node`, so the rollup's I/O is portable and its models are not.
   Two blockers verified today: production `script-src` has **no `wasm-unsafe-eval`**, so WASM cannot
   instantiate on the device at all; and the app's 0.22 vCPU is **unexplained** after three refuted
   hypotheses. Backlog Q-545 / Q-546 / Q-547.
@@ -205,8 +208,9 @@ Live at the time of writing (2026-07-30):
 - [`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`](../../handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md)
   — **the storage decision, the `disk_full` recovery (805 MB → 171 MB), and the D-track pivot.** Filed
   under `platform` because it spans the bill and the pipeline, so the `devices` glob below misses it.
-  Carries the three refuted CPU hypotheses and the measured portability of the rollup (1,110 lines,
-  17 DB-coupled) — both expensive to re-derive.
+  Carries the three refuted CPU hypotheses and the measured portability of the rollup — both
+  expensive to re-derive. (Its "17 DB-coupled lines" counted lines, not operations; the extracted
+  port is 22 methods.)
 
 - Handoffs: `ls docs/handoff-*-devices-*.md` — plus
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
