@@ -2,7 +2,7 @@ import type { FoodItem } from '@trainingai/shared/types/nutrition'
 import { sanitiseNutrition } from '@trainingai/shared/nutrition/scan-totals'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateFoodItems } from '@/lib/cache-groups'
 
 /**
@@ -89,7 +89,7 @@ export async function createFoodItem(input: NewFoodItem, userId?: string): Promi
     // Brisbane until 10am every day.
     await store.queueMutation({ userId, domain: 'food_items', date: todayInTz(), payload: body })
     await invalidateFoodItems()
-    pushMutations(userId).catch(() => {})
+    pushThenRevalidate(userId, invalidateFoodItems)
     return item
   }
 
