@@ -151,10 +151,23 @@ export const scheduleDays = pgTable('schedule_days', {
   updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.scheduleId, t.dayOfWeek] })])
 
+// TWO foreign keys to `program_sessions`, and until 2026-08-23 the dead one owned the name the live
+// one was used under (Q-474). `session_id` is the live link — every read and the only write use it.
+// `program_session_id` (079_ai_dynamic_periodization.sql, "for prescription trigger linkage") has
+// never been written or read by any code, and 0 of the owner's 91 rows have it set.
+//
+// The Drizzle property names now match what the columns hold, which is the whole fix: reaching for
+// `workoutSessions.programSessionId` gets the column that actually stores a program-session id.
+// Dropping the dead column is a data-losing migration and needs owner confirmation, so it is named
+// `unusedProgramSessionId` instead — a name nobody reaches for by accident.
+//
+// It has already cost a session: a repro fixture populated `program_session_id`, the periodization
+// block took its `null` branch, and the honest reading of that run was "the race does not exist".
 export const workoutSessions = pgTable('workout_sessions', {
   id:                uuid('id').primaryKey().defaultRandom(),
   userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  sessionId:         uuid('session_id').references(() => programSessions.id, { onDelete: 'set null' }),
+  /** The live link to `program_sessions`. Column name is historical; the property says what it holds. */
+  programSessionId:  uuid('session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionName:       text('session_name').notNull(),
   startedAt:         timestamp('started_at', { withTimezone: true }).notNull(),
   completedAt:       timestamp('completed_at', { withTimezone: true }),
@@ -165,7 +178,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   isEarlyDeload:     boolean('is_early_deload').notNull().default(false),
   wasOverride:       boolean('was_override').notNull().default(false),
   intensityMode:     text('intensity_mode'),
-  programSessionId:  uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
+  /** DEAD — never written, never read. See the block comment above; do not start using it. */
+  unusedProgramSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionRpe:        integer('session_rpe'),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),

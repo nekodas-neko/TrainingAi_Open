@@ -747,14 +747,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
 
   // ── Logging ───────────────────────────────────────────────────────────────
   async createWorkoutSession(
-    userId: string, sessionId: string | undefined, sessionName: string, startedAt: Date,
+    userId: string, programSessionId: string | undefined, sessionName: string, startedAt: Date,
     phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload = false,
   ): Promise<WorkoutSession> {
     const [r] = await this.db.insert(s.workoutSessions)
-      .values({ userId, sessionId: sessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload })
+      .values({ userId, programSessionId: programSessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload })
       .returning()
     return {
-      id: r.id, userId: r.userId, sessionId: r.sessionId ?? undefined,
+      id: r.id, userId: r.userId, sessionId: r.programSessionId ?? undefined,
       sessionName: r.sessionName, startedAt: r.startedAt,
       phaseId: r.phaseId ?? undefined, phaseType: (r.phaseType as ProgramPhaseType | null) ?? undefined,
       isEarlyDeload: r.isEarlyDeload,
@@ -766,13 +766,13 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   }
 
   async ensureWorkoutSession(
-    userId: string, sessionId: string, programSessionId: string | undefined,
+    userId: string, workoutSessionId: string, programSessionId: string | undefined,
     sessionName: string, startedAt: Date,
     phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload = false,
     intensityMode?: 'full' | 'deload' | null, wasOverride = false,
   ): Promise<EnsuredWorkoutSession> {
     const inserted = await this.db.insert(s.workoutSessions)
-      .values({ id: sessionId, userId, sessionId: programSessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload, wasOverride, intensityMode: intensityMode ?? null })
+      .values({ id: workoutSessionId, userId, programSessionId: programSessionId ?? null, sessionName, startedAt, phaseId: phaseId ?? null, phaseType: phaseType ?? null, isEarlyDeload, wasOverride, intensityMode: intensityMode ?? null })
       .onConflictDoNothing()
       .returning({ id: s.workoutSessions.id, phaseId: s.workoutSessions.phaseId, phaseType: s.workoutSessions.phaseType, isEarlyDeload: s.workoutSessions.isEarlyDeload })
     if (inserted.length > 0) {
@@ -787,7 +787,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const [existing] = await this.db
       .select({ phaseId: s.workoutSessions.phaseId, phaseType: s.workoutSessions.phaseType, isEarlyDeload: s.workoutSessions.isEarlyDeload })
       .from(s.workoutSessions)
-      .where(and(eq(s.workoutSessions.id, sessionId), eq(s.workoutSessions.userId, userId), isNull(s.workoutSessions.deletedAt)))
+      .where(and(eq(s.workoutSessions.id, workoutSessionId), eq(s.workoutSessions.userId, userId), isNull(s.workoutSessions.deletedAt)))
     if (!existing) {
       // Q-462: typed, so the route can answer 404 instead of 500. The block itself is correct and
       // unchanged — nothing is written — but a permanent, correctly-refused condition was reported
@@ -800,7 +800,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       throw new NotFoundError('Workout session')
     }
     return {
-      id: sessionId, wasInserted: false,
+      id: workoutSessionId, wasInserted: false,
       phaseId: existing.phaseId ?? undefined,
       phaseType: (existing.phaseType as ProgramPhaseType | null) ?? undefined,
       isEarlyDeload: existing.isEarlyDeload ?? false,
@@ -1098,7 +1098,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sessionName: sql<string>`COALESCE(${s.programSessions.name}, ${s.workoutSessions.sessionName})`,
     })
       .from(s.workoutSessions)
-      .leftJoin(s.programSessions, eq(s.workoutSessions.sessionId, s.programSessions.id))
+      .leftJoin(s.programSessions, eq(s.workoutSessions.programSessionId, s.programSessions.id))
       // Only include sessions that have at least one logged exercise
       .innerJoin(s.exerciseLogs, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
       .where(and(
@@ -1154,7 +1154,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       sessionName: sql<string>`COALESCE(${s.programSessions.name}, ${s.workoutSessions.sessionName})`,
     })
       .from(s.workoutSessions)
-      .leftJoin(s.programSessions, eq(s.workoutSessions.sessionId, s.programSessions.id))
+      .leftJoin(s.programSessions, eq(s.workoutSessions.programSessionId, s.programSessions.id))
       .innerJoin(s.exerciseLogs, eq(s.exerciseLogs.workoutSessionId, s.workoutSessions.id))
       .where(and(
         eq(s.workoutSessions.userId, userId),
@@ -1188,7 +1188,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       : []
 
     return wsRows.map(ws => ({
-      id: ws.id, userId: ws.userId, sessionId: ws.sessionId ?? undefined,
+      id: ws.id, userId: ws.userId, sessionId: ws.programSessionId ?? undefined,
       sessionName: ws.sessionName, startedAt: ws.startedAt,
       completedAt: ws.completedAt ?? undefined,
       phaseId: ws.phaseId ?? undefined,
@@ -1241,7 +1241,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const from = aestMidnight(y, m, d)
     const to   = aestMidnight(y, m, d + 1)
     const rows = await this.db.select({
-      sessionId: s.workoutSessions.sessionId,
+      sessionId: s.workoutSessions.programSessionId,
       exerciseName: s.exerciseLogs.exerciseName,
     })
       .from(s.exerciseLogs)
@@ -1261,7 +1261,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     const from = aestMidnight(y, m, d)
     const to   = aestMidnight(y, m, d + 1)
     const rows = await this.db.select({
-      sessionId:   s.workoutSessions.sessionId,
+      sessionId:   s.workoutSessions.programSessionId,
       sessionName: s.workoutSessions.sessionName,
       startedAt:   s.workoutSessions.startedAt,
       completedAt: s.workoutSessions.completedAt,
@@ -3038,7 +3038,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       .where(
         and(
           eq(s.workoutSessions.userId, userId),
-          inArray(s.workoutSessions.sessionId, programSessionIds),
+          inArray(s.workoutSessions.programSessionId, programSessionIds),
           isNull(s.workoutSessions.deletedAt),
         )
       )
