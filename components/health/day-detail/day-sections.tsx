@@ -1,10 +1,12 @@
 "use client";
 
 import { memo } from "react";
-import { Dumbbell, Footprints, Moon, Scale } from "lucide-react";
+import { Dumbbell, Footprints, Moon, Pencil, Scale, Trash2 } from "lucide-react";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { formatTimeOfDay } from "@trainingai/shared/date-utils";
-import type { DayLogResult, DayBodyMeta, DaySleep, DayHrPoint } from "@/app/api/day-log/route";
+import type { DayLogResult, DayExercise, DayBodyMeta, DaySleep, DayHrPoint } from "@/app/api/day-log/route";
+import type { ActivityLog } from "@trainingai/shared/types";
+import { shortSessionName } from "@trainingai/shared/utils";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import { energyDaySummary, type SessionKcal } from "@/components/health/day-detail/energy-summary";
 
@@ -39,6 +41,11 @@ function KeyValues({ rows }: { rows: [string, string][] }) {
   );
 }
 
+/** 48dp tap target for the row-level edit/delete controls (LB-1). Siblings sit in a `gap-2` row so
+ *  two destructive targets are never adjacent without the 8dp the touch rule asks for. */
+const ICON_BTN =
+  "flex h-12 w-12 flex-none items-center justify-center rounded-xl text-muted-foreground transition active:scale-95 disabled:opacity-40";
+
 const hm = (hours: number) => `${Math.floor(hours)}h ${Math.round((hours % 1) * 60)}m`;
 
 /** Whole-day HR, already bucketed server-side (DAY_HR_BUCKET_MIN). Drawn as a plain polyline —
@@ -66,8 +73,17 @@ export const DayHrTrace = memo(function DayHrTrace({ points }: { points: DayHrPo
   );
 });
 
+export interface DayEntryControls {
+  /** LB-1. Absent → the section renders read-only, which is what it did before the controls came
+   *  back. Present → each row gets a 48dp edit and delete target. */
+  onEditExercise?: (payload: { ex: DayExercise; weights: number[]; reps: number[] }) => void;
+  onDeleteExercise?: (ex: DayExercise) => void;
+  onDeleteSession?: (payload: { id: string; name: string }) => void;
+}
+
 export const TrainingSection = memo(function TrainingSection(
-  { data, kcalBySession }: { data: DayLogResult; kcalBySession?: Map<string, SessionKcal> },
+  { data, kcalBySession, onEditExercise, onDeleteExercise, onDeleteSession }:
+    { data: DayLogResult; kcalBySession?: Map<string, SessionKcal> } & DayEntryControls,
 ) {
   if (data.exercises.length === 0) return null;
   // Grouped by session **id**, not name (Q-391). A name is not identity: repeat the same session
@@ -102,9 +118,23 @@ export const TrainingSection = memo(function TrainingSection(
                   {dur.start} → {dur.end} · {dur.minutes} min
                 </span>
               )}
+              {onDeleteSession && (
+                <button
+                  type="button"
+                  aria-label={`Delete ${sessionName} session`}
+                  data-session-id={sessionId}
+                  onClick={() => onDeleteSession({ id: sessionId, name: shortSessionName(sessionName) })}
+                  className={`${ICON_BTN} ${dur ? "-my-2 -mr-2" : "-my-2 -mr-2 ml-auto"}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
             {exercises.map(ex => (
-              <div key={ex.exerciseLogId} className="flex items-baseline gap-2.5 border-b border-white/5 py-2">
+              <div
+                key={ex.exerciseLogId}
+                className={`flex gap-2 border-b border-white/5 ${onEditExercise || onDeleteExercise ? "items-center py-1" : "items-baseline py-2"}`}
+              >
                 <span className="min-w-0 flex-1 truncate text-[12.5px]">{ex.name}</span>
                 <span className="flex-none text-[10.5px] tabular-nums text-muted-foreground">
                   {ex.sets ?? 0} × {ex.reps?.[0] ?? 0}
@@ -113,6 +143,26 @@ export const TrainingSection = memo(function TrainingSection(
                   {ex.weightKg ?? "—"}
                   <i className="ml-0.5 text-[9px] font-semibold not-italic text-muted-foreground">kg</i>
                 </span>
+                {onEditExercise && (
+                  <button
+                    type="button"
+                    aria-label={`Edit ${ex.name}`}
+                    onClick={() => onEditExercise({ ex, weights: [...ex.setWeights], reps: [...ex.reps] })}
+                    className={ICON_BTN}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                {onDeleteExercise && (
+                  <button
+                    type="button"
+                    aria-label={`Delete ${ex.name}`}
+                    onClick={() => onDeleteExercise(ex)}
+                    className={`${ICON_BTN} -mr-2`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
             {volume > 0 && (
@@ -163,7 +213,9 @@ function paceLabel(secPerKm: number): string {
   return `${Math.floor(secPerKm / 60)}:${String(Math.round(secPerKm % 60)).padStart(2, "0")}/km`;
 }
 
-export const ActivitySection = memo(function ActivitySection({ data }: { data: DayLogResult }) {
+export const ActivitySection = memo(function ActivitySection(
+  { data, onDeleteActivity }: { data: DayLogResult; onDeleteActivity?: (log: ActivityLog) => void },
+) {
   if (data.activityLogs.length === 0) return null;
   return (
     <div>
@@ -190,6 +242,16 @@ export const ActivitySection = memo(function ActivitySection({ data }: { data: D
               </span>
               {a.durationMin != null && (
                 <span className="flex-none text-[0.9rem] font-bold tabular-nums">{durationLabel(a.durationMin)}</span>
+              )}
+              {onDeleteActivity && (
+                <button
+                  type="button"
+                  aria-label={`Delete ${a.title}`}
+                  onClick={() => onDeleteActivity(a)}
+                  className={`${ICON_BTN} -my-2 -mr-2`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               )}
             </div>
             {facts.length > 0 && (

@@ -94,6 +94,11 @@ grep -n '\[app-shell\]' docs/implementation-backlog.md   # 2 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **`components/health/day-overlay-sheet.tsx` is unreachable and still in the tree** (LB-3). LB-1
+  took the edit/delete controls off it and onto `/health/day` (2026-08-23, v1.334.0); the sheet still
+  owns three affordances the day screen has not got, so it was not deleted —
+  [`journal`](../../overview/entries/2026-08-23-day-screen-edit-delete.md).
+
 - ⚠️ **Q-154 — three inline sparklines remain, and the primitive cannot draw them yet.** Half the
   original list turned out to be *time-axis* charts (the primitive projects x by index) and is now
   `EXEMPT` in `scripts/check-sparkline-primitive.js`; the rest need five new props on

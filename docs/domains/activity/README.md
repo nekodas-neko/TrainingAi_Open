@@ -97,8 +97,16 @@ grep -n '\[activity\]' docs/implementation-backlog.md   # 3 queue items today (Q
 
 Live at the time of writing (2026-07-30, plus the 2026-08-07 entry below):
 
+- ⚠️ **Editing and deleting logged training was unreachable for a fortnight** (LB-1, fixed 2026-08-23,
+  v1.334.0). Q-110 moved the calendar day-tap to `/health/day` and left the four controls on a sheet
+  nothing opens. They now live on the day screen, driven by `lib/hooks/use-day-entry-mutations.ts`,
+  which `health-content.tsx` shares. **Not device-verified** —
+  [`journal`](../../overview/entries/2026-08-23-day-screen-edit-delete.md).
+
 - ⛔ **Q-488 — the activity delete never updates the local store, and the obvious fix is a no-op.**
-  Re-scoped 2026-08-18 and handed to Lane A: `lib/local-store` has no `deleteActivityLog`, and
+  **⚠ Stale as written (2026-08-23): `deleteActivityLog` exists now and the delete path calls it.**
+  See the caveat on the `projectOverview.md` row for why the row itself has not been struck.
+  Re-scoped 2026-08-18 and handed to Lane A: `lib/local-store` had no `deleteActivityLog`, and
   `upsertActivityLog` omits `deleted_at` from both its INSERT list and its `ON CONFLICT DO UPDATE
   SET`, so stamping `deletedAt` on a read-merged record type-checks and changes nothing. The fix
   needs a local-store method first, then four lines in `app/health/health-content.tsx`. Evidence and

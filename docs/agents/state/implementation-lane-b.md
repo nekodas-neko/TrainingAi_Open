@@ -4,45 +4,37 @@
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread
 > even with a perfect baton.
 
-**Updated:** 2026-08-23 · **By:** the eighth Lane B run · **Next ID:** `LB-2` (`LB-1` is filed and
-gated, see below)
+**Updated:** 2026-08-23 · **By:** the eighth Lane B run · **Next ID:** `LB-4`
 
 ## Now
-Nothing in flight. Three PRs merged on 2026-08-23 (#296, #297, #300), all green.
+Nothing in flight. Five PRs merged on 2026-08-23 (#296, #297, #300, #311, #313); LB-1 is the sixth.
 
 ## Waiting on the owner
-**LB-1 — nothing in the app can edit or delete a logged workout, exercise or activity.** `Gate:
-owner`, and it is the only Lane B item that needs a decision. The four controls that did this live in
-`DayOverlaySheet`, which **nothing can open** — `dayOverlay` starts null and every setter is a
-`prev => prev ? … : null` no-op or `null`. `/health/day`, where the calendar tap lands instead, has
-no edit or delete controls at all. Three DELETE routes have no reachable caller. The entry carries
-the inventory and a recommendation with two alternatives; do not build it before the owner picks one,
-because the naive port deletes the wrong day's data (that screen swipes between days while the
-handlers hold a captured date).
+Nothing. LB-1's gate was answered 2026-08-23 (*"Yes put the controls where reccomended"* — the
+recommended option) and shipped in v1.334.0; **LB-3** is what is left, and needs no decision.
 
 ## This run (2026-08-23, eighth)
 
+Each has a journal entry in `docs/overview/entries/2026-08-23-*`.
+
 - **Q-362b** (v1.333.2, #296) — day surfaces group by session **id**. Its guard asserts on the
   **durations, not the card count**: two cards appeared before the fix too, both reading the later
-  session's 82 min. [Journal](../../overview/entries/2026-08-23-day-surfaces-session-identity.md).
-- **LB-1 filed, then rewritten** (#297) — see *Waiting on the owner*.
-  [Journal](../../overview/entries/2026-08-23-day-edit-delete-unreachable.md).
-- **Q-421** (v1.333.3, #300) — a workout's kcal reads `Est. HR kcal` / `Est. MET kcal`, and the done
-  screen says "from heart rate" rather than naming an effort tier that did not produce the number.
-  [Journal](../../overview/entries/2026-08-23-label-session-kcal-basis.md).
-- **BF-4's Lane B half** (v1.333.4, #311) — the scan photo is bounded to 1024 px before upload,
-  measured **−86.6%** (2,266,776 → 302,944 base64 chars). **It is NOT shown to be the owner's
-  slowdown** — that entry already demoted the payload — and #112, the client-timing sink and the
-  Railway cold-start check stay open and are Lane A's.
-  [Journal](../../overview/entries/2026-08-23-bounded-scan-photo-payload.md).
+  session's 82 min.
+- **Q-421** (v1.333.3, #300) — a workout's kcal names its basis: `Est. HR kcal` / `Est. MET kcal`.
+- **BF-4's Lane B half** (v1.333.4, #311) — scan photo bounded to 1024 px, measured **−86.6%**.
+  **NOT shown to be the owner's slowdown**; #112 and the cold-start check stay open, and are Lane A's.
+- **Q-326** (v1.333.5, #313) — deleting a meal type with entries offers the move instead of refusing.
+- **LB-1** (v1.334.0) — edit/delete for logged training, back on `/health/day`. Four handlers now in
+  `lib/hooks/use-day-entry-mutations.ts`, shared with `health-content.tsx` so there is one write path
+  per domain. `day-overlay-sheet.tsx` deliberately **not** deleted — filed as **LB-3**.
 
 ## Next
 Top-down with `node scripts/next-item.js --lane B`, and **re-verify the premise first** — across the
 last two runs **five of the seven entries taken had a wrong premise**. The tool says what is
 startable, never whether it is true.
 
-**BF-4 still reads as top and its Lane B half is done** — what remains there is Lane A's, so skip to
-**Q-326** (meal-type delete dialog), then **Q-323 / the `calorie-budget-surface` batch (Q-417 +
+**BF-4 still reads as top and its Lane B half is done** — what remains there is Lane A's, and **Q-326
+is now shipped too**, so skip both and go to **Q-323 / the `calorie-budget-surface` batch (Q-417 +
 Q-415)**, three calorie budgets disagreeing across Home and Nutrition and still the largest coherent
 piece of Lane B work. **Q-406 before Q-395** — `food-row.tsx` must be extracted first.
 
@@ -50,8 +42,12 @@ piece of Lane B work. **Q-406 before Q-395** — `food-row.tsx` must be extracte
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.
 - **`floor(pct/10)` is the right RPE prefill** (Q-423, refuted on production data). Do not re-propose
   `round`; the review also records why that entry's own acceptance criterion picks the wrong mapping.
-- **`DayOverlaySheet` is unreachable** — measured twice. Do not fix bugs inside it; two sessions have
-  already done that, the second being this lane.
+- **`DayOverlaySheet` is unreachable** — measured twice; do not fix bugs inside it. LB-1 took its
+  edit/delete controls to `/health/day`; **LB-3** decides its remaining three and deletes the file.
+- **`Q-354` is why a spec must tap, not click.** LB-1's first run read exactly like the new controls
+  were wired to nothing — button found, `.click()` clean, no dialog; `el.click()` via `evaluate`
+  opened it, which separated harness from product. `page.touchscreen.tap()` for anything inside a
+  `[data-swipe-carousel]`.
 - **The seeded user is missing only `date_of_birth`** — `height_cm` and `sex` are both present.
 - Still standing: `FactorBar` is not a colour-only violation; absent scores are handled correctly on
   all 14 surfaces; Q-309 is refuted as a user-facing bug while Q-354 (mouse clicks on Nutrition) is
@@ -65,13 +61,15 @@ piece of Lane B work. **Q-406 before Q-395** — `food-row.tsx` must be extracte
 - Home with the **"Accent ring"** style (Q-281) — the band word is 7.5 px.
 - A **drain run** confirming `/admin/oura-ble` holds still while the log streams (Q-532).
 - **Q-450's device path** — the E2E run took the web fallback, not SQLite + outbox.
-- **Q-421's MET card** (sandbox constant makes it 0, so only the HR label was ever rendered) and
-  **BF-4's `getPhoto` bound** — a wrong field pair downscales silently never, which looks exactly
-  like "the fix did not help".
+- **Q-421's MET card** (sandbox constant makes it 0, so only the HR label was rendered) and **BF-4's
+  `getPhoto` bound** — a wrong field pair downscales silently never, which looks exactly like "the
+  fix did not help". **Q-326's reassign dialog** too.
+- **LB-1's four controls** — 48dp targets and the confirm dialogs' safe-area clearance, plus the
+  local-store mirroring in all four handlers, which never runs on web (`getLocalStore` is null).
 
 ## Claimed paths
-None held. This run touched `scripts/check-backlog-pointers.js` (two new rules) and
-`docs/doc-size-baseline*`; neither is a lane path and neither is held.
+None held. This run touched `scripts/check-backlog-pointers.js`, `docs/doc-size-baseline*` and
+`app/health/day/page.tsx` (a `userId` prop); none is a lane path and none is held.
 
 ## Gotchas worth carrying
 - **This clone is SHALLOW, and `git fetch origin main` RE-SHALLOWS it every time.** Not just on
@@ -97,5 +95,7 @@ None held. This run touched `scripts/check-backlog-pointers.js` (two new rules) 
 - **`E2E_BASE_URL=http://localhost:3000`** points Playwright at a running dev server — much faster
   than letting it start its own for a one-off probe.
 - **`pnpm check:rules` ran 51 of 51 on 2026-08-23.** Quote the count, never "pass".
+- **`projectOverview.md` and this baton both sit ON their ratchet baselines** — a Known-Issue rewrite
+  or a run summary must come out net-zero. LB-1 trimmed each of them six times to land.
 - **Mutation-check every guard**, and check what a passing assertion would ACCEPT — that is why the
   Q-362b spec asserts on durations rather than card count.

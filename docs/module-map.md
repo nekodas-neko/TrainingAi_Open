@@ -431,6 +431,7 @@ check `components/ui/` first** (`CLAUDE.md` visual-consistency rules).
 | Sheet back-dismiss | `lib/hooks/use-sheet-back-dismiss.ts` |
 | Roving tabindex + arrow keys for a `role="radiogroup"` | `lib/hooks/use-roving-radio-group.ts` — a hook, not a component: the 8 call sites render 5 different shapes, so what they share is behaviour. Selection is delegated by clicking the target, so each site keeps its own semantics (Q-350). |
 | Pin a scroll panel to its newest content | `lib/hooks/use-scroll-to-bottom.ts` — ref goes on the `overflow-y-auto` element. **Never `scrollIntoView` a sentinel child**: it scrolls every scrollable ancestor including the document, so an appending panel drags the whole page (Q-532). |
+| Edit/delete a day's logged exercise, session or activity | `lib/hooks/use-day-entry-mutations.ts` — the four write handlers plus their dialog state, shared by `/health/day` and `health-content.tsx` so there is one write path per domain (LB-1). Each mirrors into the local store and clears the caches **before** the caller refetches; `onChanged(date)` is that refetch. |
 | Weather | `lib/weather/use-weather.ts` |
 | PiP mode / actions | `hooks/use-pip-mode.ts`, `hooks/use-pip-actions.ts` |
 | Health calcs | `app/health/hooks/use-health-calcs.ts` |

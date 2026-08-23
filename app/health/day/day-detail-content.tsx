@@ -16,6 +16,8 @@ import type { DayLogResult } from "@/app/api/day-log/route";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
 import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { useDayEntryMutations } from "@/lib/hooks/use-day-entry-mutations";
+import { DayOverlayDialogs } from "@/components/health/day-overlay-dialogs";
 import { EnergyTimelineChart } from "@/components/health/energy-timeline-chart";
 import { workoutKcalBySession } from "@/components/health/day-detail/energy-summary";
 
@@ -81,7 +83,7 @@ function WeekStrip({ selected, onPick, today }: { selected: string; onPick: (d: 
   );
 }
 
-export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?: string }) {
+export function DayDetailContent({ initialDate, tz, userId }: { initialDate: string; tz?: string; userId?: string }) {
   const router = useTransitionRouter();
   const today = useMemo(() => todayInTz(tz), [tz]);
   const [selectedDate, setSelectedDate] = useState(initialDate);
@@ -107,10 +109,11 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
    *  reads the CURRENT day rather than the one captured when its fetch started. */
   const dateRef = useRef(initialDate);
 
-  const load = useCallback((date: string) => {
-    // Seed synchronously so a day already visited repaints instantly instead of flashing empty.
-    const seed = readCacheSync<DayLogResult>(keyFor(date));
-    setData(seed ?? null);
+  /** `seed: false` is the post-write refetch (LB-1): the caches have just been cleared, so seeding
+   *  would blank every section for the length of the round-trip. Keeping the current paint and
+   *  swapping it when the response lands is the instant-paint rule applied to a mutation. */
+  const load = useCallback((date: string, { seed = true }: { seed?: boolean } = {}) => {
+    if (seed) setData(readCacheSync<DayLogResult>(keyFor(date)) ?? null);
     cachedFetch<DayLogResult>(keyFor(date), `/api/day-log?date=${date}`, DAY_LOG_TTL, d => {
       // Guarded on the date rather than applied blind: swiping fast can land a slower response for
       // a day the user has already moved off, which would repaint the wrong day's data.
@@ -119,7 +122,7 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
 
     // Separate call rather than folding energy into /api/day-log: computeEnergyBalance reads a
     // 30-day window to calibrate maintenance, and the day payload is fetched on every swipe.
-    setEnergy(readCacheSync<EnergyBalanceResponse>(energyKeyFor(date)) ?? null);
+    if (seed) setEnergy(readCacheSync<EnergyBalanceResponse>(energyKeyFor(date)) ?? null);
     cachedFetch<EnergyBalanceResponse>(
       energyKeyFor(date), `/api/nutrition/energy-balance?date=${date}`, ENERGY_BALANCE_TTL,
       e => { setEnergy(prev => (dateRef.current === date ? e : prev)); },
@@ -127,7 +130,7 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
 
     // Q-414: the energy chart needs each meal's *time*, which the day payload does not carry —
     // it reports the day's totals. Same date-guard as above.
-    setFoodLogs(readCacheSync<FoodLogWithItem[]>(foodKeyFor(date)) ?? null);
+    if (seed) setFoodLogs(readCacheSync<FoodLogWithItem[]>(foodKeyFor(date)) ?? null);
     cachedFetch<FoodLogWithItem[]>(
       foodKeyFor(date), `/api/nutrition/food-logs?date=${date}`, DAY_LOG_TTL,
       f => { setFoodLogs(prev => (dateRef.current === date ? f : prev)); },
@@ -135,6 +138,14 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
   }, []);
 
   useEffect(() => { dateRef.current = selectedDate; load(selectedDate); }, [selectedDate, load]);
+
+  // LB-1: edit/delete for this day's entries. The date is read from `dateRef` at action time, not
+  // captured at render, so a swipe mid-dialog refreshes the day actually on screen — the entities
+  // themselves are addressed by id, so what gets written is never in doubt.
+  const currentDate = useCallback(() => dateRef.current, []);
+  const afterWrite = useCallback((date: string) => { load(date, { seed: false }); }, [load]);
+  const mut = useDayEntryMutations(userId, currentDate, afterWrite);
+  const { setDeleteEx, setDeleteSession, setDeleteActivity } = mut;
 
   const go = useCallback((next: string, dir: number) => {
     if (next > today) return;
@@ -154,6 +165,10 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
     },
     { axis: "x", filterTaps: true, pointer: { touch: true } },
   );
+
+  const closeDeleteEx = useCallback(() => setDeleteEx(null), [setDeleteEx]);
+  const closeDeleteSession = useCallback(() => setDeleteSession(null), [setDeleteSession]);
+  const closeDeleteActivity = useCallback(() => setDeleteActivity(null), [setDeleteActivity]);
 
   const label = useMemo(() => {
     const d = new Date(`${selectedDate}T12:00:00Z`);
@@ -217,8 +232,16 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
             transition={{ duration: 0.16 }}
             className="space-y-4"
           >
-            {data && <TrainingSection data={data} kcalBySession={kcalBySession} />}
-            {data && <ActivitySection data={data} />}
+            {data && (
+              <TrainingSection
+                data={data}
+                kcalBySession={kcalBySession}
+                onEditExercise={mut.setEditEx}
+                onDeleteExercise={mut.setDeleteEx}
+                onDeleteSession={mut.setDeleteSession}
+              />
+            )}
+            {data && <ActivitySection data={data} onDeleteActivity={mut.setDeleteActivity} />}
             <EnergySection energy={energy} />
             {energy?.balance && (
               <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
@@ -248,6 +271,22 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <DayOverlayDialogs
+        editEx={mut.editEx}
+        onEditExChange={mut.setEditEx}
+        onEditSave={mut.handleEditSave}
+        deleteEx={mut.deleteEx}
+        onDeleteExClose={closeDeleteEx}
+        onDeleteExConfirm={mut.handleDeleteExercise}
+        deleteActivity={mut.deleteActivity}
+        onDeleteActivityClose={closeDeleteActivity}
+        onDeleteActivityConfirm={mut.handleDeleteActivity}
+        deleteSession={mut.deleteSession}
+        onDeleteSessionClose={closeDeleteSession}
+        onDeleteSessionConfirm={mut.handleDeleteSession}
+        mutating={mut.mutating}
+      />
     </div>
   );
 }

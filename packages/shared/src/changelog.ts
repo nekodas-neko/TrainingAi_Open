@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.334.0",
+    date: "2026-08-23",
+    changes: [
+      "You can edit and delete logged training again. Open a day from the calendar and every exercise now has an edit and a delete control, every workout card has a delete, and every activity has a delete \u2014 with the same confirmations as before. These went missing on 8 August when the day tap moved from a pop-up sheet to the full day screen and the controls stayed behind on the sheet, which nothing opens any more; for a fortnight a mistyped weight or a stray session could be logged but never corrected. Editing a set writes the new weight and reps straight through, and deleting the last exercise in a workout removes the empty workout with it.",
+    ],
+  },
+  {
     version: "1.333.5",
     date: "2026-08-23",
     changes: [
