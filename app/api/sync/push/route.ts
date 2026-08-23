@@ -48,17 +48,41 @@ export async function POST(req: NextRequest) {
   if (!parsed.success) return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
 
   const valid: z.infer<typeof MutationSchema>[] = [];
+  // Q-476: a mutation that fails this schema used to be logged and then omitted from the response
+  // entirely. An empty `errors` array is how the client is told everything succeeded, so
+  // `resolveFailedOutboxIds` returned nothing, `confirmed` took the whole chunk, and
+  // `deleteMutations` removed the row that was never written — no badge, no toast, no retry, no way
+  // back. The route's own comment called that "quarantined"; quarantine is what the OTHER path does.
+  //
+  // It is reported as a per-item rejection now, which is the path that keeps the row, badges it and
+  // dead-letters it at MAX_MUTATION_ATTEMPTS. **`retryable: false` is deliberate and is not the
+  // adapter comment's wording.** Under Q-475's split, `retryable: true` means "the server could not
+  // write" and makes the client back off the whole queue and stop draining — which is the wedge this
+  // route exists to prevent, and wrong for a rejection that can never succeed. `false` routes it to
+  // `recordMutationFailures`: attempts++, backoff, dead-letter, badge.
+  const rejected: Array<{ id: string; domain: string; date: string; error: string; retryable: false }> = [];
   for (const raw of parsed.data.mutations) {
     const m = MutationSchema.safeParse(raw);
     if (m.success) {
       valid.push(m.data);
-    } else {
-      // Unsyncable shape — log and drop it so it can't wedge the queue. Omitting
-      // it from the response errors makes the client treat it as done (quarantined)
-      // rather than re-pushing it forever.
-      const r = raw as { domain?: unknown; date?: unknown };
-      console.error('[sync/push] dropping malformed mutation', { domain: r?.domain, date: r?.date });
+      continue;
     }
+    const r = raw as { id?: unknown; domain?: unknown; date?: unknown };
+    const id = typeof r?.id === 'string' && r.id.length > 0 ? r.id : null;
+    const issue = m.error.issues[0];
+    const where = issue?.path.length ? issue.path.join('.') : 'mutation';
+    console.error('[sync/push] rejecting malformed mutation', { id, domain: r?.domain, date: r?.date, where });
+    // No usable id means the client cannot match an error record back to a row — `id` is optional
+    // in the schema for pre-v13 clients, and the domain:date fallback in `resolveFailedOutboxIds`
+    // would mark every VALID sibling sharing that key as failed too. Dropping is all that is left.
+    if (!id) continue;
+    rejected.push({
+      id,
+      domain: typeof r?.domain === 'string' ? r.domain : 'unknown',
+      date: typeof r?.date === 'string' ? r.date : '',
+      error: `Rejected by the sync schema at ${where}: ${issue?.message ?? 'invalid'}`,
+      retryable: false,
+    });
   }
 
   try {
@@ -103,7 +127,10 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    return NextResponse.json(result);
+    // Rejections first: they are the ones a reader is looking for when a mutation vanished.
+    return NextResponse.json(
+      rejected.length ? { ...result, errors: [...rejected, ...result.errors] } : result,
+    );
   } catch (err) {
     console.error('[sync/push] pushMutations threw', err);
     reportServerError(err, { userId, url: req.nextUrl.pathname });

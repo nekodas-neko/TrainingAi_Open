@@ -3121,7 +3121,25 @@ moving *beside* the calories rather than under them.
   layout and overflow need no device. **The two checks that matter are still physical** — print it and
   scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
 
-### [platform][devices] Q-476 — the worse sync failure gets the softer handling: a schema-rejected mutation is deleted forever with no badge, no toast and no retry
+### [platform][devices] Q-476 — a schema-rejected mutation is deleted forever with no badge, no toast and no retry
+
+- **✅ THE ROUTE HALF SHIPPED 2026-08-23.** `app/api/sync/push` returns a per-item error entry for a
+  mutation its `MutationSchema` rejects, so the row is kept, badged, and dead-lettered at
+  `MAX_MUTATION_ATTEMPTS` instead of being silently deleted. The entry's own measurement now reads
+  `{"processed":1,"errors":[{"id":"m2",…,"retryable":false}]}` where it read `{"processed":2,"errors":[]}`.
+- **One correction to the fix shape below.** It says (quoting the unreachable adapter comment)
+  *"report it as a retryable failure"*. **Under Q-475's split that would be wrong** — `retryable: true`
+  means "the server could not write", and the client responds by backing off the *whole queue* and
+  breaking the drain loop, which is the wedge this route exists to prevent, for a rejection that can
+  never succeed. `retryable: false` is what routes it to `recordMutationFailures` (attempts++,
+  backoff, dead-letter, badge). Pinned by a test that goes red if it is flipped.
+- **Keep:** the cheap companion — validating `domain`/`date` in `queueMutation` at write time, so an
+  unsyncable mutation is refused (or marked failed) where the user can still see it, one round trip
+  earlier. Deliberately not done with the route fix: it is on the write path of 36 call sites and
+  only verifiable on device, where marking a *good* mutation failed is the app's worst-case class.
+  The domain half is already a compile error at the call site (`PendingMutation['domain']` derives
+  from `SYNCED_MUTATION_DOMAINS`), so only the date half is reachable, and the entry's own
+  reachability note says nothing produces a rejected date today.
 
 - **Branch:** `fix/sync-push-drop-reports-error`
 - **Added:** 2026-08-18 · review sweep (offline-sync failure paths) ·

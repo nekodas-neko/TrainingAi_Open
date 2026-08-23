@@ -1685,7 +1685,18 @@ Seven lines of Current Status because the durable part is not the rename but *wh
 the identifier `programSessionId` meant the dead column, and a repro fixture that populated it read
 as evidence that a race did not exist. That is the kind of thing a session re-derives expensively.
 
-## 2026-08-23 — `projectOverview.md` 7948 → 7964, `docs/agents/state/implementation-lane-b.md` 102 → 113
+## 2026-08-23 — `projectOverview.md` 7948 → 7956, `docs/implementation-backlog.md` 11406 → 11424
+
+Q-476's route half shipped. The entry stays — its write-time companion is still owed — so this is
+growth on both files rather than the usual trade.
+
+The eighteen backlog lines are mostly one correction: the fix shape the entry carried, quoted from
+an unreachable adapter comment, said to report the rejection as *retryable*. Q-475 later gave that
+flag a specific meaning — "the server could not write" — under which it would back off the whole
+queue for a mutation that can never succeed. An implementer following the entry as written would
+have built the wedge the route exists to prevent.
+
+## 2026-08-23 — `projectOverview.md` 7956 → 7972, `docs/agents/state/implementation-lane-b.md` 102 → 113
 
 Q-415/Q-417's Known-Issues entry, which is a growth rather than a trade: both queue entries are
 removed, but they were in `docs/implementation-backlog.md`, which shrinks 78 lines and is already
