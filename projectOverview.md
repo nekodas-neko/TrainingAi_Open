@@ -27,6 +27,13 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**The UTC-offset fixture sweep came back clean, and found something else (Q-394 → LA-19).** No third
+test carries the hazard that took out two PRs. But one *correctly written* test failed the sweep
+because the code under it re-derives midnight in Brisbane: `aestMidnight` takes a timezone and
+**9 call sites pass one while 13 do not** — right for the owner, wrong for every other account.
+`scripts/check-aest-midnight-timezone.js` ratchets that shrink-only (Custom Rules is now 52 steps);
+converting the 13 is LA-19.
+
 **Coach undo wrote over whatever was there (Q-468).** Apply refuses a moved target; undo read its
 captured `beforeState` and wrote it back. Two stacked changes on one exercise: undoing the *first*
 returned the row to its original value while the history still showed the second in effect, and

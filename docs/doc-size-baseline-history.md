@@ -1704,3 +1704,13 @@ backlog.
 The seven status lines carry the measurement rather than the fix — two stacked changes, undo the
 first, and the row goes back to its original value while the history says otherwise. That table is
 the reason the entry existed, and it is the thing a reader needs to recognise the shape again.
+
+## 2026-08-23 — `CLAUDE.md` 1124 → 1135, `projectOverview.md` 7963 → 7970, `docs/implementation-backlog.md` 11391 → 11368
+
+Q-394 closes (57 lines out) against LA-19 going in; the backlog shrinks 23.
+
+The eleven `CLAUDE.md` lines are the one part of this that belongs in a rule rather than a journal:
+`aestMidnight`'s timezone argument, and — the part that is expensive to re-derive — **how to find
+this class at all**. Reading does not find it. Shifting a test user's timezone into its own
+00:00–02:00 band does, on any clock. That method took two accidental discoveries and two lost PRs to
+arrive at, and it fits in a paragraph.
