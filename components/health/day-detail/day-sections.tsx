@@ -6,7 +6,7 @@ import { Hypnogram } from "@/components/health/hypnogram";
 import { formatTimeOfDay } from "@trainingai/shared/date-utils";
 import type { DayLogResult, DayBodyMeta, DaySleep, DayHrPoint } from "@/app/api/day-log/route";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
-import { energyDaySummary } from "@/components/health/day-detail/energy-summary";
+import { energyDaySummary, type SessionKcal } from "@/components/health/day-detail/energy-summary";
 
 /** Section heading — letterspaced micro-caps, matching the treatment chosen for the day screen. */
 export function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -67,7 +67,7 @@ export const DayHrTrace = memo(function DayHrTrace({ points }: { points: DayHrPo
 });
 
 export const TrainingSection = memo(function TrainingSection(
-  { data, kcalBySession }: { data: DayLogResult; kcalBySession?: Map<string, number> },
+  { data, kcalBySession }: { data: DayLogResult; kcalBySession?: Map<string, SessionKcal> },
 ) {
   if (data.exercises.length === 0) return null;
   // Grouped by session **id**, not name (Q-391). A name is not identity: repeat the same session
@@ -122,16 +122,29 @@ export const TrainingSection = memo(function TrainingSection(
                 <Stat value={String(exercises.reduce((n, e) => n + (e.sets ?? 0), 0))} label="Sets" />
                 {/*
                   The tilde and the "est." are load-bearing, not decoration. Unlike the three stats
-                  beside it, this is NOT derived from the sets: it is a flat MET 8 over the session's
-                  clock, so a 49-minute session moving 2,364 kg and one moving 800 kg produce the
-                  same figure. Sitting it in a row of measured facts is what the owner asked for;
-                  saying so in the label is what stops it reading as one of them.
+                  beside it, this is NOT derived from the sets, so sitting it in a row of measured
+                  facts needs the label to say so.
+
+                  **The basis is named because there are two of them (Q-421).** With a strap reading
+                  it is Keytel from heart rate and it responds to effort; without one it is a MET
+                  tier over the clock, so a 49-minute session moving 2,364 kg and one moving 800 kg
+                  produce the same figure. About half the owner's sessions have no strap, so two
+                  cards on one screen routinely come from different formulas whose outputs overlap
+                  rather than agree — an unlabelled pair is not comparable and does not say it isn't.
 
                   Absent rather than zero when the estimate cannot be made — a profile without age,
                   weight or sex yields no figure, and a confident `0 kcal` would be indistinguishable
-                  from a real one (the Q-278 class).
+                  from a real one (the Q-278 class). **The guard is `> 0`, not `!= null`**: the
+                  comment claimed this before the code did, and a `0` addend does reach here — the
+                  sandbox's MET constant sits below `estWorkoutKcal`'s floor (Q-331), so a strapless
+                  session rendered `~0 EST. MET KCAL` beside a real 378.
                 */}
-                {kcal != null && <Stat value={`~${Math.round(kcal).toLocaleString()}`} label="Est. kcal" />}
+                {kcal != null && kcal.kcal > 0 && (
+                  <Stat
+                    value={`~${Math.round(kcal.kcal).toLocaleString()}`}
+                    label={kcal.source === 'hr' ? 'Est. HR kcal' : 'Est. MET kcal'}
+                  />
+                )}
               </div>
             )}
           </div>

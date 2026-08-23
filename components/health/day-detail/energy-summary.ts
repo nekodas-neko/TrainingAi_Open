@@ -54,8 +54,19 @@ export function energyDaySummary(energy: EnergyBalanceResponse | null): EnergyDa
  * same screen — not a second estimate of the same thing. That is the whole reason the field ships
  * from `/api/nutrition/energy-balance` rather than being recomputed in `/api/day-log`: the parts
  * cannot disagree with the total, because they *are* the total's addends.
+ *
+ * **`source` is carried through, not dropped (Q-421).** Roughly half the owner's sessions have no
+ * strap reading, so two cards on the same screen are routinely produced by two different formulas —
+ * Keytel from heart rate, or a MET tier over the clock — whose outputs overlap rather than agree.
+ * Without the basis beside each figure the reader cannot tell which of two adjacent numbers responds
+ * to effort and which only to duration. That is permanent: the strap is not always worn.
  */
-export function workoutKcalBySession(energy: EnergyBalanceResponse | null): Map<string, number> {
+export interface SessionKcal {
+  kcal: number
+  source: 'hr' | 'met'
+}
+
+export function workoutKcalBySession(energy: EnergyBalanceResponse | null): Map<string, SessionKcal> {
   const rows = energy?.activeBreakdown?.workoutKcalBySession ?? []
-  return new Map(rows.map(r => [r.id, r.kcal]))
+  return new Map(rows.map(r => [r.id, { kcal: r.kcal, source: r.source }]))
 }
