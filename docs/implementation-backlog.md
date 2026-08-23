@@ -956,24 +956,6 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [nutrition] LB-2 — there is no way to delete a meal type's entries, only to move them
-
-- **Branch:** `feat/meal-type-delete-logs`
-- **Added:** 2026-08-23 · **Lane: A** — a repository method and a route parameter
-- **Gate: owner** — it is a bulk destructive action, and the escape it duplicates already exists
-- **Placement:** low. Nobody is stuck: Q-326 shipped the move, which is the escape that was missing.
-
-Q-326 asked its dialog for a secondary *"Delete them instead"*. **Nothing on the server can do it.**
-`reassignAndDeleteMealType` is the only escape the repository offers; there is no
-`deleteFoodLogsByMealType`, and `DELETE /api/nutrition/meal-types/[id]` either reassigns or refuses.
-So the button was not built rather than built dead.
-
-**Worth deciding before building.** It would let someone discard real logged history in one tap, and
-the only thing it saves over the move is a meal type they did not want to keep — which they can
-delete afterwards, once it is empty. If it is wanted, it needs its own confirm naming the count, and
-`invalidateNutritionWrite()` on the client, same as the move.
-
-
 ### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
