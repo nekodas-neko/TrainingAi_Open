@@ -119,6 +119,21 @@ function main() {
     // Removing a doc breaks every link to it. In the working tree those links resolve, so this is
     // only ever visible here — which makes it exactly the class of thing the dry-run exists for.
     ['doc-links', 'node', ['scripts/check-doc-links.js']],
+    // `next build` — the gate whose absence let A4b's real blocker through (Q-313).
+    //
+    // A3 was recorded as having made the model constants a runtime-only dependency, and a green
+    // `--all` from this script was the evidence. It was wrong: six modules still read a constant at
+    // **module scope**, and `next build` imports every route to collect page data, so the build
+    // opened the files. Deleting them produced `ENOENT … energy-expenditure-features.json` at
+    // *Failed to collect page data for /api/achievements* — a failed Railway deploy, not a local
+    // annoyance. `tsc --noEmit` cannot see it, because the fault is a file read at import time and
+    // not a type.
+    //
+    // `--all` only, and the cost is the reason: a build is minutes where every other gate is
+    // seconds. `--all` is the mode that models the end state and is run rarely, which is exactly
+    // where a slow gate belongs. The baseline re-run below still tells a pre-existing red from a
+    // regression, so a slow gate stays trustworthy rather than becoming one people learn to ignore.
+    ...(MODE === 'all' ? [['build', 'npx', ['next', 'build']]] : []),
   ]
 
   const results = GATES.map(([name, cmd, args]) => [name, run(cmd, args, tree, name)])
