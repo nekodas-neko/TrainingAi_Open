@@ -1676,3 +1676,11 @@ Seven lines rather than three because the reusable part is the *reason*: a rate 
 over a window and cannot tell "already running" from "ran a minute ago". That sentence is why the
 bug existed with a rate limit already in place, and it now also has a `docs/module-map.md` row so
 the next fire-and-forget background call does not repeat it.
+
+## 2026-08-23 — `projectOverview.md` 7941 → 7948, `docs/implementation-backlog.md` 11469 → 11406
+
+Q-474 shipped; its 63-line entry leaves the queue, which is most of the backlog's shrink.
+
+Seven lines of Current Status because the durable part is not the rename but *why nobody noticed*:
+the identifier `programSessionId` meant the dead column, and a repro fixture that populated it read
+as evidence that a race did not exist. That is the kind of thing a session re-derives expensively.
