@@ -339,11 +339,12 @@ without a queue entry is a dropped finding.*
 the narrative has leaked in"*. Measured 2026-08-19: BugFix **135** lines, Lane A **162**, Lane B
 **412** (its `Now` section alone is 200), Tuning **562**, Review **1,280**.
 
-**Re-measured 2026-08-20 — three of six are done, and each fell at its own role's handoff, which is
-what the entry predicted.** Orchestrator **62**, Lane A **113**, Lane B **134** (412 → 134 at the
-seventh Lane B handoff; its baseline is ratcheted down to lock the reclaim in). Still over: BugFix
-**161**, Review **170**, Tuning **582**. Tuning is the one that will not fall out of a routine
-handoff — it is 4× the target and needs its narrative moved to a dated handoff doc deliberately.
+**Re-measured 2026-08-23 — three of six, and each fell at its own role's handoff, which is what this
+entry predicted.** Lane B **96** (412 → 134 → 96 across two consecutive handoffs, baseline ratcheted
+down each time), Orchestrator **61**, Lane A **149**. Just over: BugFix **160**, Review **169** —
+both within a rewrite's reach. **Tuning 581 is the outlier** at nearly 4× the target and will not
+come down as a side effect of a routine handoff; its narrative needs moving to a dated handoff doc
+deliberately, which is the one piece of this entry that is real work rather than a by-product.
 
 This matters more than tidiness. With the lane path lists replaced by a rule, a baton's **Claimed
 paths** section is the only record of who holds a file the rule cannot place — and nobody reads a
@@ -2546,8 +2547,41 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **Why file something this narrow:** the symptom (*a tap that does nothing, silently*) is
   indistinguishable from a frozen app, and on the APK the service worker **is** the offline cold-start
   mechanism — so install day is exactly when a new user is most likely to be moving between networks.
-- **Not diagnosed:** whether the no-op is Next's router aborting a failed RSC fetch or the click
-  handler swallowing it. That needs the router's internals, not another probe.
+> **⚠️ DIAGNOSED 2026-08-23 (Lane A). The open question is answered and this is Lane B's to fix.**
+> ([`journal`](overview/entries/2026-08-23-q555-diagnosis.md))
+>
+> **It is both, and the click handler is what makes it silent.** Read from source, no probe needed —
+> the entry guessed this would need the router's internals; it needed the call sites.
+>
+> 1. `components/shell/tab-loading.tsx` — the `loading.tsx` fallback for every tab route, so **it is
+>    what is on screen during the first-ever load**, which is precisely the uncontrolled window —
+>    renders `<BottomNav />` **with no `onTabChange`**.
+> 2. Inside `TabShell` a tap is pure in-app state (`onTabChange={show}`) and never routes, which is
+>    why the controlled case works. Outside it there is no such handler.
+> 3. `handleNavClick` (`bottom-nav.tsx:77`) calls **`e.preventDefault()` unconditionally**, then
+>    `navigateWithTransition` → `router.push(href)`.
+>
+> So the `<Link>`'s native navigation is suppressed on every tap, and the only remaining path is
+> `router.push`, whose RSC fetch cannot be served offline with no worker in control. **The
+> `preventDefault()` is what removes the fallback:** without it a failed navigation is a real browser
+> navigation, and the browser shows *something* — its own offline error, or the precached `/offline`
+> page once the worker controls.
+>
+> **Measured vs inferred, kept apart.** Measured (the original review): controller `false` → the tap
+> does nothing. Code fact (verifiable now): the three points above. **Inferred:** that the App Router
+> aborts the failed RSC fetch without surfacing anything. Confirm that half with Playwright —
+> `context.setOffline(true)`, service worker unregistered, watch the RSC request fail — rather than
+> taking it on trust.
+>
+> **No Lane A fix is hiding in the service worker.** It already does `skipWaiting()` on install and
+> `clients.claim()` on activate, so it claims as early as it can; the uncontrolled window is inherent
+> to a first-ever load. The fix is in the click handler.
+>
+> **Fix shape, for Lane B to weigh rather than a prescription:** stop suppressing the native
+> navigation when there is no `onTabChange` to run — outside the shell the `preventDefault()` buys
+> nothing — or keep it and give the failed `router.push` a visible outcome. The first is smaller and
+> restores a browser behaviour the app is currently discarding.
+- **Lane: B** — `components/shell/bottom-nav.tsx`.
 - **Not exercised — and this limit is load-bearing:** web build only. On web `cachedFetch` falls back
   to `localStorage`, so what was verified is the **seed** path, **not** the native SQLite local store
   that is the real source of truth on the APK. Re-check the first-load window **on device**, where the
