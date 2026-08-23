@@ -22,28 +22,29 @@ handlers hold a captured date).
 
 ## This run (2026-08-23, eighth)
 
-- **Q-362b SHIPPED** (v1.333.2, #296) — the three day surfaces group by session **id** now. Guarded
-  by `e2e/same-named-sessions-one-day.spec.ts`, which asserts on the **durations, not the card
-  count**: two cards appeared before the fix as well, both reading the later session's 82 minutes.
-  Mutation-checked. [Journal](../../overview/entries/2026-08-23-day-surfaces-session-identity.md).
-- **LB-1 FILED, then rewritten** (#297) — filed as "delete the unreachable sheet", then its own
-  precondition inverted it. See above.
+- **Q-362b** (v1.333.2, #296) — day surfaces group by session **id**. Its guard asserts on the
+  **durations, not the card count**: two cards appeared before the fix too, both reading the later
+  session's 82 min. [Journal](../../overview/entries/2026-08-23-day-surfaces-session-identity.md).
+- **LB-1 filed, then rewritten** (#297) — see *Waiting on the owner*.
   [Journal](../../overview/entries/2026-08-23-day-edit-delete-unreachable.md).
-- **Q-421 SHIPPED** (v1.333.3, #300) — its last clause was the label. A workout's kcal now reads
-  `Est. HR kcal` or `Est. MET kcal`, and the done screen says "from heart rate" instead of naming an
-  effort tier that did not produce the number.
+- **Q-421** (v1.333.3, #300) — a workout's kcal reads `Est. HR kcal` / `Est. MET kcal`, and the done
+  screen says "from heart rate" rather than naming an effort tier that did not produce the number.
   [Journal](../../overview/entries/2026-08-23-label-session-kcal-basis.md).
+- **BF-4's Lane B half** (v1.333.4, #311) — the scan photo is bounded to 1024 px before upload,
+  measured **−86.6%** (2,266,776 → 302,944 base64 chars). **It is NOT shown to be the owner's
+  slowdown** — that entry already demoted the payload — and #112, the client-timing sink and the
+  Railway cold-start check stay open and are Lane A's.
+  [Journal](../../overview/entries/2026-08-23-bounded-scan-photo-payload.md).
 
 ## Next
-Work the queue top-down with `node scripts/next-item.js --lane B`, and **re-verify the premise before
-building**. Across the last two runs, **five of the seven entries taken had a wrong premise** — the
-tool tells you what is startable, never whether it is true.
+Top-down with `node scripts/next-item.js --lane B`, and **re-verify the premise first** — across the
+last two runs **five of the seven entries taken had a wrong premise**. The tool says what is
+startable, never whether it is true.
 
-**BF-4** is top ("the photo scan feels much slower, and it is not the AI call"), then **Q-326** (the
-meal-type delete dialog), then **Q-323 / the `calorie-budget-surface` batch (Q-417 + Q-415)** — three
-calorie budgets disagreeing across Home and Nutrition, still the largest coherent piece of Lane B
-work. **Q-406 before Q-395**: `food-row.tsx` must be extracted first, since both landing files sit on
-the 800-line limit.
+**BF-4 still reads as top and its Lane B half is done** — what remains there is Lane A's, so skip to
+**Q-326** (meal-type delete dialog), then **Q-323 / the `calorie-budget-surface` batch (Q-417 +
+Q-415)**, three calorie budgets disagreeing across Home and Nutrition and still the largest coherent
+piece of Lane B work. **Q-406 before Q-395** — `food-row.tsx` must be extracted first.
 
 ## Do not re-litigate
 - **`lib/coach/**` is Lane A** — settled against the import trace, not the path list.
@@ -64,33 +65,37 @@ the 800-line limit.
 - Home with the **"Accent ring"** style (Q-281) — the band word is 7.5 px.
 - A **drain run** confirming `/admin/oura-ble` holds still while the log streams (Q-532).
 - **Q-450's device path** — the E2E run took the web fallback, not SQLite + outbox.
-- **Q-421's MET card** — the sandbox constant makes it 0, so what a production MET figure reads was
-  never seen; only the HR label was rendered.
+- **Q-421's MET card** (sandbox constant makes it 0, so only the HR label was ever rendered) and
+  **BF-4's `getPhoto` bound** — a wrong field pair downscales silently never, which looks exactly
+  like "the fix did not help".
 
 ## Claimed paths
 None held. This run touched `scripts/check-backlog-pointers.js` (two new rules) and
 `docs/doc-size-baseline*`; neither is a lane path and neither is held.
 
 ## Gotchas worth carrying
-- **The container re-clones SHALLOW on resume.** `git merge origin/main` failed with *"refusing to
-  merge unrelated histories"* and `origin/main` had **one** commit. Nothing was wrong with the repo:
-  `git fetch --unshallow origin` restored 290 commits and the merge base was exactly the branch
-  point. Check `.git/shallow` before believing anything alarming about history.
-- **Check the actual date on resume.** This session resumed three days on, and dating work 08-20 got
-  as far as a changelog entry. `TZ=Australia/Brisbane date` settles it.
+- **This clone is SHALLOW, and `git fetch origin main` RE-SHALLOWS it every time.** Not just on
+  resume — measured 2026-08-23: after a full `--unshallow`, one plain `git fetch origin main` puts
+  `.git/shallow` back and `origin/main` reads as **one** commit, so the next merge dies with
+  *"refusing to merge unrelated histories"*. Nothing is wrong with the repo or with `main`.
+  **`git fetch --unshallow origin` (or `--deepen=400`) immediately before every merge** is the
+  working habit; `test -f .git/shallow` tells you in one line. Cost two merges in one session, and
+  the second time it read as a repo disaster because `main` genuinely had a single root commit
+  locally. Confirm against GitHub (`list_commits`) before believing the history is gone.
+- **Check the actual date on resume** — this session resumed three days on. `TZ=Australia/Brisbane date`.
 - **The aged local seed still bites, and its recorded reason is only half of it.**
   `goal-invalidation.spec.ts` needs **today's** `body_metrics` row to carry steps. Reading
   `order by date desc limit 1` is not "today" once the container has aged — confirm the date matches.
   It fails identically on clean `main`; top the row up rather than debugging the diff.
 - **`get_check_runs` lags; attempting the merge is the reliable check.**
-- **Two ratchets now say whether YOUR branch grew the file** (LA-16). "27 of which this branch added"
-  means raise it with a note; no such clause means `main` was already over and it is not yours.
+- **The ratchets say whether YOUR branch grew the file** (LA-16) — but re-read it AFTER the final
+  merge; the attribution is only as current as the base it was computed from.
 - **A `Gate:`/`Needs:` field written inline is ignored** — it must start its own bullet. Cost this
   lane twice; `check-backlog-pointers.js` now fails on it, as it does on an unknown `[domain]` tag.
-- **A backgrounded `pnpm dev` dies with its task** — `setsid nohup pnpm dev > log 2>&1 &` survives,
-  and launch it as its own step, not chained after a `pkill` in the same command.
-- **Point Playwright at a running server with `E2E_BASE_URL=http://localhost:3000`** rather than
-  letting it start its own on 3100 — much faster for a one-off render probe.
+- **A backgrounded `pnpm dev` dies with its task** — `setsid nohup pnpm dev > log 2>&1 &` survives;
+  launch it as its own step, never chained after a `pkill`.
+- **`E2E_BASE_URL=http://localhost:3000`** points Playwright at a running dev server — much faster
+  than letting it start its own for a one-off probe.
 - **`pnpm check:rules` ran 51 of 51 on 2026-08-23.** Quote the count, never "pass".
-- **Mutation-check every guard**, and **check what a passing assertion would ACCEPT** — the Q-362b
-  spec asserts on durations rather than card count for exactly that reason.
+- **Mutation-check every guard**, and check what a passing assertion would ACCEPT — that is why the
+  Q-362b spec asserts on durations rather than card count.

@@ -1627,3 +1627,22 @@ that shipped half of itself has to say which half, or the next session re-derive
 Trimmed from 19 to 8 before raising: what went was a second telling of the field-name trap and of
 why the payload was demoted, both of which the entry already states above the annotation.
 
+
+## 2026-08-23 — Lane B's baton 97 → 102, five lines, and an argument against its own ratchet
+
+**Raised three hours after I ratcheted it down to 97**, which needs saying rather than glossing. A
+fourth PR shipped in the same run and the shallow-clone gotcha got sharper with a second measurement,
+so the file grew by five lines of state that a successor genuinely needs: what BF-4's Lane B half
+did and did not establish, and that `git fetch origin main` **re-shallows this clone every time**,
+not merely on resume.
+
+I trimmed first and got two lines back before the returns went flat — the `Next` section was stale
+anyway, since BF-4's Lane B half is now done, and rewriting it was the only real cut available.
+Swapping two-line bullets for two-line bullets is not a trim, and pretending otherwise wastes a
+session's attention on a counter.
+
+**Lane A's note of 2026-08-20 already reached the right conclusion and it applies again here:** *"the
+ratchet is the wrong instrument here, and PS-4 is the fix. A baton is rewritten in full at every
+handoff, so its number measures one session, not accretion."* Two lanes have now independently hit
+that on the same file class. The durable answer is not a lower number, it is moving the inherited
+findings to permanent homes — which is what PS-4 asks for and what neither lane has done yet.
