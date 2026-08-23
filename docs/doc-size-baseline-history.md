@@ -1841,3 +1841,27 @@ is gone, so nothing was still owed on it — against 21 lines added for the reso
 ring-key progress note.
 
 `docs/implementation-backlog.md` loses 335: Q-534 closed on measurement rather than implementation.
+
+## 2026-08-23 — `docs/implementation-backlog.md` 11202 → 11129
+
+Removing four entries that had already shipped and were **resurrected by one of my own merge
+resolutions**. Recorded here rather than only in a commit message, because the mechanism is the one
+this file already warned about two entries above and it still got through.
+
+Resolving a backlog conflict with "keep both sides" is wrong when each side has *deleted a different
+completed entry*: keeping both restores both. That is what happened in #334 — LB-4, Q-454, Q-455 and
+Q-465 came back into the queue after shipping, and nothing catches it, because
+`check-backlog-pointers` only fails on a queue heading that says ✅/SHIPPED and a resurrected entry
+reads exactly like an open one.
+
+The rule that follows: on `docs/implementation-backlog.md` a conflict is almost always **two
+deletions**, and the resolution is to keep neither side. On append-only files
+(`known-issues-resolved.md`, this one) it is almost always two additions, and keeping both is right.
+Read the headings before choosing — the two cases are indistinguishable from the marker alone.
+
+## 2026-08-23 — `CLAUDE.md` 1135 → 1136
+
+One line, beside the existing `package.json`/`changelog.ts` conflict rule, because it is the same
+class and the same place someone resolving a conflict would look: a backlog conflict is two
+deletions and keeping both resurrects two shipped entries. It belongs in the rules rather than only
+in this file's history, since this file is read after the mistake and `CLAUDE.md` before it.
