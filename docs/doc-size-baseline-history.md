@@ -1512,7 +1512,7 @@ ends with a gated entry (LB-1) and a successor needs to see that before the queu
 routine rewrite. (A first draft of this note said "four of six" from memory and was wrong by one —
 Lane A sits one line under the line, which is not a margin worth rounding in either direction.)
 
-## 2026-08-23 — `projectOverview.md` 7916 → 7924, `docs/implementation-backlog.md` 11367 → 11368
+## 2026-08-23 — `projectOverview.md` 7916 → 7924, `docs/implementation-backlog.md` 11390 → 11417
 
 Q-545's D2 Task 2 (the rollup extraction behind `RollupIO`). Eight lines of Current Status and a
 27-line annotation on the Q-545 queue entry.
@@ -1526,4 +1526,5 @@ stays in the queue because Q-545 is **not finished** — Task 2 of seven shipped
 implementer needs to read those two corrections *before* sizing Task 3, which is exactly what the
 queue entry is for.
 
-The backlog's +1 against a +27 diff is the pre-existing headroom being spent, not a second raise.
+Both numbers were re-measured on the merged tree rather than spliced from the conflict hunks — the
+backlog baseline moved under this branch while it was open.
