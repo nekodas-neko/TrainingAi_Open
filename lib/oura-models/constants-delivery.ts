@@ -27,8 +27,13 @@ import modelFiles from './model-files.json'
 export const CONSTANTS_BUCKET_PREFIX = modelFiles.constantsPrefix
 
 /** Written under the deploy's own working directory — writable on Railway, wiped per deploy, which
- *  is what we want: a stale constant is worse than a re-download. */
-const CACHE_DIR = path.join(process.cwd(), '.oura-constants')
+ *  is what we want: a stale constant is worse than a re-download.
+ *
+ *  Exported because `constants/index.ts` falls back to it: boot sets `OURA_CONSTANTS_DIR`, but only
+ *  in the process that ran boot, and a worker serving a request is not always that process. A
+ *  deterministic path is what makes the delivered files findable without an inherited env var. */
+export const CONSTANTS_CACHE_DIR = path.join(process.cwd(), '.oura-constants')
+const CACHE_DIR = CONSTANTS_CACHE_DIR
 
 /** The repo copy, while it still exists. */
 const TREE_DIR = path.join(process.cwd(), 'lib', 'oura-models', 'constants')

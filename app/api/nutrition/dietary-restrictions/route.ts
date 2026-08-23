@@ -43,14 +43,13 @@ export async function PUT(req: Request) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let raw: unknown
   const read = await readJsonLimited(req, MAX_BODY_BYTES)
   if (!read.ok) {
     return read.reason === 'too_large'
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
-  const parsed = PutSchema.safeParse(raw)
+  const parsed = PutSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
