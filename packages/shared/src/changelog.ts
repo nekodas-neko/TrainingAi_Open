@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.340.0",
+    date: "2026-08-24",
+    changes: [
+      "Every meal in your plan now has a Save to My Meals button, plus Save all. A saved plan meal is an ordinary saved meal \u2014 it logs in one tap, prints a label with a QR, and can be edited ingredient by ingredient \u2014 so the plan is a thing you generate from rather than a thing you have to keep opening.",
+      "Saving is remembered, so a meal already kept shows \"In My Meals\" instead of offering again, and Save all only counts what is left. Pressing it twice cannot produce duplicates. Meals kept this way carry a \"From plan\" tag in My Meals.",
+      "Fixed: the whole meal-plan feature could not be written to at all. Creating a plan, renaming or activating or deleting one, changing meals per day, editing a single meal, and saving dietary restrictions all failed with \"Invalid body\" no matter what was sent. Five routes read the request and then validated a variable that was never filled in.",
+    ],
+  },
+  {
     version: "1.339.0",
     date: "2026-08-24",
     changes: [
