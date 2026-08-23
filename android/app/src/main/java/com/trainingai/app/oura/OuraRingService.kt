@@ -330,7 +330,7 @@ class OuraRingService : Service(), OuraGattClient.Listener {
         // After a key-only re-key these are OFF, so the ring records only system/debug
         // events until this runs — without it there is no HR/temp/SpO₂/steps to sync.
         OuraProtocol.enableMeasurementSequence().forEach { client?.write(it) }
-        log("enabled measurement features (DAYTIME_HR + SPO2 + REAL_STEPS → automatic)")
+        log("enabled measurement features (DAYTIME_HR + SPO2 + REAL_STEPS + EXERCISE_HR → automatic, fast-HR off)")
         // Set-and-forget: drain automatically on every connect (after the feature acks).
         main.postDelayed({ if (state == "ready" && ingestUrl != null) startDrain(false) }, AUTO_DRAIN_DELAY_MS)
         main.postDelayed(keepalive, KEEPALIVE_MS)
@@ -728,7 +728,7 @@ class OuraRingService : Service(), OuraGattClient.Listener {
     fun enableMeasurement(): Boolean {
         if (state != "ready") return false
         OuraProtocol.enableMeasurementSequence().forEach { client?.write(it) }
-        log("enableMeasurement: DAYTIME_HR + SPO2 + REAL_STEPS → automatic")
+        log("enableMeasurement: DAYTIME_HR + SPO2 + REAL_STEPS + EXERCISE_HR → automatic, fast-HR off")
         return true
     }
 
