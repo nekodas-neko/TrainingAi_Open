@@ -1105,6 +1105,11 @@ Optional:
   Tables without `user_id` are scoped via a documented FK path; a table that is neither user-scoped,
   FK-reachable, explicitly global, nor explicitly denied makes the generator **fail** rather than emit
   an unscoped view. `invited_emails`/`rate_limits` are denied outright (third-party PII, no audit value).
+  **The owner's user id is NOT in the generated SQL any more (Q-456)** — views scope on
+  `current_setting('app.claude_ro_owner', true)`, and the role needs it set once, out of band, the
+  same way its password is: `ALTER ROLE claude_readonly SET app.claude_ro_owner = '<uuid>';`.
+  Without that the views return **zero rows** — fail-closed, and the reason `/api/admin/db-query`
+  answering nothing on a fresh database is a missing role setting rather than a bug.
   **When you add a table, re-run `CLAUDE_RO_OWNER_USER_ID=<id> node scripts/generate-claude-ro-views.js`
   into a NEW migration number** (never overwrite the previous one — `ensureSchema` tracks by filename,
   so an edited already-applied migration is skipped forever and the change silently never lands) — the schema is default-deny, so a new table is unreadable
