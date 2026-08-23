@@ -18,6 +18,27 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — the owner confirms BF-8, and settles BF-7
+
+**`docs/implementation-backlog.md` 11474 → 11517.** 43 lines across two amendments, both in place
+rather than as new entries.
+
+BF-8 was filed the same day as an unreported observation from a screenshot — the Intensity control
+reading "Full · As prescribed" above a deload. The owner then confirmed it from experience: *"I was
+under the assumption I was doing my full session but it looks like it has been deload."* A second
+screenshot showed the active session header omitting it too, which traced both surfaces to one wrong
+predicate — `isDeloadActive` answers "is the phase a deload week", never "is today's session a
+deload". Promoted to the head of the queue and re-tagged 🔴, because a training decision was made on
+a wrong reading of the app's own display.
+
+BF-7 shrinks in scope rather than growing: the owner anchored the length slider to the session's
+configured budget and dropped 15 minutes, which settles two of that entry's three findings outright —
+the second at zero cost, since the floor and the warmup-clamp arithmetic tuned to it now stand
+unchanged. The reasoning stays in the entry even though the questions are answered; a plan that knows
+why 15 was dropped will not reintroduce it.
+
+---
+
 ## 2026-08-23 — BF-7 and BF-8, both out of one screenshot
 
 **`docs/implementation-backlog.md` 11377 → 11474.** One owner request (a 45-minute session length)
