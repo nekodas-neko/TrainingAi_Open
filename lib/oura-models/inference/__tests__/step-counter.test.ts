@@ -12,6 +12,7 @@ vi.mock('@/lib/oura-models/inference/session', async importOriginal => {
 })
 
 import { runStepCounter } from '@/lib/oura-models/inference/step-counter'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 
 const fx = JSON.parse(fs.readFileSync(
   path.join(process.cwd(), 'lib', 'oura-models', 'onnx', '__fixtures__', 'step_counter_1_3_0.golden.json'), 'utf8'))
@@ -33,7 +34,7 @@ describe('step-counter end-to-end parity vs TorchScript golden', () => {
       motionTimestamps: flat('in_2'),
       motionData: reshape2d('in_3'),
       outputSamplingIntervalMs: flat('in_4')[0],
-    })
+    }, nodeModelRuntime)
     expect(out, 'onnxruntime-node core must load').not.toBeNull()
     const windows = out!
     const expTs = reshape2d('out_0')   // [n, 2] = [start, end]

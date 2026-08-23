@@ -13,6 +13,7 @@ vi.mock('@/lib/oura-models/inference/session', async importOriginal => {
 
 import { preprocessSleepNet, type SleepNetRawNight } from '../sleepnet-preprocess'
 import { runSleepNet } from '@/lib/oura-models/inference/sleepnet'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 
 const FIX = path.join(process.cwd(), 'lib', 'health', '__fixtures__')
 function readF32(name: string): Float32Array {
@@ -73,7 +74,7 @@ describe('SleepNet preprocessor (TS port vs golden .pt sample)', () => {
 
   it('produces identical stage codes end-to-end through the ONNX model', async () => {
     const out = preprocessSleepNet(goldenNight())!
-    const result = await runSleepNet(out.highRes, out.lowRes)
+    const result = await runSleepNet(out.highRes, out.lowRes, nodeModelRuntime)
     expect(result).not.toBeNull()
     const refCodes = readF32('sleepnet_sample_stagecodes.bin') // 1800 floats (1..4)
     let mismatch = 0

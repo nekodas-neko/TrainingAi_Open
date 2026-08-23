@@ -12,6 +12,7 @@ vi.mock('../session', async importOriginal => {
 })
 
 import { runDhrvImputation } from '../dhrv'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 
 const FIX = path.join(process.cwd(), 'lib', 'oura-models', 'onnx', '__fixtures__')
 function readF32(name: string): Float32Array {
@@ -23,12 +24,12 @@ describe('dhrv imputation ONNX inference (onnxruntime-node)', () => {
   it('matches the TorchScript reference on the golden input', async () => {
     const feats = readF32('dhrv_imputation_1_1_0_features.bin')
     const ref = readF32('dhrv_imputation_1_1_0_dhrv.bin')[0]
-    const v = await runDhrvImputation(feats)
+    const v = await runDhrvImputation(feats, nodeModelRuntime)
     expect(v, 'runDhrvImputation returned null').not.toBeNull()
     expect(Math.abs(v! - ref), `got ${v} vs ref ${ref}`).toBeLessThan(1e-3)
   })
 
   it('returns null on bad feature length', async () => {
-    expect(await runDhrvImputation(new Float32Array(5))).toBeNull()
+    expect(await runDhrvImputation(new Float32Array(5), nodeModelRuntime)).toBeNull()
   })
 })

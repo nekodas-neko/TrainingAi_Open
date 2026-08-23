@@ -12,6 +12,7 @@ vi.mock('@/lib/oura-models/inference/session', async importOriginal => {
 
 import { assembleSleepNetNight, sleepNetDump, sleepNetStages5Min, bdiFromApnea, type SleepNetAssembleInput } from '../sleepnet-assemble'
 import type { StageCode } from '../inference/sleepnet'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 
 /** Build a synthetic ~7 h night of decoded-row-shaped inputs. */
 function synthInput(): SleepNetAssembleInput {
@@ -44,7 +45,7 @@ describe('SleepNet raw-night assembler + dump', () => {
   })
 
   it('runs the model end-to-end and produces a staging dump', async () => {
-    const dump = await sleepNetDump(synthInput())
+    const dump = await sleepNetDump(synthInput(), nodeModelRuntime)
     expect(dump.counts.ibiBeats).toBeGreaterThan(1000)
     expect(dump.staging, `fell back: ${dump.fallbackReason}`).not.toBeNull()
     const p = dump.staging!.stagePct
@@ -58,7 +59,7 @@ describe('SleepNet raw-night assembler + dump', () => {
 
   it('produces exactly nEpochs 5-min stages + a BDI for the rollup', async () => {
     const nEpochs = 95 // heuristic grid for a ~7.9 h night
-    const out = await sleepNetStages5Min(synthInput(), nEpochs)
+    const out = await sleepNetStages5Min(synthInput(), nEpochs, nodeModelRuntime)
     expect(out).not.toBeNull()
     expect(out!.stages.length).toBe(nEpochs)
     const valid = new Set(['deep', 'light', 'rem', 'awake'])

@@ -2895,6 +2895,17 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 > files that exercise `aggregateOuraRawSamples` pass unchanged, which is the extraction gate this
 > entry named. `adapter.ts` 6,906 → 5,818 lines.
 >
+> **✅ AND THE MODELS ARE PORTED TOO (2026-08-23).** `sleepnet.ts`, `step-counter.ts` and `dhrv.ts`
+> take a `ModelRuntime` (`lib/oura-models/inference/runtime.ts`) instead of importing
+> `onnxruntime-node`; `nodeModelRuntime` (`runtime-node.ts`) is the server implementation, passed in
+> at each composition root. `daytime-stress.ts`'s two ONNX functions moved to
+> `daytime-stress-inference.ts`. **`run.ts` no longer reaches `onnxruntime-node`, `session.ts` or any
+> `node:` builtin except through the constants loader** — measured, 46 modules, one edge left. Signature
+> churn only, no behaviour change: full suite 542 files / 4,470 tests green, 51 of 51 Custom Rules,
+> `pnpm build` and the rollup-worker esbuild bundle both clean.
+>
+> **So the ONLY thing standing between here and a device rollup is item 3 below — the constants.**
+>
 > **Two premise corrections for whoever takes Task 3.**
 >
 > 1. **`RollupIO` has 22 methods, not the 5 the plan sketches.** The "17 lines touch `this.db` /

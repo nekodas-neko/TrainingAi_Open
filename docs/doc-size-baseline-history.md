@@ -1570,3 +1570,14 @@ because it is the scope of the next task: three of the five want the same inject
 split, and one is a `sourceRank` move. Without it the next implementer re-walks the graph — and is
 likely to walk it wrong, since following type-only imports too makes the answer look like "the whole
 Postgres layer".
+
+## 2026-08-23 — `projectOverview.md` 7924 → 7927, `docs/implementation-backlog.md` 11463 → 11474
+
+Eleven lines on Q-545 recording that the model half of the rollup port shipped, and — the reason it
+belongs in the queue rather than only in the journal — that the entry's remaining blocker is now
+**exactly one** thing: the constants loader. An implementer opening this entry should not have to
+reconstruct which of the five measured edges are closed.
+
+The three in `projectOverview.md` say the same thing in the Current Status entry the extraction
+already had, because that entry's closing sentence named `onnxruntime-node` as the blocker and it no
+longer is.

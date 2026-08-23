@@ -13,6 +13,7 @@ import { bytesToHex } from '@/lib/oura-ble/decode'
 import { runStepCounterPipeline, type RawFrame } from '@/lib/oura-ble/step-counter-pipeline'
 import { measuredAtMs } from '@/lib/oura-ble/decode'
 import { hasRealConstants } from '@/lib/oura-models/__fixtures__/real-constants'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 
 // The step count itself comes out of the vendor's dequantization table, so both the absolute
 // figure and the non-zero regression guard need the real one. The Tier-1 cross-check and the
@@ -44,7 +45,7 @@ function stepFrames(n: number, walking: boolean): RawFrame[] {
 
 describe('step-counter real-data pipeline wiring', () => {
   itVendor('pairs → dequantizes → runs step_counter over synthetic frames', async () => {
-    const r = await runStepCounterPipeline(stepFrames(8, true), [], toMs)
+    const r = await runStepCounterPipeline(stepFrames(8, true), [], toMs, nodeModelRuntime)
     expect(r).not.toBeNull()
     const res = r!
     expect(res.pairedWindows).toBe(8)
@@ -62,8 +63,8 @@ describe('step-counter real-data pipeline wiring', () => {
   })
 
   it('cross-checks against the Tier-1 walk-gate estimate', async () => {
-    const walking = await runStepCounterPipeline(stepFrames(10, true), [], toMs)
-    const still = await runStepCounterPipeline(stepFrames(10, false), [], toMs)
+    const walking = await runStepCounterPipeline(stepFrames(10, true), [], toMs, nodeModelRuntime)
+    const still = await runStepCounterPipeline(stepFrames(10, false), [], toMs, nodeModelRuntime)
     // Walking windows (col14 ≤ 20) credit the gate estimate; still windows do not.
     expect(walking!.gateEstimateSteps).toBeGreaterThan(0)
     expect(still!.gateEstimateSteps).toBe(0)
@@ -72,7 +73,7 @@ describe('step-counter real-data pipeline wiring', () => {
   it('returns null when there are no paired step windows', async () => {
     // Only feature_1 frames, no matching feature_2 → nothing pairs.
     const onlyF1: RawFrame[] = [{ ringTimestampDs: 1000, tag: 0x7e, bodyHex: bytesToHex(body(0x10)) }]
-    expect(await runStepCounterPipeline(onlyF1, [], toMs)).toBeNull()
+    expect(await runStepCounterPipeline(onlyF1, [], toMs, nodeModelRuntime)).toBeNull()
   })
 
   // Real captured walk frames (owner's counted 200-step walk, 2026-07-10), tiled into a continuous
@@ -105,7 +106,7 @@ describe('step-counter real-data pipeline wiring', () => {
     // The golden fixture is random noise with all-zero expected output, so it structurally CANNOT
     // catch a column-order regression — only a real walk can. If this ever reads 0, the reorder in
     // step-counter-pipeline.ts (STEPMOTION_MODEL_ORDER) has regressed.
-    const r = await runStepCounterPipeline(continuousWalk(40), [], toMs)
+    const r = await runStepCounterPipeline(continuousWalk(40), [], toMs, nodeModelRuntime)
     expect(r).not.toBeNull()
     expect(r!.totalSteps).toBeGreaterThan(100)
     // The decoded cadence stays in the walking band regardless (it was always correct).

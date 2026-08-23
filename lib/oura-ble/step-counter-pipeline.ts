@@ -29,6 +29,7 @@ import { pairStepFeatures, type StepFeatureFrame } from './step-features'
 import { runStepsMotionDecoder, setStepsDecoderConstants, hasStepsDecoderConstants, STRIDE_FREQUENCY_COLUMN } from '@/lib/oura-models/steps-motion-decoder'
 import { getStepsDecoderConstants } from '@/lib/oura-models/constants'
 import { runStepCounter, type StepWindow } from '@/lib/oura-models/inference/step-counter'
+import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 import { estimateSteps } from '@trainingai/shared/health/step-estimate'
 
 /** A stored raw sample row reduced to what the pipeline needs. */
@@ -120,6 +121,7 @@ export async function runStepCounterPipeline(
   motionFrames: RawFrame[],
   /** ds -> wall-clock ms. The caller owns anchor policy; this pipeline only needs the conversion. */
   toMs: (ds: number) => number,
+  runtime: ModelRuntime,
 ): Promise<StepCounterPipelineResult | null> {
 
   // 1. Pair + unpack the step-feature frames into 27-column windows.
@@ -161,7 +163,7 @@ export async function runStepCounterPipeline(
       motionTimestamps,
       motionData,
       outputSamplingIntervalMs: OUTPUT_SAMPLING_INTERVAL_MS,
-    })) ?? []
+    }, runtime)) ?? []
 
   return {
     pairedWindows: paired.length,

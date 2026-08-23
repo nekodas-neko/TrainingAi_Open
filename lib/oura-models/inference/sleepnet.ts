@@ -14,7 +14,7 @@
  * Stage codes match the repo's `sleep_phase_5_min` convention (postprocessor `argmax+1`):
  *   1 = deep, 2 = light, 3 = REM, 4 = awake.
  */
-import { getSession } from './session'
+import type { ModelRuntime } from './runtime'
 
 const MODEL_FILE = 'sleepnet_moonstone_1_2_0_core.onnx'
 const N_EPOCHS = 1800
@@ -38,6 +38,7 @@ export interface SleepNetResult {
 export async function runSleepNet(
   highRes: Float32Array,
   lowRes: Float32Array,
+  runtime: ModelRuntime,
 ): Promise<SleepNetResult | null> {
   if (highRes.length !== HIGH_RES_LEN * HIGH_RES_CH || lowRes.length !== N_EPOCHS) {
     console.warn(
@@ -47,14 +48,13 @@ export async function runSleepNet(
     return null
   }
 
-  const session = await getSession(MODEL_FILE)
+  const session = await runtime.session(MODEL_FILE)
   if (!session) return null
 
   try {
-    const ort = await import('onnxruntime-node')
     const feeds = {
-      high_res: new ort.Tensor('float32', highRes, [1, HIGH_RES_LEN, HIGH_RES_CH]),
-      low_res: new ort.Tensor('float32', lowRes, [1, N_EPOCHS, 1]),
+      high_res: session.float32(highRes, [1, HIGH_RES_LEN, HIGH_RES_CH]),
+      low_res: session.float32(lowRes, [1, N_EPOCHS, 1]),
     }
     const out = await session.run(feeds)
     const staging = out.staging_logits.data as Float32Array // [1,4,1800] -> c*1800 + t

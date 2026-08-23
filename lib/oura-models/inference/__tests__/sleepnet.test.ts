@@ -12,6 +12,7 @@ vi.mock('../session', async importOriginal => {
 })
 
 import { runSleepNet, HIGH_RES_LEN, HIGH_RES_CH, APNEA_THRESHOLD } from '../sleepnet'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 
 const FIX = path.join(process.cwd(), 'lib', 'oura-models', 'onnx', '__fixtures__')
 const N_EPOCHS = 1800
@@ -33,7 +34,7 @@ describe('SleepNet ONNX inference (onnxruntime-node)', () => {
     const highRes = ramp(HIGH_RES_LEN * HIGH_RES_CH)
     const lowRes = ramp(N_EPOCHS)
 
-    const result = await runSleepNet(highRes, lowRes)
+    const result = await runSleepNet(highRes, lowRes, nodeModelRuntime)
     // Proves onnxruntime-node loads + runs the vendored ONNX in this runtime (incl. CI).
     expect(result, 'runSleepNet returned null — onnxruntime-node failed to load/run').not.toBeNull()
 
@@ -64,6 +65,6 @@ describe('SleepNet ONNX inference (onnxruntime-node)', () => {
   })
 
   it('returns null on bad input shape (infallible contract)', async () => {
-    expect(await runSleepNet(new Float32Array(10), new Float32Array(1800))).toBeNull()
+    expect(await runSleepNet(new Float32Array(10), new Float32Array(1800), nodeModelRuntime)).toBeNull()
   })
 })
