@@ -20,7 +20,7 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ## 2026-08-23 — BF-9, the trainer role
 
-**`docs/implementation-backlog.md` 11517 → 11599.** The owner wants to build programs for other
+**`docs/implementation-backlog.md` — no raise needed in the end.** The owner wants to build programs for other
 people from his own app instead of borrowing their phone.
 
 81 lines added, 54 net. Long for an unplanned feature, and the length is almost entirely the security
@@ -44,6 +44,13 @@ guards": the ownership checks stop a *bug* writing to the wrong account, not an 
 five people sharing one database a mis-scoped write corrupts a real person's history and then syncs
 it to their device. `isAdmin` stays off the table for the same reason — it is an operator permission,
 not a trainee one.
+
+**Final bookkeeping, after the merge:** this entry was drafted twice as a raise (11517 → 11571, then
+→ 11599) and ended up needing neither. #124 landed first and removed the 66-line Q-479 entry it
+completes, which more than absorbed BF-9 — so the baseline stays at **11517** and this section
+records a raise that did not happen rather than deleting the reasoning for one. Twice in one day a
+drafted raise has evaporated because parallel work shrank the file underneath it; the lesson is to
+treat the number as provisional until the merge lands, not to skip the note.
 
 ---
 
@@ -1858,3 +1865,32 @@ Worth noting for whoever runs the next sweep: Current Status is now ~178 lines a
 entries, and three separate PRs today each had to trim prose to avoid tripping this check. That is
 the ratchet doing its job, but it is also the signal that the sweep is due — the older half of the
 section describes work that has been on `main` for days.
+
+
+## 2026-08-23 — `projectOverview.md` 7977 → 7886, `docs/implementation-backlog.md` 11310 → 10975
+
+Both shrink, and both ratchets are tightened to lock the gain in rather than left at the old number.
+
+`projectOverview.md` loses 91 net: the 112-line `disk_full` Known-Issues entry moved whole to
+`known-issues-resolved.md` — the database is 210 MB with zero dead tuples and the re-stamp mechanism
+is gone, so nothing was still owed on it — against 21 lines added for the resolution note and a
+ring-key progress note.
+
+`docs/implementation-backlog.md` loses 335: Q-534 closed on measurement rather than implementation.
+
+## 2026-08-23 — `projectOverview.md` 7983 → 7989
+
+Six lines: a Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch.
+
+Worth recording *how* this nearly went wrong, since the Lane B baton warned about it and it happened
+anyway. Resolving the merge with a blind "keep both sides" **duplicated the ring-service paragraph**
+— main had compacted the same entry I had written, so the two sides were one entry reworded, not two
+independent ones. The tell was the arithmetic: the check reported 14 lines added by a branch whose
+own addition is 6. "Keep both" is right for genuinely independent appended entries and wrong for a
+rewritten one, and the only reliable way to tell them apart is to read the resolved text.
+
+## 2026-08-23 — `projectOverview.md` 7869 → 7879
+
+Ten lines: the Current Status entry for the Q-454/Q-455/Q-465 route-hardening batch, restored after
+a merge. The count moved because the surrounding section shrank underneath it, not because the entry
+grew.

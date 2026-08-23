@@ -110,6 +110,14 @@ const DAY_HR_BUCKET_MIN = 15;
 const fmtMs = fmtAest;
 
 export async function GET(req: NextRequest) {
+  // Auth first, then the parameter (Q-454). Answering "Missing date" to an anonymous caller tells
+  // them the route's contract before it tells them they may not use it. No data leaked today —
+  // the pre-auth code only read a search param — but the rule is that security checks fail first,
+  // and it is cheap now and expensive the day a param handler above this line touches the DB.
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
   const { searchParams } = new URL(req.url);
   const rawDate = searchParams.get("date");
   if (!rawDate) return NextResponse.json({ error: "Missing date" }, { status: 400 });
@@ -118,10 +126,6 @@ export async function GET(req: NextRequest) {
   // "Invalid time value" (a 500) on any non-slash or impossible date.
   const date = normalizeDateParam(rawDate);
   if (!date) return NextResponse.json({ error: "Invalid date" }, { status: 400 });
-
-  const session = await auth();
-  const userId = session?.user?.id;
-  if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const repo = await getRepository();
   const userTz = session.user?.timezone ?? DEFAULT_TZ;
