@@ -22,6 +22,9 @@ const STRANGER_EXERCISE_ROW = '00000000-0000-4000-8000-00000000cc22'
 const HINGE = 'Coach Test Deadlift'
 const HAMSTRING = 'Coach Test RDL'
 const MERGED = 'Coach Test Merged Lift'
+// A third live catalogue entry, so a change can be stacked ON a change (Q-468). MERGED cannot
+// play that part — apply refuses a merged-away entry, which is its own test above.
+const THIRD = 'Coach Test Good Morning'
 
 const patchFor = (targetId: string, from = HINGE, to = HAMSTRING): CoachPatch => ({
   domain: 'session_exercise',
@@ -55,8 +58,9 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
       `INSERT INTO exercise_library (name, muscles) VALUES
          ($1, '[{"muscle":"lower back","role":"main"},{"muscle":"hamstrings","role":"main"}]'::jsonb),
          ($2, '[{"muscle":"hamstrings","role":"main"},{"muscle":"glutes","role":"secondary"}]'::jsonb),
-         ($3, '[{"muscle":"hamstrings","role":"main"}]'::jsonb)
-       ON CONFLICT (name) DO NOTHING`, [HINGE, HAMSTRING, MERGED])
+         ($3, '[{"muscle":"hamstrings","role":"main"}]'::jsonb),
+         ($4, '[{"muscle":"hamstrings","role":"main"},{"muscle":"lower back","role":"secondary"}]'::jsonb)
+       ON CONFLICT (name) DO NOTHING`, [HINGE, HAMSTRING, MERGED, THIRD])
     // MERGED is a catalogue row kept only for FK validity — a picker must never offer it.
     await pool.query(
       `UPDATE exercise_library SET merged_into = (SELECT id FROM exercise_library WHERE name = $1)
@@ -78,7 +82,7 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
   afterAll(async () => {
     await pool.query(`DELETE FROM coach_changes WHERE user_id = ANY($1)`, [[OWNER, STRANGER]])
     await pool.query(`DELETE FROM programs WHERE id = ANY($1)`, [[PROGRAM, STRANGER_PROGRAM]])
-    await pool.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[HINGE, HAMSTRING, MERGED]])
+    await pool.query(`DELETE FROM exercise_library WHERE name = ANY($1)`, [[HINGE, HAMSTRING, MERGED, THIRD]])
     await pool.query(`DELETE FROM users WHERE id = ANY($1)`, [[OWNER, STRANGER]])
   })
 
@@ -202,6 +206,70 @@ describe.skipIf(!canRun)('AI Coach — apply path', () => {
 
     const { rows } = await pool.query(`SELECT undone_at FROM coach_changes WHERE id = $1`, [applied.changeId])
     expect(rows[0].undone_at).not.toBeNull()
+  })
+
+  // Q-468, measured entirely inside the Coach's own flow — no external edit needed. Two stacked
+  // changes on one exercise: undoing the FIRST used to return 200 and set the row back to its
+  // original value, while `coach_changes` still showed the second as in effect. Undoing both then
+  // left the row on the middle value, which the user never chose.
+  describe('stacked changes on one target', () => {
+    const swap = (id: string, from: string, to: string): CoachPatch => ({
+      domain: 'session_exercise',
+      targetId: EXERCISE_ROW,
+      changes: [{ id, field: 'exerciseName', from, to }],
+    })
+
+    it('refuses to undo a change a later one has written over', async () => {
+      const a = await applyCoachPatch(db, OWNER, swap('c1', HINGE, HAMSTRING), ['c1'])
+      const b = await applyCoachPatch(db, OWNER, swap('c2', HAMSTRING, THIRD), ['c2'])
+      if (!a.ok || !b.ok) throw new Error('setup failed')
+
+      const undoA = await undoCoachChange(db, OWNER, a.changeId)
+
+      expect(undoA.ok).toBe(false)
+      if (undoA.ok) return
+      expect(undoA.reason).toBe('stale')
+      if (undoA.reason !== 'stale') return
+      expect(undoA.drift[0]).toMatchObject({ field: 'exerciseName', expected: HAMSTRING, actual: THIRD })
+      // Refused means nothing moved, and the history still agrees with the row.
+      expect((await nameOf(EXERCISE_ROW))?.exercise_name).toBe(THIRD)
+      const { rows } = await pool.query(`SELECT undone_at FROM coach_changes WHERE id = $1`, [a.changeId])
+      expect(rows[0].undone_at).toBeNull()
+    })
+
+    it('undoing both in reverse returns the target to where it started', async () => {
+      const a = await applyCoachPatch(db, OWNER, swap('c1', HINGE, HAMSTRING), ['c1'])
+      const b = await applyCoachPatch(db, OWNER, swap('c2', HAMSTRING, THIRD), ['c2'])
+      if (!a.ok || !b.ok) throw new Error('setup failed')
+
+      expect((await undoCoachChange(db, OWNER, b.changeId)).ok).toBe(true)
+      expect((await nameOf(EXERCISE_ROW))?.exercise_name).toBe(HAMSTRING)
+
+      expect((await undoCoachChange(db, OWNER, a.changeId)).ok).toBe(true)
+      expect((await nameOf(EXERCISE_ROW))?.exercise_name).toBe(HINGE)
+    })
+
+    // The check is against the target, not against the change's position in a list: a single
+    // change still undoes even though it is the oldest, because nothing has written over it.
+    it('still undoes a change nothing has written over', async () => {
+      const a = await applyCoachPatch(db, OWNER, swap('c1', HINGE, HAMSTRING), ['c1'])
+      if (!a.ok) throw new Error('setup failed')
+      expect((await undoCoachChange(db, OWNER, a.changeId)).ok).toBe(true)
+      expect((await nameOf(EXERCISE_ROW))?.exercise_name).toBe(HINGE)
+    })
+
+    // Drift from outside the Coach is the same refusal — this is what the check buys beyond
+    // ordering, and what a wired undo button (Q-467) would otherwise expose.
+    it('refuses when the target moved outside the Coach entirely', async () => {
+      const a = await applyCoachPatch(db, OWNER, swap('c1', HINGE, HAMSTRING), ['c1'])
+      if (!a.ok) throw new Error('setup failed')
+      await pool.query(`UPDATE session_exercises SET exercise_name = $1 WHERE id = $2`, [THIRD, EXERCISE_ROW])
+
+      const undone = await undoCoachChange(db, OWNER, a.changeId)
+
+      expect(undone.ok).toBe(false)
+      expect((await nameOf(EXERCISE_ROW))?.exercise_name).toBe(THIRD)
+    })
   })
 
   it('refuses a second undo rather than re-applying the before-state', async () => {

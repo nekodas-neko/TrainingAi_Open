@@ -77,6 +77,18 @@ async function affectedExercises(db: Db, userId: string, muscleName: string): Pr
 }
 
 export const injuryHandler: DomainHandler = {
+  // Keyed by row id, not by muscle: undo addresses the injury the change created or updated, and
+  // `activeInjury` looks one up by muscle — which is the wrong question on the way back, because
+  // the muscle may since have a different active injury.
+  async currentState(db, userId, targetId) {
+    const [row] = await db
+      .select({ severity: s.injuries.severity, notes: s.injuries.notes, resolvedDate: s.injuries.resolvedDate })
+      .from(s.injuries)
+      .where(and(eq(s.injuries.id, targetId), eq(s.injuries.userId, userId), isNull(s.injuries.deletedAt)))
+      .limit(1)
+    return row ? (row as unknown as Record<string, unknown>) : null
+  },
+
   async preview(db, userId, patch): Promise<PreviewResult> {
     const muscle = patch.changes.find(c => c.field === 'muscleName')?.to as string | undefined
     const resolving = patch.changes.find(c => c.field === 'resolved')

@@ -70,6 +70,11 @@ async function phaseSetName(db: Db, userId: string, id: string | null): Promise<
 }
 
 export const programPhaseHandler: DomainHandler = {
+  async currentState(db, userId) {
+    const state = await loadState(db, userId)
+    return state ? (state as unknown as Record<string, unknown>) : null
+  },
+
   async preview(db, userId, patch): Promise<PreviewResult> {
     const state = await loadState(db, userId)
     if (!state) return { consequences: [], drift: [], target: null }
