@@ -28,7 +28,9 @@ const bodySchema = z.object({
   // slashes — a dash-only regex rejects every real request before the handler runs (Q-130).
   date: z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).optional(),
   force: z.boolean().optional(),
-})
+// `.strict()` (Q-464): the one client, `components/health/ai-insight-card.tsx`, sends exactly
+// `{ section, date, force }`. Date-bearing, so a dropped key would silently answer for today.
+}).strict()
 
 function bandLabel(score: number | null): string {
   return score == null ? 'unknown' : scoreBand(score).label.toLowerCase()

@@ -32,7 +32,9 @@ const CreateBody = z.object({
   targetDate: z.string().optional(),
   frameworkKey: z.string().optional(),
   timePerSessionMinutes: z.number().int().positive().max(180).optional(),
-})
+// `.strict()` (Q-464): the one client, `components/running/plan-setup-sheet.tsx`, builds its body
+// from `goalKind`, `targetDistanceKm`, `timePerSessionMinutes` and `frameworkKey` — all named here.
+}).strict()
 
 export async function GET() {
   const session = await auth()

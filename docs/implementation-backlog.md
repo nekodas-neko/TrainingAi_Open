@@ -3905,6 +3905,23 @@ ehr     0     0     0     0   648   208   128   556     0
 - **What is left is the sweep**, deliberately not done here: 89 non-strict schemas, each needing its
   clients checked the way `BodyMetadataPostSchema`'s two were. The ratchet is the mechanism; the
   sweep is separate and much larger, exactly as `check-hex-literals` says of its own 471.
+- 🚧 **89 → 85, 2026-08-23.** Four converted, each after reading the one client that posts to it:
+  `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. All four
+  now 400 on an unknown key and still accept the real body — verified live, not just by test.
+- **⚠ Two more exemption classes were found while doing it, and both are now in the script's header
+  with evidence rather than as a guess.** (a) **A third-party SDK's wire format:** `/api/coach` is
+  driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts `{ id, messages, trigger,
+  messageId }` — read out of `node_modules/ai/dist/index.mjs`, not assumed — against a schema naming
+  only `messages`. `.strict()` there would **400 every coach message.** (b) **`generateObject`
+  response schemas**, which the checker cannot tell apart from request schemas: `builder-chat` has
+  four `z.object`s and only one is a request. Strictness there governs the model, not a client.
+  Also: `scale-ble/samples` belongs with the outbox class, because its client is the APK's Kotlin
+  service and **the APK does not update with a Railway deploy**.
+- **The tempting shortcut does not work.** In-repo JS clients ship with the server (the APK is a
+  WebView loading Railway, so JS and server always deploy together), so a key mismatch is a bug
+  either way — but that argues a mismatch *is* a bug, not that there is none, and a silent 400 on a
+  rarely-exercised route is exactly what a codemod would introduce and no test would catch. There is
+  no substitute for reading each client.
 - **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a

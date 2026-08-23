@@ -22,10 +22,12 @@ const NO_STORE = 'private, no-store'
 // Manually pick today's run structure/duration instead of the framework's own pick — the
 // running-screen equivalent of the workout screen's short/standard/long duration preset,
 // extended to also let you swap the prescribed TYPE (skip intervals, run easy instead, etc).
+// `.strict()` (Q-464): the one client, `components/running/running-plan-content.tsx`, sends
+// exactly `{ runType, durationMin }`.
 const OverrideBody = z.object({
   runType: z.enum(['recovery', 'easy', 'long', 'tempo', 'interval']),
   durationMin: z.number().int().min(10).max(120),
-})
+}).strict()
 
 const TYPE_LABEL: Record<RunType, string> = {
   recovery: 'a recovery run', easy: 'an easy run', long: 'a long run', tempo: 'a tempo run', interval: 'an interval session',
