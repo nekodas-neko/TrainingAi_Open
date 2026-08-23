@@ -23,6 +23,7 @@ import {
 import { reportServerError } from "@/lib/observability";
 import { rateLimit } from "@/lib/rate-limit";
 import { generatePrescriptionForSession } from "@trainingai/shared/ai-periodization/generate-prescription";
+import { regeneratePrescriptionInBackground as regeneratePrescriptionSingleFlight } from "@trainingai/shared/ai-periodization/regenerate-in-background";
 
 // Re-exported so existing type imports (e.g. `import('@/app/api/workout-data/route').PhaseStatus`)
 // keep resolving after the interfaces moved to lib/workout/session-data.ts.
@@ -47,15 +48,20 @@ export async function GET(req: NextRequest) {
 // thin wrapper over generatePrescriptionForSession, so the work is identical — including its
 // rate-limit budget, re-applied here under the same key so an unattended poll loop still cannot
 // mint unlimited Gemini calls.
+// The in-flight guard, the reason it is not the rate limit, and why the marker is process-local
+// rather than a row, are all in `regenerate-in-background.ts` (Q-470).
 function regeneratePrescriptionInBackground(
   userId: string,
   programSessionId: string,
   repo: Awaited<ReturnType<typeof getRepository>>,
   tz: string,
 ) {
-  if (!rateLimit(`prescribe:${userId}`, 20, 60 * 60 * 1000)) return
-  void generatePrescriptionForSession(userId, programSessionId, repo, tz)
-    .catch(err => reportServerError(err, { userId, url: '/api/workout-data#prescribe' }))
+  regeneratePrescriptionSingleFlight(userId, programSessionId, {
+    today: todayInTz(tz),
+    allow: () => rateLimit(`prescribe:${userId}`, 20, 60 * 60 * 1000),
+    run: () => generatePrescriptionForSession(userId, programSessionId, repo, tz),
+    onError: err => reportServerError(err, { userId, url: '/api/workout-data#prescribe' }),
+  })
 }
 
 async function handleWorkoutData(req: NextRequest) {

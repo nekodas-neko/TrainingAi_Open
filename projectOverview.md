@@ -27,6 +27,13 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**A rate limit is not an idempotency mechanism (Q-470).** The background prescription regeneration
+fired twice for one session-day — two call sites in one handler, and `cachedFetch` revalidates on
+every screen open, so the second GET started a second generation before the first landed. It now
+takes an in-flight marker keyed the same way its fingerprint is, released when the work settles
+(**including on rejection** — a leaked marker would wedge that session-day until restart) and
+checked before the rate limit, so a deduped call spends no budget.
+
 **The AI-usage screen's top row was an artefact of its own fingerprint (Q-471).** Three meal-plan
 sections fingerprinted on a rounded calorie target alone, so every deliberate reroll read as a
 double trip. They now carry what distinguishes a request, keyed through a new `contentKey` helper.

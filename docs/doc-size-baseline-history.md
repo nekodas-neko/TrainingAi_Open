@@ -1666,3 +1666,13 @@ carry.
 The six in `projectOverview.md` are Q-471's Current Status entry, trimmed to the finding and the
 number that matters — 44 of the 89 redundant calls were the artefact, 45 are real — with the
 measurement in the journal.
+
+## 2026-08-23 — `projectOverview.md` 7934 → 7941, `docs/implementation-backlog.md` 11497 → 11469
+
+Q-470's Current Status entry, against its queue entry being removed for shipping — the backlog
+shrinks 28 lines, which is the trade the protocol wants.
+
+Seven lines rather than three because the reusable part is the *reason*: a rate limit is a counter
+over a window and cannot tell "already running" from "ran a minute ago". That sentence is why the
+bug existed with a rate limit already in place, and it now also has a `docs/module-map.md` row so
+the next fire-and-forget background call does not repeat it.
