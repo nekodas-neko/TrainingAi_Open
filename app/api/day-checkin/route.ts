@@ -3,7 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import { todayInTz, DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils'
-import { DayCheckinScalesSchema, DayCheckinExtrasSchema } from '@trainingai/shared/validation/day-checkin'
+import { DayCheckinScalesSchema, DayCheckinExtrasSchema, dayCheckinHasAnswers } from '@trainingai/shared/validation/day-checkin'
 import { rateLimit } from '@/lib/rate-limit'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
@@ -50,6 +50,14 @@ export async function POST(req: Request) {
   const parsed = Body.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const b = parsed.data
+  // Q-465: a body of `{}` used to return 201 and write a row with every metric null — a row
+  // indistinguishable from a real check-in in which the user answered nothing. Readiness is exactly
+  // the pillar where those two must not collapse to the same value, and the row also moves
+  // `reevaluationKey(...)` in `/api/workout-data`, so it can trigger a re-evaluation carrying no
+  // new information. The same guard runs in `pushMutations`, since the outbox reaches this table too.
+  if (!dayCheckinHasAnswers(b)) {
+    return NextResponse.json({ error: 'Check-in carries no answers' }, { status: 400 })
+  }
   // Q-496: the GET above already routes its param through `normalizeDateParamIso`; this POST did
   // not, so the schema's shape-only regex let `2026-13-45` reach the driver — measured as a 500 plus
   // an `error_events` row, a client input error filed as a server fault.
