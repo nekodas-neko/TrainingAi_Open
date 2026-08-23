@@ -1732,18 +1732,22 @@ and the module-map row; this is the pointer to it.
 `docs/implementation-backlog.md` held at its 11334 baseline exactly — the re-scoped Q-392 entry
 gained a fourteen-row key table and shed the prose the journal and module map now carry.
 
-## 2026-08-23 — `docs/implementation-backlog.md` 11334 → 11359
+## 2026-08-23 — `docs/implementation-backlog.md` 11334 → 11377
 
-Twenty-five lines, and they buy a 269-line entry becoming four an implementer can actually pick up.
+Eighty-one lines, and they buy a 269-line entry becoming four an implementer can actually pick up.
 Q-395 described a nutrition rework across sixteen screens as **one** queue item, so `next-item.js`
 offered it as a single startable thing while its own body sequenced it into phases. It is now the
 spec and the completion checkpoint, parked behind Q-395c; the work is Q-406 → Q-395a → Q-395b →
 Q-395c, chained with `Needs:`.
 
-The cost is four headings and four field blocks. It was **81 lines** before trimming: the phases
-were rewritten to point back at Q-395's findings rather than restate them, which is also the only
-way the decisions stay in one place. What did not get cut are the ⚠ warnings each phase carries —
-the 11-section coverage list, the `Saved meals`/`My Meals`/`My Foods` rename sweep, and the
-`FoodLibrarySheet`/`SavedMealsSheet` capability diff. Those are the failure modes that make a
-rework lose a section quietly, and they have to be where the work is, not one entry away.
+**The arithmetic, stated properly, because a first draft of this note got it wrong.** The split was
+81 lines before trimming and 25 after — but it was measured against a base that then moved. The
+`ring-service-device-pass` batch shipped in between and took the file to **11295**, well under the
+11334 baseline, which that PR left unlowered. So this raise spends 39 lines of existing slack and
+adds 42 of its own. Recording it as "+25" would have been true of a tree that no longer exists.
 
+The phases were rewritten to point back at Q-395's findings rather than restate them, which is also
+the only way the decisions stay in one place. What did not get cut are the ⚠ warnings each phase
+carries — the 11-section coverage list, the `Saved meals`/`My Meals`/`My Foods` rename sweep, and
+the `FoodLibrarySheet`/`SavedMealsSheet` capability diff. Those are the failure modes that make a
+rework lose a section quietly, and they have to be where the work is, not one entry away.
