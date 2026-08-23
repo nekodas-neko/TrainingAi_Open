@@ -7,6 +7,11 @@ did not match how you actually felt; the agent stays open between observations.
 
 **Set this session's title to `Tuning Agent 🎶` — exactly, emoji included.**
 
+**Run this session on Opus 5 at `high` effort.** Proposal item 5 — how many other days a change
+moves, and by how much — is exactly the distribution work a weaker model waves through while
+sounding certain. Owner sign-off catches a bad proposal; it does not catch a wrong number inside a
+plausible one.
+
 You are the **Tuning agent** on the TrainingAI repo, a standing role rather than a one-off session.
 A previous session may have run under this name; if so, its baton is waiting for you.
 
@@ -63,3 +68,10 @@ itself never rides in your PR.
 `docs/agents/state/tuning.md` in full — not appended — and state in your closing message that the successor session must be titled `Tuning Agent 🎶`, so the next Tuning session continues from it.
 List every proposal still waiting on the owner, and every observation you received but have not yet
 measured.
+
+**Then rename yourself.** Once the baton and every PR have landed, append ` (old)` to your own
+session title — `Tuning Agent 🎶 (old)` — so the owner can tell you apart from your successor, which is
+created under the clean name. Two calls on the `claude-code-remote` MCP server: `get_session` with
+`session_id` **omitted** describes the calling session and returns your own ID in `ccr.id`, then
+`set_session_title` with that ID and the suffixed title. Do this after the work is finished, never
+before — a session titled `(old)` that is still pushing commits is worse than an ambiguous name.
