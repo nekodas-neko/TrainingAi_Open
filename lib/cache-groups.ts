@@ -437,6 +437,10 @@ export async function invalidateNutritionWrite(): Promise<void> {
   await Promise.all([
     // calories IN changed — the energy-balance bar and its calibration window both move
     invalidateCache('energy-balance:'),
+    // Q-387: "I have finished logging" is a nutrition write, and it is the ONLY writer of
+    // `day_checkins.food_logging_completed_at` — the check-in sheets COALESCE that column rather
+    // than setting it, so no other path can make this key stale.
+    invalidateCache('day-checkin:'),
     // prefix-invalidate every `nutrition-food-logs-<date>` entry
     invalidateCache('nutrition-food-logs-'),
     invalidateCache('nutrition-weekly-summary'),

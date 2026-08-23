@@ -8,6 +8,8 @@ import { useDrag } from "@use-gesture/react";
 import { AnimatePresence, motion } from "motion/react";
 import { Settings, ChevronLeft, ChevronRight, MoonIcon } from "lucide-react";
 import { MacroRing } from "@/components/nutrition/macro-ring";
+import { FoodLoggingComplete } from "@/components/nutrition/food-logging-complete";
+import { MIN_LOGGED_DAYS } from "@trainingai/shared/nutrition/adaptive-tdee";
 import { budgetProvenance } from "@trainingai/shared/nutrition/calorie-balance";
 import { MealCard } from "@/components/nutrition/meal-card";
 import { FoodLoggerSheet } from "@/components/nutrition/food-logger-sheet";
@@ -646,6 +648,18 @@ export default function NutritionContent({ userId }: { userId?: string }) {
             userId={userId}
           />
         )}
+
+        {/* Q-387 asked for this as the LAST element in the day's scroll, and that placement is the
+            point: "I have finished logging" is a claim about the whole day, so it belongs after
+            everything the day contains rather than in the header beside a running total. */}
+        <FoodLoggingComplete
+          date={selectedDate}
+          isToday={selectedDate === todayStr}
+          daysLogged={balanceForDate?.maintenance?.daysLogged ?? null}
+          minDays={MIN_LOGGED_DAYS}
+          calibrated={balanceForDate?.maintenance?.source === 'calibrated'}
+          tz={tz}
+        />
       </div>
 
       <WaterLogSheet

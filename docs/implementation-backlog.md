@@ -581,35 +581,6 @@ the payload to a standing inefficiency. Open, all Lane A's:
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
-### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
-
-- **Branch:** `feat/retire-day-overlay-sheet`
-- **Added:** 2026-08-23 · **Lane: B**
-- **Placement:** low. Nothing is broken by leaving it; what is here is dead code plus three
-  capabilities that have been gone since Q-110 (2026-08-08) without a report.
-
-LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
-hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
-logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
-because deleting it silently discards three things the day screen does not have:
-
-| unreachable affordance | where it lives |
-|---|---|
-| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
-| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
-| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
-
-`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
-only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
-and `historyExercise`/`selectedActivity` can now only ever be `null` there.
-
-**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
-keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
-`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
-`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
-route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
-controls, so a third target needs a layout decision rather than another icon.
-
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -817,6 +788,8 @@ the only thing it saves over the move is a meal type they did not want to keep �
 delete afterwards, once it is empty. If it is wanted, it needs its own confirm naming the count, and
 `invalidateNutritionWrite()` on the client, same as the move.
 
+
+### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
@@ -1243,69 +1216,36 @@ quietly wrong". Backfill is deliberately **not** attempted: past days have no fl
 honest one, so the estimate starts from days marked after this ships and the counter shows that
 plainly.
 
-### [nutrition][app-shell] Q-406 — extract `food-row.tsx` first, so the rework has somewhere to land
+### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 - **Branch:** `refactor/nutrition-food-row`
-- **Added:** 2026-08-18, split out of **Q-395** so it can start immediately and in parallel rather than
-  waiting for the rework's turn in the queue.
-- **Lane B.** Pure extraction — no behaviour change, no schema, no route.
-
-- **✅ THE HEADROOM HALF IS DONE (2026-08-19, v1.325.3). THE ROW HALF IS RE-SCOPED — read the
-  correction below before starting it.** `nutrition-content.tsx` is **732** and
-  `saved-meals-sheet.tsx` is **753**, both well under 800, **with no new BASELINE rows**. Q-395 can
-  land. [`Journal`](overview/entries/2026-08-19-nutrition-headroom.md).
-
-**⚠ CORRECTED 2026-08-19 — the mechanism in this entry does not work, measured twice.**
-
-**1. Extracting a food row frees ZERO lines from either landing file.** Neither contains food-row
-markup. `nutrition-content.tsx` renders no rows at all — `MealCard` owns the diary row — and its
-only `foodItem` references are data mapping. `saved-meals-sheet.tsx` had already delegated both its
-lists, to `SavedMealCard` and `IngredientRow`. The two files are large for entirely different
-reasons, so the "unblocker" could not have unblocked anything.
-
-**What actually took them under**, and what was done instead: `AddFoodByHandForm` out of
-`saved-meals-sheet.tsx` (793 → 753 — a self-contained five-field form that owned its own state) and
-`useFoodLogsLoader` out of `nutrition-content.tsx` (800 → 732 — 69 lines, the file's largest and
-most self-contained function, no JSX and four inputs).
-
-**2. The four call sites are four DIFFERENT shapes, not one shape drawn four times.** Measured:
-- diary (`meal-card.tsx:82`) — calories in a fixed `w-16` right column, secondary line is **coloured
-  P/C/F chips**, trailing edit + delete buttons.
-- library (`food-library-sheet.tsx:100`) — calories right-aligned over a serving sub-line, whole row
-  is a button.
-- search/db (`ingredient-search.tsx:72`) — calories **inside** the secondary line, trailing `+` icon.
-- search/external (`ingredient-search.tsx:132`) — same, plus a macro-mismatch warning line and a
-  spinner.
-
-So a component covering all four **faithfully** needs a secondary-line node, a trailing slot and a
-calories-placement variant — at which point it is a wrapper, not a unification. And unifying them
-properly means **changing how three of the four look**, which this entry explicitly forbids
-(*"Behaviour must not change… Any visual difference belongs to Q-395"*). **The row cannot be
-extracted without first deciding what it should look like, and that decision is Q-395's.** Take the
-row after Q-395's design pass, not before it.
-
-**Why this was its own entry.** Q-395 could not start: both files it lands in were on the 800-line
-ceiling (`nutrition-content.tsx` at exactly **800**, `saved-meals-sheet.tsx` at **793**, neither
-grandfathered), so one added line failed Custom Rules. That part was right, and is now resolved.
-
-**What to build.** One component, `components/nutrition/food-row.tsx`, with the shape used by all six
-drawn screens: optional thumbnail · name · grey secondary line of *what and how much* · calories
-right-aligned in a fixed column · optional chevron. Props are **scalars**, not objects — the row
-renders inside `.map()` where hooks are unavailable, and an inline object literal at the call site
-silently defeats `React.memo` (`meal-macro-bars.tsx` is the reference this repo already keeps for
-exactly that reason).
-
-**Then convert the existing call sites, one per commit.** A food currently reads four different ways —
-diary, search, saved meal, builder. Converting them is what takes both landing files back under the
-line and makes the rest of Q-395 additive rather than blocked.
-
-- **⚠ Behaviour must not change in this entry.** It is an extraction. Any visual difference belongs to
-  Q-395, and mixing them makes the diff unreviewable and the regression unattributable.
-- **Done when:** ~~`node scripts/check-component-size.js` reports both files under 800 with **no new
-  BASELINE rows**~~ — **met 2026-08-19** (732 and 753, no new rows). What remains is the row
-  component, and its done-condition is now Q-395's: the four call sites render *the agreed* row,
-  which is a visual change, not "identically to before".
-- **Unblocks:** Q-395, and Q-398 which wants the same row for plan meals.
+- **Lane B.** No schema, no route.
+- **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
+  library sheet + the food-database search row now draw it.
+  [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
+  satisfied.**
+- **The other two call sites are deliberately NOT converted, and this is the reason.** The agreed
+  row's only trailing element is a chevron.
+  - **The diary row** (`meal-card.tsx`) carries inline **edit and delete** buttons. Q-395a retires
+    the list-row editor and moves editing into the quantity sheet — but **that sheet does not exist
+    yet**, so converting the diary row now removes the only way to correct a logged food. That is
+    LB-1's failure exactly: a capability deleted by a UI move whose replacement had not been built.
+    **Convert it in Q-395a, in the same PR that adds the sheet.**
+  - **The external food-database row** (`ingredient-search.tsx:132`) carries a macro-mismatch warning
+    line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
+    them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
+    per-row warning goes — which belongs with Q-395's drawings.
+- **⚠ THE DRAWINGS ARE NOT IN THE REPOSITORY.** `unit-options.png`, which Q-395a names as its
+  reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
+  mockups for cardio, scores and the AI coach, none for nutrition. The row above was built from
+  Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
+  column · optional chevron"), which is complete enough for it. **The remaining phases are not so
+  lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
+  the phases will be built from prose and the visual match cannot be checked.
+- **The optional thumbnail is deferred.** No call site passes one, and an unused `<img>` costs a
+  `no-img-element` exemption for arbitrary user photo URLs. The phase that first shows a thumbnail
+  adds it, with the loader decision made where it can be seen.
+- **Unblocks:** Q-395a, and Q-398 which wants the same row for plan meals.
 
 ### [nutrition][app-shell] Q-395 — the nutrition rework: the spec every phase reads, and the final checkpoint
 
@@ -1656,7 +1596,6 @@ whether or not anyone draws them first.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
 
-
 ### [nutrition] Q-398 — the meal plan should produce saved meals and then get out of the way
 
 > **⚠️ Lane check done 2026-08-19 (Lane A) — the answer is NO schema change, so this is wholly Lane
@@ -1945,6 +1884,37 @@ its QR, logging in one tap. The plan can then be discarded without losing anythi
   each be rejected. Those five cases are the acceptance criteria for this entry — the feature is
   the easy half.
 
+### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
+
+- **Branch:** `feat/retire-day-overlay-sheet`
+- **Added:** 2026-08-23 · **Lane: B**
+- **Placement:** low, and it now SITS low — it was filed into the slot LB-1 vacated, near the top,
+  which contradicted this line (queue position is priority). Moved 2026-08-23. Nothing is broken by
+  leaving it: what is here is dead code plus three capabilities gone since Q-110 (2026-08-08)
+  without a report.
+
+LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
+hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
+logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
+because deleting it silently discards three things the day screen does not have:
+
+| unreachable affordance | where it lives |
+|---|---|
+| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
+| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
+| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
+
+`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
+only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
+and `historyExercise`/`selectedActivity` can now only ever be `null` there.
+
+**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
+keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
+`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
+`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
+route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
+controls, so a third target needs a layout decision rather than another icon.
+
 ### [nutrition][app-shell] Q-327 — the meal photo needs somewhere to be picked
 
 - **Branch:** `feat/saved-meal-thumbnail-ui`
@@ -1972,51 +1942,26 @@ the type, so a picker has somewhere to read from and write to.
   cheapest tripwire, and the audit view now carries `image_bytes` for the same reason.
 
 
-### [cardio][devices] Q-418 — the free walk shows no heart rate while the strap feeding it cadence is connected
+### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 
 - **Branch:** `feat/free-activity-metrics`
-- **Added:** 2026-08-19 · owner, mid-walk screenshot: *"the normal walk activity doesnt have HR - any
-  further metrics we can give the normal walk - including the android pill displaying time"*
-- **Lane B** for the screen; **Lane A** for the notification half (see below), which is Kotlin and
-  needs a new APK.
+- **Lane A** — what remains is Kotlin and needs a new APK.
+- **✅ THE SCREEN HALF SHIPPED 2026-08-23 (v1.339.0).** The free-activity screen now shows **heart
+  rate** in its primary row beside distance and pace, with the guided walk's `STALE_MS` freshness
+  guard, plus a secondary line carrying the **running step total** and **elevation gained**. The
+  guided walk got the same step readout in the same PR (Q-410's half of it), because a metric on one
+  walk screen and not the other is how the free walk became the forgotten surface in the first
+  place. [`Journal`](overview/entries/2026-08-23-free-activity-metrics.md).
+- **Average pace was NOT added**, and that was deliberate: it is one of the two *proposed* metrics
+  rather than the two the owner asked for, and the layout this entry recommends — distance · pace ·
+  HR primary, cadence · steps · elevation secondary — has no sixth slot. Four `text-2xl` figures fit
+  on 412 px; six do not.
+- **`CadenceTrackerSnapshot` gained `stepsEstimate`**, derived from `summarizeCadence` inside the
+  tracker rather than integrated again on each screen — that function is already what fills the
+  saved `steps` field (Q-230), and a second integration would be a second answer to "how far did I
+  walk".
 
-**The HR gap is the cheap one, and the screenshot proves the data is there.** The free-activity screen
-(`components/activity/active-activity-screen.tsx`, 111 lines) renders **distance · pace · cadence**
-and nothing else — there is no `bpm` anywhere in the file. Yet the same screenshot reads
-**`120 spm · strap`**, so the Polar H10 was connected and streaming at that moment. A strap that
-supplies cadence supplies heart rate; the screen simply never asks.
-- **The guided walk already does it**, from the same source: `walk-active.tsx:62` subscribes via
-  `mgr.subscribe((s: LiveHrSample) => …)` and renders `liveBpm` with a `STALE_MS` freshness guard
-  (`:126`) so a dropped strap reads *"(stale)"* rather than freezing on a stale number. **Copy that
-  shape, including the guard** — a number that silently stops updating is worse than a dash.
-- **And the data is already being persisted**: `done-activity-screen.tsx` fetches `hr-window` after
-  the fact and stores `avgHr`/`maxHr`. So HR is recorded for these walks today and is only invisible
-  *while you are walking* — the one time it is actionable.
-
-**Further metrics. Two are REQUESTED, two are proposed.** Everything here is already computed
-elsewhere in the same flow, so each is a render rather than a feature:
-1. **Heart rate — requested.** Above. The obvious gap.
-2. **Total step count — requested** (*"also a total step count would be good"*, owner, same
-   conversation). `CadenceTracker` already exposes `stepsEstimate` — it is what Q-230 used to fill
-   the saved `steps` field, so the number exists and is already trusted enough to persist.
-   **Q-410 adds the same readout to the guided walk; the two screens must show the same thing.**
-   Ship them together or the free walk becomes the surface that got forgotten, which is what this
-   entry is about. **Carry Q-410's caveat with it**: the total is *integrated cadence*, not counted
-   steps, and it is **strap-only** — with no strap it does not exist, so label it an estimate and
-   hide it rather than showing `0`.
-3. **Average pace** alongside current pace — proposed. Current pace on a 1:39 walk is noise; the
-   average is the number that means something. Distance and elapsed are both already on screen, so
-   this is division.
-4. **Elevation gain** — proposed. `computeElevationChange(rawPoints)` runs on save; running it live
-   costs one call over points already in memory. Worth it on a hilly walk, invisible on a flat one,
-   so put it behind a non-zero check rather than showing `0 m`.
-
-**Do not add all four to the metric row.** It currently holds three at `text-2xl`, centred, on a
-412 px screen. Four fits; six does not. Recommendation: **distance · pace · HR** on the primary row,
-with **cadence · steps · elevation** as a smaller secondary line — the guided-walk hierarchy, which
-is already the app's answer to this question. Both owner-requested metrics land on that layout: HR
-in the primary row where it can be acted on, steps in the secondary line where a running total
-belongs.
+**What is left is the Android pill, and it is Lane A.**
 
 **The Android pill — it exists, and it cannot show the time without native work.**
 - **There is already an ongoing notification during a free walk.** `lib/activity/gps-tracking.ts:29`
@@ -2056,6 +2001,10 @@ screenshot is a **1:39** walk with the screen on, which exercises none of it.
   out of range. The notification half is **APK-only** and cannot be checked in `pnpm dev` at all.
 
 ### [cardio][devices] Q-410 — the guided walk should show speed and steps and pace itself by cadence, but the cadence signal is gated and reads `--`
+
+> **⚠ The step-total readout this entry lists shipped 2026-08-23 (v1.339.0)** with Q-418 —
+> both walk screens now show it via `ActivitySecondaryMetrics`. What is left here is the speed
+> readout and pacing by cadence.
 
 - **Branch:** `feat/walk-step-goal`
 - **Added:** 2026-08-19 · owner, mid-session, with a screenshot of a live walk

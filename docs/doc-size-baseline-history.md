@@ -1752,6 +1752,23 @@ carries — the 11-section coverage list, the `Saved meals`/`My Meals`/`My Foods
 the `FoodLibrarySheet`/`SavedMealsSheet` capability diff. Those are the failure modes that make a
 rework lose a section quietly, and they have to be where the work is, not one entry away.
 
+## 2026-08-23 — `docs/agents/state/implementation-lane-b.md` 102 → 109
+
+The Lane B baton, after a run that shipped thirteen items. Compressed three times first — the run
+list rewritten to one or two lines per PR, the stale "do not re-litigate" entries cut (Q-359's is now
+in the entry's own removal), and four gotchas folded — and it still needs seven more lines than the
+old baseline.
+
+What the seven carry, none of it derivable from the code: the **blocker** that Q-395's drawings are
+not in the repository, which parks the largest contiguous chunk of the queue and needs the owner;
+why Q-406's last two call sites are deliberately unconverted (converting the diary row before
+Q-395a's sheet exists deletes the only way to correct a logged food); that `toBeVisible()` does not
+mean in-viewport, which read exactly like a dead button for two debugging rounds; and that on a doc
+conflict "keep both" is right only for *independent* entries — it duplicated Q-406 when the two sides
+were one entry rewritten.
+
+A baton is rewritten wholesale by each successor, so this number falls back at the next handover.
+
 ## 2026-08-23 — `projectOverview.md` 7977 → 7984
 
 Seven lines: one Current Status entry for LB-4, a user-visible staleness fix. The section is
