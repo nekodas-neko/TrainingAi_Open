@@ -28,7 +28,7 @@ class OuraBlePlugin : Plugin() {
 
     private fun prefs() = context.getSharedPreferences("oura_ble", android.content.Context.MODE_PRIVATE)
 
-    // ---- key management (the key never leaves SharedPreferences; never logged) ----
+    // ---- key management (the key is never logged; `revealKey` is its only way out) ----
 
     @PluginMethod fun setKey(call: PluginCall) {
         val hex = call.getString("hex") ?: return call.reject("hex required")
@@ -42,6 +42,30 @@ class OuraBlePlugin : Plugin() {
 
     @PluginMethod fun clearKey(call: PluginCall) {
         prefs().edit().remove("key_hex").apply(); call.resolve()
+    }
+
+    /**
+     * Return the stored key so it can be copied somewhere durable (Q-537).
+     *
+     * **Why this exists, given the rule right above it.** The key had exactly one copy — this
+     * one — with no export and no backup. An uninstall or a device change destroys it silently:
+     * the service logs `no key stored` and refuses to start, while the Devices card keeps showing
+     * the ring as healthy because it reads server data. The intuitive recovery is worse than the
+     * loss, because re-onboarding the official Oura app re-keys the ring and can force a firmware
+     * update that changes the BLE event encoding — turning a recoverable credential problem into
+     * a protocol re-validation. That happened on 2026-08-17 and was only survived because the
+     * original `open_oura` `key.hex` still existed on a machine somewhere.
+     *
+     * **What it does not change.** Every caller of this plugin is already JS inside this app's own
+     * WebView, and that caller can today call `setKey` to replace the key or `clearKey` to destroy
+     * it. Reading it is strictly weaker than either. What stays true is that the key is never
+     * written to the log, never sent to the server, and never leaves the device except through a
+     * person deliberately asking for it here.
+     */
+    @PluginMethod fun revealKey(call: PluginCall) {
+        val hex = prefs().getString("key_hex", null)
+            ?: return call.reject("no key stored")
+        call.resolve(JSObject().put("hex", hex))
     }
 
     // ---- permissions ----

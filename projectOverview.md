@@ -27,6 +27,14 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
+backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
+the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
+inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
+with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
+(6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
+points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
+
 **Preferences have a server home; nothing reads it yet (Q-392, engine half).**
 `users.preferences` JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, which **merges**
 under a row lock — the unlocked version demonstrably drops the other device's key when a write
