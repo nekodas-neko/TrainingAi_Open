@@ -4,6 +4,24 @@ import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
 // self-verifies its arithmetic — we do the sums. Calories prefer the model's
 // per-100g figures (they can encode fibre/alcohol nuance) but fall back to
 // Atwater when they disagree with the macros by more than 40%.
+/**
+ * One serving's worth of a recipe's ingredients.
+ *
+ * A recipe is *n* servings; a meal is one. Dividing the **weights** and leaving the per-100g
+ * densities alone is the whole operation — the densities describe the food, not the portion.
+ *
+ * Shared because two callers do it: `/api/nutrition/scan` divides when a page states its
+ * `recipeYield`, and the meal picker divides when it does not and the user says how many it makes
+ * (Q-409). Silently importing a whole tray as one meal is a 4x calorie error that looks entirely
+ * plausible, so the two must agree by construction rather than by both being written correctly.
+ *
+ * A yield of 1 or less returns the input untouched.
+ */
+export function perServing(ingredients: NutritionIngredient[], servings: number): NutritionIngredient[] {
+  if (!(servings > 1)) return ingredients
+  return ingredients.map(i => ({ ...i, weightG: Math.round((i.weightG / servings) * 10) / 10 }))
+}
+
 export function sumIngredients(ingredients: NutritionIngredient[]): {
   servingSizeG: number
   calories: number
