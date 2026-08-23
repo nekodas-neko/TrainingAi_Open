@@ -1511,3 +1511,14 @@ ends with a gated entry (LB-1) and a successor needs to see that before the queu
 **581** is nearly four times it and is still the one that will not come down as a side effect of a
 routine rewrite. (A first draft of this note said "four of six" from memory and was wrong by one —
 Lane A sits one line under the line, which is not a margin worth rounding in either direction.)
+
+## 2026-08-23 — `docs/implementation-backlog.md` 11390 → 11405
+
+Fifteen lines of `Lane:` / `Gate:` / `Needs:` fields on Q-499, Q-549, Q-551 and Q-547 — four entries
+that sat at the head of the Lane A queue offering work no Lane A implementer could do, each of them
+already saying so in prose the tooling cannot read.
+
+This is the queue file doing its job rather than growing: the fields are what
+`scripts/check-backlog-pointers.js` validates and what `scripts/next-item.js` sorts on, and the
+alternative to the fifteen lines is the next four implementers each re-reading four entries to
+discover the same thing.
