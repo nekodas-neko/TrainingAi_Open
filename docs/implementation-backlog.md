@@ -1131,42 +1131,6 @@ going over. So it still looks like a progress bar where you want to go to the en
 **⚠ The Q-415 budget fix this used to wait on shipped in v1.335.0 — the bar will now fill toward the
 right number.**
 
-### [nutrition][platform][app-shell] LB-6 — six more write paths invalidate before the push, same as LB-4
-
-- **Lane:** B
-- **Branch:** `fix/invalidate-after-push-sweep`
-- **Added:** 2026-08-23, from LB-4's sibling sweep. LB-4 fixed the three engine paths
-  (`log-food`, `log-meal`, `create-food-item`) and left these, which are all `components/**`.
-- **The bug, once:** invalidating *before* a fire-and-forget `pushMutations` makes every
-  `useCachedValue` subscriber refetch while the server still holds the pre-write state, and
-  **re-cache it**. Nothing invalidates again, so the stale value stands for the key's full TTL.
-  Home's Energy Balance card read 42 kcal high for exactly this reason.
-- **The fix is one line each — the helper already exists.** Replace
-  `pushMutations(userId!).catch(() => {})` with
-  `pushThenRevalidate(userId!, <the same invalidator>)` from
-  `@/lib/local-store/push-then-revalidate`. Keep the immediate invalidation: offline it is the
-  only one that will ever fire, which is why moving the single call later would be wrong.
-
-| file | line | invalidator to pass |
-|---|---|---|
-| `components/activity/done-activity-screen.tsx` | 263 | the one already called above it |
-| `components/guided-walk/walk-summary.tsx` | 194 | ″ |
-| `components/fitness-tests/test-result.tsx` | 113 | ″ |
-| `components/nutrition/quick-edit-log-sheet.tsx` | 71 | `invalidateNutritionWrite` |
-| `components/nutrition/saved-meals-sheet.tsx` | 371 | `invalidateSavedMeals` |
-| `components/nutrition/saved-meals-sheet.tsx` | 462 | ″ |
-
-- **⚠ Line numbers are from 2026-08-23 and will drift.** The reliable finder is a `pushMutations(`
-  call with an `invalidate…(` within the six lines above it; `app/nutrition/nutrition-content.tsx`
-  is the shape to copy *toward*, not a hit — its delete path already invalidates after the push.
-- **⚠ Not every hit is necessarily load-bearing.** Per CLAUDE.md's "what makes an invalidation
-  load-bearing", a stale entry only *settles* where a call site passes `freshWithinTtl: true` or a
-  read path is seed-only. Convert all six anyway — the cost is one line and the condition changes
-  the moment someone adds `freshWithinTtl` — but do not report a user-visible fix for one that was
-  inert without checking which.
-- **What would count as done:** all six converted, and `grep` for the shape returns only the
-  engine's three (already converted) plus the sheets you just changed.
-
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
 - **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**

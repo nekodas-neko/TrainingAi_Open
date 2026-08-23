@@ -44,7 +44,7 @@ import { reconcileMealReminders, cancelAllMealReminders } from "@/lib/meal-remin
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import type { NutritionAdherenceResponse } from "@/app/api/nutrition/adherence/route";
 import { getLocalStore } from "@/lib/local-store";
-import { pushMutations } from "@/lib/local-store/sync-engine";
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { TdeeAdaptationCard } from "@/components/nutrition/tdee-adaptation-card";
 import { CalorieBalanceBar } from "@/components/nutrition/calorie-balance-bar";
 import { MealPlanSection } from "@/components/nutrition/meal-plan-section";
@@ -402,10 +402,17 @@ export default function NutritionContent({ userId }: { userId?: string }) {
       try {
         await store.deleteFoodLog(id);
         await store.queueMutation({ userId: userId!, domain: 'food_logs', date: today, payload: { id, deleted: true } });
-        pushMutations(userId!).then(() => {
-          invalidateNutritionWrite().catch(() => {});
+        // The mirror image of LB-4's bug, and the reason this site needed changing rather than
+        // being held up as the correct one: invalidating ONLY after the push means an offline
+        // delete repaints nothing at all, because `pushMutations` never resolves usefully with no
+        // network. Both halves are needed — immediately for this device, again once the server has
+        // the delete.
+        const revalidate = async () => {
+          await invalidateNutritionWrite().catch(() => {});
           refreshAffected();
-        }).catch(() => {});
+        };
+        void revalidate();
+        pushThenRevalidate(userId!, revalidate);
         return;
       } catch (e) {
         // Fall through to the server delete rather than reporting failure (Q-216). This used to

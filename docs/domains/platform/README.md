@@ -213,6 +213,14 @@ grep -n '\[platform\]' docs/implementation-backlog.md   # 6 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **Sixteen writes revalidated around their push, not after it** (LB-6, 2026-08-24, v1.344.0).
+  Invalidating beside a fire-and-forget `pushMutations` makes subscribers refetch and **re-cache**
+  the pre-write payload for the key's full TTL; one site had the mirror image and repainted nothing
+  offline. The entry found six — its finder looked only *above* each call.
+  `scripts/check-invalidate-after-push.js` holds the class shut. **Not device-verified: every
+  converted branch takes the web fallback here** —
+  [`journal`](../../overview/entries/2026-08-24-invalidate-after-push-sweep.md).
+
 - ⚠️ **Q-155 — the DB suite is largely blind to a loss of user scoping.** Partly mechanised
   2026-08-09: `scripts/check-repository-user-scoping.js` fails any adapter/slice method that takes
   `userId` and never uses it (368 take it, all use it today). That catches an *omitted* scope, not

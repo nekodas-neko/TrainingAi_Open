@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { toast } from 'sonner'
 import { invalidateBodyMetricWrite } from '@/lib/cache-groups'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { todayInTz } from '@trainingai/shared/date-utils'
 
 const QUICK_ADD_ML = [150, 250, 330, 500, 750, 1000]
@@ -72,7 +72,7 @@ export function WaterLogSheet({ open, onOpenChange, onLogged, userId }: WaterLog
         // while the web route added a delta, so concurrent adds on two devices would
         // last-writer-wins clobber each other instead of summing).
         await store.queueMutation({ userId: userId!, domain: 'body_metrics', date: today, payload: { waterMlDelta: ml } })
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateBodyMetricWrite)
         toast.success(`+${ml} ml logged`)
         invalidateBodyMetricWrite().catch(() => {})
         onLogged(ml)

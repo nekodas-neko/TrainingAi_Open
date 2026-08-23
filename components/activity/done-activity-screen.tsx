@@ -12,7 +12,7 @@ import { invalidateActivityWrites, invalidateRunningPlan } from '@/lib/cache-gro
 import { decodeRoute } from '@/lib/activity/route-encoding'
 import { todayInTz, msToHHMMInTz } from '@trainingai/shared/date-utils'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { omitNullFields } from '@/lib/local-store/sync-helpers'
 import { calculateSteps } from '@/lib/activity/treadmill-utils'
 import { buildRouteZoneSegments } from '@/lib/activity/route-hr-zones'
@@ -260,7 +260,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         toast.success('Activity saved')
         resetSession()
         router.push('/workout-select')
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateActivityWrites)
         savedLocally = true
         if (activityType === 'run' && prescribedRunId) {
           linkPrescribedRun(userId, prescribedRunId, logId).catch(() => {})

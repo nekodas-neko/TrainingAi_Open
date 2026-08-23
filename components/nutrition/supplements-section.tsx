@@ -8,7 +8,7 @@ import { cancelSupplementReminder } from "@/lib/supplement-reminders";
 import type { SupplementWithStatus } from "@trainingai/shared/types/supplement";
 import { cn } from "@trainingai/shared/utils";
 import { getLocalStore } from "@/lib/local-store";
-import { pushMutations } from "@/lib/local-store/sync-engine";
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import { invalidateSupplements } from "@/lib/cache-groups";
 
@@ -52,7 +52,7 @@ export function SupplementsSection({ supplements, loading, onChanged, userId }: 
             })
             await cancelSupplementReminder(s.id)
           }
-          pushMutations(userId!).catch(() => {})
+          pushThenRevalidate(userId!, invalidateSupplements)
           onChanged(supplements.map(x => x.id === s.id ? { ...x, loggedToday: !x.loggedToday } : x))
           invalidateSupplements().catch(() => {})
           savedLocally = true

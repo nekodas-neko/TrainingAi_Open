@@ -9,7 +9,7 @@ import { toast } from "sonner";
 import { PlusIcon, GripVerticalIcon, ClockIcon } from "lucide-react";
 import type { Supplement, SupplementWithStatus } from "@trainingai/shared/types/supplement";
 import { getLocalStore } from "@/lib/local-store";
-import { pushMutations } from "@/lib/local-store/sync-engine";
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { invalidateSupplements } from "@/lib/cache-groups";
 import { cancelSupplementReminder } from "@/lib/supplement-reminders";
 import { todayInTz } from "@trainingai/shared/date-utils";
@@ -82,7 +82,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         setEditTarget(null)
         toast.success(isNew ? 'Supplement added' : 'Supplement updated')
         if (!reminderEnabled) cancelSupplementReminder(id).catch(() => {})
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateSupplements)
         invalidateSupplements().catch(() => {})
         savedLocally = true
       } catch (sqliteErr) {
@@ -152,7 +152,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         setEditTarget(null)
         toast.success('Supplement deleted')
         cancelSupplementReminder(id).catch(() => {})
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateSupplements)
         invalidateSupplements().catch(() => {})
         savedLocally = true
       } catch (sqliteErr) {
@@ -193,7 +193,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         })
         onChanged(supplements.map(x => x.id === s.id ? { ...updated, userId: s.userId, createdAt: s.createdAt, loggedToday: s.loggedToday } : x))
         if (s.active) cancelSupplementReminder(s.id).catch(() => {})
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateSupplements)
         invalidateSupplements().catch(() => {})
         savedLocally = true
       } catch (sqliteErr) {

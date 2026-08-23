@@ -8,7 +8,7 @@ import { cn } from "@trainingai/shared/utils";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import type { Injury } from "@trainingai/shared/types/injury";
 import { getLocalStore } from "@/lib/local-store";
-import { pushMutations } from "@/lib/local-store/sync-engine";
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { invalidateInjuryWrites } from "@/lib/cache-groups";
 
 const MUSCLE_OPTIONS = [
@@ -71,7 +71,7 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
             userId: userId!, domain: 'injuries', date: startedDate,
             payload: { id, muscleName: muscle, notes: notes.trim() || null, severity, startedDate },
           })
-          pushMutations(userId!).catch(() => {})
+          pushThenRevalidate(userId!, invalidateInjuryWrites)
           onSaved({ id, userId: userId!, muscleName: muscle, notes: notes.trim() || null,
             severity, startedDate, resolvedDate: null, createdAt: record.createdAt, updatedAt: record.updatedAt })
           onOpenChange(false)
@@ -120,7 +120,7 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
             userId: userId!, domain: 'injuries', date: injury.startedDate,
             payload: { id: injury.id, resolvedDate },
           })
-          pushMutations(userId!).catch(() => {})
+          pushThenRevalidate(userId!, invalidateInjuryWrites)
           onSaved({ ...injury, resolvedDate })
           onOpenChange(false)
           toast.success('Injury marked as resolved')
@@ -163,7 +163,7 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
             userId: userId!, domain: 'injuries', date: injury.startedDate,
             payload: { id: injury.id, deleted: true },
           })
-          pushMutations(userId!).catch(() => {})
+          pushThenRevalidate(userId!, invalidateInjuryWrites)
           onDeleted?.(injury.id)
           onOpenChange(false)
           toast.success('Injury deleted')

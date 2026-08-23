@@ -52,6 +52,13 @@ with `Gate: device`. **Item (3) needed no work:** battery polls have persisted s
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
 
+**Sixteen writes revalidated around their push rather than after it (LB-6, v1.344.0).** The
+entry listed six; its finder looked only at the six lines *above* each call, and five sites write the
+invalidation below it. Four more sit after an `if/else`, one was introduced by hand in #333, and
+`nutrition-content.tsx` had the mirror image — invalidating *only* after the push, so an offline
+food-log delete repainted nothing. `scripts/check-invalidate-after-push.js` now fails Custom Rules on
+the class (**55 steps**).
+
 **A deload session says so now (BF-8, v1.343.0).** The Intensity control read "Full · As
 prescribed" while the card under it read "Deload session · Auto-applied", and the workout header
 showed no marker at all — the owner trained one believing it was a full session. Both surfaces asked

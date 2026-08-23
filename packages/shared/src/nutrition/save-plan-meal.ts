@@ -3,7 +3,7 @@ import { ingredientToEntry } from '@trainingai/shared/nutrition/log-plan-meal'
 import { createFoodItem } from '@trainingai/shared/nutrition/create-food-item'
 import { todayInTz } from '../date-utils'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateSavedMeals } from '@/lib/cache-groups'
 
 /**
@@ -62,7 +62,7 @@ export async function savePlanMealToLibrary(meal: PlanMealToSave, userId?: strin
       // Brisbane until 10am every day.
       await store.queueMutation({ userId, domain: 'saved_meals', date: todayInTz(), payload: body })
       await invalidateSavedMeals()
-      pushMutations(userId).catch(() => {})
+      pushThenRevalidate(userId, invalidateSavedMeals)
       savedLocally = true
     } catch (e) {
       // Its own catch, outside the API call below: a local write that throws must fall through to
