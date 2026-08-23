@@ -19,8 +19,19 @@
 export interface DownscaleOptions {
   /** Longest edge of the result, in pixels. The aspect ratio is kept. */
   maxDim: number
-  /** JPEG quality, 0–1. Defaults to 0.8. */
+  /** Encoder quality, 0–1. Defaults to 0.8. */
   quality?: number
+  /**
+   * Output format. Defaults to JPEG.
+   *
+   * WebP is roughly half the bytes at the same visible quality, which is what makes a meal
+   * thumbnail fit inside `SAVED_MEAL_IMAGE_MAX_BYTES` (Q-327). It is **requested, not guaranteed**:
+   * a browser that cannot encode it returns a PNG from `toDataURL` **without erroring**, and a PNG
+   * of the same picture is several times larger than the JPEG would have been — so an unnoticed
+   * fallback is how a thumbnail sails past the cap. `downscaleToDataUrl` checks what actually came
+   * back and re-encodes as JPEG when the request was ignored.
+   */
+  mimeType?: 'image/jpeg' | 'image/webp'
 }
 
 /**
@@ -38,7 +49,12 @@ export function fitWithin(width: number, height: number, maxDim: number): { widt
   }
 }
 
-export function downscaleToJpegDataUrl(source: Blob, { maxDim, quality = 0.8 }: DownscaleOptions): Promise<string> {
+/** Fit an image inside `maxDim` and return a JPEG data URL. */
+export function downscaleToJpegDataUrl(source: Blob, opts: DownscaleOptions): Promise<string> {
+  return downscaleToDataUrl(source, { ...opts, mimeType: 'image/jpeg' })
+}
+
+export function downscaleToDataUrl(source: Blob, { maxDim, quality = 0.8, mimeType = 'image/jpeg' }: DownscaleOptions): Promise<string> {
   return new Promise((resolve, reject) => {
     const objectUrl = URL.createObjectURL(source)
     const img = new Image()
@@ -55,7 +71,10 @@ export function downscaleToJpegDataUrl(source: Blob, { maxDim, quality = 0.8 }: 
         // hardened profile. Rejecting is honest; `!` would throw one line later with a worse message.
         if (!ctx) { done(() => reject(new Error('canvas 2d context unavailable'))); return }
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height)
-        const dataUrl = canvas.toDataURL('image/jpeg', quality)
+        let dataUrl = canvas.toDataURL(mimeType, quality)
+        // `toDataURL` answers an unsupported type with a PNG rather than an error, and a PNG here is
+        // several times the bytes a caller sized its cap against.
+        if (!dataUrl.startsWith(`data:${mimeType}`)) dataUrl = canvas.toDataURL('image/jpeg', quality)
         done(() => resolve(dataUrl))
       } catch (err) {
         done(() => reject(err))

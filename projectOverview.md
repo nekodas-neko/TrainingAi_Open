@@ -27,13 +27,35 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
-**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
-backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
-the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
+**Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
+correctly and too early: subscribers refetched a server that lacked the log and re-cached the
+pre-log figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one
+entry. The engine write paths now invalidate on **both** sides of the push (`pushThenRevalidate`);
+the immediate call stays because offline it is the only one that fires. Six `components/**` sites
+carry the same shape — filed as **LB-6**, audit done.
+
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
+(`/admin/oura-ble` → **Show key for backup**), a full re-sync that notifies on completion, and a
+connect sequence that resets the two live-HR levers a killed session left on forever. **All native —
 inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
 with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
+
+**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to
+128 px WebP (~6 KB) so it fits `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because
+nothing else fails loudly when that cap slips. The storage half shipped with Q-396 and no screen
+could reach it.
+
+**The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
+routes — create/rename/activate/delete a plan, restructure it, edit one meal, save dietary
+restrictions — read the request body and then validated a variable nothing had assigned, so every
+one answered `400 Invalid input: expected object, received undefined` to a valid request. Confirmed
+at runtime, not read: the whole meal-plan write surface was dead on `main`.
+`scripts/check-json-body-parsed.js` now fails Custom Rules on the class (52 → 53 steps). On top of
+that, each plan meal carries **Save to My Meals** with a **Save all**, keyed for idempotence on the
+`saved_meal_id` column that already existed, so the plan becomes a generator rather than somewhere
+to live ([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
 
 **Preferences have a server home; nothing reads it yet (Q-392, engine half).**
 `users.preferences` JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, which **merges**
@@ -210,9 +232,26 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
+### [platform][devices] ⚠️ `/api/body-battery` was 500ing in production; the fix is unverified there (LA-20, 2026-08-23)
+
+**Fixed in this session's deploy, not yet confirmed on production.** `error_events` held 19 live faults — `daytime-stress: constants not set`, first 10:37, latest 12:27, still firing while it was read — from the Q-545 constants port. Boot injects the model constants and sets `OURA_CONSTANTS_DIR`, and **both effects are per-process**; the process that runs boot need not be the one that serves a request. A probe route read `hasDaytimeStressConstants()` as **false** in a handler while boot had logged a successful delivery. Two independent halves: the module instance the route reads is not the one boot wrote to, and where the env var is also not inherited, `constantsDir()` falls through to a tree directory that has held no `.constants.json` since Q-49. `constantsDir()` now prefers the delivered `<cwd>/.oura-constants`, and `getRepository()` injects — the one hook every path that can reach a constants read already goes through, using a non-throwing variant so an unreadable directory cannot take down every DB route ([`journal`](docs/overview/entries/2026-08-23-oura-constants-per-process.md)).
+- **Keep: production not verified.** The reproduction is a dev-server worker split, which is not proof Railway's split is identical. **The check is `error_events` after this deploys** — and *something stopping is not something fixed*: the count must be zero across a window where `/api/body-battery` was actually called, since the route is only reachable for a user with a daytime-HRV model.
+- **This was not in any backlog entry.** It was found by the session-start `error_events` read that `CLAUDE.md` mandates and I had skipped. No local gate could have caught it: `pnpm dev` never reaches the model path, because the seeded user has no daytime-HRV model and the call is guarded.
+
 ### [cardio][devices] ⚠️ The free walk shows heart rate at last, but no device has seen it (Q-418, 2026-08-23)
 
 **Fixed in v1.339.0** — the free-activity screen now carries **HR** in its primary row beside distance and pace (with the guided walk's staleness guard), plus a secondary line with the **running step total** and **elevation gained**; the guided walk got the same step readout so the two agree ([`journal`](docs/overview/entries/2026-08-23-free-activity-metrics.md)). The strap was already streaming beats — the same one feeding that screen's cadence — and the number was already being saved afterwards; it was invisible only while walking, the one time it can be acted on. **Keep: every number here comes from a Polar H10 over BLE and the sandbox has no strap** — `HrReadout` renders its `--` placeholder and `stepsEstimate` is null on every path exercised, so the thing the entry is about (a connected strap putting a live bpm on that screen) and the staleness guard are both unverified. **🟠 The Android pill is still static** and stays Lane A: the plugin exposes only `addWatcher`/`removeWatcher`/`openSettings`, `backgroundMessage` is fixed at watcher creation, and re-adding the watcher would restart location tracking mid-walk.
+
+### [nutrition] ⚠️ The meal photo can be picked; the camera branch has not run (Q-327, v1.341.0)
+
+**Shipped.** `MealPhotoTile` beside the meal-name field in Edit Meal — picker and preview in one tile, so the image rides the save that was already there. `downscaleToDataUrl` gained a `mimeType`, and **requests** WebP rather than assuming it: `toDataURL` answers an unsupported type with a PNG and no error, several times the bytes the 16 KB cap was sized against, so it checks what came back. Guarded by `e2e/meal-photo-picker.spec.ts`, which asserts the **stored** row is a WebP under the cap after feeding it a photo four times past it ([`journal`](docs/overview/entries/2026-08-24-saved-meal-photo-picker.md)).
+- **Keep: not device-verified.** `Capacitor.isNativePlatform()` is false in a browser, so every run took the `<input type=file>` branch — the camera/gallery prompt, the tile's tap target on the S25, and the local-store mirror of the image column are all verified by reading only.
+
+### [nutrition] ⚠️ Plan meals become saved meals; the copy has not run on the device (Q-398, v1.340.0)
+
+**Shipped.** `savePlanMealToLibrary`/`savePlanMealsToLibrary` (`packages/shared/src/nutrition/save-plan-meal.ts`) are the one plan→meal copy path — the plan card and the setup sheet's ticks both call it. The setup sheet's own copy created food items with a bare POST and stamped nothing, so a meal ticked there and saved again from the card produced **two copies of one recipe**. Provenance (`From plan`) is derived from `meal_plan_meals.saved_meal_id`, never stored. Guarded by `e2e/plan-meal-to-saved-meal.spec.ts`, asserting on the copied rows rather than a toast ([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
+- **Keep: not device-verified.** Every e2e run took the web fallback (`getLocalStore` is null in a browser), so the local-store mirror and the two outbox mutations per copy are verified by reading only, as are the new controls' 48dp targets.
+- **Keep: step 3 of the entry is not done and needs the owner.** It proposes deleting `meal-plan-section` and the staleness nag once meals live in My Meals; the entry gates that on confirmation and this PR did not take it.
 
 ### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
@@ -527,33 +566,6 @@ order.
   announcement is wrong. Not on the APK, where TalkBack is the relevant reader. `coach-content.tsx`
   was examined and **excluded** (its chevron is a back button).
 
-### [app-shell] ✅ The other four render rules audited — all held, and every mechanical check over-reported (2026-08-18)
-
-- **Completes the render lens** that sweep 26 opened.
-  [`docs/reviews/2026-08-18-render-hot-paths.md`](docs/reviews/2026-08-18-render-hot-paths.md). Filed
-  nothing; Q-490 remains the only open item in this area.
-- **`key={index}` in editable lists — held.** 85 occurrences exist, but filtering to lists that are
-  **both editable and deletable** gives **zero**, and the known editable lists key on stable ids
-  (`meal.id`, `item.id`, `style.id`, `program.id`). **Reporting the 85 would have been wrong** — index
-  keys on a static list are correct React.
-- **A 1 Hz timer in the orchestrator — held.** `workout-screen.tsx:797` does hold a `setInterval`, and
-  it writes `recordTraceSample(...)` to a module singleton with **no `setState`** — which is the
-  pattern the rule wants, and its comment says so.
-- **Zustand selector breadth — held.** The orchestrator's `useShallow` pick is **62 fields**, which
-  looks alarming and is not: the hot-path *values* (`perSetWeights`, `rpeValues`) are **absent**; only
-  their *actions* are picked, and action references are stable. The leaves read the values via their
-  own narrow selectors (`active-set-card.tsx:40,44`). **Counting fields in a pick is not the test —
-  actions vs values is.**
-- **`readCacheSync` in a render body — held, and the grep flagged the rule itself.** 25 hits outside an
-  effect/callback; the three in the orchestrator are all false positives, and the first
-  (`workout-screen.tsx:264`) is **the comment stating the rule** — *"readCacheSync must never live in
-  that path"* — reported as a breach of that rule.
-- **The standing lesson, now six sweeps running:** every mechanical check here over-reported. The raw
-  counts — 85 index keys, 62 picked fields, 25 bare cache reads — are all defensible, and a review
-  that filed them would have produced three wrong entries and one absurd one. **The grep finds
-  candidates; the handler decides.**
-- **Not verified:** static analysis, no profiler, not on the APK.
-
 ### [nutrition][app-shell] 🟡 64 of 66 memos hold; the two that do not re-render every meal row on every keystroke (Q-490, 2026-08-18)
 
 - **`CLAUDE.md` warns that an inline object or arrow "defeats the memo silently" — a defeated memo
@@ -666,35 +678,6 @@ order.
 - **NOT reproduced on-device** — `getLocalStore` returns null in the web sandbox, so the local-first
   readers fall through to their API fallbacks and the inconsistency cannot appear there. On-device is
   the only real verification.
-
-### [platform] ✅ Both halves of the staleness test now audited — case (b) clean, and the mechanical test for it does not work (2026-08-18)
-
-- **Completes the lens.** Sweep 21 audited case (a) (`freshWithinTtl`); this audits case (b),
-  **seed-only read paths** — the worse half, because a seed-only key never revalidates at all.
-  [`docs/reviews/2026-08-18-seed-only-read-paths.md`](docs/reviews/2026-08-18-seed-only-read-paths.md).
-- **The naive test over-reports and must not be used.** Differencing `readCacheSync` keys against
-  `cachedFetch` keys (51 vs 66) yields five seed-only candidates — `achievements:<userId>`,
-  `ai-health-insight:<section>:<date>`, `mood:<date>`, and two `workout-card:*`. **All five
-  revalidate. None is seed-only.**
-- **Because revalidation happens three ways and `cachedFetch` is only one:** (1) `cachedFetch`;
-  (2) a raw `fetch(...)` then `setCached(...)` — `ai-insight-card.tsx`, `workout-screen.tsx`;
-  (3) a **local-store read** then `setCached(...)` — `session-select-content.tsx`'s `mood:` path.
-  **The third matters most:** for an offline-first domain the local store *is* the source of truth, so
-  "revalidate" correctly means reading SQLite, not the network. A test that looks for a network call
-  marks the app's most authoritative paths as stale.
-- **So the test for seed-only cannot be "`readCacheSync` without `cachedFetch`"** — it is "no
-  write-back to the key from any source after the seed", which is not greppable in one pass. Five
-  candidates had to be read individually.
-- **⚠️ Second time this run a `Q-NNN:` comment read as an open bug and was the fix.**
-  `workout-screen.tsx:272` (Q-126, lifetime XP reported as one session's gain) is the fix's rationale,
-  not a live defect — as was `session-select-content.tsx:896` (Q-117) last sweep. **In this codebase a
-  comment naming a Q number is usually why the code is shaped that way.** Worth knowing before
-  grepping `never invalidated` or a Q number and reaching for the alarm.
-- **Result: both halves of Q-262's test are audited and clean.** The most repeated bug class in this
-  project currently has no live instance that either half of the documented test can find.
-- **Not verified:** static audit and source reading; not on the APK or production. A stale-value bug
-  arising some *other* way — a write that updates the DB without touching the local store — is outside
-  what this test catches and was not looked for.
 
 ### [platform] ✅ Every load-bearing cache invalidation audited — no gap, closing an audit `CLAUDE.md` names as never done (2026-08-18)
 

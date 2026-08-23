@@ -87,6 +87,38 @@ describe('vendored Oura model constants', () => {
 
 // ── Runtime loading, added 2026-08-13 when the static imports were removed (Q-49 A3) ───────────
 describe('runtime constants loading', () => {
+  it('falls back to the delivered cache directory when OURA_CONSTANTS_DIR is unset', async () => {
+    // The half of the 2026-08-23 `/api/body-battery` outage that an env var cannot fix. Boot
+    // downloads the constants and sets `OURA_CONSTANTS_DIR` — **in the process that ran boot**. A
+    // worker serving a request need not be that process, and there it falls through to the tree
+    // path, which has held no `.constants.json` since Q-49 removed them. The delivered copy is at a
+    // deterministic path, so the loader can find it with no env var at all.
+    const real = process.env.OURA_CONSTANTS_DIR ?? path.join(ROOT, 'lib/oura-models/constants')
+    const cacheDir = path.join(process.cwd(), '.oura-constants')
+    const preexisting = fs.existsSync(cacheDir)
+    if (!preexisting) fs.mkdirSync(cacheDir, { recursive: true })
+    const copied: string[] = []
+    for (const f of fs.readdirSync(real)) {
+      if (!f.endsWith('.json')) continue
+      const dest = path.join(cacheDir, f)
+      if (fs.existsSync(dest)) continue
+      fs.copyFileSync(path.join(real, f), dest)
+      copied.push(dest)
+    }
+    const prev = process.env.OURA_CONSTANTS_DIR
+    delete process.env.OURA_CONSTANTS_DIR
+    vi.resetModules()
+    try {
+      const mod = await import('../index')
+      expect(mod.getResilienceConstants().planeFitCoef.length).toBeGreaterThan(0)
+    } finally {
+      if (prev !== undefined) process.env.OURA_CONSTANTS_DIR = prev
+      vi.resetModules()
+      for (const f of copied) fs.rmSync(f, { force: true })
+      if (!preexisting) fs.rmSync(cacheDir, { recursive: true, force: true })
+    }
+  })
+
   it('reads from OURA_CONSTANTS_DIR when set, so the files can live outside the repo', async () => {
     // The property the public cut rests on: the directory is a runtime input, not a build-time one.
     // A static import could not be redirected like this at all, which is why it had to go.

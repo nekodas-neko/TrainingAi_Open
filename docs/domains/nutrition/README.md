@@ -115,6 +115,21 @@ Live at the time of writing (2026-07-30):
   Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (Log Food as
   one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
   before starting any phase; the phases point back rather than copying its decisions.
+- ⚠️ **Saved meals can carry a photo at last** (Q-327, 2026-08-24, v1.341.0) — a 64 px tile in
+  Edit Meal, downscaling to 128 px WebP so the picture fits `SAVED_MEAL_IMAGE_MAX_BYTES`. The
+  storage half had shipped with Q-396 and nothing could reach it. **Not device-verified**: the
+  native camera branch never runs in a browser —
+  [`journal`](../../overview/entries/2026-08-24-saved-meal-photo-picker.md).
+- 🔴 **The whole meal-plan write surface was dead, and is fixed** (Q-398, 2026-08-24, v1.340.0).
+  Five routes guarded the request body and then validated a variable nothing assigned, so creating a
+  plan, renaming/activating/deleting one, restructuring it, editing a meal and saving dietary
+  restrictions all answered `400 Invalid input: expected object, received undefined`.
+  `scripts/check-json-body-parsed.js` holds the class shut.
+- ⚠️ **Plan meals become saved meals** (Q-398, 2026-08-24, v1.340.0) — `Save to My Meals` per meal
+  plus `Save all`, idempotent on `meal_plan_meals.saved_meal_id`, with a derived `From plan` tag.
+  `savePlanMealToLibrary` is now the one copy path; the setup sheet's own used to duplicate against
+  it. **Not device-verified**, and the entry's step 3 (deleting the plan surface) still needs the
+  owner — [`journal`](../../overview/entries/2026-08-24-meal-plan-to-saved-meals.md).
 - ⚠️ **The maintenance calibration can engage at last** (Q-387, 2026-08-23, v1.337.0) — the
   "I've finished logging" button + counter shipped, so days can be flagged complete. **Not
   device-verified, and the write has no outbox domain** —

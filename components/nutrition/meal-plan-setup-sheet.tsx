@@ -7,7 +7,8 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetFooter } from '@/com
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
 import { cn } from '@trainingai/shared/utils'
-import { invalidateMealPlans, invalidateSavedMeals } from '@/lib/cache-groups'
+import { invalidateMealPlans } from '@/lib/cache-groups'
+import { savePlanMealsToLibrary } from '@trainingai/shared/nutrition/save-plan-meal'
 import { RestrictionsPicker, type RestrictionSelection } from './restrictions-picker'
 import { MealPlanReviewStep } from './meal-plan-review-step'
 import { MyMealsPicker, type TypedMeal } from './my-meals-picker'
@@ -33,6 +34,8 @@ interface Props {
   open: boolean
   onOpenChange: (open: boolean) => void
   onSaved: (plan: MealPlan) => void
+  /** Needed so a ticked meal is copied into the library offline-first, like every other write. */
+  userId?: string
 }
 
 /**
@@ -40,7 +43,7 @@ interface Props {
  * fixed action row that never scrolls away, and `SheetFooter` owns the bottom inset — bare
  * `pb-safe` under a primary button is this repo's most repeated on-device regression.
  */
-export function MealPlanSetupSheet({ open, onOpenChange, onSaved }: Props) {
+export function MealPlanSetupSheet({ open, onOpenChange, onSaved, userId }: Props) {
   const [step, setStep] = useState<StepIndex>(0)
   const [catalogue, setCatalogue] = useState<DietaryRestriction[]>([])
   const [restrictions, setRestrictions] = useState<RestrictionSelection[]>([])
@@ -177,7 +180,13 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved }: Props) {
         return
       }
       const plan: MealPlan = await res.json()
-      await saveTickedMealsToLibrary(draft, saveToLibrary)
+      // The PERSISTED plan, not the draft: a copy has to stamp `savedMealId` back onto a real plan
+      // meal, and a draft meal has no id to stamp. Without that, a meal ticked here and then saved
+      // again from the plan card produced a second copy of the same recipe.
+      await savePlanMealsToLibrary(
+        (plan.variants[0]?.meals ?? []).filter(m => saveToLibrary[m.position]),
+        userId,
+      )
       await invalidateMealPlans()
       onSaved(plan)
       onOpenChange(false)
@@ -342,59 +351,6 @@ export function MealPlanSetupSheet({ open, onOpenChange, onSaved }: Props) {
       </SheetContent>
     </Sheet>
   )
-}
-
-/**
- * Persist each ticked meal to the saved-meal library, itemised.
- *
- * Mirrors what the food scan already does: one `food_item` per ingredient carrying its per-100g
- * values, then a `saved_meal` referencing them at the right quantity. That is what makes the saved
- * meal editable later — a single opaque "meal" item could not be adjusted ingredient by ingredient.
- *
- * `quantityMultiplier` is weight ÷ 100 because each item is stored per 100 g, matching how the
- * scan's review step assigns them.
- *
- * Best-effort and never blocks the plan: the plan itself is already saved by the time this runs, so
- * a failure here costs a library entry, not the user's plan.
- */
-async function saveTickedMealsToLibrary(
-  draft: Draft,
-  ticked: Record<number, boolean>,
-): Promise<void> {
-  const meals = draft.variants[0]?.meals.filter(m => ticked[m.position] && m.ingredients.length > 0) ?? []
-  if (meals.length === 0) return
-
-  await Promise.all(meals.map(async meal => {
-    try {
-      const items = await Promise.all(meal.ingredients.map(async ing => {
-        const res = await fetch('/api/nutrition/food-items', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            name: ing.name,
-            servingSizeG: 100,
-            calories: Math.round(ing.caloriesPer100g),
-            proteinG: Math.round(ing.proteinPer100g * 10) / 10,
-            carbsG: Math.round(ing.carbsPer100g * 10) / 10,
-            fatG: Math.round(ing.fatPer100g * 10) / 10,
-            source: 'ai',
-          }),
-        })
-        if (!res.ok) throw new Error('food item')
-        const item = await res.json()
-        return { foodItemId: item.id as string, quantityMultiplier: Math.max(0.01, ing.weightG / 100) }
-      }))
-      const res = await fetch('/api/nutrition/saved-meals', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: meal.name, items }),
-      })
-      if (!res.ok) throw new Error('saved meal')
-    } catch {
-      toast.error(`Could not save "${meal.name}" to your meals`)
-    }
-  }))
-  await invalidateSavedMeals()
 }
 
 const STEP_TITLES = [

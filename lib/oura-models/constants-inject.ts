@@ -35,3 +35,24 @@ export function ensureServerOuraConstants(): void {
   if (!hasResilienceConstants()) setResilienceConstants(getResilienceConstants())
   if (!hasCumulativeStressConstants()) setCumulativeStressConstants(getCumulativeStressConstants())
 }
+
+/**
+ * The same injection, but never throwing.
+ *
+ * For composition roots that want the constants present if they can be — the repository handle, in
+ * practice — without taking on the failure. `ensureServerOuraConstants()` throws when the files are
+ * unreadable, and the repository is on the path of every DB route in the app; letting it throw
+ * there would turn "the stress tables are missing" into "nothing in the app works", which is a
+ * strictly larger outage than the one this is fixing.
+ *
+ * Swallowing is safe because it changes nothing about what a caller sees: an unset table still
+ * throws at the accessor, at the read site, exactly as it does today. This only ever *adds* a
+ * chance for the constants to be there.
+ */
+export function tryEnsureServerOuraConstants(): void {
+  try {
+    ensureServerOuraConstants()
+  } catch {
+    // The accessor throws at the read site if this did not take. See the doc comment.
+  }
+}

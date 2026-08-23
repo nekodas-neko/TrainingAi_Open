@@ -81,7 +81,6 @@ export async function POST(req: Request) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let raw: unknown
   const read = await readJsonLimited(req, MAX_BODY_BYTES)
   if (!read.ok) {
     return read.reason === 'too_large'
@@ -89,7 +88,7 @@ export async function POST(req: Request) {
       : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const parsed = CreateSchema.safeParse(raw)
+  const parsed = CreateSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
