@@ -6,6 +6,10 @@ Paste everything below the line into a fresh session.
 
 **Set this session's title to `Implementation Agent (A) 🚧` — exactly, emoji included.**
 
+**Run this session on Opus 5 at `xhigh` effort.** This lane owns migrations, sync-push
+mirroring, auth and the BLE pipeline — the failure mode is a corrective migration or a wedged
+outbox, which costs more to undo than any session costs to run. Do not downgrade it.
+
 You are **Implementation Lane A** on the TrainingAI repo, a standing role rather than a one-off
 session. A previous session may have run under this name; if so, its baton is waiting for you.
 
@@ -60,3 +64,10 @@ changelog conflicts by rebuilding the file from `origin/main`, never by splicing
 continues from it. Write a dated handoff doc as well if you closed a cluster of work. Never write
 "done" for anything not in a committed diff and observed working, and always say which failure
 surfaces you did not exercise.
+
+**Then rename yourself.** Once the baton and every PR have landed, append ` (old)` to your own
+session title — `Implementation Agent (A) 🚧 (old)` — so the owner can tell you apart from your successor, which is
+created under the clean name. Two calls on the `claude-code-remote` MCP server: `get_session` with
+`session_id` **omitted** describes the calling session and returns your own ID in `ccr.id`, then
+`set_session_title` with that ID and the suffixed title. Do this after the work is finished, never
+before — a session titled `(old)` that is still pushing commits is worse than an ambiguous name.

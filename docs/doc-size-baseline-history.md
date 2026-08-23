@@ -18,6 +18,60 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — BF-9, the trainer role
+
+**`docs/implementation-backlog.md` — no raise needed in the end.** The owner wants to build programs for other
+people from his own app instead of borrowing their phone.
+
+81 lines added, 54 net. Long for an unplanned feature, and the length is almost entirely the security
+surface. Every write in this app is `user_id` scoped by design; this feature deliberately breaches
+that, and `saveProgram` is *already* parameterised by user id — so the only thing between the feature
+and one account writing into another is a guard that does not exist yet. An entry that said "add a
+trainer role" and stopped would leave a planning session to rediscover that, and the discovery order
+matters: the cheap reading is "reuse `isAdmin`", which would hand every trainer the operator console
+and the read-only SQL endpoint.
+
+The other half is what should *not* be built: `friendships` already implements the consent handshake
+(only the addressee can accept), `users.friend_code` the discovery, `invited_emails` the onboarding,
+and `programs` is already in the sync delta, so delivery to the trainee's device needs no new work.
+Four things not to rebuild is worth the space it takes to name them.
+
+**Amended in the same PR** once the owner approved the shape and gave the population — ~3 users, 5 at
+most, all known to him, *"so risk woudl be accepted"*. That removes real work (no permission matrix,
+no audit trail, no tenancy model) and the entry says so. It also needed a paragraph saying what the
+acceptance does **not** cover, because the cheap misreading is "small trusted group, skip the
+guards": the ownership checks stop a *bug* writing to the wrong account, not an attacker, and with
+five people sharing one database a mis-scoped write corrupts a real person's history and then syncs
+it to their device. `isAdmin` stays off the table for the same reason — it is an operator permission,
+not a trainee one.
+
+**Final bookkeeping, after the merge:** this entry was drafted twice as a raise (11517 → 11571, then
+→ 11599) and ended up needing neither. #124 landed first and removed the 66-line Q-479 entry it
+completes, which more than absorbed BF-9 — so the baseline stays at **11517** and this section
+records a raise that did not happen rather than deleting the reasoning for one. Twice in one day a
+drafted raise has evaporated because parallel work shrank the file underneath it; the lesson is to
+treat the number as provisional until the merge lands, not to skip the note.
+
+---
+## 2026-08-23 — Q-479 shipped; four docs still said it never would (`docs/q479-shipped`)
+
+**projectOverview.md 7879 → 7897 · docs/agents/state/implementation-lane-a.md 150 → 152.**
+
+The owner merged #124 on 2026-08-23, reversing their own 2026-08-18 decision to carry Q-479 as an
+accepted risk. Four places still asserted the opposite, and one of them is the first thing every
+session reads:
+
+- **projectOverview +13**, across the two Q-479 rows. The Lane A row led with *"ACCEPTED RISK …
+  deliberately unmerged"* about a fix that is now on `main`; Review's row still read as open. Both
+  now name the merge, and the Lane A row states the one thing still owed — production and the
+  24-hour window were **not** exercised end to end, so it stays in the live list rather than being
+  archived.
+- **the Lane A baton +2**: it instructed successors that #124 *"must NOT be merged"*. That line had
+  been carried forward through three batons after the decision it described was made, which is the
+  argument for the rewrite-in-full rule rather than against it — a copied line outlives its reason.
+
+Both figures are the script's own, measured on the merged tree.
+
 ## 2026-08-23 — the owner confirms BF-8, and settles BF-7
 
 **`docs/implementation-backlog.md` 11474 → 11517.** 43 lines across two amendments, both in place

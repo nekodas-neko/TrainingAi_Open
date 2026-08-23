@@ -124,6 +124,12 @@ grep -n '\[workouts\]' docs/implementation-backlog.md   # 3 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- 🔴 **A deload session was invisible on both workout surfaces** (BF-8, fixed 2026-08-24, v1.343.0).
+  The Intensity control said "Full · As prescribed" beside a card saying "Deload session ·
+  Auto-applied", and the in-workout header showed no marker — the owner trained one believing it was
+  a full session. Both asked `isDeloadActive` ("is the PHASE a deload week") instead of whether
+  today's session is one. **Not device-verified** —
+  [`journal`](../../overview/entries/2026-08-24-deload-visible-on-both-surfaces.md).
 - ⚠️ **Editing and deleting logged training was unreachable for a fortnight** (LB-1, fixed 2026-08-23,
   v1.334.0). Q-110 moved the calendar day-tap to `/health/day` and left the four controls on a sheet
   nothing opens. They now live on the day screen, driven by `lib/hooks/use-day-entry-mutations.ts`,

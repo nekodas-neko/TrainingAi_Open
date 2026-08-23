@@ -220,6 +220,14 @@ export function PreWorkoutScreen({
             value={deload}
             disabled={prescriptionPending}
             recommended={deloadRecommended}
+            prescribedDeload={
+              // Derived from the prescription this screen already holds rather than passed in: the
+              // label is a statement ABOUT that prescription, so reading it from anywhere else is
+              // how the two came to disagree (BF-8). A consumed one describes a session that has
+              // already run.
+              periodization?.state.prescriptionStatus !== 'consumed'
+              && !!periodization?.state.prescription?.deload
+            }
             onChange={onDeloadChange}
           />
         )}

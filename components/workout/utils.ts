@@ -1,4 +1,5 @@
 import type { ExerciseType } from "@trainingai/shared/types/program";
+import type { PhaseStatus } from "@trainingai/shared/workout/session-data";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import { formatDateDisplay } from "@trainingai/shared/date-utils";
 
@@ -199,4 +200,36 @@ export function plateBreakdown(targetKg: number, barKg: number = BAR_WEIGHT_KG):
   }
   const achievableKg = barKg + 2 * perSide.reduce((sum, p) => sum + p, 0);
   return { perSide, achievableKg, exact: Math.abs(achievableKg - targetKg) < 1e-9 };
+}
+
+/**
+ * The context line in the active workout's header — phase, position, and whether today is a deload.
+ *
+ * **`isDeloadActive` answers the wrong question** (BF-8). It means "is the current PHASE a deload
+ * week", so a deload the prescription applied for its own reasons — a readiness-driven, auto-applied
+ * one — printed as an ordinary session all the way to the last set. The owner trained one believing
+ * it was a full session and said so: *"I was under the assumption I was doing my full session but it
+ * looks like it has been deload... its too hidden."*
+ *
+ * So a session deload is called out too, and it keeps the phase context rather than replacing it: a
+ * phase deload has no cycle position worth printing, but a readiness deload inside Accumulation
+ * still happens somewhere, and dropping "Accumulation · S1" to say "Deload" alone trades one missing
+ * fact for another.
+ *
+ * Extracted here rather than written inline because the identical predicate governs the pre-workout
+ * intensity toggle, and a fix to one surface alone leaves the other lying — which is the
+ * sibling-surface sweep `CLAUDE.md` requires. Also because both vitest projects run in `node`, where
+ * a `.tsx` cannot be imported: a string helper is the part that can actually be pinned.
+ */
+export function sessionContextLabel(
+  phaseStatus: PhaseStatus | null | undefined,
+  sessionIsDeload: boolean,
+): string {
+  if (phaseStatus?.isDeloadActive) return "Deload · ";
+  const deload = sessionIsDeload ? "Deload · " : "";
+  if (!phaseStatus) return deload;
+  const position = phaseStatus.openEnded
+    ? `S${phaseStatus.phaseSessionNumber}`
+    : `C${phaseStatus.cycleInPhase}/${phaseStatus.totalPhaseCycles}`;
+  return `${phaseStatus.phase.name} · ${position} · ${deload}`;
 }
