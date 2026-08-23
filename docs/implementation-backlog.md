@@ -2919,20 +2919,30 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 >
 >    **Measured 2026-08-23 — the whole server-only surface of `run.ts`, following value imports only
 >    (a type-only import is erased and reaches no bundle; counting them inflates this to the entire
->    Postgres layer, which is wrong).** 50 modules reached, **four** reach-throughs:
+>    Postgres layer, which is wrong).** 50 modules reached, five edges:
 >
 >    | from `run.ts` via | lands on | what it needs |
 >    |---|---|---|
->    | `step-day-buckets` → `step-counter-pipeline` | `oura-models/constants/index.ts` — `node:fs`, `node:path` | a constants loader that fetches instead of reading disk |
+>    | `health-source.ts` | `drizzle-orm` | ✅ done — `@trainingai/shared/health/source-rank` |
+>    | `step-day-buckets` → `step-counter-pipeline` | `oura-models/constants` — `node:fs` | see 3 below |
 >    | ⋯ → `step-counter.ts` | `inference/session.ts` — `node:fs/promises`, `onnxruntime-node` | injected session |
 >    | `sleepnet-assemble` | `inference/sleepnet.ts` — `onnxruntime-node` | injected session |
->    | `daytime-stress` | `inference/dhrv.ts` — `onnxruntime-node` | **graph-only, not a call path** — the rollup calls only `buildDaytimeStressSeriesFromModel`, which is synchronous and touches no model. Splitting the model-using half out of that file removes this edge without any injection |
->    | `health-source.ts` | `drizzle-orm` | move `sourceRank` to a driver-free module |
+>    | `daytime-stress` | `inference/dhrv.ts` — `onnxruntime-node` | **graph-only, not a call path** — the rollup calls only `buildDaytimeStressSeriesFromModel`, which is synchronous and runs no model, and that file's two ONNX users have no production callers at all. **A split does NOT remove this edge on its own**, because the file still reaches `oura-models/constants` through `daytimeStressLevel` |
 >
->    Three of the five want the same fix (a session/asset provider injected the way `RollupIO` is);
->    two are just a file split. A smaller one: `sourceRank`
->    (`lib/data/health-source.ts`) pulls `drizzle-orm` into the module graph and wants moving to a
->    driver-free home.
+> **3. ⚠️ A third dependency the plan never named: the model CONSTANTS cannot reach the device
+>    either, and that is a design decision rather than a port.** `lib/oura-models/constants/index.ts`
+>    reads its JSON with `node:fs`, **synchronously**, and its own header states the position
+>    outright — *"SERVER-ONLY, and structurally so … if a client component ever needs one of these
+>    numbers, it belongs behind an API route, not behind a bundler shim."* The synchronicity is
+>    deliberate and load-bearing (two ports evaluate constants at module scope), which is exactly
+>    what forecloses fetching them. `constants-delivery.ts` solves delivery for the *server* only:
+>    it downloads them to disk at boot from object storage.
+>
+>    They are on the rollup's real call path in **two** places: `step-day-buckets` →
+>    `step-counter-pipeline`, and `buildDaytimeStressSeriesFromModel` → `scoreStressPoints` →
+>    `daytimeStressLevel` → `getDaytimeStressConstants()`. So a device rollup has no numbers to
+>    score with until this is answered — async getters everywhere, constants shipped as
+>    service-worker-cached assets, or an API route. Pick before starting Task 3, not during.
 
 
 - **Plan:** [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](superpowers/plans/2026-08-18-device-primary-compute.md)
