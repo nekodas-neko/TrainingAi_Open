@@ -54,6 +54,15 @@ already exists as the WASM sibling, which is plan Task 4.
 > `step-counter`) hard-import the node loader, and `wasm-parity.test.ts` reaches `onnxruntime-web`
 > directly rather than through `session-web.ts`. So the WASM loader is inert in exactly the way the
 > local-store bridge was — written, device-shaped, and called by nothing.
+>
+> **And the reach-through is smaller than "the models are not portable" makes it sound.** Walking
+> `run.ts`'s import graph following **value** imports only — a type-only import is erased and reaches
+> no bundle, and counting them drags in the entire Postgres layer through one `import type` in
+> `daytime-hrv-model.ts` — gives 50 modules and four edges: the step pipeline reaches both the
+> disk-reading constants loader and the node session; `sleepnet-assemble` reaches the node session;
+> `daytime-stress` reaches it **only through the module graph**, because the rollup calls just
+> `buildDaytimeStressSeriesFromModel`, which is synchronous and runs no model. That last one needs a
+> file split, not an injection. The table is on the Q-545 queue entry.
 
 A smaller one, worth doing when Task 3 lands: `sourceRank` (`lib/data/health-source.ts`) drags
 `drizzle-orm` into the module graph for what is a rank lookup.
