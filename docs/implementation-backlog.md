@@ -1979,6 +1979,10 @@ route from a logged exercise to its 1RM trend outside Stats. Note the row alread
 controls, so a third target needs a layout decision rather than another icon.
 
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
+- **Gate: device** — and the gate is the entry's own instruction, not a formality: it says
+  *verify before adding metrics*, because background tracking with the screen off has never been
+  confirmed. That check is a 20-minute pocketed walk, and the pill work is a native plugin patch
+  needing an APK, so neither half is reachable from a session.
 
 - **Branch:** `feat/free-activity-metrics`
 - **Lane A** — what remains is Kotlin and needs a new APK.
@@ -3043,136 +3047,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 - **Revised expectation, not a promise:** app CPU ~$4.42 → ~$1, app RAM ~$6.07 → ~$4 (the 400 MB
   baseline), DB ~$7.90 → ~$3 tuned. **~$18.63 → ~$8/month.** Reaching $5 needs leaving Railway or
   cutting deploy frequency, not more tuning.
-### [nutrition] Q-393 — an ingredient breakdown on the printed label, which does not fit on a round one
-
-- **Gate:** owner
-
-- **Branch:** `feat/meal-label-ingredient-breakdown`
-- **⬆ MOVED TO THE TOP OF THE QUEUE by the owner, 2026-08-18** — *"can this be added to the top
-  of the lanes queue - I will test and get back"*. Take this before the numbered items below it.
-- **✅ The owner has approved ALL the drawn variants as shippable styles** (*"I like all of these
-  ones… lets keep them all as options to cycle through and choose a default"*), so this is no
-  longer a pick-one decision — every layout below becomes an entry in the style registry the
-  renderer already reads. **The default is a stored preference, and Q-392 has now answered where:**
-  `mealLabelStyle` in the server-backed preferences bag (`packages/shared/src/user/preferences.ts`),
-  written through `/api/user/preferences`. Not a new decision.
-- **Added:** 2026-08-18 · owner: *"could we have a small font showing the break down of the meal i.e
-  Pasta / [macros] / (100g pasta, 200g mince, etc etc) so its the full summary of the meal."*
-- **Follow-up to Q-389, which shipped 2026-08-18 (v1.320.0)** — the label renderer exists
-  (`components/nutrition/meal-label-render.ts`, canvas, four styles, style passed as a parameter),
-  so this is a new layout variant inside a working system, not new machinery.
-
-**The measurement first, because it decides the shape.** On a **round** 50 × 50 mm label the usable
-area is a centred **130 × 137 px** box, and the shipped default already spends all of it:
-
-```
-band header 34 + calories 22 + macros 12 + code 46 + gaps 16  =  130 px
-                                                     leaving  =    7 px
-```
-
-**That is zero ingredient lines.** A list cannot be added to the round label without removing
-something already on it. A **square** label gets the corners back — 171 × 171 usable, **1.64× the
-area and 34 px more height** — and a full five-ingredient list fits there comfortably, with the code
-moving *beside* the calories rather than under them.
-
-- **⚠ It cannot go in the QR instead.** `packages/shared/src/nutrition/label-payload.ts:22-23` sets
-  `QR_V2_M_BYTE_CAPACITY = 26`; the shipped payload is the bare 22-char id, leaving four bytes.
-  Q-389's journal records that **a unit test asserts the length against that budget precisely so a
-  later "let's also put the name in" fails in CI rather than on paper.** An ingredient list is
-  hundreds of bytes. It goes on the paper or it does not go.
-- **Data is available and needs no new shape.** `NutritionIngredient`
-  (`packages/shared/src/types/nutrition.ts:91-97`) already carries `name` and `weightG`, which is
-  exactly "200g Beef mince". For a saved meal it comes from `saved_meal_items` →
-  `food_items`; the plumbing to get it as far as the label sheet is the only new work on the data
-  side.
-- **Three options drawn at true size in the design canvas** (ask the owner for the link):
-  1. **Square, full list** — all five ingredients, code beside the calories at 62 px / **0.656 mm per
-     module**, the roomiest code of anything drawn for this feature, because the corners paid for it.
-     Cost: the artwork does **not** survive a round die, which reverses Q-389's settled
-     "one artwork serves both".
-  2. **Round, trimmed** — three ingredients then "+2 more — scan", calories and macros merged onto
-     one line. **⚠ Forces the code down to 44 px = 0.465 mm per module, below the 0.487 that was
-     already the tightest in the set** — so it trades scan reliability for a partial list, and a
-     partial list is what the request was trying to avoid.
-  3. **Round, scan only** — no list; the code already resolves to the full breakdown in the app.
-     Keeps the code and the name at full size.
-- **The honest framing for the decision:** the printed list is only worth its cost when reading a
-  tub **without** a phone. With a phone in hand, option 3 gives the *whole* breakdown where option 2
-  gives three of five lines at 6.5 px. So the real question is not "can we fit it" but "is this label
-  read away from a phone" — and if the answer is yes, the round die is what has to give, not the code.
-- **✅ Answered 2026-08-18 — two of the owner's follow-up questions, checked against shipped code:**
-  1. **"Will the QR work?"** The shipped renderer uses a **real encoder** — `qrcode@1.5.4`,
-     `QRCode.create(encodeMealLabelToken(mealId), { errorCorrectionLevel: 'M' })`
-     (`components/nutrition/meal-label-render.ts:125`), and its own comment already reasons about
-     exactly this: *"the code is 12.2–16.4 mm on these layouts, so ink spread on a home printer is
-     the expected failure and M is the level that survives it."* EC level M tolerates ~15% damage,
-     which is the margin that absorbs spread. **What is still unproven is the print**, and nobody has
-     run one — it is one of the two physical checks Q-389 already owes. **The mockup codes are
-     placeholder patterns and will not scan; do not test with those.**
-  2. **"Can the image be saved for a label-printer app?"** **Already shipped.**
-     `meal-label-sheet.tsx` does `canvas.toBlob(…, 'image/png')` → `navigator.share({ files })`
-     behind a "Share or save" button, with `<a download>` as the browser fallback. On Android the
-     share sheet is where a label-printer app appears, which is why it was built that way rather than
-     as a Capacitor plugin. **No work needed here.**
-- **⚠ "Cycle through them and choose a default" is two requests, and the second one is new.**
-  Cycling is nearly free — the renderer already takes the style as a parameter and four styles ship,
-  so the breakdown variants are more entries in the same registry. But **Q-389 deliberately ships the
-  style as picked-at-print-time and NOT stored**, so a *default* is a stored preference — which lands
-  straight on **Q-392** (preferences live only on the device). If a label default is written to
-  `localStorage` it is lost on the next reinstall, which is the exact complaint that produced Q-392.
-  **Q-392 settled this on 2026-08-23** — `mealLabelStyle` in the preferences bag, seeded into
-  `ta_meal_label_style` for first paint. Nothing here is blocked any more.
-- **✅ SHIPPED 2026-08-18 (v1.323.0, Lane B) — option 1, and NOT option 2.** `square` is now a style
-  in the registry: full per-serving ingredient list, code at 70 units, marked **SQUARE** in the
-  picker with a standing warning under the preview that a round die crops the list. The preview also
-  reports how many ingredients actually printed and how many were summarised, so a truncated list
-  cannot ship silently. Guarded by `e2e/meal-label.spec.ts`, mutation-checked — an earlier version of
-  that guard **passed** with the ingredient path switched off (the style fell through to the round
-  painter and still painted ink), which is why the spec now asserts the reported count.
-- **⚠️ CORRECTION, measured — every module-pitch figure in this entry and in Q-389 is ~24% too
-  optimistic.** The renderer draws the 4-module quiet zone **inside** the code box
-  (`cell = codeW / (moduleCount + 8)`), so the pitch actually printed divides by **33**, not 25:
-
-  | style | code | pitch as documented (÷25) | **pitch as drawn (÷33)** |
-  |---|---|---|---|
-  | band (default) | 12.17 mm | 0.487 mm | **0.369 mm** |
-  | editorial | 13.23 mm | 0.529 mm | **0.401 mm** |
-  | ticket | 13.76 mm | 0.550 mm | **0.417 mm** |
-  | plaque | 15.87 mm | 0.635 mm | **0.481 mm** |
-  | **square (new)** | 18.52 mm | 0.741 mm | **0.561 mm** |
-
-  The app was already showing the honest number; only the docs were wrong. This makes the print test
-  **more** important, not less, and it is why `square` was sized at 70 units — its 0.561 mm is the
-  only style above the 0.487 that everything here was assumed to have.
-- **⛔ Option 2 (round, trimmed) is NOT shipped, and needs an owner decision.** At 44 units its true
-  pitch is **0.353 mm** — below every shipped style, not merely below the "0.487 floor" this entry
-  names. It buys three of five ingredient lines at 6.5 px in exchange for the least reliable code in
-  the set. Recommendation: do not build it; the square die is the answer to wanting the list on paper.
-- **✅ SUPERSEDED AND CLOSED by Q-397, shipped 2026-08-18 (v1.324.0).** This entry's central
-  premise — that the list "does not fit on a round one" — was true only for a **stacked** list. The
-  owner's actual suggestion was an **inline wrapping run**, which spends width instead of height:
-  five ingredients become three wrapped lines rather than five, and the height handed back goes to
-  the code. The complete list now fits a **round** label with a code larger than the old default's.
-  **B2 — round-safe, inline, centred — is the new `DEFAULT_MEAL_LABEL_STYLE`**, asserted in
-  `components/nutrition/__tests__/meal-label-code-size.test.ts` per Q-397's verification note.
-  **Corrected 2026-08-19 (Q-399):** the "complete list at 0.529 mm per module" claimed here was
-  never printed. The shipped geometry left room for **zero** ingredient lines, and 0.529 was the
-  pitch of a code box the layout could not fit a list underneath. Retuned to **0.401 mm per module
-  with three wrapped lines** — still above the old default's 0.369, and now the *lines* are asserted
-  rather than only the code size.
-  Option 2 as costed here is moot; the stacked square style stays in the picker.
-- **Still open:** **the stored default** — no longer blocked (Q-392's engine half shipped
-  2026-08-23) but still picked-at-print-time, so the wiring is genuinely outstanding.
-- **What would count as done:** a saved meal's label can render its ingredient list with weights;
-  whichever option is chosen, **the code's module pitch is not reduced** without an explicit owner
-  decision recorded here (the "0.487 mm" this line named was the ÷25 reading; the shipped default is
-  now **0.401** — 0.529 briefly, but that box left no room for the list, per Q-399 — and the old one
-  measured 0.369 — see the correction above); and if a square-only variant ships, the app makes
-  clear which labels are square-only rather than letting a round die silently crop the list.
-- **Surface:** the renderer and its preview are browser-testable (`pnpm dev`, the label sheet), so
-  layout and overflow need no device. **The two checks that matter are still physical** — print it and
-  scan it — and those are the same two Q-389 already owes. `components/nutrition/**` is Lane B's.
-
 ### [platform][devices] Q-476 — a schema-rejected mutation is deleted forever with no badge, no toast and no retry
 
 - **Gate: device** — the route half shipped; what is left is the write-time companion below, which
@@ -3325,6 +3199,24 @@ moving *beside* the calories rather than under them.
   (`claude_ro` is row-scoped to one user — this says nothing about other accounts.)
 
 ### [platform][app-shell] Q-392 — the preference API exists; the read sites still read `localStorage`
+
+- **⚑ ABSORBS Q-393 (removed 2026-08-23). The `mealLabelStyle` row below IS that entry.** Q-393
+  was filed as *"an ingredient breakdown on the printed label, which does not fit on a round one"*
+  and everything about the label itself has since shipped: **Q-397** (v1.324.0) refuted the premise
+  by fitting the full list on a **round** label as an inline wrapping run rather than a stacked one,
+  and **Q-399** retuned the geometry to 0.401 mm per module with three wrapped lines asserted. What
+  was left of Q-393 was one sentence — the chosen style is picked at print time and forgotten —
+  which is exactly this entry's `mealLabelStyle` → `ta_meal_label_style` row. Two entries for one
+  row is what this fold removes.
+- **⛔ OWNER DECISION 2026-08-23 — Option 2, the round trimmed label, is dead. Do not re-cost it.**
+  Q-393 carried two bullets that contradicted each other for five days, one calling Option 2 an open
+  owner decision and a later one calling it moot, and that contradiction is why the entry sat parked
+  behind `Gate: owner` at the position the owner had personally moved it to. The number that settles
+  it: at 44 units its true module pitch is **0.353 mm**, below every shipped style including the
+  0.369 the old default printed. The square die is the answer to wanting the stacked list on paper.
+- **The two physical checks Q-393 owed are already tracked** — print one and scan it — by the
+  `projectOverview.md` Known-Issues row for Q-400 (*"NOT verified on device · needs: hardware + a
+  printer"*). They were never this entry's and are not lost.
 
 - **Branch:** `feat/preferences-read-sites`
 - **Lane:** B
@@ -3605,6 +3497,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   dump hashing identically before and after). This item is the affordance only.
 
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
+- **Gate: owner** — the route shipped; what is left is a press, and it needs an admin session
+  cookie against production. A session has read-only DB access (`claude_readonly`, which cannot
+  `VACUUM` by design) and no way to obtain one, so this cannot leave the queue from here.
 
 - **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
 - **Added:** 2026-08-18 (found while measuring production for Q-541)
@@ -3643,120 +3538,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   territory (`components/**`, Lane B) — so until then it is a curl with an admin session cookie.
   The same route is what reclaims the space after Q-541's backfill and after migration 193's index
   drop, which is why it was generalised rather than copied.
-
-### [platform] Q-534 — the safe half of the disk-full incident: statistics, autovacuum, and an index that stores the payload twice
-
-- **Branch:** `fix/oura-raw-samples-index-and-vacuum`
-- **Added:** 2026-08-17, from the live `disk_full` incident (see the `projectOverview.md`
-  Known-Issues row for the measurements).
-- **This is deliberately the non-destructive half.** The retention question — what `body_hex` is
-  for and how long the server must keep it — is a separate, owner-gated decision with an
-  irreversible edge. Everything here reclaims space **without deleting a single row**, and should be
-  done first, because it may be sufficient on its own.
-- **Three findings, in order of likely payoff:**
-  1. **The dedup index stores the payload a second time.** It covers
-     `(user_id, ring_timestamp_ds, tag, body_hex)`, so `body_hex` is in both the heap and the
-     index — which is why indexes are **291 MB against a 175 MB heap**. Indexing a hash of the
-     payload instead (generated column, or an expression index) preserves the dedup guarantee on a
-     fraction of the bytes. **Verify the uniqueness semantics survive** before proposing it: a hash
-     collision would silently drop a distinct event, which is exactly the loss the dedup exists to
-     prevent, so the column must remain part of the equality check even if it leaves the index.
-  2. **Autovacuum has never run on this table.** `last_autovacuum` and `last_analyze` are both
-     null and `n_live_tup` reads 0. Find out why — the default thresholds scale with table size,
-     so a table that grew fast from empty can outrun them. No statistics also means the planner has
-     been guessing on the largest table in the database; the `DISTINCT ON` that triggered the
-     incident takes 6.5 s even with disk available.
-  3. **`work_mem` is 4 MB** and the failing query sorts 1.1M rows. Raising it for that path, or
-     giving the query an index that avoids the sort, removes the temp-disk dependency that turned a
-     full volume into a user-visible error.
-> **⚠️ The 500 MB target is withdrawn — 2026-08-18, and this is settled rather than deferred.**
-> Railway **cannot shrink a volume**: *"Down-sizing a volume is not currently supported, but
-> increasing size is supported."* And it does not need to, because Railway bills *"only … the amount
-> of storage used by your volumes,"* not the provisioned size — so the 5 GB volume costs exactly what
-> a 500 MB one would at the same usage. Reverting would mean a dump/restore onto a fresh volume,
-> i.e. real downtime and risk on the database holding the ring archive, to save nothing. **Do not
-> attempt it.** Treat every "return to stock 500 MB" line below as historical context for why the
-> work was prioritised, not as an outstanding action.
->
-> What was genuinely lost is the tripwire: 500 MB is what made the bloat scream rather than creep, and
-> 5 GB is ~30 years of headroom at the post-packing rate. Replace it deliberately — a database-size
-> line in the session-start orientation read, beside the existing `error_events` check.
-
-- **The target is concrete:** the owner raised the volume 500 MB → 5 GB as a temporary mitigation
-  and intends to return to the stock 500 MB. Measure what each change actually reclaims rather than
-  estimating, and say whether 500 MB is reachable without touching retention.
-- **Do not run a Full re-sync while this is open** — that is what triggered the incident.
-
-- **⚠️ Finding 2 above is a measurement artifact — do not chase it.** Re-measured at 08:04 and 08:45
-  UTC, `oura_raw_samples` reads `last_autovacuum = 2026-08-17T07:57:35Z` and
-  `n_live_tup = 1,097,626`. **Autovacuum has run, twice, today.** The null/zero reading was taken
-  while the statistics were still empty: an unclean shutdown makes Postgres discard the stats file
-  on recovery, and `stats_reset` stays `NULL` because only an explicit `pg_stat_reset()` sets it —
-  so freshly-zeroed counters are indistinguishable from "never" unless you know the crash happened.
-  The same artifact showed on `error_events`, which read `n_live_tup = 0` while really holding 6,222
-  rows. **Every counter on this table is "since ~07:42 recovery", not lifetime** — which matters for
-  finding 1, since index `idx_scan` counts are now a ~1-hour window, not evidence of disuse.
-- **What actually consumed the space, proven:** `n_tup_ins = 0`, `n_tup_upd = 681,005`,
-  **`n_tup_hot_upd = 0`**. A full-table `measured_at` re-stamp — the Full re-sync was the *trigger*,
-  a catch-up drain, and the re-stamp it prompts (ops-doc I14/I25) is the *mechanism*. The table went
-  360 → 666 MB while live rows went **down** by 557 and `body_hex`/`event_name` did not move at all.
-  Zero new data; ~306 MB of pure bloat.
-- **This makes a fourth finding, and it is the one with leverage.** `measured_at` is indexed, so **no
-  update that changes it can ever be HOT** — each rewrites a heap tuple plus an entry in all four
-  indexes. `measured_at` is also the *only* indexed column such a re-stamp changes. **Dropping
-  `idx_oura_raw_samples_user_measured` (117 MB, and it exists to serve range queries that can be
-  expressed as ds ranges instead) makes the whole operation HOT-eligible** — so it is both a space
-  win and the fix for the mechanism. Q-46's `IS DISTINCT FROM` guard is present and correct at
-  `adapter.ts:4954`; **it is not the bug and must not be "re-fixed"** — it can only skip a re-stamp
-  writing back the same value, and the Q-71/I25 clock correction changed every row's derived value.
-- **Two more, for sequencing:** (a) the owner must run `VACUUM FULL` (existing admin button) once the
-  re-stamp is confirmed finished — it reclaims the ~306 MB and gets the DB to ~465 MB, under stock;
-  (b) **do not revert the volume to 500 MB until the `measured_at` index is dropped**, or the next
-  prescribed re-stamp refills it. Add a pre-flight free-space guard to the redecode route: the
-  operations manual prescribes Redecode as the remedy for five failure modes (I12, I14, I19, I20,
-  I25), so the documented fix procedure is itself a disk-fill hazard.
-- **⚠️ Finding 4 is NOT a drop-in index drop — measured 2026-08-17 (Lane A).**
-  `idx_oura_raw_samples_user_measured` (118 MB, `idx_scan` 14 in the ~1 h since crash recovery) has
-  **two live consumers**, and both break into a sequential scan of the largest table in the DB if it
-  goes:
-  1. `getLatestOuraBleMeasuredAt` (`slices/oura.ts:173`) — `WHERE user_id AND measured_at IS NOT
-     NULL ORDER BY measured_at DESC LIMIT 1`. Without the index this is a full scan per call.
-  2. `getOuraRawSamplesForTags` (`adapter.ts:6446`) — `WHERE user_id AND tag IN (…) AND measured_at
-     >= now() - N days ORDER BY measured_at`.
-  This entry's *"it exists to serve range queries that can be expressed as ds ranges instead"* is a
-  **plan, not a fact**: expressing them as ds ranges means converting the window bound through the
-  clock anchors at both call sites, and `getOuraRawSamplesForTags` is on a read path. So the order is
-  **rewrite both call sites to be ds-keyed, prove equivalence, then drop the index** — three steps,
-  not one. Do not drop it first and measure afterwards.
-- ✅ **Finding 4 is DONE, 2026-08-18 (Lane A), in that order.** Both consumers now convert their
-  wall-clock window through the anchors and read ds-keyed and two-tier; migration **193** drops the
-  index (**136 MB** by then, on a 699 MB table whose indexes were 443 MB). Three consequences the
-  entry did not anticipate, recorded so they are not re-derived:
-  (a) **the stored `measured_at` and `event_name` columns are now dead**, so the redecode's re-stamp
-  loop — *the mechanism of the outage* — was writing values nothing reads, and is a documented no-op;
-  the pre-flight free-space guard this entry asks for is therefore moot, because the operation it
-  guards no longer exists;
-  (b) **`/api/oura/stats` read `connected` off "we can name a last-measured time"**, which stopped
-  being the same question once the time became derived — split into `hasOuraBleSamples`, or a ring
-  with frames but no resolvable anchor would have silently taken the Health tab's whole Ring section;
-  (c) **dropping the now-dead columns is NOT done** — that is a data-dropping migration and
-  owner-gated, whereas the index drop is reversible with one `CREATE INDEX`. Findings 1–3
-  (payload-in-index, autovacuum, `work_mem`) are untouched and still open.
-- **The redecode's own cost, since this entry gates it.** `POST /api/oura-ble/samples/redecode`
-  re-stamps `measured_at` over every row (its own opening comment says so), which is exactly the
-  non-HOT full-table rewrite that produced the ~306 MB of bloat. Measured 2026-08-17 **after** the
-  incident: DB **786 MB**, `oura_raw_samples` **667 MB** (245 MB heap / 422 MB indexes). On the
-  temporarily-raised **5 GB** volume a redecode has ample headroom; on the stock 500 MB it does not.
-  **So the sequencing is: redecode now while the volume is large, and do not revert to 500 MB until
-  the index work above has landed** — otherwise the next prescribed redecode refills it.
-- **Answering this entry's own closing question — is 500 MB reachable without touching retention?
-  Yes, and it is now measured rather than estimated.** `VACUUM FULL` → ~465 MB; + the index work
-  → ~355 MB; + Q-540 → ~305 MB; + `error_events` self-clearing → ~260 MB. **No retention change is
-  needed, and the owner has chosen none** (Q-542). The one caveat is that *reaching* 500 MB and
-  *holding* it differ: vacuum alone re-crosses it in ~5 days, this entry plus Q-540 in ~7 weeks, and
-  **Q-541 (repack) in ~3 years**. Full analysis:
-  [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §0.
-
 
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
 
@@ -3847,8 +3628,14 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   packed blob is already `bytea`, so doing both is the same migration twice over 1.1M rows.
 - **Gives up nothing.** `event_name` is 20 MB owner-scoped across **30 distinct values, fully derivable
   from `tag`** — the Kotlin/TS cross-language parity test already pins that mapping. `text` → `bytea`
-  is a lossless re-encoding that halves `body_hex` (26 MB → ~13 MB) and shrinks the 78 MB dedup index
-  with it. Together: ~45–50 MB, and ~328 B/row → ~270 B/row.
+  is a lossless re-encoding that halves `body_hex` and shrinks the dedup index with it.
+- **⚠ The sizes above are pre-packing and are now much smaller — re-measured 2026-08-23.** The table
+  is **315k rows / 87 MB** (41 MB heap, 46 MB indexes), not the 1.1M / 666 MB this entry was costed
+  against, and the dedup index is **22 MB**, not 78. `body_hex` averages **24 characters**, 7.3 MB
+  across every row. So the `bytea` half is worth roughly **4 MB of index and 4 MB of heap**, not
+  ~25 MB. Take the `event_name` half on its own merits; the `bytea` half is now small enough that
+  Q-541's *"skip it, a packed blob is already bytea"* is clearly the right call rather than a
+  close one.
 - Needs `VACUUM FULL` to reclaim (ops-doc I17).
 
 
@@ -4241,45 +4028,27 @@ ehr     0     0     0     0   648   208   128   556     0
 - **What is left is the sweep**, deliberately not done here: 89 non-strict schemas, each needing its
   clients checked the way `BodyMetadataPostSchema`'s two were. The ratchet is the mechanism; the
   sweep is separate and much larger, exactly as `check-hex-literals` says of its own 471.
+- 🚧 **89 → 85, 2026-08-23.** Four converted, each after reading the one client that posts to it:
+  `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. All four
+  now 400 on an unknown key and still accept the real body — verified live, not just by test.
+- **⚠ Two more exemption classes were found while doing it, and both are now in the script's header
+  with evidence rather than as a guess.** (a) **A third-party SDK's wire format:** `/api/coach` is
+  driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts `{ id, messages, trigger,
+  messageId }` — read out of `node_modules/ai/dist/index.mjs`, not assumed — against a schema naming
+  only `messages`. `.strict()` there would **400 every coach message.** (b) **`generateObject`
+  response schemas**, which the checker cannot tell apart from request schemas: `builder-chat` has
+  four `z.object`s and only one is a request. Strictness there governs the model, not a client.
+  Also: `scale-ble/samples` belongs with the outbox class, because its client is the APK's Kotlin
+  service and **the APK does not update with a Railway deploy**.
+- **The tempting shortcut does not work.** In-repo JS clients ship with the server (the APK is a
+  WebView loading Railway, so JS and server always deploy together), so a key mismatch is a bug
+  either way — but that argues a mismatch *is* a bug, not that there is none, and a silent 400 on a
+  rarely-exercised route is exactly what a codemod would introduce and no test would catch. There is
+  no substitute for reading each client.
 - **⚠️ `sync/push` needs care and is the reason not to codemod this.** Outbox payloads from an older
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
-
-### [platform] Q-466 — CI re-downloads the Playwright browser on every E2E run, and a slow CDN turns that into an indefinite stall
-
-- **Branch:** `ci/cache-playwright-browsers`
-- **Added:** 2026-08-18 · review sweep (observed while landing the section-coverage PRs) ·
-  [`docs/reviews/2026-08-18-ingest-and-input-validation.md`](reviews/2026-08-18-ingest-and-input-validation.md)
-- **Placement:** low-mid. Costs nothing when the CDN is healthy and blocks a PR entirely when it is not.
-- **What.** `.github/workflows/ci.yml:391-392` runs `npx playwright install --with-deps chromium` on
-  **every** E2E run, with no cache:
-  ```yaml
-  - name: Install Chromium
-    run: npx playwright install --with-deps chromium
-  ```
-  `actions/setup-node`'s `cache: 'pnpm'` (five jobs use it) caches the pnpm store, **not** the
-  Playwright browser binaries, which live in `~/.cache/ms-playwright`. So each run pulls ~150 MB of
-  Chromium plus system packages afresh.
-- **Observed three times on 2026-08-18**, on PR #47 and twice on PR #66, out of roughly 8–10 E2E runs
-  that day — a small sample, so treat the *rate* as indicative rather than measured, but three in one
-  day on one repo is not a coincidence. In both cases the step sat
-  `in_progress` for **6–22 minutes** with every other job already green, and the job had to be
-  cancelled and re-run; the re-run completed the same step in well under a minute. The tell is
-  distinctive and worth knowing: `Install Chromium` `in_progress` while `Run pnpm e2e` is still
-  `pending` means the download, not the specs.
-- **Why it is worth fixing rather than tolerating.** E2E is a **required check**, so this blocks the
-  merge outright rather than degrading it, and the recovery (cancel the run, re-run the workflow,
-  wait again) costs ~20 minutes of wall clock each time. With five concurrent agents landing PRs, that
-  is paid repeatedly.
-- **Fix shape:** add `actions/cache` for `~/.cache/ms-playwright`, keyed on the resolved
-  `@playwright/test` version from `pnpm-lock.yaml` so a version bump invalidates it — the standard
-  pattern from Playwright's own CI docs. Keep the `install` step (it must still run to place the
-  browser and system deps on a cache miss); the cache only removes the download.
-- **Note for the implementer:** `playwright.config.ts` deliberately prefers the sandbox's
-  `/opt/pw-browsers/chromium` when present and falls back to Playwright's managed download elsewhere,
-  which is why CI needs the install at all. That comment explains the design — do not "simplify" it
-  away while adding the cache.
 
 ### [readiness] Q-465 — `POST /api/day-checkin` creates a check-in row from a completely empty body
 
@@ -9187,9 +8956,43 @@ first, so the output is a design discussion, not a patch:
   under `workoutActive`/`walkActive`/`activityActive` an instant #418 (see Q-73).
 
 
-### [workouts] Q-85 — a shortened session keeps full-length rest periods, which is what actually caps its exercise count
+### [workouts] Q-85 — compress accessory rest at a Quick budget, and leave the compound alone
 
-- **Gate:** owner
+- **Lane:** A — `packages/shared/src/ai-periodization/{time-budget,generate-prescription}.ts`.
+- **✅ DECIDED BY THE OWNER 2026-08-23 — option (a), with a 45-second accessory floor.** The plan's
+  §4 question is answered and this entry is startable. Build §5's shape as written.
+  - **Compress accessory and secondary rest only. The main compound keeps its full rest.** The
+    owner's reasoning is the same one the app already encodes everywhere else: *"rest was meant to
+    be determined based on PCT — a harder/higher weight compared to your 1RM should give more rest
+    than something lower… happy to have rest be a bit shorter, but it should keep that in mind, and
+    have a very solid floor."*
+  - **The floor is 45 s**, asked as a direct question (*can you rest 45 seconds between accessory
+    sets — 60–65% of 1RM, 10–12 reps*) and answered yes. Nothing may compress below it.
+  - **Option (b) — compress everything ~25%, the compound included — is rejected.** It gains the
+    most and is the only option that helps below 27 min, and it takes a 4×5 top set from 180 s to
+    135 s. It would be the single place in the app where the *protect the primary* discipline is
+    reversed, against `SET_FLOOR`, `ROLE_TRIM_BIAS` and `TRIM_ORDER`. Do not revisit it without new
+    evidence.
+- **⚠ Know what this does and does not buy, before building it.** It gains **one exercise in the
+  27–35 minute band and nothing below**, because a single main compound at 4×5×180 s costs ~19 min
+  on its own. That was measured, the owner was told it before deciding, and it is the accepted
+  outcome — not a disappointment to be discovered mid-implementation and "fixed" by reaching for (b).
+- **⚠ The catalogue's own numbers, measured 2026-08-23 across all 91 `style_sets` rows in
+  production**, because they bound what any compression can do:
+
+  | %1RM | rest |
+  |---|---|
+  | 50–65% | **60 s** |
+  | 70% | 75 s |
+  | 75–80% | 90–130 s |
+  | 85–87% | 180 s |
+  | 90–92% | 180–240 s |
+
+  Rest is monotonic in intensity, which is what makes the owner's principle already true in the
+  data — but it is **hand-authored per style, not derived**: at 75% the catalogue ranges 90 s to
+  180 s depending on whether the style is built for strength or volume, so reps matter as much as
+  percentage. **Do not replace the authored `rest_sec` with a function of `pct`.** Scale it.
+  Note the low band is already at 60 s, so a 45 s floor is what creates any room at all here.
 
 - **Branch:** `feat/preset-aware-rest-compression`
 - **Plan:** [`2026-08-15-preset-aware-rest-compression.md`](superpowers/plans/2026-08-15-preset-aware-rest-compression.md)

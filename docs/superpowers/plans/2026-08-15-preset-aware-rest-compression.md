@@ -60,7 +60,24 @@ load-bearing at heavy loads.
 That is the real trade, and it is sharper than the entry framed it: there is no version of this that
 is both worthwhile and safe for the main lift.
 
-## 4. The owner decision this needs
+## 4. The owner decision this needs — ✅ ANSWERED 2026-08-23: (a), floor 45 s
+
+> **The owner chose (a) and set the floor at 45 seconds.** Compress accessory and secondary rest;
+> the main compound keeps full rest. **(b) is rejected** — it reverses the protect-the-primary
+> discipline the rest of the prescription logic encodes. The owner was shown the gain before
+> deciding (one exercise in the 27–35 min band, nothing below) and accepted it.
+>
+> Their reasoning, which is worth keeping because it is the rule rather than the instance:
+> *"rest was meant to be determined based on PCT — a harder/higher weight compared to your 1RM
+> should give more rest than something lower… happy to have rest be a bit shorter, but it should
+> keep that in mind, and have a very solid floor."*
+>
+> **The 45 s floor is load-bearing and was the whole question.** Accessory rest is already 60 s
+> across the catalogue (measured over all 91 `style_sets` rows), so a 60 s floor would have left
+> nothing to compress and (c) would have been the answer instead. Build to §5.
+
+### The options as originally put
+
 
 **At a Quick budget, should the main compound keep full rest?**
 
