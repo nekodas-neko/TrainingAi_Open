@@ -107,6 +107,13 @@ grep -n '\[nutrition\]' docs/implementation-backlog.md   # Q-187, Q-191, Q-196�
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **Three calorie budgets were live on one screen; there is now one** (Q-415/Q-417, fixed
+  2026-08-23, v1.335.0). Home's nutrition card and the Nutrition ring both read
+  `budgetProvenance(...).total` rather than composing `nutrition_targets.calories` — the **rest-day
+  floor** — plus a separately-sourced burn. Follow-up **LB-4** (food logs invalidate before their
+  push) and **not device-verified** —
+  [`journal`](../../overview/entries/2026-08-23-one-calorie-budget.md).
+
 - **Offline saved-meal create/edit/delete** is a new sync domain and is **not device-verified**.
 - **Offline food search** is APK-only and unverified on device.
 - The quick-edit sheet fixes and the NUT-10/11 hygiene pass shipped, but interactive verification

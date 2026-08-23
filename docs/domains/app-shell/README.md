@@ -94,6 +94,13 @@ grep -n '\[app-shell\]' docs/implementation-backlog.md   # 2 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **Three calorie budgets were live on one screen; there is now one** (Q-415/Q-417, fixed
+  2026-08-23, v1.335.0). Home's nutrition card and the Nutrition ring both read
+  `budgetProvenance(...).total` rather than composing `nutrition_targets.calories` — the **rest-day
+  floor** — plus a separately-sourced burn. Follow-up **LB-4** (food logs invalidate before their
+  push) and **not device-verified** —
+  [`journal`](../../overview/entries/2026-08-23-one-calorie-budget.md).
+
 - ⚠️ **`components/health/day-overlay-sheet.tsx` is unreachable and still in the tree** (LB-3). LB-1
   took the edit/delete controls off it and onto `/health/day` (2026-08-23, v1.334.0); the sheet still
   owns three affordances the day screen has not got, so it was not deleted —

@@ -120,7 +120,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [metaToday, setMetaToday]           = useState<BodyMetaRow | null>(null);
   const [metaRecent, setMetaRecent]         = useState<BodyMetaRow[]>([]);
   const [metaLoading, setMetaLoading]       = useState(true);
-  const [activeEnergyKcalToday, setActiveEnergyKcalToday] = useState<number | null>(null);
   const [activeWidgets, setActiveWidgets]   = useState<MetaKey[]>(DEFAULT_WIDGETS);
   const [pillColors, setPillColors]         = useState<Record<string, string>>({});
   const [cardColors, setCardColors]         = useState<Record<string, string>>({});
@@ -510,14 +509,16 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         }
       }
     }
-    await cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: { steps: number; calories: number; waterMl: number } | null; activeEnergyKcalToday?: number | null }>(
+    // Q-415: `activeEnergyKcalToday` used to be read here and added to the stored calorie goal to
+    // make Home's nutrition budget. It is no longer read on this screen at all — the budget comes
+    // from `/api/nutrition/energy-balance`, which is the one place that knows what the base is.
+    await cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: { steps: number; calories: number; waterMl: number } | null }>(
       'body-metadata', '/api/body-metadata', TTL_MEDIUM,
       (data) => {
         if (!isBodyMetadataFresh(data, tz)) return;
         setMetaToday(data.today ?? null);
         setMetaRecent(data.recent ?? []);
         setWeekToDate(data.weekToDate ?? null);
-        setActiveEnergyKcalToday(data.activeEnergyKcalToday ?? null);
         setMetaLoading(false);
       },
     );
@@ -1220,7 +1221,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   metaToday={metaToday}
                   metaRecent={metaRecent}
                   metaLoading={metaLoading}
-                  activeEnergyKcalToday={activeEnergyKcalToday}
                   weekToDate={weekToDate}
                   calorieGoal={calorieGoal}
                   calorieType={calorieType}

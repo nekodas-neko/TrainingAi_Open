@@ -8,7 +8,7 @@ import { cn, accentCardStyle } from '@trainingai/shared/utils'
 import { CARD_DEFAULT_COLORS } from '@/app/session-select/constants'
 import { Sparkline } from '@/components/ui/sparkline'
 import { ColorSwatchPicker } from '@/components/ui/color-swatch-picker'
-import { HomeNutritionZoneBar } from '@/components/home/home-nutrition-zone-bar'
+import { HomeNutritionCard } from '@/components/home/home-nutrition-card'
 import dynamic from 'next/dynamic'
 import type { BodyMetaRow } from '@/app/api/body-metadata/route'
 import type { TrainingLoadResponse } from '@/app/api/training-load/route'
@@ -17,7 +17,6 @@ import type { MoodLog } from '@trainingai/shared/types/mood'
 import { todayInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { STAGE_COLOR } from '@trainingai/shared/health/hypnogram'
 import { acwrBandByKey } from '@trainingai/shared/ai-periodization/acwr'
-import { MACRO_COLORS } from '@trainingai/shared/nutrition/macro-colors'
 import type { HrSleepWindow } from '@trainingai/shared/health/hr-sleep-band'
 import { recoveryBand } from '@trainingai/shared/health/recovery-band'
 
@@ -52,7 +51,6 @@ interface HomeCardWidgetProps {
   metaToday: BodyMetaRow | null
   metaRecent: BodyMetaRow[]
   metaLoading: boolean
-  activeEnergyKcalToday: number | null
   weekToDate: { steps: number; calories: number; waterMl: number } | null
   // goals
   calorieGoal: number | null
@@ -77,7 +75,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
   const pathname = usePathname()
   const {
     sectionKey, sectionEditMode, activeCardWidgets, cardColors, onColorChange,
-    metaToday, metaRecent, metaLoading, activeEnergyKcalToday, weekToDate,
+    metaToday, metaRecent, metaLoading, weekToDate,
     calorieGoal, calorieType, weightLookback, stepsGoal, stepsGoalType,
     sleepGoal, moodLog, sleepData, acwrData, muscleData, hrData, setMoodSheetOpen,
   } = props
@@ -89,9 +87,6 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
   const nutrCarbs    = metaToday?.carb     ?? null
   const nutrFat      = metaToday?.fat      ?? null
   const nutrCalories = metaToday?.calories ?? null
-  const nutrTotalG   = (nutrProtein ?? 0) + (nutrCarbs ?? 0) + (nutrFat ?? 0)
-  const proteinPct   = nutrTotalG > 0 ? (nutrProtein ?? 0) / nutrTotalG : 0
-  const carbsPct     = nutrTotalG > 0 ? (nutrCarbs   ?? 0) / nutrTotalG : 0
 
   switch (sectionKey) {
     case 'card_weightSparkline': {
@@ -118,56 +113,20 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
     }
     case 'card_nutritionDonut': {
       if (!activeCardWidgets.includes('nutritionDonut')) return null
-      const rawGoalKcal = calorieGoal
-      const burnedBoost = activeEnergyKcalToday != null && activeEnergyKcalToday > 0 ? Math.round(activeEnergyKcalToday) : 0
-      const boostedGoal = rawGoalKcal != null ? rawGoalKcal + burnedBoost : null
-      const isWeekly = calorieType === "weekly"
-      const goalDisplay = isWeekly && boostedGoal ? boostedGoal * 7 : boostedGoal
-      const consumedDisplay = isWeekly ? (weekToDate?.calories ?? 0) : nutrCalories
-      const _nColor = cardColors['nutritionDonut'] ?? CARD_DEFAULT_COLORS.nutritionDonut
       return (
-        <div className="px-4 pb-3 relative">
-          {sectionEditMode && (
-            <div className="absolute top-4 right-12 z-20" onClick={e => e.stopPropagation()}>
-              <ColorSwatchPicker value={_nColor} label="Nutrition card" onChange={hex => onColorChange('nutritionDonut', hex)} />
-            </div>
-          )}
-          <div role="button" tabIndex={0} onClick={() => { if (!sectionEditMode) navigateWithTransition(router, pathname, "/nutrition"); }} className={cn("w-full rounded-2xl p-4 flex items-center gap-4 text-left active:scale-95 transition cursor-pointer", sectionEditMode && "pointer-events-none")} style={accentCardStyle(_nColor)}>
-            <div className="relative flex-none w-[58px] h-[58px]">
-              <div className="absolute inset-0 rounded-full" style={{
-                background: nutrTotalG > 0
-                  ? `conic-gradient(from -90deg, ${MACRO_COLORS.protein} 0deg ${(proteinPct * 360).toFixed(1)}deg, ${MACRO_COLORS.carbs} ${(proteinPct * 360).toFixed(1)}deg ${((proteinPct + carbsPct) * 360).toFixed(1)}deg, ${MACRO_COLORS.fat} ${((proteinPct + carbsPct) * 360).toFixed(1)}deg 360deg)`
-                  : 'var(--border)',
-                WebkitMask: 'radial-gradient(farthest-side, transparent 60%, black 61%)',
-                mask: 'radial-gradient(farthest-side, transparent 60%, black 61%)',
-              }} />
-              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-[9px] font-extrabold leading-none">{metaLoading ? "…" : nutrCalories != null ? nutrCalories : "—"}</span>
-                <span className="text-[7px] leading-none" style={{ opacity: 0.4 }}>kcal</span>
-              </div>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-baseline justify-between mb-1">
-                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">Nutrition{isWeekly ? " (week)" : ""}</p>
-                {goalDisplay && <p className="text-xs text-muted-foreground">{consumedDisplay ?? 0} / {goalDisplay} kcal</p>}
-              </div>
-              {/* Q-401: the gradient progress fill that used to be here measured "how full is the
-                  tank" against a fixed target. The zone bar measures "am I on target" against a
-                  budget that rises with what you burned, which is the number the rest of the app
-                  now uses. Same component as the Nutrition tab's, so the two cannot drift. */}
-              <HomeNutritionZoneBar />
-              <div className="space-y-0.5">
-                {[{ color: MACRO_COLORS.protein, label: "Protein", value: nutrProtein }, { color: MACRO_COLORS.carbs, label: "Carbs", value: nutrCarbs }, { color: MACRO_COLORS.fat, label: "Fat", value: nutrFat }].map(m => (
-                  <div key={m.label} className="flex items-center gap-2">
-                    <div className="w-1.5 h-1.5 rounded-full flex-none" style={{ background: m.color }} />
-                    <p className="text-[10px] text-muted-foreground flex-1">{m.label}</p>
-                    <p className="text-[10px] font-bold" style={{ color: m.color }}>{m.value != null ? `${m.value}g` : metaLoading ? "…" : "—"}</p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
+        <HomeNutritionCard
+          sectionEditMode={sectionEditMode}
+          color={cardColors['nutritionDonut'] ?? CARD_DEFAULT_COLORS.nutritionDonut}
+          onColorChange={onColorChange}
+          metaLoading={metaLoading}
+          calorieGoal={calorieGoal}
+          calorieType={calorieType}
+          weekToDate={weekToDate}
+          nutrCalories={nutrCalories}
+          nutrProtein={nutrProtein}
+          nutrCarbs={nutrCarbs}
+          nutrFat={nutrFat}
+        />
       )
     }
     case 'card_sleepWidget': {

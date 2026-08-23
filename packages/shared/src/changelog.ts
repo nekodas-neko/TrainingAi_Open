@@ -6,6 +6,15 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.335.0",
+    date: "2026-08-23",
+    changes: [
+      "Home and Nutrition now show the same calorie budget. Three different numbers were on screen at once from the same data \u2014 the bar said 2,180, Home's card 2,451 and the Nutrition ring 2,001 \u2014 so one card could say \"Goal reached\" while the card above it said you had 166 kcal left. Both cards now count against the figure the bar describes underneath them: your resting burn, plus your target, plus what you actually earned from movement.",
+      "The Nutrition ring's protein, carb and fat bars now grow with the day too. They were measured against your rest-day numbers, so a day with 550 kcal earned reported fat over target when it was well under. Protein deliberately does not move \u2014 it is set per kilo of bodyweight, and a walk does not create protein demand \u2014 so the earned calories go to carbs and fat in the ratio they already hold.",
+      "The ring's \"+N from cardio\" line now reads \"from movement\", because that number always included strength sessions and steps. On a leg day it was crediting a whole session to cardio.",
+    ],
+  },
+  {
     version: "1.334.0",
     date: "2026-08-23",
     changes: [
