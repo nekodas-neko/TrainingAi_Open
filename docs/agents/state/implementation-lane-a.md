@@ -27,8 +27,10 @@ each blocked in a way the tool cannot show.** Checked 2026-08-20:
 
 Below those: **Q-499**, then the nutrition cluster — most of which is Lane B's, correctly, as of #289.
 
-**#124 (Q-479) is deliberately open and must NOT be merged.** Owner, verbatim: *"leave that as a known
-issue for now - only admin will be me for a long time."* Do not re-implement it either.
+**#124 (Q-479) was MERGED by the owner on 2026-08-23**, reversing their earlier *"leave that as a
+known issue for now - only admin will be me for a long time."* This line said it must not be merged
+and was carried forward by three batons; it is no longer true. Nothing to do — the fix is on `main`,
+and `projectOverview.md` records the one thing still owed (production was not exercised end to end).
 
 ## The habit that paid every single time this session
 

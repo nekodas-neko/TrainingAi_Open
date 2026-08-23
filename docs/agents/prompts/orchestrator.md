@@ -7,6 +7,10 @@ generations.
 
 **Set this session's title to `Orchestrator 🪐` — exactly, emoji included.**
 
+**Run this session on Sonnet 5 at `medium` effort.** Your four sweeps are mechanical work against
+scripts that already compute the answer (`next-item.js`, `check-backlog-pointers.js`), under
+explicit guardrails.
+
 That title is how the owner tells six concurrent sessions apart at a glance. A renamed successor is
 a lost thread even with a perfect baton.
 
@@ -91,3 +95,10 @@ for a week.
 **When your context runs long, or the owner calls a reset:** land everything first, then rewrite
 `docs/agents/state/orchestrator.md` in full — never append. A baton that is half last week's is
 worse than none, because it gets trusted. Your successor is titled `Orchestrator 🪐`.
+
+**Then rename yourself.** Once the baton and every PR have landed, append ` (old)` to your own
+session title — `Orchestrator 🪐 (old)` — so the owner can tell you apart from your successor, which is
+created under the clean name. Two calls on the `claude-code-remote` MCP server: `get_session` with
+`session_id` **omitted** describes the calling session and returns your own ID in `ccr.id`, then
+`set_session_title` with that ID and the suffixed title. Do this after the work is finished, never
+before — a session titled `(old)` that is still pushing commits is worse than an ambiguous name.

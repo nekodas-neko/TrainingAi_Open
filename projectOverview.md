@@ -397,11 +397,21 @@ order.
   the native paths never fall through to the browser download — in the WebView that is a no-op, so a
   fall-through would toast success and produce nothing.
 
-### [platform] 🟡 ACCEPTED RISK: a revoked admin keeps catalogue write access for ≤24h (Q-479, 2026-08-18)
+### [platform] ✅ FIXED 2026-08-23: a revoked admin kept catalogue write access for ≤24h (Q-479, 2026-08-18)
 
-- **Owner decision, 2026-08-18: not fixing now — "only admin will be me for a long time."** The fix
-  is written, tested and CI-green; it is deliberately unmerged. Do **not** re-implement it: the
-  branch is `fix/exercises-route-admin-db-check` and the PR is #124.
+- **Shipped — the owner merged #124 on 2026-08-23**, reversing their own 2026-08-18 decision to
+  carry it as an accepted risk (*"only admin will be me for a long time"*). `app/api/exercises` now
+  reads the row instead of trusting the session claim: a revoked admin gets **403** where it
+  previously got **201** and created a row in `exercise_library`.
+  `scripts/check-admin-claim-in-api.js` stops it returning — zero baseline, verified to fail on a
+  reintroduction — and `admin-claim-not-authoritative.test.ts` pins the deliberate disagreement
+  between `requireAdmin` and `isAdminUser` so neither drifts into the other.
+- **Kept here rather than archived:** the PR states production and the 24-hour window were **not
+  exercised end to end** — the measurement was a local reproduction with cookie rotation persisted.
+  Archive it once that is confirmed against production. The **duplicate row further down this file**
+  (Review's original finding, same Q number) is resolved by the same merge.
+- The description below is the state *before* that merge, kept because it is the measurement.
+- **Do not re-implement it.** Branch `fix/exercises-route-admin-db-check`, PR #124, merged.
 - **What it is.** `app/api/exercises` authorises from the session's `isAdmin` JWT claim rather than
   reading the row, because it calls `isAdminUser(userId, isAdmin)` — which *returns the passed flag*
   when given one. Its 61 sibling API routes call `requireAdmin`, which reads the row every call and
@@ -900,8 +910,11 @@ order.
 - **Observability needs no work:** every fault reached `error_events` tagged `[pg 22P02]`, via
   `reportServerError` or `onRequestError`.
 
-### [platform] 🟠 A revoked admin keeps one write for up to 24 hours, and the module docstring says it cannot (Q-479, 2026-08-18)
+### [platform] ✅ FIXED 2026-08-23 — A revoked admin keeps one write for up to 24 hours, and the module docstring says it cannot (Q-479, 2026-08-18)
 
+- **Resolved by #124, merged by the owner 2026-08-23.** This is Review's original finding; the
+  Lane A row higher up this file carries what shipped and what is still owed (production was not
+  exercised). Everything below is the finding as measured, kept for the measurement.
 - **The first sweep to test privilege *revocation* rather than cross-user data isolation.**
   [`docs/reviews/2026-08-18-auth-session-boundaries.md`](docs/reviews/2026-08-18-auth-session-boundaries.md).
 - **`lib/admin.ts` holds two admin checks that disagree.** `requireAdmin` takes an `_isAdmin`
