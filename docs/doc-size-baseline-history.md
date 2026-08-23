@@ -18,6 +18,25 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-23 — BF-1's owner decision, and the public-repo hazard it exposes
+
+**`docs/implementation-backlog.md` 11350 → 11381.** The owner cleared BF-1's gate by choosing
+crop-before-upload, which unblocks the entry but also answers a question nobody had asked: what
+happens to the example report they have ready for testing.
+
+31 lines, and the largest single block of it is the warning that this repository is public and a real
+pathology report must never become a test fixture. That is worth queue space rather than a passing
+mention. The identifiers BF-1 exists to strip are exactly what a committed fixture would publish, git
+history makes it permanent, and the obvious next step for anyone building this — drop the sample in
+under `__tests__/fixtures/` — is the step that does it. A warning that is not sitting in the entry
+being implemented is a warning that arrives too late.
+
+The rest records two verified constraints the decision surfaced: the upload path is image-only
+(`ALLOWED_IMAGE_MIME` has no PDF) while a lab report is usually a PDF, and no crop UI exists in the
+app today, though `Camera.getPhoto({ allowEditing: true })` may supply one for free.
+
+---
+
 ## 2026-08-23 — three owner feature notes (BF-1, BF-2, BF-3)
 
 **`docs/implementation-backlog.md` 11328 → 11350.** Three feature requests the owner sent as one

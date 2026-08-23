@@ -11117,7 +11117,6 @@ they read before; and a weekly substance's reminder fires weekly.
 ### [nutrition][body] 🔵 BF-1 — import blood panel results as a nutrition baseline, de-identified
 
 - Lane: ? — new table + extraction route is A, the upload/review surface is B; needs a migration (**Lane A**)
-- Gate: owner — see the decision below; it has to be settled before anything is built
 
 **Owner request, 2026-08-23 (verbatim):** *"I'd like to be able to import some blood scan results and
 de-identify myself/user etc to have a baseline - should help with reccomendations for nutrition etc."*
@@ -11142,17 +11141,49 @@ transmission one.** Two things are true and they point in opposite directions:
   *after* extraction is too late, and redacting *before* extraction is circular, because reading the
   pixels is the extraction.
 
-  **This is the owner decision the gate is for.** Three routes, with a recommendation:
-  - **(a) Crop/mask before upload, on-device** — the owner blanks the header block in a preview
-    before anything is sent. Cheapest, no new dependency, and puts the owner in control of exactly
-    what leaves the phone. **Recommended.**
-  - **(b) Type the analytes in by hand** — perfect privacy, no AI call, and realistically the owner
-    will not do it more than once. Worth keeping as the always-available fallback path regardless.
-  - **(c) Send the whole report and rely on the provider's handling** — least work, and the one that
-    cannot be undone once a document has been sent. Not recommended.
+  **✅ DECIDED by the owner, 2026-08-23 — route (a), crop before upload.** Verbatim: *"Yes we can
+  crop the report; if its a document that gets uploaded; we can choose where the crop should be; or
+  it can be pre-cropped. I have an example one ready so we should be able to go with that for
+  testing."* The gate is cleared; this entry is buildable once planned. Two requirements come out of
+  that answer and both are binding:
+  - **The crop is chosen, not fixed.** An in-app crop step where the owner picks the region, because
+    lab layouts differ between providers and a hardcoded header height would silently leak on the
+    first report that does not match it.
+  - **An already-cropped file must be accepted as-is.** The crop step is offered, never forced —
+    the owner may arrive with the redaction already done.
+
+  Route (b), typing analytes by hand, stays as the always-available fallback: it needs no AI call at
+  all and is the honest answer when a report will not extract cleanly. Route (c) — sending the whole
+  report — is rejected and should not be revisited without a new owner decision.
 
   Under every route: **do not persist the document.** Store the extracted analytes and discard the
   image, which makes the de-identification durable rather than a promise about a retention policy.
+
+**Three things the crop decision surfaces, all verified 2026-08-23:**
+
+1. **The upload pipeline is image-only, and a pathology report is usually a PDF.**
+   `ALLOWED_IMAGE_MIME` (`packages/shared/src/http/request-guards.ts:34`) is exactly
+   `['image/jpeg', 'image/png', 'image/webp']` — no PDF, and nothing in the tree renders one. The
+   owner's words were *"a document that gets uploaded"*, so the plan must pick one: add a
+   PDF→raster step (a new dependency, and it must run **on-device** or the un-cropped PDF reaches
+   the server, defeating the whole decision), or accept only images and let the owner photograph or
+   screenshot the report. **Recommended: images only for v1.** `@capacitor/camera` with
+   `CameraSource.Prompt` already gives camera-or-gallery in one call
+   (`components/nutrition/capture-step.tsx:113`), so photographing a printed report or picking a
+   screenshot works today with no new plumbing.
+2. **No crop UI exists anywhere in the app** — grepped `components/`, `app/` and `lib/`; the only
+   hits are unrelated (voice logging, meal-label rendering, the GIF creator). So the crop is new
+   work. **The cheap path is `Camera.getPhoto({ allowEditing: true })`**, which hands off to
+   Android's own crop screen — no new dependency, and it satisfies "we can choose where the crop
+   should be". Evaluate that before reaching for a React cropper library.
+3. **🔴 The example report must never be committed — this repository is PUBLIC.** Confirmed via the
+   API on 2026-08-23: `"private": false`, `"visibility": "public"`. The owner has *"an example one
+   ready"* for testing, and the obvious next move — dropping it in as a test fixture — would publish
+   a real pathology report, with the identifiers the entire feature exists to remove, to a public
+   repository and to anyone who has ever cloned it. **Git history makes that effectively permanent.**
+   Test against a **synthetic** report built to match the layout, keep the real one outside the
+   repository entirely, and treat any local copy as untracked. If the real report is ever needed to
+   validate extraction, run it through a local dev server by hand and commit nothing.
 
 **What it would feed — worth scoping before building, because "helps with nutrition" is not yet a
 consumer.** The honest position is that no code reads a biomarker today. The realistic first consumers
