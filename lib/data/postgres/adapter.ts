@@ -83,6 +83,7 @@ import { readRawFrames, readRecentRawFrames, DS_BUCKET_SPAN } from './slices/our
 import { runOuraRollup } from '@/lib/oura-ble/rollup/run'
 import { createPostgresRollupIO } from './rollup-io'
 import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
+import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { packOuraRawBuckets, countPackableBuckets } from './slices/oura-raw-pack'
 import * as bodyBattery from './slices/body-battery'
 import { mergeSet, initialSourceMap, HEALTH_SOURCES, sourceRank, type HealthSource, type SourceColumn } from '@/lib/data/health-source'
@@ -5177,6 +5178,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
    *  body_metrics (HRV, RHR, SpO₂ per wake day). Reuses the same non-clobbering
    *  upserts as the Oura Cloud sync (one write function per domain). */
   async aggregateOuraRawSamples(userId: string, timezone: string, opts?: import('@/lib/oura-ble/rollup/run').RollupOptions): Promise<import('../repository').OuraRawAggregateResult> {
+    ensureServerOuraConstants()
     return runOuraRollup(createPostgresRollupIO({
       db: this.db,
       userId,
@@ -5207,6 +5209,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     // Same bucketing + merge the rollup uses — see lib/oura-ble/step-day-buckets.ts. This is a
     // read-only DRY RUN of the write, so it must not have its own copy: the owner authorises a
     // destructive backfill from these numbers.
+    ensureServerOuraConstants()
     const stepsByDay = await computeStepsByDay({
       runtime: nodeModelRuntime,
       stepFrames: stepFrameRows,

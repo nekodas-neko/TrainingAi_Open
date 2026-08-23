@@ -19,14 +19,42 @@
 // Library port only — not wired into any surface or the stress rollup (that is a follow-on;
 // the chronic_stress_score / chronic_stress_contributors columns already exist from migration 123).
 
-import { getCumulativeStressConstants } from './constants'
+import type { CumulativeStressConstants } from './constants'
 
-// Read on FIRST USE, memoised — not at module scope. `next build` imports every route to
-// collect page data, so a module-scope read opened the constants file at build time, and the
-// directory only exists at runtime now that the vendored copies are gone (Q-49 A4b). Each
-// function below takes its own `const K = K_()` so the bodies read exactly as before.
-let kCache: ReturnType<typeof getCumulativeStressConstants> | null = null
-const K_ = (): ReturnType<typeof getCumulativeStressConstants> => (kCache ??= getCumulativeStressConstants())
+// The constants are INJECTED, not read from disk here (Q-545). Importing the loader put `node:fs`
+// in this module's graph, and the Oura rollup reaches this file through
+// `@trainingai/shared/health/chronic-stress-assembly` — which is what kept a rollup that is
+// otherwise runtime-agnostic from ever running in the WebView. Same mechanism
+// `steps-motion-decoder` has used since Q-221. Each function below still takes its own
+// `const K = K_()`, so the bodies read exactly as before.
+let kCache: CumulativeStressConstants | null = null
+
+/** Provide the cumulative-stress constants. Server: `ensureServerOuraConstants()`. */
+export function setCumulativeStressConstants(c: CumulativeStressConstants): void {
+  kCache = c
+}
+
+export function hasCumulativeStressConstants(): boolean {
+  return kCache !== null
+}
+
+/** Test-only: forget the injected constants so a test can assert the unset behaviour. */
+export function __clearCumulativeStressConstants(): void {
+  kCache = null
+}
+
+// Throws rather than defaulting, deliberately — the same call the disk loader used to make. This
+// port is pinned to a captured golden vector; with no constants it would emit plausible, wrong
+// chronic-stress scores rather than fail.
+const K_ = (): CumulativeStressConstants => {
+  if (!kCache) {
+    throw new Error(
+      'cumulative-stress: constants not set — call setCumulativeStressConstants() first ' +
+        '(server: ensureServerOuraConstants() from lib/oura-models/constants/server-inject)',
+    )
+  }
+  return kCache
+}
 
 // ── Inputs ──────────────────────────────────────────────────────────────────────────────────
 // Every series is a flat number[] (the .pt takes column vectors [N,1]; the port flattens on read).
