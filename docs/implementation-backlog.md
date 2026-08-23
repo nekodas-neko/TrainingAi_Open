@@ -830,31 +830,22 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
+### [nutrition] LB-2 — there is no way to delete a meal type's entries, only to move them
 
-- **Branch:** `feat/meal-type-reassign-dialog`
-- **Added:** 2026-08-19 · Lane A, splitting the UI half out of Q-412 once the endpoint shipped
-- **Lane:** B
-- **Lane B** (`components/nutrition/meal-type-manager.tsx`). The server half is done and merged —
-  see [`entries/2026-08-19-meal-type-reassign.md`](overview/entries/2026-08-19-meal-type-reassign.md).
+- **Branch:** `feat/meal-type-delete-logs`
+- **Added:** 2026-08-23 · **Lane: A** — a repository method and a route parameter
+- **Gate: owner** — it is a bulk destructive action, and the escape it duplicates already exists
+- **Placement:** low. Nobody is stuck: Q-326 shipped the move, which is the escape that was missing.
 
-**What already exists, so it is not rebuilt.** `DELETE /api/nutrition/meal-types/[id]` refuses with
-**409** carrying `code: 'MEAL_TYPE_HAS_LOGS'`, a human message, and **`logCount`**; adding
-`?reassignTo=<uuid>` moves every entry onto that meal type and soft-deletes the source in one
-transaction, re-stamping each moved log's time against the new window, and answers
-`{ success: true, moved }`. Refusals are already shaped for a UI: **400** for the same id or a
-malformed one, **404** for a target that is not yours, and nothing is changed in either case.
+Q-326 asked its dialog for a secondary *"Delete them instead"*. **Nothing on the server can do it.**
+`reassignAndDeleteMealType` is the only escape the repository offers; there is no
+`deleteFoodLogsByMealType`, and `DELETE /api/nutrition/meal-types/[id]` either reassigns or refuses.
+So the button was not built rather than built dead.
 
-**What is left.**
-- **The delete button should not be able to only fail.** Today it fires the DELETE, gets a 409 and
-  shows a toast. Use `logCount` to open the move dialog directly, or disable-with-explanation.
-- **The dialog is a choice, not an error**: *"Afternoon Snack has 34 entries. Move them to…"* with a
-  picker of the remaining live meal types, and a secondary *"Delete them instead"*.
-- **Say that it rewrites history.** A 3 pm snack moved to Lunch reads as Lunch on every past day.
-  That is the intent — it is what "I want three meals a day" means — but it should not be a surprise.
-- **Verification is on-device**, per the offline-first rule: reassign a meal type with logs, then
-  confirm on the APK that the entries show under the new type with the same calories, that the day
-  total is unchanged, and that it survives an app restart.
+**Worth deciding before building.** It would let someone discard real logged history in one tap, and
+the only thing it saves over the move is a meal type they did not want to keep — which they can
+delete afterwards, once it is empty. If it is wanted, it needs its own confirm naming the count, and
+`invalidateNutritionWrite()` on the client, same as the move.
 
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
