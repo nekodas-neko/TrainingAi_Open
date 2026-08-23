@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A plan rename or a partial update.
+const MAX_BODY_BYTES = 2 * 1024 * 1024
 
 // Whitelisted. `isActive` is here as an explicit boolean rather than a settable column passthrough,
 // so activation still goes through the transactional path that clears the previous active plan.
@@ -19,6 +24,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   const repo = await getRepository()
   const plan = await repo.getMealPlan(id, userId)
@@ -35,11 +42,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const parsed = PatchSchema.safeParse(raw)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = PatchSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
@@ -66,6 +78,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   const repo = await getRepository()
   // Soft delete — the tombstone is what lets the removal reach a device that has not synced.

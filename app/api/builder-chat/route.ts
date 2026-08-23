@@ -10,6 +10,11 @@ import type { GeneratedProgram, ChatMessage } from '@trainingai/shared/types/bui
 import { KNOWN_STYLES, GOAL_STYLE_RULES } from '@trainingai/shared/workout/known-styles'
 import { styleWorkSec, workingBudgetMin, TRANSITION_SEC_BARBELL, TRANSITION_SEC_STANDARD } from '@trainingai/shared/workout/duration-model'
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Fully bounded by its own schema, unlike the coach routes: 20 history messages x 2,000 chars plus a
+// 1,000-char message is under 50 KB. 256 KB is generous past that.
+const MAX_BODY_BYTES = 256 * 1024
 
 const ChatMessageSchema = z.object({
   role: z.enum(['user', 'assistant']),
@@ -72,8 +77,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Rate limit exceeded. Try again in an hour.' }, { status: 429 })
   }
 
-  const body = await req.json().catch(() => null)
-  const parsed = RequestSchema.safeParse(body)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid input' }, { status: 400 })
+  }
+  const parsed = RequestSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid input' }, { status: 400 })
 
   const { message, program, chatHistory, equipment, goal, timePerSessionMinutes } = parsed.data

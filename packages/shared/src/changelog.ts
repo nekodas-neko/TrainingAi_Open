@@ -6,6 +6,266 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.341.0",
+    date: "2026-08-24",
+    changes: [
+      "Saved meals can have a photo. Edit a meal and there is a tile beside the name: tap it for the camera or gallery, tap the corner to remove it. The picture is shrunk on the phone before it is saved \u2014 a normal camera photo is far too big to store against a meal, so it becomes a small thumbnail around 6 KB, and the tile shows you the size so you can see it stayed small.",
+    ],
+  },
+  {
+    version: "1.340.1",
+    date: "2026-08-24",
+    changes: [
+      "Logging food updates Home straight away. The calorie figures were being refreshed a moment too early \u2014 before the log had reached the server \u2014 so the app fetched the old totals back and kept them. Home showed 208 kcal left while the Nutrition tab showed 166, a gap of exactly one unlogged item, and it stayed wrong until the cached figure aged out on its own.",
+    ],
+  },
+  {
+    version: "1.340.0",
+    date: "2026-08-24",
+    changes: [
+      "Every meal in your plan now has a Save to My Meals button, plus Save all. A saved plan meal is an ordinary saved meal \u2014 it logs in one tap, prints a label with a QR, and can be edited ingredient by ingredient \u2014 so the plan is a thing you generate from rather than a thing you have to keep opening.",
+      "Saving is remembered, so a meal already kept shows \"In My Meals\" instead of offering again, and Save all only counts what is left. Pressing it twice cannot produce duplicates. Meals kept this way carry a \"From plan\" tag in My Meals.",
+      "Fixed: the whole meal-plan feature could not be written to at all. Creating a plan, renaming or activating or deleting one, changing meals per day, editing a single meal, and saving dietary restrictions all failed with \"Invalid body\" no matter what was sent. Five routes read the request and then validated a variable that was never filled in.",
+    ],
+  },
+  {
+    version: "1.339.0",
+    date: "2026-08-24",
+    changes: [
+      "A free walk or run now shows your heart rate while you are walking. The strap was already streaming beats \u2014 the same one feeding the cadence reading on that screen \u2014 and the number was already being saved afterwards; it just was not shown at the one time you could act on it. It goes grey and says \"(stale)\" if the strap stops reporting, rather than freezing on the last reading.",
+      "The same screen now shows a running step total and, on a hilly route, how much you have climbed. The step count is estimated from cadence and needs the strap, so it stays hidden rather than showing zero when there is nothing to count. The guided walk shows the step total too, so the two screens agree.",
+    ],
+  },
+  {
+    version: "1.338.0",
+    date: "2026-08-23",
+    changes: [
+      "Foods in the History list and in food-database search results now line up. Calories sit in their own column on the right instead of being buried in the grey line under the name in one place and stacked over a serving size in another \u2014 a list of foods was three different shapes depending on where you were looking at it.",
+    ],
+  },
+  {
+    version: "1.337.0",
+    date: "2026-08-23",
+    changes: [
+      "There is now an \"I've finished logging\" button at the end of the Nutrition day, with an Undo. Only days you mark are used to work out what you actually burn \u2014 previously a day you stopped logging halfway through looked exactly like a completed light day and pulled the estimate down with nothing to stop it. Measured on the underlying change: fourteen days at a true 2,600 maintenance, six of them stopping at 1,400, came out 514 kcal low with nothing flagged.",
+      "A counter under the button says how many days are marked and how many more the estimate needs. It ships with the button on purpose: the button feeds something that was otherwise invisible, and that invisibility is why this went unnoticed until it was asked about.",
+    ],
+  },
+  {
+    version: "1.336.0",
+    date: "2026-08-23",
+    changes: [
+      "The calorie bar is now a progress bar you fill toward the end, instead of a dial with a marker in the middle. The track runs red through amber to green just before the goal notch, with a short amber-and-red tail past it, and the fill is that same colouring clipped to what you have eaten \u2014 so the leading edge tells you where you stand without a second colour that could disagree with the words beside it.",
+      "Home's nutrition ring answers \"how much is left\" rather than \"what were my macros\". It used to be a full circle split into protein, carbs and fat \u2014 which the three rows next to it already say in grams \u2014 so it never showed progress at all. It now sweeps with what you have eaten, greys the remainder, and the centre counts down and flips to \"over\" once you pass the budget.",
+    ],
+  },
+  {
+    version: "1.335.0",
+    date: "2026-08-23",
+    changes: [
+      "Home and Nutrition now show the same calorie budget. Three different numbers were on screen at once from the same data \u2014 the bar said 2,180, Home's card 2,451 and the Nutrition ring 2,001 \u2014 so one card could say \"Goal reached\" while the card above it said you had 166 kcal left. Both cards now count against the figure the bar describes underneath them: your resting burn, plus your target, plus what you actually earned from movement.",
+      "The Nutrition ring's protein, carb and fat bars now grow with the day too. They were measured against your rest-day numbers, so a day with 550 kcal earned reported fat over target when it was well under. Protein deliberately does not move \u2014 it is set per kilo of bodyweight, and a walk does not create protein demand \u2014 so the earned calories go to carbs and fat in the ratio they already hold.",
+      "The ring's \"+N from cardio\" line now reads \"from movement\", because that number always included strength sessions and steps. On a leg day it was crediting a whole session to cardio.",
+    ],
+  },
+  {
+    version: "1.334.0",
+    date: "2026-08-23",
+    changes: [
+      "You can edit and delete logged training again. Open a day from the calendar and every exercise now has an edit and a delete control, every workout card has a delete, and every activity has a delete \u2014 with the same confirmations as before. These went missing on 8 August when the day tap moved from a pop-up sheet to the full day screen and the controls stayed behind on the sheet, which nothing opens any more; for a fortnight a mistyped weight or a stray session could be logged but never corrected. Editing a set writes the new weight and reps straight through, and deleting the last exercise in a workout removes the empty workout with it.",
+    ],
+  },
+  {
+    version: "1.333.5",
+    date: "2026-08-23",
+    changes: [
+      "Deleting a meal type that has entries against it now asks where they should go instead of just refusing. Pick another meal type and everything moves across, then the old one is removed \u2014 previously the button could only fail, and the only way through was deleting every entry by hand. It says up front that past days move too: a 3 pm snack moved to Lunch reads as Lunch on every earlier day, which is the point, but it should not be a surprise.",
+    ],
+  },
+  {
+    version: "1.333.4",
+    date: "2026-08-23",
+    changes: [
+      "Photos for the food scan are now shrunk on your phone before they are sent. A full-resolution capture was going up whole \u2014 measured at 4000\u00d73000, that is about 2.2 MB of upload; it is now about 300 KB, an 87% cut. Nothing is lost: the model normalises every image to the same size before it reads it, so the extra pixels were never looked at. This should shorten the wait between taking the photo and seeing the result, though it does not rule out other causes.",
+    ],
+  },
+  {
+    version: "1.333.3",
+    date: "2026-08-23",
+    changes: [
+      "A workout's calorie estimate now says what it was worked out from. With a heart-rate reading it reads EST. HR KCAL and responds to how hard the session actually was; without one it reads EST. MET KCAL and comes from the clock and an assumed effort, so two sessions of the same length give the same number. About half your sessions have no strap reading, so a day often shows one of each \u2014 previously both were labelled the same and there was no way to tell which figure responded to effort. The finish screen says \u201cfrom heart rate\u201d instead of naming an effort level when the heart rate produced the number.",
+    ],
+  },
+  {
+    version: "1.333.2",
+    date: "2026-08-23",
+    changes: [
+      "If you train the same session twice in one day \u2014 two Push days, say \u2014 the day screen and the week-day sheet now show each one's own start, finish and length. Both were showing the later workout's times against both entries, so a 32-minute morning session read as the 82-minute evening one, and the earlier one's times were not shown anywhere.",
+    ],
+  },
+  {
+    version: "1.333.1",
+    date: "2026-08-20",
+    changes: [
+      "The calories shown when you finish a workout now come from your heart rate for that session, the same as everywhere else in the app. The finish screen was still estimating from the clock and your effort rating alone, so a workout you wore the strap for was reported one way there and another way on the day screen \u2014 two different figures for the same session. There is now one estimate behind both.",
+    ],
+  },
+  {
+    version: "1.333.0",
+    date: "2026-08-20",
+    changes: [
+      "Each workout on the day screen now shows what it burned, beside its volume, exercises and sets — the same figure the day’s energy breakdown counts, so the two cannot disagree. It reads as ~639 EST. KCAL because it is an estimate from the session’s length and heart rate, not from the weight you moved; a session with nothing to estimate from shows no figure rather than a confident zero.",
+    ],
+  },
+  {
+    version: "1.332.2",
+    date: "2026-08-20",
+    changes: [
+      "The calories shown when you finish a workout are now worked out from your most recent weigh-in. They were being worked out from the very first weight you ever logged, so the figure drifted further from the truth the more your weight moved \u2014 and it disagreed with the same workout's contribution to the day's energy budget. The two now match.",
+    ],
+  },
+  {
+    version: "1.332.1",
+    date: "2026-08-19",
+    changes: [
+      "Meal labels are composed properly again. The text block used to be pinned to the top of the label while the code was pinned to the bottom, so a meal with one or two ingredients left a band of empty space above the code \u2014 up to 8.6 mm, about an eighth of the label. The leftover space is now shared, and the calorie figure sits on the label's centre line with KCAL beside it, rather than the number and unit being centred as a pair.",
+    ],
+  },
+  {
+    version: "1.332.0",
+    date: "2026-08-19",
+    changes: [
+      "Saved meals can now carry a small photo, so a meal you built weeks ago is recognisable from more than its name. The storage and sync are in; the picker itself lands next, and until then nothing changes on screen.",
+    ],
+  },
+  {
+    version: "1.331.0",
+    date: "2026-08-19",
+    changes: [
+      "Day detail now shows calories in against calories out across the day, so you can see when you refuelled against when you burned it. Meals appear as bars at the time you ate them; the burn line's shape comes from your heart rate. The day's totals are unchanged \u2014 only their timing is new, and the chart says so, because heart rate rises for reasons other than movement.",
+    ],
+  },
+  {
+    version: "1.330.0",
+    date: "2026-08-19",
+    changes: [
+      "When the Coach swaps an exercise, it now sets the new exercise's role instead of silently keeping the old one's. The role decides the sets and percentages you get prescribed, so a light movement swapped in for a heavy one no longer inherits the heavy loading — and the Coach tells you what the role will be before you accept the change.",
+    ],
+  },
+  {
+    version: "1.329.0",
+    date: "2026-08-19",
+    changes: [
+      "Your macro targets now grow with the day like your calorie budget does. Earn 500 calories from movement and the carbs and fat you are aiming for go up to match; protein stays where it is, because it is set from your bodyweight and a walk does not change how much you need.",
+    ],
+  },
+  {
+    version: "1.328.0",
+    date: "2026-08-19",
+    changes: [
+      "You can now delete a meal type that has entries against it. Deleting one asks you to move its entries to another meal type, and does the move and the delete together — until now the refusal told you to reassign them first, which was something the app had never let you do, so the only way out was deleting the entries themselves.",
+      "Moved entries are re-timed to their new meal's window, so a 3pm snack moved to Lunch does not sit outside Lunch on the day view.",
+    ],
+  },
+  {
+    version: "1.327.0",
+    date: "2026-08-19",
+    changes: [
+      "A food log now records when you ate, not when you tapped. Log it inside the meal's own time window and it keeps the real time; log it outside — including when you back-fill yesterday the next morning — and it lands in the middle of that meal's window, on the day you filed it against.",
+      "Existing logs whose time fell on a different day than the date they were filed under have been corrected the same way. Logs entered on the right day were left exactly as they were, because that time was real.",
+      "Fixed a sync gap that would have kept those corrections on the server: a food log already on your phone could not learn a changed time or meal from a sync, only a changed quantity.",
+    ],
+  },
+  {
+    version: "1.326.0",
+    date: "2026-08-19",
+    changes: [
+      "The meal label's Share button did nothing on the phone. It is now two buttons — Save to gallery, which writes the label straight into your Photos, and Share, which hands it to another app — and both of them tell you what happened either way.",
+      "A saved label now prints at the 50 mm it was drawn at. It carried no size information before, so printers assumed their own default and it came out at about 312 mm.",
+      "The label style you pick is remembered instead of resetting to the default every time you open the sheet.",
+    ],
+  },
+  {
+    version: "1.325.9",
+    date: "2026-08-19",
+    changes: [
+      "Sleep data on Home, Health and the Sleep screen now refreshes after any change to it, not just after a ring sync. Editing a sleep record by hand used to leave those screens showing the old numbers until you navigated away and back.",
+    ],
+  },
+  {
+    version: "1.325.8",
+    date: "2026-08-19",
+    changes: [
+      "Changing your display name or profile picture now updates the greeting and avatar on Home straight away, instead of waiting for the next app restart.",
+    ],
+  },
+  {
+    version: "1.325.7",
+    date: "2026-08-19",
+    changes: [
+      "Four more places keep themselves up to date instead of holding what they loaded at app start: the training-stress line on Health, the heart-rate zone profile behind both activity detail sheets, and the muscle-recovery card on the workout picker.",
+    ],
+  },
+  {
+    version: "1.325.6",
+    date: "2026-08-19",
+    changes: [
+      "Six more cards \u2014 the day timeline, the calendar, strength progress, HR recovery, cardio trends and the detected-exercise card \u2014 now update themselves when their data changes, instead of showing whatever they loaded when the app started. This is the same fix as the heart-rate card got, applied to the next batch; the remaining screens follow.",
+    ],
+  },
+  {
+    version: "1.325.5",
+    date: "2026-08-19",
+    changes: [
+      "Meal labels are drawn as squares now, so the artwork uses the corners it was leaving empty for a round die \u2014 64% more room. Every style\u2019s scannable code is larger as a result, and the default style fits four lines of ingredients where it fitted three. The \u201csquare dies only\u201d warning is gone, since there is no longer a style that a round die treats differently. The Plaque style\u2019s double ring is now a square frame rather than two circles, which is what the rest of the label became. Codes are also drawn on a whole-pixel grid, so every module has the same crisp edge instead of a slightly grey one \u2014 they scan more reliably, on screen and on paper.",
+    ],
+  },
+  {
+    version: "1.325.4",
+    date: "2026-08-19",
+    changes: [
+      "The heart-rate profile card on Health now updates when its data changes, instead of showing whatever it had when the app started. A project-wide check was added at the same time so no new screen can be built the old way \u2014 19 screens still are, and they will be converted one at a time.",
+    ],
+  },
+  {
+    version: "1.325.3",
+    date: "2026-08-19",
+    changes: [
+      "Groundwork for the nutrition redesign \u2014 no visible change. Two of the screens it lands on had grown to the size limit the project enforces, so nothing could be added to them; the food-log loader and the \u201cadd a food by hand\u201d form now live in their own files. One small repair rode along: if adding a food by hand fails, the form keeps what you typed instead of clearing it.",
+    ],
+  },
+  {
+    version: "1.325.2",
+    date: "2026-08-19",
+    changes: [
+      "Home\u2019s nutrition card now shows the same on-target bar as the Nutrition tab, instead of a progress fill against a target that never moves. Under both bars is a line saying where today\u2019s budget came from \u2014 the amount you get before moving, plus what you earned by moving \u2014 so a number that grows during the day reads as intended rather than as a glitch.",
+      "The card explaining why your set goal and today\u2019s budget differ now appears while those two numbers actually differ. It was hidden until your maintenance had been measured from several days of logging \u2014 which is exactly the period when nothing else on the screen accounts for the gap. It still only offers to change your target once there is measured data behind the suggestion.",
+    ],
+  },
+  {
+    version: "1.325.1",
+    date: "2026-08-19",
+    changes: [
+      "The energy balance bar on Home updates as you log, instead of only after restarting the app. Logging food or water cleared the stored figure correctly, but nothing told the card on Home to go and fetch a new one \u2014 and because Home never closes while you use the app, it kept showing the number it had when you opened it. Cards that read stored figures can now be told when one changes.",
+    ],
+  },
+  {
+    version: "1.325.0",
+    date: "2026-08-19",
+    changes: [
+      "Meal labels print the ingredient list again. The centred style \u2014 the default \u2014 had no room left for it once the name, calories and macros were drawn, so it printed none at all, at any meal name length, and the preview quietly stopped mentioning ingredients rather than saying so. The headline figures are slightly smaller now and three wrapped lines of ingredients fit beneath them; the code is still larger than the style this replaced. If a label ever has no room for the list again, the preview says so in red instead of going silent.",
+      "Labels are drawn at twice the resolution, so the printed artwork is 600 dpi rather than 300. The scannable code was being drawn with soft, half-pixel edges, which is exactly what ink spread then merges \u2014 this affects every label style, not just the default.",
+      "The style picker no longer promises \u201cthe full ingredient list\u201d, since long lists are summarised; and it had gone on calling Black band \u201cthe default\u201d after it stopped being one.",
+    ],
+  },
+  {
+    version: "1.324.9",
+    date: "2026-08-18",
+    changes: [
+      "Typing in the meal plan editor no longer redraws every meal's macro bars on each keystroke. The bars were built to skip redrawing when nothing about them had changed, and that had never actually worked \u2014 so renaming a meal or writing an instruction re-rendered the whole list letter by letter.",
+    ],
+  },
+  {
     version: "1.324.8",
     date: "2026-08-18",
     changes: [

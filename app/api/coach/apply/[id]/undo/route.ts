@@ -7,6 +7,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { undoCoachChange } from '@/lib/coach/apply'
 import { invalidateProgramStructure } from '@/lib/cache-groups'
 import { errorLog } from '@trainingai/shared/logger'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 /**
  * Undo a change AI Coach applied.
@@ -26,6 +27,8 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   }
 
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   try {
     await ensureSchema()
@@ -54,6 +57,14 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const result = await undoCoachChange(db, userId, id)
     if (!result.ok) {
       if (result.reason === 'not_found') return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      if (result.reason === 'stale') {
+        // 409, the same as apply: the request was well-formed, the target moved. Usually because a
+        // later Coach change is still in effect over this one — undo that first (Q-468).
+        return NextResponse.json(
+          { error: 'This change is no longer the one in effect — undo the later change first', drift: result.drift },
+          { status: 409 },
+        )
+      }
       const detail = result.reason === 'invalid' ? result.detail : 'This change can no longer be undone'
       return NextResponse.json({ error: detail }, { status: 400 })
     }

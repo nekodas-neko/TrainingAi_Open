@@ -4,6 +4,11 @@ import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import type { PeriodizationPhase } from '@trainingai/shared/types/ai-periodization'
 import { POST_TRANSITION_STATUS } from './status'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One phase transition.
+const MAX_BODY_BYTES = 16 * 1024
 
 const BodySchema = z.object({
   newPhase: z.enum(['accumulation', 'intensification', 'realisation', 'deload']),
@@ -32,12 +37,20 @@ export async function POST(
 
   let body: z.infer<typeof BodySchema>
   try {
-    body = BodySchema.parse(await req.json())
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok) {
+      return read.reason === 'too_large'
+        ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+        : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    }
+    body = BodySchema.parse(read.body)
   } catch {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }
 
   const { sessionId } = await params
+  const badId = invalidUuidResponse(sessionId)
+  if (badId) return badId
   const repo = await getRepository()
 
   const state = await repo.getSessionPeriodization(userId, sessionId)

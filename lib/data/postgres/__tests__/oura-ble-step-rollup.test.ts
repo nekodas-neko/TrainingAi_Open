@@ -28,6 +28,7 @@ vi.mock('@/lib/oura-models/inference/session', async importOriginal => {
 import { runStepCounterPipeline, type RawFrame } from '@/lib/oura-ble/step-counter-pipeline'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
 import { measuredAtMs } from '@/lib/oura-ble/decode'
+import { nodeModelRuntime } from '@/lib/oura-models/inference/runtime-node'
 
 const canRun = !!process.env.DATABASE_URL
 const TEST_USER_ID = '00000000-0000-4000-8000-00000000d011'
@@ -85,7 +86,7 @@ const liveMs = (startDs: number, endDs: number, steps: number): StepCountWindow 
 // The value the rollup should persist for a day: step_counter over that day's frames, merged with
 // any live windows (Tier-2 override) — computed with the SAME anchor the rollup uses.
 const expectedSteps = async (frames: RawFrame[], live: StepCountWindow[]): Promise<number> => {
-  const r = await runStepCounterPipeline(frames, [], (ds) => measuredAtMs(ds, ANCHOR_DS, ANCHOR_UTC_MS))
+  const r = await runStepCounterPipeline(frames, [], (ds) => measuredAtMs(ds, ANCHOR_DS, ANCHOR_UTC_MS), nodeModelRuntime)
   return mergeStepCounterWithLive(r?.stepWindows ?? [], live)
 }
 

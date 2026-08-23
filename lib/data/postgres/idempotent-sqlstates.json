@@ -1,0 +1,11 @@
+{
+  "_comment": "SQLSTATEs that mean 'the object is already there' — the expected outcome of re-running an idempotent migration against a database that already has it, not a failure. Classified by code rather than message text: the messages are English prose that varies by object type and Postgres version, while the code is part of the wire protocol. This lives in JSON, not in client.ts, because scripts/local-db/migrate.js has to agree with it and is plain CommonJS that deliberately avoids ts-node — the two runners disagreeing is the bug this file exists to prevent (2026-08-20).",
+  "codes": {
+    "42P07": "duplicate_table — also indexes, views: relation \"x\" already exists",
+    "42710": "duplicate_object — constraint, trigger, type",
+    "42701": "duplicate_column",
+    "42P06": "duplicate_schema",
+    "42723": "duplicate_function",
+    "23505": "unique_violation — a seed row that is already present"
+  }
+}

@@ -1,143 +1,149 @@
 # Implementation Agent (A) 🚧 — baton
 
-> **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
-> successor is a lost thread even with a perfect baton.
+> **Successor sessions are titled `Implementation Agent (A) 🚧`** — exactly, emoji included. The title
+> is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
+> perfect baton.
 
-**Updated:** 2026-08-18 · **By:** the second session to run as Lane A · **Q band:** 314–349 (next free: **319**)
-**Migrations:** 189–197 taken; next free is **198**. Local SQLite unchanged at v22.
+**Updated:** 2026-08-23 · **By:** the sixth session to run as Lane A · **Next ID:** `LA-18`
+(`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
+**Migrations:** through 206; next free is **207**. Local SQLite **v28**, untouched this session.
 
 ## Now
 
-**The standing priority is still the owner's instruction of 2026-08-17:** the 5 GB volume is
-temporary and must be **deprecated by end of this week**. *All work aims at returning the database to
-the stock 500 MB.*
+**Nothing is in flight.** Every branch this session opened is merged. Start with
+`node scripts/next-item.js --lane A`.
 
-### The reclaim is built. Two thirds of it has still not run.
+**But read this before taking the top item: the Lane A queue is thin right now, and the top three are
+each blocked in a way the tool cannot show.** Checked 2026-08-20:
+
+- **LA-16 is CLOSED** (#288, #291, #292) — all seven ratchets now ask whether *this branch* grew the
+  thing. One of the seven, the memo check, needed a materialised base tree because its count is not a
+  function of a single file; the rest are per-file. `scripts/lib/base-ref.js` is the shared piece.
+- **Q-324 is CLOSED on evidence** — 30 consecutive fresh-database CI runs post-fix, and the causal
+  chain verifiably removed. **If it recurs, the migration-recording fix is ruled out.**
+- **Q-555** is **undiagnosed by its own text** (*"whether the no-op is Next's router aborting a failed
+  RSC fetch or the click handler swallowing it"*) and needs a device check. Do not build it blind —
+  it is now the top Lane A item and it is not startable as written.
+
+Below those: **Q-499**, then the nutrition cluster — most of which is Lane B's, correctly, as of #289.
+
+**#124 (Q-479) is deliberately open and must NOT be merged.** Owner, verbatim: *"leave that as a known
+issue for now - only admin will be me for a long time."* Do not re-implement it either.
+
+## The habit that paid every single time this session
+
+**Re-verify an entry's premise against current `main` before building it, and write down what you
+checked.** Six items, and it changed the work on four of them:
+
+| entry | what it said | what was true |
+|---|---|---|
+| **Q-331** | they agree, just add a test | they had **stopped** agreeing — #255 gave the day path an HR estimate and left the route on MET |
+| **RV-34** | check supplied ids against the program's existing rows | that refuses **every** save from the workout builder, which mints a fresh UUID per session |
+| **Q-421** | route (b) + a labelling clause | (b) owner-rejected, (a) shipped, half the rest done that morning — it was a Lane B item |
+| **PS-3** | four migrations re-fail forever | production has all four recorded; local-only, and smaller than the framing |
+
+## Shipped
+
+#270 PS-3 · #274 Q-331 · #278 RV-32+34 · #280 RV-33 · #281 Q-362a (**additive** — LA-15 contracts it
+after Q-362b) · #282 Q-424 · #283 Q-421 · #284 baton · #285 LA-13 · #286 LA-14 **refuted, no code** ·
+#287 LA-17 · #288 LA-16 half · #289 lane tags. Narrative is in each PR body and journal entry.
+
+**The queue itself changed in #289 and every agent is affected.** `next-item.js` had been taking the
+first `Lane`-shaped string in an entry's body, and the commonest shape here is a banner reading *"the
+Lane A half SHIPPED — what is left is Lane B"*. **Eight of Lane A's top ten READY items were Lane
+B's.** Nineteen entries now carry an explicit `Lane:` field; three are `?` because they are genuine
+A/B splits and resolving those is Orchestrator's. Where a blocker was stated in prose only, it is now
+a `Needs:` field (Q-556 → Q-328, Q-407 → Q-398).
+
+## Standing constraints
+
+- **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". It is
+  **51 of 51** now: #282 added a base-branch fetch step. It was 50 this morning. Do not hardcode it.
+- **`get_check_runs` is unreliable in both directions.** It read `total_count: 0` for 25 minutes on a
+  PR whose base was current. **Attempting the merge is the authoritative check.**
+- **Green CI is not proof a CI-only path ran.** #282's fetch step could have silently failed and the
+  job would still be green, because the script falls back. Read the log when the change *is* the CI
+  behaviour: it printed `[new branch] main -> origin/main`, which is the proof.
+- **Fixture constants are synthetic.** Strength is activity 8 with `met_moderate: 0.6`, below
+  `estWorkoutKcal`'s 1.5 floor — **every MET strength estimate is 0** in CI and the sandbox. Open any
+  test touching it with a vacuity guard. `met_hard` is 3 and does clear the floor; activity 7
+  (elliptical) clears it under both real and synthetic constants.
+- **The HR estimator needs no MET table**, so an HR-path test is non-vacuous under fixtures. That is
+  the way past the trap, not a workaround.
+- **Nothing ran on the S25 this session.** Anything touching offline-first, native, safe-area,
+  gestures or notifications needs the device smoke run or an explicit Known-Issues row.
+
+## Traps this session walked into, so you do not
+
+- **`git reset --soft origin/main` does NOT merge.** It moves HEAD and leaves the tree alone, so
+  committing after it **reverts every file another PR landed in between**. Caught by diffing
+  `--name-only` against `origin/main` before pushing; #275's two e2e files and a journal entry were
+  about to be deleted. **Always diff against `origin/main` before you push.**
+- **A rebase replays your conflict resolutions as new content.** Restacking nearly resurrected Q-423,
+  which #273 had just refuted, because an earlier hunk resolution had carried its block. Rebuild a
+  shared doc from `origin/main` and re-apply your own edit; never replay the hunk.
+- **`git checkout -- <file>` after a mutation test discards uncommitted work.** Commit before mutation
+  testing. Also: two files both named `route.ts` overwrite each other in a `basename`-keyed backup.
+- **A count that moves further than your change explains is the bug.** A `next-item.js` fix hid 96 of
+  203 entries from both lanes; nothing failed, `check:rules` was green, and the only tell was READY
+  dropping 149 → 53. An entry stating no lane must be `null`, never `undefined`.
+- **Extracting a helper for testability without switching the caller over is worse than not
+  extracting it.** `laneFromLines` was used only by its own test while `next-item.js` kept an inline
+  copy; they drifted within a day, so the test was testing a function the tool did not call.
+- **Green does not prove a CI-only path ran.** #285's replay could have replayed nothing and still
+  exited 0. It now fails when it re-ran nothing. Needing to read a log to know whether a check checked
+  anything *is* the defect.
+- **A check that adds a network call adds a way to fail.** Q-424's base fetch went red on a blip; it
+  is `|| true` now, because the fallback is stricter, not weaker.
+- **Smaller costs:** `psql -tAc` output carries a trailing newline (a URL built from it makes `curl`
+  return `000`); `fmtAest` strings do not sort (`"5:00pm" < "9:00am"`).
+
+## The database reclaim is still the standing deadline item
+
+Inherited unchanged for the fifth baton running, because **no session has been able to touch it**:
 
 | Step | Worth | State |
-|---|---:|---|
-| Migration **193** drops `idx_oura_raw_samples_user_measured` | **136 MB** | ✅ merged — `DROP INDEX` frees the files immediately, so it lands on deploy with **no press** |
+|---|---|---|
+| Migration **193** drops `idx_oura_raw_samples_user_measured` | **136 MB** | ✅ landed |
 | Pack the raw frames (Q-541 Task 5 backfill) | **~630 MB** | ⛔ **needs a press against production** |
 | `VACUUM FULL error_events` (Q-315) | **~49 MB** | ⛔ **needs a press against production** |
 
-Production was **819 MB** on 2026-08-18 (`oura_raw_samples` 699 MB: 255 MB heap, 443 MB indexes).
-With all three: **~140 MB**. Without the two presses: ~683 MB, still over.
-
-**Nothing has been packed and no row has moved.** Do not read the shipped tasks as progress against
-the deadline; `projectOverview.md` says so and should keep saying so.
-
-**Why it needs a press, and the three ways out** — full detail and a paste-ready runbook in
+A sandbox session cannot authenticate to production (`CLAUDE_DB_QUERY_SECRET` is read-only,
+`ADMIN_EXPORT_SECRET` is GET-only on one route). Either the owner runs the curls, or Lane B builds the
+buttons (Q-316), or a **confirm-first** bearer path is added — **do not build the third without an
+explicit yes, it is an auth change.** Runbook:
 [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md).
-In short: every reclaim is admin-session-gated and **a sandbox session cannot authenticate to
-production** (`CLAUDE_DB_QUERY_SECRET` is read-only; `ADMIN_EXPORT_SECRET` is GET-only on one route).
-Either the owner runs the curls, or Lane B builds the buttons (Q-316), or a **confirm-first**
-bearer-token path is added. **Do not build the third without an explicit yes — it is an auth change.**
 
-## Shipped this session (for the successor's orientation, not for credit)
-Q-310, Q-536, Q-539, Q-351, Q-541 Tasks 0–4 and 7, Q-534 finding 4, Q-315 (route), Q-353, Q-314,
-Q-535 (Lane A half), Q-356. Everything is on `main`.
+## Waiting on the owner
 
-## Next
-1. **Drive the two presses** the moment the owner picks a route. This is the whole deadline.
-2. **Q-541 Task 6 — hot-window prune.** Only after Task 5 has verified clean in production.
-   Writable before that, not verifiable.
-3. **Q-534 findings 1–3**, still open: the dedup index stores `body_hex` a *second* time
-   (**156 MB** — but packing removes the rows it indexes, so it shrinks on its own once Task 5 runs;
-   do it after, or not at all); autovacuum has never run on that table; `work_mem` is 4 MB against a
-   query sorting 1.1 M rows.
-4. **Q-460** `[workouts][platform]` — the session-RPE route reports success for a write that matched
-   nothing, and the sync path then discards the mutation. Genuine data loss; not yet triaged by Lane A.
-5. **Q-463 / Q-464** `[platform]` — "the row you named does not exist" answered five different ways
-   with five 500s; and request schemas almost never `.strict()`, which on a date-bearing write route
-   turns a mistyped key into a silent wrong-day write.
-6. **Q-537** `[devices][platform]` — owner-approved, but credential handling and **nothing about it
-   is checkable from the sandbox**. Device-only verification.
-7. **Q-540** `[devices][platform]` — largely superseded by Q-541; take only if packing is abandoned.
-
-**Q-313** touches `scripts/`, which neither lane lists — claim it here first and check Lane B's baton.
-
-## Blocked
-- **Q-541 Task 5 and Q-315** — on the owner, per the three options above.
-- **Q-537** — approved, unverifiable from here.
-
-Owed rather than blocked: the device check on Q-310, filed as a Known-Issues row in
-`projectOverview.md`. Confirm at the next engine-chosen deload: header "Deload", reduced weights, no
-PR badge.
+- **Q-420** needs a decision on the 6–10 → 1–10 RPE scale mapping. **Q-422** is Tuning-originated:
+  *Tuning proposes → owner signs off → Lane A implements*. Do not start it as Lane A.
+- Two Sentry checks on-device; a Railway-dashboard reading for **Q-549**.
+- Device checks owed and accumulating: **Q-400** (print once and measure — it also decides Q-411),
+  **Q-413**, **Q-412**, **Q-405**, **Q-310**.
 
 ## Claimed paths
-None held. `app/api/admin/vacuum/`, `app/api/oura-ble/rekey/` and
-`lib/data/postgres/slices/oura-raw-{frames,pack}.ts` are new and Lane A's.
 
-## Findings recorded, so they are not re-derived
-- **All raw-frame reads go through `lib/data/postgres/slices/oura-raw-frames.ts`.** A hot-only read
-  silently returns a 7-day history and raises nothing. There is a `docs/module-map.md` row.
-- **An aggregate cannot use that reader's dedupe** — the summary's per-tag counts double-counted a
-  bucket in both tiers (80 read as **120**). Count via an anti-join on `(epoch, tag, ds_bucket)`.
-- **`oura_raw_samples.measured_at` and `event_name` are DEAD COLUMNS.** Present, written at ingest,
-  read by nothing. **Do not add a new reader.** Dropping them is data-dropping and owner-gated.
-- **The redecode's re-stamp — the mechanism of the 2026-08-17 disk_full outage — is a no-op now**,
-  so Q-534's ask for a free-space pre-flight guard on that route is moot.
-- **A ds regression is NOT evidence of a ring-clock reset** (Q-314). A re-drain produces one. The
-  discriminator is the *ratio* to the epoch ceiling — 53% and 89% on the two real events, against a
-  5% bound. A re-key is **declared** (`POST /api/oura-ble/rekey`); the ratio is only a net, and it is
-  unvalidated in the direction it exists for because there is no observed true reset in the data.
-- **The `VACUUM FULL` allowlist is a safety boundary, not validation** — VACUUM takes no bind
-  parameter. `hasOwnProperty`, never `in` (`'toString' in obj` is true for every object).
-- **`error_events`: 4 live rows in 49 MB.** Not a leak — Q-539 fixed the writer — just space MVCC
-  never handed back.
-- **The redecode's `?async=1` job path exists but is opt-in** (Q-535). The default is unchanged
-  because both consoles report completion from the synchronous shape; flipping it blind makes them
-  say finished work had finished when it had only started. **Q-318** is the other half.
+- **`scripts/lib/`** — new this session (`base-ref.js`, `lane.js`). Lane A's.
+- `lib/media/`, `android/app/src/main/java/com/trainingai/app/media/`, `lib/net/safe-fetch.ts`,
+  `app/api/admin/vacuum/`, `app/api/oura-ble/rekey/`,
+  `lib/data/postgres/slices/oura-raw-{frames,pack}.ts` — inherited, still Lane A's.
+- `components/nutrition/meal-label-*` is **Lane B's** — hand it back.
 
-## Do not re-litigate
-- Lane contract, authority limits and Q bands are in [`docs/agents/README.md`](../README.md). Take Q
-  numbers from the band above, never from the backlog's next-free pointer.
-- **Q-541 Task 0 is answered structurally and must not be re-answered by counting.** `epoch` is not
-  in the dedup unique constraint. Counting now returns "none" for the *wrong* reason, because
-  migration 190 collapsed every sample to epoch 0.
-- **Q-540 is superseded by Q-541** — a packed blob *is* `bytea`, and packed rows store no
-  `event_name`. Doing both rewrites 1.1 M rows twice.
-- **Q-310's fix-direction items 2 and 3 were refuted and deliberately not built.**
-- **Q-185 is closed**, despite `docs/domains/workouts/README.md` saying otherwise.
+## Findings, so they are not re-derived
 
-## Method notes worth keeping
-- **A migration verified on a fixture is not verified.** Q-536's first migration passed a 5-test
-  suite and CI and still rolled back on every production boot: the fixture was 8 rows, the table
-  434,707 on 667 MB, and the pool's `statement_timeout` is **15 s**. Ask the production row count
-  *before* writing a data migration; put `SET LOCAL statement_timeout` on anything not obviously
-  small.
-- **The tell that a migration silently failed:** absent from `schema_migrations` while
-  `/api/version` reports the release carrying it. `ensureSchema` catches, logs to console only, and
-  retries every boot — there is no `error_events` row.
-- **Rehearse a data change through the live dev server, not just the suite.** Q-541 Task 3's
-  double-count survived tsc, lint, 3,937 tests and review; thirty seconds of `curl` against
-  `pnpm dev` caught it. Same for Q-353, where the real model's output is what proved the fix.
-- **A new table needs a regenerated `claude_ro` view migration** or the coverage guard goes red.
-  Generate it **after** the table exists locally — the generator reads the live schema, so running it
-  first silently emits a file with no view for the new table.
-- **A Next.js `route.ts` may not export arbitrary symbols.** Exporting helpers for tests fails the
-  generated route-type check (`Property 'x' is incompatible with index signature`). Put them in a
-  sibling module.
-- **`CLAUDE_DB_QUERY_SECRET` works from the sandbox**, but mind the `claude_ro` search_path:
-  `pg_total_relation_size('oura_raw_samples')` resolves to the **view** and returns 0. Join
-  `pg_class` to `pg_stat_user_tables` on `relnamespace = 'public'::regnamespace`.
-- **The seed user is not an admin and has no raw samples.** `UPDATE users SET is_admin = true WHERE
-  email='test@local.dev'` (checked against the DB, not the JWT, so an existing cookie keeps working)
-  and **revert after**. `npx playwright test --project=setup` mints a cookie into
-  `e2e/.auth/seed-user.json`.
-- **The rate limiter has an in-memory L1 in the dev-server process.** `DELETE FROM rate_limits` does
-  not clear it — restart `pnpm dev` if you 429 yourself.
-- **The local DB is shared across branches.** A table created by another branch's migration makes the
-  `claude_ro` coverage guard fail on a branch that lacks it — local skew, not a defect. It clears when
-  the other branch merges.
-- **`scripts/check-doc-index-size.js` conflicted on EIGHT consecutive merges this session.** Resolve
-  mechanically, never by splicing: delete the numeric lines, re-measure the merged files, write them
-  back, keep both prose blocks. Same for `package.json`/`changelog.ts` — rebuild from
-  `git show origin/main:…` and prepend your entry.
-- **`get_check_runs` returning `total_count: 0` minutes after opening a PR is a stale base, not slow
-  CI.** Fetch, merge, push. Conversely, when it looks frozen on a current base, attempting the merge
-  is the reliable check — branch protection refuses a genuinely pending required check.
-- **After merging another lane's work, `pnpm install` before believing a `tsc` error.** A missing
-  `qrcode` module read as a code error and was an uninstalled dependency.
-- The local dev DB reports three pre-existing `ensureSchema` failures (`038`, `040`, `041`).
-  Unrelated to any change; ignore them.
+*Inherited, and none is recorded elsewhere. They are durable knowledge rather than state — the next
+handoff should move them out (Oura → `docs/oura-ble-operations.md`) instead of carrying them again.*
+
+- **Raw frames:** read only via `slices/oura-raw-frames.ts` (a hot-only read silently returns 7 days);
+  an aggregate cannot use its dedupe — anti-join on `(epoch, tag, ds_bucket)`.
+  `oura_raw_samples.measured_at` and `event_name` are **dead columns**, owner-gated to drop. A ds
+  regression is **not** a ring-clock reset (Q-314) — a re-drain makes one.
+- **Security:** the `VACUUM FULL` allowlist is a boundary, not validation — `hasOwnProperty`, never
+  `in`. **DNS rebinding is NOT closed in `fetchPublicUrl`**: the address is validated, then the
+  hostname is connected to by name; closing it needs a pinned-IP connect undici does not expose.
+- **Sandbox limits:** `computeActiveEnergy` cannot run here via a complete-profile `energy-balance`
+  request (a vendored constants file object storage will not serve) — true on `main` too. A stale
+  local DB looks like a code defect: `setup.sh` will not re-seed a non-empty one, drop
+  `/var/lib/postgresql/local-dev`. `npx next lint` is **not** `pnpm lint`. Drizzle will not marshal a
+  JS array into `unnest(...)` in a raw `sql` template.

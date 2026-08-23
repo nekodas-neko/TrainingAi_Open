@@ -6,6 +6,10 @@ import { CoachPatchSchema } from '@/lib/coach/patch'
 import { previewPatch } from '@/lib/coach/consequences'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { errorLog } from '@trainingai/shared/logger'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// The same patch shape coach/apply takes.
+const MAX_BODY_BYTES = 256 * 1024
 
 /**
  * What a proposed change would cost, measured against the real rows.
@@ -27,7 +31,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const parsed = CoachPatchSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const parsed = CoachPatchSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid patch' }, { status: 400 })
 
   try {
@@ -37,6 +47,7 @@ export async function POST(req: Request) {
       userId,
       parsed.data,
       todayInTz(session.user?.timezone ?? DEFAULT_TZ),
+      session.user?.timezone ?? DEFAULT_TZ,
     )
     if (!result.target) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     return NextResponse.json(result)

@@ -1,32 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { withRouteErrors } from '@/lib/api/route-errors'
-import { z } from 'zod'
+import { withRouteErrors, invalidUuidResponse } from '@/lib/api/route-errors'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
+import { InjuryPatchSchema } from '@trainingai/shared/validation/injury'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 
-// SEC-I4: the web PATCH forwarded an unvalidated body — the adapter key-whitelists
-// columns (no mass assignment) but never checked value types/enums, so the offline
-// sync path (which does enforce the severity enum) was stricter than web. Validate at
-// the route, matching the supplement-patch pattern.
-const InjuryPatchSchema = z.object({
-  muscleName:   z.string().min(1).max(100).optional(),
-  notes:        z.string().max(1000).nullable().optional(),
-  severity:     z.enum(['mild', 'moderate', 'severe']).optional(),
-  startedDate:  z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
-  resolvedDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().optional(),
-}).strict()
+// One injury with its notes.
+const MAX_BODY_BYTES = 16 * 1024
+
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
-  const parsed = InjuryPatchSchema.safeParse(await req.json().catch(() => null))
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = InjuryPatchSchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const repo = await getRepository()
   // Q-463: an id that is not yours (or does not exist) answered 500 with an empty body.
   return withRouteErrors(async () => {
-    const injury = await repo.updateInjury(id, session.user!.id!, parsed.data)
+    // The schema accepts both separators (localDateString emits slashes); the DATE columns must get
+    // dashes, since `2026/08/09` is DateStyle-dependent at the driver.
+    const { startedDate, resolvedDate, ...rest } = parsed.data
+    const injury = await repo.updateInjury(id, session.user!.id!, {
+      ...rest,
+      ...(startedDate !== undefined ? { startedDate: startedDate.replace(/\//g, '-') } : {}),
+      ...(resolvedDate !== undefined ? { resolvedDate: resolvedDate?.replace(/\//g, '-') ?? null } : {}),
+    })
     return NextResponse.json(injury)
   })
 }
@@ -36,6 +44,8 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id } = await params
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
   const repo = await getRepository()
   return withRouteErrors(async () => {
     await repo.deleteInjury(id, session.user!.id!)

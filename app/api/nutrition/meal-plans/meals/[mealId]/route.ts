@@ -5,6 +5,11 @@ import { getRepository } from '@/lib/data'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One meal with its ingredient snapshot.
+const MAX_BODY_BYTES = 256 * 1024
 
 // Whitelisted, same reasoning as the plan PATCH. The repository proves ownership by joining this
 // meal's variant back to its plan before writing — the meal id alone says nothing about who owns it.
@@ -35,11 +40,16 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ mealId
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   const { mealId } = await params
+  const badId = invalidUuidResponse(mealId)
+  if (badId) return badId
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const parsed = PatchSchema.safeParse(raw)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = PatchSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

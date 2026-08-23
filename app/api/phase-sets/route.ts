@@ -2,6 +2,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import type { EditablePhase } from '@/components/config/phase-editor'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A phase set: a name and its phases.
+const MAX_BODY_BYTES = 256 * 1024
 
 async function getUserId() {
   const session = await auth()
@@ -21,16 +25,33 @@ export async function POST(req: NextRequest) {
   const userId = await getUserId()
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json() as { name: string; phases: EditablePhase[] }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const body = (read.body ?? {}) as { name: string; phases: EditablePhase[] }
   if (!body.name?.trim()) {
     return NextResponse.json({ error: 'Name is required' }, { status: 400 })
   }
 
   const repo = await getRepository()
+
+  // RV-32: the PUT twin at `[id]/route.ts` has refused a style id the caller does not own since
+  // Q-129; this create path never got the same check, so the identical body was a 400 on PUT and a
+  // 201 here. `progression_styles.user_id` is NOT NULL and there is no shared style, so a foreign id
+  // is always wrong — and the FK is `ON DELETE SET NULL`, which means the owner deleting their own
+  // style silently nulls a column in someone else's program.
+  const phasesIn = body.phases ?? []
+  if (!(await repo.progressionStyleIdsOwned(userId, phasesIn.flatMap(p => [p.primaryStyleId, p.secondaryStyleId])))) {
+    return NextResponse.json({ error: 'Invalid styleId' }, { status: 400 })
+  }
+
   const phaseSet = await repo.createPhaseSet(
     userId,
     body.name.trim(),
-    (body.phases ?? []).map((p, i) => ({
+    phasesIn.map((p, i) => ({
       position: i,
       name: p.name,
       durationCycles: p.durationCycles,

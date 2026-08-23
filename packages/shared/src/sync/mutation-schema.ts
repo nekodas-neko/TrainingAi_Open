@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { isCalendarDate } from '../date-utils'
 
 // The single canonical list of outbox domains. The push envelope enum below AND
 // the local-store `PendingMutation['domain']` type (lib/local-store/types.ts)
@@ -26,7 +27,11 @@ export const MutationSchema = z.object({
   domain:  z.enum(SYNCED_MUTATION_DOMAINS),
   // Both separators: the client fills date params from localDateString(), which emits
   // slashes — a dash-only regex rejects every real request before the handler runs (Q-130).
-  date:    z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/),
+  // ...and `.refine(isCalendarDate)` because the regex bounds the SHAPE only: `2026-13-45` and
+  // `2026-02-31` pass it, reach the driver as `[pg 22008]`, and the push route echoes the whole
+  // failed INSERT back to the caller (Q-496, measured). A mutation that fails here is dropped and
+  // quarantined by the route's existing per-item handling rather than wedging the queue.
+  date:    z.string().regex(/^\d{4}[-/]\d{2}[-/]\d{2}$/).refine(isCalendarDate, 'Not a real calendar date'),
   payload: z.record(z.string(), z.unknown()),
 })
 

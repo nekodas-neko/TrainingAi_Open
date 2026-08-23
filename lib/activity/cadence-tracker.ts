@@ -123,6 +123,12 @@ export interface CadenceTrackerSnapshot {
   /** Raw decoded stride frequency, carried through unconverted so the calibration console
    *  can show both candidate unit interpretations without re-deriving anything. */
   ringStrideHz: number | null
+  /**
+   * Running total of steps for this session, integrated from cadence — **not counted steps**
+   * (Q-418/Q-410). Null when nothing usable has been read yet, which is the strap-only case: with
+   * no strap this number does not exist and must be hidden rather than shown as `0`.
+   */
+  stepsEstimate: number | null
   /** Gait windows seen this session. 0 means the ring has delivered nothing at all —
    *  a very different problem from "delivered windows, but none looked locomotor". */
   ringWindowCount: number
@@ -359,6 +365,10 @@ export class CadenceTracker {
     return {
       liveSpm: live?.spm ?? null,
       liveSource: live?.source ?? null,
+      // Derived here rather than in each readout: `summarizeCadence` is the one place that turns
+      // readings into steps (it is what the SAVED `steps` field already uses, Q-230), so a second
+      // integration on a screen would be a second answer to "how far did I walk".
+      stepsEstimate: this.summary().stepsEstimate,
       ring: ringFresh,
       strap: strapFresh,
       agreement: ringFresh && strapFresh ? compareCadence(ringFresh.spm, strapFresh.spm) : null,

@@ -86,11 +86,15 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 - [`docs/superpowers/plans/2026-08-18-device-primary-compute.md`](../../superpowers/plans/2026-08-18-device-primary-compute.md)
   — **closing D2 Task 5/6 and D3 (2026-08-18, owner-directed focus).** The phone drains, stores and
   cursors correctly and then **nothing consumes it** — a repo-wide grep finds no caller for
-  `getUnrolledRaw` or `markRolledUp`. Measured: `aggregateOuraRawSamples` is 1,110 lines with only **17
-  DB-coupled lines**, so the device rollup is a port behind a `RollupIO` interface, not a rewrite.
-  Two blockers verified today: production `script-src` has **no `wasm-unsafe-eval`**, so WASM cannot
-  instantiate on the device at all; and the app's 0.22 vCPU is **unexplained** after three refuted
-  hypotheses. Backlog Q-545 / Q-546 / Q-547.
+  `getUnrolledRaw` or `markRolledUp`. The device rollup is a port behind a `RollupIO` interface, not a
+  rewrite — **Task 2 shipped 2026-08-23**, see
+  [the journal entry](../../overview/entries/2026-08-23-oura-rollup-io-port.md). Note the plan's "17
+  DB-coupled lines" is a **line** count: the port is **22 store operations**, and `run.ts` still
+  reaches `onnxruntime-node`, so the rollup's I/O is portable and its models are not.
+  Two blockers were verified when it was written and **both have since been answered**: the missing
+  `wasm-unsafe-eval` shipped 2026-08-20 (Q-546, #259), and the 0.22 vCPU turned out to be spiky and
+  largely deploy churn (Q-547, measured 2026-08-18). The plan's §4 still reads as current on the
+  first and is not. Backlog Q-545 / Q-546 / Q-547.
 
 - [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](../../superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
   — **Q-541 implementation plan (2026-08-17).** Two tiers: `oura_raw_samples` stays exactly as it is
@@ -142,7 +146,36 @@ Genuinely superseded, kept for the trail only: `docs/oura-on-device-handover.md`
 
 - [`docs/reviews/2026-08-18-ble-era-input-drift.md`](../../reviews/2026-08-18-ble-era-input-drift.md) — **the BLE-only Recovery Index refit, run on 42 nights, 2026-08-18** (Q-509 — the refit lands at 3.31 h against a shipped anchor of 5, and the anchor must **not** move: it and the input shrank by the same factor, so the hours estimator carries a multiplicative bias from the ~2× noisier BLE series. Q-510 — resilience is starved by the daytime-stress coverage check, which is persisted nowhere, and `worn_hours_ble` is NULL on all 96 rows).
 
+- [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](../../reviews/2026-08-19-daily-summary-replace-wipe.md) — **`oura_daily_summary` holds 1 row against 198,223 raw samples, 2026-08-19**
+  (Q-528). `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
+  the guard sits on the INSERT, not the DELETE — so a full-history pass over a narrow input wipes
+  the history and returns successfully, with no error and no log. The windowed path is safe, which
+  is why it survived: only the rarely-taken `fullHistory` branch can do it. **Illness scores from
+  the same array survived** because they write through a COALESCE upsert to a different table.
+  Also records `oura_bucket` and `step_live_windows` at **0 rows system-wide** — the first carries
+  `met_mean`/`motion_mad`, the drift-proof anchor Q-522 needs. **Corrects Q-525's diagnosis.**
+
+- [`docs/reviews/2026-08-20-accurate-on-first-open.md`](../../reviews/2026-08-20-accurate-on-first-open.md) — **the ring uploads about once an hour, 2026-08-20** (owner requirement on
+  Q-529: *"accurate on first open… without needing time to adjust"*). **214 ingest batches over 7
+  days: median gap 62.0 min**, p90 71, max 306 — each batch a short high-rate burst, not a stream.
+  So the server can be up to an hour behind the wrist when the app opens, which is what makes last
+  night's summary "adjust". **Neither the scoring nor the rollup is the cause.** Fixing it needs a
+  **drain on app open — native Kotlin, so a new APK** — then rollup-and-rescore on that drain; the
+  provisional state is the only part shippable without one. **Do not shorten the rollup schedule
+  alone**: it addresses a 4-minute term and leaves the 62-minute one.
+
 ## Open issues
+
+> **2026-08-20 — one correction worth reading before you trust a row count here.**
+> [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md)
+> retracts the 2026-08-19 finding that a `fullHistory` rollup had wiped `oura_daily_summary`. It had
+> not: the table holds **45 rows, 43 created 2026-08-17 07:50**. The "1 row" came from
+> `pg_stat_user_tables.n_live_tup`, a **planner estimate** — `last_analyze` is NULL on every table
+> here and the same field reads **0** against `oura_raw_packed`'s **764** real rows. **To ask whether
+> a table in this pipeline is empty, run `count(*)`.** Also recorded there: `oura_raw_samples` keeping
+> only a ~10-day hot window is **not** data loss — the older 941,233 frames are packed in
+> `oura_raw_packed` and `readRawFrames` reads both tiers.
+
 
 ```bash
 grep -n '^### .*\[devices\]' projectOverview.md   # 45 entries today
@@ -176,8 +209,9 @@ Live at the time of writing (2026-07-30):
 - [`docs/handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md`](../../handoff-2026-08-18-platform-db-storage-and-device-primary-compute.md)
   — **the storage decision, the `disk_full` recovery (805 MB → 171 MB), and the D-track pivot.** Filed
   under `platform` because it spans the bill and the pipeline, so the `devices` glob below misses it.
-  Carries the three refuted CPU hypotheses and the measured portability of the rollup (1,110 lines,
-  17 DB-coupled) — both expensive to re-derive.
+  Carries the three refuted CPU hypotheses and the measured portability of the rollup — both
+  expensive to re-derive. (Its "17 DB-coupled lines" counted lines, not operations; the extracted
+  port is 22 methods.)
 
 - Handoffs: `ls docs/handoff-*-devices-*.md` — plus
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)

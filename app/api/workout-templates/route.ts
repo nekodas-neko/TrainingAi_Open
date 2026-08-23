@@ -1,9 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
+import { refusalResponse, isRefusal } from '@/lib/api/route-errors'
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
 import { computeDefaultVolumeTargets } from "@trainingai/shared/ai-periodization/volume-targets";
 import type { Program } from "@trainingai/shared/types";
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A whole program with its sessions and exercises.
+const MAX_BODY_BYTES = 256 * 1024
 
 async function getUserId() {
   const session = await auth();
@@ -22,7 +27,13 @@ export async function POST(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json() as { program?: Program; linkPhaseSetOwnership?: boolean; recalibrateCycleAnchor?: boolean; programId?: string };
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const body = (read.body ?? {}) as { program?: Program; linkPhaseSetOwnership?: boolean; recalibrateCycleAnchor?: boolean; programId?: string };
 
   const repo = await getRepository();
 
@@ -47,6 +58,16 @@ export async function POST(req: NextRequest) {
       if (!ownedPhaseSetIds.has(body.program.phaseSetId)) {
         return NextResponse.json({ error: 'Invalid phaseSetId' }, { status: 400 })
       }
+    }
+
+    // RV-32: `session_exercises.style_id` is the same client-supplied FK into the same strictly
+    // user-scoped table as the phaseSetId check above, and it arrived here unchecked. Also
+    // `ON DELETE SET NULL`, so a borrowed style being deleted by its owner blanks a column in this
+    // program.
+    const incomingStyleIds = (body.program.sessions ?? []).flatMap(sess =>
+      (sess.exercises ?? []).map(ex => ex.styleId))
+    if (!(await repo.progressionStyleIdsOwned(userId, incomingStyleIds))) {
+      return NextResponse.json({ error: 'Invalid styleId' }, { status: 400 })
     }
 
     // Capture the phase set this program was on before this save overwrites it,
@@ -112,14 +133,12 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ ok: true, program: saved });
   } catch (e) {
-    const message = e instanceof Error ? e.message : 'Save failed'
-    if (message.includes('already exists')) {
-      return NextResponse.json({ error: message }, { status: 409 })
+    // Past a refusal only — a name clash is a user action, not a server fault.
+    if (!isRefusal(e)) {
+      reportServerError(e, { userId, url: '/api/workout-templates' })
+      console.error('[workout-templates POST]', e)
     }
-    // Past the 409 branch only — a name clash is a user action, not a server fault.
-    reportServerError(e, { userId, url: '/api/workout-templates' })
-    console.error('[workout-templates POST]', e)
-    return NextResponse.json({ error: message }, { status: 500 })
+    return refusalResponse(e, 'Save failed')
   }
 }
 
@@ -127,7 +146,13 @@ export async function DELETE(req: NextRequest) {
   const userId = await getUserId();
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  const body = await req.json() as { id?: string; name?: string };
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const body = (read.body ?? {}) as { id?: string; name?: string };
   if (!body.id && !body.name) return NextResponse.json({ error: "Missing id or name" }, { status: 400 });
 
   const repo = await getRepository();

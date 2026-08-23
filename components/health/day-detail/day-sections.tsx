@@ -1,12 +1,14 @@
 "use client";
 
 import { memo } from "react";
-import { Dumbbell, Footprints, Moon, Scale } from "lucide-react";
+import { Dumbbell, Footprints, Moon, Pencil, Scale, Trash2 } from "lucide-react";
 import { Hypnogram } from "@/components/health/hypnogram";
 import { formatTimeOfDay } from "@trainingai/shared/date-utils";
-import type { DayLogResult, DayBodyMeta, DaySleep, DayHrPoint } from "@/app/api/day-log/route";
+import type { DayLogResult, DayExercise, DayBodyMeta, DaySleep, DayHrPoint } from "@/app/api/day-log/route";
+import type { ActivityLog } from "@trainingai/shared/types";
+import { shortSessionName } from "@trainingai/shared/utils";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
-import { energyDaySummary } from "@/components/health/day-detail/energy-summary";
+import { energyDaySummary, type SessionKcal } from "@/components/health/day-detail/energy-summary";
 
 /** Section heading — letterspaced micro-caps, matching the treatment chosen for the day screen. */
 export function SectionLabel({ children }: { children: React.ReactNode }) {
@@ -39,6 +41,11 @@ function KeyValues({ rows }: { rows: [string, string][] }) {
   );
 }
 
+/** 48dp tap target for the row-level edit/delete controls (LB-1). Siblings sit in a `gap-2` row so
+ *  two destructive targets are never adjacent without the 8dp the touch rule asks for. */
+const ICON_BTN =
+  "flex h-12 w-12 flex-none items-center justify-center rounded-xl text-muted-foreground transition active:scale-95 disabled:opacity-40";
+
 const hm = (hours: number) => `${Math.floor(hours)}h ${Math.round((hours % 1) * 60)}m`;
 
 /** Whole-day HR, already bucketed server-side (DAY_HR_BUCKET_MIN). Drawn as a plain polyline —
@@ -66,19 +73,35 @@ export const DayHrTrace = memo(function DayHrTrace({ points }: { points: DayHrPo
   );
 });
 
-export const TrainingSection = memo(function TrainingSection({ data }: { data: DayLogResult }) {
+export interface DayEntryControls {
+  /** LB-1. Absent → the section renders read-only, which is what it did before the controls came
+   *  back. Present → each row gets a 48dp edit and delete target. */
+  onEditExercise?: (payload: { ex: DayExercise; weights: number[]; reps: number[] }) => void;
+  onDeleteExercise?: (ex: DayExercise) => void;
+  onDeleteSession?: (payload: { id: string; name: string }) => void;
+}
+
+export const TrainingSection = memo(function TrainingSection(
+  { data, kcalBySession, onEditExercise, onDeleteExercise, onDeleteSession }:
+    { data: DayLogResult; kcalBySession?: Map<string, SessionKcal> } & DayEntryControls,
+) {
   if (data.exercises.length === 0) return null;
-  const bySession = new Map<string, typeof data.exercises>();
+  // Grouped by session **id**, not name (Q-391). A name is not identity: repeat the same session
+  // twice in a day and the two cards would collide on the key. The duration now comes from the
+  // id-keyed record too (Q-362b) — until then this grouped correctly and then printed the same
+  // duration on both cards, because it looked the value up by name.
+  const bySession = new Map<string, { name: string; exercises: typeof data.exercises }>();
   for (const ex of data.exercises) {
-    const list = bySession.get(ex.sessionName) ?? [];
-    list.push(ex);
-    bySession.set(ex.sessionName, list);
+    const group = bySession.get(ex.workoutSessionId) ?? { name: ex.sessionName, exercises: [] };
+    group.exercises.push(ex);
+    bySession.set(ex.workoutSessionId, group);
   }
   return (
     <div>
       <SectionLabel>Training</SectionLabel>
-      {[...bySession.entries()].map(([sessionName, exercises]) => {
-        const dur = data.workoutDurations[sessionName];
+      {[...bySession.entries()].map(([sessionId, { name: sessionName, exercises }]) => {
+        const dur = data.workoutDurationsById[sessionId];
+        const kcal = kcalBySession?.get(sessionId);
         // Derived here rather than server-side: the route already returns every set's weight and
         // rep count, so a second source of truth for volume would be a formula in two places.
         const volume = exercises.reduce((sum, ex) => {
@@ -86,7 +109,7 @@ export const TrainingSection = memo(function TrainingSection({ data }: { data: D
           return sum + ex.setWeights.reduce((s, w, i) => s + (w ?? 0) * (reps[i] ?? 0), 0);
         }, 0);
         return (
-          <div key={sessionName} className="mb-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+          <div key={sessionId} className="mb-2 rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
             <div className="flex items-center gap-2.5 pb-2.5">
               <Dumbbell className="h-4 w-4 flex-none" style={{ color: "var(--accent-cyan)" }} />
               <span className="text-[14.5px] font-bold tracking-tight">{sessionName}</span>
@@ -95,9 +118,23 @@ export const TrainingSection = memo(function TrainingSection({ data }: { data: D
                   {dur.start} → {dur.end} · {dur.minutes} min
                 </span>
               )}
+              {onDeleteSession && (
+                <button
+                  type="button"
+                  aria-label={`Delete ${sessionName} session`}
+                  data-session-id={sessionId}
+                  onClick={() => onDeleteSession({ id: sessionId, name: shortSessionName(sessionName) })}
+                  className={`${ICON_BTN} ${dur ? "-my-2 -mr-2" : "-my-2 -mr-2 ml-auto"}`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </div>
             {exercises.map(ex => (
-              <div key={ex.exerciseLogId} className="flex items-baseline gap-2.5 border-b border-white/5 py-2">
+              <div
+                key={ex.exerciseLogId}
+                className={`flex gap-2 border-b border-white/5 ${onEditExercise || onDeleteExercise ? "items-center py-1" : "items-baseline py-2"}`}
+              >
                 <span className="min-w-0 flex-1 truncate text-[12.5px]">{ex.name}</span>
                 <span className="flex-none text-[10.5px] tabular-nums text-muted-foreground">
                   {ex.sets ?? 0} × {ex.reps?.[0] ?? 0}
@@ -106,6 +143,26 @@ export const TrainingSection = memo(function TrainingSection({ data }: { data: D
                   {ex.weightKg ?? "—"}
                   <i className="ml-0.5 text-[9px] font-semibold not-italic text-muted-foreground">kg</i>
                 </span>
+                {onEditExercise && (
+                  <button
+                    type="button"
+                    aria-label={`Edit ${ex.name}`}
+                    onClick={() => onEditExercise({ ex, weights: [...ex.setWeights], reps: [...ex.reps] })}
+                    className={ICON_BTN}
+                  >
+                    <Pencil className="h-4 w-4" />
+                  </button>
+                )}
+                {onDeleteExercise && (
+                  <button
+                    type="button"
+                    aria-label={`Delete ${ex.name}`}
+                    onClick={() => onDeleteExercise(ex)}
+                    className={`${ICON_BTN} -mr-2`}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                )}
               </div>
             ))}
             {volume > 0 && (
@@ -113,6 +170,31 @@ export const TrainingSection = memo(function TrainingSection({ data }: { data: D
                 <Stat value={Math.round(volume).toLocaleString()} label="Volume kg" />
                 <Stat value={String(exercises.length)} label="Exercises" />
                 <Stat value={String(exercises.reduce((n, e) => n + (e.sets ?? 0), 0))} label="Sets" />
+                {/*
+                  The tilde and the "est." are load-bearing, not decoration. Unlike the three stats
+                  beside it, this is NOT derived from the sets, so sitting it in a row of measured
+                  facts needs the label to say so.
+
+                  **The basis is named because there are two of them (Q-421).** With a strap reading
+                  it is Keytel from heart rate and it responds to effort; without one it is a MET
+                  tier over the clock, so a 49-minute session moving 2,364 kg and one moving 800 kg
+                  produce the same figure. About half the owner's sessions have no strap, so two
+                  cards on one screen routinely come from different formulas whose outputs overlap
+                  rather than agree — an unlabelled pair is not comparable and does not say it isn't.
+
+                  Absent rather than zero when the estimate cannot be made — a profile without age,
+                  weight or sex yields no figure, and a confident `0 kcal` would be indistinguishable
+                  from a real one (the Q-278 class). **The guard is `> 0`, not `!= null`**: the
+                  comment claimed this before the code did, and a `0` addend does reach here — the
+                  sandbox's MET constant sits below `estWorkoutKcal`'s floor (Q-331), so a strapless
+                  session rendered `~0 EST. MET KCAL` beside a real 378.
+                */}
+                {kcal != null && kcal.kcal > 0 && (
+                  <Stat
+                    value={`~${Math.round(kcal.kcal).toLocaleString()}`}
+                    label={kcal.source === 'hr' ? 'Est. HR kcal' : 'Est. MET kcal'}
+                  />
+                )}
               </div>
             )}
           </div>
@@ -131,7 +213,9 @@ function paceLabel(secPerKm: number): string {
   return `${Math.floor(secPerKm / 60)}:${String(Math.round(secPerKm % 60)).padStart(2, "0")}/km`;
 }
 
-export const ActivitySection = memo(function ActivitySection({ data }: { data: DayLogResult }) {
+export const ActivitySection = memo(function ActivitySection(
+  { data, onDeleteActivity }: { data: DayLogResult; onDeleteActivity?: (log: ActivityLog) => void },
+) {
   if (data.activityLogs.length === 0) return null;
   return (
     <div>
@@ -158,6 +242,16 @@ export const ActivitySection = memo(function ActivitySection({ data }: { data: D
               </span>
               {a.durationMin != null && (
                 <span className="flex-none text-[0.9rem] font-bold tabular-nums">{durationLabel(a.durationMin)}</span>
+              )}
+              {onDeleteActivity && (
+                <button
+                  type="button"
+                  aria-label={`Delete ${a.title}`}
+                  onClick={() => onDeleteActivity(a)}
+                  className={`${ICON_BTN} -my-2 -mr-2`}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
               )}
             </div>
             {facts.length > 0 && (

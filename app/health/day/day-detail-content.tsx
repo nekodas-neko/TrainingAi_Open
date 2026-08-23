@@ -7,13 +7,19 @@ import { ChevronLeft, Zap, HeartPulse, Moon, Flame } from "lucide-react";
 import { ScreenHeader } from "@/components/shell/screen-header";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
-import { DAY_LOG_TTL, ENERGY_BALANCE_TTL } from "@trainingai/shared/cache-ttl";
-import { todayInTz, shiftDateStr } from "@trainingai/shared/date-utils";
+import { DAY_LOG_TTL, ENERGY_BALANCE_TTL, HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
+import { todayInTz, shiftDateStr, dateStrMidnightInTz } from "@trainingai/shared/date-utils";
 import {
   TrainingSection, ActivitySection, EnergySection, SleepSection, BodySection, DayHrTrace, SectionLabel,
 } from "@/components/health/day-detail/day-sections";
 import type { DayLogResult } from "@/app/api/day-log/route";
 import type { EnergyBalanceResponse } from "@/app/api/nutrition/energy-balance/route";
+import type { FoodLogWithItem } from "@trainingai/shared/types/nutrition";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { useDayEntryMutations } from "@/lib/hooks/use-day-entry-mutations";
+import { DayOverlayDialogs } from "@/components/health/day-overlay-dialogs";
+import { EnergyTimelineChart } from "@/components/health/energy-timeline-chart";
+import { workoutKcalBySession } from "@/components/health/day-detail/energy-summary";
 
 /** Cache key per day — the whole point of this screen is swiping between days, so each day's
  *  payload is seeded synchronously from cache and revalidated, never shown as a skeleton twice. */
@@ -21,6 +27,10 @@ const keyFor = (date: string) => `day-log:${date}`;
 /** Nutrition's Energy Balance card already owns this key and TTL for the same endpoint — reusing
  *  them means the two screens share one cached answer rather than racing two of their own. */
 const energyKeyFor = (date: string) => `energy-balance:${date}`;
+/** Q-414. Its own key rather than reusing `day-log:` — the day payload has no meal times. */
+const foodKeyFor = (date: string) => `food-logs:${date}`;
+/** Module-level so the empty fallback keeps one identity — it feeds a memoised chart. */
+const EMPTY_HR: DayLogResult['hr'] = [];
 
 function ScoreCell({ Icon, label, value, accent, first }: {
   Icon: typeof Zap; label: string; value: number | null; accent: string; first: boolean;
@@ -73,21 +83,37 @@ function WeekStrip({ selected, onPick, today }: { selected: string; onPick: (d: 
   );
 }
 
-export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?: string }) {
+export function DayDetailContent({ initialDate, tz, userId }: { initialDate: string; tz?: string; userId?: string }) {
   const router = useTransitionRouter();
   const today = useMemo(() => todayInTz(tz), [tz]);
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [data, setData] = useState<DayLogResult | null>(null);
   const [energy, setEnergy] = useState<EnergyBalanceResponse | null>(null);
+  const [foodLogs, setFoodLogs] = useState<FoodLogWithItem[] | null>(null);
+  const hrProfile = useCachedValue<{ maxHr: number; restingHr: number }>(
+    'hr-profile', '/api/hr-profile', HR_PROFILE_TTL,
+  );
+  // `loggedAt` means when the food was EATEN, not when the row was written — that is Q-413, and it
+  // is the whole reason this chart can exist. Before it, every back-filled day spiked at whatever
+  // hour the user reached for their phone.
+  // Q-391: the per-session addends of the Energy section's "Workouts" row, so a session card and
+  // the day total on the same screen cannot disagree — they are the same numbers.
+  const kcalBySession = useMemo(() => workoutKcalBySession(energy), [energy]);
+
+  const intakeEvents = useMemo(
+    () => (foodLogs ?? []).map(l => ({ atMs: new Date(l.loggedAt).getTime(), kcal: l.calories })),
+    [foodLogs],
+  );
   const dirRef = useRef(0);
   /** Mirrors selectedDate for the async guard below — a ref, not state, so an in-flight response
    *  reads the CURRENT day rather than the one captured when its fetch started. */
   const dateRef = useRef(initialDate);
 
-  const load = useCallback((date: string) => {
-    // Seed synchronously so a day already visited repaints instantly instead of flashing empty.
-    const seed = readCacheSync<DayLogResult>(keyFor(date));
-    setData(seed ?? null);
+  /** `seed: false` is the post-write refetch (LB-1): the caches have just been cleared, so seeding
+   *  would blank every section for the length of the round-trip. Keeping the current paint and
+   *  swapping it when the response lands is the instant-paint rule applied to a mutation. */
+  const load = useCallback((date: string, { seed = true }: { seed?: boolean } = {}) => {
+    if (seed) setData(readCacheSync<DayLogResult>(keyFor(date)) ?? null);
     cachedFetch<DayLogResult>(keyFor(date), `/api/day-log?date=${date}`, DAY_LOG_TTL, d => {
       // Guarded on the date rather than applied blind: swiping fast can land a slower response for
       // a day the user has already moved off, which would repaint the wrong day's data.
@@ -96,14 +122,30 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
 
     // Separate call rather than folding energy into /api/day-log: computeEnergyBalance reads a
     // 30-day window to calibrate maintenance, and the day payload is fetched on every swipe.
-    setEnergy(readCacheSync<EnergyBalanceResponse>(energyKeyFor(date)) ?? null);
+    if (seed) setEnergy(readCacheSync<EnergyBalanceResponse>(energyKeyFor(date)) ?? null);
     cachedFetch<EnergyBalanceResponse>(
       energyKeyFor(date), `/api/nutrition/energy-balance?date=${date}`, ENERGY_BALANCE_TTL,
       e => { setEnergy(prev => (dateRef.current === date ? e : prev)); },
     ).catch(() => {});
+
+    // Q-414: the energy chart needs each meal's *time*, which the day payload does not carry —
+    // it reports the day's totals. Same date-guard as above.
+    if (seed) setFoodLogs(readCacheSync<FoodLogWithItem[]>(foodKeyFor(date)) ?? null);
+    cachedFetch<FoodLogWithItem[]>(
+      foodKeyFor(date), `/api/nutrition/food-logs?date=${date}`, DAY_LOG_TTL,
+      f => { setFoodLogs(prev => (dateRef.current === date ? f : prev)); },
+    ).catch(() => {});
   }, []);
 
   useEffect(() => { dateRef.current = selectedDate; load(selectedDate); }, [selectedDate, load]);
+
+  // LB-1: edit/delete for this day's entries. The date is read from `dateRef` at action time, not
+  // captured at render, so a swipe mid-dialog refreshes the day actually on screen — the entities
+  // themselves are addressed by id, so what gets written is never in doubt.
+  const currentDate = useCallback(() => dateRef.current, []);
+  const afterWrite = useCallback((date: string) => { load(date, { seed: false }); }, [load]);
+  const mut = useDayEntryMutations(userId, currentDate, afterWrite);
+  const { setDeleteEx, setDeleteSession, setDeleteActivity } = mut;
 
   const go = useCallback((next: string, dir: number) => {
     if (next > today) return;
@@ -123,6 +165,10 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
     },
     { axis: "x", filterTaps: true, pointer: { touch: true } },
   );
+
+  const closeDeleteEx = useCallback(() => setDeleteEx(null), [setDeleteEx]);
+  const closeDeleteSession = useCallback(() => setDeleteSession(null), [setDeleteSession]);
+  const closeDeleteActivity = useCallback(() => setDeleteActivity(null), [setDeleteActivity]);
 
   const label = useMemo(() => {
     const d = new Date(`${selectedDate}T12:00:00Z`);
@@ -186,9 +232,29 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
             transition={{ duration: 0.16 }}
             className="space-y-4"
           >
-            {data && <TrainingSection data={data} />}
-            {data && <ActivitySection data={data} />}
+            {data && (
+              <TrainingSection
+                data={data}
+                kcalBySession={kcalBySession}
+                onEditExercise={mut.setEditEx}
+                onDeleteExercise={mut.setDeleteEx}
+                onDeleteSession={mut.setDeleteSession}
+              />
+            )}
+            {data && <ActivitySection data={data} onDeleteActivity={mut.setDeleteActivity} />}
             <EnergySection energy={energy} />
+            {energy?.balance && (
+              <div className="rounded-2xl border border-white/10 bg-white/[0.04] p-3.5">
+                <EnergyTimelineChart
+                  dayStartMs={dateStrMidnightInTz(selectedDate, tz).getTime()}
+                  restingHr={hrProfile?.restingHr ?? null}
+                  restingBaseKcal={energy.balance.restingBaseKcal}
+                  activeKcal={energy.balance.activeKcal}
+                  hr={data?.hr ?? EMPTY_HR}
+                  intake={intakeEvents}
+                />
+              </div>
+            )}
             <SleepSection sleep={data?.sleep ?? null} tz={tz} />
             {data && data.hr.length > 1 && (
               <div>
@@ -205,6 +271,22 @@ export function DayDetailContent({ initialDate, tz }: { initialDate: string; tz?
           </motion.div>
         </AnimatePresence>
       </div>
+
+      <DayOverlayDialogs
+        editEx={mut.editEx}
+        onEditExChange={mut.setEditEx}
+        onEditSave={mut.handleEditSave}
+        deleteEx={mut.deleteEx}
+        onDeleteExClose={closeDeleteEx}
+        onDeleteExConfirm={mut.handleDeleteExercise}
+        deleteActivity={mut.deleteActivity}
+        onDeleteActivityClose={closeDeleteActivity}
+        onDeleteActivityConfirm={mut.handleDeleteActivity}
+        deleteSession={mut.deleteSession}
+        onDeleteSessionClose={closeDeleteSession}
+        onDeleteSessionConfirm={mut.handleDeleteSession}
+        mutating={mut.mutating}
+      />
     </div>
   );
 }

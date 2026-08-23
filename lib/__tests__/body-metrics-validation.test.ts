@@ -8,6 +8,7 @@ import {
   validCaloriesOrNull,
   validMacroGOrNull,
   validStepsOrNull,
+  STEPS_MAX,
   validDistanceKmOrNull,
 } from '@trainingai/shared/validation/body-metrics'
 
@@ -37,7 +38,6 @@ describe('push-parity field validators (SYNC-P1)', () => {
     expect(validMacroGOrNull(150)).toBe(150)
     expect(validMacroGOrNull(3000)).toBeNull()
     expect(validStepsOrNull(9200)).toBe(9200)
-    expect(validStepsOrNull(1.5)).toBeNull()
     expect(validStepsOrNull(-1)).toBeNull()
     expect(validDistanceKmOrNull(5.2)).toBe(5.2)
     expect(validDistanceKmOrNull(2000)).toBeNull()
@@ -55,6 +55,36 @@ describe('push-parity field validators (SYNC-P1)', () => {
     expect(validBodyFatPctOrNull(95)).toBeNull()
     expect(validCaloriesOrNull(100000)).toBeNull()
     expect(validStepsOrNull(-1)).toBeNull()
+  })
+
+  // Q-321. `validStepsOrNull` was the only validator in the file gated on `Number.isInteger`, so a
+  // fractional count lost the whole day's steps rather than the half-step. It rounds now, matching
+  // `validRestingHrOrNull`/`validWaterMlDeltaOrNull` — the other two integer columns.
+  it('round a fractional step count instead of discarding the day', () => {
+    expect(validStepsOrNull(8000.5)).toBe(8001)
+    expect(validStepsOrNull(8000.4)).toBe(8000)
+    // Bounds are checked on the RAW value, before rounding — so -0.4 is out of range rather than
+    // rounding up to a valid 0. That is `validRestingHrOrNull`'s order too, and keeping it means
+    // "in range" never depends on which way a value happens to round.
+    expect(validStepsOrNull(-0.4)).toBeNull()
+    expect(validStepsOrNull(-1)).toBeNull()
+    expect(validStepsOrNull(STEPS_MAX + 1)).toBeNull()
+    expect(validStepsOrNull(Number.NaN)).toBeNull()
+    expect(validStepsOrNull(Number.POSITIVE_INFINITY)).toBeNull()
+  })
+
+  // The pairing is the point, not either half: the offline push calls the validator and the web
+  // route parses the schema, so a rounding rule applied to one alone would let a value through the
+  // APK that the web route refuses — the drift the one-write-path-per-domain rule exists to stop.
+  it('web route and offline push agree on a fractional step count', () => {
+    const parsed = BodyMetadataPostSchema.safeParse({ steps: 8000.5 })
+    expect(parsed.success).toBe(true)
+    expect(parsed.success && parsed.data.steps).toBe(8001)
+    expect(validStepsOrNull(8000.5)).toBe(8001)
+
+    // And still agree on rejecting one that is out of bounds.
+    expect(BodyMetadataPostSchema.safeParse({ steps: STEPS_MAX + 1 }).success).toBe(false)
+    expect(validStepsOrNull(STEPS_MAX + 1)).toBeNull()
   })
 })
 
@@ -75,7 +105,6 @@ describe('BodyMetadataPostSchema', () => {
     expect(BodyMetadataPostSchema.safeParse({ weightKg: 10 }).success).toBe(false)
     expect(BodyMetadataPostSchema.safeParse({ bodyFat: 95 }).success).toBe(false)
     expect(BodyMetadataPostSchema.safeParse({ steps: -1 }).success).toBe(false)
-    expect(BodyMetadataPostSchema.safeParse({ steps: 1.5 }).success).toBe(false)
     expect(BodyMetadataPostSchema.safeParse({ calories: 100000 }).success).toBe(false)
     expect(BodyMetadataPostSchema.safeParse({ localDate: 'yesterday' }).success).toBe(false)
   })

@@ -34,12 +34,15 @@ interface DeloadState {
   deloadNow: boolean
 }
 
-function dayBounds(today: string): { start: Date; end: Date } {
+// `today` and `timezone` travel together: a local day string means nothing without the zone it was
+// computed in, and splitting them is how a Brisbane midnight ends up bounding another user's day
+// (LA-19).
+function dayBounds(today: string, timezone: string): { start: Date; end: Date } {
   const [y, m, d] = today.split('-').map(Number)
-  return { start: aestMidnight(y, m, d), end: aestMidnight(y, m, d + 1) }
+  return { start: aestMidnight(y, m, d, timezone), end: aestMidnight(y, m, d + 1, timezone) }
 }
 
-async function loadState(db: Db, userId: string, today: string): Promise<DeloadState | null> {
+async function loadState(db: Db, userId: string, today: string, timezone: string): Promise<DeloadState | null> {
   const [program] = await db
     .select({
       id: s.programs.id,
@@ -52,7 +55,7 @@ async function loadState(db: Db, userId: string, today: string): Promise<DeloadS
     .limit(1)
   if (!program) return null
 
-  const { start, end } = dayBounds(today)
+  const { start, end } = dayBounds(today, timezone)
   const todayRows = await db
     .select({ id: s.workoutSessions.id })
     .from(s.workoutSessions)
@@ -74,10 +77,15 @@ async function loadState(db: Db, userId: string, today: string): Promise<DeloadS
   }
 }
 
-export function earlyDeloadHandler(today: string): DomainHandler {
+export function earlyDeloadHandler(today: string, timezone: string): DomainHandler {
   return {
+    async currentState(db, userId) {
+      const state = await loadState(db, userId, today, timezone)
+      return state ? { deloadNow: state.deloadNow } : null
+    },
+
     async preview(db, userId, patch): Promise<PreviewResult> {
-      const state = await loadState(db, userId, today)
+      const state = await loadState(db, userId, today, timezone)
       if (!state) return { consequences: [], drift: [], target: null }
 
       const change = patch.changes.find(c => c.field === 'deloadNow')
@@ -127,7 +135,7 @@ export function earlyDeloadHandler(today: string): DomainHandler {
     },
 
     async apply(db, userId, patch, accepted) {
-      const state = await loadState(db, userId, today)
+      const state = await loadState(db, userId, today, timezone)
       if (!state) return { ok: false, reason: 'not_found' }
 
       const change = accepted.find(c => c.field === 'deloadNow')

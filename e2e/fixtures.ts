@@ -90,3 +90,61 @@ export async function expectNoSkeleton(page: Page, timeout = SKELETON_TIMEOUT_MS
  * a card that never seeds at all, which is the failure this rule is actually about.
  */
 export const SKELETON_TIMEOUT_MS = 20_000
+
+/**
+ * Give the seeded user everything `computeEnergyBalance` needs before it will return a number.
+ *
+ * The route answers `balance: null` plus `missingProfileFields` until it has weight, height, date of
+ * birth and sex (`lib/health/energy-balance-service.ts:161-167`). The seeded user has three of the
+ * four — **only `date_of_birth` is missing** — so every Home card that renders an energy figure
+ * shows "Add your date of birth in Profile" instead of a value, and a spec that drives one is
+ * testing the empty state without meaning to. Q-402's fix could not be driven end to end for
+ * exactly this reason: three probes measured zero `/api/nutrition/energy-balance` requests.
+ *
+ * Written here rather than in `scripts/local-db/seed.sql` for the same reason as the zero-data
+ * account: `setup.sh` skips the seed on a non-empty `users` table, so an existing local database
+ * would never gain the column while CI always would.
+ *
+ * Returns the user's id, which callers need to scope their own fixture rows.
+ */
+export async function ensureEnergyBalanceProfile(email = SEED_EMAIL): Promise<string> {
+  const connectionString = process.env.DATABASE_URL
+  expect(connectionString, 'DATABASE_URL must be set — see e2e/README.md').toBeTruthy()
+  const { Client } = await import('pg')
+  const db = new Client({ connectionString })
+  await db.connect()
+  try {
+    // A fixed date, not an offset from today: an age that changes between runs changes the BMR and
+    // with it every number this fixture underpins.
+    const { rows } = await db.query<{ id: string }>(
+      `UPDATE users SET date_of_birth = COALESCE(date_of_birth, DATE '1995-06-15'),
+                        height_cm     = COALESCE(height_cm, 180),
+                        sex           = COALESCE(sex, 'male')
+        WHERE email = $1
+       RETURNING id`,
+      [email],
+    )
+    const id = rows[0]?.id
+    expect(id, `${email} is not seeded — run pnpm db:local`).toBeTruthy()
+    return id
+  } finally {
+    await db.end()
+  }
+}
+
+/**
+ * Turn Home's card widgets on for this page.
+ *
+ * `DEFAULT_CARD_WIDGETS` is empty (`lib/home/home-prefs.ts:104`), so a fresh browser profile renders
+ * **no card widgets at all** — the second half of why Q-402's fix was unguarded. The preference is
+ * plain localStorage, so an init script sets it without driving the More → Home Widgets UI, which
+ * would couple every Home-card spec to an unrelated screen.
+ *
+ * Call before `page.goto`.
+ */
+export async function enableHomeCards(page: Page, keys: string[]): Promise<void> {
+  await page.addInitScript(
+    ([storageKey, value]) => localStorage.setItem(storageKey, value),
+    ['ta_ss_cards', JSON.stringify(keys)] as const,
+  )
+}

@@ -1163,15 +1163,20 @@ export class SQLiteLocalStore implements LocalStore {
     };
   }
 
+  // Q-387: `food_logging_completed_at` is COALESCEd rather than overwritten. The check-in sheets
+  // call this with the flag absent (so, null), and a bare `excluded.` would clear "I have finished
+  // logging today" every time the evening check-in was saved or edited — the same clobber the
+  // server-side `saveDayCheckin` guards against by omitting the column when it is undefined. Undo
+  // is its own write, which sets it explicitly.
   async upsertDayCheckin(record: LocalDayCheckin): Promise<void> {
     await runSQL(
       `INSERT INTO day_checkins
          (log_date, phase, physical_tiredness, mental_drain, barely_moved,
           hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
           sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-          sleep_quality_feel_touched, sore_muscles, journal, updated_at,
+          sleep_quality_feel_touched, sore_muscles, journal, food_logging_completed_at, updated_at,
           deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON CONFLICT(log_date, phase) DO UPDATE SET
          physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
          barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -1182,7 +1187,9 @@ export class SQLiteLocalStore implements LocalStore {
          perceived_recovery_touched=excluded.perceived_recovery_touched,
          sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
          sore_muscles=excluded.sore_muscles,
-         journal=excluded.journal, updated_at=excluded.updated_at,
+         journal=excluded.journal,
+         food_logging_completed_at=COALESCE(excluded.food_logging_completed_at, day_checkins.food_logging_completed_at),
+         updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
       [
         record.logDate, record.phase, record.physicalTiredness, record.mentalDrain,
@@ -1190,7 +1197,8 @@ export class SQLiteLocalStore implements LocalStore {
         record.wakeMood, record.perceivedRecovery, record.motivation,
         record.sleepQualityFeel, record.restingSoreness,
         record.illnessContext, record.perceivedRecoveryTouched ? 1 : 0, record.sleepQualityFeelTouched ? 1 : 0,
-        JSON.stringify(record.soreMuscles), record.journal, record.updatedAt,
+        JSON.stringify(record.soreMuscles), record.journal,
+        record.foodLoggingCompletedAt ?? null, record.updatedAt,
         record.deletedAt, record.syncStatus,
       ],
     );
@@ -1831,7 +1839,16 @@ export class SQLiteLocalStore implements LocalStore {
               logged_at, updated_at, deleted_at, sync_status)
            VALUES (?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(id) DO UPDATE SET
+             -- Q-325: this arm used to set only quantity_multiplier, updated_at and deleted_at, so a
+             -- server-side change to any OTHER column never reached a device that already held the
+             -- row. Found while shipping Q-413, whose whole point is correcting logged_at -- the
+             -- correction would have stopped at the server. meal_type_id is the same story and is
+             -- what Q-412's reassign will move. The sync_status='synced' guard below is what
+             -- protects a pending local edit; the narrow SET was never the protection.
+             date=excluded.date, meal_type_id=excluded.meal_type_id,
+             food_item_id=excluded.food_item_id,
              quantity_multiplier=excluded.quantity_multiplier,
+             logged_at=excluded.logged_at,
              updated_at=excluded.updated_at, deleted_at=excluded.deleted_at,
              sync_status='synced'
            WHERE food_logs.sync_status='synced'`,
@@ -1918,9 +1935,9 @@ export class SQLiteLocalStore implements LocalStore {
              (log_date, phase, physical_tiredness, mental_drain, barely_moved,
               hydration, late_heavy_meal, wake_mood, perceived_recovery, motivation,
               sleep_quality_feel, resting_soreness, illness_context, perceived_recovery_touched,
-              sleep_quality_feel_touched, sore_muscles, journal, updated_at,
+              sleep_quality_feel_touched, sore_muscles, journal, food_logging_completed_at, updated_at,
               deleted_at, sync_status)
-           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,'synced')
            ON CONFLICT(log_date, phase) DO UPDATE SET
              physical_tiredness=excluded.physical_tiredness, mental_drain=excluded.mental_drain,
              barely_moved=excluded.barely_moved, hydration=excluded.hydration,
@@ -1931,7 +1948,9 @@ export class SQLiteLocalStore implements LocalStore {
              perceived_recovery_touched=excluded.perceived_recovery_touched,
              sleep_quality_feel_touched=excluded.sleep_quality_feel_touched,
              sore_muscles=excluded.sore_muscles,
-             journal=excluded.journal, updated_at=excluded.updated_at,
+             journal=excluded.journal,
+             food_logging_completed_at=excluded.food_logging_completed_at,
+             updated_at=excluded.updated_at,
              deleted_at=excluded.deleted_at, sync_status='synced'
            WHERE day_checkins.sync_status='synced'
              AND excluded.updated_at > day_checkins.updated_at`,
@@ -1939,7 +1958,7 @@ export class SQLiteLocalStore implements LocalStore {
            r.hydration, r.lateHeavyMeal, r.wakeMood, r.perceivedRecovery, r.motivation,
            r.sleepQualityFeel, r.restingSoreness, r.illnessContext,
            r.perceivedRecoveryTouched ? 1 : 0, r.sleepQualityFeelTouched ? 1 : 0,
-           JSON.stringify(r.soreMuscles), r.journal,
+           JSON.stringify(r.soreMuscles), r.journal, r.foodLoggingCompletedAt ?? null,
            r.updatedAt, r.deletedAt],
         );
       }
@@ -2362,7 +2381,7 @@ export class SQLiteLocalStore implements LocalStore {
   // per-item macro scaling is inlined here — same shape as getFoodLogsWithItems).
   async getSavedMeals(): Promise<SavedMeal[]> {
     const meals = await querySQL<Record<string, unknown>>(
-      `SELECT id, name, servings, created_at FROM saved_meals WHERE deleted_at IS NULL ORDER BY created_at DESC`,
+      `SELECT id, name, servings, image_data_uri, created_at FROM saved_meals WHERE deleted_at IS NULL ORDER BY created_at DESC`,
       [],
     );
     if (meals.length === 0) return [];
@@ -2413,6 +2432,7 @@ export class SQLiteLocalStore implements LocalStore {
         // A row written before v25 has no value; 1 is the only safe reading, and dividing by 0
         // would make one portion infinite.
         servings: Number(m.servings) > 0 ? Number(m.servings) : 1,
+        imageDataUri: m.image_data_uri ? String(m.image_data_uri) : null,
         createdAt: new Date(String(m.created_at)),
         items,
         totals: { calories: totals.calories, proteinG: r1(totals.proteinG), carbsG: r1(totals.carbsG), fatG: r1(totals.fatG) },
@@ -2423,13 +2443,20 @@ export class SQLiteLocalStore implements LocalStore {
   // Write a meal + replace its items in one shot (offline create/edit). The caller sets
   // syncStatus: 'pending' for a local edit or 'synced' when hydrating from the server.
   async upsertSavedMeal(meal: LocalSavedMeal, items: LocalSavedMealItem[]): Promise<void> {
+    // `imageDataUri` omitted means "this write is not about the image" and must NOT clear a stored
+    // one — the standing rule that a local upsert overwrites every column by default is exactly how
+    // a name edit would silently delete the photo. An explicit `null` still removes it, so the two
+    // cases stay distinguishable here the same way they are on the server (Q-396).
+    const keepImage = meal.imageDataUri === undefined
     await runSQL(
-      `INSERT INTO saved_meals (id, name, servings, created_at, updated_at, deleted_at, sync_status)
-       VALUES (?,?,?,?,?,?,?)
+      `INSERT INTO saved_meals (id, name, servings, image_data_uri, created_at, updated_at, deleted_at, sync_status)
+       VALUES (?,?,?,?,?,?,?,?)
        ON CONFLICT(id) DO UPDATE SET
-         name=excluded.name, servings=excluded.servings, updated_at=excluded.updated_at,
+         name=excluded.name, servings=excluded.servings,
+         image_data_uri=${keepImage ? 'COALESCE(excluded.image_data_uri, saved_meals.image_data_uri)' : 'excluded.image_data_uri'},
+         updated_at=excluded.updated_at,
          deleted_at=excluded.deleted_at, sync_status=excluded.sync_status`,
-      [meal.id, meal.name, meal.servings ?? 1, meal.createdAt, meal.updatedAt, meal.deletedAt, meal.syncStatus],
+      [meal.id, meal.name, meal.servings ?? 1, meal.imageDataUri ?? null, meal.createdAt, meal.updatedAt, meal.deletedAt, meal.syncStatus],
     );
     await runSQL(`DELETE FROM saved_meal_items WHERE saved_meal_id=?`, [meal.id]);
     for (const it of items) {
@@ -2465,7 +2492,9 @@ export class SQLiteLocalStore implements LocalStore {
       );
       if (local.length > 0 && local[0].sync_status === 'pending') continue; // keep the local edit
       await this.upsertSavedMeal(
-        { id: m.id, name: m.name, servings: m.servings ?? 1, createdAt: (m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt)), updatedAt: now, deletedAt: null, syncStatus: 'synced' },
+        // `?? null`, not omitted: the server list IS authoritative here, so a meal whose image was
+        // removed on another device must lose it locally too (Q-396).
+        { id: m.id, name: m.name, servings: m.servings ?? 1, imageDataUri: m.imageDataUri ?? null, createdAt: (m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt)), updatedAt: now, deletedAt: null, syncStatus: 'synced' },
         m.items.map(it => ({ id: it.id, savedMealId: m.id, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
       );
     }
@@ -2602,6 +2631,68 @@ export class SQLiteLocalStore implements LocalStore {
         record.updatedAt, record.deletedAt, record.syncStatus,
       ],
     );
+  }
+
+  /**
+   * Q-488 — the activity delete was server-only, so three local-first readers kept showing it.
+   *
+   * `sync_status='synced'`, not 'pending', for the reason `deleteExerciseLogLocally` above gives:
+   * the web DELETE round-trip has already succeeded when this runs, so local matches server at this
+   * exact instant. 'pending' would be actively harmful here rather than merely wrong — `applyDelta`
+   * applies the server tombstone as `DELETE … WHERE id = ? AND sync_status='synced'`, so a row left
+   * pending would block its own tombstone forever and the soft-deleted row would never be reaped.
+   *
+   * This is NOT an offline-capable delete: there is no `queueMutation`, so a delete attempted with
+   * no network still fails at the fetch and never reaches here. Giving this domain a real offline
+   * delete is a larger question (it needs an outbox domain and a tombstone path) and is deliberately
+   * not folded in.
+   *
+   * Do not "simplify" this into `upsertActivityLog` with a `deletedAt` field: that method's INSERT
+   * column list and its ON CONFLICT DO UPDATE both omit `deleted_at` entirely, so the write would
+   * compile, type-check, lint clean, and change nothing.
+   */
+  async deleteActivityLog(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await runSQL(
+      `UPDATE activity_logs SET deleted_at=?, sync_status='synced', updated_at=? WHERE id=?`,
+      [now, now, id],
+    );
+  }
+
+  /**
+   * The offline-capable delete the method above is not (Q-328) — pair it with a
+   * `queueMutation({ domain: 'activity_logs', payload: { id, deleted: true } })`.
+   *
+   * **The only difference is `sync_status`, and it is the whole point.** `'synced'` above is
+   * load-bearing rather than incidental: `applyDelta` prunes an activity-log tombstone with
+   * `DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, so a row left `'pending'`
+   * is skipped by that prune forever. A row awaiting a push MUST be `'pending'` anyway — that is
+   * what stops the pull-clobber gate overwriting a delete that has not reached the server — so the
+   * two states are both correct, at different moments. `markActivityLogSynced` is what moves the
+   * row from one to the other, and it runs on push confirmation.
+   *
+   * Kept as a second method rather than a flag on the first so the existing bare-`fetch` caller
+   * (`app/health/health-content.tsx`) keeps its exact behaviour until it is switched over; a row
+   * marked `'pending'` with no mutation queued behind it would never be pruned.
+   */
+  async softDeleteActivityLogPending(id: string): Promise<void> {
+    const now = new Date().toISOString();
+    await runSQL(
+      `UPDATE activity_logs SET deleted_at=?, sync_status='pending', updated_at=? WHERE id=?`,
+      [now, now, id],
+    );
+  }
+
+  /**
+   * Flip a queued activity-log row to synced once its push is confirmed (Q-328).
+   *
+   * Deliberately its own method rather than the `upsertActivityLog` round-trip the confirm path
+   * uses for an upsert, because that route cannot work for a delete on two counts: `getActivityLogs`
+   * filters `deleted_at IS NULL` so the row is never found, and `upsertActivityLog`'s column list
+   * omits `deleted_at` entirely. Same shape and same reason as `markSavedMealSynced`.
+   */
+  async markActivityLogSynced(id: string): Promise<void> {
+    await runSQL(`UPDATE activity_logs SET sync_status='synced' WHERE id=?`, [id]);
   }
 
   async upsertActivityLog(record: LocalActivityLog): Promise<void> {

@@ -4,6 +4,10 @@ import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { z } from 'zod'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One explain request.
+const MAX_BODY_BYTES = 16 * 1024
 
 const Body = z.object({
   type: z.string().max(40),
@@ -24,7 +28,13 @@ export async function POST(req: NextRequest) {
   if (!rateLimit(`running-explain:${userId}`, 15, 60 * 60 * 1000)) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
-  const parsed = Body.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = Body.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const { type, durationMin, rationale, gateReasons } = parsed.data
 

@@ -14,10 +14,12 @@
  * subtracts a 1.5-MET resting baseline, so every term here is net active energy above rest —
  * consistent with the sedentary base.
  */
-import { estWorkoutKcal, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estSessionKcal, estWorkoutKcal, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
 
-/** Budget resting base = BMR × this. Sedentary Mifflin factor (BMR + TEF + incidental NEAT). */
-export const SEDENTARY_MULTIPLIER = 1.2
+// Defined in a dependency-free leaf module and re-exported here, so a caller that needs only the
+// number does not pull in this file's `workout-energy` → `oura-models` → `node:path` chain. Every
+// existing import of `SEDENTARY_MULTIPLIER` from this module keeps working.
+export { SEDENTARY_MULTIPLIER } from './energy-baseline'
 
 /** Steps assumed already covered by the sedentary base (a desk-job day's incidental stepping). Only
  *  steps above this count as extra movement, so we don't double-count the baseline against BMR×1.2. */
@@ -61,8 +63,14 @@ export interface EnergyProfile {
 
 export interface ActiveEnergyInput {
   profile: EnergyProfile
-  /** Completed strength sessions today (duration in minutes). */
-  strengthSessions: { durationMin: number }[]
+  /**
+   * Completed strength sessions today (duration in minutes).
+   *
+   * `id` is optional so existing callers are unchanged; pass it to get the per-session breakdown
+   * back. `rpe` is the session's stored `session_rpe` (Q-419) — omit it and the session is estimated
+   * at `moderate`, exactly as before.
+   */
+  strengthSessions: { durationMin: number; id?: string; rpe?: number | null; avgBpm?: number | null }[]
   /** Today's logged activities. */
   activities: { activityType: string; durationMin?: number | null; distanceKm?: number | null }[]
   /** Phone-pedometer steps today (body_metrics), excluding treadmill/logged-indoor steps. */
@@ -74,6 +82,20 @@ export interface ActiveEnergyResult {
   activityKcal: number
   stepsKcal: number
   total: number
+  /**
+   * The addends of `workoutKcal`, per strength session that supplied an `id` (Q-391).
+   *
+   * **The point of returning them from here rather than recomputing per session elsewhere** is that
+   * a per-session figure and the day total then cannot disagree — these ARE the terms that were
+   * summed. `energy-summary.ts` already records why that matters: the day screen's Energy section
+   * deliberately reads its `workoutKcal` from this same route *"because the day screen disagreeing
+   * with Nutrition about how much was burned is worse than either being slightly off"*. A second
+   * estimate computed in `/api/day-log` off its own profile inputs would reintroduce exactly that.
+   *
+   * A session filtered out by the plausibility guard is absent rather than zero — it contributed
+   * nothing to the total, and zero would read as "measured, and it was nothing".
+   */
+  workoutKcalBySession: { id: string; kcal: number; source: 'hr' | 'met' }[]
 }
 
 /** Duration (min) for a logged activity: use the recorded duration, else estimate from distance. */
@@ -94,16 +116,42 @@ function activityDurationMin(a: { activityType: string; durationMin?: number | n
  */
 export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResult {
   const { ageYears, weightKg, sex } = input.profile
-  const zero = { workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0 }
+  const zero = { workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0, workoutKcalBySession: [] }
   if (ageYears == null || weightKg == null || sex == null) return zero
 
-  const est = (activityId: number, durationMin: number) =>
-    estWorkoutKcal({ durationMin, ageYears, weightKg, sex, activityId, intensity: 'moderate' }) ?? 0
+  const est = (activityId: number, durationMin: number, intensity: Intensity = 'moderate') =>
+    estWorkoutKcal({ durationMin, ageYears, weightKg, sex, activityId, intensity }) ?? 0
 
-  // Strength — activity 8.
+  // Strength — activity 8, at the intensity the user's own RPE implies (Q-419).
+  //
+  // **This was hardcoded to 'moderate' while the done screen used `intensityFromRpe(rpe)` for the
+  // same session**, so tapping an RPE changed the number on that screen and then changed nothing
+  // anywhere else — the day's ENERGY row, Nutrition's earned calories and the Home budget all
+  // reverted to moderate. The tap looked load-bearing and was not.
+  //
+  // `intensityFromRpe` returns 'moderate' for a null RPE, so an unrated session is unchanged and no
+  // history without a rating moves.
   let workoutKcal = 0
+  const workoutKcalBySession: { id: string; kcal: number; source: 'hr' | 'met' }[] = []
   for (const s of input.strengthSessions) {
-    if (s.durationMin > 0 && s.durationMin <= MAX_PLAUSIBLE_SESSION_MIN) workoutKcal += est(8, s.durationMin)
+    if (s.durationMin > 0 && s.durationMin <= MAX_PLAUSIBLE_SESSION_MIN) {
+      // Q-421: heart rate first, MET as the fallback — which is what the MET path always was
+      // (Oura's `has_enough_motion === false` branch). The HR estimate is unavailable whenever it
+      // cannot be supported (no strap that session, an implausible bpm, an incomplete profile), and
+      // 36 of the owner's 78 sessions have no HR at all, so the fallback is the common case rather
+      // than an edge one. Q-331: the precedence itself lives in `estSessionKcal`, because the done
+      // screen's route has to make the same choice and had drifted to MET-only.
+      const est = estSessionKcal({
+        durationMin: s.durationMin, rpe: s.rpe, avgBpm: s.avgBpm, ageYears, weightKg, sex, activityId: 8,
+      })
+      const kcal = est.kcal ?? 0
+      workoutKcal += kcal
+      // Q-421 asked for the basis to be stored rather than chosen silently, because roughly half of
+      // sessions have no strap reading and the two estimators are not interchangeable. The done
+      // screen's route already returns it (Q-331); this is the same fact on the day's breakdown, so
+      // a surface showing a per-session figure can say which estimator produced it.
+      if (s.id != null) workoutKcalBySession.push({ id: s.id, kcal, source: est.source })
+    }
   }
 
   // Logged activities — MET by type over their duration.
@@ -126,5 +174,10 @@ export function computeActiveEnergy(input: ActiveEnergyInput): ActiveEnergyResul
 
   const round = (n: number) => Math.round(n)
   workoutKcal = round(workoutKcal); activityKcal = round(activityKcal); stepsKcal = round(stepsKcal)
-  return { workoutKcal, activityKcal, stepsKcal, total: workoutKcal + activityKcal + stepsKcal }
+  // `workoutKcalBySession` is deliberately NOT rounded here, while `workoutKcal` is. Rounding each
+  // addend and rounding their sum are different numbers, and a card showing 120 + 130 under a total
+  // of 251 is the failure this breakdown exists to avoid. Returned exact, the parts sum to the
+  // pre-rounding total by construction — the same additions in the same order — and how to display
+  // them is the renderer's decision.
+  return { workoutKcal, activityKcal, stepsKcal, total: workoutKcal + activityKcal + stepsKcal, workoutKcalBySession }
 }

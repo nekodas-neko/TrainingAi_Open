@@ -1,0 +1,81 @@
+# 2026-08-23 — The Oura rollup now takes an I/O port (Q-545, D2 Task 2)
+
+**Branch:** `feat/oura-rollup-io-port` · **Lane A** · no behaviour change
+
+The D-track's north star, in the owner's words, is *"all the ring data goes directly to the phone
+and once it's aggregated and calculated it sends to DB."* Today it is inverted: the phone ships raw
+frames up and Railway decodes them and runs SleepNet. Q-545 is the missing middle, and this is its
+Task 2 — the extraction that makes a device rollup possible without writing a second one.
+
+## What shipped
+
+`PostgresRepository.aggregateOuraRawSamples` was 1,102 lines of computation with its stores wired
+straight into the method body. It is now:
+
+| file | what it is |
+|---|---|
+| `lib/oura-ble/rollup/run.ts` | `runOuraRollup(io, timezone, opts)` — the whole computation, runtime-agnostic |
+| `lib/oura-ble/rollup/io.ts` | `RollupIO` — every store the rollup touches, 22 methods |
+| `lib/data/postgres/rollup-io.ts` | `createPostgresRollupIO(deps)` — the server implementation |
+| `lib/data/postgres/adapter.ts` | a 10-line wrapper; the file drops 6,906 → 5,818 lines |
+
+`RollupIO` is bound to one user by the implementation, so the rollup itself never handles a
+`userId` and structurally cannot write across one.
+
+**The gate this entry named was "identical output over a sample of historical days".** The
+in-repo form of that gate is the **20 test files** that drive `aggregateOuraRawSamples`
+end-to-end against real Postgres — sleep staging, night merge, anchor drift, step rollup and
+backfill, SpO₂ day-keying, HRV median, illness persistence, incremental window, daily summary.
+All 20 pass unchanged, and so does the full suite (542 files, 4,470 tests) and all 51 Custom
+Rules steps.
+
+## Two premise corrections, both of which change how Task 3 should be sized
+
+**1. The port is 22 methods, not five.** The plan measured *"17 lines touch `this.db` / `.select(`
+/ an `oura.*` slice helper"* and sketched a five-method interface from it. Lines are not
+operations: there are **28 touchpoints across 22 distinct store operations** — nine reads (two
+anchor reads, the watermark, raw frames, step live-windows, existing steps, workout windows, the
+latest daily summary, the daytime-HRV model, daily derived) and thirteen writes. Anyone sizing the
+device implementation off "five methods" would be out by about four-fold.
+
+**2. ⚠️ The I/O is portable now; the models are not, and this extraction did not change that.**
+`run.ts` still reaches `onnxruntime-node` transitively — `sleepnet-assemble` → `inference/sleepnet`
+→ `inference/session.ts`, and `daytime-stress` → `inference/dhrv` → the same loader — a file whose
+own header reads *"server-only: onnxruntime-node is a native addon and must never reach the client
+bundle."* So Task 3 needs the model session injected the same way the I/O now is. `session-web.ts`
+already exists as the WASM sibling, which is plan Task 4.
+
+> **Correction, same day.** This entry first said Task 4 was "gated on plan Task 1: the production
+> CSP has no `wasm-unsafe-eval`". **That gate is gone** — Q-546 added the directive on 2026-08-20
+> (#259) and `lib/security/csp.ts` carries it with a test on both halves. The plan's §4, which is
+> where the claim came from, still reads as current and is not. What is actually left of Task 4 is
+> narrower and worth stating plainly: **`getWebSession` has no importers.** All seven consumers of a
+> model session (`sleepnet`, `dhrv`, `energy`, `illness`, `awhr`, `awhr-profile-selector`,
+> `step-counter`) hard-import the node loader, and `wasm-parity.test.ts` reaches `onnxruntime-web`
+> directly rather than through `session-web.ts`. So the WASM loader is inert in exactly the way the
+> local-store bridge was — written, device-shaped, and called by nothing.
+>
+> **And the reach-through is smaller than "the models are not portable" makes it sound.** Walking
+> `run.ts`'s import graph following **value** imports only — a type-only import is erased and reaches
+> no bundle, and counting them drags in the entire Postgres layer through one `import type` in
+> `daytime-hrv-model.ts` — gives 50 modules and four edges: the step pipeline reaches both the
+> disk-reading constants loader and the node session; `sleepnet-assemble` reaches the node session;
+> `daytime-stress` reaches it **only through the module graph**, because the rollup calls just
+> `buildDaytimeStressSeriesFromModel`, which is synchronous and runs no model. That last one needs a
+> file split, not an injection. The table is on the Q-545 queue entry.
+
+A smaller one, worth doing when Task 3 lands: `sourceRank` (`lib/data/health-source.ts`) drags
+`drizzle-orm` into the module graph for what is a rank lookup.
+
+## Not exercised
+
+No device run — this is a server-side refactor that reaches the APK through a Railway deploy with
+no rebuild, and the rollup's on-device path does not exist yet. Not exercised against drifted
+production data either: the gate is the test corpus against a fresh local Postgres, which is the
+same gate the rollup has always had.
+
+## What this does *not* claim
+
+Nothing here moves the bill. The rollup still runs on the server, computing exactly what it
+computed before. The saving lands at plan Task 7, the single-writer flip, and every task between
+here and there is still open.

@@ -4,6 +4,11 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import type { MealPlan } from '@trainingai/shared/types/nutrition'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A whole plan: up to 3 variants x 20 meals, each with a 2,000-char note and a snapshot of its
+// ingredients. Roughly 700 KB at the schema's own limits; 2 MB is generous past that.
+const MAX_BODY_BYTES = 2 * 1024 * 1024
 
 export interface MealPlansResponse {
   plans: MealPlan[]
@@ -76,11 +81,14 @@ export async function POST(req: Request) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
 
-  const parsed = CreateSchema.safeParse(raw)
+  const parsed = CreateSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

@@ -3,6 +3,13 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import type { AiPrescription, AiPrescriptionExercise } from '@trainingai/shared/types/ai-periodization'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// `adjustments`, `dropThisCycle` and `dropPermanent` all carry a `.default([])` and **no `.max()`**,
+// so the schema bounds none of their lengths. Until they gain caps this byte limit is what bounds
+// them; `reasoning` is the only field the schema actually caps (2,000 chars).
+const MAX_BODY_BYTES = 256 * 1024
 
 const ApplySchema = z.object({
   adjustments: z.array(z.object({
@@ -29,10 +36,19 @@ export async function POST(
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { sessionId: programSessionId } = await params
+  const badId = invalidUuidResponse(programSessionId)
+  if (badId) return badId
+
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
 
   let body: z.infer<typeof ApplySchema>
   try {
-    body = ApplySchema.parse(await req.json())
+    body = ApplySchema.parse(read.body)
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }

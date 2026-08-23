@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { getRepository } from "@/lib/data";
-import { formatInTimeZone } from "date-fns-tz";
 import { DEFAULT_TZ, todayInTz, startOfWeekInTz, aestMidnight, toAestDay, shiftDateStr } from "@trainingai/shared/date-utils";
 import { getScheduledSessionsPerWeek } from "@trainingai/shared/schedule-utils";
 import { computeWeightRateKgPerWeek } from "@trainingai/shared/health/long-term-goal-progress";
@@ -28,13 +27,13 @@ export async function GET() {
   const weekStartStr = startOfWeekInTz(tz);
   const [wy, wm, wd] = weekStartStr.split('-').map(Number);
   const mondayUtc = aestMidnight(wy, wm, wd, tz);
-  const sevenDaysAgo = formatInTimeZone(new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), tz, 'yyyy-MM-dd');
+  const sevenDaysAgo = shiftDateStr(today, -7);
   const fourteenDaysAgo = shiftDateStr(today, -13);
 
   const [sleepSessions, program, dayExercises, nextSession, bodyBaseline, weekSessionsAll, weightHistory] = await Promise.all([
     repo.listSleepSessions(userId, sevenDaysAgo, today),
     repo.getActiveProgram(userId),
-    repo.getDayExerciseNames(userId, today.replace(/-/g, '/')),
+    repo.getDayExerciseNames(userId, today.replace(/-/g, '/'), tz),
     repo.getNextSession(userId, tz),
     repo.getBodyMetricsBaseline(userId),
     repo.getWorkoutSessionsFrom(userId, mondayUtc),

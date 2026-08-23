@@ -5,6 +5,7 @@ import { rateLimit } from '@/lib/rate-limit'
 import { setWorkSec, transitionSecForEquipment } from '@trainingai/shared/workout/duration-model'
 import { errorLog } from '@trainingai/shared/logger'
 import { reportServerError } from '@/lib/observability'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export interface ExerciseTiming {
   name: string
@@ -60,6 +61,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     }
 
     const { id: sessionId } = await params
+    const badId = invalidUuidResponse(sessionId)
+    if (badId) return badId
     const repo = await getRepository()
     const ws = await repo.getWorkoutSessionDetail(userId, sessionId)
     if (!ws) return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -119,7 +122,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     })
   } catch (error) {
     reportServerError(error, { url: '/api/workout-sessions/[id]/timing' })
-    const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/timing')
-    return NextResponse.json({ error: errMsg }, { status: 500 })
+    // Q-483: `errorLog` returns `[ERROR]: ${error}`, and returning that as the body published the
+    // whole failing statement — every column of `workout_sessions` — to the client. Measured on a
+    // malformed id, which reaches the driver as 22P02. The log line above keeps the full detail and
+    // `reportServerError` already banked it, so redacting the response costs no diagnostics.
+    errorLog(error, 'GET /api/workout-sessions/[id]/timing')
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

@@ -6,6 +6,12 @@ import { requireAdmin, adminFailureOutcome } from '@/lib/admin'
 import { rateLimit } from '@/lib/rate-limit'
 import { safeCompare } from '@/lib/security/constant-time'
 import { reportServerError } from '@/lib/observability'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { clientIp } from '@trainingai/shared/http/client-ip'
+
+// One SQL statement. The audit log truncates it at 20,000 characters, so 64 KB is generous past
+// anything that is meaningfully recorded.
+const MAX_BODY_BYTES = 64 * 1024
 
 /**
  * Read-only production query endpoint (plan:
@@ -35,7 +41,7 @@ async function authorize(req: NextRequest): Promise<AuthOutcome> {
   const bearer = req.headers.get('authorization')?.match(/^Bearer\s+(.+)$/i)?.[1]
 
   if (bearer) {
-    const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+    const ip = clientIp(req)
     // Bound every attempt per IP BEFORE the compare so a brute-force can't run at full throughput,
     // and return the same 401 on trip as for a bad token.
     if (!rateLimit(`db-query-token:${ip}`, 10, 60_000)) {
@@ -91,14 +97,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Read-only database access is not configured' }, { status: 503 })
   }
 
-  let body: unknown
-  try {
-    body = await req.json()
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
   }
 
-  const sql = (body as { sql?: unknown })?.sql
+  const sql = (read.body as { sql?: unknown } | null)?.sql
   if (typeof sql !== 'string' || !sql.trim()) {
     return NextResponse.json({ error: 'Body must be { sql: string }' }, { status: 400 })
   }
@@ -108,7 +114,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Only a single statement per request' }, { status: 400 })
   }
 
-  const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown'
+  const ip = clientIp(req)
   const started = Date.now()
 
   try {

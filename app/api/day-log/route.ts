@@ -85,7 +85,8 @@ export interface DayLogResult {
   date: string;
   exercises: DayExercise[];
   bodyMeta: DayBodyMeta | null;
-  workoutDurations: Record<string, WorkoutDuration | null>;
+  /** Keyed by `workout_sessions.id` — the identity that cannot collide (Q-362a). */
+  workoutDurationsById: Record<string, WorkoutDuration | null>;
   activityLogs: ActivityLog[];
   sleep: DaySleep | null;
   scores: DayScores | null;
@@ -123,7 +124,8 @@ export async function GET(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const repo = await getRepository();
-  const workoutSessions = await repo.getDayLog(userId, date);
+  const userTz = session.user?.timezone ?? DEFAULT_TZ;
+  const workoutSessions = await repo.getDayLog(userId, date, userTz);
 
   const exercises: DayExercise[] = workoutSessions.flatMap(ws =>
     ws.exercises.map(el => ({
@@ -140,14 +142,18 @@ export async function GET(req: NextRequest) {
     }))
   );
 
-  // Per-session workout durations
-  const workoutDurations: Record<string, WorkoutDuration | null> = {};
+  // Per-session workout durations, keyed by session id — a name is not an identity, and two `Push`
+  // sessions on one day left a single key holding only the later window (Q-362a). The name-keyed
+  // record that used to sit beside this one is gone: Q-362b moved all three consumers to it, and
+  // LA-15 removed the legacy half once they had (verified by reading them, not by the entry's
+  // absence).
+  const workoutDurationsById: Record<string, WorkoutDuration | null> = {};
   for (const ws of workoutSessions) {
     const timedExercises = ws.exercises
       .filter(e => e.loggedAt)
       .map(e => ({ t: e.loggedAt.getTime(), dur: (e.timeToComplete ?? 0) * 1000 }));
     if (timedExercises.length === 0) {
-      workoutDurations[ws.sessionName] = null;
+      workoutDurationsById[ws.id] = null;
       continue;
     }
     // Check if startedAt is more than 1 minute into the local day (not UTC midnight).
@@ -160,7 +166,7 @@ export async function GET(req: NextRequest) {
       ? ws.startedAt.getTime()
       : Math.min(...timedExercises.map(x => x.t));
     const endMs = Math.max(...timedExercises.map(x => x.t + x.dur));
-    workoutDurations[ws.sessionName] = {
+    workoutDurationsById[ws.id] = {
       start: fmtMs(startMs),
       end:   fmtMs(endMs),
       minutes: Math.round((endMs - startMs) / 60000),
@@ -258,6 +264,6 @@ export async function GET(req: NextRequest) {
 
   const activityLogs = await repo.listActivityLogs(userId, pgDate, pgDate);
 
-  const result: DayLogResult = { date, exercises, bodyMeta, workoutDurations, activityLogs, sleep, scores, hr };
+  const result: DayLogResult = { date, exercises, bodyMeta, workoutDurationsById, activityLogs, sleep, scores, hr };
   return NextResponse.json(result, { headers: { "Cache-Control": "private, no-store" } });
 }

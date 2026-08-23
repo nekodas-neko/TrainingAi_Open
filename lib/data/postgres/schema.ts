@@ -28,6 +28,12 @@ export const users = pgTable('users', {
   avatar:       text('avatar'),
   passwordHash: text('password_hash'),
   timezone:     text('timezone').notNull().default('Australia/Brisbane'),
+  /** Server-authoritative user preferences, seeded into localStorage for first paint (Q-392).
+   *  Shape and merge rule: `packages/shared/src/user/preferences.ts`. */
+  preferences:  jsonb('preferences').$type<import('@trainingai/shared/user/preferences').UserPreferences>().notNull().default({}),
+  /** SUPERSEDED by `preferences.foodRegion` (Q-392). Never read or written by any code — it was
+   *  dead when the preferences work found it. Dropping it is a data-losing migration and belongs to
+   *  a schema sweep, not here. */
   foodRegion:   text('food_region').notNull().default('AU'),
   sex:          text('sex'),
   stepsGoal:        integer('steps_goal'),
@@ -151,10 +157,23 @@ export const scheduleDays = pgTable('schedule_days', {
   updatedAt:  timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 }, t => [primaryKey({ columns: [t.scheduleId, t.dayOfWeek] })])
 
+// TWO foreign keys to `program_sessions`, and until 2026-08-23 the dead one owned the name the live
+// one was used under (Q-474). `session_id` is the live link — every read and the only write use it.
+// `program_session_id` (079_ai_dynamic_periodization.sql, "for prescription trigger linkage") has
+// never been written or read by any code, and 0 of the owner's 91 rows have it set.
+//
+// The Drizzle property names now match what the columns hold, which is the whole fix: reaching for
+// `workoutSessions.programSessionId` gets the column that actually stores a program-session id.
+// Dropping the dead column is a data-losing migration and needs owner confirmation, so it is named
+// `unusedProgramSessionId` instead — a name nobody reaches for by accident.
+//
+// It has already cost a session: a repro fixture populated `program_session_id`, the periodization
+// block took its `null` branch, and the honest reading of that run was "the race does not exist".
 export const workoutSessions = pgTable('workout_sessions', {
   id:                uuid('id').primaryKey().defaultRandom(),
   userId:            uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  sessionId:         uuid('session_id').references(() => programSessions.id, { onDelete: 'set null' }),
+  /** The live link to `program_sessions`. Column name is historical; the property says what it holds. */
+  programSessionId:  uuid('session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionName:       text('session_name').notNull(),
   startedAt:         timestamp('started_at', { withTimezone: true }).notNull(),
   completedAt:       timestamp('completed_at', { withTimezone: true }),
@@ -165,7 +184,8 @@ export const workoutSessions = pgTable('workout_sessions', {
   isEarlyDeload:     boolean('is_early_deload').notNull().default(false),
   wasOverride:       boolean('was_override').notNull().default(false),
   intensityMode:     text('intensity_mode'),
-  programSessionId:  uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
+  /** DEAD — never written, never read. See the block comment above; do not start using it. */
+  unusedProgramSessionId: uuid('program_session_id').references(() => programSessions.id, { onDelete: 'set null' }),
   sessionRpe:        integer('session_rpe'),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
@@ -214,6 +234,15 @@ export const setLogs = pgTable('set_logs', {
   updatedAt:     timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:     timestamp('deleted_at', { withTimezone: true }),
 }, t => [unique().on(t.exerciseLogId, t.setNumber)])
+
+// Q-481: the mutation ids the outbox has already applied, for the push branches that are not
+// idempotent under replay. Only `body_metrics`' waterMlDelta writes here — see migration 199 for
+// why the other eighteen branches do not need it.
+export const appliedMutations = pgTable('applied_mutations', {
+  userId:     uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  mutationId: text('mutation_id').notNull(),
+  appliedAt:  timestamp('applied_at', { withTimezone: true }).notNull().defaultNow(),
+}, t => [primaryKey({ columns: [t.userId, t.mutationId] })])
 
 export const bodyMetrics = pgTable('body_metrics', {
   id:          uuid('id').primaryKey().defaultRandom(),
@@ -478,6 +507,10 @@ export const dayCheckins = pgTable('day_checkins', {
   sleepQualityFeelTouched:   boolean('sleep_quality_feel_touched').notNull().default(false),
   soreMuscles:       text('sore_muscles').array().notNull().default([]),
   journal:           text('journal'),
+  /** Q-387 — "I have finished logging today". NULL means not marked, which the maintenance
+   *  calibration reads as EXCLUDED rather than as assumed-complete: the failure mode has to be
+   *  "the estimate waits", not "the estimate is quietly wrong". Undo sets it back to NULL. */
+  foodLoggingCompletedAt: timestamp('food_logging_completed_at', { withTimezone: true }),
   createdAt:         timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt:         timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
   deletedAt:         timestamp('deleted_at', { withTimezone: true }),
@@ -579,6 +612,10 @@ export const savedMeals = pgTable('saved_meals', {
   // How many portions the recipe makes. 1 for an ordinary meal; >1 for a batch (the owner's
   // protein ice cream makes two), so a plan can take one portion instead of the whole tub.
   servings:  doublePrecision('servings').notNull().default(1),
+  // A 128x128 WebP thumbnail as a base64 data URI, capped at SAVED_MEAL_IMAGE_MAX_BYTES (Q-396).
+  // Not a URL: this row syncs to a phone and has to render offline. Not 5 MB like `users.avatar`:
+  // that column never enters the sync delta and this one does.
+  imageDataUri: text('image_data_uri'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 })
 

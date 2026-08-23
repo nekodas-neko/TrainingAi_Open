@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { toast } from 'sonner'
 import type { FoodLogWithItem, MealPlan, MealPlanMeal, MealType } from '@trainingai/shared/types/nutrition'
 import { logPlanMeal } from '@trainingai/shared/nutrition/log-plan-meal'
@@ -26,6 +27,8 @@ interface Options {
  * count toward the day's totals unless they said they ate it.
  */
 export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef, onLogged }: Options) {
+  // Q-413: the eaten-at resolution happens in the USER's zone, not the device's.
+  const tz = useUserTimezone()
   const [loggingPosition, setLoggingPosition] = useState<number | null>(null)
 
   /**
@@ -63,6 +66,8 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
         mealTypes,
         dateRef.current,
         userId,
+        new Date(),
+        tz,
       )
       toast.success(`${meal.name} logged`)
       for (const log of written) onLogged(log)
@@ -71,7 +76,7 @@ export function usePlanMealLogging({ mealPlan, mealTypes, logs, userId, dateRef,
     } finally {
       setLoggingPosition(null)
     }
-  }, [mealTypes, userId, dateRef, onLogged])
+  }, [mealTypes, userId, dateRef, onLogged, tz])
 
   // ── Declines (Q-187 phase 2) ─────────────────────────────────────────────
   //

@@ -8,6 +8,7 @@ import { DEFAULT_TZ, toAestDay } from '@trainingai/shared/date-utils'
 import { buildRecapFacts } from '@trainingai/shared/workout/session-recap'
 import { errorLog } from '@trainingai/shared/logger'
 import { reportServerError } from '@/lib/observability'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
 
 export async function GET(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -16,6 +17,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
     if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     const { id: sessionId } = await params
+    const badId = invalidUuidResponse(sessionId)
+    if (badId) return badId
     const repo = await getRepository()
     const tz = session.user?.timezone ?? DEFAULT_TZ
 
@@ -92,7 +95,11 @@ In at most 3 sentences: say what stood out about this session, and give one thin
     return NextResponse.json({ recap })
   } catch (error) {
     reportServerError(error, { url: '/api/workout-sessions/[id]/recap' })
-    const errMsg = errorLog(error, 'GET /api/workout-sessions/[id]/recap')
-    return NextResponse.json({ error: errMsg }, { status: 500 })
+    // Q-483: `errorLog` returns `[ERROR]: ${error}`, and returning that as the body published the
+    // whole failing statement — every column of `workout_sessions` — to the client. Measured on a
+    // malformed id, which reaches the driver as 22P02. The log line above keeps the full detail and
+    // `reportServerError` already banked it, so redacting the response costs no diagnostics.
+    errorLog(error, 'GET /api/workout-sessions/[id]/recap')
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

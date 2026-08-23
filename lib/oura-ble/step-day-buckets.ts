@@ -12,6 +12,7 @@
  */
 import { resolveDsToMs, type ClockAnchor } from './clock'
 import { runStepCounterPipeline, type RawFrame } from './step-counter-pipeline'
+import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 import { mergeStepCounterWithLive, type StepCountWindow } from '@trainingai/shared/health/step-estimate'
 import { toAestDay, dateStrMidnightInTz } from '@trainingai/shared/date-utils'
 import { INGEST_FUTURE_TOLERANCE_MS } from '@trainingai/shared/validation/ingest-clock'
@@ -43,6 +44,8 @@ export interface StepDayInputs {
   timezone: string
   /** Injectable clock, so the future guard below is testable. */
   nowMs?: number
+  /** Which inference runtime the step_counter core runs on — node on the server, WASM on device. */
+  runtime: ModelRuntime
 }
 
 export interface StepDayBuckets {
@@ -160,6 +163,7 @@ export async function computeStepsByDay(input: StepDayInputs): Promise<Map<strin
       stepFramesByDay.get(day) ?? [],
       motionFramesByDay.get(day) ?? [],
       toMs,
+      input.runtime,
     )
     out.set(day, Math.round(mergeStepCounterWithLive(result?.stepWindows ?? [], liveByDay.get(day) ?? [])))
   }

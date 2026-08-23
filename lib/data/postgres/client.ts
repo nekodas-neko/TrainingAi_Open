@@ -3,6 +3,7 @@ import { drizzle } from 'drizzle-orm/node-postgres'
 import { readFileSync, readdirSync } from 'fs'
 import { join } from 'path'
 import * as schema from './schema'
+import idempotentSqlstates from './idempotent-sqlstates.json'
 
 let _pool: Pool | null = null
 let _db: ReturnType<typeof drizzle<typeof schema>> | null = null
@@ -59,17 +60,12 @@ export function getDb() {
  * SQLSTATEs that mean "the object is already there" — the expected outcome of re-running an
  * idempotent migration against a database that already has it, not a failure.
  *
- * Classified by code rather than message text: the messages are English prose that varies by
- * object type and Postgres version, while the code is part of the wire protocol.
+ * The list itself lives in `idempotent-sqlstates.json` so `scripts/local-db/migrate.js` can read
+ * the same one. That script's docstring says it mirrors this function, and until 2026-08-20 it did
+ * not: it had no classifier at all, so it reported four already-applied migrations as failures on
+ * every run against an existing database.
  */
-const IDEMPOTENT_SQLSTATES = new Set([
-  '42P07', // duplicate_table — also indexes, views: `relation "x" already exists`
-  '42710', // duplicate_object — constraint, trigger, type
-  '42701', // duplicate_column
-  '42P06', // duplicate_schema
-  '42723', // duplicate_function
-  '23505', // unique_violation — a seed row that is already present
-])
+const IDEMPOTENT_SQLSTATES = new Set(Object.keys(idempotentSqlstates.codes))
 
 export function isIdempotentMigrationError(err: unknown): boolean {
   const code = (err as { code?: string } | null)?.code

@@ -1,6 +1,6 @@
 {
   "name": "trainingai",
-  "version": "1.324.8",
+  "version": "1.341.0",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
@@ -80,6 +80,7 @@
     "@radix-ui/react-slot": "^1.2.3",
     "@radix-ui/react-switch": "^1.2.6",
     "@radix-ui/react-use-controllable-state": "^1.2.2",
+    "@sentry/nextjs": "^10.70.0",
     "@trainingai/shared": "workspace:*",
     "@types/bcryptjs": "^2.4.6",
     "@types/react-syntax-highlighter": "^15.5.13",

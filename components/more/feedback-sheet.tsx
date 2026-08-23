@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { cn } from "@trainingai/shared/utils";
 import { ImageIcon, XIcon } from "lucide-react";
+import { downscaleToJpegDataUrl } from "@/lib/media/downscale-image";
 
 interface Props {
   open: boolean;
@@ -20,23 +21,10 @@ const TYPE_LABELS: Record<FeedbackType, string> = {
   other: "Other",
 };
 
-async function compressImage(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => {
-      const MAX_WIDTH = 800;
-      const scale = Math.min(1, MAX_WIDTH / img.width);
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.round(img.width * scale);
-      canvas.height = Math.round(img.height * scale);
-      const ctx = canvas.getContext("2d")!;
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-      resolve(canvas.toDataURL("image/jpeg", 0.7));
-    };
-    img.onerror = reject;
-    img.src = URL.createObjectURL(file);
-  });
-}
+// Was a local copy that scaled by WIDTH only, so a portrait screenshot — which is what this app
+// produces, at 412 × 915 — kept its full height and most of its bytes. The shared helper fits the
+// longest edge (BF-4).
+const SCREENSHOT_MAX_DIM = 800;
 
 export function FeedbackSheet({ open, onOpenChange }: Props) {
   const [type, setType] = useState<FeedbackType | null>(null);
@@ -57,7 +45,7 @@ export function FeedbackSheet({ open, onOpenChange }: Props) {
     const file = e.target.files?.[0];
     if (!file) return;
     try {
-      const compressed = await compressImage(file);
+      const compressed = await downscaleToJpegDataUrl(file, { maxDim: SCREENSHOT_MAX_DIM, quality: 0.7 });
       setScreenshot(compressed);
     } catch {
       toast.error("Failed to process image");

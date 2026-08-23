@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
+import { refusalResponse, isRefusal } from "@/lib/api/route-errors";
+import { reportServerError } from "@/lib/observability";
 import { auth } from "@/auth";
 import { requireAdmin } from "@/lib/admin";
 import { getRepository } from "@/lib/data";
@@ -8,6 +10,10 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 import type { MuscleAssignment } from "@trainingai/shared/types/program";
 import { invalidateExerciseMuscleMap } from "@/lib/data/exercise-muscle-map-cache";
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One exercise: a name, muscles, equipment and 2,000 chars of instructions.
+const MAX_BODY_BYTES = 32 * 1024;
 
 const ExerciseBody = z.object({
   name:         z.string().min(1).max(120),
@@ -56,7 +62,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const body = ExerciseBody.safeParse(await req.json());
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 });
+  }
+  const body = ExerciseBody.safeParse(read.body);
   if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
 
   const repo = await getRepository();
@@ -92,8 +104,14 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: "Forbidden" }, { status: 403 });
   }
 
-  const { id, ...rest } = await req.json();
-  if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const { id, ...rest } = (read.body ?? {}) as Record<string, unknown>;
+  if (typeof id !== "string" || !id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
 
   const body = ExerciseBody.safeParse(rest);
   if (!body.success) return NextResponse.json({ error: "Invalid body" }, { status: 400 });
@@ -110,8 +128,11 @@ export async function PATCH(req: NextRequest) {
       exerciseType: body.data.exerciseType,
     });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : "Update failed";
-    return NextResponse.json({ error: msg }, { status: 409 });
+    // Every error answered 409 with its own text as the body, so a missing row read as a name
+    // clash and a driver failure published its statement (Q-320). The status now comes from the
+    // thrown error: 404 missing, 409 clash, 500 anything unmarked.
+    if (!isRefusal(e)) reportServerError(e, { url: '/api/admin/exercises' });
+    return refusalResponse(e, "Update failed");
   }
   invalidateExerciseMuscleMap();
 

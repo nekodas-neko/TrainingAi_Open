@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { getRepositoryAsync } from '@/lib/data'
 import { syncAndAttributeSessionHr } from '@/lib/workout/post-completion-hr'
 import { rateLimit } from '@/lib/rate-limit'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One workout-session id.
+const MAX_BODY_BYTES = 4 * 1024
 
 // POST — fetch and store Oura HR data for a completed workout session.
 // Body: { workoutSessionId: string }
@@ -16,7 +20,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const { workoutSessionId } = await req.json() as { workoutSessionId?: string }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+  const { workoutSessionId } = (read.body ?? {}) as { workoutSessionId?: string }
   if (!workoutSessionId) return NextResponse.json({ error: 'Missing workoutSessionId' }, { status: 400 })
 
   const repo = await getRepositoryAsync()

@@ -7,6 +7,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { resolveBaseRef, lineCountAtBase, verdict } = require('./lib/base-ref');
 
 const LIMIT = 800;
 
@@ -18,8 +19,14 @@ const LIMIT = 800;
 // growth in the diff where a reviewer sees it, instead of letting these files drift upward one
 // unremarked commit at a time (which is how they reached these sizes).
 const BASELINE = {
-  'components/workout-screen.tsx': 1850,
-  'app/session-select/session-select-content.tsx': 1457,
+  'components/workout-screen.tsx': 1833,
+  // Raised 2026-08-19 (Lane B, Q-359): 1456 -> 1458. The screen's `sleep-sessions` refetch moved
+  // off the `ta:oura-ble-synced` event onto `useInvalidationRefetch`, which covers every writer of
+  // that key rather than the one event that thought to dispatch — `invalidateBiometrics` clears it
+  // too, so an edited sleep row used to leave this screen stale until a remount. Two lines is the
+  // wrapper the hook call needs; the event listener it replaced is already down to its minimum
+  // (it still bumps `refreshTick` for the four gated effects, which are not cache reads).
+  'app/session-select/session-select-content.tsx': 1458,
   'components/config-screen.tsx': 997,
   // Raised 2026-08-18 (Lane B, Q-478): 911 -> 912. Net +1 after paying for what could be paid
   // for — the file's two `@/app/api/body-metadata/route` type imports were merged, reclaiming a
@@ -28,12 +35,19 @@ const BASELINE = {
   // server-stamped date to Brisbane's, and today's metrics and active energy stay blank for
   // 14 hours a day for a New York user. There is no smaller shape — a hook cannot be called
   // from inside the callback that needs its value.
-  'app/health/health-content.tsx': 912,
+  // Raised 2026-08-18 (Lane A, Q-488): 912 -> 915. Three lines — one call and two lines of
+  // comment pointing at where the reasoning lives. The item is *specifically* that this handler
+  // deletes server-side only, so three screens reading activity_logs local-first keep showing the
+  // deleted activity until the next sync; there is no zero-line shape for "also write locally".
+  // The full explanation deliberately lives on `deleteActivityLog` in sqlite-backend.ts rather
+  // than here, which is what kept this to three lines instead of nine.
+  'app/health/health-content.tsx': 915,
   'components/config/program-editor-sheet.tsx': 963,
 };
 
 const root = path.join(__dirname, '..');
 const failures = [];
+const inherited = [];
 
 function walk(dir) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
@@ -47,14 +61,28 @@ function walk(dir) {
       // Match `wc -l` (newline count), so a baseline can be read straight off the shell.
       const lines = src.split('\n').length - (src.endsWith('\n') ? 1 : 0);
       const allowed = BASELINE[rel] ?? LIMIT;
-      if (lines > allowed) {
+      // LA-16 / Q-424: ask whether THIS BRANCH grew the file, not whether it is over. A file already
+      // over its number on the base is not this branch's to fix, and failing it here reports someone
+      // else's merge as this author's oversized change.
+      const v = verdict({ count: lines, limit: allowed, atBase: lineCountAtBase(baseRef, rel) });
+      if (v === 'inherited') {
+        inherited.push(`${rel}: ${lines} lines against a ${allowed}-line baseline, but the base branch is already there. Not this branch's growth.`);
+      } else if (v === 'fail') {
         failures.push({ rel, lines, allowed, grandfathered: rel in BASELINE });
       }
     }
   }
 }
 
+const baseRef = resolveBaseRef();
+
 for (const top of ['app', 'components']) walk(path.join(root, top));
+
+// Reported whether or not the run fails, and never as a failure (Q-424).
+if (inherited.length > 0) {
+  console.log('check-component-size: inherited from the base branch, not caused here:');
+  inherited.forEach((f) => console.log('  • ' + f));
+}
 
 if (failures.length > 0) {
   console.error(`Component file(s) over the ${LIMIT}-line limit (CLAUDE.md: keep files under ~800 lines — extract into components/ children instead of appending):`);

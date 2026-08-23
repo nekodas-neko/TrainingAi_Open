@@ -26,9 +26,9 @@
  */
 import { decodeEventBody, hexToBytes } from './decode'
 import { pairStepFeatures, type StepFeatureFrame } from './step-features'
-import { runStepsMotionDecoder, setStepsDecoderConstants, hasStepsDecoderConstants, STRIDE_FREQUENCY_COLUMN } from '@/lib/oura-models/steps-motion-decoder'
-import { getStepsDecoderConstants } from '@/lib/oura-models/constants'
+import { runStepsMotionDecoder, STRIDE_FREQUENCY_COLUMN } from '@/lib/oura-models/steps-motion-decoder'
 import { runStepCounter, type StepWindow } from '@/lib/oura-models/inference/step-counter'
+import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 import { estimateSteps } from '@trainingai/shared/health/step-estimate'
 
 /** A stored raw sample row reduced to what the pipeline needs. */
@@ -120,6 +120,7 @@ export async function runStepCounterPipeline(
   motionFrames: RawFrame[],
   /** ds -> wall-clock ms. The caller owns anchor policy; this pipeline only needs the conversion. */
   toMs: (ds: number) => number,
+  runtime: ModelRuntime,
 ): Promise<StepCounterPipelineResult | null> {
 
   // 1. Pair + unpack the step-feature frames into 27-column windows.
@@ -130,10 +131,10 @@ export async function runStepCounterPipeline(
   if (paired.length === 0) return null
 
   // 2. Dequantize: 27 columns → 11 physical gait features, each window expanded to 3×10 s sub-rows.
-  // Server-side, so the table comes off disk (Q-221 — the decoder no longer holds it at module
-  // scope, because that static import is what put it in the browser bundle). Memoised by the
-  // constants reader, so this is one file read per process.
-  if (!hasStepsDecoderConstants()) setStepsDecoderConstants(getStepsDecoderConstants())
+  // The table must already be injected — `ensureServerOuraConstants()` on the server, the fetch in
+  // `steps-decoder-constants-client.ts` on the device. This pipeline used to inject it from disk
+  // itself, which is why `node:fs` stayed in the Oura rollup's graph long after everything else
+  // portable had been moved out (Q-545).
   const decoded = runStepsMotionDecoder({
     timestamps: paired.map((p) => toMs(p.ds)),
     data: paired.map((p) => p.columns),
@@ -161,7 +162,7 @@ export async function runStepCounterPipeline(
       motionTimestamps,
       motionData,
       outputSamplingIntervalMs: OUTPUT_SAMPLING_INTERVAL_MS,
-    })) ?? []
+    }, runtime)) ?? []
 
   return {
     pairedWindows: paired.length,

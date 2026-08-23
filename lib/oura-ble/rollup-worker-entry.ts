@@ -14,6 +14,7 @@
 import { parentPort, workerData } from 'node:worker_threads'
 import { PostgresWorkoutRepository } from '@/lib/data/postgres/adapter'
 import type { OuraRawAggregateResult } from '@/lib/data/repository'
+import { ensureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 
 /** Everything `aggregateOuraRawSamples` accepts. The ingest path passes only `sinceDs`; the admin
  *  redecode route passes the rest. */
@@ -88,6 +89,11 @@ export function msg(err: unknown): string {
 }
 
 async function handle(job: WorkerJob): Promise<WorkerReply> {
+  // Its own realm, so it does NOT inherit the main thread's injected constants — only the
+  // `OURA_CONSTANTS_DIR` it set in `process.env`, which a worker does copy at spawn. Idempotent, so
+  // this is three boolean checks after the first job. Missing this call is how the port change
+  // (Q-545) would have taken the rollup down here and nowhere else.
+  ensureServerOuraConstants()
   if (job.kind === 'redecode') {
     let redecoded: RedecodeCounts | null = null
     let redecodeError: string | null = null

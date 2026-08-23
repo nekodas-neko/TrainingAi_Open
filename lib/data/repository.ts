@@ -1,3 +1,4 @@
+import type { UserPreferences } from '@trainingai/shared/user/preferences'
 import type {
   User, Program, ProgressionStyle,
   WorkoutSession, ExerciseLog, SetLog, ExerciseHistoryLogRow,
@@ -363,6 +364,13 @@ export interface PushResult {
    * failures. Absent/false is the safe default: bounded retry, then dead-letter.
    */
   errors:    Array<{ id?: string; domain: string; date: string; error: string; retryable?: boolean }>;
+  /**
+   * Q-485 — the mutation was accepted, but a field in it was silently discarded for being
+   * out of range. Deliberately NOT an `errors` entry: an error dead-letters the whole mutation,
+   * and a discarded field is no reason to throw away the fields that landed. The client can surface
+   * these without quarantining anything.
+   */
+  warnings?: Array<{ id?: string; domain: string; date: string; warning: string }>;
 }
 
 export interface UserGoals {
@@ -472,6 +480,8 @@ export interface WorkoutRepository {
 
   // ── Progression Styles ─────────────────────────────────────────────────────
   listProgressionStyles(userId: string): Promise<ProgressionStyle[]>
+  /** True when every id supplied belongs to `userId` (RV-32). A malformed id is false, not a throw. */
+  progressionStyleIdsOwned(userId: string, ids: (string | null | undefined)[]): Promise<boolean>
   saveProgressionStyle(userId: string, style: ProgressionStyle): Promise<ProgressionStyle>
   deleteProgressionStyle(userId: string, styleId: string): Promise<void>
 
@@ -494,7 +504,7 @@ export interface WorkoutRepository {
   countAllSessionsSinceStart(userId: string, programId: string): Promise<Map<string, number>>
   autoRecalibrateCycleAnchor(userId: string, programId: string): Promise<void>
   getActiveProgramWithPhases(userId: string): Promise<{ program: Program; phases: ProgramPhase[] } | null>
-  confirmEarlyDeload(userId: string, programId: string, today: string): Promise<void>
+  confirmEarlyDeload(userId: string, programId: string, today: string, timezone?: string): Promise<void>
 
   // ── Workout Logging ────────────────────────────────────────────────────────
   createWorkoutSession(userId: string, sessionId: string | undefined, sessionName: string, startedAt: Date, phaseId?: string, phaseType?: ProgramPhaseType, isEarlyDeload?: boolean): Promise<WorkoutSession>
@@ -519,6 +529,9 @@ export interface WorkoutRepository {
   upsertBodyMetrics(userId: string, metrics: Omit<BodyMetrics, 'id' | 'userId' | 'createdAt'>[], source: HealthSource): Promise<void>
   listBodyMetrics(userId: string, from: string, to: string): Promise<BodyMetrics[]>
   // Earliest-ever logged weight/body-fat values — "starting point" for long-term goal progress.
+  // NOT the current weight: it orders `asc(date)`, so the number it returns is frozen at the first
+  // reading ever taken and its error grows with every kilogram since. Anything asking "what does
+  // this user weigh?" wants `getMostRecentConfirmedWeightKg` below (Q-330).
   getBodyMetricsBaseline(userId: string): Promise<{ weightKg: number | null; bodyFatPct: number | null }>
 
   // ── Direct-BLE scale (docs/superpowers/plans/2026-07-27-renpho-ble-direct-scale.md) ────────
@@ -544,7 +557,8 @@ export interface WorkoutRepository {
   /** Ownership-checked single row; the metrics PATCH needs the stored duration to rate-check a patch. */
   getActivityLogById(userId: string, id: string): Promise<ActivityLog | null>
   updateActivityLogMetrics(userId: string, id: string, patch: { distanceKm?: number; caloriesBurned?: number; avgHr?: number; maxHr?: number }): Promise<void>
-  deleteActivityLog(userId: string, id: string): Promise<void>
+  /** `false` when the (id, user) pair matched no row — absent or not yours (Q-556). */
+  deleteActivityLog(userId: string, id: string): Promise<boolean>
   saveFitnessTest(userId: string, test: Omit<FitnessTest, 'userId'>): Promise<FitnessTest>
   listFitnessTests(userId: string, from: string, to: string): Promise<FitnessTest[]>
   deleteFitnessTest(userId: string, id: string): Promise<void>
@@ -565,8 +579,20 @@ export interface WorkoutRepository {
   listSleepSessions(userId: string, from: string, to: string): Promise<SleepSession[]>
   listMoodLogs(userId: string, from: string, to: string): Promise<MoodLog[]>
   incrementWaterLog(userId: string, date: string, ml: number): Promise<void>
+  /** Q-481 — the same increment, applied at most once per outbox mutation id. Returns false when
+   *  this id was already applied (an at-least-once replay), which the caller counts as processed:
+   *  it WAS processed, on an earlier delivery. */
+  incrementWaterLogOnce(userId: string, date: string, ml: number, mutationId: string): Promise<boolean>
   getUserGoals(userId: string): Promise<UserGoals>
   updateUserGoals(userId: string, goals: Partial<UserGoals>): Promise<void>
+
+  /** Q-392 — the server-authoritative preferences bag. Absent keys mean "never set"; the read
+   *  sites keep their own defaults. */
+  getUserPreferences(userId: string): Promise<UserPreferences>
+  /** Merge a patch over the stored bag and return the merged result, so the caller never has to
+   *  re-read. An explicit `null` clears a key. Merge, never replace — a device that only knows the
+   *  keys it uses must not blank the ones another device set. */
+  updateUserPreferences(userId: string, patch: Record<string, unknown>): Promise<UserPreferences>
 
   // ── Personal Records ───────────────────────────────────────────────────────
   getPersonalRecord(userId: string, exerciseName: string): Promise<{ estimated1rm: number } | null>
@@ -605,15 +631,17 @@ export interface WorkoutRepository {
   // Rolling-window trained-day map (not month-aligned) for streak/week-strip
   // widgets that must not lose data at calendar-month boundaries.
   getRecentTrainedDays(userId: string, days: number, timezone?: string): Promise<Record<string, string[]>>
-  getDayLog(userId: string, date: string): Promise<WorkoutSession[]>
+  /** `timezone` defaults to DEFAULT_TZ, which is right for the owner and wrong for anyone else —
+   *  pass `session.user?.timezone` (LA-19). */
+  getDayLog(userId: string, date: string, timezone?: string): Promise<WorkoutSession[]>
   // Lightweight alternative to getDayLog for "already logged today" checks —
   // single join, no nested exercises/sets.
-  getDayExerciseNames(userId: string, date: string): Promise<{ sessionId?: string; exerciseName: string }[]>
+  getDayExerciseNames(userId: string, date: string, timezone?: string): Promise<{ sessionId?: string; exerciseName: string }[]>
   // Lightweight alternative to getDayLog for the HR-chart "Workout" overlay band —
   // session-columns-only, no nested exercise/set trees. Excludes sessions with zero
   // logged exercises (abandoned starts) via an EXISTS check, matching getDayLog's
   // existing consumer-side filter.
-  getDaySessionSummaries(userId: string, date: string): Promise<{ sessionId?: string; sessionName: string; startedAt: Date; completedAt?: Date }[]>
+  getDaySessionSummaries(userId: string, date: string, timezone?: string): Promise<{ sessionId?: string; sessionName: string; startedAt: Date; completedAt?: Date }[]>
   // Batched ownership lookups for sync-time IDOR checks — returns a map of
   // row id -> owning userId for whichever of the given ids already exist.
   getWorkoutSessionOwners(sessionIds: string[]): Promise<Map<string, string>>
@@ -673,7 +701,10 @@ export interface WorkoutRepository {
   // ── Day check-in (End of Day review) ────────────────────────────────────────
   getDayCheckin(userId: string, logDate: string, phase: string): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin | null>
   listDayCheckins(userId: string, from: string, to: string, phase: string): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin[]>
-  saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt'>): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin>
+  /** Q-387 — `foodLoggingCompletedAt` is optional and LEFT ALONE when omitted: finishing a food log
+   *  and filling in the evening check-in are separate acts on the same row, and this upsert
+   *  overwrites every column it names. Pass `null` to undo; omit to preserve. */
+  saveDayCheckin(userId: string, checkin: Omit<import('@trainingai/shared/types/day-checkin').DayCheckin, 'id' | 'userId' | 'createdAt' | 'updatedAt' | 'foodLoggingCompletedAt'> & { foodLoggingCompletedAt?: Date | null }): Promise<import('@trainingai/shared/types/day-checkin').DayCheckin>
 
   countWorkoutSessions(userId: string): Promise<number>
 
@@ -682,6 +713,10 @@ export interface WorkoutRepository {
   createMealType(userId: string, data: Omit<MealType, 'id' | 'userId' | 'createdAt'>): Promise<MealType>
   updateMealType(id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType>
   deleteMealType(id: string, userId: string): Promise<void>
+  /** Live (non-soft-deleted) food logs pointing at a meal type — what the delete refusal reports (Q-412). */
+  countLiveFoodLogsForMealType(userId: string, mealTypeId: string): Promise<number>
+  /** Move every live log onto `toId`, re-stamping each one's eaten-at against the new window, then soft-delete `fromId`. One transaction (Q-412). */
+  reassignAndDeleteMealType(userId: string, fromId: string, toId: string): Promise<{ moved: number }>
   reorderMealTypes(userId: string, orderedIds: string[]): Promise<void>
   seedDefaultMealTypes(userId: string): Promise<void>
 
@@ -701,8 +736,9 @@ export interface WorkoutRepository {
   deleteFoodLog(id: string, userId: string): Promise<void>
 
   listSavedMeals(userId: string): Promise<SavedMeal[]>
-  createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number): Promise<SavedMeal>
-  updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number): Promise<SavedMeal>
+  /** `imageDataUri`: omit to leave a stored thumbnail alone, `null` to remove it. Capped (Q-396). */
+  createSavedMeal(userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings?: number, imageDataUri?: string | null): Promise<SavedMeal>
+  updateSavedMeal(id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings?: number, imageDataUri?: string | null): Promise<SavedMeal>
   deleteSavedMeal(id: string, userId: string): Promise<void>
 
   // ── Meal Plan (Q-186) ────────────────────────────────────────────────────────
@@ -967,6 +1003,8 @@ export interface WorkoutRepository {
   // 180d oura_heartrate / 90d rr_intervals prunes.
   upsertWorkoutHrStats(userId: string, sessionId: string, stats: WorkoutHrStatsInput): Promise<void>
   getWorkoutHrStats(userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null>
+  /** `sessionId → avgBpm` for the sessions that have one (Q-421). Absent = no usable HR. */
+  getAvgBpmBySession(userId: string, sessionIds: string[]): Promise<Map<string, number>>
   listSessionsMissingHrStats(userId: string, since: Date, limit: number): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   // Per-SET HR metric snapshot (migration 139) — durable per-set record for per-exercise HR trends,
   // sibling of workout_hr_stats. getSetDetailsForSession feeds the formula; the rest persist/read it.
@@ -984,7 +1022,7 @@ export interface WorkoutRepository {
   markOuraWorkoutReviewed(userId: string, id: string): Promise<void>
   getSetTimestampsForSession(workoutSessionId: string): Promise<{ exerciseName: string; setNumber: number; setStartMs: number | null; setEndMs: number | null; loggedAt: Date | null }[]>
   markHrSynced(workoutSessionId: string): Promise<void>
-  getUnsyncedHrSessionsForDay(userId: string, day: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
+  getUnsyncedHrSessionsForDay(userId: string, day: string, timezone?: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   getUnsyncedHrSessions(userId: string, from: Date, to: Date): Promise<{ id: string; startedAt: Date; completedAt: Date | null }[]>
   getWorkoutSessionById(userId: string, id: string): Promise<{ id: string; startedAt: Date; completedAt: Date | null } | null>
   // Full session detail (exercises + sets) for a single workout session — used by the

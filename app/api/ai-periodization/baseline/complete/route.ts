@@ -3,6 +3,10 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { z } from 'zod'
 import type { Baseline1rmEntry } from '@trainingai/shared/types/ai-periodization'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A baseline completion marker.
+const MAX_BODY_BYTES = 8 * 1024
 
 // The only real caller (ai-periodization-status-card.tsx) always sends
 // useExisting:true — there was never a client posting real amrapResults (the actual AMRAP
@@ -19,7 +23,13 @@ export async function POST(req: NextRequest) {
 
   let body: z.infer<typeof BodySchema>
   try {
-    body = BodySchema.parse(await req.json())
+    const read = await readJsonLimited(req, MAX_BODY_BYTES)
+    if (!read.ok) {
+      return read.reason === 'too_large'
+        ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+        : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+    }
+    body = BodySchema.parse(read.body)
   } catch {
     return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   }

@@ -110,31 +110,93 @@ export function computeCalorieBalance(input: CalorieBalanceInput): CalorieBalanc
   }
 }
 
-/**
- * Marker position for the bar, 0..1 across the five bands. The bar is drawn on a fixed
- * deviation scale of ±(OUTER + ON_TARGET) so the green band always occupies the same middle
- * slice and the eye learns one layout; deviations beyond the scale clamp to the ends.
- */
-export const BAR_SCALE_KCAL = OUTER_KCAL + ON_TARGET_KCAL
-
-export function barPosition(deviationKcal: number): number {
-  const clamped = Math.max(-BAR_SCALE_KCAL, Math.min(BAR_SCALE_KCAL, deviationKcal))
-  return (clamped + BAR_SCALE_KCAL) / (2 * BAR_SCALE_KCAL)
+export interface MacroTargets {
+  proteinG: number
+  carbsG: number
+  fatG: number
 }
 
-/** The five bands as fractions of the bar width, left (well under) to right (well over). */
-export function barBands(): { zone: BalanceZone; label: string; color: string; widthPct: number }[] {
-  const total = 2 * BAR_SCALE_KCAL
-  const outerW = ((BAR_SCALE_KCAL - OUTER_KCAL) / total) * 100
-  const midW = ((OUTER_KCAL - ON_TARGET_KCAL) / total) * 100
-  const centreW = ((2 * ON_TARGET_KCAL) / total) * 100
-  return [
-    { zone: 'far_under', ...ZONE_META.far_under, widthPct: outerW },
-    { zone: 'under',     ...ZONE_META.under,     widthPct: midW },
-    { zone: 'on_target', ...ZONE_META.on_target, widthPct: centreW },
-    { zone: 'over',      ...ZONE_META.over,      widthPct: midW },
-    { zone: 'far_over',  ...ZONE_META.far_over,  widthPct: outerW },
+/** kcal per gram. Not configurable — these are the Atwater factors the rest of the app uses. */
+const KCAL_PER_G = { protein: 4, carbs: 4, fat: 9 } as const
+
+/**
+ * The day's macro targets once movement has grown the calorie budget (Q-323).
+ *
+ * `nutrition_targets` stores the **rest-day** macros, derived from the rest-day calorie floor. The
+ * budget on screen is `floor + earned from movement`, so the calorie figure moves through the day
+ * and the grams beneath it did not — the card told the user to eat 300 more kcal without saying of
+ * what.
+ *
+ * **Protein holds, and the reason is arithmetic rather than taste** (owner decision, 2026-08-19).
+ * It is dosed per kg of bodyweight, so 150 g is ~2 g/kg. Re-express that as a share of calories and
+ * apply it to a bigger day and it becomes ~2.6 g/kg — a protein requirement that rises because the
+ * user went for a walk. Movement burns carbohydrate and fat; it does not create protein demand.
+ *
+ * **Carbs and fat absorb the earned kcal in the proportion they already hold to each other.** What
+ * that preserves precisely is the **carbs:fat energy ratio** — not each macro's share of the day's
+ * total, which cannot stay fixed while protein is held constant and the total grows. Splitting into
+ * carbs alone (Q-401's first answer) would instead drift fat's share downward as the day's movement
+ * grows.
+ *
+ * Returns the input unchanged when nothing was earned. A budget only ever grows with movement, so a
+ * negative `earnedKcal` is meaningless here rather than a shrink to model.
+ */
+export function scaleMacrosForEarnedKcal(base: MacroTargets, earnedKcal: number): MacroTargets {
+  if (!Number.isFinite(earnedKcal) || earnedKcal <= 0) return base
+
+  const carbKcal = base.carbsG * KCAL_PER_G.carbs
+  const fatKcal = base.fatG * KCAL_PER_G.fat
+  const splittable = carbKcal + fatKcal
+
+  // A target with no carbs and no fat has no ratio to preserve. Everything goes to carbs, which is
+  // the answer Q-401 reached before the ratio refinement, and the case is degenerate anyway.
+  const carbShare = splittable > 0 ? carbKcal / splittable : 1
+
+  return {
+    proteinG: base.proteinG,
+    carbsG: Math.round(base.carbsG + (earnedKcal * carbShare) / KCAL_PER_G.carbs),
+    fatG: Math.round(base.fatG + (earnedKcal * (1 - carbShare)) / KCAL_PER_G.fat),
+  }
+}
+
+/**
+ * The calorie bar as a PROGRESS bar rather than a gauge (Q-323).
+ *
+ * The owner's words: *"more like Red/Orange/green; all the way like a progress bar with the green
+ * towards the end, and then a little orange/red bar after to depict going over. So it still looks
+ * like a progress bar where you want to go to the end."* That inverts what the old bar meant — it
+ * drew fixed deviation bands with a marker showing where you sat, which reads as a dial. This has
+ * an end you walk toward.
+ *
+ * The x-axis is INTAKE, from 0 to `budget + OUTER_KCAL`, so the notch sits at the budget and the
+ * tail past it is exactly the far-over threshold — long enough to read, short enough that it does
+ * not present itself as a second target.
+ *
+ * **The stops sit on the real thresholds, and that is what keeps the colour honest.** A literal
+ * five-band reading would make the on-target stripe `ON_TARGET_KCAL / (budget + OUTER)` wide —
+ * **under 6% of the bar** on a 2,180 kcal day, too thin to see. Returning colour *stops* instead of
+ * band widths lets the gradient interpolate: green is exact at the notch and blends out across the
+ * ±150 window, so the green region reads about as wide as it truly is while every boundary stays
+ * where `balanceZone()` puts it. A caller that clips this same gradient to `fillPct` therefore gets
+ * the owner's "fill takes the colour of the band it currently ends in" for free, and cannot drift
+ * from the zone label printed beside it.
+ */
+export function barProgress(
+  { intakeKcal, budgetKcal }: { intakeKcal: number; budgetKcal: number },
+): { fillPct: number; notchPct: number; stops: { color: string; pct: number }[] } {
+  const scale = Math.max(1, budgetKcal + OUTER_KCAL)
+  const at = (kcal: number) => Math.max(0, Math.min(1, kcal / scale))
+  // Monotonic by construction after clamping, which matters for a tiny budget where
+  // `budget - OUTER_KCAL` goes negative and several stops collapse onto 0.
+  const stops = [
+    { color: ZONE_META.far_under.color, pct: 0 },
+    { color: ZONE_META.far_under.color, pct: at(budgetKcal - OUTER_KCAL) },
+    { color: ZONE_META.under.color, pct: at(budgetKcal - ON_TARGET_KCAL) },
+    { color: ZONE_META.on_target.color, pct: at(budgetKcal) },
+    { color: ZONE_META.over.color, pct: at(budgetKcal + ON_TARGET_KCAL) },
+    { color: ZONE_META.far_over.color, pct: 1 },
   ]
+  return { fillPct: at(intakeKcal), notchPct: at(budgetKcal), stops }
 }
 
 /** The daily calorie target implied by a maintenance estimate and the goal's offset. */
@@ -156,4 +218,34 @@ export function goalToDailyKcal(goalKcal: number, goalType: 'daily' | 'weekly' |
 /** Inverse of `goalToDailyKcal` — preserves the user's chosen daily/weekly display preference. */
 export function dailyKcalToGoal(dailyKcal: number, goalType: 'daily' | 'weekly' | null): number {
   return goalType === 'weekly' ? Math.round(dailyKcal * 7) : Math.round(dailyKcal)
+}
+
+/**
+ * Where today's calorie budget came from, split into the part that is always there and the part you
+ * earned by moving.
+ *
+ * Q-401. The owner's model, in their words: *"i want the lowest number that assumes no
+ * exercise/movement — and only has BMR essentially. then we adjust/increase that number [by]
+ * activity."* So `base` is the budget on a zero-movement day — resting burn plus the goal's delta,
+ * which is negative for a deficit and positive for a surplus — and `earned` is today's measured
+ * movement. Their sum is the budget the zone bar judges you against.
+ *
+ *
+ * **Lives here, beside `computeCalorieBalance` whose output it reads.** It spent a day in
+ * `components/nutrition/` only to avoid colliding with the Lane A half of Q-401 in this directory;
+ * that half has landed, so it has moved to its proper home.
+ *
+ * Kept as a `.ts` rather than folded into `calorie-zone-bar.tsx`, for one blunt reason: both vitest
+ * projects are `environment: 'node'` and cannot parse JSX, so arithmetic that sits in a `.tsx`
+ * cannot be asserted at all. Two surfaces render this number — the Nutrition tab and Home's
+ * nutrition card — and a second, unasserted copy of a calorie figure is exactly what produced
+ * Q-401: two budgets on one screen, 274 kcal apart, both labelled "left".
+ */
+export function budgetProvenance(
+  { restingBaseKcal, activeKcal, targetNetKcal }:
+  { restingBaseKcal: number; activeKcal: number; targetNetKcal: number },
+): { base: number; earned: number; total: number } {
+  const base = Math.round(restingBaseKcal + targetNetKcal)
+  const earned = Math.round(activeKcal)
+  return { base, earned, total: base + earned }
 }

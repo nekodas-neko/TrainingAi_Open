@@ -4,6 +4,11 @@ import { getRepository } from '@/lib/data'
 import { rateLimit } from '@/lib/rate-limit'
 import { activityImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { z } from 'zod'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A handful of numeric metrics for one activity.
+const MAX_BODY_BYTES = 8 * 1024
 
 // Health-Connect backfill for logs saved without HR/distance/calories (lib/health-connect-sync.ts
 // enrichActivityLogs). The underlying UPDATE COALESCEs, so this can only ever FILL a null — but it
@@ -29,13 +34,18 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const body = MetricsBody.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const body = MetricsBody.safeParse(read.body)
   if (!body.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
 
   const { id } = await params
-  if (!z.string().uuid().safeParse(id).success) {
-    return NextResponse.json({ error: 'Invalid id' }, { status: 400 })
-  }
+  const badId = invalidUuidResponse(id)
+  if (badId) return badId
 
   const repo = await getRepository()
   const existing = await repo.getActivityLogById(userId, id)

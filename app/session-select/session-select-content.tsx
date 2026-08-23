@@ -32,6 +32,8 @@ import { cn } from "@trainingai/shared/utils";
 import { todayInTz, todayMidnightUtc, toAestDay, startOfWeekInTz, todayDayOfWeek, shiftDateStr, dayKeyInTz } from "@trainingai/shared/date-utils";
 import { formatInTimeZone } from "date-fns-tz";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
+import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 import { invalidateWorkoutSummaries, invalidateReadinessInputs, invalidateOuraSync, invalidateWorkoutMetaRefresh, invalidatePrescriptionChanged } from "@/lib/cache-groups";
 import { mergeCalendarOverlay, readLocalCalendarOverlay } from "@/lib/calendar/local-overlay";
 import { syncOuraRing } from "@/lib/oura-ble/sync";
@@ -118,7 +120,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   const [metaToday, setMetaToday]           = useState<BodyMetaRow | null>(null);
   const [metaRecent, setMetaRecent]         = useState<BodyMetaRow[]>([]);
   const [metaLoading, setMetaLoading]       = useState(true);
-  const [activeEnergyKcalToday, setActiveEnergyKcalToday] = useState<number | null>(null);
   const [activeWidgets, setActiveWidgets]   = useState<MetaKey[]>(DEFAULT_WIDGETS);
   const [pillColors, setPillColors]         = useState<Record<string, string>>({});
   const [cardColors, setCardColors]         = useState<Record<string, string>>({});
@@ -508,14 +509,16 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         }
       }
     }
-    await cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: { steps: number; calories: number; waterMl: number } | null; activeEnergyKcalToday?: number | null }>(
+    // Q-415: `activeEnergyKcalToday` used to be read here and added to the stored calorie goal to
+    // make Home's nutrition budget. It is no longer read on this screen at all — the budget comes
+    // from `/api/nutrition/energy-balance`, which is the one place that knows what the base is.
+    await cachedFetch<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: { steps: number; calories: number; waterMl: number } | null }>(
       'body-metadata', '/api/body-metadata', TTL_MEDIUM,
       (data) => {
         if (!isBodyMetadataFresh(data, tz)) return;
         setMetaToday(data.today ?? null);
         setMetaRecent(data.recent ?? []);
         setWeekToDate(data.weekToDate ?? null);
-        setActiveEnergyKcalToday(data.activeEnergyKcalToday ?? null);
         setMetaLoading(false);
       },
     );
@@ -709,29 +712,28 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // shading) but isn't one of the refreshTick-gated effects — it was invalidated correctly
   // but nothing ever re-fetched it on this signal, same gap as sleep-content.tsx/health-content.tsx.
   useEffect(() => {
-    const onBleSynced = () => {
-      setRefreshTick(t => t + 1);
-      cachedFetch<SleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM,
-        d => setSleepData(Array.isArray(d) ? d : []));
-    };
+    const onBleSynced = () => setRefreshTick(t => t + 1);
     window.addEventListener('ta:oura-ble-synced', onBleSynced);
     return () => window.removeEventListener('ta:oura-ble-synced', onBleSynced);
   }, []);
 
+  // Was on the BLE event; the invalidation is wider (`invalidateBiometrics` clears this key too).
+  useInvalidationRefetch('sleep-sessions', () => {
+    cachedFetch<SleepRow[]>('sleep-sessions', '/api/sleep-sessions', TTL_MEDIUM, d => setSleepData(Array.isArray(d) ? d : []));
+  });
+
+  // Q-359: synced into state, not derived — `goalsProfile` also takes optimistic local writes that
+  // must outlive a refetch. Safe because the goals card gates on `goalsCheckinDismissed` first.
+  const userProfile = useCachedValue<{ user?: { displayName?: string | null; name?: string | null; avatar?: string | null; activityLevel?: string | null; fitnessGoal?: string | null; lastGoalReviewAt?: string | null } }>(
+    'more-user-profile', '/api/user/profile', TTL_MEDIUM,
+  );
   useEffect(() => {
-    cachedFetch<{ user?: { displayName?: string | null; name?: string | null; avatar?: string | null; activityLevel?: string | null; fitnessGoal?: string | null; lastGoalReviewAt?: string | null } }>(
-      'more-user-profile', '/api/user/profile', TTL_MEDIUM,
-      d => {
-        setDisplayName(d.user?.displayName ?? d.user?.name ?? null);
-        if (d.user?.avatar) setUserAvatar(d.user.avatar);
-        setGoalsProfile({
-          activityLevel: d.user?.activityLevel ?? null,
-          fitnessGoal: d.user?.fitnessGoal ?? null,
-          lastGoalReviewAt: d.user?.lastGoalReviewAt ?? null,
-        });
-      },
-    ).catch(() => {})
-  }, []);
+    const u = userProfile?.user;
+    if (!u) return;
+    setDisplayName(u.displayName ?? u.name ?? null);
+    if (u.avatar) setUserAvatar(u.avatar);
+    setGoalsProfile({ activityLevel: u.activityLevel ?? null, fitnessGoal: u.fitnessGoal ?? null, lastGoalReviewAt: u.lastGoalReviewAt ?? null });
+  }, [userProfile]);
 
   useEffect(() => {
     let cancelled = false;
@@ -1219,7 +1221,6 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
                   metaToday={metaToday}
                   metaRecent={metaRecent}
                   metaLoading={metaLoading}
-                  activeEnergyKcalToday={activeEnergyKcalToday}
                   weekToDate={weekToDate}
                   calorieGoal={calorieGoal}
                   calorieType={calorieType}

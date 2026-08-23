@@ -1,8 +1,10 @@
 import type { FoodLogWithItem, NutritionIngredient, NutritionScanResult } from '@trainingai/shared/types/nutrition'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { invalidateNutritionWrite } from '@/lib/cache-groups'
+import { resolveLocalEatenAt } from './local-eaten-at'
+import { DEFAULT_TZ } from '../date-utils'
 
 /**
  * A single food entry to log. When `foodItemId` is present the item already
@@ -177,6 +179,7 @@ export async function logFoodEntries(
   date: string,
   mealTypeId: string,
   userId?: string,
+  tz: string = DEFAULT_TZ,
 ): Promise<FoodLogWithItem[]> {
   const store = userId ? getLocalStore(userId) : null
   const now = new Date().toISOString()
@@ -184,6 +187,10 @@ export async function logFoodEntries(
 
   if (store) {
     try {
+      // When the food was EATEN, which is not when this ran if the user is back-filling a day
+      // (Q-413). `now` stays the write clock — `updated_at` is a sync cursor and must keep meaning
+      // "when this row changed".
+      const eatenAt = await resolveLocalEatenAt(store, mealTypeId, date, new Date(now), tz)
       // Mint the food-item id client-side instead of awaiting the create POST —
       // offline, that POST throws and the whole log is lost (SYNC-O2). The item
       // is created server-side via its own outbox mutation, queued before the
@@ -222,19 +229,22 @@ export async function logFoodEntries(
         await store.upsertFoodLog({
           id: logId, date, mealTypeId, foodItemId,
           quantityMultiplier: entry.quantityMultiplier,
-          loggedAt: now, updatedAt: now, deletedAt: null, syncStatus: 'pending',
+          loggedAt: eatenAt, updatedAt: now, deletedAt: null, syncStatus: 'pending',
         })
         await store.queueMutation({
           userId: userId!,
           domain: 'food_logs',
           date,
-          payload: { id: logId, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: now },
+          payload: { id: logId, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: eatenAt },
         })
-        optimistic.push(toWithItem(entry, { id: logId, userId: userId!, date, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: now }))
+        optimistic.push(toWithItem(entry, { id: logId, userId: userId!, date, mealTypeId, foodItemId, quantityMultiplier: entry.quantityMultiplier, loggedAt: eatenAt }))
       }
       await cancelMealReminder(mealTypeId)
+      // Twice, deliberately: now so this device's screens repaint at once (and because offline
+      // this is the only one that will ever fire), and again once the server has the write —
+      // otherwise the refetch this triggers re-caches the pre-log figures. See pushThenRevalidate.
       await invalidateNutritionWrite()
-      pushMutations(userId!).catch(() => {})
+      pushThenRevalidate(userId!, invalidateNutritionWrite)
       return optimistic
     } catch (sqliteErr) {
       console.error('Food log SQLite write failed, falling back to API:', sqliteErr)

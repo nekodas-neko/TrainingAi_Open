@@ -5,6 +5,11 @@ import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { generatePrescriptionForSession } from '@trainingai/shared/ai-periodization/generate-prescription'
 import { z } from 'zod'
+import { invalidUuidResponse } from '@/lib/api/route-errors'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Optional prescription overrides.
+const MAX_BODY_BYTES = 16 * 1024
 
 export const maxDuration = 30
 
@@ -31,12 +36,20 @@ export async function POST(
   }
 
   const { sessionId: programSessionId } = await params
+  const badId = invalidUuidResponse(programSessionId)
+  if (badId) return badId
   // excludeSessionId: the just-completed workout session id, when this call is fired from
   // complete-workout's post-completion hook — excluded from the hoursSinceLastSession gap so
   // a fresh completion can't self-trigger the emergency deload (W5 §4.2). Absent for
   // manual/GET-style prescribe calls.
   // durationPreset: a today-only time-budget choice from the pre-workout screen.
-  const body = await req.json().catch(() => ({}))
+  // Optional body — the manual/GET-style prescribe calls send none — so an absent or unreadable
+  // one still falls back to {} and reaches the schema; only an oversized one is refused.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+  }
+  const body = (read.ok ? read.body : null) ?? {}
   const parsed = PrescribeBodySchema.safeParse(body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   const { excludeSessionId, durationPreset } = parsed.data

@@ -13,6 +13,10 @@ import { latestIllnessFromDerived } from '@trainingai/shared/health/illness-rada
 import { computeSleepScoreSeries } from '@trainingai/shared/health/sleep-score'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// An optional force flag.
+const MAX_BODY_BYTES = 4 * 1024
 
 const CACHE_SECTION = 'weekly-digest'
 
@@ -27,8 +31,12 @@ export async function POST(req: Request) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let force = false
-  try { force = Boolean((await req.json())?.force) } catch { /* no body */ }
+  // Optional body: an absent or unreadable one keeps the default, only an oversized one is refused.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+  }
+  const force = Boolean((read.ok ? (read.body as { force?: unknown } | null) : null)?.force)
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
 

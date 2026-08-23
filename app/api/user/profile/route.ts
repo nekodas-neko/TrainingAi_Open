@@ -3,6 +3,10 @@ import { z } from 'zod'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { ACTIVITY_LEVELS, FITNESS_GOALS } from '@trainingai/shared/types/user'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Eight fields, the longest capped at 100 characters by the schema below. 8 KB is generous.
+const MAX_BODY_BYTES = 8 * 1024
 
 const ProfileSchema = z.object({
   displayName:   z.string().min(1).max(100).optional().nullable(),
@@ -37,7 +41,16 @@ export async function PATCH(req: NextRequest) {
   const session = await auth()
   if (!session?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const parsed = ProfileSchema.safeParse(await req.json())
+  // `safeParse(await req.json())` threw on malformed JSON before the schema could answer, so a bad
+  // body was a 500 rather than the 400 the schema would have given it.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 })
+  }
+
+  const parsed = ProfileSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }

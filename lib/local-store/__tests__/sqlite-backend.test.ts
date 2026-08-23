@@ -85,6 +85,25 @@ describe('applyDelta pull-clobber guards', () => {
     expect(stmt).toContain(`sync_status='synced'`)
   })
 
+  it('food_logs pull carries meal_type_id, date and logged_at, not just the quantity (Q-325)', async () => {
+    // The conflict arm used to set only quantity_multiplier, updated_at and deleted_at, so a
+    // server-side change to any other column never reached a device that already held the row.
+    // Found while shipping Q-413 — the migration that corrects `logged_at` would have stopped at
+    // the server — and it is also the column Q-412's reassign moves.
+    await store.applyDelta({ foodLogs: [{
+      id: 'fl-1', date: '2026-08-17', mealTypeId: 'mt-lunch', foodItemId: 'fi-1',
+      quantityMultiplier: 1, loggedAt: '2026-08-17T03:30:00.000Z',
+      updatedAt: '2026-08-19T09:00:00.000Z', deletedAt: null, syncStatus: 'synced' as const,
+    }] })
+    const stmt = sqlCalls().find(s => s.includes('INTO food_logs'))!
+    const onConflict = stmt.slice(stmt.indexOf('ON CONFLICT'))
+    for (const col of ['meal_type_id=excluded', 'date=excluded', 'logged_at=excluded', 'food_item_id=excluded']) {
+      expect(onConflict, `the update arm must carry ${col}`).toContain(col)
+    }
+    // The guard is what protects a pending local edit — widening the SET must not remove it.
+    expect(onConflict).toContain(`WHERE food_logs.sync_status='synced'`)
+  })
+
   it('workout_sessions pull carries session_id / intensity_mode / was_override (Q-131)', async () => {
     // All three exist on both ends' schemas and were dropped by the pull mapping and this insert,
     // so a device restored from sync replayed its outbox with no program-session link and fell
@@ -423,6 +442,66 @@ describe('deleteExerciseLogLocally / updateExerciseLogLocally sync_status (SYN-4
     expect(exStmt).not.toContain(`sync_status='pending'`)
     const setStmt = sqlCalls().find(s => s.includes('UPDATE set_logs'))!
     expect(setStmt).toContain(`sync_status='synced'`)
+  })
+
+  // Q-488: the same instant-match reasoning, on the delete that was missing entirely. Here 'pending'
+  // would be worse than merely wrong — applyDelta reaps the row with
+  // `DELETE … WHERE id = ? AND sync_status='synced'`, so a pending row blocks its own tombstone.
+  it('deleteActivityLog soft-deletes and marks it synced, not pending', async () => {
+    await store.deleteActivityLog('al-1')
+    const stmt = sqlCalls().find(s => s.includes('UPDATE activity_logs'))!
+    expect(stmt).toContain('deleted_at=?')
+    expect(stmt).toContain(`sync_status='synced'`)
+    expect(stmt).not.toContain(`sync_status='pending'`)
+  })
+
+  it('deleteActivityLog scopes the write to the one id and stamps updated_at', async () => {
+    await store.deleteActivityLog('al-1')
+    const call = runSQL.mock.calls.find(c => String(c[0]).includes('UPDATE activity_logs'))!
+    expect(String(call[0])).toContain('WHERE id=?')
+    const params = call[1] as unknown[]
+    expect(params[2]).toBe('al-1')
+    // deleted_at and updated_at both stamped, and with the same instant.
+    expect(params[0]).toBe(params[1])
+  })
+
+  // Q-328: the offline-capable sibling. The pairing with the test above is the point — 'synced' and
+  // 'pending' are BOTH correct, at different moments, and which one a row carries decides whether
+  // applyDelta's tombstone reaper can ever touch it.
+  it('softDeleteActivityLogPending marks it pending, so a queued delete is not pull-clobbered', async () => {
+    await store.softDeleteActivityLogPending('al-1')
+    const stmt = sqlCalls().find(s => s.includes('UPDATE activity_logs'))!
+    expect(stmt).toContain('deleted_at=?')
+    expect(stmt).toContain(`sync_status='pending'`)
+    expect(stmt).not.toContain(`sync_status='synced'`)
+  })
+
+  it('softDeleteActivityLogPending scopes to the one id and stamps both timestamps together', async () => {
+    await store.softDeleteActivityLogPending('al-1')
+    const call = runSQL.mock.calls.find(c => String(c[0]).includes('UPDATE activity_logs'))!
+    expect(String(call[0])).toContain('WHERE id=?')
+    const params = call[1] as unknown[]
+    expect(params[2]).toBe('al-1')
+    expect(params[0]).toBe(params[1])
+  })
+
+  // The other half: without this the pending tombstone above is stuck forever, because the reaper
+  // only removes rows already marked synced.
+  it('markActivityLogSynced flips the row without touching deleted_at', async () => {
+    await store.markActivityLogSynced('al-1')
+    const stmt = sqlCalls().find(s => s.includes('UPDATE activity_logs'))!
+    expect(stmt).toContain(`sync_status='synced'`)
+    expect(stmt).not.toContain('deleted_at')
+  })
+
+  // Q-488 recorded that the first thing a session reaches for is a read-merge `upsertActivityLog`
+  // with `deletedAt: now`. It compiles, type-checks, passes lint — and changes nothing, because that
+  // method's INSERT column list and its ON CONFLICT DO UPDATE both omit deleted_at. This pins the
+  // trap: if someone adds deleted_at to the upsert, this test fails and points at deleteActivityLog.
+  it('upsertActivityLog does NOT touch deleted_at — a "soft delete via upsert" is a silent no-op', async () => {
+    await store.upsertActivityLog(activityLog)
+    const stmt = sqlCalls().find(s => s.includes('INSERT INTO activity_logs'))!
+    expect(stmt).not.toContain('deleted_at')
   })
 
   it('updateExerciseLogLocally marks the exercise_log and each set synced, not pending', async () => {

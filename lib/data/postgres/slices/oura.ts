@@ -949,6 +949,26 @@ export async function upsertWorkoutHrStats(db: Db, userId: string, sessionId: st
     })
 }
 
+/**
+ * Average BPM for many sessions at once, as a `sessionId → avgBpm` map (Q-421).
+ *
+ * The energy path estimates a whole 14-day window in one pass, so the per-session
+ * `getWorkoutHrStats` above would be N queries on a route that already runs a lot of them. Sessions
+ * with no snapshot, or a snapshot whose `avg_bpm` is null, are simply absent from the map — the
+ * caller falls back to the MET estimate for those, which is 36 of the owner's 78 sessions.
+ */
+export async function getAvgBpmBySession(db: Db, userId: string, sessionIds: string[]): Promise<Map<string, number>> {
+  if (sessionIds.length === 0) return new Map()
+  const rows = await db
+    .select({ id: s.workoutHrStats.workoutSessionId, avgBpm: s.workoutHrStats.avgBpm })
+    .from(s.workoutHrStats)
+    .where(and(
+      eq(s.workoutHrStats.userId, userId),
+      inArray(s.workoutHrStats.workoutSessionId, sessionIds),
+    ))
+  return new Map(rows.filter(r => r.avgBpm != null).map(r => [r.id, r.avgBpm as number]))
+}
+
 export async function getWorkoutHrStats(db: Db, userId: string, sessionId: string): Promise<WorkoutHrStatsRow | null> {
   const [row] = await db
     .select({
@@ -1231,9 +1251,12 @@ export async function markHrSynced(db: Db, workoutSessionId: string) {
     .where(eq(s.workoutSessions.id, workoutSessionId))
 }
 
-export async function getUnsyncedHrSessionsForDay(db: Db, userId: string, day: string) {
+// No production caller today — only the adapter wrapper, the repository interface and a test. Kept
+// rather than deleted because that test is real soft-delete coverage; fixed rather than left wrong
+// because a window keyed to the owner's zone is what an eventual caller would inherit (LA-19).
+export async function getUnsyncedHrSessionsForDay(db: Db, userId: string, day: string, timezone = DEFAULT_TZ) {
   const [y, m, d] = day.split('-').map(Number)
-  const from = aestMidnight(y, m, d)
+  const from = aestMidnight(y, m, d, timezone)
   const to   = new Date(from.getTime() + 24 * 60 * 60 * 1000)
   return db
     .select({

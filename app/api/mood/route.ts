@@ -5,6 +5,10 @@ import { MoodFieldsSchema } from '@trainingai/shared/validation/mood-log'
 import { rateLimit } from '@/lib/rate-limit'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, normalizeDateParamIso } from '@trainingai/shared/date-utils'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One mood check-in.
+const MAX_BODY_BYTES = 8 * 1024
 
 // Shared with the outbox's mood_logs branch in pushMutations, which used to cast straight
 // through with no validation at all (Q-131).
@@ -38,7 +42,13 @@ export async function POST(req: NextRequest) {
   }
 
   const tz = session.user.timezone ?? DEFAULT_TZ
-  const parsed = MoodSchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid body' }, { status: 400 })
+  }
+  const parsed = MoodSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
   }

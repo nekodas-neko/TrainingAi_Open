@@ -3,11 +3,15 @@ import { z } from 'zod'
 import { generateObject } from 'ai'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import type { NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Same shape as the plan route plus one meal's ingredients. 256 KB is generous.
+const MAX_BODY_BYTES = 256 * 1024
 
 /**
  * Regenerate ONE meal against a target the caller already holds.
@@ -80,10 +84,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
   }
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const parsed = RequestSchema.safeParse(raw)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = RequestSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
@@ -109,7 +116,20 @@ export async function POST(req: Request) {
   let meal: z.infer<typeof MealSchema>
   try {
     const result = await loggedGenerateObject(
-      { section: rewriting ? 'meal-plan-edit-meal' : 'meal-plan-generate-meal', userId, fingerprint: String(Math.round(input.targetCalories)) },
+      {
+        section: rewriting ? 'meal-plan-edit-meal' : 'meal-plan-generate-meal',
+        userId,
+        // A rounded calorie target alone made every deliberate reroll look like a double trip
+        // (Q-471) — it is the same for every slot in a plan and does not change when the user
+        // rerolls. What actually differs is `avoidNames`, which carries the meal being replaced
+        // (see the schema), and for a rewrite the instruction and the meal it applies to.
+        fingerprint: {
+          kcal: Math.round(input.targetCalories),
+          avoid: contentKey(...(input.avoidNames ?? [])),
+          instruction: contentKey(input.instruction),
+          meal: contentKey(input.currentMeal?.name),
+        },
+      },
       () => generateObject({
         model: aiModel(),
         schema: MealSchema,

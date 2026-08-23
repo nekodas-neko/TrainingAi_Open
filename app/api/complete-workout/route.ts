@@ -4,6 +4,10 @@ import { rateLimit } from "@/lib/rate-limit";
 import { CompleteWorkoutPayloadSchema, completeWorkoutFromPayload } from "@trainingai/shared/workout/complete-workout";
 import { reportServerError } from "@/lib/observability";
 import { syncAndAttributeSessionHr } from "@/lib/workout/post-completion-hr";
+import { readJsonLimited } from "@trainingai/shared/http/request-guards";
+
+// A UUID and a timestamp. 4 KB is already far past anything this route can use.
+const MAX_BODY_BYTES = 4 * 1024;
 
 export async function POST(req: NextRequest) {
   const session = await auth();
@@ -13,11 +17,13 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  let rawBody: unknown;
-  try { rawBody = await req.json(); } catch {
-    return NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === "too_large"
+      ? NextResponse.json({ error: "Request too large" }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
   }
-  const parsed = CompleteWorkoutPayloadSchema.safeParse(rawBody);
+  const parsed = CompleteWorkoutPayloadSchema.safeParse(read.body);
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
   let result: { alreadyCompleted: boolean; programSessionId: string | null };

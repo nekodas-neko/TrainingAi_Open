@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
-import { shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
+import { formatInTimeZone } from 'date-fns-tz'
+import { isCalendarDate, shiftDateStr, aestMidnight, toAestDay, normalizeDateParam, normalizeDateParamIso, dateStrMidnightInTz, ageFromDob, weekStartForDay, formatDateDisplay, formatDayShort, dayKeyInTz } from '../date-utils'
 
 describe('ageFromDob', () => {
   const today = new Date('2026-07-22T00:00:00Z')
@@ -10,6 +11,34 @@ describe('ageFromDob', () => {
   it('returns null for a missing or invalid DOB', () => {
     expect(ageFromDob(null, today)).toBeNull()
     expect(ageFromDob('not-a-date', today)).toBeNull()
+  })
+})
+
+describe('isCalendarDate (Q-496)', () => {
+  // The shape regexes in the route schemas accept all three of these, and Postgres then refuses
+  // them as `[pg 22008]` — a client input error recorded as a server fault. Measured:
+  // `POST /api/day-checkin {"date":"2026-13-45"}` answered 500 and wrote an `error_events` row.
+  it('rejects a date-shaped string that is not a real day', () => {
+    expect(isCalendarDate('2026-13-45')).toBe(false)
+    expect(isCalendarDate('2026-02-31')).toBe(false)
+    expect(isCalendarDate('0000-00-00')).toBe(false)
+    expect(isCalendarDate('2026-00-10')).toBe(false)
+  })
+
+  it('accepts a real day in either separator, because the client emits slashes', () => {
+    expect(isCalendarDate('2026-08-17')).toBe(true)
+    expect(isCalendarDate('2026/08/17')).toBe(true)
+    expect(isCalendarDate('2024-02-29')).toBe(true)   // a real leap day
+  })
+
+  it('rejects the non-leap Feb 29 that Date would silently roll to March 1', () => {
+    expect(isCalendarDate('2026-02-29')).toBe(false)
+  })
+
+  it('rejects anything that is not date-shaped at all', () => {
+    expect(isCalendarDate('')).toBe(false)
+    expect(isCalendarDate('not-a-date')).toBe(false)
+    expect(isCalendarDate('2026-8-1')).toBe(false)
   })
 })
 
@@ -27,6 +56,45 @@ describe('shiftDateStr', () => {
   it('handles month boundaries', () => {
     expect(shiftDateStr('2026-01-31', 1)).toBe('2026-02-01')
     expect(shiftDateStr('2026-03-01', -1)).toBe('2026-02-28')
+  })
+
+  // Q-497. The year was the one field without width padding, so a year under 1000 emitted three
+  // digits — and '999-01-01' sorts BEFORE '1000-01-01', silently reordering any string comparison.
+  it('pads the year to four digits, so a low year still sorts correctly', () => {
+    expect(shiftDateStr('1000-01-01', -1)).toBe('0999-12-31')
+    expect(shiftDateStr('0999-12-31', 1)).toBe('1000-01-01')
+    expect(shiftDateStr('0999-12-31', 1) > shiftDateStr('1000-01-01', -1)).toBe(true)
+  })
+
+  // Q-329. `Date.UTC` reads a year of 0–99 as 1900+y, so this returned 1900-12-31 — off by ~1,900
+  // years, silently, on a value `normalizeDateParamIso` accepts (`\d{4}` matches `0050`). The
+  // admin backfill route COMMITS, so it would have written recomputed scores onto 1950s dates.
+  it('does not shift a first-century date by ~1,900 years', () => {
+    expect(shiftDateStr('0001-01-01', -1)).toBe('0000-12-31')
+    expect(shiftDateStr('0050-06-15', 1)).toBe('0050-06-16')
+    expect(shiftDateStr('0099-12-31', 1)).toBe('0100-01-01')
+  })
+
+  // The boundary either side of the legacy mapping's range.
+  it('leaves years at and above 100 alone', () => {
+    expect(shiftDateStr('0100-01-01', -1)).toBe('0099-12-31')
+    expect(shiftDateStr('0100-01-01', 1)).toBe('0100-01-02')
+  })
+
+  // The correction must not reach the common path — this is the case that killed the tempting
+  // "construct in a safe year and re-stamp" rewrite, which returned March 1 here.
+  it('still handles an ordinary non-leap February boundary', () => {
+    expect(shiftDateStr('2026-03-01', -1)).toBe('2026-02-28')
+    expect(shiftDateStr('2024-03-01', -1)).toBe('2024-02-29')
+  })
+
+  // The other half of Q-497, pinned so nobody reads the padding above as making string comparison
+  // safe. It does not, and cannot: a 'YYYY-MM-DD' contract has no room for a five-digit year, and
+  // padStart is a no-op on one. This is why the two admin range loops iterate a validated day COUNT
+  // instead of `for (d = start; d <= end; …)` — that comparison ran ~29M times.
+  it('cannot keep a five-digit year orderable — the reason range loops must not compare strings', () => {
+    expect(shiftDateStr('9999-12-31', 1)).toBe('10000-01-01')
+    expect('10000-01-01' <= '9999-12-31').toBe(true)
   })
 
   it('handles year boundaries', () => {
@@ -211,5 +279,48 @@ describe('dayKeyInTz (Q-163)', () => {
 
   it('crosses a month boundary correctly', () => {
     expect(dayKeyInTz('Australia/Brisbane', 1, new Date('2026-08-01T02:00:00Z'))).toBe('2026/07/31')
+  })
+})
+
+// Q-489 — "yesterday" derived by subtracting 86,400,000 ms is wrong on a DST fall-back day.
+//
+// This is a **class** test, not a call-site test. Five sites built a calendar day from an ms offset
+// (`toAestDay(new Date(Date.now() - 86_400_000), tz)` and friends); all five now shift the date
+// string instead. Pinning the divergence itself means the test cannot go stale when a call site
+// moves, and — the part that matters — **it needs no clock**. Both instants are passed in
+// explicitly, so it fires on every CI run rather than for one hour, once a year, in one timezone.
+// The repo has been bitten twice by tests that only fire inside a window (Q-356 and the
+// `scale-ble-day-keying` fixture), which is the reason for building it this way.
+describe('Q-489 — a calendar day comes from the date string, never from an ms offset', () => {
+  const NY = 'America/New_York'
+  const msOffsetYesterday = (now: Date, tz: string) =>
+    formatInTimeZone(new Date(now.getTime() - 86_400_000), tz, 'yyyy-MM-dd')
+  const stringShiftYesterday = (now: Date, tz: string) =>
+    shiftDateStr(formatInTimeZone(now, tz, 'yyyy-MM-dd'), -1)
+
+  it('agree on an ordinary day, and on the 23-hour spring-forward day', () => {
+    for (const iso of ['2026-06-15T14:00:00Z', '2026-03-08T05:30:00Z', '2026-11-01T04:30:00Z']) {
+      const now = new Date(iso)
+      expect(stringShiftYesterday(now, NY), iso).toBe(msOffsetYesterday(now, NY))
+    }
+  })
+
+  it('diverge in the last hour of the 25-hour fall-back day — the ms offset returns TODAY', () => {
+    // 04:30 UTC on 2026-11-02 is 23:30 local on 2026-11-01 in New York — the last hour of a day
+    // that ran 25 hours. Subtracting 24 hours from it lands back inside the same local day.
+    // The hour matters: at 03:30 UTC (22:30 local) the offset is still correct, which is why this
+    // is a one-hour-per-year defect rather than a one-day one.
+    const now = new Date('2026-11-02T04:30:00Z')
+    expect(formatInTimeZone(now, NY, 'yyyy-MM-dd')).toBe('2026-11-01')
+
+    expect(msOffsetYesterday(now, NY)).toBe('2026-11-01')   // the bug: "yesterday" is today
+    expect(stringShiftYesterday(now, NY)).toBe('2026-10-31') // the fix: the true previous day
+  })
+
+  it('shifts across a month and a year boundary without hand-rolled arithmetic', () => {
+    expect(shiftDateStr('2026-03-01', -1)).toBe('2026-02-28')
+    expect(shiftDateStr('2024-03-01', -1)).toBe('2024-02-29')
+    expect(shiftDateStr('2026-01-01', -1)).toBe('2025-12-31')
+    expect(shiftDateStr('2026-11-01', -7)).toBe('2026-10-25')
   })
 })

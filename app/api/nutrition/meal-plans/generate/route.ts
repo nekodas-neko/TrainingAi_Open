@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { generateObject } from 'ai'
 import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
-import { aiModel, loggedGenerateObject } from '@/lib/ai/instrument'
+import { aiModel, loggedGenerateObject, contentKey } from '@/lib/ai/instrument'
 import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { computeEnergyBalance } from '@/lib/health/energy-balance-service'
@@ -17,6 +17,11 @@ import { sumIngredients } from '@trainingai/shared/nutrition/scan-totals'
 import { scaleWithTopUp } from '@/lib/nutrition/meal-top-up'
 import { savedMealToIngredients } from '@trainingai/shared/nutrition/saved-meal-ingredients'
 import { NutritionIngredientsSchema } from '@trainingai/shared/validators/nutrition-ingredient'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// The schema's own caps total well under 100 KB (200 excluded foods x 80 chars is the largest
+// array). 256 KB is generous past that.
+const MAX_BODY_BYTES = 256 * 1024
 
 /**
  * Generate a meal-plan DRAFT. Persists nothing — the client reviews and then POSTs to
@@ -91,10 +96,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests — try again shortly.' }, { status: 429 })
   }
 
-  let raw: unknown
-  try { raw = await req.json() }
-  catch { return NextResponse.json({ error: 'Invalid JSON' }, { status: 400 }) }
-  const parsed = RequestSchema.safeParse(raw)
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid JSON' }, { status: 400 })
+  }
+  const parsed = RequestSchema.safeParse(read.body)
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? 'Invalid body' }, { status: 400 })
   }
@@ -102,14 +110,15 @@ export async function POST(req: Request) {
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const repo = await getRepository()
-  const [balance, targets, restrictions, baseline, savedMeals] = await Promise.all([
+  const [balance, targets, restrictions, currentWeightKg, savedMeals] = await Promise.all([
     computeEnergyBalance(repo, userId, tz, todayInTz(tz)),
     repo.getNutritionTargets(userId),
     repo.listUserDietaryRestrictions(userId),
     // CURRENT weight, not `users.weight_goal_kg` — the meal-count suggestion is protein per kg of
     // the body doing the eating, and the goal weight would skew it by however far off target
-    // the user is.
-    repo.getBodyMetricsBaseline(userId),
+    // the user is. Q-330: `getBodyMetricsBaseline` reads `asc(date)`, i.e. the FIRST weight ever
+    // logged, which is the opposite of what that sentence asks for.
+    repo.getMostRecentConfirmedWeightKg(userId),
     // Only fetched when the user asked to keep some — listing the library on every generate would
     // be a wasted query on the common path.
     input.keepSavedMealIds?.length ? repo.listSavedMeals(userId) : Promise.resolve([]),
@@ -153,7 +162,7 @@ export async function POST(req: Request) {
   })
 
   const mealCount = input.mealCount
-    ?? suggestMealCount(dailyProtein, baseline.weightKg ?? 0)
+    ?? suggestMealCount(dailyProtein, currentWeightKg ?? 0)
     ?? 3
 
   const allergies = restrictions.filter(r => r.severity === 'allergy').map(r => r.label)
@@ -164,7 +173,20 @@ export async function POST(req: Request) {
   let draft: z.infer<typeof DraftSchema>
   try {
     const result = await loggedGenerateObject(
-      { section: 'meal-plan-generate', userId, fingerprint: `${mealCount}:${dayTypes.join('/')}` },
+      {
+        section: 'meal-plan-generate',
+        userId,
+        // `mealCount:dayTypes` is stable across a regenerate with different constraints, so two
+        // genuinely different plans fingerprinted alike (Q-471). The kept meals matter most —
+        // they change on every partial regenerate.
+        fingerprint: {
+          mealCount,
+          dayTypes: dayTypes.join('/'),
+          kept: contentKey(...kept.map(k => k.name)),
+          stores: contentKey(...(input.stores ?? [])),
+          excluded: contentKey(...(input.excludedFoods ?? [])),
+        },
+      },
       () => generateObject({
         model: aiModel(),
         schema: DraftSchema,

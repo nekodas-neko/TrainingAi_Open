@@ -1,7 +1,9 @@
 'use client'
 
+import { memo, useCallback } from 'react'
 import { Search, X, Plus, Loader2, Sparkles, AlertTriangle } from 'lucide-react'
 import type { FoodItem } from '@trainingai/shared/types/nutrition'
+import { FoodRow } from '@/components/nutrition/food-row'
 import type { FoodSearchResponse } from '@/app/api/nutrition/food-search/route'
 import { macroCalorieDisagreement, MACRO_MISMATCH_VISIBLE_LIMIT } from '@trainingai/shared/nutrition/scan-totals'
 
@@ -70,23 +72,11 @@ export function IngredientSearch({
 
       {searchResults.length > 0 && (
         <div className="rounded-xl border divide-y divide-border/30 overflow-hidden">
+          {/* Q-406: the calories move out of the secondary line into the shared right-hand column,
+              which is what lets a list of foods line up. What a "serving" weighs stays, because it
+              is what the quantity control counts in and "1 serving" is meaningless without it. */}
           {searchResults.map(item => (
-            <button
-              key={item.id}
-              onClick={() => onAdd(item)}
-              className="w-full flex items-center justify-between px-3 py-2.5 text-left active:bg-muted/40 transition-colors"
-            >
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{item.name}</p>
-                {/* What a "serving" weighs, because that is what the quantity control counts in
-                    and "1 serving" is meaningless without it. */}
-                <p className="text-xs tabular-nums text-muted-foreground">
-                  {Math.round(item.calories ?? 0)} kcal · {Math.round(item.proteinG ?? 0)}g P per{' '}
-                  {(item.servingSizeG ?? 0) > 0 ? `${Math.round(item.servingSizeG!)} g serving` : 'serving'}
-                </p>
-              </div>
-              <Plus className="h-4 w-4 text-brand flex-none ml-2" />
-            </button>
+            <SearchResultRow key={item.id} item={item} onAdd={onAdd} />
           ))}
         </div>
       )}
@@ -174,3 +164,20 @@ export function IngredientSearch({
     </>
   )
 }
+
+/** Wrapper so the memoised row gets a stable `onPress` from inside a `.map()`, where a hook cannot
+ *  live and an inline arrow would defeat `React.memo` silently (Q-490). */
+const SearchResultRow = memo(function SearchResultRow(
+  { item, onAdd }: { item: FoodItem; onAdd: (i: FoodItem) => void },
+) {
+  const press = useCallback(() => onAdd(item), [item, onAdd])
+  const serving = (item.servingSizeG ?? 0) > 0 ? `${Math.round(item.servingSizeG!)} g serving` : 'serving'
+  return (
+    <FoodRow
+      name={item.name}
+      secondary={`${Math.round(item.proteinG ?? 0)}g P per ${serving}`}
+      calories={item.calories}
+      onPress={press}
+    />
+  )
+})

@@ -8,6 +8,10 @@
 export async function register() {
   if (process.env.NEXT_RUNTIME === 'nodejs') {
     await import('./instrumentation-node')
+    await import('./sentry.server.config')
+  }
+  if (process.env.NEXT_RUNTIME === 'edge') {
+    await import('./sentry.edge.config')
   }
 }
 
@@ -43,4 +47,14 @@ export async function onRequestError(
       cookieHeader: Array.isArray(cookie) ? cookie.join('; ') : cookie,
     })
   }
+
+  // And to Sentry, for the alert (Q-404). Deliberately IN ADDITION to `error_events` above, never
+  // instead of it: that table is the queryable record in our own database, and this is the thing it
+  // structurally cannot do — tell somebody. Sentry's own capture is scrubbed in
+  // `lib/observability/sentry-scrub.ts`; it is a no-op when no DSN is configured, which is the case
+  // in dev and in every test.
+  const Sentry = await import('@sentry/nextjs')
+  Sentry.captureRequestError(err, request as Parameters<typeof Sentry.captureRequestError>[1], {
+    routerKind: 'App Router', routePath: request?.path ?? '', routeType: 'route',
+  })
 }

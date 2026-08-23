@@ -48,6 +48,15 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   proposed as 5 (**Q-500, ⛔ owner sign-off**); and Q-271's headline numbers ("never above 50, ever",
   "2.2 pts/day") are an 8-day artefact — over 41 days it is 12 days above 50 and 0.71 pts/day. Also
   files **Q-501**: persisted readiness rows drift from the summaries they derive from.
+- [`docs/reviews/2026-08-20-daily-summary-wipe-retracted.md`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md)
+  — **retracts the 2026-08-19 claim that a rollup wiped the daily summaries, and restores Q-525.**
+  `oura_daily_summary` holds **45 rows, 43 of them created 2026-08-17 07:50** and untouched since; the
+  "1 row" came from `pg_stat_user_tables.n_live_tup`, a **planner estimate** that reads **0** against
+  `oura_raw_packed`'s **764** real rows. Q-528's code shape survives as a latent hazard on the
+  `fullHistory` path; its rebuild half does not. For **chronic stress**, both countable gates were then
+  measured and **both pass** — 43 summary rows against a threshold of 21, and 27 of 31 nights complete
+  in the trailing window — so the refusal is inside the **granular** layer, which persists no reason
+  for a null. Filed **TN-1**.
 - [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
   — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
   at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's
@@ -129,6 +138,13 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
 - [`docs/reviews/2026-08-18-production-verification.md`](../../reviews/2026-08-18-production-verification.md) — **this run's own findings checked against production, 2026-08-18** (Q-465 refuted in practice — zero truly-empty check-in rows across all 50, once the six morning columns are included). Filed Q-472; **amended Q-460, Q-465, Q-467, Q-468** — one refuted, two re-scoped to zero exposure, one shown unprovable either way.
 
 - [`docs/reviews/2026-08-18-model-version-clobber.md`](../../reviews/2026-08-18-model-version-clobber.md) — **the readiness model stamp is erased within hours, 2026-08-18** (Q-518 — same row read at 04:38:27 carries `{"bodyComp","readiness"}` and at 10:18:40 carries `{"bodyComp"}` alone; stamped rows table-wide go 1 → 0. `upsertOuraDailyDerived` sets every column with `COALESCE(excluded, existing)`, which for a `jsonb` column replaces the document **whole**, so the merge is left to each caller and only `readiness-payload.ts` does it. **Retracts PR #85's claim that the merge "held in production"** and defeats Q-501's purpose. Fix belongs in the upsert (`existing || excluded`), the same shape as Q-280).
+
+- [`docs/reviews/2026-08-19-score-audit-trail.md`](../../reviews/2026-08-19-score-audit-trail.md) — **the score-audit trail, 2026-08-19** (Q-525 — **`chronic_stress_score` is NULL on
+  all 96 rows and has never produced a value**, the third dormant score after the illness radar
+  (Q-506) and resilience (Q-508). Its gate needs 21 complete nights of granular BLE signals **in one
+  pass**, so a nightly incremental rollup can never satisfy it. Distinct from Q-507, which is
+  *daytime* stress minutes — same word, different model. Readiness itself comes out **clean**: it is
+  the reference for a good trail, storing sub-scores **plus `provisional` flags`**.)
 
 ## Open issues
 

@@ -27,16 +27,29 @@ import modelFiles from './model-files.json'
 export const CONSTANTS_BUCKET_PREFIX = modelFiles.constantsPrefix
 
 /** Written under the deploy's own working directory — writable on Railway, wiped per deploy, which
- *  is what we want: a stale constant is worse than a re-download. */
-const CACHE_DIR = path.join(process.cwd(), '.oura-constants')
+ *  is what we want: a stale constant is worse than a re-download.
+ *
+ *  Exported because `constants/index.ts` falls back to it: boot sets `OURA_CONSTANTS_DIR`, but only
+ *  in the process that ran boot, and a worker serving a request is not always that process. A
+ *  deterministic path is what makes the delivered files findable without an inherited env var. */
+export const CONSTANTS_CACHE_DIR = path.join(process.cwd(), '.oura-constants')
+const CACHE_DIR = CONSTANTS_CACHE_DIR
 
 /** The repo copy, while it still exists. */
 const TREE_DIR = path.join(process.cwd(), 'lib', 'oura-models', 'constants')
 
+/**
+ * The synthetic set the test suite already runs against (`scripts/generate-test-constants.js`).
+ *
+ * Committed, keys-real/numbers-fake, and the last resort **outside production only** — see
+ * `ensureConstantsAvailable`.
+ */
+const FIXTURES_DIR = path.join(process.cwd(), 'lib', 'oura-models', '__fixtures__', 'constants')
+
 export interface ConstantsDeliveryResult {
   /** Directory the loader should read from, or null when nothing could be provided. */
   dir: string | null
-  source: 'tree' | 'bucket' | 'unavailable'
+  source: 'tree' | 'bucket' | 'fixtures' | 'unavailable'
   /** Files written this boot. Zero for the tree, or on a cache hit within one process. */
   fetched: number
   detail: string
@@ -58,8 +71,43 @@ async function hasConstants(dir: string): Promise<boolean> {
  *
  * Prefers the repo copy when present — that keeps local development and CI working with no bucket
  * credentials at all, which is the same split that lets the model tests run from recordings.
+ *
+ * **Outside production, an otherwise-unavailable set falls back to the committed test fixtures**
+ * (Q-361). The wrapper below owns that decision; this function reports the real outcome, so the
+ * two stay separable.
  */
 export async function ensureConstantsAvailable(): Promise<ConstantsDeliveryResult> {
+  const real = await deliverRealConstants()
+  if (real.dir || process.env.NODE_ENV === 'production') return real
+
+  // Gated on NODE_ENV rather than on "did the bucket answer", for the same reason
+  // `instrumentation-node.ts`'s `fatalOrLoud` is: gating on credentials would substitute fake
+  // numbers in exactly the case that must fail — a production deploy that lost its storage
+  // variables. NODE_ENV cannot be wrong in the direction that matters; Railway sets it.
+  //
+  // What this buys is narrow and worth naming: `lib/oura-models/constants/*` is gitignored, so a
+  // sandbox never has it and no bucket credential resolves there either. `GET /api/nutrition/
+  // energy-balance` and `GET /api/body-metadata` therefore returned 500 in every session — not a
+  // degraded screen, an empty one — so "tested on `pnpm dev`" was silently untrue for the Energy
+  // card, the Nutrition energy bar and anything else reading them.
+  //
+  // The fixtures are the right substitute rather than a new stub: they are generated from the
+  // loader's own file list, every key is real and every *number* is synthetic, and the test suite
+  // already runs against them (`vitest.config.ts` makes the same choice). A second hand-written
+  // stub would be a set nothing keeps in step, sitting in a gitignored path indistinguishable from
+  // the vendor's own files.
+  if (await hasConstants(FIXTURES_DIR)) {
+    return {
+      dir: FIXTURES_DIR,
+      source: 'fixtures',
+      fetched: 0,
+      detail: `SYNTHETIC test fixtures — every number is fake. ${real.detail}`,
+    }
+  }
+  return real
+}
+
+async function deliverRealConstants(): Promise<ConstantsDeliveryResult> {
   if (await hasConstants(TREE_DIR)) {
     return { dir: TREE_DIR, source: 'tree', fetched: 0, detail: 'reading the repository copy' }
   }

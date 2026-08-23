@@ -14,22 +14,13 @@
 // `mergeSet`/`initialSourceMap` and never re-implement it (One-Formula-One-Place).
 
 import { sql, type SQL } from 'drizzle-orm'
+import { HEALTH_SOURCES, SOURCE_RANK, sourceRank, type HealthSource } from '@trainingai/shared/health/source-rank'
 
-export const HEALTH_SOURCES = ['health_connect', 'oura_cloud', 'oura_ble', 'scale_ble', 'manual'] as const
-export type HealthSource = (typeof HEALTH_SOURCES)[number]
-
-const RANK: Record<HealthSource, number> = {
-  health_connect: 1,
-  oura_cloud: 2,
-  oura_ble: 3,
-  scale_ble: 4,
-  manual: 5,
-}
-
-/** Precedence rank; null/unknown (legacy rows written before provenance existed) rank 0. */
-export function sourceRank(source: string | null | undefined): number {
-  return source && source in RANK ? RANK[source as HealthSource] : 0
-}
+// The ladder itself lives in `@trainingai/shared/health/source-rank` — driver-free, because the
+// Oura rollup reads it and has to be able to run outside Node. Re-exported here so the six existing
+// importers of this module are unaffected.
+export { HEALTH_SOURCES, SOURCE_RANK, sourceRank }
+export type { HealthSource }
 
 /** A `{prop, col}` pair: the Drizzle model property name and its snake_case SQL column. */
 export interface SourceColumn {
@@ -40,9 +31,15 @@ export interface SourceColumn {
 // SQL that reads the stored per-field source rank for `<table>.source_map->>'<col>'`.
 // Every part is a trusted compile-time constant (table/column names from our schema), so
 // sql.raw is safe — there is no user input in this string.
+// Generated from SOURCE_RANK rather than written out, so the SQL ladder and the TypeScript one
+// cannot drift — they were two hand-maintained copies of the same five numbers.
+const RANK_WHENS = [...HEALTH_SOURCES]
+  .sort((a, b) => SOURCE_RANK[b] - SOURCE_RANK[a])
+  .map(s => `WHEN '${s}' THEN ${SOURCE_RANK[s]}`)
+  .join(' ')
+
 function storedRankSql(table: string, col: string): string {
-  return `CASE ${table}.source_map->>'${col}' ` +
-    `WHEN 'manual' THEN 5 WHEN 'scale_ble' THEN 4 WHEN 'oura_ble' THEN 3 WHEN 'oura_cloud' THEN 2 WHEN 'health_connect' THEN 1 ELSE 0 END`
+  return `CASE ${table}.source_map->>'${col}' ${RANK_WHENS} ELSE 0 END`
 }
 
 /**

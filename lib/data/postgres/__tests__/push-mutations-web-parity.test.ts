@@ -16,6 +16,8 @@ vi.mock('@/auth', () => ({
 vi.mock('@/lib/rate-limit', () => ({ rateLimit: () => true }))
 
 const TEST_USER_ID = '00000000-0000-4000-8000-00000000f00d'
+// A second real user, so the Q-328 delete branch's user scoping is proven rather than assumed.
+const OTHER_USER_ID = '00000000-0000-4000-8000-000000328f00'
 
 function jsonReq(url: string, body: object) {
   return new Request(url, {
@@ -373,6 +375,63 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     expect(result.processed).toBe(1)
     const row = await pool.query(`SELECT calories_burned FROM activity_logs WHERE id = $1`, [id])
     expect(Number(row.rows[0].calories_burned)).toBe(320)
+    await pool.query(`DELETE FROM activity_logs WHERE id = $1`, [id])
+  })
+
+  it('activity_logs: a queued delete soft-deletes the row, mirroring the web DELETE route (Q-328)', async () => {
+    const id = crypto.randomUUID()
+    await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-act-del-1', domain: 'activity_logs', date: '2026-01-14',
+      payload: { id, activityType: 'walk', title: 'Delete Me', startTime: '07:00', durationMin: 20 },
+    }])
+
+    const del = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-act-del-2', domain: 'activity_logs', date: '2026-01-14',
+      payload: { id, deleted: true },
+    }])
+    expect(del.processed).toBe(1)
+    expect(del.errors).toHaveLength(0)
+
+    const row = await pool.query(`SELECT deleted_at FROM activity_logs WHERE id = $1`, [id])
+    expect(row.rows[0].deleted_at).not.toBeNull()
+
+    await pool.query(`DELETE FROM activity_logs WHERE id = $1`, [id])
+  })
+
+  it('activity_logs: a delete that matches nothing is processed, not quarantined (Q-328)', async () => {
+    // The commonest benign replay is a delete re-sent because its confirmation never landed, and
+    // the poison-pill rule forbids dead-lettering that forever. The row is gone either way, which
+    // is what the mutation asked for — so a miss must not become an error.
+    const del = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-act-del-3', domain: 'activity_logs', date: '2026-01-14',
+      payload: { id: '00000000-0000-4000-8000-000000000328', deleted: true },
+    }])
+    expect(del.processed).toBe(1)
+    expect(del.errors).toHaveLength(0)
+  })
+
+  it('activity_logs: a delete cannot reach another user\'s row (Q-328)', async () => {
+    const id = crypto.randomUUID()
+    await pool.query(
+      `INSERT INTO users (id, email, name, is_active) VALUES ($1, $2, 'Q328 Other', true)
+       ON CONFLICT (id) DO NOTHING`,
+      [OTHER_USER_ID, `q328-${OTHER_USER_ID}@example.com`],
+    )
+    await pool.query(
+      `INSERT INTO activity_logs (id, user_id, date, activity_type, title, duration_min)
+       VALUES ($1, $2, '2026-01-14', 'walk', 'Not Yours', 10)`,
+      [id, OTHER_USER_ID],
+    )
+
+    const del = await repo.pushMutations(TEST_USER_ID, [{
+      id: 'mut-act-del-4', domain: 'activity_logs', date: '2026-01-14',
+      payload: { id, deleted: true },
+    }])
+    expect(del.processed).toBe(1)
+
+    const row = await pool.query(`SELECT deleted_at FROM activity_logs WHERE id = $1`, [id])
+    expect(row.rows[0].deleted_at).toBeNull()
+
     await pool.query(`DELETE FROM activity_logs WHERE id = $1`, [id])
   })
 

@@ -6,6 +6,10 @@ import { DEFAULT_TZ, startOfWeekInTz, ageFromDob } from "@trainingai/shared/date
 import { BodyMetadataPostSchema } from "@trainingai/shared/validation/body-metrics";
 import { type Sex } from "@trainingai/shared/health/workout-energy";
 import { computeActiveEnergy } from "@trainingai/shared/health/daily-energy";
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// One day's body metadata.
+const MAX_BODY_BYTES = 16 * 1024
 
 // Reject an implausibly long session span (a midnight `startedAt` fallback + evening completion).
 const MAX_PLAUSIBLE_SESSION_MIN = 240;
@@ -141,11 +145,20 @@ export async function GET() {
   // Total active energy to add to the energy budget's "burned" — strength workouts + logged
   // activities (walk/run/cycle/…) + passive steps above a sedentary baseline, all net-of-rest via
   // the shared MET/Schofield estimator, de-duplicated so nothing is counted twice (see daily-energy).
+  // Q-421: batch the HR lookup for today's sessions; absent = no usable HR, and the MET estimate
+  // stands in for that session.
+  const avgBpmBySession = await repo
+    .getAvgBpmBySession(userId, todayWorkouts.filter(w => w.completedAt != null).map(w => w.id))
+    .catch(() => new Map<string, number>());
+
   const activeEnergy = computeActiveEnergy({
     profile: { ageYears, weightKg: bodyWeightForEnergy, sex: userSex },
     strengthSessions: todayWorkouts
       .filter(ws => ws.completedAt != null)
-      .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000 })),
+      // Q-419: the session's own RPE decides the intensity tier, matching the done screen. Without it
+      // this route reported a different burn for the same workout than the screen that logged it.
+      // Q-421: and `avgBpm` takes precedence over the tier where the strap was worn.
+      .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
     activities: todayActivityLogs.map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
     pedometerSteps: todayMetric?.steps ?? null,
   });
@@ -222,11 +235,14 @@ export async function POST(req: NextRequest) {
   const userId = session?.user?.id;
   if (!userId) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
-  let raw: unknown;
-  try { raw = await req.json(); }
-  catch { return NextResponse.json({ error: "Invalid JSON" }, { status: 400 }); }
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: "Request too large" }, { status: 413 })
+      : NextResponse.json({ error: "Invalid JSON" }, { status: 400 });
+  }
 
-  const parsed = BodyMetadataPostSchema.safeParse(raw);
+  const parsed = BodyMetadataPostSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid body" }, { status: 400 });
   }

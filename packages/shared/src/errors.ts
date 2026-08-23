@@ -50,3 +50,35 @@ export function isNotFoundError(err: unknown): err is NotFoundError {
  * oracle for other users' ids. Both conditions are `NotFoundError`, and the resource label is for
  * the log, never for the client.
  */
+
+/**
+ * Marker for a refusal whose message was **written to be read by the user**.
+ *
+ * Q-320 — the routes could not tell one from the other. A caught error's `.message` was used as
+ * both the status router (`msg.includes('default')`) and the response body, so a Drizzle failure
+ * published `Failed query: select "id", "user_id", …` with the same confidence as "Already friends".
+ * Two habits, one variable. Marking the deliberate ones is what separates them: anything unmarked
+ * is a fault, gets a fixed string, and keeps its detail in the log.
+ *
+ * Substring status-matching goes with it. `msg.includes('default')` matched any error carrying the
+ * word — the status now travels on the error that chose it.
+ */
+const USER_FACING_MARKER = 'trainingai/user-facing'
+
+export class UserFacingError extends Error {
+  readonly __kind = USER_FACING_MARKER
+  readonly status: number
+
+  constructor(message: string, status = 400) {
+    super(message)
+    this.name = 'UserFacingError'
+    this.status = status
+  }
+}
+
+export function isUserFacingError(err: unknown): err is UserFacingError {
+  return (
+    err instanceof UserFacingError ||
+    (typeof err === 'object' && err !== null && (err as { __kind?: unknown }).__kind === USER_FACING_MARKER)
+  )
+}

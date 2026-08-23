@@ -299,11 +299,11 @@ export async function replaceVolumeTargets(db: Db, userId: string, programId: st
 
 export async function getWorkoutSessionProgramSessionId(db: Db, userId: string, workoutSessionId: string): Promise<string | null> {
   const [row] = await db
-    .select({ sessionId: s.workoutSessions.sessionId })
+    .select({ programSessionId: s.workoutSessions.programSessionId })
     .from(s.workoutSessions)
     .where(and(eq(s.workoutSessions.id, workoutSessionId), eq(s.workoutSessions.userId, userId), isNull(s.workoutSessions.deletedAt)))
     .limit(1)
-  return row?.sessionId ?? null
+  return row?.programSessionId ?? null
 }
 
 export async function getRecentSessionsOfType(db: Db, userId: string, programSessionId: string, limit: number): Promise<Array<{
@@ -319,7 +319,7 @@ export async function getRecentSessionsOfType(db: Db, userId: string, programSes
     .from(s.workoutSessions)
     .where(and(
       eq(s.workoutSessions.userId, userId),
-      eq(s.workoutSessions.sessionId, programSessionId),
+      eq(s.workoutSessions.programSessionId, programSessionId),
       isNull(s.workoutSessions.deletedAt),
     ))
     .orderBy(desc(s.workoutSessions.startedAt))

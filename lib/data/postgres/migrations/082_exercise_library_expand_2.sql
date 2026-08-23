@@ -3,6 +3,8 @@
 -- shoulder machine/pike, core side-plank/pallof/climbers/v-up/toe-touch,
 -- glute donkey-kick/fire-hydrant, tricep diamond push-up, trap machine shrug,
 -- forearm wrist extension, leg barbell box squat.
+--
+-- IDEMPOTENT: the seed conflicts on exercise_library.name and does nothing.
 
 INSERT INTO exercise_library (name, muscles, equipment, instructions, exercise_type) VALUES
 
@@ -130,7 +132,9 @@ INSERT INTO exercise_library (name, muscles, equipment, instructions, exercise_t
  '[{"muscle":"quads","role":"main"},{"muscle":"glutes","role":"main"},{"muscle":"hamstrings","role":"secondary"},{"muscle":"core","role":"secondary"}]',
  ARRAY['barbell'],
  'Place a box or bench behind you at roughly knee height. Unrack the bar in a standard squat position. Squat back and down, pushing your hips back more than in a regular squat, until you sit on the box. Hold briefly, then drive back up. The box breaks the stretch-shortening cycle and builds strength from a dead stop at the bottom.',
- 'weighted');
+ 'weighted')
+
+ON CONFLICT (name) DO NOTHING;
 
 -- ─── Safety-net: ensure equipment is set if INSERT quirk produced {} ──────────
 

@@ -324,11 +324,32 @@ describe.skipIf(!canRun)('repository ownership scoping (Q-155)', () => {
   })
 
   it('deleteActivityLog cannot delete another user\'s activity', async () => {
-    await repo.deleteActivityLog(USER_A, bIds.activity).catch(() => {})
+    // Q-556: it now also REPORTS the miss. The row staying intact was always the security property;
+    // returning `false` is what lets the route stop answering `{ success: true }` for it.
+    const deleted = await repo.deleteActivityLog(USER_A, bIds.activity).catch(() => false)
+    expect(deleted).toBe(false)
     const { rows } = await pool.query(
       `SELECT deleted_at FROM activity_logs WHERE id = $1`, [bIds.activity])
     expect(rows).toHaveLength(1)
     expect(rows[0].deleted_at).toBeNull()
+  })
+
+  it('deleteActivityLog reports false for an id that does not exist at all', async () => {
+    // Indistinguishable from someone else's id, which is the enumeration property the cross-user
+    // review's control pass verified. Both answer `false`; neither says which.
+    const deleted = await repo.deleteActivityLog(USER_A, '00000000-0000-4000-8000-0000000556ff')
+    expect(deleted).toBe(false)
+  })
+
+  it('deleteActivityLog is idempotent — a re-delete of your own row still reports true', async () => {
+    // The WHERE does not filter `deleted_at IS NULL` on purpose. A double-tap, or a row already
+    // deleted on another device, must not read as a failure — which is half of why this route
+    // cannot answer 404 on a miss until activity-log deletes have an outbox domain (Q-328).
+    const { rows } = await pool.query(
+      `SELECT id FROM activity_logs WHERE user_id = $1 AND deleted_at IS NULL LIMIT 1`, [USER_A])
+    if (rows.length === 0) return
+    expect(await repo.deleteActivityLog(USER_A, rows[0].id)).toBe(true)
+    expect(await repo.deleteActivityLog(USER_A, rows[0].id)).toBe(true)
   })
 
   // ---- nutrition slice: 22 predicates, zero test coverage before this ----

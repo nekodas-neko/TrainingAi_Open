@@ -11,6 +11,10 @@ import { rateLimit } from '@/lib/rate-limit'
 import { projectWeeklyWeightChangeKg, stepsPaceToWeeklyGoal } from '@trainingai/shared/health/daily-digest-context'
 import { buildAutomaticPhaseStatus } from '@trainingai/shared/phase-engine'
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// An optional force flag.
+const MAX_BODY_BYTES = 4 * 1024
 
 const CACHE_SECTION = 'daily-digest'
 
@@ -19,8 +23,12 @@ export async function POST(req: Request) {
   const userId = session?.user?.id
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  let force = false
-  try { force = Boolean((await req.json())?.force) } catch { /* no body */ }
+  // Optional body: an absent or unreadable one keeps the default, only an oversized one is refused.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 })
+  }
+  const force = Boolean((read.ok ? (read.body as { force?: unknown } | null) : null)?.force)
 
   const tz = session.user?.timezone ?? DEFAULT_TZ
   const todayIso = todayInTz(tz)
@@ -29,7 +37,7 @@ export async function POST(req: Request) {
   const [sessionsToday, weekPrs, program, foodLogs, nutritionTargets, morningCheckin, userGoals, bodyMetricsToday, exerciseLibrary] = await Promise.all([
     // getDaySessionSummaries takes a slash-formatted date ("YYYY/MM/DD"), not the
     // hyphenated todayIso — matches the same conversion app/api/workout-sessions/day/route.ts uses.
-    repo.getDaySessionSummaries(userId, todayIso.replace(/-/g, '/')),
+    repo.getDaySessionSummaries(userId, todayIso.replace(/-/g, '/'), tz),
     repo.listRecentPersonalRecords(userId, new Date(todayMidnightUtc(tz).getTime()), new Date()),
     repo.getActiveProgram(userId),
     repo.listFoodLogs(userId, todayIso),

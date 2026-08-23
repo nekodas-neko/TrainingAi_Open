@@ -5,6 +5,11 @@ import { rateLimit } from "@/lib/rate-limit";
 import { DEFAULT_TZ, toAestDay, todayInTz, todayMidnightUtc } from "@trainingai/shared/date-utils";
 import { z } from "zod";
 import { activityImplausibleReason, sleepImplausibleReason } from "@trainingai/shared/validation/plausibility";
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Three arrays of at most MAX_ITEMS (400) rows of bounded numbers — about 300 KB at the schema's
+// own limit. 1 MB is generous past that.
+const MAX_BODY_BYTES = 1024 * 1024
 
 // Receives native Health Connect data from the Capacitor app.
 // The JS layer pre-aggregates data into daily buckets and sends individual
@@ -75,8 +80,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
 
-  // Fail closed: a null / non-JSON / malformed / oversized body is a 400, never a throw.
-  const parsed = SyncHealthSchema.safeParse(await req.json().catch(() => null));
+  // Fail closed: a null / non-JSON / malformed body is a 400, never a throw — and an **oversized**
+  // one is now a 413 rather than something this route reads in full first. That last clause is what
+  // the comment here used to claim and the code did not do: `req.json()` buffers before any schema
+  // can refuse it, so "oversized → 400" described protection that was not present (Q-322).
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+  }
+  const parsed = SyncHealthSchema.safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid payload", issues: parsed.error.issues }, { status: 400 });
   }

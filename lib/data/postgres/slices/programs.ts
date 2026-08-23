@@ -1,5 +1,5 @@
 import { randomUUID } from 'crypto'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
 import { eq, and, inArray, gte, lt, asc, desc, sql, isNull } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -8,8 +8,9 @@ import type {
   ProgressionStyle, StyleSet,
 } from '@trainingai/shared/types'
 import type { ProgramPhase, ProgramPhaseType, PhaseSetWithPhases, ExerciseRole } from '@trainingai/shared/types/program'
-import { aestMidnight, toAestDateStr, todayInTz } from '@trainingai/shared/date-utils'
+import { aestMidnight, toAestDateStr, todayInTz, DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { buildOwnedPhaseSetName } from '@trainingai/shared/phase-set-naming'
+import { isUuid } from '@trainingai/shared/validation/uuid'
 
 type Db = ReturnType<typeof getDb>
 
@@ -161,7 +162,7 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
         program.id ? sql`${s.programs.id} != ${program.id}` : undefined,
       ))
     if (nameClash) {
-      throw new Error(`A program named "${program.name}" already exists. Use a different name.`)
+      throw new UserFacingError(`A program named "${program.name}" already exists. Use a different name.`, 409)
     }
 
     let pRow: typeof s.programs.$inferSelect
@@ -225,20 +226,44 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
     // sessions that already existed, so the recreated row keeps the same id and the
     // link can be restored by identity (see restore loop below). The position-based
     // map is kept only as a fallback for sessions saved before ids were round-tripped.
-    let orphanedWorkoutSessions: { id: string; sessionId: string | null }[] = []
+    let orphanedWorkoutSessions: { id: string; programSessionId: string | null }[] = []
     const oldByPosition = new Map(oldSessions.map(r => [r.position, r.id]))
     const oldIdSet = new Set(oldSessions.map(r => r.id))
     let savedPeriodizationRows: (typeof s.sessionPeriodization.$inferSelect)[] = []
     if (oldSessions.length) {
       const oldIds = oldSessions.map(r => r.id)
-      orphanedWorkoutSessions = await tx.select({ id: s.workoutSessions.id, sessionId: s.workoutSessions.sessionId })
+      orphanedWorkoutSessions = await tx.select({ programSessionId: s.workoutSessions.programSessionId, id: s.workoutSessions.id })
         .from(s.workoutSessions)
-        .where(inArray(s.workoutSessions.sessionId, oldIds))
+        .where(inArray(s.workoutSessions.programSessionId, oldIds))
       savedPeriodizationRows = await tx.select()
         .from(s.sessionPeriodization)
         .where(inArray(s.sessionPeriodization.programSessionId, oldIds))
       await tx.delete(s.sessionExercises).where(inArray(s.sessionExercises.sessionId, oldIds))
       await tx.delete(s.programSessions).where(eq(s.programSessions.programId, programId))
+    }
+
+    // RV-34: `sessions[].id` is the client's, used verbatim as the new row's primary key so a program
+    // edit does not sever `workout_sessions.session_id` from already-logged workouts. Unchecked, an
+    // id belonging to ANOTHER user's program was a raw `23505` duplicate-key 500 with the failed SQL
+    // in `error_events` — failing closed by accident of a constraint rather than by design.
+    //
+    // The guard has to be "exists under a different program", NOT "not one of this program's rows":
+    // `builder-review.tsx` mints a fresh `crypto.randomUUID()` for every session on save, so the
+    // stricter reading refuses every save from the workout builder. An id that exists nowhere is an
+    // ordinary insert; an id that exists elsewhere is the case that used to 500.
+    const suppliedSessionIds = program.sessions.map(sess => sess.id).filter((id): id is string => !!id)
+    if (!suppliedSessionIds.every(isUuid)) {
+      // Would reach the driver as `22P02` on insert and surface as the same opaque 500.
+      throw new UserFacingError('This program contains a malformed session id. Reload and try again.', 400)
+    }
+    const foreignIds = suppliedSessionIds.filter(id => !oldIdSet.has(id))
+    if (foreignIds.length) {
+      const taken = await tx.select({ id: s.programSessions.id })
+        .from(s.programSessions)
+        .where(inArray(s.programSessions.id, foreignIds))
+      if (taken.length) {
+        throw new UserFacingError('This program refers to a session that belongs to another program. Reload and try again.', 409)
+      }
     }
 
     const sessionsWithIds = program.sessions.map(sess => ({
@@ -298,9 +323,9 @@ export async function saveProgram(db: Db, userId: string, program: Program): Pro
         if (sess.id && oldIdSet.has(sess.id)) newIdByOldId.set(sess.id, sess.id)
       }
       for (const ws of orphanedWorkoutSessions) {
-        const newId = ws.sessionId ? newIdByOldId.get(ws.sessionId) : undefined
+        const newId = ws.programSessionId ? newIdByOldId.get(ws.programSessionId) : undefined
         if (newId) {
-          await tx.update(s.workoutSessions).set({ sessionId: newId }).where(eq(s.workoutSessions.id, ws.id))
+          await tx.update(s.workoutSessions).set({ programSessionId: newId }).where(eq(s.workoutSessions.id, ws.id))
         }
       }
     }
@@ -424,7 +449,12 @@ export async function listPhaseSets(db: Db, userId: string): Promise<PhaseSetWit
       primaryStyleName: primaryStyle.name,
     })
     .from(s.programPhases)
-    .leftJoin(primaryStyle, eq(primaryStyle.id, s.programPhases.primaryStyleId))
+    // RV-32: scoped to the caller. `program_phases.primary_style_id` is a client-supplied FK that
+    // three write paths accepted without an ownership check, and this join is what turned a borrowed
+    // id into someone else's style NAME on screen and inside an LLM prompt. Scoping it means a
+    // reference the caller does not own reads as blank rather than as another user's words — which
+    // stays true for rows written before the write guards existed.
+    .leftJoin(primaryStyle, and(eq(primaryStyle.id, s.programPhases.primaryStyleId), eq(primaryStyle.userId, userId)))
     .where(inArray(s.programPhases.phaseSetId, sets.map(set => set.id)))
     .orderBy(asc(s.programPhases.position))
 
@@ -512,7 +542,7 @@ export async function updatePhaseSet(
     .where(and(eq(s.phaseSets.id, phaseSetId), eq(s.phaseSets.userId, userId)))
     .limit(1)
   if (!existing) throw new NotFoundError('Phase set')
-  if (existing.isDefault) throw new Error('Default phase set cannot be modified')
+  if (existing.isDefault) throw new UserFacingError('Default phase set cannot be modified', 403)
 
   return db.transaction(async tx => {
     await tx.update(s.phaseSets).set({ name }).where(eq(s.phaseSets.id, phaseSetId))
@@ -538,7 +568,7 @@ export async function deletePhaseSet(db: Db, phaseSetId: string, userId: string)
     .where(and(eq(s.phaseSets.id, phaseSetId), eq(s.phaseSets.userId, userId)))
     .limit(1)
   if (!existing) throw new NotFoundError('Phase set')
-  if (existing.isDefault) throw new Error('Cannot delete the default phase set')
+  if (existing.isDefault) throw new UserFacingError('Cannot delete the default phase set', 403)
 
   // Scoped to the caller: an unscoped probe both blocked this user's delete on a stranger's
   // program and named that program in an error surfaced verbatim to the client (Q-129).
@@ -547,7 +577,7 @@ export async function deletePhaseSet(db: Db, phaseSetId: string, userId: string)
     .from(s.programs)
     .where(and(eq(s.programs.phaseSetId, phaseSetId), eq(s.programs.userId, userId)))
   if (using.length > 0) {
-    throw new Error(`In use by: ${using.map(p => p.name).join(', ')}`)
+    throw new UserFacingError(`In use by: ${using.map(p => p.name).join(', ')}`, 400)
   }
   await db.delete(s.phaseSets).where(eq(s.phaseSets.id, phaseSetId))
 }
@@ -638,7 +668,7 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
   const sessionNameLower = sql<string>`lower(${s.workoutSessions.sessionName})`
   const rows = await db
     .select({
-      sessionId: s.workoutSessions.sessionId,
+      sessionId: s.workoutSessions.programSessionId,
       sessionName: sessionNameLower,
       count: sql<number>`count(*)::int`,
     })
@@ -649,7 +679,7 @@ export async function countAllSessionsSinceStart(db: Db, userId: string, program
       isNull(s.workoutSessions.deletedAt),
       sql`${s.workoutSessions.startedAt} > coalesce(${prog?.cycleAnchorAt ?? null}, ${prog?.startedAt ?? null}::timestamptz, '-infinity'::timestamptz)`,
     ))
-    .groupBy(s.workoutSessions.sessionId, sessionNameLower)
+    .groupBy(s.workoutSessions.programSessionId, sessionNameLower)
 
   const counts = new Map<string, number>()
   for (const r of rows) {
@@ -680,10 +710,10 @@ export async function getActiveProgramWithPhases(db: Db, userId: string) {
   return { program: prog, phases }
 }
 
-export async function confirmEarlyDeload(db: Db, userId: string, programId: string, today: string): Promise<void> {
+export async function confirmEarlyDeload(db: Db, userId: string, programId: string, today: string, timezone = DEFAULT_TZ): Promise<void> {
   const [y, m, d] = today.split('-').map(Number)
-  const dayStart = aestMidnight(y, m, d)
-  const dayEnd   = aestMidnight(y, m, d + 1)
+  const dayStart = aestMidnight(y, m, d, timezone)
+  const dayEnd   = aestMidnight(y, m, d + 1, timezone)
   await db.transaction(async tx => {
     await tx.update(s.programs)
       .set({ earlyDeloadWeekStart: today })
@@ -699,6 +729,29 @@ export async function confirmEarlyDeload(db: Db, userId: string, programId: stri
 }
 
 // ── Progression Styles ────────────────────────────────────────────────────────
+
+/**
+ * True when every id supplied is a progression style belonging to `userId` (RV-32).
+ *
+ * `progression_styles.user_id` is NOT NULL and there is no shared or global style, so an id the
+ * caller does not own is always wrong. The narrow shape matters: the three write paths that needed
+ * this include `logExerciseFromPayload`, which runs on every logged set — `listProgressionStyles`
+ * would be two queries and a full hydrate of every style's sets to answer one boolean.
+ *
+ * A malformed id is `false`, not a throw: the column is `uuid`, so passing one through would reach
+ * the driver as `22P02` and surface as an opaque 500 — the shape RV-33 is about.
+ */
+export async function progressionStyleIdsOwned(
+  db: Db, userId: string, ids: (string | null | undefined)[],
+): Promise<boolean> {
+  const wanted = [...new Set(ids.filter((v): v is string => typeof v === 'string' && v.length > 0))]
+  if (!wanted.length) return true
+  if (!wanted.every(isUuid)) return false
+  const rows = await db.select({ id: s.progressionStyles.id })
+    .from(s.progressionStyles)
+    .where(and(eq(s.progressionStyles.userId, userId), inArray(s.progressionStyles.id, wanted)))
+  return rows.length === wanted.length
+}
 
 export async function listProgressionStyles(db: Db, userId: string): Promise<ProgressionStyle[]> {
   const styleRows = await db.select().from(s.progressionStyles)

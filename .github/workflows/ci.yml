@@ -1,5 +1,14 @@
 name: CI
 
+# Action versions are the MINIMUM that runs on Node 24, verified per action against each one's own
+# `action.yml` `runs.using` rather than bumped uniformly (LA-17). That distinction is load-bearing:
+# `upload-artifact@v5` is still `node20`, so a uniform "everything to v5" would have left it behind
+# while the deprecation looked cleared. checkout/setup-node/setup-java/pnpm reach node24 at v5;
+# upload-artifact needs v6. All of them require Actions runner >= 2.327.1, which `ubuntu-latest` has.
+#
+# Every one of them is runtime-only — no input-schema change — which matters here because Custom Rules now
+# depends on checkout's shallow default plus an explicit `git fetch --depth=1 origin main` (Q-424).
+
 on:
   # PRs always run CI: with all jobs as required status checks, skipping CI on a
   # markdown-only PR would leave those checks "Expected" forever and block the
@@ -24,11 +33,11 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -61,11 +70,11 @@ jobs:
     env:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -88,11 +97,11 @@ jobs:
       HEALTH_CONNECT_INGEST_SECRET: placeholder
       WEBHOOK_USER_ID: placeholder
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -103,7 +112,7 @@ jobs:
     name: Custom Rules
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: No unresolved conflict markers
         run: node scripts/check-conflict-markers.js
@@ -291,6 +300,18 @@ jobs:
       - name: An admin check that cannot run is not a refusal
         run: node scripts/check-admin-guard-catch.js
 
+      - name: A route that reads a request body parses it
+        run: node scripts/check-json-body-parsed.js
+
+      - name: No raw error in an API response body
+        run: node scripts/check-no-raw-error-in-response.js
+
+      - name: Request bodies are bounded before they are parsed
+        run: node scripts/check-bounded-request-body.js
+
+      - name: Dynamic route path params are validated as UUIDs
+        run: node scripts/check-dynamic-route-uuid-guard.js
+
       - name: API routes do not authorise from the stale isAdmin claim
         run: node scripts/check-admin-claim-in-api.js
 
@@ -299,6 +320,18 @@ jobs:
 
       - name: Cache today-guards take the user's timezone
         run: node scripts/check-tz-aware-cache-guards.js
+
+      - name: Client "today" uses the user's timezone
+        run: node scripts/check-client-today-timezone.js
+
+      - name: Day windows take the user's timezone
+        run: node scripts/check-aest-midnight-timezone.js
+
+      - name: memo() call sites pass stable props
+        run: node scripts/check-memo-prop-stability.js
+
+      - name: No new fetch-once effects
+        run: node scripts/check-fetch-once-effects.js
 
       - name: Non-strict request schemas do not increase
         run: node scripts/check-strict-request-schemas.js
@@ -327,6 +360,18 @@ jobs:
       - name: Backlog pointers and Q numbers are accurate
         run: node scripts/check-backlog-pointers.js
 
+      # Q-424: the size ratchet asks whether THIS BRANCH grew a file, which needs the base branch's
+      # copy to compare against. `actions/checkout` is shallow (depth 1), so `main` is not present —
+      # one depth-1 fetch of that ref is all it takes, and the script degrades to baseline-only if it
+      # is missing rather than failing.
+      - name: Fetch the base branch, for the size ratchet's comparison
+        # `|| true` because a fetch failure must not fail the gate. The checks degrade to the plain
+        # absolute comparison when no base resolves, which is STRICTER than the base-aware one — so
+        # the worst case is the behaviour we had before Q-424, never a weaker check. Without this the
+        # step turns a transient network blip into a red Custom Rules run on an unrelated change,
+        # which is the same "failure that is not the branch author's" this whole class is about. It
+        # bit locally the first time it was flaky.
+        run: git fetch --depth=1 origin main || true
       - name: Orientation docs stay within their baselines
         run: node scripts/check-doc-index-size.js
 
@@ -356,11 +401,11 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -369,6 +414,19 @@ jobs:
         env:
           DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
         run: node scripts/local-db/migrate.js
+
+      # LA-13: the step above runs against a FRESH database, which is the one case where a
+      # non-idempotent migration cannot fail — PS-3's four hid for months for exactly that reason.
+      # Replaying every file against the schema it just built is what catches them. The truncate is
+      # here rather than inside the runner so the destructive step is visible at its call site; the
+      # database is a throwaway CI service container.
+      - name: Migrations are idempotent (replay against a schema that already has everything)
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -d trainingai_ci -c 'TRUNCATE schema_migrations'
+          node scripts/local-db/migrate.js --replay
 
   e2e:
     # Its own job, deliberately not folded into Tests: a browser job's runtime and failure modes
@@ -393,11 +451,11 @@ jobs:
       DATABASE_URL: postgresql://postgres:postgres@localhost:5432/trainingai_ci
       AUTH_SECRET: e2e-ci-secret-not-used-outside-this-job
     steps:
-      - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: actions/checkout@v5
+      - uses: pnpm/action-setup@v5
         with:
           version: 10.33.0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v5
         with:
           node-version: '20'
           cache: 'pnpm'
@@ -412,7 +470,7 @@ jobs:
       - name: Install Chromium
         run: npx playwright install --with-deps chromium
       - run: pnpm e2e
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         if: failure()
         with:
           name: playwright-report

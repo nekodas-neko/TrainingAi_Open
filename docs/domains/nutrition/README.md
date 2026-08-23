@@ -59,21 +59,37 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
   correction worth reading before any print test: every module-pitch figure in Q-389/Q-393 is ~24%
   optimistic**, since the quiet zone is drawn *inside* the code box (band is 0.369 mm, not 0.487).
   The round trimmed variant was measured at 0.353 mm and deliberately **not** built.
+- [`docs/overview/entries/2026-08-19-label-line-budget.md`](../../overview/entries/2026-08-19-label-line-budget.md)
+  — **Q-399: the default label promised the ingredient breakdown and printed zero lines of it for a
+  release (v1.324.0–v1.324.6), and three separate gates stayed quiet.** The sheet's "Printing N
+  ingredients" copy was gated on `> 0`, so the one reading worth having removed itself; the picker
+  went on claiming "the full ingredient list"; and the only test on that style asserted the code's
+  **size**, which a bigger code scored better on. Read it before changing any label geometry: the
+  four vertical gaps are spec data now, `centredStackLineBudget` derives the line count from them,
+  and a test asserts the promise rather than a constant.
 - [`docs/overview/entries/2026-08-18-meal-label-inline-centred.md`](../../overview/entries/2026-08-18-meal-label-inline-centred.md)
   — **Q-397, the label that actually shipped to the agreed design (v1.324.0), and the reasoning
   worth keeping.** Q-393's "the list does not fit a round label" was true only for a **stacked**
   list; running the ingredients as one **wrapping** run spends width instead of height, so the
-  complete list fits a round die with a code *larger* than the old default (0.529 vs 0.369 mm per
-  module). **`inlineCentred` is the new default.** Process lesson recorded there and in Q-397: the
-  correction was made in chat and never written back into the queue entry, so the superseded
-  analysis shipped as a work order.
+  list fits a round die with a code *larger* than the old default. **`inlineCentred` is the new
+  default.** Process lesson recorded there and in Q-397: the correction was made in chat and never
+  written back into the queue entry, so the superseded analysis shipped as a work order.
+  **Corrected 2026-08-19 by Q-399** — the "0.529 vs 0.369" this line carried was the pitch of a code
+  box with **no room for the list underneath it**: the style drew zero ingredient lines for a full
+  release. Retuned to 0.401 with three wrapped lines, and the line count is asserted now, not just
+  the code size. **Superseded again 2026-08-19 by Q-411**, which retired the round constraint
+  entirely — every style draws square, the default is **0.561 with four lines**, and both test
+  thresholds were raised because the square canvas made the old ones unable to fail
+  ([`journal`](../../overview/entries/2026-08-19-square-label-canvas.md)). ⚠ That gain holds only if
+  the owner's circle template **crops**; if it **scales**, the default lands at 0.397 — worse than
+  what it replaced. Unresolved until one test print — [`journal`](../../overview/entries/2026-08-19-label-line-budget.md).
 - No standalone system reference exists for this pillar yet; the offline-first section of
   [`CLAUDE.md`](../../../CLAUDE.md) and [`docs/module-map.md`](../../module-map.md) §3 carry the
   load-bearing rules.
 
 - Reviews: [`docs/reviews/2026-08-07-full-app-review.md`](../../reviews/2026-08-07-full-app-review.md) — **full-app deep review, 2026-08-07** (saving/caching/performance/logic across all 201 routes and 40 pages; 53 findings queued as Q-117…Q-138, plus root cause for Q-73 and mechanisms for Q-72/Q-107)
 
-- [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md) — **are the memos actually memoising? 2026-08-18**. All 66 `memo(...)` declarations collected and every call site scanned: **64 hold**, no inline arrows anywhere. Q-490 — `MealMacroBars`/`DayMacroTotals` are called with an inline `target={{…}}` inside `variant.meals.map(...)`, so every keystroke in the meal-plan edit sheet re-renders every meal row. Also notes the rule's *"both long-standing memos"* count is stale (66, not 2).
+- [`docs/reviews/2026-08-18-memo-stability-audit.md`](../../reviews/2026-08-18-memo-stability-audit.md) — **are the memos actually memoising? 2026-08-18**. All 66 `memo(...)` declarations collected and every call site scanned: Q-490 — `MealMacroBars`/`DayMacroTotals` are called with an inline `target={{…}}` inside `variant.meals.map(...)`, so every keystroke in the meal-plan edit sheet re-renders every meal row. Also notes the rule's *"both long-standing memos"* count is stale (66, not 2). **Q-490 SHIPPED 2026-08-18** (v1.324.9): both take scalars now, and `scripts/check-memo-prop-stability.js` enforces the class — [`journal`](../../overview/entries/2026-08-18-memo-scalar-props.md). **Two of this audit's claims did not survive that check:** `actual` is a fresh object at three of the four sites too, not just `target`, so fixing `target` alone would have left three still defeated; and *"64 hold, no inline arrows anywhere"* is wrong — there are **four** inline-arrow sites on four other memoised components, now baselined and filed as Q-357.
 - [`docs/reviews/2026-08-18-malformed-route-ids.md`](../../reviews/2026-08-18-malformed-route-ids.md) — **every dynamic route called with an id that is not a UUID, 2026-08-18** (Q-483 — three routes reply with the raw driver error including the full `SELECT` and every column name of `workout_sessions`, from their own catch, unredacted in production; Q-482 — 21 route/method pairs across 14 routes 500 on a malformed id while answering a valid-but-missing one correctly, and only 2 of 30 dynamic routes validate the id at all).
 - [`docs/reviews/2026-08-18-outbox-replay-idempotency.md`](../../reviews/2026-08-18-outbox-replay-idempotency.md) — **the same mutation pushed twice, 2026-08-18** (Q-481 — a water quick-add replayed by the outbox stores 750 ml for 250 logged; `waterMlDelta` is the only non-idempotent branch of nineteen, and the server keeps no record of processed mutation ids). The additive write is deliberate (SYNC-P7) and must stay — the fix is mutation-id dedupe, not a change of semantics.
 - [`docs/reviews/2026-08-18-write-surface-not-found.md`](../../reviews/2026-08-18-write-surface-not-found.md) — **nutrition/cardio/activity writes probed cross-user, and the whole write surface measured for the not-found answer, 2026-08-18** (Q-463 — `PUT /api/nutrition/meal-types/[id]` and both supplement write routes answer a missing row with a bodiless 500). Finding Q-463; **cross-user protection holds across all four write pillars**, and the idempotent `DELETE` pattern is recorded as clean rather than filed.
@@ -90,6 +106,43 @@ grep -n '\[nutrition\]' docs/implementation-backlog.md   # Q-187, Q-191, Q-196�
 ```
 
 Live at the time of writing (2026-07-30):
+
+- 🎨 **The nutrition rework is specified and phased (Q-395, split 2026-08-23).** Sixteen screens are
+  drawn at true S25 size in this app's own tokens, the owner has reviewed them twice and answered
+  every blocking question, and the coverage audit is done — so the design is not the bottleneck.
+  **Q-395 is now the spec and the final checkpoint, not a work item.** The work is **Q-406** (one
+  shared `food-row.tsx`, replacing four shapes for one thing) → **Q-395a** (quantity sheet + Edit
+  Meal) → **Q-395b** (the day screen, against an 11-section coverage list) → **Q-395c** (Log Food as
+  one screen, and the `Saved meals` / `My Meals` / `My Foods` rename swept in one pass). Read Q-395
+  before starting any phase; the phases point back rather than copying its decisions.
+- ⚠️ **Saved meals can carry a photo at last** (Q-327, 2026-08-24, v1.341.0) — a 64 px tile in
+  Edit Meal, downscaling to 128 px WebP so the picture fits `SAVED_MEAL_IMAGE_MAX_BYTES`. The
+  storage half had shipped with Q-396 and nothing could reach it. **Not device-verified**: the
+  native camera branch never runs in a browser —
+  [`journal`](../../overview/entries/2026-08-24-saved-meal-photo-picker.md).
+- 🔴 **The whole meal-plan write surface was dead, and is fixed** (Q-398, 2026-08-24, v1.340.0).
+  Five routes guarded the request body and then validated a variable nothing assigned, so creating a
+  plan, renaming/activating/deleting one, restructuring it, editing a meal and saving dietary
+  restrictions all answered `400 Invalid input: expected object, received undefined`.
+  `scripts/check-json-body-parsed.js` holds the class shut.
+- ⚠️ **Plan meals become saved meals** (Q-398, 2026-08-24, v1.340.0) — `Save to My Meals` per meal
+  plus `Save all`, idempotent on `meal_plan_meals.saved_meal_id`, with a derived `From plan` tag.
+  `savePlanMealToLibrary` is now the one copy path; the setup sheet's own used to duplicate against
+  it. **Not device-verified**, and the entry's step 3 (deleting the plan surface) still needs the
+  owner — [`journal`](../../overview/entries/2026-08-24-meal-plan-to-saved-meals.md).
+- ⚠️ **The maintenance calibration can engage at last** (Q-387, 2026-08-23, v1.337.0) — the
+  "I've finished logging" button + counter shipped, so days can be flagged complete. **Not
+  device-verified, and the write has no outbox domain** —
+  [`journal`](../../overview/entries/2026-08-23-food-logging-complete.md).
+- ⚠️ **Q-323 turned the calorie bar into a progress bar and Home's donut into a progress ring**
+  (2026-08-23, v1.336.0). `barPosition`/`barBands` are gone; `barProgress()` replaces them. **Not
+  device-verified** — [`journal`](../../overview/entries/2026-08-23-calorie-progress-bar.md).
+- ⚠️ **Three calorie budgets were live on one screen; there is now one** (Q-415/Q-417, fixed
+  2026-08-23, v1.335.0). Home's nutrition card and the Nutrition ring both read
+  `budgetProvenance(...).total` rather than composing `nutrition_targets.calories` — the **rest-day
+  floor** — plus a separately-sourced burn. Follow-up **LB-4** (food logs invalidate before their
+  push) and **not device-verified** —
+  [`journal`](../../overview/entries/2026-08-23-one-calorie-budget.md).
 
 - **Offline saved-meal create/edit/delete** is a new sync domain and is **not device-verified**.
 - **Offline food search** is APK-only and unverified on device.

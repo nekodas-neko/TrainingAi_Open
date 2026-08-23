@@ -150,12 +150,55 @@ export function normalizeDateParamIso(input: string): string | null {
   return slash === null ? null : slash.replace(/\//g, '-')
 }
 
+/**
+ * Is this a real calendar day, not merely a date-SHAPED string?
+ *
+ * The `^\d{4}[-/]\d{2}[-/]\d{2}$` regexes scattered through the route schemas bound the shape and
+ * nothing else, so `2026-13-45`, `2026-02-31` and `0000-00-00` all pass and then fail at the
+ * Postgres driver as `[pg 22008]` — a client input error recorded as a server fault (Q-496).
+ * Measured: `POST /api/day-checkin {"date":"2026-13-45"}` answered **500** and wrote an
+ * `error_events` row; the same value through `/api/sync/push` echoed the whole INSERT statement back
+ * to the caller.
+ *
+ * `Date` will not refuse those — it normalises Feb 31 to March 3 — so the test is a round trip:
+ * a value that is not its own zero-day shift was never that day.
+ */
+export function isCalendarDate(dateStr: string): boolean {
+  if (!/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(dateStr)) return false
+  const iso = dateStr.replace(/\//g, '-')
+  return shiftDateStr(iso, 0) === iso
+}
+
 // Shifts a YYYY-MM-DD string by N calendar days without touching toISOString().
+//
+// The year is padded to four digits (Q-497). Month and day always were; the year was the one field
+// without it, so a year under 1000 emitted `999-01-01` — three digits, which sorts BEFORE
+// `1000-01-01` in any string comparison and silently reorders a range.
+//
+// **This does NOT make the output safe to compare as a string in a loop bound**, and it is worth
+// being exact about why, because the obvious reading is that it does. `padStart` cannot help at the
+// TOP of the range: one day after `9999-12-31` is `10000-01-01`, five digits, and
+// `'10000-01-01' <= '9999-12-31'` is `true` because `'1' < '9'`. Two admin routes looped ~29M times
+// on exactly that. A `YYYY-MM-DD` contract cannot express a five-digit year, so the fix belongs at
+// the call site: iterate a validated day COUNT, never `for (d = start; d <= end; …)`.
+//
+// The 0–99 year range is corrected inside the function (Q-329) — `Date.UTC` would otherwise read it
+// as 1900+y and move a first-century date by ~1,900 years.
 export function shiftDateStr(dateStr: string, days: number): string {
   const [y, m, d] = dateStr.split('-').map(Number)
   const shifted = new Date(Date.UTC(y, m - 1, d + days))
+  // `Date.UTC` applies the legacy two-digit-year mapping: a year of 0–99 is read as 1900+y, so
+  // `shiftDateStr('0001-01-01', -1)` returned **1900-12-31** instead of 0000-12-31 — off by ~1,900
+  // years, silently (Q-329). Undo it for exactly that range and leave every ordinary year on the
+  // path all the existing tests cover.
+  //
+  // Deliberately a correction rather than a rebuild: constructing in a safe year and re-stamping
+  // was tried first and is WRONG — anchoring on 2000 (a leap year) makes `2026-03-01` minus a day
+  // return March 1 again, because the intermediate lands on Feb 29 and re-stamping a non-leap year
+  // rolls it forward. The conditional keeps that whole class out of the common path.
+  if (y >= 0 && y < 100) shifted.setUTCFullYear(shifted.getUTCFullYear() - 1900)
   return [
-    shifted.getUTCFullYear(),
+    String(shifted.getUTCFullYear()).padStart(4, '0'),
     String(shifted.getUTCMonth() + 1).padStart(2, '0'),
     String(shifted.getUTCDate()).padStart(2, '0'),
   ].join('-')

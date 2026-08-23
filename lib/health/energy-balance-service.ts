@@ -9,7 +9,7 @@ import { type Sex } from '@trainingai/shared/health/workout-energy'
 import { mifflinStJeorBmr } from '@trainingai/shared/nutrition/goal-recommendation'
 import { cunninghamBmr } from '@trainingai/shared/health/body-composition'
 import {
-  computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA,
+  computeCalorieBalance, targetFromMaintenance, GOAL_DAILY_DELTA, scaleMacrosForEarnedKcal,
 } from '@trainingai/shared/nutrition/calorie-balance'
 import {
   resolveMaintenance, maintenanceGapMessage, MAX_WINDOW_DAYS, type MaintenanceDay,
@@ -47,7 +47,28 @@ export interface EnergyBalanceResult {
     currentKcal: number | null
     driftsFromRecommendation: boolean
   }
-  activeBreakdown: { workoutKcal: number; activityKcal: number; stepsKcal: number }
+  /**
+   * The day's macro grams once today's movement has grown the budget (Q-323), or null when the user
+   * has no stored macro target to grow.
+   *
+   * **Computed here rather than on the client** — the client already has `activeKcal` and the stored
+   * targets, so it could do this itself, and that is exactly the second implementation the
+   * one-formula rule exists to prevent. `base` is what `nutrition_targets` stores (the rest-day
+   * floor); `scaled` is what the day actually calls for. They are equal when nothing was earned.
+   */
+  macroTargets: {
+    base:   { proteinG: number; carbsG: number; fatG: number }
+    scaled: { proteinG: number; carbsG: number; fatG: number }
+    earnedKcal: number
+  } | null
+  activeBreakdown: {
+    workoutKcal: number
+    activityKcal: number
+    stepsKcal: number
+    /** The exact addends of `workoutKcal`, per strength session (Q-391). Unrounded — see
+     *  `computeActiveEnergy`. Join on `workoutSessionId` from `/api/day-log`. */
+    workoutKcalBySession: { id: string; kcal: number; source: 'hr' | 'met' }[]
+  }
   goal: FitnessGoal | null
   missingProfileFields: string[]
 }
@@ -71,7 +92,7 @@ export async function computeEnergyBalance(
 
   // The whole window is fetched, not just the requested day: a calibrated maintenance needs the
   // window's average movement to separate resting burn from habitual movement (see below).
-  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile] = await Promise.all([
+  const [metrics, foodSummary, activityLogs, workouts, targets, userGoals, profile, dayCheckins] = await Promise.all([
     repo.listBodyMetrics(userId, windowStart, date).catch(() => []),
     repo.listFoodLogsSummary(userId, windowStart, date).catch(() => []),
     repo.listActivityLogs(userId, windowStart, date).catch(() => []),
@@ -79,9 +100,22 @@ export async function computeEnergyBalance(
     repo.getNutritionTargets(userId).catch(() => null),
     repo.getUserGoals(userId).catch(() => null),
     repo.getUserById(userId).catch(() => null),
+    // Q-387: which days the user marked "I have finished logging". Only those may enter the
+    // maintenance mean — a day abandoned after lunch is indistinguishable from a completed light
+    // one, and counting it dragged the estimate 86 kcal lower per partial day.
+    repo.listDayCheckins(userId, windowStart, date, 'evening').catch(() => []),
   ])
 
+  // Q-421: one batch read for the whole window rather than a query per session. Sessions with no
+  // usable HR are absent from the map and fall back to the MET estimate inside `computeActiveEnergy`.
+  const avgBpmBySession = await repo
+    .getAvgBpmBySession(userId, workouts.filter(w => w.completedAt != null).map(w => w.id))
+    .catch(() => new Map<string, number>())
+
   const intakeByDate = new Map(foodSummary.map(r => [r.date, r.calories]))
+  const loggingCompleteByDate = new Set(
+    dayCheckins.filter(c => c.foodLoggingCompletedAt != null).map(c => c.logDate),
+  )
   const metricByDate = new Map(metrics.map(m => [m.date, m]))
 
   const byDateDesc = (a: { date: string }, b: { date: string }) => b.date.localeCompare(a.date)
@@ -102,7 +136,11 @@ export async function computeEnergyBalance(
       profile: energyProfile,
       strengthSessions: workouts
         .filter(ws => ws.completedAt != null && ws.startedAt >= start && ws.startedAt < end)
-        .map(ws => ({ durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000 })),
+        // `id` threads through so `workoutKcalBySession` can come back keyed by the session (Q-391).
+        // `/api/day-log` already exposes `workoutSessionId` per exercise, so the day screen's
+        // Training card can join on it without keying by session NAME — which is not identity here
+        // and breaks outright for two same-named sessions in one day.
+        .map(ws => ({ id: ws.id, durationMin: (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60000, rpe: ws.sessionRpe ?? null, avgBpm: avgBpmBySession.get(ws.id) ?? null })),
       activities: activityLogs
         .filter(a => a.date === day)
         .map(a => ({ activityType: a.activityType, durationMin: a.durationMin ?? null, distanceKm: a.distanceKm ?? null })),
@@ -114,6 +152,7 @@ export async function computeEnergyBalance(
     workoutKcal: activeEnergy.workoutKcal,
     activityKcal: activeEnergy.activityKcal,
     stepsKcal: activeEnergy.stepsKcal,
+    workoutKcalBySession: activeEnergy.workoutKcalBySession,
   }
 
   const intakeKcal = Math.round(intakeByDate.get(date) ?? 0)
@@ -126,10 +165,24 @@ export async function computeEnergyBalance(
     sex == null ? 'sex' : null,
   ].filter((f): f is string => f != null)
 
+  /**
+   * Q-323. `earned` is today's measured movement — the same figure the budget on screen adds to the
+   * rest-day floor — so the grams and the calories move together instead of the card asking for
+   * 300 more kcal without saying of what. Null when there is no stored macro target to grow.
+   */
+  const macroTargetsFor = (earned: number) => {
+    if (targets?.proteinG == null || targets.carbsG == null || targets.fatG == null) return null
+    const base = { proteinG: targets.proteinG, carbsG: targets.carbsG, fatG: targets.fatG }
+    return { base, scaled: scaleMacrosForEarnedKcal(base, earned), earnedKcal: Math.round(earned) }
+  }
+
   if (missingProfileFields.length > 0) {
     return {
       date, balance: null, maintenance: null,
       target: { recommendedKcal: null, currentKcal: targets?.calories ?? null, driftsFromRecommendation: false },
+      // Still populated: a missing height does not stop the stored macros being real, and the
+      // measured movement is independent of the BMR formula that is blocked.
+      macroTargets: macroTargetsFor(activeEnergy.total),
       activeBreakdown, goal, missingProfileFields,
     }
   }
@@ -153,6 +206,7 @@ export async function computeEnergyBalance(
     windowDays.push({
       date: d,
       intakeKcal: intakeByDate.get(d) ?? null,
+      loggingComplete: loggingCompleteByDate.has(d),
       weightKg: metricByDate.get(d)?.weightKg ?? null,
     })
   }
@@ -197,6 +251,7 @@ export async function computeEnergyBalance(
       currentKcal,
       driftsFromRecommendation: currentKcal != null && Math.abs(currentKcal - recommendedKcal) > 100,
     },
+    macroTargets: macroTargetsFor(activeEnergy.total),
     activeBreakdown,
     goal,
     missingProfileFields: [],

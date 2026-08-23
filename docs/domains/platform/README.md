@@ -20,6 +20,7 @@ sleep score is not.
 | AI | `lib/ai/`, `lib/ai-chat/` |
 | Background & SW | `lib/background/`, `lib/sw/`, `app/sw.js/route.ts` |
 | Admin & ops | `lib/admin/`, `app/admin/`, `lib/export/`, `scripts/` |
+| User preferences (server-authoritative) | `packages/shared/src/user/preferences.ts`, `app/api/user/preferences/route.ts`, `users.preferences` JSONB (mig 206) |
 
 **[`docs/module-map.md`](../../module-map.md) is this pillar's real index** — §0 (there is **no cron
 layer**) through §16. Read it before building any shared helper.
@@ -32,6 +33,15 @@ layer**) through §16. Read it before building any shared helper.
   frame packer (~630 MB) and a `VACUUM FULL` route for `error_events` (49 MB) — but **the last two
   have never run against production**, because a sandbox session cannot authenticate there. Carries
   the paste-ready runbook, the three ways to unblock it, and what protects the run.
+
+- [`docs/overview/entries/2026-08-19-sandbox-energy-constants.md`](../../overview/entries/2026-08-19-sandbox-energy-constants.md)
+  — **`pnpm dev` could not render the energy screens at all, and CI could not tell you (Q-361).**
+  `/api/nutrition/energy-balance` and `/api/body-metadata` answered **500 in every session** because
+  the gitignored model constants are never on disk here; the boot delivery now falls back to the
+  committed synthetic fixtures outside production. Records why each CI job missed it (build reads on
+  first use, vitest already points at the fixtures, no E2E spec visits either screen) — and the
+  caveat to carry forward: **the energy numbers a sandbox now shows are arbitrary**, so they verify
+  plumbing and never a value.
 
 - [`docs/handoff-2026-08-17-cross-comprehensive-review-six-rounds.md`](../../handoff-2026-08-17-cross-comprehensive-review-six-rounds.md)
   — the six-round comprehensive review (Q-271 … Q-308), its five findings that died on verification,
@@ -181,6 +191,18 @@ layer**) through §16. Read it before building any shared helper.
 
 - [`docs/reviews/2026-08-18-claude-md-prose-counts.md`](../../reviews/2026-08-18-claude-md-prose-counts.md) — **every count in `CLAUDE.md`, verified mechanically, 2026-08-18** (Q-492 — script-backed counts 3 of 3 current, hand-typed prose counts **7 of 9 stale**: hex literals 471 → **428**, the >800-line hotspot list still names a 476-line file, "22 of 33" → **29 of 40**). Two items are more than drift: `more/profile-tab.tsx` should already have been struck under the file's own rule, and the rollup-glob maintenance command at `CLAUDE.md:976` is scoped to the directory the glob covers, so it **can only confirm the glob against itself** (latent — nothing mis-timed today). Recommendation: **cite the command, or delete the number and keep the rule.**
 - [`docs/reviews/2026-08-18-model-version-clobber.md`](../../reviews/2026-08-18-model-version-clobber.md) — **the readiness model stamp is erased within hours, 2026-08-18** (Q-518 — same row read at 04:38:27 carries `{"bodyComp","readiness"}` and at 10:18:40 carries `{"bodyComp"}` alone; stamped rows table-wide go 1 → 0. `upsertOuraDailyDerived` sets every column with `COALESCE(excluded, existing)`, which for a `jsonb` column replaces the document **whole**, so the merge is left to each caller and only `readiness-payload.ts` does it. **Retracts PR #85's claim that the merge "held in production"** and defeats Q-501's purpose. Fix belongs in the upsert (`existing || excluded`), the same shape as Q-280).
+- [`docs/reviews/2026-08-20-non-workout-write-surface-ownership.md`](../../reviews/2026-08-20-non-workout-write-surface-ownership.md) — **the non-workout write surface, probed live with two accounts, 2026-08-20** (RV-33 — `POST /api/progression-styles` and `PATCH /api/nutrition/food-logs/[id]` answer a correct ownership refusal with an **empty-bodied 500** and file it into `error_events` as a server fault; the Q-462/Q-463 class on two routes that fix missed). **`CLAUDE.md`'s write-path ownership rule (b) — a raw request body into Drizzle `.set()` — is audited for the first time and is clean**: 116 mutating routes, 325 `.set()` sites, every one built field by field. Rule (a) remains the one with no evidence.
+
+- [`docs/reviews/2026-08-19-cross-pillar-score-ranges.md`](../../reviews/2026-08-19-cross-pillar-score-ranges.md) — **every pillar's range side by side, and why range alone is the wrong test, 2026-08-19.** Only **Body Battery** genuinely spans (sd 29.6 — though 5 of 51 days sit exactly on a clamp bound); **activity is the most compressed** (sd **6.0**, zero days under 50); sleep's stored 85.3 is the **old** model. Range catches the stuck-score class instantly but **cannot see a score that moves the wrong way** — Q-507's stress metric has a fine spread and correlates **+0.40** with readiness. Pair it with a correlation against an independent signal.
+
+- [`docs/reviews/2026-08-19-daily-summary-replace-wipe.md`](../../reviews/2026-08-19-daily-summary-replace-wipe.md) — **`oura_daily_summary` holds 1 row against 198,223 raw samples, 2026-08-19**
+  (Q-528). `replaceOuraDailySummary` **deletes unconditionally and then checks for emptiness** —
+  the guard sits on the INSERT, not the DELETE — so a full-history pass over a narrow input wipes
+  the history and returns successfully, with no error and no log. The windowed path is safe, which
+  is why it survived: only the rarely-taken `fullHistory` branch can do it. **Illness scores from
+  the same array survived** because they write through a COALESCE upsert to a different table.
+  Also records `oura_bucket` and `step_live_windows` at **0 rows system-wide** — the first carries
+  `met_mean`/`motion_mad`, the drift-proof anchor Q-522 needs. **Corrects Q-525's diagnosis.**
 
 ## Open issues
 
@@ -214,6 +236,15 @@ Live at the time of writing (2026-07-30):
   critical older than a week), not every session.
 
 ## History
+
+- **[`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](../../handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)**
+  — the CI job named **Migration Check** could not fail on a broken migration: `migrate.js` exited 0
+  whatever happened, and it had no error classifier, so it also called four already-applied
+  migrations "failed" where `ensureSchema()` calls them benign. Fixing the gate immediately caught a
+  real one — **`142_claude_ro_views.sql` creates a view over a table `143` creates**, so on every
+  fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
+  carries the CSP work (`'wasm-unsafe-eval'`, and two dead Oura Cloud hosts removed) and the
+  body-weight source fix behind the done screen's calorie figure.
 
 - **[`docs/handoff-2026-08-13-cross-combined-backlog-handover.md`](../../handoff-2026-08-13-cross-combined-backlog-handover.md)**
   — ⭐ **START HERE for backlog work.** Reconciles the two sessions that ran in parallel on 2026-08-13
@@ -378,6 +409,7 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md) — **Review sweeps 29–39, 2026-08-20** (11 PRs, Q-492…Q-499 + Q-552…Q-556; three CI checks added for documentation facts nothing was checking). **10 of 13 findings have since shipped**, verified in source. Its most transferable output is the method section: **five measurements were wrong, each producing a plausible result in the expected direction** — and the keeper, *corroboration between two weak signals is not evidence when they can fail for the same reason*.
 - [`handoff-2026-08-18-platform-decision-brief-rule.md`](../../handoff-2026-08-18-platform-decision-brief-rule.md)
   — the `CLAUDE.md` rule governing how a decision is brought to the owner (#69), and the merge
   friction that shipping it exposed: **three of four CI rounds were base collisions on the doc-index

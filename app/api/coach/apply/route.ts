@@ -8,6 +8,10 @@ import { applyCoachPatch } from '@/lib/coach/apply'
 import { invalidateProgramStructure } from '@/lib/cache-groups'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { errorLog } from '@trainingai/shared/logger'
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// A patch of at most 8 changes plus up to 8 accepted ids. 256 KB is far past any real patch.
+const MAX_BODY_BYTES = 256 * 1024
 
 const BodySchema = z.object({
   patch: CoachPatchSchema,
@@ -31,7 +35,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
   }
 
-  const parsed = BodySchema.safeParse(await req.json().catch(() => null))
+  const read = await readJsonLimited(req, MAX_BODY_BYTES)
+  if (!read.ok) {
+    return read.reason === 'too_large'
+      ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
+      : NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
+  }
+  const parsed = BodySchema.safeParse(read.body)
   if (!parsed.success) return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
   if (!hasUniqueChangeIds(parsed.data.patch)) {
     return NextResponse.json({ error: 'Duplicate change ids' }, { status: 400 })
@@ -45,6 +55,7 @@ export async function POST(req: Request) {
       parsed.data.patch,
       parsed.data.acceptedChangeIds,
       todayInTz(session.user?.timezone ?? DEFAULT_TZ),
+      session.user?.timezone ?? DEFAULT_TZ,
     )
 
     if (!result.ok) {

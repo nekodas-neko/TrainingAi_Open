@@ -1,12 +1,12 @@
 "use client";
 
-import { Fragment, memo, useEffect, useState } from "react";
+import { Fragment, memo } from "react";
 import {
   Sunrise, Moon, Dumbbell, Footprints, Utensils,
   BedDouble, Flame, Clock, MapPin, Zap, Tag,
   type LucideIcon,
 } from "lucide-react";
-import { cachedFetchToday, readTodayCacheSync } from "@/lib/sqlite/cache";
+import { useCachedValue } from "@/lib/hooks/use-cached-value";
 import { TTL_SHORT } from "@trainingai/shared/cache-ttl";
 import type { TimelineEvent } from "@/app/api/day-timeline/route";
 import { useTransitionRouter } from "@/lib/view-transition";
@@ -226,36 +226,21 @@ function EventRow({ ev, isLast }: { ev: TimelineEvent; isLast: boolean; isFirst?
 }
 
 function HomeDayTimelineComponent() {
-  const [events, setEvents] = useState<TimelineEvent[] | null>(null);
+  // `today: true` because 'home-day-timeline' is a date-less today key — one canonical variant per
+  // key, and `sync-provider`'s warm list agrees.
+  const payload = useCachedValue<{ events: TimelineEvent[] }>(
+    "home-day-timeline", "/api/day-timeline", TTL_SHORT, { today: true },
+  );
+  const events = payload?.events ?? null;
 
-  useEffect(() => {
-    const seeded = readTodayCacheSync<{ events: TimelineEvent[] }>("home-day-timeline");
-    if (seeded?.events) setEvents(seeded.events);
-    cachedFetchToday<{ events: TimelineEvent[] }>(
-      "home-day-timeline",
-      "/api/day-timeline",
-      TTL_SHORT,
-      d => { if (d?.events) setEvents(d.events); },
-    );
-  }, []);
-
-  // Q-91 sibling gap: a BLE drain settling invalidates the 'home-day-timeline' cache entry
-  // (invalidateOuraSync) but this screen, once mounted, never learned to refetch it — a
-  // just-synced night's bed/wake time kept showing the stale pre-sync value until the next
-  // navigate-away/remount or a full app restart. Mirrors sleep-content.tsx's listener for the
-  // same event, added for the 'sleep-sessions' key in Q-91 — this widget reads a different key.
-  useEffect(() => {
-    const onBleSynced = () => {
-      cachedFetchToday<{ events: TimelineEvent[] }>(
-        "home-day-timeline",
-        "/api/day-timeline",
-        TTL_SHORT,
-        d => { if (d?.events) setEvents(d.events); },
-      );
-    };
-    window.addEventListener("ta:oura-ble-synced", onBleSynced);
-    return () => window.removeEventListener("ta:oura-ble-synced", onBleSynced);
-  }, []);
+  // **The `ta:oura-ble-synced` listener that used to sit here is gone, and that is the point of the
+  // conversion.** Q-91 added it because this widget, mounted in the shell, never learned to refetch
+  // after a BLE drain invalidated its entry — a just-synced night kept showing the pre-sync bed/wake
+  // time. That is Q-402's bug with a hand-built workaround for one event. `useCachedValue` refetches
+  // on the invalidation itself, which covers every writer rather than the one that thought to
+  // dispatch. Safe to drop because both dispatch sites call `invalidateOuraSync()` immediately
+  // before the event, and `lib/__tests__/cache-groups.test.ts` asserts that group clears this key —
+  // so the dependency this now leans on is guarded, not assumed.
 
   if (!events) return null;
   if (events.length === 0) return null;

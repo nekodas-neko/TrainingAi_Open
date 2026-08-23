@@ -1,12 +1,11 @@
 'use client'
 
-import { barBands, barPosition } from '@trainingai/shared/nutrition/calorie-balance'
+import { budgetProvenance } from '@trainingai/shared/nutrition/calorie-balance'
+import { CalorieProgressBar } from '@/components/nutrition/calorie-progress-bar'
 import { useEnergyBalanceToday } from '@/app/health/hooks/use-health-calcs'
 
-const BANDS = barBands()
-
 /**
- * Home's compact calories-in-vs-out card. Same shared banding and the same server payload as the
+ * Home's compact calories-in-vs-out card. Same shared bar and the same server payload as the
  * full bar on Nutrition and Health — this is a denser presentation of one number, not a second
  * calculation. Reads through `useEnergyBalanceToday`, which cache-seeds synchronously, so a
  * revisit paints last-known figures rather than a skeleton.
@@ -33,7 +32,6 @@ export function HomeEnergyBalanceCard() {
   }
 
   const b = data.balance
-  const pos = barPosition(b.deviationKcal)
   const over = b.remainingKcal < 0
 
   return (
@@ -50,15 +48,9 @@ export function HomeEnergyBalanceCard() {
         </span>
       </p>
 
-      <div className="relative h-2 rounded-full overflow-hidden flex" role="presentation">
-        {BANDS.map(band => (
-          <div key={band.zone} style={{ width: `${band.widthPct}%`, backgroundColor: band.color, opacity: 0.35 }} />
-        ))}
-        <div
-          className="absolute top-0 bottom-0 w-1 rounded-full transition-[left] duration-500 ease-out motion-reduce:transition-none"
-          style={{ left: `calc(${pos * 100}% - 2px)`, backgroundColor: b.zoneColor, boxShadow: '0 0 0 2px var(--background)' }}
-        />
-      </div>
+      {/* Same bar as Nutrition's and Home's nutrition card — a sibling surface drawing its own
+          would be the drift that put two budgets on one screen (Q-401). */}
+      <CalorieProgressBar intakeKcal={b.intakeKcal} budgetKcal={budgetProvenance(b).total} />
 
       <p className="mt-2 text-[10px] text-muted-foreground tabular-nums">
         {b.intakeKcal.toLocaleString()} eaten · {b.expenditureKcal.toLocaleString()} burned

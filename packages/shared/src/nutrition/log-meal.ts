@@ -1,9 +1,11 @@
 import type { FoodLogWithItem, SavedMeal, SavedMealItem } from '@trainingai/shared/types/nutrition'
 import { cancelMealReminder } from '@/lib/meal-reminders'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateNutritionWrite } from '@/lib/cache-groups'
 import { oneServingItems } from './saved-meal-ingredients'
+import { resolveLocalEatenAt } from './local-eaten-at'
+import { DEFAULT_TZ } from '../date-utils'
 
 function r1(n: number) { return Math.round(n * 10) / 10 }
 
@@ -41,6 +43,7 @@ export async function logMealItems(
   date: string,
   mealTypeId: string,
   userId?: string,
+  tz: string = DEFAULT_TZ,
 ): Promise<FoodLogWithItem[]> {
   const store = userId ? getLocalStore(userId) : null
   const optimistic: FoodLogWithItem[] = []
@@ -48,6 +51,8 @@ export async function logMealItems(
   if (store) {
     try {
       const now = new Date().toISOString()
+      // See logFoodEntries: `loggedAt` is when it was eaten, `updatedAt` is when the row changed.
+      const eatenAt = await resolveLocalEatenAt(store, mealTypeId, date, new Date(now), tz)
       for (const item of oneServingItems(meal)) {
         // Mirror the item locally first — same as the single-food path — so
         // getFoodLogsWithItems' local JOIN doesn't drop this row when the item
@@ -65,19 +70,22 @@ export async function logMealItems(
         await store.upsertFoodLog({
           id: logId, date, mealTypeId, foodItemId: item.foodItemId,
           quantityMultiplier: item.quantityMultiplier,
-          loggedAt: now, updatedAt: now, deletedAt: null, syncStatus: 'pending',
+          loggedAt: eatenAt, updatedAt: now, deletedAt: null, syncStatus: 'pending',
         })
         await store.queueMutation({
           userId: userId!,
           domain: 'food_logs',
           date,
-          payload: { id: logId, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier, loggedAt: now },
+          payload: { id: logId, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier, loggedAt: eatenAt },
         })
-        optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: now }))
+        optimistic.push(savedMealItemToWithItem(item, { id: logId, date, mealTypeId, loggedAt: eatenAt }))
       }
       await cancelMealReminder(mealTypeId)
+      // Twice, deliberately: now so this device's screens repaint at once (and because offline
+      // this is the only one that will ever fire), and again once the server has the write —
+      // otherwise the refetch this triggers re-caches the pre-log figures. See pushThenRevalidate.
       await invalidateNutritionWrite()
-      pushMutations(userId!).catch(() => {})
+      pushThenRevalidate(userId!, invalidateNutritionWrite)
       return optimistic
     } catch (sqliteErr) {
       console.error('Food log SQLite write failed, falling back to API:', sqliteErr)

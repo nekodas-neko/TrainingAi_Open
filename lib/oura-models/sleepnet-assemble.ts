@@ -9,6 +9,7 @@
  */
 import { preprocessSleepNet, type SleepNetRawNight } from '@trainingai/shared/health/sleepnet-preprocess'
 import { runSleepNet, type StageCode } from '@/lib/oura-models/inference/sleepnet'
+import type { ModelRuntime } from '@/lib/oura-models/inference/runtime'
 import type { SleepStage } from '@trainingai/shared/health/hypnogram'
 
 const CODE_TO_STAGE: Record<number, SleepStage> = { 1: 'deep', 2: 'light', 3: 'rem', 4: 'awake' }
@@ -151,10 +152,10 @@ export function bdiFromApnea(apneaWin: boolean[], codes: StageCode[]): SleepNetB
  * apnea head (a free byproduct we otherwise discard). Returns null on any failure (caller keeps the
  * heuristic).
  */
-export async function sleepNetStages5Min(input: SleepNetAssembleInput, nEpochs: number): Promise<{ stages: SleepStage[]; bdi: SleepNetBdi } | null> {
+export async function sleepNetStages5Min(input: SleepNetAssembleInput, nEpochs: number, runtime: ModelRuntime): Promise<{ stages: SleepStage[]; bdi: SleepNetBdi } | null> {
   const pre = preprocessSleepNet(assembleSleepNetNight(input))
   if (!pre) return null
-  const result = await runSleepNet(pre.highRes, pre.lowRes)
+  const result = await runSleepNet(pre.highRes, pre.lowRes, runtime)
   if (!result) return null
   const codes = result.stageCodes.slice(pre.realEpochStart, pre.realEpochStart + pre.realEpochCount)
   const out: SleepStage[] = []
@@ -196,7 +197,7 @@ function rle(codes: StageCode[]): string {
 }
 
 /** Assemble + run SleepNet on a night, returning a copy-pasteable diagnostic dump. */
-export async function sleepNetDump(input: SleepNetAssembleInput): Promise<SleepNetDump> {
+export async function sleepNetDump(input: SleepNetAssembleInput, runtime: ModelRuntime): Promise<SleepNetDump> {
   const durationH = Math.round(((input.bedtimeEndMs - input.bedtimeStartMs) / 3_600_000) * 100) / 100
   const night = assembleSleepNetNight(input)
   const nBeats = night.ibi.ibiMs.length
@@ -221,7 +222,7 @@ export async function sleepNetDump(input: SleepNetAssembleInput): Promise<SleepN
     dump.fallbackReason = 'preprocess returned null (unusable night)'
     return dump
   }
-  const result = await runSleepNet(pre.highRes, pre.lowRes)
+  const result = await runSleepNet(pre.highRes, pre.lowRes, runtime)
   if (!result) {
     dump.fallbackReason = 'runSleepNet returned null (inference unavailable/failed)'
     return dump

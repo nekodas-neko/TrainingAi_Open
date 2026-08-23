@@ -1,4 +1,5 @@
 import type { FoodLogWithItem, MealType, NutritionIngredient } from '@trainingai/shared/types/nutrition'
+import { DEFAULT_TZ } from '../date-utils'
 import { logFoodEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/log-food'
 
 /**
@@ -21,8 +22,12 @@ import { logFoodEntries, type NewFoodEntry } from '@trainingai/shared/nutrition/
  * exactly this portion. That is the difference between the library gaining "Cooked quinoa" — a
  * thing you can log again at any weight — and gaining "Cooked quinoa (236 g)", which is useful
  * once and clutter forever.
+ *
+ * Exported because copying a planned meal into the saved-meal library (Q-398) has to mint the same
+ * food items with the same numbers — a second conversion would drift the first time either side
+ * rounded differently.
  */
-function ingredientToEntry(ing: NutritionIngredient): NewFoodEntry {
+export function ingredientToEntry(ing: NutritionIngredient): NewFoodEntry {
   return {
     name: ing.name,
     servingSizeG: 100,
@@ -73,6 +78,7 @@ export async function logPlanMeal(
   date: string,
   userId?: string,
   now: Date = new Date(),
+  tz: string = DEFAULT_TZ,
 ): Promise<FoodLogWithItem[]> {
   if (meal.ingredients.length === 0) {
     throw new Error('This meal has no ingredients to log')
@@ -86,5 +92,5 @@ export async function logPlanMeal(
   const mealTypeId = meal.mealTypeId ?? mealTypeForHour(mealTypes, hour)
   if (!mealTypeId) throw new Error('No meal type available')
 
-  return logFoodEntries(meal.ingredients.map(ingredientToEntry), date, mealTypeId, userId)
+  return logFoodEntries(meal.ingredients.map(ingredientToEntry), date, mealTypeId, userId, tz)
 }

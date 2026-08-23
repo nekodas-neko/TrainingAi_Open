@@ -32,7 +32,7 @@ describe('daily-energy', () => {
       profile: { ageYears: null, weightKg: 82.5, sex: 'male' },
       strengthSessions: [{ durationMin: 55 }], activities: [], pedometerSteps: 10000,
     })
-    expect(r).toEqual({ workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0 })
+    expect(r).toEqual({ workoutKcal: 0, activityKcal: 0, stepsKcal: 0, total: 0, workoutKcalBySession: [] })
   })
 
   itVendor('estimates a strength session in a sane range (~200-400 kcal for 55 min)', () => {

@@ -38,3 +38,35 @@ export function energyDaySummary(energy: EnergyBalanceResponse | null): EnergyDa
     ],
   }
 }
+
+/**
+ * Per-session workout calories, keyed by `workout_sessions.id` (Q-391).
+ *
+ * **Keyed by id, never by name.** A session name is not identity — repeat the same session twice in
+ * one day and two cards would collide on the key, each showing the other's figure or one showing
+ * both. `/api/day-log` already carries `workoutSessionId` per exercise, so the join costs nothing.
+ *
+ * **Deliberately returns the UNROUNDED values.** Rounding each addend and rounding their sum are
+ * different numbers: three sessions at 120.4 render as 120 each under a total of 361. Round at the
+ * point of display, so the drift is at most half a kcal per card rather than compounding here.
+ *
+ * These are the terms `computeActiveEnergy` summed into the Energy section's "Workouts" row on this
+ * same screen — not a second estimate of the same thing. That is the whole reason the field ships
+ * from `/api/nutrition/energy-balance` rather than being recomputed in `/api/day-log`: the parts
+ * cannot disagree with the total, because they *are* the total's addends.
+ *
+ * **`source` is carried through, not dropped (Q-421).** Roughly half the owner's sessions have no
+ * strap reading, so two cards on the same screen are routinely produced by two different formulas —
+ * Keytel from heart rate, or a MET tier over the clock — whose outputs overlap rather than agree.
+ * Without the basis beside each figure the reader cannot tell which of two adjacent numbers responds
+ * to effort and which only to duration. That is permanent: the strap is not always worn.
+ */
+export interface SessionKcal {
+  kcal: number
+  source: 'hr' | 'met'
+}
+
+export function workoutKcalBySession(energy: EnergyBalanceResponse | null): Map<string, SessionKcal> {
+  const rows = energy?.activeBreakdown?.workoutKcalBySession ?? []
+  return new Map(rows.map(r => [r.id, { kcal: r.kcal, source: r.source }]))
+}

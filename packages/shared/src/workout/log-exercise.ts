@@ -148,7 +148,7 @@ export async function logExerciseFromPayload(
   const norm = normalizeDateParam(localDate ?? todayInTz(tz));
   const rawDate = norm ?? todayInTz(tz).replace(/-/g, '/');
   const [y, m, d] = rawDate.split('/').map(Number);
-  const startOfDay = aestMidnight(y, m, d);
+  const startOfDay = aestMidnight(y, m, d, tz);
   const sessionStart = workoutStartedAt ? new Date(workoutStartedAt) : startOfDay;
 
   let wsId = workoutSessionId;
@@ -164,7 +164,7 @@ export async function logExerciseFromPayload(
       sessionIsEarlyDeload = ensured.isEarlyDeload;
     }
   } else {
-    const todaySessions = await repo.getDayLog(userId, rawDate);
+    const todaySessions = await repo.getDayLog(userId, rawDate, tz);
     const existing = todaySessions.find(ws => ws.sessionName === sessionName && !ws.completedAt);
     if (existing) {
       wsId = existing.id;
@@ -246,11 +246,24 @@ export async function logExerciseFromPayload(
     : workoutStartedAt != null ? new Date(workoutStartedAt)
     : new Date();
 
+  // RV-32: `exercise_logs.style_id` is a client-supplied FK into a strictly user-scoped table, and
+  // it arrived here unchecked on both the web route and the outbox's `pushMutations` branch — this
+  // function is the one place that covers both.
+  //
+  // **Dropped to null rather than refused**, unlike the two program-config paths, and the difference
+  // is deliberate: a refusal here is a 4xx on a queued mutation, which the outbox quarantines as a
+  // poison pill — so a foreign style id would cost the user a whole logged workout over a metadata
+  // column. Losing the style reference is the smaller loss by a wide margin. The config paths refuse
+  // instead because the user is editing interactively and can see and fix the rejection.
+  const ownedStyleId = styleId != null && !(await repo.progressionStyleIdsOwned(userId, [styleId]))
+    ? null
+    : styleId
+
   const { exerciseLog } = await repo.logExerciseAndSets(userId, {
     workoutSessionId: wsId,
     exerciseLogId: clientExerciseLogId,
     exerciseName: exercise,
-    styleId: styleId,
+    styleId: ownedStyleId ?? undefined,
     styleName: styleName,
     estimated1rm,
     target80,

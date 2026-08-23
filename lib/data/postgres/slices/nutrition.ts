@@ -1,5 +1,7 @@
 import { eq, and, inArray, gte, lte, asc, desc, sql, isNull } from 'drizzle-orm'
-import { NotFoundError } from '@trainingai/shared/errors'
+import { NotFoundError, UserFacingError } from '@trainingai/shared/errors'
+import { resolveEatenAt } from '@trainingai/shared/nutrition/eaten-at'
+import { DEFAULT_TZ } from '@trainingai/shared/date-utils'
 import { randomUUID } from 'node:crypto'
 import type { getDb } from '../client'
 import * as s from '../schema'
@@ -75,8 +77,28 @@ export async function createMealType(db: Db, userId: string, data: Omit<MealType
 }
 
 export async function updateMealType(db: Db, id: string, userId: string, data: Partial<Omit<MealType, 'id' | 'userId' | 'createdAt'>>): Promise<MealType> {
+  // Every field of the PUT schema is optional, so `{}` parses — and Drizzle's `.set({})` throws
+  // "No values to set", which the route answered as a 500 on an otherwise valid request. Found by
+  // Q-482's probe, which sends `{}`; every sibling PATCH route already handled this, so it is the
+  // one route, not a class. Guarded here rather than at the route so a second caller cannot repeat it.
+  if (Object.keys(data).length === 0) throw new UserFacingError('No fields to update', 400)
+  // RV-33: column by column, the way its ~20 siblings already do. Passing `data` into `.set()`
+  // wholesale was safe only because its one caller validates with a `.strict()` Zod schema — the
+  // guarantee lived at the route, so a second caller would inherit nothing, and `userId`/`createdAt`
+  // are settable column keys whatever the TypeScript `Omit<>` says (it is compile-time only).
+  const patch: Partial<typeof s.mealTypes.$inferInsert> = {}
+  if (data.name !== undefined)             patch.name = data.name
+  if (data.emoji !== undefined)            patch.emoji = data.emoji
+  if (data.sortOrder !== undefined)        patch.sortOrder = data.sortOrder
+  if (data.timeStartHour !== undefined)    patch.timeStartHour = data.timeStartHour
+  if (data.timeEndHour !== undefined)      patch.timeEndHour = data.timeEndHour
+  if (data.remindersEnabled !== undefined) patch.remindersEnabled = data.remindersEnabled
+  if (data.required !== undefined)         patch.required = data.required
+  // A body of only unknown keys reaches the same "No values to set" throw the guard above exists to
+  // prevent, so it gets the same refusal rather than a 500.
+  if (Object.keys(patch).length === 0) throw new UserFacingError('No fields to update', 400)
   const [r] = await db.update(s.mealTypes)
-    .set(data)
+    .set(patch)
     .where(and(eq(s.mealTypes.id, id), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
     .returning()
   if (!r) throw new NotFoundError('Meal type')
@@ -97,14 +119,96 @@ export async function updateMealType(db: Db, id: string, userId: string, data: P
  * Soft-deleting sidesteps the RESTRICT entirely: the soft-deleted logs keep pointing at a row that
  * still exists, so their sync tombstones survive and no unsynced device can resurrect them.
  */
-export async function deleteMealType(db: Db, id: string, userId: string): Promise<void> {
-  const logs = await db.select({ id: s.foodLogs.id }).from(s.foodLogs)
+export async function countLiveFoodLogsForMealType(db: Db, userId: string, mealTypeId: string): Promise<number> {
+  const [row] = await db.select({ n: sql<number>`count(*)::int` }).from(s.foodLogs)
     .where(and(
-      eq(s.foodLogs.mealTypeId, id),
+      eq(s.foodLogs.mealTypeId, mealTypeId),
       eq(s.foodLogs.userId, userId),
       isNull(s.foodLogs.deletedAt),
-    )).limit(1)
-  if (logs.length > 0) throw new Error('MEAL_TYPE_HAS_LOGS')
+    ))
+  return row?.n ?? 0
+}
+
+/**
+ * Thrown when a delete is refused because logs point at the meal type. Carries the count, so the
+ * caller can say *"Afternoon Meal has 34 entries"* rather than *"reassign them first"* — a 409 that
+ * names a number and offers the fix is a different product from one that names a number and stops
+ * (Q-412).
+ */
+export class MealTypeHasLogsError extends Error {
+  constructor(readonly logCount: number) {
+    super('MEAL_TYPE_HAS_LOGS')
+    this.name = 'MealTypeHasLogsError'
+  }
+}
+
+/**
+ * Move every live log off `fromId` and onto `toId`, then soft-delete `fromId` — **one transaction**,
+ * because a reassign that succeeds and a delete that then fails leaves the user halfway with no way
+ * back (Q-412).
+ *
+ * **The moved rows are re-stamped through `resolveEatenAt` against the NEW window**, per Q-413. A
+ * 3 pm snack reassigned to Lunch would otherwise keep a 15:00 stamp sitting outside Lunch's 12–15h
+ * window — the exact inconsistency the move was meant to tidy. This is done in TypeScript rather
+ * than a second SQL copy of the midpoint arithmetic: the SQL in migration 203 is a one-off
+ * historical correction, and every *live* path goes through the one implementation.
+ *
+ * One UPDATE regardless of how many rows moved, and it is scoped to `user_id` like every other
+ * write here.
+ */
+export async function reassignAndDeleteMealType(
+  db: Db, userId: string, fromId: string, toId: string,
+): Promise<{ moved: number }> {
+  if (fromId === toId) throw new UserFacingError('Pick a different meal type to move the entries to')
+
+  const [target] = await db.select({
+    timeStartHour: s.mealTypes.timeStartHour,
+    timeEndHour:   s.mealTypes.timeEndHour,
+  }).from(s.mealTypes)
+    .where(and(eq(s.mealTypes.id, toId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
+    .limit(1)
+  if (!target) throw new NotFoundError('Meal type')
+
+  const [{ timezone } = { timezone: DEFAULT_TZ }] = await db
+    .select({ timezone: s.users.timezone }).from(s.users).where(eq(s.users.id, userId)).limit(1)
+  const tz = timezone ?? DEFAULT_TZ
+  const window = { timeStartHour: target.timeStartHour, timeEndHour: target.timeEndHour }
+
+  return db.transaction(async tx => {
+    const rows = await tx.select({ id: s.foodLogs.id, date: s.foodLogs.date, loggedAt: s.foodLogs.loggedAt })
+      .from(s.foodLogs)
+      .where(and(
+        eq(s.foodLogs.mealTypeId, fromId),
+        eq(s.foodLogs.userId, userId),
+        isNull(s.foodLogs.deletedAt),
+      ))
+
+    // One statement per row, on purpose: each row resolves against its own `date`, so there is no
+    // single timestamp to set. This is a settings action bounded by one meal type's history, not a
+    // hot path, and a row-count-shaped optimisation here would trade clarity for nothing measurable.
+    // `updated_at` is the sync cursor — bumping it is what carries the move out to every device on
+    // the next pull, so it is not incidental.
+    for (const r of rows) {
+      await tx.update(s.foodLogs)
+        .set({
+          mealTypeId: toId,
+          loggedAt:   resolveEatenAt({ date: r.date, window, at: r.loggedAt, tz }),
+          updatedAt:  new Date(),
+        })
+        .where(and(eq(s.foodLogs.id, r.id), eq(s.foodLogs.userId, userId)))
+    }
+
+    await tx.update(s.mealTypes)
+      .set({ deletedAt: new Date() })
+      .where(and(eq(s.mealTypes.id, fromId), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
+
+    return { moved: rows.length }
+  })
+}
+
+export async function deleteMealType(db: Db, id: string, userId: string): Promise<void> {
+  const logCount = await countLiveFoodLogsForMealType(db, userId, id)
+  if (logCount > 0) throw new MealTypeHasLogsError(logCount)
   await db.update(s.mealTypes)
     .set({ deletedAt: new Date() })
     .where(and(eq(s.mealTypes.id, id), eq(s.mealTypes.userId, userId), isNull(s.mealTypes.deletedAt)))
@@ -211,16 +315,51 @@ export async function listLatestMealTimes(db: Db, userId: string, from: string, 
   return rows
 }
 
+/**
+ * Resolve when the food was eaten, for a log the caller is about to write (Q-413).
+ *
+ * **This is the single place both server write paths pass through** — the web route and the offline
+ * `pushMutations` branch both land in `createFoodLog`, so the rule cannot drift between them the way
+ * this project's write paths repeatedly have. One query, because the window and the timezone are
+ * both needed and neither caller holds them: `foodLogRefsValid` has already proved the meal type is
+ * the user's by the time this runs.
+ *
+ * Falls back to the candidate instant if the meal type has somehow gone — a missing window is not a
+ * reason to refuse a food log, and the row's `date` is still correct.
+ */
+async function resolveLogEatenAt(db: Db, userId: string, mealTypeId: string, date: string, at: Date): Promise<Date> {
+  const [row] = await db
+    .select({
+      timeStartHour: s.mealTypes.timeStartHour,
+      timeEndHour:   s.mealTypes.timeEndHour,
+      timezone:      s.users.timezone,
+    })
+    .from(s.mealTypes)
+    .innerJoin(s.users, eq(s.users.id, userId))
+    .where(and(eq(s.mealTypes.id, mealTypeId), eq(s.mealTypes.userId, userId)))
+    .limit(1)
+  if (!row) return at
+  return resolveEatenAt({
+    date,
+    window: { timeStartHour: row.timeStartHour, timeEndHour: row.timeEndHour },
+    at,
+    tz: row.timezone ?? DEFAULT_TZ,
+  })
+}
+
 export async function createFoodLog(
   db: Db,
   userId: string,
   data: Pick<FoodLog, 'date' | 'mealTypeId' | 'foodItemId' | 'quantityMultiplier'> & { id?: string; loggedAt?: Date },
 ): Promise<FoodLog> {
   const { id, loggedAt, ...rest } = data
+  // The client's `loggedAt` is a CANDIDATE, not an answer — an offline replay carries the instant
+  // the button was pressed, which is the very thing Q-413 exists to stop storing unexamined.
+  const eatenAt = await resolveLogEatenAt(db, userId, rest.mealTypeId, rest.date, loggedAt ?? new Date())
   // Optional client id: offline-created logs keep their local UUID so an outbox
   // replay updates in place (idempotent) instead of duplicating the row.
   const [r] = await db.insert(s.foodLogs)
-    .values({ ...(id ? { id } : {}), ...(loggedAt ? { loggedAt } : {}), userId, ...rest })
+    .values({ ...(id ? { id } : {}), loggedAt: eatenAt, userId, ...rest })
     .onConflictDoUpdate({
       target: s.foodLogs.id,
       set: { quantityMultiplier: rest.quantityMultiplier, updatedAt: new Date() },
@@ -366,7 +505,7 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
     )
     // `totals` stays the WHOLE recipe — dividing here would make every existing caller
     // silently change meaning. Callers that want one portion divide by `servings` themselves.
-    return { id: m.id, userId: m.userId, name: m.name, servings: m.servings, createdAt: m.createdAt, items, totals }
+    return { id: m.id, userId: m.userId, name: m.name, servings: m.servings, imageDataUri: m.imageDataUri ?? null, createdAt: m.createdAt, items, totals }
   })
 }
 
@@ -375,13 +514,16 @@ export async function listSavedMeals(db: Db, userId: string): Promise<SavedMeal[
 // offline create that replays — or a create+edit that replays out of order — lands
 // in place instead of duplicating or throwing. The meal id is client-minted (offline)
 // or generated here (online without one), and the junction rows are replaced wholesale.
-async function writeSavedMeal(db: Db, userId: string, id: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings: number): Promise<SavedMeal> {
+async function writeSavedMeal(db: Db, userId: string, id: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings: number, imageDataUri?: string | null): Promise<SavedMeal> {
   await db.transaction(async tx => {
     const [meal] = await tx.insert(s.savedMeals)
-      .values({ id, userId, name, servings })
+      // `undefined` means "the caller did not mention the image", which must not clear a stored one
+      // — only an explicit `null` removes it. That distinction is why the parameter is optional
+      // rather than defaulted (Q-396).
+      .values({ id, userId, name, servings, ...(imageDataUri !== undefined ? { imageDataUri } : {}) })
       .onConflictDoUpdate({
         target: s.savedMeals.id,
-        set: { name, servings },
+        set: { name, servings, ...(imageDataUri !== undefined ? { imageDataUri } : {}) },
         setWhere: eq(s.savedMeals.userId, userId),   // never touch another user's row
       })
       .returning({ id: s.savedMeals.id })
@@ -406,12 +548,12 @@ async function writeSavedMeal(db: Db, userId: string, id: string, name: string, 
   return all.find(m => m.id === id)!
 }
 
-export async function createSavedMeal(db: Db, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings = 1): Promise<SavedMeal> {
-  return writeSavedMeal(db, userId, id ?? randomUUID(), name, items, servings)
+export async function createSavedMeal(db: Db, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], id?: string, servings = 1, imageDataUri?: string | null): Promise<SavedMeal> {
+  return writeSavedMeal(db, userId, id ?? randomUUID(), name, items, servings, imageDataUri)
 }
 
-export async function updateSavedMeal(db: Db, id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings = 1): Promise<SavedMeal> {
-  return writeSavedMeal(db, userId, id, name, items, servings)
+export async function updateSavedMeal(db: Db, id: string, userId: string, name: string, items: { foodItemId: string; quantityMultiplier: number }[], servings = 1, imageDataUri?: string | null): Promise<SavedMeal> {
+  return writeSavedMeal(db, userId, id, name, items, servings, imageDataUri)
 }
 
 export async function deleteSavedMeal(db: Db, id: string, userId: string): Promise<void> {

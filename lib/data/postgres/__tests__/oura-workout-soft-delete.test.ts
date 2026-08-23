@@ -165,7 +165,10 @@ describe.skipIf(!canRun)('oura slice, workout queries — soft-delete filters', 
 
   // ── getUnsyncedHrSessionsForDay — ws.deleted_at ──
   describe('getUnsyncedHrSessionsForDay', () => {
-    const list = () => slice.getUnsyncedHrSessionsForDay(db, USER, localDay)
+    // Passes the user's timezone, the way a real caller must (LA-19). Without it the query keys
+    // its window to Brisbane and this test fails for any user outside AEST — which is how the
+    // omission was found.
+    const list = () => slice.getUnsyncedHrSessionsForDay(db, USER, localDay, TZ)
 
     it('finds the day\'s session while its HR is unsynced', async () => {
       expect(ids(await list())).toContain(sessionId)

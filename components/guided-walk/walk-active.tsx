@@ -13,6 +13,7 @@ import type { LiveHrSample } from '@/lib/live-hr/types'
 import { LeaveWalkDialog } from './leave-walk-dialog'
 import { CadenceTracker } from '@/lib/activity/cadence-tracker'
 import { CadenceReadout } from '@/components/activity/cadence-readout'
+import { ActivitySecondaryMetrics } from '@/components/activity/activity-secondary-metrics'
 import type { CadenceSummary } from '@trainingai/shared/health/cadence'
 import { startGpsWatcher, type GpsWatcher } from '@/lib/activity/gps-tracking'
 import { startRunClockChip, stopRunChip } from '@/lib/native/run-status-chip'
@@ -185,6 +186,10 @@ export function WalkActive({ userProfile, onFinish }: {
       )}
 
       <CadenceReadout tracker={cadenceTracker} />
+      {/* Q-418/Q-410: the free walk and the guided walk must show the same running step total, or
+          whichever one is missing it reads as the surface that got forgotten. No elevation here —
+          the guided walk has no route map to put it beside. */}
+      <ActivitySecondaryMetrics tracker={cadenceTracker} elevationGainM={null} />
 
       {distanceKm > 0 && (
         <p className="text-sm tabular-nums text-muted-foreground">{distanceKm.toFixed(2)} km</p>

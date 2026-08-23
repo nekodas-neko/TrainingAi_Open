@@ -72,24 +72,34 @@ export function DayOverlaySheet({
             </div>
           )}
           {!dayOverlay?.loading && dayOverlay?.data && (() => {
-            const { exercises: dayExercises, bodyMeta, workoutDurations, activityLogs } = dayOverlay.data;
-            const sessionNames = Array.from(new Set(dayExercises.map(e => e.sessionName)));
+            const { exercises: dayExercises, bodyMeta, workoutDurationsById, activityLogs } = dayOverlay.data;
+            // Grouped by session **id**, not name (Q-362b). Two `Push` sessions in one day are two
+            // workouts, and grouping them by name merged them into a single card that then loaded
+            // ONE of their heart-rate traces — a wrong number presented as the right one, with
+            // nothing on screen saying which session it belonged to.
+            const bySession = new Map<string, { name: string; exercises: typeof dayExercises }>();
+            for (const ex of dayExercises) {
+              const group = bySession.get(ex.workoutSessionId) ?? { name: ex.sessionName, exercises: [] };
+              group.exercises.push(ex);
+              bySession.set(ex.workoutSessionId, group);
+            }
             const iconByType = new Map(activityTypes.map(t => [t.id, t.icon]));
             return (
               <div className="content-fade-in space-y-3">
-                {sessionNames.length > 0 && (
+                {bySession.size > 0 && (
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground pt-1">Exercise</p>
                 )}
-                {sessionNames.map(sessionName => {
+                {[...bySession.entries()].map(([workoutSessionId, { name: sessionName, exercises: sessExercises }]) => {
+                  // The palette still keys off the NAME: two sessions of the same programme session
+                  // should read as the same colour, which is the one thing about them that is shared.
                   const sessIdx = activeSessions.findIndex(s => s.name === sessionName);
                   const palette = getPaletteEntry(sessIdx >= 0 ? sessIdx : 0);
-                  const sessExercises = dayExercises.filter(e => e.sessionName === sessionName);
-                  const expandKey = `workout-${sessionName}`;
+                  const expandKey = `workout-${workoutSessionId}`;
                   const isExpanded = dayOverlay.expanded === expandKey;
-                  const workoutSessionId = sessExercises[0]?.workoutSessionId ?? null;
-                  const hrState = workoutSessionId ? sessionHrData[workoutSessionId] : undefined;
+                  const duration = workoutDurationsById[workoutSessionId];
+                  const hrState = sessionHrData[workoutSessionId];
                   return (
-                    <div key={sessionName} className={cn("rounded-xl border overflow-hidden", palette.bgClass)}>
+                    <div key={workoutSessionId} className={cn("rounded-xl border overflow-hidden", palette.bgClass)}>
                       <div
                         role="button"
                         tabIndex={0}
@@ -97,14 +107,14 @@ export function DayOverlaySheet({
                         onClick={() => {
                           const expanding = !isExpanded;
                           setDayOverlay(prev => prev ? { ...prev, expanded: expanding ? expandKey : null } : prev);
-                          if (expanding && workoutSessionId) loadSessionHr(workoutSessionId);
+                          if (expanding) loadSessionHr(workoutSessionId);
                         }}
                         onKeyDown={e => {
                           if (e.key === "Enter" || e.key === " ") {
                             e.preventDefault();
                             const expanding = !isExpanded;
                             setDayOverlay(prev => prev ? { ...prev, expanded: expanding ? expandKey : null } : prev);
-                            if (expanding && workoutSessionId) loadSessionHr(workoutSessionId);
+                            if (expanding) loadSessionHr(workoutSessionId);
                           }
                         }}
                       >
@@ -112,41 +122,37 @@ export function DayOverlaySheet({
                           <span className="text-lg">{palette.emoji}</span>
                           <div className="min-w-0">
                             <p className={cn("text-sm font-bold truncate", palette.textClass)}>{shortSessionName(sessionName)}</p>
-                            {workoutDurations[sessionName] && (
+                            {duration && (
                               <p className="text-xs text-muted-foreground tabular-nums">
-                                {workoutDurations[sessionName]!.start} → {workoutDurations[sessionName]!.end} · {workoutDurations[sessionName]!.minutes} min
+                                {duration.start} → {duration.end} · {duration.minutes} min
                               </p>
                             )}
                           </div>
                         </div>
                         <div className="flex items-center gap-1 flex-none">
-                          {workoutSessionId && (
-                            <>
-                              <button
-                                aria-label="Edit session"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  if (!isExpanded) {
-                                    setDayOverlay(prev => prev ? { ...prev, expanded: expandKey } : prev);
-                                    if (workoutSessionId) loadSessionHr(workoutSessionId);
-                                  }
-                                }}
-                                className="rounded p-1.5 hover:bg-muted text-muted-foreground"
-                              >
-                                <PencilIcon className="h-4 w-4" />
-                              </button>
-                              <button
-                                aria-label="Delete session"
-                                onClick={e => {
-                                  e.stopPropagation();
-                                  onDeleteSession({ id: workoutSessionId, name: shortSessionName(sessionName) });
-                                }}
-                                className="rounded p-1.5 hover:bg-muted text-muted-foreground"
-                              >
-                                <Trash2Icon className="h-4 w-4" />
-                              </button>
-                            </>
-                          )}
+                          <button
+                            aria-label="Edit session"
+                            onClick={e => {
+                              e.stopPropagation();
+                              if (!isExpanded) {
+                                setDayOverlay(prev => prev ? { ...prev, expanded: expandKey } : prev);
+                                loadSessionHr(workoutSessionId);
+                              }
+                            }}
+                            className="rounded p-1.5 hover:bg-muted text-muted-foreground"
+                          >
+                            <PencilIcon className="h-4 w-4" />
+                          </button>
+                          <button
+                            aria-label="Delete session"
+                            onClick={e => {
+                              e.stopPropagation();
+                              onDeleteSession({ id: workoutSessionId, name: shortSessionName(sessionName) });
+                            }}
+                            className="rounded p-1.5 hover:bg-muted text-muted-foreground"
+                          >
+                            <Trash2Icon className="h-4 w-4" />
+                          </button>
                           <ChevronDownIcon className={cn("h-4 w-4 text-muted-foreground transition-transform", isExpanded && "rotate-180")} />
                         </div>
                       </div>

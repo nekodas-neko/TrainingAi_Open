@@ -9,6 +9,10 @@ import { uploadExerciseMedia, mediaKey, isStorageConfigured } from '@/lib/exerci
 import { loadDataset, findBestMatch, findDirectUrl, DATASET_BASE } from '@trainingai/shared/exercise-gif-matcher';
 import { eq, and } from 'drizzle-orm';
 import { StatusCodes } from 'http-status-codes';
+import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+
+// Optional tuning flags; the body is normally absent.
+const MAX_BODY_BYTES = 8 * 1024
 
 const BodySchema = z.object({
   exerciseName: z.string().min(1).max(120),
@@ -31,7 +35,12 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
   }
 
-  const body = await req.json().catch(() => ({}));
+  // Optional body: an absent or unreadable one falls back to {}, only an oversized one is refused.
+  const read = await readJsonLimited(req, MAX_BODY_BYTES);
+  if (!read.ok && read.reason === 'too_large') {
+    return NextResponse.json({ error: 'Request too large' }, { status: 413 });
+  }
+  const body = (read.ok ? read.body : null) ?? {};
   const parsed = BodySchema.safeParse(body);
   if (!parsed.success) {
     return NextResponse.json({ error: 'Invalid request' }, { status: StatusCodes.BAD_REQUEST });

@@ -52,16 +52,17 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
           ) : (() => {
             const exercises = data?.exercises ?? [];
             const bodyMeta = data?.bodyMeta ?? null;
-            const workoutDurations = data?.workoutDurations ?? {};
+            const workoutDurationsById = data?.workoutDurationsById ?? {};
 
-            // Group exercises by session
-            const sessionGroups = exercises.reduce<Record<string, DayExercise[]>>((acc, ex) => {
-              if (!acc[ex.sessionName]) acc[ex.sessionName] = [];
-              acc[ex.sessionName].push(ex);
-              return acc;
-            }, {});
-            const sessionNames = Object.keys(sessionGroups);
-            const hasContent = sessionNames.length > 0 || bodyMeta !== null;
+            // Grouped by session **id**, not name (Q-362b). Two `Push` sessions in one day are two
+            // workouts; keying on the name merged them into one block under one duration chip.
+            const sessionGroups = new Map<string, { name: string; exercises: DayExercise[] }>();
+            for (const ex of exercises) {
+              const group = sessionGroups.get(ex.workoutSessionId) ?? { name: ex.sessionName, exercises: [] };
+              group.exercises.push(ex);
+              sessionGroups.set(ex.workoutSessionId, group);
+            }
+            const hasContent = sessionGroups.size > 0 || bodyMeta !== null;
 
             if (!hasContent) {
               return (
@@ -91,11 +92,10 @@ export function WeekDaySheet({ date, onClose, onExerciseTap }: WeekDaySheetProps
                     ))}
                   </div>
                 )}
-                {sessionNames.map((sessionName) => {
-                  const exs = sessionGroups[sessionName];
-                  const dur = workoutDurations[sessionName];
+                {[...sessionGroups.entries()].map(([sessionId, { name: sessionName, exercises: exs }]) => {
+                  const dur = workoutDurationsById[sessionId];
                   return (
-                    <div key={sessionName} className="space-y-2">
+                    <div key={sessionId} className="space-y-2">
                       <div className="flex items-center justify-between">
                         <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{sessionName}</p>
                         {dur && (
