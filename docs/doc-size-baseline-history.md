@@ -1528,7 +1528,17 @@ queue entry is for.
 
 Both numbers were re-measured on the merged tree rather than spliced from the conflict hunks — the
 backlog baseline moved under this branch while it was open.
-<<<<<<< HEAD
+## 2026-08-23 — `docs/implementation-backlog.md` 11417 → 11432
+
+Fifteen lines of `Lane:` / `Gate:` / `Needs:` fields on Q-499, Q-549, Q-551 and Q-547 — four entries
+that sat at the head of the Lane A queue offering work no Lane A implementer could do, each of them
+already saying so in prose the tooling cannot read.
+
+This is the queue file doing its job rather than growing: the fields are what
+`scripts/check-backlog-pointers.js` validates and what `scripts/next-item.js` sorts on, and the
+alternative to the fifteen lines is the next four implementers each re-reading four entries to
+discover the same thing.
+
 
 ## 2026-08-23 — `docs/implementation-backlog.md` 11432 → 11453
 
@@ -1547,15 +1557,3 @@ because it is the scope of the next task: three of the five want the same inject
 split, and one is a `sourceRank` move. Without it the next implementer re-walks the graph — and is
 likely to walk it wrong, since following type-only imports too makes the answer look like "the whole
 Postgres layer".
-=======
-## 2026-08-23 — `docs/implementation-backlog.md` 11417 → 11432
-
-Fifteen lines of `Lane:` / `Gate:` / `Needs:` fields on Q-499, Q-549, Q-551 and Q-547 — four entries
-that sat at the head of the Lane A queue offering work no Lane A implementer could do, each of them
-already saying so in prose the tooling cannot read.
-
-This is the queue file doing its job rather than growing: the fields are what
-`scripts/check-backlog-pointers.js` validates and what `scripts/next-item.js` sorts on, and the
-alternative to the fifteen lines is the next four implementers each re-reading four entries to
-discover the same thing.
->>>>>>> origin/main
