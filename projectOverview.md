@@ -27,6 +27,12 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**Preferences have a server home; nothing reads it yet (Q-392, engine half).**
+`users.preferences` JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, which **merges**
+under a row lock — the unlocked version demonstrably drops the other device's key when a write
+lands mid-merge. Proven with two signed-in sessions against the local DB. **Nothing the owner can
+see changed:** the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
+
 **The UTC-offset fixture sweep came back clean, and found something else (Q-394, LA-19 — both
 closed).** No third test carries the hazard that took out two PRs. But one *correctly written* test
 failed the sweep because the code under it re-derived midnight in Brisbane: `aestMidnight` takes a

@@ -28,6 +28,12 @@ export const users = pgTable('users', {
   avatar:       text('avatar'),
   passwordHash: text('password_hash'),
   timezone:     text('timezone').notNull().default('Australia/Brisbane'),
+  /** Server-authoritative user preferences, seeded into localStorage for first paint (Q-392).
+   *  Shape and merge rule: `packages/shared/src/user/preferences.ts`. */
+  preferences:  jsonb('preferences').$type<import('@trainingai/shared/user/preferences').UserPreferences>().notNull().default({}),
+  /** SUPERSEDED by `preferences.foodRegion` (Q-392). Never read or written by any code — it was
+   *  dead when the preferences work found it. Dropping it is a data-losing migration and belongs to
+   *  a schema sweep, not here. */
   foodRegion:   text('food_region').notNull().default('AU'),
   sex:          text('sex'),
   stepsGoal:        integer('steps_goal'),
