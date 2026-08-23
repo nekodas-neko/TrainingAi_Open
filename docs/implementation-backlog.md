@@ -4940,6 +4940,7 @@ session working from a temporarily restored copy.
 - **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
   than the release and tag, so the release id and tag survive the swap.
 
+<<<<<<< HEAD
 ### [platform][readiness] Q-453 — `/api/training-stress` silently answers for *today* when handed a malformed date; its ten siblings all reject it
 
 - **Branch:** `fix/training-stress-date-param-validation`
@@ -4961,6 +4962,45 @@ session working from a temporarily restored copy.
   separators; see the review). It is the adjacent one: a normaliser whose `null` return is read as
   "use the default" rather than "reject". Worth grepping for the same
   `normalizeDateParam*(...) ?? today…` shape elsewhere when fixing.
+=======
+### [platform] Q-454 — two routes validate their params before checking auth, out of 122
+
+- **Branch:** `fix/auth-before-param-validation`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens, **all 122 GET routes called anonymously**) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** low. **No data leaks** — this is ordering, not a hole.
+- **Measured.** 122 `app/api` GET routes called with no session cookie. 120 reveal nothing about their
+  contract. Two answer the *parameter* question first:
+  - `GET /api/day-log` → `400 {"error":"Missing date"}`
+  - `GET /api/exercise-history` → `400 {"error":"Missing name"}`
+- **Verified not a leak.** Supply the missing param and both return `401 {"error":"Unauthorized"}`
+  (`/api/day-log?date=2026-08-14`, `/api/exercise-history?name=Bench%20Press` — both 401 anonymous).
+- **Why fix it anyway:** the stated rule is that security checks fail closed and fail *first*. Today
+  the pre-auth code only reads a search param; it is cheap to reorder now, and expensive the day
+  someone adds a param handler above the `auth()` call that touches the DB.
+- **Filed here rather than separately, same class:** `GET /api/push/subscribe` returns
+  `503 {"error":"Push not configured"}` to an anonymous caller, disclosing deployment configuration
+  before authentication. (Q-285/Q-286 already cover web push having no senders or subscribers; this is
+  only about the pre-auth answer.)
+
+### [platform][devices] Q-455 — an unhandled throw in a GET route returns a bodiless 500, not a JSON error
+
+- **Branch:** `fix/decoder-constants-json-error-shape`
+- **Added:** 2026-08-17 · review sweep (failure-cells lens) ·
+  [`docs/reviews/2026-08-17-failure-cells-running-the-app.md`](reviews/2026-08-17-failure-cells-running-the-app.md)
+- **Placement:** low.
+- **Observed.** `GET /api/oura-ble/decoder-constants` returned **500 with an empty body** — no JSON,
+  no `error` key — because a `JSON.parse(fs.readFileSync(...))` threw straight out of
+  `app/api/oura-ble/decoder-constants/route.ts:29` with nothing catching it.
+- **The trigger is environmental and is NOT what is being filed.** This sandbox cannot reach the
+  model-constants bucket (`SignatureDoesNotMatch (403)` at boot, logged by instrumentation) — the
+  already-recorded Known Issue *"The bucket download path for the model constants has never actually
+  run (2026-08-15)"*. In production with working credentials the read succeeds.
+- **What is filed is the shape.** `CLAUDE.md` requires routes to return a JSON error rather than
+  throwing; a client doing `res.json()` on this gets a parse exception stacked on top of the original
+  fault. The route has a deliberate boot-time check that turns this into a deploy failure rather than
+  a first-request one — but the first-request path still exists and still answers with nothing.
+>>>>>>> origin/main
 
 ### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
 
