@@ -153,32 +153,27 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [workouts][activity][app-shell] 🟠 A logged workout, exercise or activity cannot be edited or deleted from anywhere in the app (LB-1, 2026-08-23)
+### [workouts][activity][app-shell] ⚠️ Editing and deleting logged training is back, but has not been checked on the device (LB-1, 2026-08-23)
 
-**The four controls that did this live in a sheet nothing can open.** `DayOverlaySheet` is rendered
-only by `health-content.tsx`, gated on a `dayOverlay` state that starts `null` — and every
-`setDayOverlay` call in the repo is either a `prev => prev ? … : null` updater, which no-ops while
-the state is null, or `null` itself. Nothing constructs a non-null value, so the sheet never renders.
-`day-overlay-dialogs.tsx` (the edit sheet and the delete confirmations) is dead with it.
+**Fixed in v1.334.0** — `/health/day` now carries edit + delete on every exercise row, delete on
+every session card, delete on every activity, reusing `day-overlay-dialogs.tsx` unchanged. The four
+handlers moved into `lib/hooks/use-day-entry-mutations.ts`, called by the day screen *and*
+`health-content.tsx`, so there is one write path per domain rather than a second copy.
+Guarded by `e2e/day-entry-edit-delete.spec.ts` — four cases, each asserting on the **database**, not
+on the row disappearing: every handler toasts and closes *before* its request resolves, so a control
+wired to nothing looks identical on screen
+([`journal`](docs/overview/entries/2026-08-23-day-screen-edit-delete.md)).
 
-**Measured repo-wide, 2026-08-23.** The only Edit/Delete exercise/session controls in the app are in
-that file, and the only client callers of `DELETE /api/workout-entry`, `/api/workout-sessions` and
-`/api/activity-logs` are the handlers they drive (the other three `activity-logs` call sites are
-POST). The one other trash icon nearby — `workout-review-sheet.tsx` — is a **drop-set indicator**.
-So a mis-logged set, a duplicate session or a wrong activity cannot be corrected by the user at all.
+**For the record:** Q-110 (2026-08-08, v1.270.0) repointed the calendar day-tap from `DayOverlaySheet`
+to `/health/day` and the controls stayed on the sheet, which nothing else opened — so the app's only
+Edit/Delete controls, and the only client callers of the three DELETE routes, sat unreachable.
 
-**How it happened.** Q-110 repointed Health's calendar day-tap from the sheet to `/health/day`, which
-has no edit or delete affordances at all (`day-sections.tsx` contains zero `onClick`, `<button>` or
-`role="button"`), and left a comment saying *"the same overlay is still opened from other surfaces"*.
-Already false when written, and it is what kept ~300 lines of unreachable UI looking alive — two
-sessions have since fixed bugs inside it, including Q-362b in v1.333.2. Comment corrected; capability
-not restored.
-
-**Not fixed here, deliberately.** The port is not a code move: `/health/day` swipes between days, and
-the sheet's handlers are written against a single overlay date. Wiring them to the wrong date on a
-screen whose whole job is changing dates would **delete the wrong day's data**, which is the one
-class of change this repo requires confirmation for. LB-1 carries the inventory and the design
-question; it needs a planned implementation, not an in-place refactor.
+- **Keep: not device-verified.** The 48dp targets and the dialogs' safe-area clearance were built to
+  the rule but the sandbox renders insets as 0, and the local-store mirroring in all four handlers
+  never ran (`getLocalStore` is null on web) — so the offline half is verified by reading only.
+- **Follow-up: LB-3** — `day-overlay-sheet.tsx` is still unreachable in the tree, deliberately:
+  deleting it discards three affordances the day screen has not got (exercise-name tap →
+  `ExerciseHistorySheet`, activity tap → `ActivityDetailSheet`, per-session HR expander).
 
 ### [workouts][platform][nutrition] 🟠 Three write paths accept another user's progression-style id; the PUT twin of one of them rejects it (RV-32…RV-34, 2026-08-20)
 
@@ -586,6 +581,11 @@ question; it needs a planned implementation, not an in-place refactor.
   above the call is within a few lines.
 
 ### [activity][app-shell] 🟠 Deleting an activity leaves it in the local store, so three other screens keep showing it (Q-488, 2026-08-18)
+
+> **⚠ Stale as written (noticed 2026-08-23 during LB-1, not investigated further).**
+> `deleteActivityLog` exists and the delete path calls it; Q-328 then gave the domain a real outbox
+> delete ([`journal`](docs/overview/entries/2026-08-19-activity-log-delete-outbox.md)). Not struck —
+> that needs someone to confirm nothing else this row lists is still owed.
 
 - **The successor sweep 22 named for itself:** a stale value arising *outside* Q-262's test — a write
   that updates the server without touching the local store.

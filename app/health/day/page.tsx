@@ -11,5 +11,5 @@ export default async function DayDetailPage({
   // The date is a starting point only — swiping changes it client-side, so a bad param falls back
   // to today rather than 404ing a screen the user reached from a calendar tap.
   const initialDate = (date && normalizeDateParam(date)?.replace(/\//g, "-")) || todayInTz(tz);
-  return <DayDetailContent initialDate={initialDate} tz={tz} />;
+  return <DayDetailContent initialDate={initialDate} tz={tz} userId={session?.user?.id} />;
 }

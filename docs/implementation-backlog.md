@@ -581,64 +581,34 @@ the payload to a standing inefficiency. Open, all Lane A's:
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
-### [workouts][activity][app-shell] LB-1 — nothing in the app can edit or delete a logged workout, exercise or activity
+### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
 
-- **Branch:** `feat/day-screen-edit-delete`
+- **Branch:** `feat/retire-day-overlay-sheet`
 - **Added:** 2026-08-23 · **Lane: B**
-- **Gate: owner** — the UI shape is a decision, see *the decision for the owner* below
-- **Placement:** high for a Lane B item. It is not cosmetic: the user cannot correct their own data,
-  and every wrong row is permanent from the UI's point of view.
+- **Placement:** low. Nothing is broken by leaving it; what is here is dead code plus three
+  capabilities that have been gone since Q-110 (2026-08-08) without a report.
 
-**This entry was filed as "delete some dead code" and that was wrong.** Its own instruction was to
-check whether `/health/day` still lacks the affordances the unreachable sheet had **before**
-deleting, because *"if it does, this is a feature gap, not dead code"*. It does. Measured 2026-08-23.
+LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
+hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
+logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
+because deleting it silently discards three things the day screen does not have:
 
-**What is unreachable.** `DayOverlaySheet` is rendered only by `health-content.tsx`, gated on
-`dayOverlay`, which starts `null`; every `setDayOverlay` call in the repo is a
-`prev => prev ? … : null` no-op or `null`. `day-overlay-dialogs.tsx` (the edit sheet and both delete
-confirmations) is dead with it, as are `fetchDayOverlay`, `refreshDayOverlay` and four handlers.
+| unreachable affordance | where it lives |
+|---|---|
+| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
+| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
+| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
 
-**What that costs, measured repo-wide:**
+`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
+only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
+and `historyExercise`/`selectedActivity` can now only ever be `null` there.
 
-| capability | only control | only client caller of |
-|---|---|---|
-| edit a logged exercise | `day-overlay-sheet.tsx:184` | — |
-| delete a logged exercise | `:187` | `DELETE /api/workout-entry` |
-| edit a session | `:134` | — |
-| delete a session | `:147` | `DELETE /api/workout-sessions` |
-| delete an activity | the sheet's activity row | `DELETE /api/activity-logs` |
-
-The other three `/api/activity-logs` call sites are POST. `workout-review-sheet.tsx`'s trash icon is
-a **drop-set indicator**, not a delete control — check that before concluding a path exists.
-
-**Do NOT just move the handlers, and this is the reason it is gated.** `/health/day` swipes between
-days; the sheet's handlers are written against a single overlay date and call `refreshDayOverlay(date)`
-from closure. Wiring them to the wrong date on a screen whose whole purpose is changing dates
-**deletes the wrong day's data** — the one class of change `CLAUDE.md` requires confirmation for.
-
-**The decision for the owner**, since it is a UI shape on a screen they use daily rather than
-something derivable from the repo:
-
-- **Recommended: put the controls on `/health/day`**, where the calendar tap already lands — per
-  exercise row and per session card, reusing `day-overlay-dialogs.tsx` unchanged so the confirm copy
-  and the edit sheet stay the ones already written and tested. A year out this is the durable answer:
-  one screen owns a day, and the sheet stops being a second half-maintained copy of it.
-- **Alternative: re-point the calendar tap back at the sheet.** Smaller, and it restores the
-  capability in one line — but it undoes Q-110, which moved to the day screen for sleep, body
-  composition, scores and the whole-day HR trace that the sheet does not show. It trades a better
-  screen for a faster fix.
-- **Alternative: leave it and delete the sheet.** Only right if the owner does not want to correct
-  logged data from the day view at all, which the four controls existing in the first place argues
-  against.
-- **Reversal cost is low either way** — this is presentation over routes that already exist and are
-  already scoped to `user_id`.
-
-**Whichever is chosen, the sweep is the same:** the day screen's Training and Activity sections need
-the controls, `day-sections.tsx` currently has **zero** interactive elements, and the ported handlers
-must take their date from the screen's current day rather than a captured one. Device-verify: these
-are destructive actions behind confirm dialogs on a 6.9" screen, so tap targets and the confirm's
-safe-area clearance both matter.
-
+**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
+keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
+`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
+`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
+route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
+controls, so a third target needs a layout decision rather than another icon.
 
 ### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
 

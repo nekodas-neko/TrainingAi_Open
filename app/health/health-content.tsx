@@ -11,7 +11,6 @@ import { useTransitionRouter } from "@/lib/view-transition";
 import { useTabVisibility } from "@/components/shell/tab-visibility";
 import { SegmentedTabs } from "@/components/ui/segmented-tabs";
 import { ScreenHeader } from "@/components/shell/screen-header";
-import { toast } from "sonner";
 import { todayInTz, todayMidnightUtc, toAestDay, shiftDateStr } from "@trainingai/shared/date-utils";
 import { getLocalStore } from "@/lib/local-store";
 import { pushMutations, pullDelta } from "@/lib/local-store/sync-engine";
@@ -20,7 +19,7 @@ import type { BodyMetaRow, WeekToDate } from "@/app/api/body-metadata/route";
 import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCacheSync, isBodyMetadataFresh } from "@/lib/sqlite/cache";
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
-import { invalidateReadinessInputs, invalidateWorkoutSummaries, invalidateOuraSync, invalidateActivityWrites, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite } from "@/lib/cache-groups";
+import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite } from "@/lib/cache-groups";
 import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL, DAY_LOG_TTL } from '@trainingai/shared/cache-ttl';
 import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
 import type { SleepDetailReading } from "@/components/health-metric-sheet";
@@ -28,6 +27,7 @@ import { MetricSheets } from "@/components/health/metric-sheets";
 import { DayOverlaySheet } from "@/components/health/day-overlay-sheet";
 import { ExerciseHistorySheet } from "@/components/exercise-history-sheet";
 import { DayOverlayDialogs } from "@/components/health/day-overlay-dialogs";
+import { useDayEntryMutations } from "@/lib/hooks/use-day-entry-mutations";
 import { WaterLogSheet } from '@/components/profile/water-log-sheet'
 import { MetricLogSheet, type LogField, type LogState } from '@/components/health/metric-log-sheet'
 import type { Injury } from "@trainingai/shared/types/injury";
@@ -39,7 +39,7 @@ const ActivityDetailSheet = dynamic(
 import type { WeeklyStatsResponse } from "@/app/api/weekly-stats/route";
 import type { MuscleSetsEntry } from "@/app/api/weekly-muscle-sets/route";
 import type { StrengthTrendEntry } from "@/app/api/strength-trend/route";
-import type { DayLogResult, DayExercise } from "@/app/api/day-log/route";
+import type { DayLogResult } from "@/app/api/day-log/route";
 import type { ProgressSummaryResponse } from "@/app/api/progress-summary/route";
 import type { ProgramSession } from "@trainingai/shared/types/program";
 import type { ActivityLog, ActivityType } from "@trainingai/shared/types";
@@ -157,13 +157,8 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
 
   const [sessionHrData, setSessionHrData] = useState<Record<string, HrSessionState>>({});
   const [historyExercise, setHistoryExercise] = useState<string | null>(null);
-  const [editEx, setEditEx] = useState<{ ex: DayExercise; weights: number[]; reps: number[] } | null>(null);
-  const [deleteEx, setDeleteEx] = useState<DayExercise | null>(null);
-  const [deleteSession, setDeleteSession] = useState<{ id: string; name: string } | null>(null);
-  const [deleteActivity, setDeleteActivity] = useState<ActivityLog | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<ActivityLog | null>(null);
   const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
-  const [mutating, setMutating] = useState(false);
 
   // ONLY the first-paint seed (Q-241): `userGoals` below supersedes them the moment it loads. See
   // the hook for why it re-reads on tabEpoch rather than on mount alone (Q-260).
@@ -548,158 +543,11 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     await fetchDayOverlay(date);
   }, [fetchDayOverlay]);
 
-  const handleEditSave = useCallback(async () => {
-    if (!editEx || !dayOverlay) return;
-    const ex = editEx;
-    const date = dayOverlay.date;
-    setMutating(true);
-    // Feedback-first (PERF-10): close + toast synchronously, don't wait on the
-    // network round-trip. The offline/outbox mechanics themselves are R3's job —
-    // this chunk owns only the render/paint half.
-    toast.success("Updated");
-    setEditEx(null);
-    try {
-      const res = await fetch("/api/workout-entry", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exerciseLogId: ex.ex.exerciseLogId, weights: ex.weights, reps: ex.reps }),
-      });
-      if (!res.ok) throw new Error();
-      // Mirror into the local store so this device's own render reflects the edit
-      // immediately instead of waiting for the next pull (SYNC-R4).
-      if (userId) {
-        const store = getLocalStore(userId);
-        if (store) {
-          // intensityPct omitted (not set to null) — the server recomputes it from the
-          // new weights/1RM; the mirror must not clobber that with a bare null (SYNC-4).
-          const sets = ex.weights.map((weightKg, i) => ({
-            setNumber: i + 1, weightKg, reps: ex.reps[i] ?? 0,
-          }));
-          await store.updateExerciseLogLocally(ex.ex.exerciseLogId, sets);
-        }
-      }
-      // refreshDayOverlay reads through cachedFetch (day-log:<date>) now — await
-      // invalidation first so the refetch doesn't repaint the pre-edit weights/reps.
-      // Mirrors the sibling delete path below (and stats-content.tsx's own edit
-      // handler): weights-summary/strength-trend/exercise-history/progress-summary
-      // all derive from this edit too, not just the mid-session-log subset
-      // invalidateExerciseLogged covers (CCH-2/SYN-9).
-      await invalidateWorkoutSummaries().catch(() => {});
-      refreshDayOverlay(date);
-    } catch {
-      toast.error("Failed to update");
-      // Reconcile the overlay back to server truth since the optimistic toast
-      // already told the user it saved.
-      await invalidateWorkoutSummaries().catch(() => {});
-      refreshDayOverlay(date);
-    }
-    finally { setMutating(false); }
-  }, [editEx, dayOverlay, refreshDayOverlay, userId]);
-
-  const handleDelete = useCallback(async () => {
-    if (!deleteEx || !dayOverlay) return;
-    const ex = deleteEx;
-    const date = dayOverlay.date;
-    setMutating(true);
-    // Feedback-first (PERF-10): close + toast synchronously, don't wait on the
-    // network round-trip.
-    toast.success("Deleted");
-    setDeleteEx(null);
-    try {
-      const res = await fetch("/api/workout-entry", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ exerciseLogId: ex.exerciseLogId }),
-      });
-      if (!res.ok) throw new Error();
-      const resBody = await res.json().catch(() => null) as { sessionDeleted?: boolean } | null;
-      // Mirror into the local store so it vanishes from this device's own render
-      // immediately instead of resurrecting until the next pull (SYNC-R4). If this
-      // was the session's last exercise, the server also tombstoned the whole
-      // session (SYN-2) — mirror that too, or the empty shell lingers locally.
-      if (userId) {
-        const store = getLocalStore(userId);
-        if (store) {
-          if (resBody?.sessionDeleted && ex.workoutSessionId) {
-            await store.deleteWorkoutSessionLocally(ex.workoutSessionId);
-          } else {
-            await store.deleteExerciseLogLocally(ex.exerciseLogId);
-          }
-        }
-      }
-      // Deleting a session decrements its AI-periodization phase counter server-side;
-      // clear the derived caches (periodization overview, training load, timeline, …)
-      // so the stale "N sessions" count refreshes instead of sticking for 30 min.
-      // refreshDayOverlay now reads through cachedFetch (day-log:<date>), which
-      // invalidateWorkoutSummaries() clears — await it first so the refetch doesn't
-      // repaint the just-deleted entry from a stale cache hit.
-      await invalidateWorkoutSummaries().catch(() => {});
-      refreshDayOverlay(date);
-    } catch {
-      toast.error("Failed to delete");
-      await invalidateWorkoutSummaries().catch(() => {});
-      refreshDayOverlay(date);
-    }
-    finally { setMutating(false); }
-  }, [deleteEx, dayOverlay, refreshDayOverlay, userId]);
-
-  const handleDeleteSession = useCallback(async () => {
-    if (!deleteSession || !dayOverlay) return;
-    const session = deleteSession;
-    const date = dayOverlay.date;
-    setMutating(true);
-    // Feedback-first (PERF-10): close + toast synchronously, don't wait on the
-    // network round-trip.
-    toast.success("Session deleted");
-    setDeleteSession(null);
-    try {
-      const res = await fetch("/api/workout-sessions", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ workoutSessionId: session.id }),
-      });
-      if (!res.ok) throw new Error();
-      // Mirror into the local store (SYN-2) so the empty session shell disappears
-      // from this device's own render immediately instead of resurrecting until
-      // the next pull.
-      if (userId) {
-        const store = getLocalStore(userId);
-        if (store) await store.deleteWorkoutSessionLocally(session.id);
-      }
-      // Deleting a whole session shifts phase counters, training load, timeline
-      // and history counts — clear derived caches so they don't serve stale
-      // totals for 30 min. refreshDayOverlay reads through cachedFetch now — await
-      // the invalidation first so the refetch doesn't repaint the deleted session.
-      await invalidateWorkoutSummaries().catch(() => {});
-      refreshDayOverlay(date);
-    } catch {
-      toast.error("Failed to delete session");
-      await invalidateWorkoutSummaries().catch(() => {});
-      refreshDayOverlay(date);
-    }
-    finally { setMutating(false); }
-  }, [deleteSession, dayOverlay, refreshDayOverlay, userId]);
-
-  const handleDeleteActivity = useCallback(async () => {
-    if (!deleteActivity || !dayOverlay) return;
-    setMutating(true);
-    try {
-      const res = await fetch("/api/activity-logs", {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: deleteActivity.id }),
-      });
-      if (!res.ok) throw new Error();
-      // Q-488: three other screens read activity_logs local-first, so a server-only delete left it
-      // visible there until the next sync. See deleteActivityLog in sqlite-backend for the why.
-      if (userId) await getLocalStore(userId)?.deleteActivityLog(deleteActivity.id).catch(() => {});
-      toast.success("Deleted");
-      setDeleteActivity(null);
-      await invalidateActivityWrites();
-      refreshDayOverlay(dayOverlay.date);
-    } catch { toast.error("Failed to delete"); }
-    finally { setMutating(false); }
-  }, [deleteActivity, dayOverlay, refreshDayOverlay, userId]);
+  // LB-1: these four handlers now live in useDayEntryMutations, shared with /health/day — which is
+  // where the calendar's day-tap actually lands since Q-110. Keeping a second copy here was how the
+  // two paths would drift; there is one write path per domain and both callers use it.
+  const overlayDate = useCallback(() => dayOverlay?.date ?? "", [dayOverlay]);
+  const mut = useDayEntryMutations(userId, overlayDate, refreshDayOverlay);
 
   const lastSleep = sleepRows[0] ?? null;
   // Only treat sleep as "recent" if it's from last night or today — prevents
@@ -865,19 +713,19 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       />
 
       <DayOverlayDialogs
-        editEx={editEx}
-        onEditExChange={setEditEx}
-        onEditSave={handleEditSave}
-        deleteEx={deleteEx}
-        onDeleteExClose={() => setDeleteEx(null)}
-        onDeleteExConfirm={handleDelete}
-        deleteActivity={deleteActivity}
-        onDeleteActivityClose={() => setDeleteActivity(null)}
-        onDeleteActivityConfirm={handleDeleteActivity}
-        deleteSession={deleteSession}
-        onDeleteSessionClose={() => setDeleteSession(null)}
-        onDeleteSessionConfirm={handleDeleteSession}
-        mutating={mutating}
+        editEx={mut.editEx}
+        onEditExChange={mut.setEditEx}
+        onEditSave={mut.handleEditSave}
+        deleteEx={mut.deleteEx}
+        onDeleteExClose={() => mut.setDeleteEx(null)}
+        onDeleteExConfirm={mut.handleDeleteExercise}
+        deleteActivity={mut.deleteActivity}
+        onDeleteActivityClose={() => mut.setDeleteActivity(null)}
+        onDeleteActivityConfirm={mut.handleDeleteActivity}
+        deleteSession={mut.deleteSession}
+        onDeleteSessionClose={() => mut.setDeleteSession(null)}
+        onDeleteSessionConfirm={mut.handleDeleteSession}
+        mutating={mut.mutating}
       />
 
       <DayOverlaySheet
@@ -888,12 +736,12 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         activityTypes={activityTypes}
         sessionHrData={sessionHrData}
         loadSessionHr={loadSessionHr}
-        onEditExercise={setEditEx}
-        onDeleteExercise={setDeleteEx}
+        onEditExercise={mut.setEditEx}
+        onDeleteExercise={mut.setDeleteEx}
         onExerciseTap={setHistoryExercise}
-        onDeleteSession={setDeleteSession}
+        onDeleteSession={mut.setDeleteSession}
         onSelectActivity={setSelectedActivity}
-        onDeleteActivity={setDeleteActivity}
+        onDeleteActivity={mut.setDeleteActivity}
       />
 
       <ExerciseHistorySheet

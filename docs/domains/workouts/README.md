@@ -124,6 +124,12 @@ grep -n '\[workouts\]' docs/implementation-backlog.md   # 3 queue items today
 
 Live at the time of writing (2026-07-30):
 
+- ⚠️ **Editing and deleting logged training was unreachable for a fortnight** (LB-1, fixed 2026-08-23,
+  v1.334.0). Q-110 moved the calendar day-tap to `/health/day` and left the four controls on a sheet
+  nothing opens. They now live on the day screen, driven by `lib/hooks/use-day-entry-mutations.ts`,
+  which `health-content.tsx` shares. **Not device-verified** —
+  [`journal`](../../overview/entries/2026-08-23-day-screen-edit-delete.md).
+
 - 🔴 **`personal_records` is not the all-time best, and "starting weights" never reach the bar** —
   open and enlarged since first found; a corrective migration is written but awaiting the owner.
 - ~~Workout tab card didn't show "trained today" right after finishing~~ **fixed 2026-08-05 (Q-89,
