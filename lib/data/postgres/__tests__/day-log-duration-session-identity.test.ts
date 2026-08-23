@@ -2,10 +2,10 @@
 // Brisbane day collapsed to a single key holding only the later window. The earlier session's
 // duration was gone, not merged.
 //
-// The fix is additive on purpose. Three Lane B surfaces read the name-keyed record (Q-362b), and
-// switching the key outright would have left all three showing NO duration for however long the two
-// lanes' PRs were apart. So the route now emits `workoutDurationsById` beside the legacy record, and
-// the legacy half is removed once those consumers move (LA-15).
+// The fix shipped additively on purpose. Three Lane B surfaces read the name-keyed record (Q-362b),
+// and switching the key outright would have left all three showing NO duration for however long the
+// two lanes' PRs were apart. So the route emitted `workoutDurationsById` beside the legacy record
+// until those consumers moved — then LA-15 removed the legacy half, which is the state pinned here.
 //
 // The fixture is derived from the clock and anchored at MIDDAY of the user's local day — a hardcoded
 // date is a time bomb, and midnight is a boundary, which is where an off-by-one stops being visible.
@@ -98,11 +98,12 @@ describe.skipIf(!canRun)('day-log workout durations key on session identity (Q-3
     expect(workoutDurationsById[lateId]).toEqual({ start: '5:00pm', end: '5:41pm', minutes: 41 })
   })
 
-  it('still emits the legacy name-keyed record, unchanged, for the consumers Q-362b moves', async () => {
-    const { workoutDurations, workoutDurationsById } = await dayLog()
-    // One key for two sessions — the collision itself, deliberately preserved until Q-362b lands.
-    expect(Object.keys(workoutDurations)).toEqual(['Push'])
-    // And it is the later session that wins, which is what those consumers render today.
-    expect(workoutDurations['Push']).toEqual(workoutDurationsById[lateId])
+  // LA-15: the legacy name-keyed record is GONE. It was emitted beside the id-keyed one only so the
+  // three surfaces reading it kept working while Q-362b moved them over — an expand/migrate/contract,
+  // and this is the contract. Asserting its absence is what stops it being reintroduced by a merge.
+  it('no longer emits the colliding name-keyed record', async () => {
+    const data = await dayLog()
+    expect(data.workoutDurations).toBeUndefined()
+    expect(Object.keys(data.workoutDurationsById)).toHaveLength(2)
   })
 })

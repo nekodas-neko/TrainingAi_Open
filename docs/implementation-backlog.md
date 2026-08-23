@@ -761,23 +761,6 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [platform] LA-15 — remove the name-keyed `workoutDurations` once its consumers have moved
-
-- **Branch:** `chore/day-log-drop-legacy-durations`
-- **Added:** 2026-08-20 · the contract half of Q-362a's expand/contract
-- **Lane: A** — `app/api/day-log/route.ts`.
-- **Needs:** Q-362b
-
-Q-362a keyed workout durations by `workout_sessions.id` **additively**: `workoutDurationsById` is the
-correct record, and the colliding name-keyed `workoutDurations` is still emitted beside it so the
-three Lane B surfaces keep rendering until Q-362b moves them. It carries a `@deprecated` on the type.
-
-Once Q-362b has landed, delete the legacy record, its loop writes and the `@deprecated` field, and
-grep for any consumer added in the meantime. **Do not do this before Q-362b merges** — that is the
-regression window the additive shape exists to avoid.
-
-- **What would count as done:** `grep -rn 'workoutDurations\b'` finds only `workoutDurationsById`.
-
 ### [nutrition][app-shell] Q-326 — the meal-type delete dialog: offer the move, don't just refuse
 
 - **Branch:** `feat/meal-type-reassign-dialog`
