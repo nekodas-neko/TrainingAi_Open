@@ -72,8 +72,7 @@ export const CalorieBalanceBar = memo(function CalorieBalanceBar({ data, isToday
           thing (Q-401). Two hand-maintained copies of this scale is exactly the class of drift that
           put two different calorie budgets on one screen. */}
       <CalorieZoneBar
-        deviationKcal={b.deviationKcal}
-        zoneColor={b.zoneColor}
+        intakeKcal={b.intakeKcal}
         restingBaseKcal={b.restingBaseKcal}
         activeKcal={b.activeKcal}
         targetNetKcal={b.targetNetKcal}

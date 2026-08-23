@@ -196,11 +196,12 @@ order.
 > check, no un-run follow-up. Nineteen ✅-marked entries stayed for exactly that reason and are still
 > below.
 
-### [nutrition][app-shell] ⚠️ The three calorie budgets are now one, but a food log still evicts its caches too early (Q-415/Q-417 fixed, LB-4 open, 2026-08-23)
+### [nutrition][app-shell] ⚠️ The calorie surface: one budget, a progress bar, and one open cache-ordering bug (Q-415/Q-417/Q-323 fixed, LB-4 open, 2026-08-23)
 
 **Fixed in v1.335.0.** Home's nutrition card and the Nutrition ring both read `budgetProvenance(...).total` — the expression the provenance line under the bar already prints — instead of composing `nutrition_targets.calories` (the **rest-day floor**) plus a separately-sourced burn. Three budgets used to be on screen at once from the same data (2,180 / 2,451 / 2,001), which is how one card said "Goal reached" while the card two rows above said "166 kcal left". Macro bars now use `macroTargets.scaled`; the label says "from movement" ([`journal`](docs/overview/entries/2026-08-23-one-calorie-budget.md)).
 - **🟠 LB-4 — logging food invalidates BEFORE its push,** so subscribers refetch a payload the server has not got and cache it. Cause of Q-417's 42 kcal gap between Home's and Nutrition's identical cards. Lane A: local-store/outbox path.
-- **Keep: not device-verified.** The sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here — only the heart-rate contribution ran.
+- **v1.336.0 finished Q-323's display half.** The zone bar is now a progress bar filling toward a goal notch (x-axis is intake, 0 → `budget + OUTER_KCAL`), and Home's donut became a progress ring with a grey remainder — it was a 360° macro split, which the rows beside it already give in grams ([`journal`](docs/overview/entries/2026-08-23-calorie-progress-bar.md)). **`barPosition`/`barBands` are deleted**; `barProgress` replaces them. Note the entry said "the macro ring" but described Home's donut — the Nutrition ring already did the asked-for thing.
+- **Keep: not device-verified.** The sandbox serves the MET table as synthetic fixtures, so the **activity** contribution to the budget is 0 here — only the heart-rate contribution ran. The bar and ring are purely visual and were judged at 412 px in Chromium, never on the Samsung WebView compositor that is the known hazard for masked conic-gradients, and never in the light/dark pair.
 
 ### [workouts][activity][app-shell] ⚠️ Editing and deleting logged training is back, but has not been checked on the device (LB-1, 2026-08-23)
 
