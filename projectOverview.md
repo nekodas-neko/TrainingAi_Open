@@ -27,6 +27,14 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
+schema was deleted forever — no badge, no toast, no retry — while one that failed a layer later got
+all three. It returns a per-item error now, so the row is kept and dead-letters normally. **The fix
+shape needed correcting:** the entry said report it as *retryable*, which under Q-475's split means
+"the server could not write" and backs off the whole queue; `retryable: false` is what quarantines
+it. The write-time companion is deliberately still open (`Keep:` on the entry) — it is device-only
+verifiable and sits on 36 save paths.
+
 **`workout_sessions`'s dead column owned the name the live one was used under (Q-474).** Two foreign
 keys to `program_sessions`: `session_id` is live, `program_session_id` has never been written or
 read — and the Drizzle property `programSessionId` pointed at the dead one. It had already cost a
