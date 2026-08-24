@@ -26,12 +26,12 @@ const BodySchema = z.object({
   id:         z.string().uuid().optional(),
   planMealId: z.string().uuid(),
   logDate:    z.string().regex(DATE_RE),
-})
+}).strict()
 
 const DeleteSchema = z.object({
   planMealId: z.string().uuid(),
   logDate:    z.string().regex(DATE_RE),
-})
+}).strict()
 
 export async function GET(req: NextRequest) {
   const session = await auth()

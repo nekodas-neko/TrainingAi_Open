@@ -12,7 +12,7 @@ const MAX_BODY_BYTES = 4 * 1024
 
 const RequestSchema = z.object({
   name: z.string().min(1).max(120),
-})
+}).strict()
 
 const MUSCLES = ['Chest', 'Shoulders', 'Triceps', 'Biceps', 'Forearms', 'Upper Back', 'Lats', 'Lower Back', 'Traps', 'Core', 'Quads', 'Hamstrings', 'Glutes', 'Calves', 'Adductors'] as const
 const EQUIPMENT = ['barbell', 'dumbbell', 'cable', 'kettlebell', 'machine', 'bodyweight'] as const
