@@ -85,3 +85,16 @@ Two calls on the `claude-code-remote` MCP server: `get_session` with `session_id
 describes the calling session and returns your own ID in `ccr.id`, then `set_session_title` with
 that ID and the red title. Do this **last**, after the work is finished — showing 🔴 while still
 pushing commits is worse than an ambiguous name.
+
+**Last, create your successor.** Do not leave this to the owner — a session's model is fixed at
+creation, so this is the only moment your role's model can be applied, and leaving it to a person is
+exactly why it never was. Call `create_session` on the `claude-code-remote` MCP server with
+`title: "📖 Review Agent 🟢"`, `model: "Opus 5"`, and `prompt` set to everything **below the `---`**
+in `docs/agents/prompts/review.md`. Omit everything else so the environment and permission mode
+inherit from you.
+
+Do this **after** your baton is committed and pushed — your successor's first act is to read it — and
+**only once**, even if the handoff is retried. If the call fails, say so in your closing message with
+the title and model the owner should use, and do not retry it; a handoff that reads as complete while
+no successor exists is worse than one that reports the failure.
+
