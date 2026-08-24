@@ -57,6 +57,18 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   measured and **both pass** — 43 summary rows against a threshold of 21, and 27 of 31 nights complete
   in the trailing window — so the refusal is inside the **granular** layer, which persists no reason
   for a null. Filed **TN-1**.
+- [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](../../reviews/2026-08-24-readiness-temperature-penalty.md)
+  — **the temperature penalty fires on 91% of nights, 2026-08-24.** `computeBlendedScore`
+  (`readiness-payload.ts:169`) subtracts on an **absolute °C** ladder (−10 past 0.3, −20 past 0.5,
+  cap 40 past 1.0) — a different path from the `tempZ` one Q-506 covers, and nothing was queued
+  against it. The stored deviation is **positive on 34 of 34 nights** (mean +0.662 °C) because the
+  baseline mean sits **0.363 °C below** the true measured mean, a gap that clears the 0.3 threshold
+  on its own. Cost: **−16.3 readiness points/day**; a trailing-mean baseline takes that to −0.4.
+  **The same object's sd is ~13× too wide**, which is Q-506 reproduced from another table — so **one
+  baseline fails two consumers in opposite directions** (wide sd → the radar can never fire; low mean
+  → readiness penalised daily). Filed **TN-6**, batched with Q-506 as `temperature-baseline`.
+  **Do not touch the 0.3/0.5/1.0 ladder** — against a true sd of 0.140 °C it sits at 2.1/3.6/7.1 sd,
+  and this is the fourth "the threshold is right, the input is wrong" in this pillar.
 - [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](../../reviews/2026-08-24-body-battery-charge-window-collapse.md)
   — **the Body Battery charge window has closed, 2026-08-24.** Charging needs
   `HR ≤ restingHr + 0.05 × reserve` = **57.8 bpm**, against a 5th-percentile waking HR of **62** and a
