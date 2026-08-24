@@ -57,6 +57,19 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   measured and **both pass** — 43 summary rows against a threshold of 21, and 27 of 31 nights complete
   in the trailing window — so the refusal is inside the **granular** layer, which persists no reason
   for a null. Filed **TN-1**.
+- [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](../../reviews/2026-08-24-body-battery-charge-window-collapse.md)
+  — **the Body Battery charge window has closed, 2026-08-24.** Charging needs
+  `HR ≤ restingHr + 0.05 × reserve` = **57.8 bpm**, against a 5th-percentile waking HR of **62** and a
+  median of **86**, so a time-weighted **0.5%** of the waking day can charge and the tank floors by
+  early afternoon (7 of 56 days at 0, **5 of the last 8**). Both causes are correct data — resting HR
+  fell 67 → 52, and `hrMax` fell 187 → 168 on 2026-08-05 — which is **Q-515's** mechanism with a
+  visible consequence. Filed **TN-2** (fit an explicit waking-rest bpm offset, bracket **+8 … +12**,
+  owner signed off on the direction), **TN-3a/b** (the per-bucket stress series is computed and
+  discarded, so no hour-of-day question is answerable), **TN-4** (31 × 500 on `/api/body-battery` on
+  2026-08-23, stopped unexplained). **Two method rules to carry out of it:** any coverage or
+  percentile measurement on the BLE HR series must be **time-weighted**, because the ring power-gates
+  its PPG and a per-sample percentile reads ~20% where the time-weighted answer is ~1.6%; and
+  **+18 bpm overshoots** into a permanently-full tank (mean 90.8, a third of days at 100).
 - [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
   — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
   at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's
