@@ -39,26 +39,35 @@ A resurrection that restores a *full* entry still passes. Two stronger checks we
 Narrow and free beat general and speculative here. If the full-entry form ever lands, the deepened
 fetch is the answer and this entry is the evidence for paying for it.
 
-## Also: LB-7 has a second occurrence, and it is now blocking every lane
+## A correction: my LB-7 diagnosis was wrong, and Lane B had already fixed it
 
 `e2e/recipe-url-to-meal.spec.ts` failed CI again — on **PR #363, a diff of test fixtures for a MET
-table**, which no browser spec can see. A **different** assertion this time
+table**, which no browser spec can see. A different assertion this time
 (`:146 /from a 4-serve recipe/`, `element(s) not found`), on the first run **and** the retry.
 
-That rules out a timing flake and rules out cross-worker interference —
-`playwright.config.ts` is `workers: 1, fullyParallel: false`. What is left is **accumulated state**:
-one worker in file order means ~50 specs share one database and one user, and this file runs near the
-end. It is the one condition a local run cannot reproduce, and it explains a file that fails
-*different* assertions on different runs while passing three runs in four.
+I reasoned from `playwright.config.ts` being `workers: 1, fullyParallel: false` to **accumulated
+state across ~50 specs sharing one database**, and started writing that into the entry. It is wrong.
 
-Two reproduction attempts failed and are recorded in the entry so nobody repeats them: the file alone
-(4 passed, twice) and `meal-label.spec.ts` → this file in order (7 passed). The untried one is the
-whole suite in order against a fresh database.
+**Lane B found the real cause in #359, which merged at 00:25:36 UTC — two minutes after #363's run
+began.** `public/sw-template.js` re-issues **every** `/api/` request with no method filter, so once
+the service worker controls the page the request originates from the worker, and Playwright cannot
+intercept service-worker fetches. The spec's `page.route` stub was therefore bypassed, the real
+`POST /api/nutrition/scan` returned **400**, and the row fell into its could-not-resolve state —
+where the host genuinely *is* the name. Whether the worker has taken control when the POST fires is a
+race, which is why one run had three failures and one stubbed pass, why different assertions in the
+same file fail on different runs, and why it passed locally every time. Fixed with
+`test.use({ serviceWorkers: 'block' })`.
+
+Two things worth keeping from this. **My original LB-7 entry pointed at a condition that was not
+occurring** — the no-title fallback is real code, and it was not what fired — so chasing it would
+have "fixed" the wrong thing; that is now written into the entry on `main`. And **#363 needed a
+rebase, not a diagnosis**: its run predated the fix by two minutes. The merge conflict here is what
+surfaced all of it, because resolving it meant reading `main`'s version rather than keeping my own.
 
 ## Verified
 
 `check-backlog-pointers` 187 entries clean; `pnpm check:rules` 54 of 54.
 
-**Failure surfaces NOT exercised:** nothing runtime is touched — this is a checker script and three
-documentation files. The LB-7 finding is a diagnosis, not a fix; the spec is still failing
-intermittently in CI and remains Lane B's.
+**Failure surfaces NOT exercised:** nothing runtime is touched — this is a checker script and two
+documentation files. The LB-7 work is Lane B's and already merged (#359); nothing about it is claimed
+here beyond the correction above.
