@@ -336,7 +336,15 @@ signed off by the owner in that conversation. Review:
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
 - **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
-- **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire).
+- **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire), and **BF-13**, which names the line that makes the object wrong.
+- **⚑ The cause is one line, found independently and filed as BF-13 — read it before implementing.**
+  `updateBaseline` seeds the mean at **literal zero** (`personal-baseline.ts:30`), then anneals its
+  gain to 1/32 after night 14. This entry's *"cold-started at 34.696 °C"* is measured from n=14,
+  where `temp_dev_c` first becomes non-null; the true start is **17.905 °C at n=2** — exactly
+  `35.81 / 2`, a first update from zero at gain 1/2. **That changes the fix**: a low-but-plausible
+  seed wants a longer warm-up, a zero seed wants a correct seed. BF-13 also finds a **third**
+  consumer (the deload card's `TEMP_ALERT_THRESHOLD_C`, firing on 23/34 nights), so this entry's
+  *"fix both or neither"* is really **all three**.
 - **Gate: owner** — changes the readiness score. Not signed off.
 
 Home shows *"Body temp elevated · +0.5°C above your baseline (threshold 0.5°C)"* and a Recovery
@@ -1151,92 +1159,117 @@ work is to bring them down, and **it is not a separate task**: a baton is rewrit
 handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
 Close this when all five are under ~150 lines.
 
-### [readiness][devices] BF-13 — "Body temp elevated" is a baseline that never finished converging, not a fever; and the breathing baseline is ~9.5x its own metric
+### [readiness][devices] BF-13 — the baseline EMA seeds at ZERO: the line under TN-6 and Q-506, and it is shared by all six baselines
 
-- **Lane: A** — `packages/shared/src/health/personal-baseline.ts` and whatever feeds it. Reached by
-  the rollup and the summary push, not by a screen.
-- **Added:** 2026-08-24 · owner: *"body temperature elevation could we look to see what its at? as
-  its done this a few times but I have not been sick in the last 50+ days. so might need to raise
-  the safe range"* — screenshot showed **"+0.5C above your baseline (threshold 0.5C), based on 50
-  nights of history"** driving a Recovery recommendation on a Push day.
-- **Raising the threshold is the WRONG FIX, and this entry exists to say so before someone does it.**
-  The owner's instinct treats the symptom. The signal is not measuring their body.
+- **Lane: A**
+- **Batch:** temperature-baseline — ships with **TN-6** and **Q-506**, which are the two
+  *consumers* of the object this entry's line corrupts. Same PR or none: fixing the seed without
+  re-deriving the stored baselines leaves both of them still reading wrong.
+- **Added:** 2026-08-24 · BugFix, from the owner — *"body temperature elevation could we look to see
+  what its at? as its done this a few times but I have not been sick in the last 50+ days. so might
+  need to raise the safe range"*.
+- **⚑ Read TN-6 and Q-506 first. This entry does NOT re-measure what they measured** — it was
+  investigated independently and every shared number agrees exactly (deviation mean **+0.662 °C**,
+  **0 of 34** nights negative, range +0.14…+1.33, baseline **35.464** vs true **35.827**). Treat that
+  agreement as corroboration from a second route, and do not re-litigate it. **What follows is only
+  what those two entries do not have.**
 
-**The measurement (owner's rows, `claude_ro.oura_daily_summary`, 34 nights with data):**
+**1. The line. `updateBaseline` seeds the mean at literal zero.**
 
-```
-temp_dev_c:   min +0.14   mean +0.66   sd 0.29   max +1.33     <- NEVER NEGATIVE
-nights over the 0.5 threshold: 23 of 34 (68%)
-```
+`packages/shared/src/health/personal-baseline.ts:30` — `let meanX8 = baseline?.meanX8 ?? 0` — then
+anneals its gain by age (`:35-44`): **1/2** under 4 nights, **1/8** from 4–14, **1/32** after 14. The
+step size collapses long before the mean has climbed from 0 °C to ~35.8 °C, so it is still short at
+`n_history = 50`.
 
-**A deviation that is never negative is not a deviation.** For comparison, the Cloud-era
-`oura_daily.temperature_deviation` over the same kind of window reads mean **+0.035**, sd 0.158,
-range **-0.22 to +0.27** — centred on zero, symmetric, which is what this column should look like.
-
-**Cause, traced to the line.** `updateBaseline` (`packages/shared/src/health/personal-baseline.ts:29`)
-seeds `meanX8 = baseline?.meanX8 ?? 0` — **zero** — on the first-ever sample, then anneals its gain
-by age: 1/2 under 4 nights, 1/8 from 4-14, **1/32 after 14**. So the mean starts at 0 C and the
-step size collapses long before it has climbed to ~35.8 C. Watch it converge, and watch the
-"elevation" decay with it while the actual nightly temperature stays flat:
+**The proof it is a zero seed and not merely a low first reading — night 2:**
 
 ```
-night  n_history   nightly C   baseline C   temp_dev_c
-   2       2         35.81       17.905        (null)
-   4       4         35.96       31.919        (null)
-  14      14         35.86       34.696        +1.33
-  30      30         35.86       35.203        +0.68
-  40      40         35.85       35.349        +0.52
-  50      50         35.95       35.464        +0.50
+n_history   nightly °C   baseline °C
+    2         35.81        17.905      <- exactly 35.81 / 2  =  (0 + sample) / 2, gain 1/2 from zero
+    4         35.96        31.919
+   14         35.86        34.696      <- where TN-6's "cold-started at 34.696" begins
+   50         35.95        35.464
 ```
 
-**The nightly value is flat at 35.5-36.1 the whole time** (that is the body: no fever, matching the
-owner exactly). **The baseline is the only thing moving.** `temp_dev_c` is tracking baseline
-immaturity, not physiology — 50 nights in, the baseline is still ~0.4 C short of the true mean, and
-that residual *is* the reported elevation.
+TN-6 measures from n=14 because that is where `temp_dev_c` becomes non-null, and reasonably reads it
+as a low cold start. **It starts at 0.** That distinction changes the fix: a low-but-plausible seed
+wants a longer warm-up; a zero seed wants a *correct seed*. Set `meanX8 = sampleX8` (and `devX8 = 0`)
+on the first-ever sample — which is also the likely origin of **Q-506's 18.7× sd**, since a deviation
+accumulated against a mean sweeping up from zero is measuring the sweep, not the spread. **That makes
+one line the plausible cause of both entries.**
 
-- **`TEMP_BASELINE_MIN_DAYS = 30` was meant to prevent exactly this and is insufficient.** Its own
-  comment says a green baseline "produced spurious body temp elevated deloads". At n=30 the
-  deviation was still +0.68; at n=50 it is +0.50. The guard picked a number; the algorithm needed a
-  different seed.
-- **Why raising the threshold is the wrong fix, stated plainly:** it papers over a converging
-  artefact, and it *permanently desensitises the real signal*. Once the baseline does converge, a
-  genuine fever would have to clear an inflated bar to register. It also would not work now — at
-  0.8 C it still fires on 10 of 34 nights.
-- **Fix direction (not decided here):** seed the baseline from the **first real sample**
-  (`meanX8 = sampleX8`, `devX8 = 0`) instead of 0, and backfill/reset the existing baselines so they
-  restart from a true value rather than crawling. **Check the vendor port first** — this file is a
-  faithful port of `baseline_update_lt_mean_and_dev` and the header says do not "improve" the
-  algorithm, so establish whether ecore seeds differently (or never exposes a baseline this young)
-  before changing the shared function. If the port is faithful, the fix belongs at the **call site
-  or the seed**, not in the ported maths.
+- **⚠ Check the vendor port before changing the shared maths.** This file is a faithful port of
+  `baseline_update_lt_mean_and_dev` and its header says do not "improve" the algorithm. Establish
+  whether ecore seeds from the first sample (or simply never exposes a baseline this young) — if the
+  port is faithful, the fix belongs at the **seed / call site**, not in the ported update.
 
-**Second, separate defect found in the same pass — the breathing baseline is ~9.5x its metric.**
+**2. Blast radius: this is a baseline-engine defect, not a temperature one.**
+
+`updateBaseline` is the shared updater for **all six** BLE baselines — HRV, RHR, temperature, sleep,
+MET, breathing (its own header says so). Every one seeds from zero. It is *visible* in temperature
+because temperature has a large non-zero mean and a tight spread. **Check MET and sleep before
+assuming they are clean.**
+
+- **Checked and NOT broken — recorded so nobody re-investigates:** the **RHR** baseline tracks
+  `rhr_low_bpm` (53.0 vs 50.7 at n=50), **not** `rhr_avg_bpm` (60.9); comparing it against the
+  average makes a healthy baseline look 8 bpm wrong. **HRV** (55.4 against a noisy 51–66) is
+  plausible.
+
+**3. A third consumer neither TN-6 nor Q-506 names: the deload recommendation.**
+
+TN-6 covers the readiness *penalty ladder* (`readiness-payload.ts:169`). Separately,
+`TEMP_ALERT_THRESHOLD_C = 0.5` (`packages/shared/src/ai-periodization/deload-constants.ts:75`) is
+read by `ai-dynamic.ts:184` and drives the **"Body temp elevated → Recovery recommended"** card the
+owner screenshotted. **23 of 34 nights (68%) cross it.** So one broken object is failing **three**
+consumers, not two — and TN-6's *"fix both or neither"* should read **all three**.
+
+- **`TEMP_BASELINE_MIN_DAYS = 30` was written to prevent exactly this and is insufficient.** Its own
+  comment says a green baseline "produced spurious body temp elevated deloads". At n=30 the deviation
+  was still **+0.68**; at n=50 it is **+0.50**. The guard picked a number when the algorithm needed a
+  seed.
+- **Raising `TEMP_ALERT_THRESHOLD_C` is the wrong fix**, for the same reason TN-6 gives for the
+  readiness ladder: it hides a broken input behind a plausible firing rate, and it would
+  *permanently desensitise* a real fever once the baseline converges. At 0.8 °C it still fires on 10
+  of 34 nights. **This is the owner's own suggested fix, and the answer to it is no** — recorded here
+  because they asked directly.
+
+**What would count as fixed** (in addition to TN-6's pass test): the deload card stops firing on the
+owner's healthy nights, and a fresh baseline for any metric is within one sample-noise unit of the
+true mean on night 2 rather than converging for fifty.
+
+- **Surface: server/shared, web-reproducible.** Pure function over data already in Postgres; no
+  device needed to fix or verify. **Re-deriving the stored baselines is a data change** and needs the
+  owner, same shape as Q-304b.
+
+### [devices][readiness] BF-14 — the breathing-rate baseline converges to ~93 against a real 9.8 rpm
+
+- **Lane: A**
+- **NOT in the temperature batch** — different metric, and the evidence points at units
+  rather than the zero seed, so it neither blocks nor is blocked by BF-13/TN-6/Q-506.
+- **Added:** 2026-08-24 · found while investigating BF-13; nothing else covers it.
+- **Measured** (`claude_ro.oura_daily_summary`, owner's rows):
 
 ```
-n_history:      5      15      30      40      50
-breath base:  80.9    88.9    91.6    93.0    92.5     <- converging toward ~95
-breath_avg_rpm: 9.1     9.7    10.0     9.8      9.8     <- the real value
+n_history:        5      15      30      40      50
+breath baseline: 80.9    88.9    91.6    93.0    92.5     <- converging toward ~95
+breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is compared against
 ```
 
-The baseline is converging correctly — **toward the wrong number**, ~9.5x the metric it is compared
-against. Consistent with `updateBaseline` being fed rpm x10 (or an extra x8) while
-`breath_avg_rpm` stores plain rpm. Any threshold reading "breathing rate elevated/depressed" off
-this is meaningless. Related to **Q-4** (`respiratory_rate` from an estimator its own docs call
-uncalibrated) but distinct: that entry is about the estimator, this is about the comparison.
-
-- **Checked and NOT broken, recorded so nobody re-investigates:** the **RHR** baseline tracks
-  `rhr_low_bpm` (53.0 vs 50.7 at n=50), **not** `rhr_avg_bpm` (60.9) — comparing it against the
-  average makes it look 8 bpm wrong when it is fine. **HRV** (55.4 against a noisy 51-66) is
-  plausible. Only temperature and breathing are affected.
-- **Blast radius:** `updateBaseline` is shared by all six BLE baselines (HRV, RHR, temp, sleep, MET,
-  breathing), so the zero-seed applies to every one — it is visible in temp because temp has a large
-  non-zero mean and a tight spread. Check MET and sleep before assuming they are clean.
-- **What would count as fixed:** `temp_dev_c` centred near zero across a wear period with no
-  illness, going negative on cool nights as a deviation should; the deload stops firing on the
-  owner's healthy nights; and the breathing baseline sits within a rpm or so of `breath_avg_rpm`.
-- **Surface: server/shared, web-reproducible from stored data.** No device needed to fix or verify —
-  the summaries are in Postgres and the maths is a pure function. A recompute of existing baselines
-  is a data change and needs the owner, same shape as Q-304b.
+- **The baseline is converging correctly — toward the wrong number**, ~9.5× the metric. That rules
+  out BF-13's zero-seed as the cause: a zero-seeded EMA converges to the *true* mean, just slowly,
+  and this one is heading somewhere else entirely. Consistent with `updateBaseline` being fed
+  rpm × 10 (or an extra ×8 applied) while `breath_avg_rpm` stores plain rpm.
+- **Consequence:** any threshold reading "breathing rate elevated/depressed" off this baseline is
+  meaningless — the comparison is against a number ~9.5× too high, so the sign is effectively pinned.
+  **Establish which consumers read it before fixing**, so the blast radius is known rather than
+  assumed.
+- **Related but distinct from Q-4** (`respiratory_rate` persisted from an estimator its own docs call
+  uncalibrated). Q-4 is about whether the *measurement* is trustworthy; this is about the *baseline
+  it is compared against* being in the wrong units. Fixing either leaves the other.
+- **What would count as fixed:** the breathing baseline sits within roughly one rpm of
+  `breath_avg_rpm`, and the units it is fed are asserted in a test so the mismatch cannot silently
+  return.
+- **Surface: server/shared, web-reproducible.** Same as BF-13.
 
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
@@ -5543,7 +5576,12 @@ ehr     0     0     0     0   648   208   128   556     0
 ### [devices][readiness] Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
 
 - **Branch:** `fix/temperature-baseline-cold-start`
-- **Batch:** temperature-baseline — ships with **TN-6**, the same baseline object's other half (its *mean* is 0.36 °C low, penalising readiness daily). Correcting only one of the two looks like it fixed both.
+- **Batch:** temperature-baseline — ships with **TN-6**, the same baseline object's other half (its *mean* is 0.36 °C low, penalising readiness daily), and **BF-13**, the shared cause. Correcting only one of the three looks like it fixed the others.
+- **⚑ The 18.7× sd is plausibly the same one line — see BF-13.** `updateBaseline` seeds the mean at
+  zero, and the deviation is accumulated against that mean as it sweeps upward from 0 °C to ~35.8 °C.
+  A spread measured against a moving mean is measuring **the sweep, not the spread** — which is the
+  shape of an sd this many times too wide. Branch `fix/temperature-baseline-cold-start` was already
+  named for a cold start; BF-13 supplies the line.
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a baseline/data fix, not
   a scoring-constant change.
 - **Added:** 2026-08-18 · Tuning agent ·
