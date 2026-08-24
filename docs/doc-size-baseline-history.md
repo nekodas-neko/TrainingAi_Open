@@ -1987,7 +1987,26 @@ worked out — it bought nothing and had to be undone within the hour.
 
 ## 2026-08-24 — LB-3, the day-overlay retirement
 
-**`projectOverview.md` 7897 → 7900 (+3).** A four-line note for user-visible work, on a file that
+**`projectOverview.md` 7897 → 7900, then 7905 → 7908 (+3) on merge.** A Tuning session raised the
+same number to 7905 while this branch was open, so this ended up as a second raise on top of
+theirs rather than the one it was written as.
+
+**Two sessions raised this file on the same day, and that is the finding.** The trims were tried
+first here — this PR's note went from six lines to four to three, and the two statements it had to
+correct elsewhere were rewritten shorter — and the remainder is genuinely new. But three rounds of
+shaving prose to fit four lines, twice in one day by two different sessions, is a file past its
+maintenance point, not two careless notes.
+
+**No fully-resolved Known Issue was available to archive instead**, which is the mechanism the
+wrap-up rule points at first: every ✅ entry scanned states what it still owes, and Q-479's says so
+outright — *"Kept here rather than archived: the PR states production and the 24-hour window were
+not exercised end to end… Archive it once that is confirmed against production."* Archiving one
+anyway to buy three lines is exactly what that rule forbids.
+
+**So the next session that needs room should not raise it again — it should compact the
+shipped-notes section**, which is where the growth is. Filed for Orchestrator.
+
+**The original note, as written:** A four-line note for user-visible work, on a file that
 has sat at exactly its number for several PRs in a row.
 
 The trims were tried first and the raise is what is left. This PR's own note started at six lines
@@ -2007,3 +2026,15 @@ other sessions' prose three times in one day, which is a worse cost than three l
 shaving a sentence it did not write, to fit a note about work it did, is how a shared file loses
 accuracy. If this recurs, the answer is a compaction sweep of the shipped-notes section, not a
 per-PR raise.
+## 2026-08-24 — `claude/tuning-agent-0q9yl7` (Tuning session close)
+
+**projectOverview.md (+8):** the handoff pointer for the Tuning session that retracted Q-528. It earns
+its lines by carrying the *rule* rather than the incident — `pg_stat_user_tables.n_live_tup` is a
+planner estimate, it read 1 against 45 real rows and 0 against 764, and a data-loss incident was filed
+off it. A reader who takes only the pointer and never opens the handoff still leaves with the thing
+that prevents a repeat.
+
+**Tuning baton: no change, and deliberately so.** It shrank 581 → 474 in this handover (rewritten in
+full, not appended). The baseline stays at 582 rather than ratcheting down: a baton is rewritten whole
+at every handover, so its size oscillates by design, and locking in a trough would make the next
+successor raise it with a note that says nothing. The shrink is visible in the diff either way.

@@ -14,7 +14,7 @@
  * subtracts a 1.5-MET resting baseline, so every term here is net active energy above rest —
  * consistent with the sedentary base.
  */
-import { estSessionKcal, estWorkoutKcal, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
+import { estSessionKcal, estWorkoutKcal, MAX_PLAUSIBLE_SESSION_MIN, type Intensity, type Sex } from '@trainingai/shared/health/workout-energy'
 
 // Defined in a dependency-free leaf module and re-exported here, so a caller that needs only the
 // number does not pull in this file's `workout-energy` → `oura-models` → `node:path` chain. Every
@@ -33,7 +33,6 @@ export const WALKING_CADENCE_SPM = 100
  *  stride). Used only to REMOVE steps already attributed to logged walks/runs from the passive total. */
 export const STEPS_PER_KM = 1300
 
-const MAX_PLAUSIBLE_SESSION_MIN = 240
 
 // App activityType string → Oura MET-table id (`energy-expenditure-features.json` activity_type_dict).
 const ACTIVITY_TYPE_TO_OURA_ID: Record<string, number> = {

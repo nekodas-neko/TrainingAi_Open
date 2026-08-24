@@ -1,242 +1,135 @@
 # 🎶 Tuning Agent — baton
 
-> **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
-> successor is a lost thread even with a perfect baton.
+> **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, emoji included. The **leading** emoji
+> is the role and never changes; the **trailing light** is this session's own status (🟢 live, 🔴 handed
+> on) and is set by the session itself, never by the owner. See `docs/agents/README.md` §4.
 
-**Updated:** 2026-08-20 · **By:** `claude/tuning-agent-0q9yl7` · **Next ID:** `TN-2`. **The band that ran out is gone** — IDs now count up from your own `TN-` prefix with no ceiling, so there is nothing to agree with the owner. Find the next free with `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.
+**Updated:** 2026-08-24 · **By:** `claude/tuning-agent-0q9yl7` (closed 🔴) · **Next ID:** `TN-2`.
+IDs count up from your own `TN-` prefix with no ceiling — there is no band and nothing to agree with the
+owner. Next free: `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`. Legacy `Q-` numbers
+stay valid and are never renumbered. **Rewritten in full at this handover, not appended** — the
+narrative of sessions before 2026-08-20 lives in the reviews and handoffs each bullet links.
+
+## ⛔ Do this before anything else
+
+**The owner has a request coming.** The session that closed was told to wrap up and to tell you a
+request is on its way, without being told what it is. **Orient, then wait.** Do not pick a backlog
+item, start a measurement, or propose a scoring change on your own initiative.
+
+**⚠️ Every production number below was pulled on 2026-08-20 and the session then sat idle until it
+closed on 2026-08-24.** Ring data ended 2026-08-20 05:28 at that pull. **Re-pull before quoting any of
+it** — `main` moved 105 commits in that gap, and this repo's own rule is that production data moves
+under you mid-session.
 
 ## Now
-The owner's three-pillar range pass is done as far as Tuning can take it. Nothing waits on them.
-Since then, working only scores no other lane holds:
-- **⛔ I RETRACTED MY OWN Q-528 ON 2026-08-20 — read this before trusting any row count in this baton.**
-  I filed "`oura_daily_summary` holds **1 row**, a full-history rollup wiped the history". **It holds 45,
-  and 43 of them were created 2026-08-17 07:50** — they existed continuously through the reading that
-  said one. The count came from `pg_stat_user_tables.n_live_tup`, which is a **planner ESTIMATE, not a
-  count**: `last_analyze`/`last_autovacuum` are NULL on every table here, and the same field reads **0**
+
+**Nothing is blocked on the owner, and no proposal is awaiting sign-off.** Two shipped
+(Q-500 readiness anchor, Q-503 sleep recalibration); everything else Tuning has filed is propose-only
+and sits in Lane A's queue.
+
+- **⛔ I RETRACTED MY OWN Q-528 ON 2026-08-20 — read this before trusting any row count anywhere.**
+  A predecessor filed *"`oura_daily_summary` holds **1 row**, a full-history rollup wiped the history."*
+  **It holds 45, and 43 of them were created 2026-08-17 07:50** — they existed continuously through the
+  reading that said one. The count came from `pg_stat_user_tables.n_live_tup`, a **planner ESTIMATE, not
+  a count**: `last_analyze`/`last_autovacuum` are NULL on every table here, and the same field reads **0**
   against `oura_raw_packed`'s **764** real rows. **To ask whether a table is empty, run `count(*)`.**
-  Q-528 is rewritten as a latent hazard (the delete-before-guard shape is real, `fullHistory`-only, and
-  **has not fired**); its "rebuild the summaries" half is deleted. **CLAUDE.md's session-start size read
-  now carries the size-vs-counter split**, because that rule is what sent me wrong.
-  - **Q-525 IS LIVE AGAIN** — the suspension it inherited was based on a phantom. And it is sharper:
-    **both countable gates PASS.** The 2026-08-17 `fullHistory` pass built **43** summary rows against a
+  - **Q-528 survives as a latent hazard.** The delete-before-guard in `replaceOuraDailySummary`
+    (`lib/data/postgres/slices/oura.ts:1345`) is real and `fullHistory`-only, and **has not fired**;
+    its "rebuild the summaries" half is withdrawn.
+  - **Q-525 IS LIVE AGAIN and is sharper.** The suspension it inherited rested on a phantom. **Both
+    countable gates PASS**: the 2026-08-17 `fullHistory` pass built **43** summary rows against a
     threshold of 21, and **27 of 31** nights in the trailing window are complete at the summary level.
     That pass scored illness on all 23 derived rows it wrote and chronic stress on **0**. **The refusal
     is inside the granular layer** (`signalsByDate` → `computeNightIntermediates`), which is recomputed
     in memory by design and **persists no reason for a null** → filed **TN-1**.
-  - **Q-522's half still stands** — `oura_bucket` is genuinely 0 rows (row-scoped view, re-checked).
-    Only the `oura_daily_summary` line was misread; do not sweep the rest of that day's work away.
-  [`review`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md).
-- **Owner acceptance criterion on Q-529: "accurate on first open, without needing time to adjust".**
-  Measured the whole chain — **the cause is neither scoring nor rollup. The ring uploads about once an
-  hour**: 214 batches over 7 days, **median gap 62.0 min**, p90 71, max 306. The owner opened in the
-  gap between the 05:40 and 06:44 uploads, so their wake was still on the ring.
-  - **Three links, ordered:** drain on app open (**native ⇒ new APK**, the dominant term) → rollup and
-    re-score on that drain (~4 min today) → provisional state until both land (**the only part
-    shippable without an APK**). **Doing the rollup alone makes the app faster at showing stale data.**
-  - **Say the limit out loud:** open before the ring registers the night's end and nothing fixes it —
-    session end was 06:47, screenshot 06:46. Target is *within seconds of the ring knowing*.
-  - **⛔ The 62-min cadence is OBSERVED, not a documented setting.** Whether it is configurable and
-    what it costs in ring battery is unknown, and the firmware is deliberately frozen — check before
-    promising an on-open drain is cheap.
-  [`review`](../../reviews/2026-08-20-accurate-on-first-open.md).
-- **⚠️ Q-529 was OVERCLAIMED and corrected hours later — read before touching it.** I filed "the
-  score is never recomputed". **It is** (47 → 55, `computed_at` 06:45:56 → **06:54:41**, after the
-  session settled 06:51:03). The "near-twin" also failed: 08-17 matched on *duration and onset* and
-  differs on **REM 1.42 vs 2.08 h** (contributor 63 vs **99**) and efficiency 86 vs 90 (**57 vs 82**) —
-  the remaining 23 points are the score **working**. What survives is a **~9-minute window where a
-  provisional score renders as final**; re-scoped Lane A → **Lane B** and merged with the range-label
-  Known Issue.
-  - **Two mistakes compounded, both avoidable:** a **three-minute** observation used to assert a
-    *permanent* absence, and a twin chosen on the summary columns that happened to be in the query
-    rather than on the contributor vector. **Compare contributors, not summary columns** — the
-    hypnogram decode an hour later did it right and got the answer first time.
-- **Owner report 2026-08-20 — sleep score stamped mid-sync** (Q-529). *"That wake up time is way
-  off, I woke up around 6am."* **The session was already right and the score was not.** `computed_at`
-  **06:45:56** vs `sleep_sessions.updated_at` **06:46:19** — the score predates its input by 23
-  seconds, and had not recomputed 3 minutes later. Session healed 4:52 am → **6:44 am**, 6.5 →
-  **7.75 h**; score stuck at **47** while the 08-17 near-twin (7.58 h, 90%, 35 m) scores **78**.
-  - **Check the cheap thing FIRST before anyone builds a recompute path:** re-read `computed_at` for
-    2026-08-20 the next day. Confirmed over 3 minutes, **not** hours — a slower nightly pass may fix
-    it, which would shrink this to surfacing provisionality.
-  - **Not a duplicate of Q-520.** That is a genuinely incomplete night; this is a complete night
-    scored against a partial copy of itself.
+  - **Q-522's half STANDS** — `oura_bucket` genuinely holds 0 rows (row-scoped view, re-checked). Only
+    the `oura_daily_summary` line was misread; do not sweep the rest of that day's work away.
+  - **CLAUDE.md's session-start size read now carries the size-vs-counter split**, because that rule is
+    what sent the predecessor wrong.
+  [`review`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md) ·
+  [`handoff`](../../handoff-2026-08-24-devices-daily-summary-wipe-retraction.md).
+- **Q-529 — a provisional sleep score renders as final for ~9 minutes.** Owner report 2026-08-20,
+  *"that wake up time is way off, I woke up around 6am."* The session was right and the score was not:
+  `computed_at` **06:45:56** predates `sleep_sessions.updated_at` **06:46:19**. **It DOES recompute**
+  (47 → 55 at 06:54:41) — an earlier filing said it never did, from a three-minute observation.
+  Re-scoped to **Lane B** (surfacing provisionality), merged with the range-label Known Issue.
   [`review`](../../reviews/2026-08-20-sleep-score-computed-mid-sync.md).
-- **~~`oura_daily_summary` holds 1 row against 198,223 raw samples~~ (Q-528) — ⛔ RETRACTED 2026-08-20,
-  see the top of this section.** The table holds 45 rows and always did. The `replaceOuraDailySummary`
-  delete-before-guard shape is real and `fullHistory`-only, but **it has not fired**; the "rebuild the
-  summaries" instruction is withdrawn. **Its two knock-on claims split:** the correction it applied to
-  **Q-525 is void** (that entry is live again, and sharper), while **Q-522's half stands** —
-  `oura_bucket` carries `met_mean`/`motion_mad`, MET and motion do not drift with fitness, and it
-  genuinely holds **0 rows**, so an HR-based fit still inherits the drift.
-  [`retraction`](../../reviews/2026-08-20-daily-summary-wipe-retracted.md) ·
-  [`original`](../../reviews/2026-08-19-daily-summary-replace-wipe.md).
-- **Daily vs weekly windows — MEASURED, reshapes Q-505** (owner question, 2026-08-19). *"The goal
-  being x heart minutes per day… but you also gotta count for weekly targets. How handle this?"* —
-  correct, and bigger than it looks. `DEFAULT_ZONE_MINUTES_GOAL = 22` is **WHO 150/week ÷ 7**.
-  **Rule: match each contributor's window to its guideline's unit** — applied across all six, exactly
-  one is wrong (`zoneMinutes`). **Recommendation: split the Activity Score into Today and This Week.**
-  - **This RETIRES the `strengthFreq`-ceiling framing I added the same morning.** 100 on 78% of days
-    is a defect in a daily score and *correct* in a weekly compliance number. **Its scorecard was the
-    problem, not its ceiling** — do not re-file it as a constraint.
-  - **Q-522 rises in priority** — under the split, `moveHours` becomes half the daily number.
-  - **Do NOT claim "the score is really a weekly number" from the 60%-rolling-weight figure.** I
-    nearly did. The rolling terms saturate, so they set the LEVEL and carry almost no variance:
-    score ↔ same-day steps **+0.324**, ↔ sessions7d +0.186, ↔ volume7d **+0.026** (n = 23).
-  [`review`](../../reviews/2026-08-19-daily-vs-weekly-windows.md).
-- **Body Battery drain model — FITTED, propose-only** (Q-521 closed out, **Q-527** filed). The owner
-  resolved the contradiction between their two answers and added a term: *"the fitter we get, the more
-  workout stimulus we should need for draining, outside of BMR draining which should naturally go up
-  too."* → **goal-normalised + a BMR-proportional baseline.**
+- **"Accurate on first open" (Q-529's acceptance criterion) is a SYNC problem, not a scoring one.**
+  **The ring uploads about once an hour**: 214 batches over 7 days, median gap **62.0 min**, p90 71,
+  max 306. Three links in order — drain on app open (**native ⇒ new APK**, the dominant term) → rollup
+  and re-score on that drain (~4 min today) → provisional state until both land (**the only part
+  shippable without an APK**). **Doing the rollup alone makes the app faster at showing stale data.**
+  **⛔ The 62-min cadence is OBSERVED, not a documented setting** — whether it is configurable and what
+  it costs in ring battery is unknown, and the firmware is deliberately frozen.
+  [`review`](../../reviews/2026-08-20-accurate-on-first-open.md).
+- **Body Battery drain model — FITTED, propose-only** (Q-521 closed out, **Q-527** filed).
   `endValue = max(0, 100 − b − (100 − b) × c^2.0)`, `b = 25 × bmrToday/bmrReference`,
   `c = 0.5×workoutFrac + 0.5×stepsFrac`. Everything-hit **0** · workout-only **~30** · nothing **75** ·
-  typical **~44**.
-  - **A LINEAR split cannot satisfy the brief — do not let an implementer try it first.** Every
-    allocation swept lands mean 26–34 / sd 16–22, because a typical day is ~58% of a full one. Not
-    saturation: workout completion sd **0.403**, steps sd **0.346** — both vary well.
-  - **Expect LESS spread than shipped and say so up front**: sd **~22.6** vs **30.1**, range 0–75 vs
-    0–100. Today's spread is ring wear time. The 75 ceiling is inherent to having a baseline term.
-  - **BMR is flat (r = +0.080 over 3.5 months)** — build for it, don't promise it in UI copy.
-  [`review`](../../reviews/2026-08-19-body-battery-drain-model.md).
-- **THREE OWNER DECISIONS ANSWERED 2026-08-19, and TWO of my asks withdrawn.** Read this before
-  asking the owner for anything.
-  - **Q-523 — no labels needed after all.** The owner's *"use current recorded high, % off it,
-    dynamic"* pointed at `targetAnchorMax`, which `resolveHrProfile` **already computes** (observed
-    **167** vs age-predicted **187**; `maxHr` deliberately refuses to drop below the age value). That
-    alone only moves zero-days 53→38 of 59. The real defect: **`activeMinutesFromZoneSeconds` is one
-    band off the WHO convention it documents** — it calls ≥60% reserve "moderate" when WHO moderate
-    is **40–59%**, so **moderate intensity maps to no zone and earns nothing.** Fixed rule takes the
-    contributor to **6/59 zero days, sub-score sd 38.7 — the highest-variance input in the score.**
-    [`review`](../../reviews/2026-08-19-active-minutes-who-threshold.md).
-  - **Q-524 — one goal: `users.steps_goal` wins**, `getDailyGoals()` reads it, derived value is the
-    fallback. The AI-recommend + manual-entry half **already exists** and needs no work.
-  - **Q-276 — Body Battery = "energy left"; Readiness = a morning starting number.** Different
-    questions, so **+0.12 is not a defect**. Readiness needs **no model change** — all nine weights
-    are overnight/previous-day, nothing reads today. **Presentation only → Lane B, unblocked now**;
-    the "wait for Q-272" instruction no longer applies.
-  - **Q-72 — the ask to spread the sleep ratings is WITHDRAWN.** `sleep_quality_feel` is the **most**
-    variable **live** self-report (only `perceived_recovery`, sd 0.36, is still collected alongside it) and
-    tracks efficiency at **+0.316**. Volume (+0.03) and RPE (−0.02) are **structurally disqualified** —
-    volume is prescribed by the app, RPE has a 1.5 dead band. **Fix the yardstick, not the rating.**
-    [`review`](../../reviews/2026-08-19-sleep-validation-targets.md).
-- **Score-audit trail — MEASURED** (Q-525, Q-526). Whether each score leaves enough behind to be
-  calibrated retrospectively. Over 96 rows: **sleep, readiness and illness are fine** (readiness is
-  the reference — sub-scores *plus* `provisional` flags; illness's stored biomarkers are what let
-  Q-506 diagnose a poisoned baseline from history). **Activity stores the blend wrapper**
-  `{base, adjustment, trained}` instead of its six components, which are in memory on the same
-  request — that is why the contributor audit could only report a *predicted* sd ceiling, since the
-  goals changed underneath on 2026-08-11. **Q-526 is sequenced BEFORE Q-505** or the old model's
-  history is lost. **`chronic_stress_score` is NULL on all 96 rows** — third dormant score (Q-525);
-  its gate needs 21 granular nights **in one pass**, so an incremental rollup can never satisfy it.
-  [`review`](../../reviews/2026-08-19-score-audit-trail.md).
-- **Activity Score contributor audit — COMPLETE, and it ANSWERS Q-277** (Q-524 filed, Q-277 removed).
-  All six contributors measured over 90 days. **Only `steps` (sd 33.4) and `strengthVolume` (sd 23.8)
-  carry information.** `strengthFreq` is at 100 on **78%** of days; `moveHours`, `zoneMinutes` and
-  `activeEnergy` carry none. After renormalisation **51% of effective weight is informative, 49% is
-  not**, and the largest effective weight (strengthFreq, 33%) is one of the inert ones. Q-137/Q-190
-  **did** work — stored sd **5.0 → 7.4** across 2026-08-11 — but history is not back-filled.
-  **Q-524:** the Goals Progress card and daily digest grade steps against **7,000** while the Activity
-  Score and its own progress bar use **10,000**; the derived 10,000 contradicts the Paluch 7–8k
-  plateau `daily-goals.ts` cites, while the 8,000 fallback matches it. Owner decision.
+  typical **~44**. **A LINEAR split cannot satisfy the brief — do not let an implementer try it first.**
+  **Expect LESS spread than shipped**: sd ~22.6 vs 30.1, range 0–75 vs 0–100; the 75 ceiling is inherent
+  to having a baseline term. **BMR is flat** (r = +0.080 over 3.5 months) — build for it, don't promise
+  it in UI copy. [`review`](../../reviews/2026-08-19-body-battery-drain-model.md).
+- **Daily vs weekly windows — reshapes Q-505.** `DEFAULT_ZONE_MINUTES_GOAL = 22` is **WHO 150/week ÷ 7**.
+  **Rule: match each contributor's window to its guideline's unit** — across all six, exactly one is
+  wrong. **Recommendation: split the Activity Score into Today and This Week.** This retires the
+  `strengthFreq`-ceiling framing: 100 on 78% of days is a defect in a daily score and *correct* in a
+  weekly compliance number. [`review`](../../reviews/2026-08-19-daily-vs-weekly-windows.md).
+- **Activity contributor audit — COMPLETE** (Q-524 filed, Q-277 answered and removed). Only `steps`
+  (sd 33.4) and `strengthVolume` (sd 23.8) carry information; after renormalisation **51% of effective
+  weight is informative, 49% is not**, and the largest effective weight is one of the inert ones.
+  **Q-524:** the Goals card grades steps against **7,000** while the Activity Score uses **10,000**.
   [`review`](../../reviews/2026-08-19-activity-contributor-audit.md).
-- **Zone minutes + movement-per-hour coverage — MEASURED, propose-only** (Q-522, Q-523). The check
-  Q-521 deferred, asked for directly by the owner. **Both inputs are unusable, failing in opposite
-  directions.** `moveHours` is **saturated** — 856 of 857 waking hours with data count as "moved",
-  **48 of 59 days score exactly 100**, so its only variance is ring-off hours. `zoneMinutes` is
-  **floored** — **0 on 53 of 59 days**, because Zone 2 starts at 133 bpm and the chest strap's p99
-  during workouts is **121**. Plus a third defect: `DEFAULT_MAX_GAP_SEC = 120` against the ring's
-  **exact 300 s cadence** truncates 80.1% of its intervals, so ring days keep 35% of elapsed time and
-  strap days 84%. **Q-521's first slice must be steps + workout load only.**
+- **Zone minutes + movement-per-hour — both unusable, failing in opposite directions** (Q-522, Q-523).
+  `moveHours` **saturated** (48 of 59 days score exactly 100); `zoneMinutes` **floored** (0 on 53 of 59).
+  Third defect: `DEFAULT_MAX_GAP_SEC = 120` against the ring's **exact 300 s cadence** truncates 80.1%
+  of its intervals. **Q-521's first slice must be steps + workout load only.**
   [`review`](../../reviews/2026-08-19-zone-minutes-move-hours-coverage.md).
-- **Body Battery range — CLEAN, nothing filed.** Over 50 days: mean 51.5, **sd 29.2**, full 0–100
-  range, bands Charged 28% / Good 26% / Low 26% / Drained 20%. **It already passes the owner's
-  acceptance test** — the only pillar that did without work. Thresholds 75/50/25 sit right for this
-  distribution. [`entry`](../../overview/entries/2026-08-18-battery-range-clean.md).
-- **Sleep-scale consumer audit — CLEAN, plus one side effect worth protecting** (Q-511). Exactly
-  **one** comparison threshold exists on the sleep scale codebase-wide (`LOW_SLEEP_SCORE`) and it was
-  re-anchored in the recalibration PR, so nothing was missed. The audit did find that Body Battery's
-  anchor takes the sleep score **raw**, and its sleep→readiness flip was worth **−17.7 points** (sd
-  10.2, worst −51) — the owner's 2026-08-02 "the number visibly jumped" report, quantified. The
-  recalibration cut ~82% of that systematic offset as a **side effect**. The symmetric readiness-scale
-  audit found Q-500's threshold table listed **six of eight** — `ots.ts:151` and a `< 40` line inside
-  an **LLM prompt string** were missing; the conclusion holds (checked, not assumed) and that review is
-  amended in place. [`review`](../../reviews/2026-08-18-battery-anchor-discontinuity.md).
-- **BLE-era input drift — MEASURED, propose-only** (Q-509, Q-510). The Recovery Index refit on 42
-  BLE nights lands at **3.31 h** against the shipped anchor of 5 — and **the anchor must not move**:
-  the refit anchor and the input distribution shrank by the *same* factor (0.715× vs 0.72–0.74×), which
-  is a multiplicative bias in the estimator, not a change in the owner. This is the `devices` finding
-  `readiness-composite.ts` pre-registered. Q-510 closes Q-508's open lead: all four `contributorsOk`
-  gates pass 18/18 August days, so resilience is starved by the daytime-stress **coverage** check —
-  which is not persisted anywhere, and `worn_hours_ble` is NULL on all 96 rows.
-  [`review`](../../reviews/2026-08-18-ble-era-input-drift.md).
-- **Daytime stress + resilience — MEASURED, propose-only** (Q-507, Q-508). The last two scores with
-  no calibration review, and now none remain. `STRESS_HIGH_DAY_THRESHOLD_MIN = 120` fires at a
-  healthy-looking 16% but on the **wrong days** (high-stress minutes correlate **+0.40** with
-  readiness; the four firing days average readiness 79 against 65). **Resilience has emitted exactly
-  one value ever** — level 5, granular at the 5.99 clamp, all 13 rows — because
-  `longTermSleepRecovery` is a window *sum* where its siblings are means, carrying 70% of the
-  recovery weight. It is **also dormant** — 13 rows on 2026-08-05, the same 13 today.
-  [`review`](../../reviews/2026-08-18-stress-resilience-calibration.md).
-- **Illness radar — MEASURED, propose-only** (Q-506). It has never produced an action-bearing flag in
-  46 days, and the cause is a **cold-start-poisoned temperature baseline** (stored dev 253.7 vs a true
-  nightly sd of 13.5 — **18.7×**) on the biomarker carrying **40%** of the weight. Same `tempZ` also
-  makes readiness's temperature contributor near-constant.
-  **Fix the baseline, not the thresholds** — Lane A implements.
-  [`review`](../../reviews/2026-08-18-illness-radar-calibration.md).
-- **Sleep — SHIPPED** (v1.319.0, Q-503): mean 84.1 → 69.5, sd 15.9 → 16.6, range 32–99, every band
-  populated. [`review`](../../reviews/2026-08-18-sleep-score-range-recalibration.md).
-- **Readiness — SHIPPED** (v1.321.0, Q-500): Recovery Index anchor 6 h → 5 h, fitted against Oura's
-  own contributor. `READINESS_MODEL_VERSION` now stamped (`v3:ri5:2026-08-18`).
-  **Q-504 (a range calibration) was REFUTED** — implemented, then reverted: it breaks three
-  invariants the composite holds, and the z-slope lever fails because those contributors already
-  saturate. [`review`](../../reviews/2026-08-18-readiness-range-refuted.md).
-- **Activity — SPECIFIED, not built** (Q-505). All three decisions resolved; ready for Lane A.
-  [`plan`](../../superpowers/plans/2026-08-18-activity-score-redesign.md) ·
-  [`review`](../../reviews/2026-08-18-activity-score-calibration.md).
+- **Score-audit trail** (Q-525, Q-526). Sleep, readiness and illness keep enough to be calibrated
+  retrospectively; **Activity stores the blend wrapper** `{base, adjustment, trained}` instead of its
+  six components. **Q-526 is sequenced BEFORE Q-505** or the old model's history is lost.
+  [`review`](../../reviews/2026-08-19-score-audit-trail.md).
+- **Earlier propose-only findings, all still open:** illness radar cannot fire (Q-506, a
+  cold-start-poisoned temperature baseline 18.7× too wide) · stress override fires on the *best* days
+  (Q-507) · resilience has emitted one value ever (Q-508, Q-510) · BLE-era input drift, and **the
+  anchor must not move** (Q-509) · Body Battery anchor flip worth −17.7 pts, 82% removed as a side
+  effect (Q-511) · ACWR call-site windows, not its constants (Q-512, Q-513) · 64% of back-off load cuts
+  are an expected-RPE clamp artefact (Q-514) · rest/active boundary shrinks as the owner gets fitter
+  (Q-515) · `PEAK_BANDS` calibrated for a range strength training never reaches (Q-516) · adaptive-TDEE
+  can hand the user a maintenance below their own BMR (Q-517) · the readiness model stamp is erased by
+  a sibling writer (Q-518) · manual bedtime (Q-519) and a partial-night flag (Q-520).
 
 ## Next
-1. **Q-505 — build the Activity redesign** (Lane A). Decisions and sequencing are in the plan's §4.
-2. ~~Verify the two shipped recalibrations against production~~ — **DONE 2026-08-18, both are LIVE**
-   — **but see Q-518: the readiness stamp is erased within hours by the bodyComp backfill**, so the
-   "merge held in production" half of that verification is **retracted**.
-   Sleep was verified by recomputation (no stamp): 08-17 stores 78 against a raw blend of 77.91 (old),
-   08-18 stores 92 against a calibrated 92 (new). **The trend step falls between 08-17 and 08-18** and
-   history is not back-filled, so 95 of 96 rows stay pre-recalibration.
-   [`review`](../../reviews/2026-08-18-recalibrations-live-verified.md).
-3. **Do NOT propose a Zone 2 floor for Q-523 without the owner's labels.** Fitting a threshold needs
-   days the owner would call "active" to fit against; guessing a number into the code is how the
-   current one got there. Ask for the labels, then fit — that half *is* Tuning's.
-4. **Re-run the Q-509 refit after any HR-smoothing change.** The anchor-vs-input ratio (§1.3 of that
-   review) is the pass test: if it goes to ~1.0 the estimator was fine and the input needed
-   conditioning. Until then, `RECOVERY_INDEX_OPTIMAL_HOURS` stays at 5.
+
+1. **Wait for the owner's request.** That is the top item and it displaces the rest.
+2. **Re-measure after Lane A lands one of Q-506…Q-529 or TN-1.** Each entry carries its own pass test.
+   **Nothing has landed yet** — as of 2026-08-20 all of them are still queued.
+3. **Q-528 and TN-1 want to be ONE Lane A branch.** `fullHistory` is the only path that can ever reach
+   the chronic-stress model (a routine pass builds ~3 summary rows and returns early) and it is the same
+   flag arming Q-528's delete. Written into both entries; say so again if an implementer splits them.
+4. **Re-run the Q-509 refit after any HR-smoothing change.** The anchor-vs-input ratio is the pass test:
+   if it goes to ~1.0 the estimator was fine and the input needed conditioning. Until then,
+   `RECOVERY_INDEX_OPTIMAL_HOURS` stays at 5.
 5. **Once Q-510's coverage is persisted, ask whether `minDaytimeStressHours` is too strict** for this
-   wear pattern. That one *is* Tuning's — but it is unanswerable until the number is visible.
-6. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z in that
-   review's §2 table moves by ~19×, so the radar may then fire *too* often. That is a calibration
-   question and it is Tuning's, unlike the fix itself.
-7. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). Its call site passes
-   **our** sleep score *and* the Recovery Index contributor, so both v1.319.0 and v1.321.0 feed it,
-   all 13 existing rows predate both, and the move is *downward* on the term that is saturating.
-   **Every score in the app now has a calibration review** — there is no un-reviewed pillar left to
-   pick up cold.
-8. ~~Re-derive Q-500's anchor on BLE-era nights~~ — **DONE, and the answer was "do not"** (Q-509).
-9. **Watch the shipped Sleep Score for two weeks.** If the new spread reads as jitter rather than
-   signal, flatten `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12
-   displayed points around the median, which is the deliberate cost of range.
+   wear pattern. Unanswerable until the number is visible.
+6. **Re-measure the illness radar once Q-506's baseline is corrected** — every biomarker z moves by
+   ~19×, so the radar may then fire *too* often. That half is Tuning's; the fix is not.
+7. **Re-measure resilience once the recalibrations reach stored rows** (Q-508). All 13 existing rows
+   predate both v1.319.0 and v1.321.0.
+8. **Watch the shipped Sleep Score.** If the new spread reads as jitter rather than signal, flatten
+   `SCORE_CALIBRATION`'s 74–85 segment — it amplifies ~4 blend points into ~12 displayed points around
+   the median, which is the deliberate cost of range.
 
 ## Owner reports handled
-- **2026-08-19 — "body battery still doesn't seem that good… id like granular drain."** Measured and
-  the owner is right: **drain tracks ring WEAR TIME, not exertion** — `corr(hr_sample_count,
-  total_drained)` = **+0.518** while `corr(steps, total_drained)` = **−0.153**, and a workout moves
-  `end_value` by **0.6 points** (50.6 vs 50.0). The four days that hit 0 had **828–4,152 steps**.
-  Filed **Q-521** with an exertion-integrated design brief.
-  **Their other two asks are already done or specified:** sleep's 90–100 band is delivered by Q-503
-  (7 of 65 replayed nights in the 90s — it just isn't visible because stored history is pre-recalibration),
-  and Activity's "everything hit = 100" is Q-505, unbuilt.
-  [`review`](../../reviews/2026-08-19-body-battery-drain-and-roadmap.md).
-- **2026-08-19 — ring not worn until 4 am.** Filed **Q-519** (manual bedtime entry, writes exactly one
-  column) and **Q-520** (partial-night flag, sequenced second and deliberately manual). The owner
-  proposed manual bedtime and it is smaller and better-targeted than the flag I had suggested.
-  [`review`](../../reviews/2026-08-19-partial-night-manual-bedtime.md).
+- **2026-08-20 — "that wake up time is way off, I woke up around 6am."** → Q-529, above. The score was
+  stamped mid-sync; the session was already correct.
+- **2026-08-19 — "body battery still doesn't seem that good… id like granular drain."** Measured and the
+  owner is right: **drain tracks ring WEAR TIME, not exertion** — `corr(hr_sample_count, total_drained)`
+  = **+0.518** while `corr(steps, total_drained)` = **−0.153**, and a workout moves `end_value` by
+  **0.6 points**. Filed **Q-521**, model fitted as Q-527 above.
+- **2026-08-19 — ring not worn until 4 am.** → **Q-519** (manual bedtime, writes exactly one column) and
+  **Q-520** (partial-night flag). The owner's proposal was smaller and better-targeted than mine.
+- **2026-08-18 — "whatever your recommendation is… best practice + future proof."** Standing delegation
+  on the open decisions of that date. It is not a blank cheque for scoring changes.
 
 ## Pillar coverage — this is the real scoreboard, not "every score has a review"
 The owner asked on 2026-08-18 whether **all pillars** had been tuned against historical data. The

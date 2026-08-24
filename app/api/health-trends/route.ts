@@ -10,13 +10,15 @@ import { energyBalanceByDay, medianOf } from '@trainingai/shared/health/energy-b
 import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volume'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
+import { sessionEffort, type SessionRpeSource } from '@trainingai/shared/workout/derive-session-rpe'
+import { isPlausibleSessionDuration } from '@trainingai/shared/health/workout-energy'
 
 export interface TrendsResponse {
   view: string
   insight: string
   buckets: { label: string; avg: number; count: number }[]
   hasSufficientData: boolean
-  series?: { date: string; sessionRpe: number; sessionLoad: number }[]
+  series?: { date: string; sessionRpe: number; sessionLoad: number; source: SessionRpeSource }[]
   /** n / r / p behind the claim (Q-75). Absent for views with no paired series. */
   stats?: CorrelationStats
   /** Set when a sentence was deliberately withheld, and why. */
@@ -162,20 +164,35 @@ export async function GET(req: Request) {
 
   } else if (view === 'session-rpe') {
     const workoutSessions = await repo.getWorkoutSessionsFrom(userId, from90dDate)
+    // Q-420. The sessions are already hydrated with their exercise and set logs, so deriving costs
+    // nothing here — no extra query, and no stored column that could drift from the sets it came
+    // from. A self-reported rating always wins; `source` travels with the point because the two are
+    // different instruments on different scales (see `sessionEffort`), and a chart that draws them
+    // as one line should at least be able to say which is which.
     const series = workoutSessions
-      .filter(ws => ws.sessionRpe != null && ws.completedAt != null)
+      .filter(ws => ws.completedAt != null)
       .map(ws => {
+        const effort = sessionEffort(ws.sessionRpe, ws.exercises.flatMap(e => e.sets.map(set => set.rpe)))
+        if (!effort) return null
         const durationMin = (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60_000
+        // LA-21, owner-decided: a session left running is culled from statistics rather than clamped.
+        // `sessionLoad` is `rpe × durationMin`, so one 14-hour row is a 10× point in a series that
+        // feeds the acute:chronic ratio — and a ratio distorted upward reads as "you are training far
+        // too hard", which is the direction that would change someone's programme.
+        if (!isPlausibleSessionDuration(durationMin)) return null
         return {
           date: toAestDay(ws.startedAt, tz),
-          sessionRpe: ws.sessionRpe!,
-          sessionLoad: Math.round(ws.sessionRpe! * durationMin),
+          sessionRpe: effort.rpe,
+          sessionLoad: Math.round(effort.rpe * durationMin),
+          source: effort.source,
         }
       })
+      .filter((p): p is NonNullable<typeof p> => p != null)
       .sort((a, b) => a.date.localeCompare(b.date))
     const hasSufficientData = series.length >= 3
+    const derived = series.filter(p => p.source === 'derived').length
     const insight = hasSufficientData
-      ? `${series.length} sessions rated so far — average effort ${(series.reduce((a, s) => a + s.sessionRpe, 0) / series.length).toFixed(1)}/10.`
+      ? `${series.length} sessions rated so far${derived > 0 ? ` (${derived} from set ratings)` : ''} — average effort ${(series.reduce((a, s) => a + s.sessionRpe, 0) / series.length).toFixed(1)}/10.`
       : 'Not enough rated sessions yet.'
     result = { view, insight, buckets: [], hasSufficientData, series }
 

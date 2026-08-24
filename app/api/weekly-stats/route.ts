@@ -4,11 +4,11 @@ import { getRepository } from "@/lib/data";
 import { formatInTimeZone, fromZonedTime, toZonedTime } from "date-fns-tz";
 import { DEFAULT_TZ } from "@trainingai/shared/date-utils";
 import { classifyDay, isDeloadSession } from "./classify-day";
+import { MAX_PLAUSIBLE_SESSION_MIN } from '@trainingai/shared/health/workout-energy';
 
-// Upper bound for a single training session's wall-clock duration. Beyond this we assume
-// `startedAt` fell back to local-midnight (no real start time was captured) and use the
-// exercise-log span instead of an inflated completedAt−startedAt figure.
-const MAX_PLAUSIBLE_SESSION_MIN = 240;
+// The bound is shared (LA-21) — it was declared identically in three files, with two different
+// behaviours attached to it. This site EXCLUDES and falls back to the exercise-log span, which is
+// right here: a session whose `startedAt` fell back to local midnight still has real logs to measure.
 
 export interface WeeklyStatsResponse {
   days: {

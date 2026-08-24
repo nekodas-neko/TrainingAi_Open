@@ -382,7 +382,8 @@ itself warns against. It stays queued as the home of its ratchet, not as work.
 - **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
   are done** — v1.325.0 gave the default label its three ingredient lines at 0.401 mm per module,
   and v1.325.1 gave the cache an invalidation signal so Home's energy card stops freezing.)
-  Q-387's wiring is a shared-module change and can run in parallel in the other lane.
+  (**Q-387 is done too** — its shared-module wiring shipped 2026-08-19 and its button, Undo and
+  N-of-10 counter in #330.)
 - **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
   `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
   first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
@@ -627,6 +628,84 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
+### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
+
+- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`.
+- **Added:** 2026-08-24, found while shipping Q-420's derivation — the derived series made it visible
+  on nine points where it had been visible on one.
+- **⚠️ MEASURED IN PRODUCTION 2026-08-24, and the filing above was wrong about severity.** It said
+  *"not a live corruption… the owner's production rows do not currently show one."* **They show
+  eleven.** Of 81 completed sessions, **11 (13.6%) span 534–845 minutes — 8.9 to 14.1 hours.**
+- **The distribution is bimodal with an empty gap, which is what makes it a defect and not a long
+  workout:**
+
+  | duration | sessions |
+  |---|---:|
+  | 0–30 min | 21 |
+  | 30–60 min | 26 |
+  | 60–90 min | 21 |
+  | 90–120 min | 2 |
+  | *120–534 min* | **0** |
+  | 534–845 min | **11** |
+
+  p50 is **56 minutes**; p90 is **548**. Nothing at all sits between 92 and 534 minutes, so these are
+  not the tail of a distribution — they are a different phenomenon.
+- **They are REAL, COMPLETE workouts, which decides clamp-vs-exclude.** Each of the eleven carries
+  **5–6 exercises, 13–18 sets and 3,700–7,400 kg of volume**. Excluding them would delete genuine
+  training from the record; the duration is the only thing wrong. **Clamp, do not exclude** — the
+  earlier note guessing the opposite for the load series was written before this was measured.
+- **They all stopped, and nobody knows why.** Every one is between **2026-05-04 and 2026-05-29**, and
+  there has not been another since. Per CLAUDE.md that makes it **unexplained, not fixed** — whatever
+  produced it may still be reachable, and the fix should bound the number regardless of cause.
+- **Live exposure today is smaller than 13.6% sounds, and this is worth knowing before pricing it.**
+  None of the eleven carries a session RPE **or a single rated set**, so they are invisible to
+  `health-trends`' `sessionLoad` series — checked specifically against Q-420's derivation, which
+  reads set RPEs and therefore does *not* pull them in. And `app/api/body-metadata` only ever reads
+  **today's** workouts, so the day-energy path cannot reach a May session. What is left is the
+  per-session views: `workout-sessions/[id]/energy` and the recap, where opening one of those eleven
+  shows a calorie estimate built on a 10× duration.
+- **What.** `durationMin = (completedAt - startedAt) / 60_000` with **no upper bound anywhere**:
+  `app/api/health-trends/route.ts` (`sessionLoad = rpe × durationMin`), `estWorkoutKcal` and
+  `estSessionKcal` (`workout-energy.ts:113, 225`). Observed on the dev database: a session spanning
+  **1,176 minutes** produced `sessionLoad 10585` against a normal 440 — **24×** — and it would carry
+  the same factor into the calorie estimate and into anything reading the load series (ACWR, training
+  stress).
+- **Why it is not merely cosmetic:** ACWR is a ratio of recent to chronic load, so a single 24× point
+  distorts both windows for weeks, and it distorts them in the direction that reads as "you are
+  training far too hard".
+
+- **Lane:** A · **Branch:** `fix/cull-implausible-session-duration`
+- **Owner-decided 2026-08-24:** *"There are likely all errors from it being left on too long. Make
+  sure they are culled from statistics."* Culled, not clamped — a clamped figure is still partly
+  fiction, and the entry's earlier guess (exclude from load, clamp for calories) is superseded.
+- **`MAX_PLAUSIBLE_SESSION_MIN` + `isPlausibleSessionDuration`** now live once, in
+  `packages/shared/src/health/workout-energy.ts`, and both `estWorkoutKcal` and `estWorkoutKcalFromHr`
+  return `null` above the bound — so `estSessionKcal` is covered on both of its branches.
+  `app/api/health-trends` drops the point from the `sessionLoad` series.
+- **⚠ The bound already existed in THREE independent copies and nobody had noticed** — `body-metadata`
+  (declared and never read), `weekly-stats`, and `daily-energy` — all `= 240`, with **two different
+  behaviours** attached: `daily-energy` clamps for activities and excludes for sessions, `weekly-stats`
+  excludes and falls back to the exercise-log span. That is the One Formula, One Place failure this
+  repo keeps paying for, and it means `body-metadata` and `weekly-stats` were **already** culling
+  while `health-trends` and the per-session energy routes were not. All four now share one export;
+  each site keeps its own deliberate clamp-or-exclude behaviour.
+- **⚠ THERE ARE TWO CAUSES, NOT ONE, AND THE LOCAL CLOCK TIMES SEPARATE THEM CLEANLY.** Of the eleven:
+
+  | local start → end | n | reading |
+  |---|---:|---|
+  | **00:00** → 08:53–14:05 | **7** | `startedAt` fell back to local midnight — the cause the existing code comments named |
+  | 07:29–11:56 → 18:12–22:52 | **4** | started for real and completed ~11 hours later — the owner's "left running", morning to after work |
+
+  So the owner's explanation is right for four of them and the comments already in `weekly-stats` and
+  `body-metadata` are right for the other seven. **Both stopped after 2026-05-29 and neither is
+  explained**, which per CLAUDE.md is unexplained rather than fixed. The cull bounds the number
+  whichever cause fires.
+- **Keep:** the **midnight-`startedAt` fallback itself is not fixed** — seven sessions recorded a start
+  time that was never captured, and the cull hides the symptom rather than restoring the real span.
+  `weekly-stats` already substitutes the exercise-log span for exactly this case; whether the other
+  duration consumers should do the same, or whether the write path should stop inventing a midnight
+  start at all, is the open half.
+
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -819,6 +898,32 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   units, with its own intensity thresholds rather than Foster's; an override survives later set edits;
   and the result is checked against the 20 paired sessions for *plausibility* — not fitted to them.
 
+- 🚧 **THE DERIVATION SHIPPED 2026-08-24 (Lane A), and it needed NO migration and NO schema change.**
+  `packages/shared/src/workout/derive-session-rpe.ts` — `deriveSessionRpe` (rounded mean of the rated
+  sets, set-RPE units, nulls ignored rather than counted as zero) and `sessionEffort`, which returns
+  `{ rpe, source: 'self' | 'derived' }` with a self-reported rating always winning.
+  `app/api/health-trends` consumes it and each series point carries its `source`.
+  **⚠️ THIS ENTRY PRESCRIBED A STORED COLUMN PLUS A SOURCE FLAG PLUS A RE-DERIVE RULE, AND ALL THREE
+  TURNED OUT TO BE AVOIDABLE.** Deriving on READ removes them together: `session_rpe` stays purely
+  self-reported, so "overridden" is just "that column is non-null"; a derived value cannot drift from
+  the sets because it is recomputed from them every time; and a later set edit is reflected for free,
+  which is the whole of the owner's *"can be overwritten if needed"*. CLAUDE.md's **Stored Counters**
+  rule says exactly this — every stored counter in this project has drifted, derive at read time —
+  and the entry's own worry about a re-derive eating a manual correction is that drift, predicted.
+  **It costs nothing:** `getWorkoutSessionsFrom` already hydrates each session's set logs, so there is
+  no extra query. Measured on the dev database: the `session-rpe` series went from **0 points to 10**
+  (9 derived, 1 self-reported), insight line *"10 sessions rated so far (9 from set ratings)"*.
+- **What is still open on this entry:**
+  - **The user-facing prompt removal** (`done-screen.tsx:398`) — **Lane B**, and it is item 1 of the
+    owner's decision. The derivation exists now, so removing the prompt no longer loses anything.
+  - **`intensityFromRpe` still applies Foster's ≤4/≥8 thresholds to a set-scale number.** The entry
+    is right that a derived value needs its own thresholds, and picking them is a **scoring change** —
+    Tuning proposes, the owner signs off. Deliberately not done here, which is why the derived value
+    is not yet wired into the energy path.
+  - **The HR + derived-intensity combination is Q-422's**, not this entry's, and it is `Gate: owner`.
+- **Keep:** the prompt removal, the derived-scale thresholds, and the plausibility check against the
+  20 paired sessions.
+
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
 - **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
@@ -872,181 +977,6 @@ residual into a correction rather than a mystery.
 - **What would count as done:** a stated multiplier with its confidence, derived only from gated
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
-
-### [nutrition][platform] LB-7 — the recipe spec's attribution assertion can pass with no attribution
-
-> **⚠️ REWRITTEN 2026-08-24 — the diagnosis below was wrong about the cause, and the blocking failure
-> is already fixed (#359).** This entry was filed from a CI failure and reasoned that *"when the
-> scrape returns no title the name falls back to the host"*. That fallback is real, but it was not
-> what happened. **The CI server log shows `POST /api/nutrition/scan 400` three times, once per
-> failing attempt** — the request reached the real route, so the spec's `page.route` stub never
-> applied and the row fell into its could-not-resolve state, where the host IS the name.
->
-> **Why the stub was bypassed:** `public/sw-template.js` re-issues **every** `/api/` request — no
-> method filter — so once the service worker controls the page the request originates from the
-> worker, and Playwright does not intercept service-worker fetches. Whether the worker has taken
-> control by the time the POST fires is a race, which is why the same run had three failures and one
-> stubbed pass, and why it passed locally every time. Fixed with
-> `test.use({ serviceWorkers: 'block' })`; both that rule and "never `expect` inside a route handler"
-> are now in `e2e/README.md`.
->
-> **Chasing "make the scrape mock return no title" would have fixed a condition that was not
-> occurring.**
-
-- **Lane:** B — `e2e/` only now.
-- **Branch:** `fix/recipe-spec-structural-attribution`
-- **Placement:** low. Not blocking anything; the spec is green.
-
-**What is left, and it is the one point of the original entry that still stands.** The assertion is
-`dialog.getByText('example.com').last()`. `.last()` targets the attribution today because it renders
-after the name — but if the attribution row disappeared entirely, `.last()` would match the *name*
-and the assertion would still pass. A guard that survives the removal of the thing it guards is not
-a guard.
-
-**Fix shape:** assert on the attribution's structure rather than on its text position — it is the row
-carrying the `Link2` icon and the `· from a N-serve recipe` suffix. A `data-testid` on that row is
-the cheap version. Then delete the `.last()` and its comment.
-
-### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
-
-- **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
-  Done: `day_checkins.food_logging_completed_at` (migration **201**, local SQLite **v27**, both sync
-  directions, `claude_ro` views **202**), `POST /api/food-logging-complete` with its Undo, and
-  `estimateMaintenance` filtering on the flag instead of `intakeKcal > 0`. The partial-day case the
-  module had **zero** coverage of now has five tests, plus an end-to-end pair through
-  `computeEnergyBalance`. [`Journal`](overview/entries/2026-08-19-tdee-day-completeness.md).
-- **⚠️ Until the button ships, the calibration cannot engage** — no day can be marked, so every day
-  is excluded and `source` stays `'formula'`. That is the intended failure mode ("the estimate
-  waits", not "the estimate is quietly wrong") and it costs nothing today, because per Q-302 **0 of
-  the last 30 rolling windows** cleared `MIN_LOGGED_DAYS` anyway. It does mean the feature is inert
-  until Lane B lands.
-- **Still open — Lane B:** the *"Complete Today's Logging"* button as the last element in the day's
-  scroll (not the header, not beside the ring), the copy beneath it, the receipt-with-Undo it
-  becomes, and the **"N of 10 days" counter shipped with it, not after** — the button feeds
-  something invisible, and that invisibility is why this bug survived. `POST /api/food-logging-complete`
-  takes `{ date?, complete }` and answers `{ date, complete, completedAt }`; sending
-  `complete: false` is the Undo.
-
-- **Branch:** `fix/tdee-partial-day-completeness`
-- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
-  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
-  the rest? does it assume thats all I had for the day and tune around that? Need some control
-  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
-  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
-  that the owner's suspicion is correct.
-- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
-  There is no completeness concept anywhere in the path.
-
-**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
-"logged day" is with a bare non-zero test:
-
-```ts
-const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
-```
-
-A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
-*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
-(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
-`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
-
-**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
-miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
-in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
-comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
-in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
-the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
-abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
-fixed the version that self-corrects by evening, and left the version that never does.
-
-**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
-eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
-1400, dinner never logged):
-
-```
-partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
-0            14          2600        2600         medium      null
-6            14          2086        2086         medium      null
-14           14          1400        1400         medium      null
-```
-
-Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
-`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
-as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
-"plausible" 1400.
-
-**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
-`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
-inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
-under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
-module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
-too, so the Balance card's "burned" figure is dragged down in step.
-
-- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
-  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
-  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
-  presents protections (1) and (2) as the complete story — the claim this corrects.
-- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
-  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
-  this question is about: logs consistently enough to switch tuning on.
-- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
-  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
-  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
-  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
-
-**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
-
-1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
-   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
-   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
-   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
-   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
-   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
-2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
-   "expected" is the calorie target, derived *from* maintenance, which is the number being
-   estimated, so a low estimate lowers the threshold and admits more partial days next window.
-   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
-   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
-   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
-3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
-   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
-   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
-   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
-   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
-
-- **What would count as fixed:** a day the user did not finish logging can no longer enter
-  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
-  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
-  rather than toward a confident wrong number. Whichever mechanism is chosen,
-  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
-  module is well-tested for empty days and has never been tested for half-full ones.
-- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
-  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
-  control, if option 1 is chosen, would need a device check.
-
-
-**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
-meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
-one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
-option 3 (silent inference) cannot be corrected by the person who knows the answer.
-
-**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
-— not in the header, not beside the ring. It is a statement about a day that has finished, and its
-position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
-is everything you ate. Only completed days are used to work out your maintenance calories."*
-Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
-must be reversible, since the whole point is that a wrong day poisons the estimate.
-
-**Ship the counter with it, not after it.** The button feeds something invisible today, and that
-invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
-had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
-for, so the two land together rather than one inventing a second version of the other.
-
-**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
-`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
-assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
-quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
-honest one, so the estimate starts from days marked after this ships and the counter shows that
-plainly.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
@@ -1209,8 +1139,9 @@ a fate — finding 1 is the former only.
   ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
   weight, and moving them is churn — but editing them two tabs from where they are judged is the
   friction the shortcut removes.
-- **"Complete Today's Logging" is a button at the foot of the day's log** — see **Q-387**, where the
-  decision and its wiring live.
+- ~~**"Complete Today's Logging" is a button at the foot of the day's log**~~ — **shipped** (Q-387,
+  Lane A half v1.319.x, Lane B half #330). It is **no longer at the foot**: BF-6 moved it directly
+  under the meals in v1.344.0 because at the foot it took zero presses in seven weeks.
 - **The meal plan becomes a generator of saved meals** — see **Q-398**.
 
 **11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
@@ -3310,27 +3241,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `event_name` drop alone**, and that is a data-dropping migration: it needs the owner's yes before
   it merges, even though the column is derivable from `tag` and no reader has touched it since
   Q-541 Task 7.
-
-### [devices][platform] Q-542 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6, §7b
-- **Added:** 2026-08-17 · **Answered the same day.** No longer blocking anything.
-- **The owner chose A + B + C — index audit, row narrowing, repack. Options D and E are declined.**
-  Nothing irreversible is being done: every chosen step preserves `body_hex` byte for byte, so the
-  `CLAUDE.md` archival rule stands unchanged and needs no rewrite.
-- **The reframing the decision rested on:** the archival rule protects `body_hex`, which is **26 MB of
-  the 360 MB table — 7.3%**. The rest is indexes and row overhead, all reversible. So the expensive
-  thing and the irreplaceable thing were never the same thing.
-- **The `disk_full` incident (Q-534) did not change this and must not be read as forcing it.** That
-  was a bloat event from a full `measured_at` re-stamp, not growth; **§6 A would have prevented it and
-  neither D nor E would have.** Against the stock 500 MB target the non-destructive path alone reaches
-  ~260 MB and, with C, holds it for years.
-- **Also settled:** D4 remains the destination with **no deadline**, which lapses decision O1 and
-  unblocks Q-540. The 2026-08-02 retention decision justified the 14-day device tier *because* the
-  server keeps `body_hex` forever — that premise now holds indefinitely, so the tier needs no revision.
-- **Remove this entry** once Q-534/Q-540/Q-541 are all closed; it carries no work of its own.
-
-
 
 ### [devices][app-shell] Q-533 — the drain now reports its own ending; nobody has seen it do so
 
