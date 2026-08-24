@@ -331,6 +331,70 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
+- **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
+- **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire).
+- **Gate: owner** — changes the readiness score. Not signed off.
+
+Home shows *"Body temp elevated · +0.5°C above your baseline (threshold 0.5°C)"* and a Recovery
+recommendation with readiness 52. `computeBlendedScore` (`readiness-payload.ts:169`) applies an
+**absolute °C** ladder to the blended score — **−10** past 0.3 °C, **−20** past 0.5 °C, **capped at
+40** past 1.0 °C. This is *not* the `tempZ` path Q-506 covers; it is a hard subtraction, and nothing
+was queued against it.
+
+**Measured over the 34 nights holding a stored deviation:**
+
+| | |
+|---|---|
+| deviation mean | **+0.662 °C**, range +0.14 … +1.33 |
+| nights with a **negative** deviation | **0 of 34** |
+| −10 arm fires | **31/34 (91.2%)** |
+| −20 arm fires | **23/34 (67.6%)** |
+| cap-at-40 arm fires | **6/34 (17.6%)** |
+| nights with **no** penalty | **3/34 (8.8%)** |
+
+A deviation that is positive on every night is not a deviation.
+
+**Root cause — the baseline mean never converged.** `temp_baseline_mean_x8` is ×8 of centi-degrees
+(degrees = `raw/800`; confirmed against the stored deviation: 35.950 − 35.464 = +0.486 vs stored
++0.503). True measured nightly temp over 34 nights is **35.827 °C (sd 0.140)**; the stored baseline
+is **35.464 °C** — **0.363 °C low, which exceeds the 0.3 °C threshold on its own.** The EMA
+cold-started at 34.696 °C and has climbed +0.767 over 36 nights: converging, still short at
+`n_history = 50`.
+
+**⚠️ The same object's SD is also ~13× too wide** — 1.82 °C against a true 0.140 °C, which is
+**Q-506's finding reproduced from a different table**. One baseline is failing two consumers in
+opposite directions: the **wide sd** divides `tempZ` to nothing so the illness radar can never fire
+(Q-506), the **low mean** makes the absolute deviation permanently positive so readiness is penalised
+daily (this entry). **Fix both or neither** — correcting one leaves the other looking addressed.
+
+**Counterfactual** (baseline = trailing mean of prior nights, min 7; 27 comparable nights): deviation
+mean **+0.557 → −0.040 °C**, negative nights **0/27 → 16/27**, −10 arm **88.9% → 3.7%**, −20 arm
+**59.3% → 0%**, mean readiness penalty **−16.3 → −0.4 pts/day**. The trailing mean is a **diagnostic,
+not the proposed design** — it shows the offset is an estimator artefact rather than physiology, but
+it would absorb a genuine multi-day fever into the baseline within a week. Re-seed or correct the
+existing baseline instead.
+
+**⛔ Do not touch the 0.3/0.5/1.0 ladder.** Against a true nightly sd of 0.140 °C it sits at
+2.1/3.6/7.1 sd, which is defensible. **Fourth instance of "the threshold is right, the input is
+wrong"** in this pillar after Q-506, Q-512 and Q-514; adjusting the ladder would hide a broken
+baseline behind a plausible firing rate, which is the Q-504 mistake.
+
+**Check Q-2 first** (nightly temperature treats one frame's simultaneous probes as consecutive
+samples) — it is already queued and is a plausible contributor to why the EMA seeded ~1.1 °C low.
+
+**Pass test:** stored deviation mean within ±0.05 °C of zero over the trailing 30 nights; at least
+40% of nights negative; the −10 arm firing on under 20% of nights; and the illness radar able to
+reach its `watch` threshold on at least one historical night (the Q-506 half).
+
+**Not established:** whether the owner was actually ill on any flagged night. The finding is that a
+permanently-positive deviation cannot tell illness from baseline error.
+
+Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/2026-08-24-readiness-temperature-penalty.md).
+
 ### [readiness][heart-rate] TN-2 — the Body Battery charge window has closed, so the tank only drains
 
 - **Branch:** _unassigned_
@@ -5164,6 +5228,7 @@ ehr     0     0     0     0   648   208   128   556     0
 ### [devices][readiness] Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
 
 - **Branch:** `fix/temperature-baseline-cold-start`
+- **Batch:** temperature-baseline — ships with **TN-6**, the same baseline object's other half (its *mean* is 0.36 °C low, penalising readiness daily). Correcting only one of the two looks like it fixed both.
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a baseline/data fix, not
   a scoring-constant change.
 - **Added:** 2026-08-18 · Tuning agent ·
