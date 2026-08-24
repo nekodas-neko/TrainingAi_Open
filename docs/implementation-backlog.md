@@ -1329,7 +1329,9 @@ true mean on night 2 rather than converging for fifty.
 - **Surface: server/shared, web-reproducible.** Pure function over data already in Postgres; no
   device needed to fix or verify.
 
-- **✅ OWNER DECISION 2026-08-24 — asked plainly, both halves answered. `Gate: owner` is CLEARED.**
+- **✅ OWNER DECISION 2026-08-24 — asked plainly, both halves answered. The owner gate is CLEARED
+  and its field removed** (worded without the literal field name, so a grep for gated entries does
+  not report this one).
   1. **Re-derive the stored baselines** (not seed-fix-only). The reasoning the owner accepted: a
      baseline is a corrupted *intermediate*, not a record of what the app told them, so re-deriving it
      is a different act from re-scoring history and does not contradict the "leave stored days alone,
@@ -1372,7 +1374,50 @@ true mean on night 2 rather than converging for fifty.
   which is the one category of mistake the owner gate exists to prevent. The factors are four lines
   apart in `daily-summary.ts`; read them.
 
-### [devices][readiness] BF-14 — the breathing-rate baseline converges to ~93 against a real 9.8 rpm
+### [devices][readiness] BF-14 — ❌ REFUTED 2026-08-24: the breathing baseline is fed rpm×10 on purpose; it is correct
+
+> **⛔ REFUTED by measurement (Tuning, 2026-08-24). Do not implement this. It is kept, not deleted,
+> because the trap it fell into is worth reading — and because the same trap caught Tuning the same
+> day, in the opposite direction.**
+>
+> **The ×10 is deliberate and documented at the feed site.** `daily-summary.ts:110-112`:
+> *"Breathing in rpm×10 for integer-sample resolution (same trick as MET ×10) — rateBrpm carries
+> 0.1-rpm precision that a bare Math.round would destroy."* And `personal-baseline.ts:32` stores
+> `sample << 3`. So the column is `(rpm × 10) << 3` and **rpm = meanX8 / 80**, not `/8`.
+>
+> This entry divides by 8 alone, reads 92.5, and compares it against 9.8 rpm. Corrected:
+>
+> | n_history | rpm | rawX8 | this entry read | correct (÷80) | ratio (raw/8) ÷ rpm |
+> |---|---|---|---|---|---|
+> | 5 | 9.1 | 647 | 80.9 | **8.09** | 8.89 |
+> | 15 | 9.7 | 711 | 88.9 | **8.89** | 9.16 |
+> | 30 | 10.0 | 733 | 91.6 | **9.16** | 9.16 |
+> | 40 | 9.8 | 744 | 93.0 | **9.30** | 9.49 |
+> | 50 | 9.8 | 740 | 92.5 | **9.25** | 9.44 |
+>
+> True mean over 49 nights **9.400 rpm** (sd 0.553) against a stored baseline of **9.250** — a gap of
+> **+0.150 rpm, +0.27 sd**, which is clean. The full six-baseline sweep is on **BF-13**; only
+> temperature is distorted.
+>
+> **Its own table is evidence for BF-13, not against it.** The rightmost column climbs 8.89 → 9.44
+> **toward 10** — that is the ×10 feed with the zero-seed lag still closing. This entry reads that
+> convergence as heading for "the wrong number ~9.5×" and concludes the zero seed is ruled out; it is
+> the zero seed, and the residual 0.15 rpm is what remains of it. **BF-13's seed fix covers this**
+> (it fixes all six), so there is nothing separate to do here.
+>
+> **The lesson, which cost both agents a wrong finding on the same day:** get a fixed-point factor
+> from the **call site**, never by inference or by assuming the `X8` suffix is the whole story. Here
+> the suffix names one of two factors. Tuning's mirror-image version of this was inferring sleep's
+> scale as a power of ten when it is ×60, which produced a phantom 3.24-hour sleep defect and would
+> have caused an unnecessary production data change. All six factors sit within four lines of each
+> other in `daily-summary.ts`.
+>
+> **What survives:** nothing actionable. **Q-4** (`respiratory_rate` from an estimator its own docs
+> call uncalibrated) is untouched by this and remains open on its own merits — that is about whether
+> the *measurement* is trustworthy, which this refutation says nothing about.
+
+**Original entry follows, unedited.**
+
 
 - **Lane: A**
 - **NOT in the temperature batch** — different metric, and the evidence points at units

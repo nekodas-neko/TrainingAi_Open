@@ -35,6 +35,11 @@ On **BF-13** (BugFix's entry, whose root cause supersedes TN-6's): re-derive the
 seed for all six, re-derive only what is measurably wrong. **Measured: only `temp` is** (gap +2.80 sd,
 100% of nights above; the other five are ≤0.28 sd).
 
+**BF-14 refuted 2026-08-24** — the breathing baseline is fed `rpm × 10` deliberately
+(`daily-summary.ts:110-112`, comment says so), so rpm = `meanX8 / 80`, not `/8`. Corrected it reads
+9.250 against a true 9.400, **+0.27 sd — clean**. Its own table is evidence *for* BF-13's zero seed,
+not against it. Kept in the queue with the reasoning, per Q-504's precedent.
+
 Reviews: [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
 [sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
 [temperature](../../reviews/2026-08-24-readiness-temperature-penalty.md) ·
