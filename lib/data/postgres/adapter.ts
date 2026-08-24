@@ -57,7 +57,7 @@ import {
 import { sleepImplausibleReason } from '@trainingai/shared/validation/plausibility'
 import { ActivityLogBody, deriveEndTime } from '@trainingai/shared/validation/activity-log'
 import { describeZodFailure } from './push-error-detail'
-import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, RunningBaseline, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm } from '../repository'
+import type { WorkoutRepository, UserGoals, EnsuredWorkoutSession, SessionLoad, YearReviewTotals, YearReviewTopExercise, UnitFixResult, SyncDelta, IncomingMutation, PushResult, OuraRawSampleInput, OuraRawSampleSummary, OuraRawSampleLatest, OuraRawSampleRow, FitnessTest, RunningPlan, PrescribedRun, PrescribedRunUpdate, AiCallLogInput, AiCallUsageSummary, ScaleRawSampleInput, ScalePendingSample, LastRealOneRm } from '../repository'
 import { FitnessTestBody } from '@trainingai/shared/validation/fitness-test'
 import { PrescribedRunPatchBody } from '@trainingai/shared/validation/prescribed-run'
 import type {
@@ -1635,7 +1635,16 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
           ROW_NUMBER() OVER (PARTITION BY el.exercise_name ORDER BY el.logged_at DESC) AS rn
         FROM exercise_logs el
         JOIN workout_sessions ws ON ws.id = el.workout_session_id
-        WHERE ws.user_id = ${userId} AND el.estimated_1rm IS NOT NULL
+        -- \`> 0\`, not \`IS NOT NULL\` (Q-298). A deloaded exercise stores estimated_1rm = 0 **on
+        -- purpose** — deload work is submaximal and must not read as a max — so \`IS NOT NULL\`
+        -- admitted it as the previous estimate whenever the last-but-one session was a deload.
+        --
+        -- That produced a signal pair that contradicted itself, and both halves go to the AI:
+        -- \`oneRmTrendStatus\` guards \`previous <= 0\` and so reported **flat**, while
+        -- \`signals.ts\`'s \`rm1ChangeKg\` (\`current - prev\`) has no such guard and reported the
+        -- lifter's **entire 1RM as a gain since last time**. Every sibling query already gates on
+        -- \`> 0\`; this was the one that did not.
+        WHERE ws.user_id = ${userId} AND el.estimated_1rm > 0
           AND el.deleted_at IS NULL AND ws.deleted_at IS NULL
       ) ranked
       WHERE rn = 2
@@ -2082,6 +2091,14 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
   async saveActivityLog(userId: string, log: Omit<ActivityLog, 'id' | 'userId' | 'createdAt'> & { id?: string }, opts?: { overwrite?: boolean }): Promise<ActivityLog> {
     const { id, ...data } = log
     const caloriesBurned = data.caloriesBurned ?? await this.deriveActivityKcal(userId, data.activityType, data.durationMin ?? null)
+    // Q-307: pace was read from the column and never derived, so it was absent on 32 of 39 logs
+    // that carried both inputs — a client either sends it or leaves it null forever. Same shape as
+    // caloriesBurned above: derive server-side when the client didn't supply one, from the two
+    // fields that are already present far more often than pace is.
+    const avgPaceSecPerKm = data.avgPaceSecPerKm
+      ?? (data.durationMin != null && data.distanceKm != null && data.distanceKm > 0
+        ? (data.durationMin * 60) / data.distanceKm
+        : null)
     const values = {
       ...(id ? { id } : {}),
       userId, date: data.date, activityType: data.activityType, title: data.title,
@@ -2095,7 +2112,7 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       splits: data.splits ?? null,
       bestEfforts: data.bestEfforts ?? null,
       paceSeries: data.paceSeries ?? null,
-      avgPaceSecPerKm: data.avgPaceSecPerKm ?? null,
+      avgPaceSecPerKm,
       elevationGainM: data.elevationGainM ?? null,
       elevationLossM: data.elevationLossM ?? null,
       elevationProfile: data.elevationProfile ?? null,
@@ -2462,23 +2479,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
     return this.rowToRunningPlan(r)
   }
 
-  async saveRunningBaseline(userId: string, baseline: Omit<RunningBaseline, 'id' | 'userId' | 'createdAt'>): Promise<RunningBaseline> {
-    const [r] = await this.db.insert(s.runningBaselines).values({
-      userId, planId: baseline.planId,
-      vo2max: baseline.vo2max ?? null, maxHr: baseline.maxHr ?? null,
-      restingHr: baseline.restingHr ?? null, thresholdHr: baseline.thresholdHr ?? null,
-      weeklyBaseMinutes: baseline.weeklyBaseMinutes ?? null, easyPaceSecPerKm: baseline.easyPaceSecPerKm ?? null,
-    }).returning()
-    return this.rowToRunningBaseline(r)
-  }
-
-  async getRunningBaseline(userId: string, planId: string): Promise<RunningBaseline | null> {
-    const [r] = await this.db.select().from(s.runningBaselines)
-      .where(and(eq(s.runningBaselines.userId, userId), eq(s.runningBaselines.planId, planId)))
-      .limit(1)
-    return r ? this.rowToRunningBaseline(r) : null
-  }
-
   async getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]> {
     const rows = await this.db.select().from(s.prescribedRuns)
       .where(and(
@@ -2527,15 +2527,6 @@ export class PostgresWorkoutRepository implements WorkoutRepository {
       frameworkKey: r.frameworkKey, fitnessSnapshot: r.fitnessSnapshot,
       timePerSessionMinutes: r.timePerSessionMinutes ?? null,
       isActive: r.isActive, createdAt: r.createdAt, updatedAt: r.updatedAt,
-    }
-  }
-
-  private rowToRunningBaseline(r: typeof s.runningBaselines.$inferSelect): RunningBaseline {
-    return {
-      id: r.id, userId: r.userId, planId: r.planId,
-      vo2max: r.vo2max ?? null, maxHr: r.maxHr ?? null, restingHr: r.restingHr ?? null, thresholdHr: r.thresholdHr ?? null,
-      weeklyBaseMinutes: r.weeklyBaseMinutes ?? null, easyPaceSecPerKm: r.easyPaceSecPerKm ?? null,
-      createdAt: r.createdAt,
     }
   }
 

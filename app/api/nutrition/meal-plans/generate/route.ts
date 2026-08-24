@@ -55,8 +55,8 @@ const RequestSchema = z.object({
   keepMeals: z.array(z.object({
     name: z.string().min(1).max(200),
     ingredients: NutritionIngredientsSchema,
-  })).max(6).optional(),
-})
+  }).strict()).max(6).optional(),
+}).strict()
 
 /**
  * What the model returns. Ingredients use the SAME shape as the food scan (`IngredientSchema` in

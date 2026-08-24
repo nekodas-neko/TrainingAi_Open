@@ -32,7 +32,7 @@ const RequestSchema = z.object({
   scheduleType: z.enum(['rotation', 'weekly']).default('rotation'),
   rotationRestAfterN: z.number().int().min(1).max(7).default(3),
   weeklyDays: z.array(z.number().int().min(0).max(6)).default([0, 2, 4]),
-})
+}).strict()
 
 const EQUIPMENT_LABEL: Record<string, string> = {
   barbell: 'Barbell', dumbbell: 'Dumbbells', cable: 'Cables',

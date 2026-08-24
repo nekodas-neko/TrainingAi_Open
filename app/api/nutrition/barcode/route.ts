@@ -5,12 +5,14 @@ import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
 import { offProductToNutrition, offFetchJson, OFF_FIELDS, OFF_TIMEOUT_MS } from '@trainingai/shared/nutrition/open-food-facts'
 
+// Built from `searchParams` below, not a raw client body — `.strict()` guards nothing today but
+// costs nothing and catches the day this route reads a spread of the query instead (Q-464).
 const BarcodeSchema = z.object({
   code: z.string()
     .min(8, 'Barcode too short')
     .max(15, 'Barcode too long')
     .regex(/^\d+$/, 'Barcode must contain only digits'),
-})
+}).strict()
 
 export async function GET(req: Request) {
   const session = await auth()

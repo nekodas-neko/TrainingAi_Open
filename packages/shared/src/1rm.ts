@@ -48,8 +48,11 @@ export function calcAmrap1RM(weight: number, reps: number): number {
 // session even when the lifter matches the prescription exactly. This factor rescales
 // calc1RM's output so that hitting the prescription exactly reproduces the previous
 // 1RM, while exceeding/missing it moves the estimate up/down accordingly.
-function prescriptionFactor(pct?: number, targetReps?: number): number {
-  if (!pct || pct <= 0 || !targetReps || targetReps <= 0 || targetReps >= 37) return 1
+// Returns null when no style prescribes this set, rather than 1 — a real prescription can
+// legitimately resolve to exactly 1 (Q-304), and the caller needs to tell "no correction applies"
+// from "the correction happens to be 1" so it knows to fall back to the AMRAP band correction.
+function prescriptionFactor(pct?: number, targetReps?: number): number | null {
+  if (!pct || pct <= 0 || !targetReps || targetReps <= 0 || targetReps >= 37) return null
   return 1 / ((pct / 100) * repFactor(targetReps))
 }
 
@@ -66,7 +69,12 @@ export function calculate1RM(
       const w = weights[i] ?? weights[weights.length - 1] ?? 0
       const r = reps[i] ?? 0
       if (!(w && r) || r > REP_CEILING) return 0  // beyond the ceiling: estimation formulas break down
-      const factor = prescriptionFactor(style?.[i]?.pct, style?.[i]?.reps)
+      // Q-304: a set with no prescribed pct/targetReps is an AMRAP set by construction, and
+      // amrapScaleFactor is the correction that already exists for exactly that — it was applied
+      // to bodyweight/baseline sets (amrapAverage1Rm) but not here, so an unprescribed set at
+      // 13+ reps fed the estimate un-discounted. A prescribed set keeps its own rescale; the two
+      // never combine (double-correcting a prescribed set would deflate the estimate instead).
+      const factor = prescriptionFactor(style?.[i]?.pct, style?.[i]?.reps) ?? amrapScaleFactor(r)
       return mround(w * repFactor(r) * factor, 0.25)
     })
     .filter(v => v > 0)

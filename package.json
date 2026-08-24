@@ -1,6 +1,6 @@
 {
   "name": "trainingai",
-  "version": "1.349.0",
+  "version": "1.360.0",
   "private": true,
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
@@ -40,7 +40,8 @@
     "typecheck": "tsc --noEmit",
     "ci:local": "pnpm lint && pnpm check:rules && pnpm typecheck && pnpm test",
     "check:rules": "node scripts/run-custom-rules.js",
-    "db:local": "bash scripts/local-db/setup.sh"
+    "db:local": "bash scripts/local-db/setup.sh",
+    "db:snapshot": "node scripts/local-db/snapshot.js"
   },
   "dependencies": {
     "@ai-sdk/google": "^3.0.86",

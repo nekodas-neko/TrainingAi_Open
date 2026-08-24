@@ -1719,3 +1719,72 @@ with nothing at risk.
 > words. Nothing owed. The one item this entry raised that is *not* closed — the 23 unprobed FK edges
 > into user-scoped tables — is a future lens, carried in the Review baton's Next section, not an
 > outstanding obligation of these fixes.
+
+### [cardio][activity] ✅ Pace was null on 32 of the 39 activity logs that could compute it — FIXED 2026-08-24 (v1.351.0, Q-307)
+
+`avg_pace_sec_per_km` was populated on 7 of 46 logs while 39 carried both `duration_min` and
+`distance_km` — read from the column, never derived, and written as an explicit `null` at every
+save site.
+
+- **Fix:** `saveActivityLog` now derives `avgPaceSecPerKm = durationMin * 60 / distanceKm` when the
+  caller supplies none, the same shape and the same call site as the existing `caloriesBurned`
+  derivation from Q-230 — so the web route and the `pushMutations` outbox branch both get it from
+  one shared function, by construction.
+- **Migration 210** backfills the rows written before the derivation existed: an idempotent
+  `UPDATE … WHERE avg_pace_sec_per_km IS NULL AND duration_min IS NOT NULL AND distance_km IS NOT
+  NULL AND distance_km > 0`. Never touches a row that already carries a value.
+- **Verified:** five new tests (`activity-log-pace.test.ts`) mirroring the Q-230 test's shape — fills
+  a missing value, never overwrites a supplied one, stays null with either input missing, stays null
+  on a zero-distance guard. Full suite green (123 files, 761 tests). Migration round-tripped by hand
+  against three inserted rows on the local DB: one filled, one left alone, one left null.
+
+> Moved out of `projectOverview.md` on 2026-08-24, same PR as the fix. **Not exercised:** the
+> backfill has not yet run against the real 46-row production table this entry was measured
+> against — it applies automatically on the next `ensureSchema()` cold start after this deploys,
+> same as any other migration, and nothing further is owed beyond that ordinary deploy.
+
+### [platform] ✅ `.env.example` was wrong in both directions — FIXED 2026-08-24, Q-458
+
+Eight declared keys were read by no code, and four real config vars were undeclared. Verified by
+differencing every `process.env.X` read under `lib app packages scripts instrumentation*` against
+the file, re-checked against `main` before touching anything (each of the twelve confirmed
+individually, not taken from the entry's word).
+
+- **Removed** (dead): the five Oura **Cloud** OAuth keys (`OURA_CLIENT_ID`/`_SECRET`/
+  `_REDIRECT_URI`/`_WEBHOOK_CALLBACK_URL`/`_WEBHOOK_VERIFICATION_TOKEN`) — the integration was
+  deleted 2026-08-13 and `CLAUDE.md` forbids re-adding it, so the public onboarding file was
+  inviting a contributor to configure the one thing the project docs say never to touch. Also
+  `GEMINI_API_KEY` (retired at Q-189), `AUTH_URL` (unread), and **`TOKEN_ENC_KEY`** — the sharpest
+  edge, since it read as "encrypts stored tokens at rest" and nothing consumed it, so setting it
+  bought an operator a false sense of a security property the app does not have.
+- **Added** (real, previously undeclared): `PG_POOL_MAX`, `LOCAL_DATABASE_URL` (dev-tooling,
+  auto-set by `scripts/local-db/setup.sh`), `CLAUDE_RO_OWNER_USER_ID`, and an informational note for
+  `RAILWAY_GIT_COMMIT_SHA` (Railway-injected, never set by hand).
+- **A drive-by while in the file:** `GITHUB_RELEASES_TOKEN`'s comment still said "required only
+  while the repository is private" — the repo went public 2026-08-17 (Q-49), so the comment was
+  corrected to "optional, buys a higher rate limit" rather than filed as a second entry.
+- **Verified:** `pnpm check:rules` 55 of 55. No dedicated env-example-vs-code CI check exists yet —
+  the entry suggested one; not built here, since the drift it would catch is exactly what this fix
+  just cleared and adding the check is a separable, smaller follow-up.
+
+### [workouts] ✅ Autoregulation's missing-data defaults favoured adding load — FIXED 2026-08-24, Q-299
+
+`repCompletionRate` is null on ~83% of sets, and `autoregulation.ts` read that null asymmetrically:
+`missedReps` defaulted to `false` (not proven missed) but `metReps` defaulted to `true` (`(x ?? 1)
+>= 1`, reading absent data as a completed set). Missing evidence removed a condition from the
+load-increase path and added none to it, while the decrease path got no matching benefit of the
+doubt.
+
+- **Fix:** `metReps` is now `sig.repCompletionRate != null && sig.repCompletionRate >= 1` — null-safe
+  the same shape as `missedReps`, so missing data reads the same way (not proven) on both the push
+  and back-off paths, and blocks a push it can't substantiate.
+- **Decided without an owner round-trip.** The entry offered two symmetric options — block on
+  missing data, or treat it as neutral on both paths — and both agreed the *asymmetric* status quo
+  was wrong; the conservative option (don't push without evidence) is the standard default for
+  automated load adjustment, and the change is a plain code revert if it's ever wrong, no migration
+  or data touched.
+- **What's still open, split off as Q-299b:** why 83% of sets carry no `planned_reps` in the first
+  place — untouched, and a separate, larger investigation from making the missing-data case safe.
+- **Verified:** new test (`does not push when completion is unknown`) plus the existing 32 green;
+  full suite unaffected elsewhere (no other caller of `computeRpeAdjustment`/`applyAutoregulation`
+  outside `generate-prescription.ts`, which has no dedicated test exercising this path).

@@ -117,11 +117,22 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           VERSION=$(node -p "require('./package.json').version")
-          # Recreate the rolling release so its single asset is always the newest
-          # build (gh can't overwrite an existing asset of the same name in place).
-          gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-          gh release create apk-latest \
-            android/app/build/outputs/apk/debug/app-debug.apk \
-            --title "Latest debug APK (v$VERSION)" \
-            --notes "Auto-built from \`main\` @ ${GITHUB_SHA::7} (v$VERSION). Debug build for sideloading on the S25 — download \`app-debug.apk\` below." \
-            --prerelease
+          NOTES="Auto-built from \`main\` @ ${GITHUB_SHA::7} (v$VERSION). Debug build for sideloading on the S25 — download \`app-debug.apk\` below."
+          # Q-459: swap only the ASSET, never delete-then-recreate the release+tag.
+          # gh can't overwrite an existing asset of the same name in place, so a
+          # replace still needs a delete — but deleting just the asset leaves the
+          # release id and tag alive throughout, so /releases/tags/apk-latest (what
+          # /api/download-apk resolves against) never 404s. Only the direct asset
+          # download URL has a brief gap between the two gh calls, not the whole
+          # window a delete-release-and-recreate used to open.
+          if gh release view apk-latest >/dev/null 2>&1; then
+            gh release delete-asset apk-latest app-debug.apk --yes 2>/dev/null || true
+            gh release upload apk-latest android/app/build/outputs/apk/debug/app-debug.apk
+            gh release edit apk-latest --title "Latest debug APK (v$VERSION)" --notes "$NOTES"
+          else
+            gh release create apk-latest \
+              android/app/build/outputs/apk/debug/app-debug.apk \
+              --title "Latest debug APK (v$VERSION)" \
+              --notes "$NOTES" \
+              --prerelease
+          fi

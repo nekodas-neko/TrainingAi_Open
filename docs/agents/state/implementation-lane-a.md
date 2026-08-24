@@ -4,146 +4,146 @@
 > is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a
 > perfect baton.
 
-**Updated:** 2026-08-23 · **By:** the sixth session to run as Lane A · **Next ID:** `LA-18`
+**Updated:** 2026-08-24 · **By:** the seventh session to run as Lane A · **Next ID:** `LA-22`
 (`grep -rhoE '\bLA-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1` is the authority, not this line)
-**Migrations:** through 206; next free is **207**. Local SQLite **v28**, untouched this session.
+**Migrations:** through 209; next free is **210**. Local SQLite **v28**, untouched this session.
 
 ## Now
 
 **Nothing is in flight.** Every branch this session opened is merged. Start with
-`node scripts/next-item.js --lane A`.
+`node scripts/next-item.js --lane A` — not a hand-scan; the tool is the only thing that can tell you
+whether the top entry is *startable*.
 
-**But read this before taking the top item: the Lane A queue is thin right now, and the top three are
-each blocked in a way the tool cannot show.** Checked 2026-08-20:
+Narrative for the fifteen PRs, with the wrong turns:
+[`docs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md`](../../handoff-2026-08-24-platform-implementation-lane-a-engine-run.md).
 
-- **LA-16 is CLOSED** (#288, #291, #292) — all seven ratchets now ask whether *this branch* grew the
-  thing. One of the seven, the memo check, needed a materialised base tree because its count is not a
-  function of a single file; the rest are per-file. `scripts/lib/base-ref.js` is the shared piece.
-- **Q-324 is CLOSED on evidence** — 30 consecutive fresh-database CI runs post-fix, and the causal
-  chain verifiably removed. **If it recurs, the migration-recording fix is ruled out.**
-- **Q-555** is **undiagnosed by its own text** (*"whether the no-op is Next's router aborting a failed
-  RSC fetch or the click handler swallowing it"*) and needs a device check. Do not build it blind —
-  it is now the top Lane A item and it is not startable as written.
+**The queue is no longer thin.** The previous baton's three-item blockage is resolved: LA-16 and
+Q-324 closed, Q-555 still needs a device check and still must not be built blind. The Orchestrator's
+first sweep (2026-08-24) re-classified lanes and cleared the completed-work baseline, so the tool's
+output is now trustworthy in a way it was not two sessions ago.
 
-Below those: **Q-499**, then the nutrition cluster — most of which is Lane B's, correctly, as of #289.
-
-**#124 (Q-479) was MERGED by the owner on 2026-08-23**, reversing their earlier *"leave that as a
-known issue for now - only admin will be me for a long time."* This line said it must not be merged
-and was carried forward by three batons; it is no longer true. Nothing to do — the fix is on `main`,
-and `projectOverview.md` records the one thing still owed (production was not exercised end to end).
-
-## The habit that paid every single time this session
+## The habit that has now paid on ten consecutive entries
 
 **Re-verify an entry's premise against current `main` before building it, and write down what you
-checked.** Six items, and it changed the work on four of them:
+checked.** It changed the work on four of six entries last session and on two of this one:
 
 | entry | what it said | what was true |
 |---|---|---|
-| **Q-331** | they agree, just add a test | they had **stopped** agreeing — #255 gave the day path an HR estimate and left the route on MET |
-| **RV-34** | check supplied ids against the program's existing rows | that refuses **every** save from the workout builder, which mints a fresh UUID per session |
-| **Q-421** | route (b) + a labelling clause | (b) owner-rejected, (a) shipped, half the rest done that morning — it was a Lane B item |
-| **PS-3** | four migrations re-fail forever | production has all four recorded; local-only, and smaller than the framing |
+| **Q-298** | three queries let a deload's zero become the previous 1RM | two already filtered `> 0`; the leak was the **third**, `listPrevious1rm`, gating on `IS NOT NULL` |
+| **LA-21** | *(my own filing)* not a live corruption | production held **11 of 81 (13.6%)** at 534–845 min, with an empty gap from 92 min |
 
 ## Shipped
 
-#270 PS-3 · #274 Q-331 · #278 RV-32+34 · #280 RV-33 · #281 Q-362a (**additive** — LA-15 contracts it
-after Q-362b) · #282 Q-424 · #283 Q-421 · #284 baton · #285 LA-13 · #286 LA-14 **refuted, no code** ·
-#287 LA-17 · #288 LA-16 half · #289 lane tags. Narrative is in each PR body and journal entry.
-
-**The queue itself changed in #289 and every agent is affected.** `next-item.js` had been taking the
-first `Lane`-shaped string in an entry's body, and the commonest shape here is a banner reading *"the
-Lane A half SHIPPED — what is left is Lane B"*. **Eight of Lane A's top ten READY items were Lane
-B's.** Nineteen entries now carry an explicit `Lane:` field; three are `?` because they are genuine
-A/B splits and resolving those is Orchestrator's. Where a blocker was stated in prose only, it is now
-a `Needs:` field (Q-556 → Q-328, Q-407 → Q-398).
+#345 Q-313 · #351 Q-456 · #356 LB-7 filing (**diagnosis wrong** — see below) · #360 Q-541 Task 6 ·
+#362 + #378 Q-464 batches 2–3 · #363 Q-312 · #364 backlog-resurrection check · #365 BF-4 +
+`payload_bytes` (migrations 208, 209) · #368 Q-420 · #371 LA-21 measured · #372 LA-21 cull ·
+#374 LA-21 session-start ladder · #381 journal compaction (57 entries) · #385 Q-298.
 
 ## Standing constraints
 
 - **The local gate is `pnpm check:rules`** — quote its `Ran N of N`, never the word "pass". It is
-  **51 of 51** now: #282 added a base-branch fetch step. It was 50 this morning. Do not hardcode it.
-- **`get_check_runs` is unreliable in both directions.** It read `total_count: 0` for 25 minutes on a
-  PR whose base was current. **Attempting the merge is the authoritative check.**
-- **Green CI is not proof a CI-only path ran.** #282's fetch step could have silently failed and the
-  job would still be green, because the script falls back. Read the log when the change *is* the CI
-  behaviour: it printed `[new branch] main -> origin/main`, which is the proof.
-- **Fixture constants are synthetic.** Strength is activity 8 with `met_moderate: 0.6`, below
-  `estWorkoutKcal`'s 1.5 floor — **every MET strength estimate is 0** in CI and the sandbox. Open any
-  test touching it with a vacuity guard. `met_hard` is 3 and does clear the floor; activity 7
-  (elliptical) clears it under both real and synthetic constants.
-- **The HR estimator needs no MET table**, so an HR-path test is non-vacuous under fixtures. That is
-  the way past the trap, not a workaround.
-- **Nothing ran on the S25 this session.** Anything touching offline-first, native, safe-area,
+  **51 of 51** now. Do not hardcode it; the runner reads the count from `ci.yml`.
+- **The clone is depth 1.** `git fetch --deepen=200 origin main` before any `git merge origin/main`,
+  or it refuses as "unrelated histories". This cost several rounds before it was internalised.
+- **`get_check_runs` is unreliable in both directions.** `total_count: 0` right after a push is
+  **registration lag**, not a stale base — tell them apart by checking whether `origin/main` is an
+  ancestor of your head. It also reports `in_progress` 16–30 min after a job passed. **Attempting the
+  merge is the authoritative check.**
+- **Green CI is not proof a CI-only path ran.** When the change *is* the CI behaviour, read the log.
+- **Fixture MET constants now clear the floor (Q-312, #363).** `met_easy: 2, met_moderate: 4,
+  met_hard: 6`, all above `estWorkoutKcal`'s 1.5. The previous baton's standing "every MET strength
+  estimate is 0 under fixtures" trap is **retired** — a fixture-MET test is no longer vacuous, and
+  the vacuity guards written for it can go when touched.
+- **Nothing ran on the S25 for two sessions.** Anything touching offline-first, native, safe-area,
   gestures or notifications needs the device smoke run or an explicit Known-Issues row.
 
 ## Traps this session walked into, so you do not
 
-- **`git reset --soft origin/main` does NOT merge.** It moves HEAD and leaves the tree alone, so
-  committing after it **reverts every file another PR landed in between**. Caught by diffing
-  `--name-only` against `origin/main` before pushing; #275's two e2e files and a journal entry were
-  about to be deleted. **Always diff against `origin/main` before you push.**
-- **A rebase replays your conflict resolutions as new content.** Restacking nearly resurrected Q-423,
-  which #273 had just refuted, because an earlier hunk resolution had carried its block. Rebuild a
-  shared doc from `origin/main` and re-apply your own edit; never replay the hunk.
-- **`git checkout -- <file>` after a mutation test discards uncommitted work.** Commit before mutation
-  testing. Also: two files both named `route.ts` overwrite each other in a `basename`-keyed backup.
-- **A count that moves further than your change explains is the bug.** A `next-item.js` fix hid 96 of
-  203 entries from both lanes; nothing failed, `check:rules` was green, and the only tell was READY
-  dropping 149 → 53. An entry stating no lane must be `null`, never `undefined`.
-- **Extracting a helper for testability without switching the caller over is worse than not
-  extracting it.** `laneFromLines` was used only by its own test while `next-item.js` kept an inline
-  copy; they drifted within a day, so the test was testing a function the tool did not call.
-- **Green does not prove a CI-only path ran.** #285's replay could have replayed nothing and still
-  exited 0. It now fails when it re-ran nothing. Needing to read a log to know whether a check checked
-  anything *is* the defect.
-- **A check that adds a network call adds a way to fail.** Q-424's base fetch went red on a blip; it
-  is `|| true` now, because the fallback is stricter, not weaker.
-- **Smaller costs:** `psql -tAc` output carries a trailing newline (a URL built from it makes `curl`
-  return `000`); `fmtAest` strings do not sort (`"5:00pm" < "9:00am"`).
+- **A diagnosis reached from a config file is a guess.** I read `playwright.config.ts`
+  (`workers: 1, fullyParallel: false`) and concluded LB-7 was accumulated suite state. Lane B found
+  the real cause: `public/sw-template.js` re-issues **every** `/api/` request with no method filter,
+  so once the service worker controls the page, `page.route` is bypassed — Playwright cannot
+  intercept SW fetches. Fix is `test.use({ serviceWorkers: 'block' })`.
+- **A severity claim from the local seed is not a severity claim.** LA-21 was filed "not a live
+  corruption" from a dev fixture; production was 13.6%. Query production before writing severity.
+- **A number justified in prose inside your own diff is not a measured number.** My autopack cap
+  shipped at 8 with a comment asserting "2.8× the production rate"; it was 1.4×, ~12 days to clear
+  the backlog. The measured figure (0.32 s/bucket) put it at 25.
+- **Never slice a generated file by string index.** A header edit cut ~1,400 lines off migration 209
+  because `s.index('DO $')` matched the grant block. Regenerate and prepend.
+- **Commit, then push, then switch branches.** A commit was dropped on #374 by switching after
+  committing; `git status` was clean and said nothing. Reading the PR's commit count found it.
+- **Journal compaction has five traps, three new this session**, now in
+  `docs/overview/entries/README.md`. Worst: **a concurrent PR can link an entry you already folded.**
+  Three became cited by the Orchestrator's handoff mid-sweep and git surfaced only the one it also
+  modified — two would have gone unnoticed (60 → 57 folded).
+- **A stale remote branch from an earlier sweep is not yours to force-push.** Date the new one.
+- **Inherited and still true:** `git reset --soft origin/main` does **not** merge — diff
+  `--name-only` against `origin/main` before every push. A rebase replays conflict resolutions as new
+  content; rebuild a shared doc from `origin/main` instead of replaying the hunk. `git checkout --`
+  after a mutation test discards uncommitted work. A count that moves further than your change
+  explains is the bug. Extracting a helper for testability without switching the caller over is
+  worse than not extracting it. `psql -tAc` output carries a trailing newline; `fmtAest` strings do
+  not sort.
 
-## The database reclaim is still the standing deadline item
-
-Inherited unchanged for the fifth baton running, because **no session has been able to touch it**:
+## The database reclaim — half done, at last
 
 | Step | Worth | State |
 |---|---|---|
 | Migration **193** drops `idx_oura_raw_samples_user_measured` | **136 MB** | ✅ landed |
-| Pack the raw frames (Q-541 Task 5 backfill) | **~630 MB** | ⛔ **needs a press against production** |
-| `VACUUM FULL error_events` (Q-315) | **~49 MB** | ⛔ **needs a press against production** |
+| Pack the raw frames (Q-541) | **~630 MB** | ✅ **automatic now** (#360) and observed: 318,883 → 205,278 rows, 764 → 864 buckets, 0 faults |
+| `VACUUM FULL oura_raw_samples` | **36 MB** | ✅ owner pressed it 2026-08-24 — 93 MB → **57 MB** (heap 44→28, idx 49→29) |
+| `VACUUM FULL error_events` (Q-315) | **~49 MB** | ⛔ **still needs one press** |
 
-A sandbox session cannot authenticate to production (`CLAUDE_DB_QUERY_SECRET` is read-only,
-`ADMIN_EXPORT_SECRET` is GET-only on one route). Either the owner runs the curls, or Lane B builds the
-buttons (Q-316), or a **confirm-first** bearer path is added — **do not build the third without an
-explicit yes, it is an auth change.** Runbook:
+Q-315 is the only piece left and there is **no button for it** — the admin UI's vacuum control
+covers `oura_raw_samples`. It needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin
+session cookie. A sandbox session cannot authenticate to production. **Do not add a bearer path to
+that route without an explicit yes — it is an auth change.** Runbook:
 [`docs/handoff-2026-08-18-platform-database-reclaim.md`](../../handoff-2026-08-18-platform-database-reclaim.md).
 
 ## Waiting on the owner
 
-- **Q-420** needs a decision on the 6–10 → 1–10 RPE scale mapping. **Q-422** is Tuning-originated:
-  *Tuning proposes → owner signs off → Lane A implements*. Do not start it as Lane A.
+- **Q-422** is Tuning-originated: *Tuning proposes → owner signs off → Lane A implements*. Not yours
+  to start. (**Q-420 shipped** in #368 — the scale-mapping question it was blocked on is answered by
+  `sessionEffort()` returning `{ rpe, source }`, so a derived value is never read as a self-report.)
+- **Q-388 SpO₂ is not a code question and should not be built.** All 14 production days carry SpO₂
+  frames (673–10,588/day). No baseline exists because `enableMeasurementSequence()` sets it AUTOMATIC
+  on **every** connect; the missing datum is one night *without* it, which needs a Kotlin change and
+  a new APK.
 - Two Sentry checks on-device; a Railway-dashboard reading for **Q-549**.
-- Device checks owed and accumulating: **Q-400** (print once and measure — it also decides Q-411),
-  **Q-413**, **Q-412**, **Q-405**, **Q-310**.
+- Device checks owed and accumulating: **Q-400** (also decides Q-411), **Q-413**, **Q-412**,
+  **Q-405**, **Q-310**, plus everything shipped in the last two sessions.
 
 ## Claimed paths
 
-- **`scripts/lib/`** — new this session (`base-ref.js`, `lane.js`). Lane A's.
-- `lib/media/`, `android/app/src/main/java/com/trainingai/app/media/`, `lib/net/safe-fetch.ts`,
+- `scripts/lib/` (`base-ref.js`, `lane.js`), `lib/media/`,
+  `android/app/src/main/java/com/trainingai/app/media/`, `lib/net/safe-fetch.ts`,
   `app/api/admin/vacuum/`, `app/api/oura-ble/rekey/`,
-  `lib/data/postgres/slices/oura-raw-{frames,pack}.ts` — inherited, still Lane A's.
+  `lib/data/postgres/slices/oura-raw-{frames,pack}.ts` — Lane A's.
+- New this session: `packages/shared/src/workout/derive-session-rpe.ts`,
+  `packages/shared/src/health/workout-energy.ts` (`isPlausibleSessionDuration` — **the** copy; three
+  divergent ones were consolidated into it, so do not add a fourth).
 - `components/nutrition/meal-label-*` is **Lane B's** — hand it back.
 
 ## Findings, so they are not re-derived
 
-*Inherited, and none is recorded elsewhere. They are durable knowledge rather than state — the next
-handoff should move them out (Oura → `docs/oura-ble-operations.md`) instead of carrying them again.*
+*Inherited on its fourth baton, and still recorded nowhere else. **Move the Oura half to
+[`docs/oura-ble-operations.md`](../../oura-ble-operations.md) rather than carrying it a fifth time.***
 
 - **Raw frames:** read only via `slices/oura-raw-frames.ts` (a hot-only read silently returns 7 days);
   an aggregate cannot use its dedupe — anti-join on `(epoch, tag, ds_bucket)`.
   `oura_raw_samples.measured_at` and `event_name` are **dead columns**, owner-gated to drop. A ds
-  regression is **not** a ring-clock reset (Q-314) — a re-drain makes one.
+  regression is **not** a ring-clock reset (Q-314) — a re-drain makes one. The packer's phase-3
+  delete goes by **row id**, never by the bucket's ds range: a frame arriving between the select and
+  the delete was previously removed having never been packed, i.e. in neither tier.
 - **Security:** the `VACUUM FULL` allowlist is a boundary, not validation — `hasOwnProperty`, never
   `in`. **DNS rebinding is NOT closed in `fetchPublicUrl`**: the address is validated, then the
   hostname is connected to by name; closing it needs a pinned-IP connect undici does not expose.
+- **`claude_ro` needs no manual step.** Views scope on
+  `current_setting('app.claude_ro_owner', true)`, set at boot by `bootstrapClaudeRoOwner()` — no
+  `ALTER ROLE`. Verified in production: setting configured, 85 views, rows returned. It is
+  **row-scoped to one user**, so every count from `/api/admin/db-query` is *the owner's* — write
+  findings as "none of the owner's", never "nothing is failing".
 - **Sandbox limits:** `computeActiveEnergy` cannot run here via a complete-profile `energy-balance`
   request (a vendored constants file object storage will not serve) — true on `main` too. A stale
   local DB looks like a code defect: `setup.sh` will not re-seed a non-empty one, drop

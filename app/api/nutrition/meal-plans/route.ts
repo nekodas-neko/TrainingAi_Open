@@ -31,7 +31,7 @@ const MealSchema = z.object({
   // so swapping one meal meant rebuilding the plan.
   ingredients: NutritionIngredientsSchema.optional(),
   suggestedTime: z.string().regex(/^\d{1,2}:\d{2}$/).nullable().optional(),
-})
+}).strict()
 
 const VariantSchema = z.object({
   dayType: z.enum(['all', 'training', 'rest']),
@@ -40,7 +40,7 @@ const VariantSchema = z.object({
   targetCarbsG: z.number().min(0).max(2000),
   targetFatG: z.number().min(0).max(2000),
   meals: z.array(MealSchema).min(1).max(20),
-})
+}).strict()
 
 const CreateSchema = z.object({
   name: z.string().min(1).max(120),
@@ -56,12 +56,12 @@ const CreateSchema = z.object({
     code: z.string().max(60),
     label: z.string().max(120),
     severity: z.enum(['avoid', 'allergy']),
-  })).max(60).optional(),
+  }).strict()).max(60).optional(),
   avoidNote: z.string().max(2000).nullable().optional(),
   // 'all' alone, or the training/rest pair — never a partial split.
   variants: z.array(VariantSchema).min(1).max(2),
   activate: z.boolean().optional(),
-})
+}).strict()
 
 export async function GET() {
   const session = await auth()

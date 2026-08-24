@@ -21,7 +21,7 @@ export async function DELETE(req: NextRequest) {
       ? NextResponse.json({ error: 'Request too large' }, { status: 413 })
       : NextResponse.json({ error: 'Invalid body' }, { status: 400 });
   }
-  const parsed = z.object({ workoutSessionId: z.string().uuid() }).safeParse(read.body);
+  const parsed = z.object({ workoutSessionId: z.string().uuid() }).strict().safeParse(read.body);
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }

@@ -6,6 +6,83 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.360.0",
+    date: "2026-08-24",
+    changes: [
+      "The Training Calendar's today marker now uses your own timezone setting instead of the device's — if you'd set a timezone other than Brisbane, it could highlight the wrong day.",
+    ],
+  },
+  {
+    version: "1.359.0",
+    date: "2026-08-24",
+    changes: [
+      "The Devices screen now says so when the ring has no key stored, instead of still showing it as synced from old data — this is when the ring actually can't sync at all, and the app was the last place that would tell you.",
+    ],
+  },
+  {
+    version: "1.358.0",
+    date: "2026-08-24",
+    changes: [
+      "Two collapse/expand buttons (the weights summary panel, the added-weight picker) now announce their open/closed state properly to screen readers.",
+    ],
+  },
+  {
+    version: "1.357.0",
+    date: "2026-08-24",
+    changes: [
+      "The end-of-workout “How hard was that session?” rating is gone — the app now works out how hard a session was from your own set ratings instead of asking you to judge the whole thing as one number.",
+    ],
+  },
+  {
+    version: "1.356.0",
+    date: "2026-08-24",
+    changes: [
+      "Two Health cards (HR Recovery Profile, Estimated 1RM) now say so when they can't load, instead of silently vanishing as if you had no data yet — including when you'd simply hit the app's own rate limit.",
+    ],
+  },
+  {
+    version: "1.355.0",
+    date: "2026-08-24",
+    changes: [
+      "A set with no recorded target reps can no longer nudge a prescription upward on RPE alone \u2014 it needed the same missing-data caution the app already applied when deciding whether to cut a prescription down.",
+    ],
+  },
+  {
+    version: "1.354.0",
+    date: "2026-08-24",
+    changes: [
+      "Estimated 1RM and prescribed weights are now a little more conservative on sets logged past about 6 reps with no set target \u2014 those were feeding the estimate at full strength instead of the same discount an AMRAP set already gets elsewhere, which meant a high-rep set without a specific target could push a prescription higher than it should.",
+    ],
+  },
+  {
+    version: "1.353.0",
+    date: "2026-08-24",
+    changes: [
+      "Pace now shows up on activities that have distance and duration but where nothing calculated it \u2014 32 of the last 39 logged walks and runs were missing it, which meant most of the efficiency chart was empty.",
+    ],
+  },
+  {
+    version: "1.352.0",
+    date: "2026-08-24",
+    changes: [
+      "Deleting an activity log that's already gone (a double-tap, or one already removed on another device) now behaves the same as before; deleting one that never belonged to you, or never existed, is now reported honestly instead of as a silent success.",
+    ],
+  },
+  {
+    version: "1.351.0",
+    date: "2026-08-24",
+    changes: [
+      "The admin ring debug page's Device Metrics sparklines now draw a night-only signal as a short line with visible gaps around it, instead of stretching a few hours of samples to fill the whole width like they ran all day.",
+    ],
+  },
+  {
+    version: "1.350.0",
+    date: "2026-08-24",
+    changes: [
+      "Deleting a logged activity now works with no connection. It was the one activity write that went straight to the server with nothing queued behind it, so offline it just failed \u2014 everything else about an activity, including creating it, already went through the offline queue.",
+    ],
+  },
+  {
     version: "1.349.0",
     date: "2026-08-24",
     changes: [

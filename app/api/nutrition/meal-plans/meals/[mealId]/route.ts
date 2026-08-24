@@ -33,7 +33,7 @@ const PatchSchema = z.object({
    * that has already scaled them wants.
    */
   scaleToTarget: z.boolean().optional(),
-})
+}).strict()
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ mealId: string }> }) {
   const session = await auth()
