@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.362.0",
+    date: "2026-08-24",
+    changes: [
+      "The workout picker and the workout screens now work out what day it is from your own timezone rather than the app's default, so the recommended session, the morning check-in prompt and the day-review banner all land on the right day when you're not in Brisbane.",
+    ],
+  },
+  {
     version: "1.361.0",
     date: "2026-08-24",
     changes: [
