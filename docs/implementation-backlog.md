@@ -416,44 +416,207 @@ Close this when all five are under ~150 lines.
 (below BF-10/BF-4/LA-21/Q-420/Q-422/Q-406/Q-395abc) to sit right after the standing coordination
 entry. Queue position is priority; nothing else about either entry changed in this move.
 
-### [nutrition] BF-11 — the meal creator and meal planner need a coordinated redesign; the owner and BugFix worked out the shape together
+### [nutrition] BF-11 — the meal creator/planner redesign: the spec every phase reads, and the final checkpoint
 
-- **Lane: B**, one item needs a migration (see below). **Feature request — this entry plus its
-  linked spec are the trace and the settled design, not an implementation plan.** A planning session
-  still turns this into implementation plan(s) before Lane B builds it, per the backlog protocol.
+- **Needs:** BF-11h
+- **Not a work item.** Split into eight phases 2026-08-24 (BF-11a…BF-11h below), the way Q-395 was.
+  This entry is the spec pointer and the closing checkpoint: strike it when every phase has shipped
+  *and* the whole flow has been walked once on the S25 — creating a meal from a recipe URL, from a
+  multi-dish photo, and generating a plan that draws on the library.
 - **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
   think this needs to be moved 'create a meal' then the meal builder can reference previously made
-  meals."* Grew across three more owner messages, same session, into a full design for both the
-  meal creator and the meal planner's generation logic — BugFix traced each piece against current
-  code live as the owner described it, confirming what already exists, what's a real gap, and
-  reaching agreement on the open calls.
-- **Full design: [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).**
-  Read that doc before planning this — it has the complete trace (file/line citations for every
-  claim), what's already built vs. genuinely missing, and the owner's decisions on each open
-  question. Summary only, here:
-  - **Meal Creator** (`saved-meals-sheet.tsx` "Build a Meal"): move the URL-recipe scan there from
-    the wizard (original ask); add multi-item detection so one scan can produce several meals; wire
-    in the existing food-item History list (`capture-step.tsx`) as a quick-add source; PDF upload
-    descoped (screenshot-as-image instead); duplicate-detection on scan agreed as designed.
-  - **Meal Planner** (`generate/route.ts` + `meal-plan-review-step.tsx`): reorder generation to
-    search the saved-meal library for each slot before falling back to AI; lift/redesign the
-    6-meal `keepSavedMealIds` cap for a "use my whole library" mode; add a meal-type/tag system so
-    slot-matching isn't macro-blind (pancakes ≠ dinner) — **recommends reusing `MealType`
-    (`packages/shared/src/types/nutrition.ts`) via a new `SavedMeal`↔`MealType` join, which needs a
-    migration Lane A numbers when this is planned**; extend reroll to offer a library swap before
-    AI regeneration; surface "why this meal was picked" so edits/rerolls have context; redesign the
-    meal-count-change prompt (inspired by but NOT reusing `MealTypeReassignDialog`'s mechanism,
-    which moves logged history — this needs to redistribute an in-progress draft instead).
-  - **Owner's priority, explicit:** Meal Creator ships first, on its own merits; Planner integration
-    depends on it and comes after.
-  - **Still open for the planning session** (not decided in the design conversation): the
-    no-library-match fallback (prompt-to-create vs. AI-fallback), the exact meal-count-change
-    interaction, and the upper bound for "select all" against a large library.
-- **Overlap with Q-407, not a duplicate of it.** Q-407 (below) reworks the *whole* wizard into a
-  coach conversation and does not address scanning location or planner matching logic. Whoever plans
-  either should read the other first — if Q-407 lands first, its Meals step should be designed as a
-  **picker over saved meals** from the start, per this entry's design.
-- **Surface:** web-reproducible, no device needed. Item requiring a migration is server-side only.
+  meals."* Grew across three more owner messages, same session, into a full design for both halves.
+- **The design (decisions, owner's words, file/line trace):**
+  [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).
+- **The plans (build order, resolved open calls, verification):**
+  - Part 1 — [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md)
+  - Part 2 — [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md)
+- **Owner's sequencing is binding:** the Meal Creator (BF-11a…d) ships first and on its own merits;
+  the Planner integration (BF-11e…h) comes after and depends on it.
+- **The three open calls the design left to planning are RESOLVED** — reasoning in Part 2 §3, so
+  nobody re-litigates them. In short: the no-match fallback is **AI generation, labelled** (not
+  prompt-to-create, which would strand a half-built wizard); the meal-count prompt fires **only when
+  a pin would be dropped**, and there is **nothing to "transfer"** because the split derives from the
+  day's totals rather than the sum of the slots; and "select all" is **`useLibrary: boolean`**, not a
+  list, because the route already reads the library server-side. **None needed the owner.**
+- **⚠ Two live defects found while planning, in the path BF-11h rewrites.** Lower the meal count
+  after picking meals (the picker's `maxKeepable` guard only holds going forward) and
+  `generate/route.ts` puts a **negative number in the prompt** (`Meals: exactly -1`) and **silently
+  discards** every pinned meal past the slot count — `names[i]` is never read beyond `slots.length`.
+  Part 2 §2 has the trace. It is the mechanism behind the owner's *"it's gotta prompt you
+  somewhere"*, and it is a silent drop, not just a missing prompt.
+- **Overlap with Q-407 (below), not a duplicate.** Q-407 reworks the whole wizard into a coach
+  conversation and touches neither scanning location nor planner matching. The engine phases
+  (BF-11e, BF-11g) are untouched by it either way, which is why they lead. Part 2 §6 has the
+  either-order rule.
+- **Collision with the parked Q-406 → Q-395a/b/c chain** (that chain is `Gate: owner` — its
+  reference drawings were never committed). Part 1 §8 has the file-by-file collision table and the
+  carry-across rule. **Do not plan around that chain landing, and do not wait for it.**
+
+### [nutrition] BF-11a — extract Build a Meal's ingredient picker so the rest of Part 1 can land
+
+- **Lane:** B
+- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §3
+- **Branch:** `refactor/ingredient-picker-extract`
+- **Added:** 2026-08-24 · planning session, from BF-11.
+- **No behaviour change — that is the point.** `components/nutrition/saved-meals-sheet.tsx` is at
+  **774 lines against the 800 ceiling** and is *not* one of `check-component-size.js`'s five recorded
+  hotspots, so it fails CI the moment it crosses. Four features land in it in BF-11c/d. Extraction is
+  the precondition, not the cleanup — which is why it is its own entry rather than a first commit
+  somebody skips under time pressure.
+- **Extract the ingredient-acquisition half** (search, Open Food Facts results, the AI text estimate,
+  add-by-hand) and **carry its comments** — three are load-bearing incident records: the two separate
+  search effects and why chaining them was wrong, the 700 ms OFF debounce vs the 250 ms one (OFF
+  rate-limits ~10/min), and `addExternalFood`'s `source: 'text'` (a name search is not a barcode).
+- **Target:** under ~600 lines, so BF-11c and BF-11d do not need a second extraction mid-flight.
+- **Also helps Q-395a**, which edits the same form and is currently blocked on drawings.
+
+### [nutrition] BF-11b — the scan route returns N candidate meals instead of one
+
+- **Lane:** A
+- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §4
+- **Branch:** `feat/scan-multi-candidate`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 2).
+- **Lane A by the §3 rule, not by BF-11's old `Lane: B` line** — `app/api/nutrition/scan/route.ts` is
+  reached by `app/api/**`. The engine half lands before the UI that consumes it.
+- **`ScanSchema` returns exactly one `name` + one `ingredients[]` for every input mode today.** A
+  week of meal-prep containers, or a "5 lunches" roundup page, is forced into one merged estimate.
+- **Additive, not breaking.** Four call sites read the current shape (`capture-step.tsx`,
+  `review-step.tsx`, `meal-backfill-section.tsx`, `saved-meals-sheet.tsx`); three of them are
+  single-dish by nature. Keep the top level as-is (= `candidates[0]`) and add `candidates` alongside.
+  **Do not flip the top level to an array.**
+- **The risk is the splitting decision, not the macros:** one plated curry-rice-naan is **one** meal;
+  five labelled tubs are five. Pin it with fixture tests asserting candidate **counts and names**,
+  never calories, or the test becomes a model snapshot that fails on every prompt tweak.
+- Cap candidates at 8; `identified: false` still returns none; the URL branch's `recipeYield` divide
+  is **per candidate**.
+
+### [nutrition] BF-11c — Build a Meal gains the recipe URL, the candidate picker and History quick-add
+
+- **Lane:** B
+- **Needs:** BF-11a, BF-11b
+- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §5
+- **Branch:** `feat/build-a-meal-add-methods`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design items 1, 2, 3). **This is BF-11's
+  original ask** — the recipe-URL scan reachable without starting the whole plan wizard.
+- **Three add-methods beside the existing search; none replaces anything.** (a) an `https:` URL →
+  whole recipe; (b) a multi-candidate list when a scan returns several dishes, each kept one becoming
+  **its own** saved meal; (c) the food-item **History** list Log Food already has
+  (`capture-step.tsx:245`) as the default state before you type — **reuse that source, do not build a
+  second one.**
+- **⚠ The unstated-yield case is not cosmetic.** `recipeYield: null` means the payload is the WHOLE
+  recipe — a banana-bread page measured **1,956 kcal for the loaf**. Reuse `my-meals-picker.tsx`'s
+  handling and the shared `perServing`, so the two divides cannot drift.
+- **One real difference from the wizard's version:** a "makes 12" recipe lands as `servings: 12` with
+  the whole recipe's items, **not** pre-divided — `SavedMeal.totals` is the whole recipe by contract
+  and `oneServingItems()` is the one place that divides. Pre-dividing here double-divides on log.
+- **Check before reusing `food-row.tsx`**: its only trailing element is a chevron, and a candidate row
+  needs keep/discard. Q-406 records that adding slots for per-row controls is what turns that row into
+  a wrapper rather than a unification — extend it deliberately or draw the candidate list separately
+  and say which.
+
+### [nutrition] BF-11d — a scan that duplicates an existing meal asks instead of silently adding one
+
+- **Lane:** B
+- **Needs:** BF-11c
+- **Plan:** [`plans/2026-08-24-meal-creator.md`](superpowers/plans/2026-08-24-meal-creator.md) §6
+- **Branch:** `feat/saved-meal-duplicate-detection`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 5). Owner: *"happy to have this
+  workflow for now"* — build as designed, refine on use.
+- **"Close" already has a definition worth reusing rather than inventing:** `fitDistance`
+  (`packages/shared/src/nutrition/meal-macro-fit.ts`) reduces a macro comparison to one comparable
+  number and exists so two versions of the same meal can be compared without a second opinion about
+  "better". Pair it with a normalised name match and **require both** — macros alone match every
+  protein shake against every other one.
+- **It asks, never merges.** "Save as new" is one tap and is the safe default on dismissal. It runs on
+  save, not per keystroke.
+- **"Update it" must keep the existing id** — `meal_plan_meals.saved_meal_id` and the printed QR label
+  both reference it, so a new id orphans a label already stuck on a container.
+- May batch with BF-11c (one screen, one verification pass) if BF-11c's save path lands unchanged.
+
+### [nutrition] BF-11e — saved meals get meal-type tags, so slot matching is not macro-blind
+
+- **Lane:** A
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.1
+- **Branch:** `feat/saved-meal-meal-type-tags`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8). Owner: *"we don't want
+  pancakes recommended for dinner."*
+- **Reuse `MealType` as the vocabulary** rather than a parallel "category" concept — the user already
+  names and configures their own meal types, each with a time window, and a meal can be eligible for
+  several. New join table `saved_meal_meal_types`, composite PK, `saved_meal_id` cascading.
+- **⚠ Needs a Postgres migration. Lane A claims the number against the directory AND open PRs when it
+  builds** — the tree already carries four collided pairs and `migrate.js` applies in filename order.
+  The plan names the requirement, never the number.
+- **Three constraints the trace found, none obvious:** `meal_types` **soft-deletes**, so a join row can
+  point at a deleted type — filter on read rather than deleting join rows, so restoring a type
+  restores its tags; saved meals reach the device via **`hydrateSavedMeals`, not `getSyncDelta`**, so
+  tags ride the existing `listSavedMeals` response and there is no pull-delta branch; but the **push**
+  branch does exist (`adapter.ts:4175`), so route, outbox payload, `pushMutations` and the local table
+  all take tags **in the same PR**.
+- Local SQLite: new table registered in `RECONCILE_TABLES` in the same commit, plus a version bump.
+  Every `SavedMeal` mapper gains `mealTypeIds` — a missed mapper fails silently as "tags don't save".
+- **Never batch this** — it carries a migration.
+
+### [nutrition] BF-11f — tagging a meal from Build a Meal
+
+- **Lane:** B
+- **Needs:** BF-11e
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.2
+- **Branch:** `feat/saved-meal-tag-ui`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design item 8, UI half).
+- Multi-select chips of the user's live meal types in the build/edit form; reuse the wizard's existing
+  `ChipGroup` rather than drawing a fourth chip.
+- **An untagged meal is eligible for EVERY slot, not none** — the other way round silently shrinks
+  everyone's library to zero on the day it ships.
+- Independent of BF-11g; the two may run in parallel in different lanes.
+
+### [nutrition] BF-11g — the planner searches your saved meals before asking the AI
+
+- **Lane:** A
+- **Needs:** BF-11e
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.3
+- **Branch:** `feat/library-first-meal-plan`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design items 6, 7, 9, 10). **The core of Part
+  2.** Owner: *"it prefers meals already in the planner and adds other meals around it."*
+- **Today every non-pinned slot is a fresh AI recipe** — nothing reads the library. New order per
+  unpinned slot: filter by the slot's meal type (plus untagged) → rank by **`fitDistance`** → take the
+  best if `mealFit` says it is close enough → otherwise fall through to AI → either way through
+  `scaleWithTopUp`, unchanged.
+- **Do not write a second ranking function.** `fitDistance`/`mealFit`
+  (`packages/shared/src/nutrition/meal-macro-fit.ts`) is already the One-Formula-One-Place for "how
+  far is this meal from its target", relative rather than absolute, calories deliberately excluded.
+- **`useLibrary: boolean`, not a list of ids** — the route already calls `listSavedMeals(userId)`
+  server-side, so "use all my saved meals" costs zero payload and cannot name another user's meal.
+  **Keep `keepSavedMealIds.max(6)`**: it equals `MEAL_COUNT_MAX`, so it is not arbitrary. But
+  `listSavedMeals` is currently fetched only when pins exist — it must be fetched when either is set.
+- **⚠ New failure mode this change creates: a meal used twice in one day.** The "genuinely DIFFERENT
+  food" instruction constrains the *model*, and a library search never reaches the model. Track what
+  each slot consumed.
+- **Also fixes the §2 server half:** cap honoured pins at the slot count and **report the drop**,
+  so a client that skips BF-11h's prompt still gets a coherent plan instead of a silent discard.
+- `matchReason` on the response is not decoration — BF-11h's swap and the existing AI edit both need it.
+
+### [nutrition] BF-11h — the wizard surfaces the library, the reasons, and the meal-count prompt
+
+- **Lane:** B
+- **Needs:** BF-11f, BF-11g
+- **Plan:** [`plans/2026-08-24-library-first-meal-planner.md`](superpowers/plans/2026-08-24-library-first-meal-planner.md) §5.5
+- **Branch:** `feat/meal-plan-library-surface`
+- **Added:** 2026-08-24 · planning session, from BF-11 (design items 10, 11, 12).
+- Four things, one screen pair, one verification pass: a **"use all my saved meals"** toggle in the
+  *Yours* step (the existing checkboxes stay and keep meaning *pin* — the copy must distinguish
+  them); **"why this meal"** from `matchReason`, and its inverse on a fallback slot, which is the
+  useful half of the rejected prompt-to-create option; **reroll offers a library swap first**, AI
+  second; and the **meal-count reduction prompt**.
+- **⚠ The reduction prompt is fixing a live silent drop, not adding a nicety** — see BF-11 above and
+  Part 2 §2. It fires **only when `K > M − 1`** (pins exceed the slots left after the planner's
+  reserved one). Below that, re-run the split and say nothing: **there is nothing to "transfer"**,
+  because the split derives from the day's totals, so removing a slot redistributes automatically.
+  What the user loses is a meal *choice*, and that is what the prompt is about.
+- **Verify the regression, don't inspect it:** pick the maximum meals, go back, lower the count,
+  confirm the prompt fires and nothing is dropped. The failure is invisible from the UI.
+- Read Q-407 first (Part 2 §6) — it edits the same two files, and its instruction *"do not delete the
+  stepper in this PR"* holds here too.
 
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
