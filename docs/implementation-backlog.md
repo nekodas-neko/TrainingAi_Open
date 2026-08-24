@@ -623,6 +623,35 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
+### [workouts][platform] LA-21 — a workout session's duration is uncapped, so one left running poisons its load and its calories
+
+- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`.
+- **Branch:** `fix/cap-session-duration`
+- **Added:** 2026-08-24, found while shipping Q-420's derivation — the derived series made it visible
+  on nine points where it had been visible on one.
+- **Placement:** low-mid. Not a live corruption; it needs a session that was started and not ended,
+  and the owner's production rows do not currently show one. Filed because the failure is silent and
+  the number it produces is not obviously wrong at a glance.
+- **What.** `durationMin = (completedAt - startedAt) / 60_000` with **no upper bound anywhere**:
+  `app/api/health-trends/route.ts` (`sessionLoad = rpe × durationMin`), `estWorkoutKcal` and
+  `estSessionKcal` (`workout-energy.ts:113, 225`). Observed on the dev database: a session spanning
+  **1,176 minutes** produced `sessionLoad 10585` against a normal 440 — **24×** — and it would carry
+  the same factor into the calorie estimate and into anything reading the load series (ACWR, training
+  stress).
+- **Why it is not merely cosmetic:** ACWR is a ratio of recent to chronic load, so a single 24× point
+  distorts both windows for weeks, and it distorts them in the direction that reads as "you are
+  training far too hard".
+- **Fix shape:** one shared cap, not three — the same `One Formula, One Place` argument as everything
+  else in `workout-energy.ts`. Pick the bound from the data rather than from taste: the owner's real
+  sessions run 45–75 minutes, so a cap in the 3–4 hour region is far outside anything genuine while
+  still bounding the pathological case. Whether an over-cap session should be **clamped** or
+  **excluded** is the real decision — clamping keeps a data point that is partly fiction, excluding
+  loses a session that did happen. Excluding is probably right for the load series and clamping for
+  the calorie estimate, but decide it deliberately rather than by which is easier to write.
+- **Check first whether the workout screen can even produce one** — if an abandoned session is
+  auto-closed or discarded on the device, the reachable case is narrower than it looks and the entry
+  shrinks to the two energy call sites.
+
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
@@ -814,6 +843,32 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   RPE, visible and overridable; the value is the rounded mean of that session's rated sets, in set-RPE
   units, with its own intensity thresholds rather than Foster's; an override survives later set edits;
   and the result is checked against the 20 paired sessions for *plausibility* — not fitted to them.
+
+- 🚧 **THE DERIVATION SHIPPED 2026-08-24 (Lane A), and it needed NO migration and NO schema change.**
+  `packages/shared/src/workout/derive-session-rpe.ts` — `deriveSessionRpe` (rounded mean of the rated
+  sets, set-RPE units, nulls ignored rather than counted as zero) and `sessionEffort`, which returns
+  `{ rpe, source: 'self' | 'derived' }` with a self-reported rating always winning.
+  `app/api/health-trends` consumes it and each series point carries its `source`.
+  **⚠️ THIS ENTRY PRESCRIBED A STORED COLUMN PLUS A SOURCE FLAG PLUS A RE-DERIVE RULE, AND ALL THREE
+  TURNED OUT TO BE AVOIDABLE.** Deriving on READ removes them together: `session_rpe` stays purely
+  self-reported, so "overridden" is just "that column is non-null"; a derived value cannot drift from
+  the sets because it is recomputed from them every time; and a later set edit is reflected for free,
+  which is the whole of the owner's *"can be overwritten if needed"*. CLAUDE.md's **Stored Counters**
+  rule says exactly this — every stored counter in this project has drifted, derive at read time —
+  and the entry's own worry about a re-derive eating a manual correction is that drift, predicted.
+  **It costs nothing:** `getWorkoutSessionsFrom` already hydrates each session's set logs, so there is
+  no extra query. Measured on the dev database: the `session-rpe` series went from **0 points to 10**
+  (9 derived, 1 self-reported), insight line *"10 sessions rated so far (9 from set ratings)"*.
+- **What is still open on this entry:**
+  - **The user-facing prompt removal** (`done-screen.tsx:398`) — **Lane B**, and it is item 1 of the
+    owner's decision. The derivation exists now, so removing the prompt no longer loses anything.
+  - **`intensityFromRpe` still applies Foster's ≤4/≥8 thresholds to a set-scale number.** The entry
+    is right that a derived value needs its own thresholds, and picking them is a **scoring change** —
+    Tuning proposes, the owner signs off. Deliberately not done here, which is why the derived value
+    is not yet wired into the energy path.
+  - **The HR + derived-intensity combination is Q-422's**, not this entry's, and it is `Gate: owner`.
+- **Keep:** the prompt removal, the derived-scale thresholds, and the plausibility check against the
+  20 paired sessions.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
@@ -3349,27 +3404,6 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   `event_name` drop alone**, and that is a data-dropping migration: it needs the owner's yes before
   it merges, even though the column is derivable from `tag` and no reader has touched it since
   Q-541 Task 7.
-
-### [devices][platform] Q-542 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6, §7b
-- **Added:** 2026-08-17 · **Answered the same day.** No longer blocking anything.
-- **The owner chose A + B + C — index audit, row narrowing, repack. Options D and E are declined.**
-  Nothing irreversible is being done: every chosen step preserves `body_hex` byte for byte, so the
-  `CLAUDE.md` archival rule stands unchanged and needs no rewrite.
-- **The reframing the decision rested on:** the archival rule protects `body_hex`, which is **26 MB of
-  the 360 MB table — 7.3%**. The rest is indexes and row overhead, all reversible. So the expensive
-  thing and the irreplaceable thing were never the same thing.
-- **The `disk_full` incident (Q-534) did not change this and must not be read as forcing it.** That
-  was a bloat event from a full `measured_at` re-stamp, not growth; **§6 A would have prevented it and
-  neither D nor E would have.** Against the stock 500 MB target the non-destructive path alone reaches
-  ~260 MB and, with C, holds it for years.
-- **Also settled:** D4 remains the destination with **no deadline**, which lapses decision O1 and
-  unblocks Q-540. The 2026-08-02 retention decision justified the 14-day device tier *because* the
-  server keeps `body_hex` forever — that premise now holds indefinitely, so the tier needs no revision.
-- **Remove this entry** once Q-534/Q-540/Q-541 are all closed; it carries no work of its own.
-
-
 
 ### [devices][app-shell] Q-533 — the drain now reports its own ending; nobody has seen it do so
 
