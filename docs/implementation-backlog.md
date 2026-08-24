@@ -1420,6 +1420,52 @@ whether or not anyone draws them first.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
 
+### [nutrition] BF-11 — recipe-URL scan only exists inside the meal-plan wizard; the owner wants it on "create a meal" instead, with the wizard referencing the result
+
+- **Lane: B.** `components/nutrition/my-meals-picker.tsx`, `components/nutrition/saved-meals-sheet.tsx`,
+  `components/nutrition/meal-plan-setup-sheet.tsx`. No schema. **Feature request — this entry is the
+  trace, not a plan.** A planning session still needs to write the implementation plan before Lane B
+  builds it, per the backlog protocol.
+- **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
+  think this needs to be moved 'create a meal' then the meal builder can reference previously made
+  meals."*
+- **Traced — the owner's read of where the feature lives is exactly right.**
+  `/api/nutrition/scan` accepts `{ text }`, `{ image }` or, since Q-409, `{ url }` — a whole recipe
+  in one call. The **only** call site that ever sends `{ url }` is
+  `my-meals-picker.tsx` (`docs/overview/entries/2026-08-24-recipe-url-to-meal-ui.md`), which is
+  itself reachable from exactly one place: the **"Meals" step of the meal-plan wizard**
+  (`meal-plan-setup-sheet.tsx`, `STEPS = ['Stores','Avoid','Skip','Meals','Yours','Training','Review']`).
+  To turn a recipe link into a meal today you start the whole plan wizard, work through Stores/Avoid/
+  Skip to reach the Meals step, scan the URL there, and it only becomes a reusable saved meal if you
+  finish the wizard to Review and hit **Save to My Meals** / **Save all** (Q-398). There is no path
+  from Nutrition → Saved Meals → **New Meal** (`saved-meals-sheet.tsx`'s "Build a Meal" screen — the
+  actual general-purpose meal-creation UI) to a URL scan at all.
+- **"Build a Meal" already calls the same scan route, but only in a narrower mode.**
+  `saved-meals-sheet.tsx:241-271` (`estimateAndAdd`) posts `{ text }` to add **one** ingredient at a
+  time by AI estimate — it has no URL field and no whole-recipe path. So the gap is not "Build a Meal
+  can't scan" — it already can, for single items — it's that the *recipe* mode (URL → several
+  ingredients, ask-if-no-yield, keep/discard) exists only in the wizard's picker.
+- **The wizard step is not purely a scanner today — it is already half a picker.** `my-meals-picker`
+  takes `selectedIds: string[]` of existing `SavedMeal`s alongside `typedMeals` (freshly
+  typed/scanned entries) — so the Meals step already blends "pick from your library" and "create
+  something new" in one screen. The owner's ask is to un-blend it: creation (especially the
+  URL-recipe path) becomes "Build a Meal"'s job, since that is the one general-purpose place a
+  scanned meal is born as a first-class saved meal with no wizard required around it; the wizard step
+  narrows to picking from the resulting library, the way `selectedIds` already half-does.
+- **Overlap with Q-407, not a duplicate of it.** Q-407 (queued, above this entry once inserted)
+  reworks the *whole* wizard into a coach conversation and explicitly plans to keep the Meals step's
+  shape unless it says otherwise — it does not address where scanning lives. Whoever plans this
+  should read Q-407 first: if Q-407 lands first, the Meals step becomes a widget and this entry's
+  "wizard references saved meals" half may fall out of that redesign directly, leaving only the
+  "move URL scan into Build a Meal" half to do. If this lands first, Q-407's plan should design the
+  Meals step as a **picker over saved meals**, not a scanner, from the start.
+- **What a plan needs to settle, not decided here:** (1) does `estimateAndAdd`'s single-item path
+  gain a URL/whole-recipe mode, or does "Build a Meal" grow a second entry point for it; (2) what
+  happens to a URL-scanned recipe's per-serving question (Q-409's "how many does it serve" ask) in a
+  context with no wizard footer to hold state across; (3) whether the wizard's Meals step keeps
+  *any* create-new affordance or becomes pure-picker with a "New Meal" handoff to Build a Meal.
+- **Surface:** web-reproducible, no device needed — this is a screen-placement question, not native.
+
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
