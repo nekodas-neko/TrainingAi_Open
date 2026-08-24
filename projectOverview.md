@@ -27,6 +27,11 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Disk maintenance works from a desktop again (Q-544).** The DB-footprint card and the device-metrics
+panel touch no plugin, but sat after `OuraBleDebug`'s native early-return — so reclaiming disk needed
+the APK, the one client `VACUUM FULL`'s exclusive lock blocks, and was impossible while the APK was
+broken. Both moved above it. `Gate: device`.
+
 **The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
 it. Its confirm copy deliberately does not read like the lossless VACUUM one — it is the only
 control here that DELETEs archival frames — and a refused bucket is listed with its reason rather
@@ -120,20 +125,18 @@ allowed — its callbacks take the meal and hand it back, so the parent shares o
 every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued
 and dropped server-side. **Three** sheets, not the one the entry named.
 
-**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed
-six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it (55 steps).
+**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
 
 **The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven
-weeks** (0 of 55 `day_checkins` rows), and the calibration excludes an unmarked day rather than
-treating it as light — so a control nobody reached withheld the feature outright.
+weeks**, and the calibration excludes an unmarked day rather than treating it as light.
 
 **A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the
-card under it read "Deload session · Auto-applied" and the header showed no marker — the owner
-trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
+card under it read "Deload session" — the owner trained one believing it was full. Both asked
+`isDeloadActive` (the PHASE), not today's session.
 
-**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands
-back the **whole recipe** — 1,956 kcal for a banana-bread loaf — so the row asks how many it serves
-and cannot be kept until answered; `perServing` is shared with the route so the divides cannot drift.
+**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back
+the **whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept
+until answered.
 
 **Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px
 WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
@@ -151,15 +154,12 @@ version demonstrably drops the other device's key mid-merge. **Nothing the owner
 the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
 
 **The UTC-offset fixture sweep came back clean, and found something else (Q-394, LA-19 — both
-closed).** No third test carries the hazard that took out two PRs, but one *correctly written* test
-failed because the code under it re-derived midnight in Brisbane: `aestMidnight` takes a timezone
-and only **9 of 22** call sites passed one. All 22 do now, `check-aest-midnight-timezone.js` holds
-it at zero (empty baseline). Proven by the experiment that found it — 18/18 under a shifted tz.
+closed).** One *correctly written* test failed because the code under it re-derived midnight in
+Brisbane: `aestMidnight` takes a timezone and only **9 of 22** call sites passed one. All 22 do now.
 
 **`DELETE /api/activity-logs` stopped reporting success for a delete that deleted nothing (Q-556).**
 Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or
-not-yours id, matching every sibling delete, while a double-tap or an already-gone row still matches
-and reports success. The web fallback treats a 404 the same as success rather than throwing.
+not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
 
 **Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
 `Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day rather than
