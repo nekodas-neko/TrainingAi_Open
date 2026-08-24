@@ -8,10 +8,9 @@
 ## Now
 **Open: the Q-486 PR.** Everything else this run merged — #353, #355, #358, #359, #361.
 
-**Q-486 touches `lib/local-store/dead-letter-signal.ts`, a Lane A path, and the claim is recorded
-here.** Its backlog entry assigns Lane B and names that file as the mechanism to route through, and
-the four call sites it fixes are in `components/workout-screen.tsx`. Release the claim when the
-branch merges.
+**Q-486 touches `lib/local-store/dead-letter-signal.ts`, a Lane A path — claimed here.** Its backlog
+entry assigns Lane B and names that file as the mechanism; the four sites it fixes are in
+`components/workout-screen.tsx`. Release the claim when the branch merges.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
