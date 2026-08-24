@@ -19,7 +19,7 @@ import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { invalidateSavedMeals } from '@/lib/cache-groups'
 import { TTL_MEDIUM, TTL_LONG } from '@trainingai/shared/cache-ttl'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { SavedMealCard } from './saved-meal-card'
 import { MealPhotoTile } from './meal-photo-tile'
 import { usePlanSavedMealIds } from '@/lib/hooks/use-plan-saved-meal-ids'
@@ -377,7 +377,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(), payload: { id: mealId, name, items, servings: mealServings, imageDataUri: mealImage } })
         await invalidateSavedMeals()
         setMeals(await store.getSavedMeals())
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateSavedMeals)
         savedLocally = true
         // Without this the throw reached the outer catch and reported a failed save, never trying
         // the server write in the arm below.
@@ -468,7 +468,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
         await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(), payload: { id: meal.id, deleted: true } })
         await invalidateSavedMeals()
         setMeals(prev => prev.filter(m => m.id !== meal.id))
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateSavedMeals)
       } else {
         const res = await fetch(`/api/nutrition/saved-meals/${meal.id}`, { method: 'DELETE' })
         if (!res.ok) throw new Error()

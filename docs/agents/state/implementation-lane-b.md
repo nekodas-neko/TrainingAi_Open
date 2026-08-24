@@ -3,41 +3,38 @@
 > **Successor sessions are titled `🚧 Implementation Agent (B) 🟢`** — exactly, emoji included. That
 > title is how six concurrent sessions stay tellable apart; a renamed successor is a lost thread.
 
-**Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-5`
+**Updated:** 2026-08-24 · **By:** the eighth Lane B run · **Next ID:** `LB-8`
 
 ## Now
-**#354** (BF-6) is open. Everything before it merged — #331, #332, #333, #338, #346, #353.
+**Open: the Q-486 PR.** Everything else this run merged — #353, #355, #358, #359, #361.
+
+**Q-486 touches `lib/local-store/dead-letter-signal.ts`, a Lane A path, and the claim is recorded
+here.** Its backlog entry assigns Lane B and names that file as the mechanism to route through, and
+the four call sites it fixes are in `components/workout-screen.tsx`. Release the claim when the
+branch merges.
 
 ## This run (2026-08-23/24) — each has a journal entry in `docs/overview/entries/`
 
-- **Q-362b** (#296) — day surfaces group by session **id**; its guard asserts on the **durations,
-  not the card count** (two cards appeared before the fix, both showing 82 min).
-- **Q-421** (#300) — a workout's kcal names its basis: `Est. HR kcal` / `Est. MET kcal`.
-- **BF-4's Lane B half** (#311) — scan photo bounded to 1024 px, **−86.6%**. **NOT shown to be the
-  owner's slowdown**; #112 and the cold-start check stay open, and are Lane A's.
-- **Q-326** (#313) — deleting a meal type with entries offers the move, not a refusal.
-- **LB-1** (#316) — edit/delete for logged training, back on `/health/day`. `day-overlay-sheet.tsx`
-  deliberately **not** deleted — **LB-3**.
-- **Q-415/Q-417** (#320) — one calorie budget, from `budgetProvenance(...).total`. Found **LB-4**.
-- **Q-323's display half** (#326) — the bar fills toward a goal notch. Its item (1) said "the macro
-  ring" but described **Home's** donut.
-- **Q-387's Lane B half** (#330) — "I've finished logging" + Undo + the N-of-10 counter. **Q-359
-  closed with it.**
-- **Q-406** (#331) — `FoodRow`; the diary row and the external-search row deliberately **not**
-  converted (that would delete the only way to correct a logged food before Q-395a exists).
-- **Q-418's screen half** (#332) — HR, steps and elevation on the free walk. The pill stays Lane A.
-- **BF-6** (#354) — the finished-logging control moves above End of Day. **Zero presses in seven
+- **Merged and journalled, no state owed:** Q-362b (#296), Q-421 (#300), BF-4's Lane B half (#311),
+  Q-326 (#313), LB-1 (#316), Q-415/Q-417 (#320), Q-323's display half (#326), Q-387's Lane B half
+  (#330), Q-406 (#331), Q-418's screen half (#332). Read their entries in `docs/overview/entries/`
+  rather than re-deriving any of it. **Two carry a deliberate NOT-done:** `day-overlay-sheet.tsx`
+  survives for **LB-3**, and Q-406's last two call sites wait on Q-395a's missing drawings.
+- **LB-6** (#361) — sixteen writes revalidated around their push, not after it. The entry said six;
+  its finder looked only at the six lines ABOVE each call. Custom Rules is **55**.
+- **Q-486** — the four swallowed `queueMutation` calls warn and toast. **The entry's fix shape was
+  wrong and not followed:** the badge counts outbox ROWS the Data & Sync card retries or discards,
+  and a throw leaves no row. **Its Known-Issues row and backlog `Keep:` both stay** — the failure
+  needs a broken local SQLite on a device, so the fix is read, not observed.
+- **BF-6** (#355) — the finished-logging control moves above End of Day. **Zero presses in seven
   weeks**, and the calibration excludes an unmarked day rather than treating it as light.
 - **BF-8** (#353) — a deload session says so on both workout surfaces. Owner-confirmed: he trained
   one believing it was full. Both asked `isDeloadActive` (the PHASE) rather than today's session.
-- **Q-409's Lane B half** (#346) — a recipe link becomes a meal; an unstated yield is ASKED about
-  rather than assumed to be one plate.
-- **Q-327** (#338) — the meal photo tile, the half Q-396's column had been waiting for.
-- **Q-398** (#333) — plan meals become saved meals, idempotent on the existing `saved_meal_id`.
-  **It uncovered a live outage:** five `app/api/nutrition/meal-plan*` routes read the request body
-  and then validated an unassigned `raw`, so the whole meal-plan write surface answered 400 to every
-  request. Fixed in that PR (Lane A paths, taken deliberately) with
-  `scripts/check-json-body-parsed.js` holding the class shut. Custom Rules is **53**.
+- **Q-409's Lane B half** (#346), **Q-327** (#338) — a recipe link becomes a meal (unstated yield is
+  ASKED about, not assumed one plate); the meal photo tile Q-396's column was waiting for.
+- **Q-398** (#333) — plan meals become saved meals. **It uncovered a live outage:** five
+  `app/api/nutrition/meal-plan*` routes validated an unassigned `raw`, so the whole meal-plan write
+  surface answered 400 to every request. Fixed there, with `scripts/check-json-body-parsed.js`.
 
 ## Next
 `node scripts/next-item.js --lane B`, and **re-verify the premise first** — most entries taken this
@@ -106,3 +103,7 @@ log-plan-meal}.ts`, one line of `lib/cache-groups.ts`, and the five meal-plan AP
 - **The sandbox serves the MET table as SYNTHETIC fixtures**, so any activity's energy estimate is
   **0** here. Seed a session plus a `workout_hr_stats` row with `avg_bpm` for a real earned figure.
 - **Mutation-check every guard**, and check what a passing assertion would ACCEPT.
+- **Two `page.route` rules, both from #359 and both now in `e2e/README.md`:** never `expect` inside
+  the handler (a throw skips `fulfill` and breaks the request you are asserting about), and stubbing
+  an `/api/` route needs `serviceWorkers: 'block'` — the SW re-issues those and Playwright never
+  sees them.

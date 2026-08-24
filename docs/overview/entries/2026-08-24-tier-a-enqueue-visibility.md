@@ -1,6 +1,6 @@
 # The last line of defence stopped failing silently (Q-486)
 
-**Branch:** `fix/tier-a-enqueue-visibility` · **Lane B** · v1.345.0
+**Branch:** `fix/tier-a-enqueue-visibility` · **Lane B** · v1.346.0
 
 ## What was wrong
 

@@ -987,42 +987,6 @@ residual into a correction rather than a mystery.
   than trust the line. Same class as the over-counting scanner it sits beside, and the reason the
   run line prints computed totals.
 
-### [nutrition][platform][app-shell] LB-6 — six more write paths invalidate before the push, same as LB-4
-
-- **Lane:** B
-- **Branch:** `fix/invalidate-after-push-sweep`
-- **Added:** 2026-08-23, from LB-4's sibling sweep. LB-4 fixed the three engine paths
-  (`log-food`, `log-meal`, `create-food-item`) and left these, which are all `components/**`.
-- **The bug, once:** invalidating *before* a fire-and-forget `pushMutations` makes every
-  `useCachedValue` subscriber refetch while the server still holds the pre-write state, and
-  **re-cache it**. Nothing invalidates again, so the stale value stands for the key's full TTL.
-  Home's Energy Balance card read 42 kcal high for exactly this reason.
-- **The fix is one line each — the helper already exists.** Replace
-  `pushMutations(userId!).catch(() => {})` with
-  `pushThenRevalidate(userId!, <the same invalidator>)` from
-  `@/lib/local-store/push-then-revalidate`. Keep the immediate invalidation: offline it is the
-  only one that will ever fire, which is why moving the single call later would be wrong.
-
-| file | line | invalidator to pass |
-|---|---|---|
-| `components/activity/done-activity-screen.tsx` | 263 | the one already called above it |
-| `components/guided-walk/walk-summary.tsx` | 194 | ″ |
-| `components/fitness-tests/test-result.tsx` | 113 | ″ |
-| `components/nutrition/quick-edit-log-sheet.tsx` | 71 | `invalidateNutritionWrite` |
-| `components/nutrition/saved-meals-sheet.tsx` | 371 | `invalidateSavedMeals` |
-| `components/nutrition/saved-meals-sheet.tsx` | 462 | ″ |
-
-- **⚠ Line numbers are from 2026-08-23 and will drift.** The reliable finder is a `pushMutations(`
-  call with an `invalidate…(` within the six lines above it; `app/nutrition/nutrition-content.tsx`
-  is the shape to copy *toward*, not a hit — its delete path already invalidates after the push.
-- **⚠ Not every hit is necessarily load-bearing.** Per CLAUDE.md's "what makes an invalidation
-  load-bearing", a stale entry only *settles* where a call site passes `freshWithinTtl: true` or a
-  read path is seed-only. Convert all six anyway — the cost is one line and the condition changes
-  the moment someone adds `freshWithinTtl` — but do not report a user-visible fix for one that was
-  inert without checking which.
-- **What would count as done:** all six converted, and `grep` for the shape returns only the
-  engine's three (already converted) plus the sheets you just changed.
-
 ### [nutrition][platform] LB-7 — the recipe spec's attribution assertion can pass with no attribution
 
 > **⚠️ REWRITTEN 2026-08-24 — the diagnosis below was wrong about the cause, and the blocking failure
@@ -1996,7 +1960,7 @@ this fits without an extraction.
 
 ### [workouts][devices] Q-486 — the outbox enqueue for a workout is the only write in the app that fails silently, and it is the last line of defence
 
-> **The code half landed 2026-08-24 (v1.345.0).** The four `queueMutation` calls in
+> **The code half landed 2026-08-24 (v1.346.0).** The four `queueMutation` calls in
 > `components/workout-screen.tsx` now route their rejection through `reportEnqueueFailure` in
 > `lib/local-store/dead-letter-signal.ts` — a `console.warn` matching the one already above them, and
 > a Tier-A toast naming what was lost. Control flow is unchanged and they are still fire-and-forget.
@@ -3662,33 +3626,6 @@ ehr     0     0     0     0   648   208   128   556     0
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
-
-### [platform] Q-312 — the synthetic MET table is physiologically impossible, and it costs ~9 tests in CI
-
-- **Branch:** `fix/test-constants-met-floor`
-- **Found:** 2026-08-16, while guarding the constant-dependent tests for A4b.
-
-`scripts/generate-test-constants.js` replaces every number with a ramp in [0.1, 1.0] for fractions and
-[1, 8] for integers. Applied to `energy-expenditure-features.json` that yields METs **below 1.0** —
-impossible, since 1 MET *is* resting metabolism — and `estWorkoutKcal`'s net-MET guard therefore
-returns null for every activity.
-
-The consequence is not that a few parity assertions differ; it is that assertions with nothing to do
-with vendor magnitudes cannot run at all. Nine tests are guarded off in CI purely because both sides
-of the comparison are null: the "agrees with the aggregate that recomputes the same activity"
-consistency check in `activity-log-calories.test.ts` (a Q-230 sibling-drift guard), the run-burns-
-more-than-walk ordering, the steps-baseline subtraction, and the three-source summation in
-`daily-energy.test.ts`.
-
-**Do:** give the generator a floor for MET-shaped keys — `met_easy`/`met_moderate`/`met_hard` scrub to
-a ramp starting at 1.0, ordered easy < moderate < hard. That is public physiology, not the vendor's
-tuning, so it discloses nothing. Then remove the `itVendor` guards that were only there because the
-value was unusable rather than because the assertion is a parity check.
-
-**Constraint that decides when:** fixtures can only be regenerated on a machine that still has the
-vendor's files (`generate-test-constants.js` exits early otherwise). Since A4b that is the owner's
-machine or a restored archive — a session cannot do it. Needs the owner to run one command, or a
-session working from a temporarily restored copy.
 
 > **Q-258 FIXED and removed, 2026-08-16 (v1.317.3).** Four goal inputs in `goal-targets-section.tsx`
 > (steps, sleep, water, calories) and two in `required-info-section.tsx` (weight, body fat) had

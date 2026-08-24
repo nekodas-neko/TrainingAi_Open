@@ -13,7 +13,7 @@ import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import { formatTime } from "./utils";
 import { useCountUp } from "@/lib/hooks/use-count-up";
 import { getLocalStore } from "@/lib/local-store";
-import { pushMutations } from "@/lib/local-store/sync-engine";
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import { TrainingStressBadge } from "@/components/workout/training-stress-badge";
 import { TimeSummaryCard } from "@/components/workout/time-summary-card";
@@ -166,7 +166,7 @@ export function DoneScreen({
           userId: userId!, domain: 'session_rpe', date: todayInTz(),
           payload: { workoutSessionId, sessionRpe: rpe },
         });
-        pushMutations(userId!).catch(() => {});
+        pushThenRevalidate(userId!, invalidateHealthTrends);
       } else {
         const res = await fetch('/api/workout-sessions/rpe', {
           method: 'POST',

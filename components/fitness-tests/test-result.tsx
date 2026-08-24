@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { TrendingUpIcon, TrendingDownIcon, MinusIcon } from 'lucide-react'
 import { getLocalStore } from '@/lib/local-store'
-import { pushMutations } from '@/lib/local-store/sync-engine'
+import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { invalidateFitnessTests } from '@/lib/cache-groups'
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { sixMwtVo2max, cooperVo2max, baselineHrr1, restingHrFrom, maxHrFrom } from '@trainingai/shared/health/fitness-tests'
@@ -110,7 +110,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
         toast.success('Baseline saved')
         onDone()
         router.push('/health?tab=training')
-        pushMutations(userId!).catch(() => {})
+        pushThenRevalidate(userId!, invalidateFitnessTests)
         return
       } catch (e) {
         console.error('Fitness test SQLite write failed, falling back to API:', e)

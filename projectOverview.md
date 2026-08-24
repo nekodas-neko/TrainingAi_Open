@@ -65,24 +65,24 @@ with `Gate: device`. **Item (3) needed no work:** battery polls have persisted s
 (6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
 points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
 
+**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed
+six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it (55 steps).
+
 **The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven
 weeks** (0 of 55 `day_checkins` rows), and the calibration excludes an unmarked day rather than
 treating it as light — so a control nobody reached withheld the feature outright.
 
-**A deload session says so now (BF-8, v1.343.0).** The Intensity control read "Full · As
-prescribed" while the card under it read "Deload session · Auto-applied", and the workout header
-showed no marker at all — the owner trained one believing it was a full session. Both surfaces asked
-`isDeloadActive` ("is the PHASE a deload week") rather than whether TODAY's session is one.
+**A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the
+card under it read "Deload session · Auto-applied" and the header showed no marker — the owner
+trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
 
-**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** The plan wizard's "meals you
-usually eat" step takes a URL. A page that states no yield hands back the **whole recipe** — 1,956
-kcal for a banana-bread loaf — so the row asks how many it serves and cannot be kept until answered;
-`perServing` is shared with the route so the two divides cannot drift.
+**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands
+back the **whole recipe** — 1,956 kcal for a banana-bread loaf — so the row asks how many it serves
+and cannot be kept until answered; `perServing` is shared with the route so the divides cannot drift.
 
 **Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to
-128 px WebP (~6 KB) so it fits `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because
-nothing else fails loudly when that cap slips. The storage half shipped with Q-396 and no screen
-could reach it.
+128 px WebP (~6 KB) to fit `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because
+nothing else fails loudly when that cap slips. The storage half shipped with Q-396, unreachable.
 
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
 routes — create/rename/activate/delete a plan, restructure it, edit one meal, save dietary
@@ -803,7 +803,7 @@ order.
 
 ### [workouts][devices] 🟠 The outbox enqueue for a workout is the only write in the app that fails silently — and it is the last line of defence (Q-486, 2026-08-18)
 
-> **⚠️ THE CODE HALF SHIPPED 2026-08-24 (v1.345.0) — the device check is what is left.** All four
+> **⚠️ THE CODE HALF SHIPPED 2026-08-24 (v1.346.0) — the device check is what is left.** All four
 > sites route their rejection through `reportEnqueueFailure` (`lib/local-store/dead-letter-signal.ts`):
 > a `console.warn` matching the one already above them, plus a Tier-A toast naming what was lost.
 > Control flow unchanged. **The entry's "light the dead-letter badge" was wrong and was not followed**
