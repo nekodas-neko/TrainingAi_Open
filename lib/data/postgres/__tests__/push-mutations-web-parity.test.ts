@@ -460,6 +460,61 @@ describe.skipIf(!canRun)('pushMutations <-> web route parity', () => {
     await pool.query(`DELETE FROM activity_logs WHERE id = $1`, [id])
   })
 
+  it('activity_logs: DELETE /api/activity-logs answers 404 for a miss, 200 for a real delete (Q-556)', async () => {
+    const { DELETE } = await import('@/app/api/activity-logs/route')
+    const deleteReq = (id: string) => new Request('http://localhost/api/activity-logs', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }) as never
+
+    const missRes = await DELETE(deleteReq('00000000-0000-4000-8000-000000000556'))
+    expect(missRes.status).toBe(404)
+
+    const id = crypto.randomUUID()
+    await pool.query(
+      `INSERT INTO activity_logs (id, user_id, date, activity_type, title, duration_min)
+       VALUES ($1, $2, '2026-01-14', 'walk', 'Q-556 Delete Me', 10)`,
+      [id, TEST_USER_ID],
+    )
+    const hitRes = await DELETE(deleteReq(id))
+    expect(hitRes.status).toBe(200)
+    expect(await hitRes.json()).toEqual({ success: true, deleted: true })
+
+    // Idempotent: a double-tap re-delete still matches (no deleted_at filter) and reports 200/true.
+    const redeleteRes = await DELETE(deleteReq(id))
+    expect(redeleteRes.status).toBe(200)
+    expect(await redeleteRes.json()).toEqual({ success: true, deleted: true })
+
+    await pool.query(`DELETE FROM activity_logs WHERE id = $1`, [id])
+  })
+
+  it('activity_logs: DELETE /api/activity-logs answers 404 for another user\'s row (Q-556)', async () => {
+    const id = crypto.randomUUID()
+    await pool.query(
+      `INSERT INTO users (id, email, name, is_active) VALUES ($1, $2, 'Q556 Other', true)
+       ON CONFLICT (id) DO NOTHING`,
+      [OTHER_USER_ID, `q556-${OTHER_USER_ID}@example.com`],
+    )
+    await pool.query(
+      `INSERT INTO activity_logs (id, user_id, date, activity_type, title, duration_min)
+       VALUES ($1, $2, '2026-01-14', 'walk', 'Q-556 Not Yours', 10)`,
+      [id, OTHER_USER_ID],
+    )
+    const { DELETE } = await import('@/app/api/activity-logs/route')
+    const res = await DELETE(new Request('http://localhost/api/activity-logs', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    }) as never)
+    expect(res.status).toBe(404)
+
+    const row = await pool.query(`SELECT deleted_at FROM activity_logs WHERE id = $1`, [id])
+    expect(row.rows[0].deleted_at).toBeNull()
+
+    await pool.query(`DELETE FROM activity_logs WHERE id = $1`, [id])
+  })
+
   it('activity_logs: both paths reject a title-less payload instead of storing "undefined" (SYNC-P3)', async () => {
     const { POST } = await import('@/app/api/activity-logs/route')
     const res = await POST(jsonReq('http://localhost/api/activity-logs', {
