@@ -642,12 +642,31 @@ without a queue entry is a dropped finding.*
 
 - **Branch:** `refactor/nutrition-food-row`
 - **Lane B.** No schema, no route.
-- **Gate: owner**
-- **⛔ BLOCKED on the owner, 2026-08-24: Q-395's reference drawings are not in the repository.**
-  `unit-options.png`, which Q-395a names as its reference, is nowhere in the tree — `docs/design/`
-  holds cardio, score-row and AI-coach mockups and nothing for nutrition. The two remaining call
-  sites wait on Q-395a's quantity sheet, which cannot be built to a drawing nobody can open. Raised
-  2026-08-23; clears when the drawings land under `docs/design/`.
+- **✅ GATE CLEARED 2026-08-24 — the drawings are in the repository:**
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
+  All twelve artboards, at true S25 size, openable in a browser with no build step and no canvas.
+  This gate's own clearing condition was *"clears when the drawings land under `docs/design/`"*, and
+  they have. **Q-395a/b/c are unblocked too** — they cite the same drawings.
+  - **Recovered, not redrawn.** They were a Claude Design canvas
+    (<https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b>, *"Nutrition UI Review"*)
+    that had never been committed. Every artboard's markup and inline styles are unchanged; only the
+    editor's `<x-dc>`/`<helmet>` wrappers were stripped. **These are the drawings the owner reviewed
+    twice**, not a fresh interpretation of the prose — which is the whole point, since a re-drawing
+    would need re-approving.
+  - **⚠ `unit-options.png` never existed as a file** and no session will ever find it. It was a
+    screenshot of the `srv/g — A/B/C` artboards. Cite `UnitA.dc.html` (page 2 of the committed file).
+  - **⚠ Q-395a's two references are two different artboards.** The EXPANDED row is `srv/g — A`; the
+    COLLAPSED `Full Cream Milk` row is in **`EditMeal.dc.html`** (artboard 5), not in unit-options.
+    Both entries' wording implies one drawing holds both. It does not.
+  - **Known fidelity limit, bounded and marked:** three artboards (`MealsNow`, `Targets`, `UnitA`)
+    used editor-side `sc-for` loops that were never bound to data — they drew N placeholder rows via
+    `hint-placeholder-count`. An inline shim reproduces that, and unbound values render as a muted
+    `{{token}}`, exactly as the canvas showed them. Those captions are marked TEMPLATED. **The six
+    reworked screens on page 1 use no templating and are exact.**
+  - Rendered and checked in Chromium before committing: 12 of 12 artboards draw, no JS errors.
+- **Still owed, and deliberately not a gate:** the two unconverted call sites below need a *design
+  answer* (where a per-row warning goes), not a drawing. Q-395's drawings do not settle it, so it
+  stays an open question for whoever builds the external-food row.
 - **✅ THE COMPONENT SHIPPED 2026-08-23 (v1.338.0)** — `components/nutrition/food-row.tsx`, and the
   library sheet + the food-database search row now draw it.
   [`Journal`](overview/entries/2026-08-23-shared-food-row.md). **Q-395a's `Needs: Q-406` is
@@ -663,9 +682,16 @@ without a queue entry is a dropped finding.*
     line and an in-flight spinner. The agreed row has nowhere to put either, and adding a slot for
     them is what makes it a wrapper rather than a unification. **Needs a design answer** — where a
     per-row warning goes — which belongs with Q-395's drawings.
-- **⚠ THE DRAWINGS ARE NOT IN THE REPOSITORY.** `unit-options.png`, which Q-395a names as its
+- **✅ RESOLVED 2026-08-24 — struck, and kept only for the lesson.** ~~THE DRAWINGS ARE NOT IN THE
+  REPOSITORY~~: they are, at
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html).
+  **The lesson worth keeping: a mockup that lives only in a chat artifact is a mockup the queue
+  cannot use.** These were drawn 2026-08-18, reviewed twice, decided against — and then blocked four
+  entries for six days because nobody committed them. **Commit the canvas in the same PR that files
+  the entry citing it.** The historical text follows.
+  ~~`unit-options.png`, which Q-395a names as its
   reference for the expanded and collapsed rows, is nowhere in the tree — `docs/design/` holds
-  mockups for cardio, scores and the AI coach, none for nutrition. The row above was built from
+  mockups for cardio, scores and the AI coach, none for nutrition.~~ The row above was built from
   Q-406's **written** description ("name · grey secondary line · calories right-aligned in a fixed
   column · optional chevron"), which is complete enough for it. **The remaining phases are not so
   lucky**: Q-395a/b/c reference drawings no session can open. Commit them under `docs/design/`, or
@@ -942,8 +968,11 @@ whether or not anyone draws them first.
   (*"Option A's shape (unit chip on the number) is what that sheet uses"*), so the decision confirms
   it rather than reopening it. **A row in the diary that expands to edit would be a
   misreading of both.**
-- **The drawings exist** (finding 6); `unit-options.png`'s column A is the reference for the
-  expanded row, and its `Full Cream Milk` row is the reference for the collapsed one. Findings 1, 2,
+- **The drawings exist, and since 2026-08-24 they are IN THE REPO** —
+  [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html)
+  (finding 6's canvas, committed). The expanded row is the **`srv/g — A`** artboard
+  (`UnitA.dc.html`); the collapsed `Full Cream Milk` row is in **`EditMeal.dc.html`** — two different
+  artboards, which this line previously implied were one. Findings 1, 2,
   3, 7 and 8 never depended on this answer and can still go first — but nothing is blocked now.
 - **Still open, and deliberately not blocking: where `My Foods` lives** (note 17). Recommendation
   stands — a **fourth tab** beside Recent, Frequent and Saved meals, because it is a list of foods
@@ -963,8 +992,12 @@ whether or not anyone draws them first.
 
 - **Lane:** B
 - **Needs:** Q-406
-- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. Drawings:
-  `unit-options.png` column A (expanded row) and its `Full Cream Milk` row (collapsed).
+- **Spec:** Q-395, findings 9, 12, 13 and the 2026-08-19 owner decision. **Drawings (committed
+  2026-08-24):** [`docs/design/2026-08-18-nutrition-rework-mockups.html`](design/2026-08-18-nutrition-rework-mockups.html)
+  — the expanded row is the **`srv/g — A`** artboard, the collapsed row is the `Full Cream Milk` row
+  in **`EditMeal.dc.html`**, and the sheet itself is **`Quantity.dc.html`**. Three artboards, not
+  one: the old wording (`unit-options.png` column A "and its Full Cream Milk row") named a file that
+  never existed and implied a single drawing carried both rows.
 - **Split out of Q-395 on 2026-08-23.** **Read Q-395 first** — it holds the decisions and this
   entry does not repeat them.
 - **Scope.** The quantity sheet (new), and `ingredient-row.tsx` becoming `food-row.tsx` plus an

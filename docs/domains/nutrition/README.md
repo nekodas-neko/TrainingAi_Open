@@ -19,6 +19,23 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 ## Reference docs
 
+- [`docs/design/2026-08-18-nutrition-rework-mockups.html`](../../design/2026-08-18-nutrition-rework-mockups.html)
+  — **the nutrition rework's twelve reference drawings**, at true S25 size in the app's own tokens.
+  Open this before building **Q-395 / Q-395a / Q-395b / Q-395c** or **Q-406**; it is what they cite.
+  Page 1 is the six reworked screens (day · add food · my meals · meal detail · edit meal ·
+  quantity), page 2 the review that produced them (today's Saved Meals, the tap-target audit, the
+  hardcoded-green finding, and `srv/g` options A/B/C).
+  **Recovered and committed 2026-08-24** from the Claude Design canvas they had only ever lived in —
+  which had blocked those four entries for six days. Two corrections it carries: there is no
+  `unit-options.png` (it was a screenshot of the `srv/g` artboards), and Q-395a's expanded and
+  collapsed rows are **two different artboards** (`UnitA` and `EditMeal`), not one.
+- [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](../../superpowers/specs/2026-08-24-meal-creator-and-planner-design.md)
+  — **the meal creator / planner redesign** (BF-11), owner-agreed. Plans:
+  [Part 1, the creator](../../superpowers/plans/2026-08-24-meal-creator.md) ·
+  [Part 2, the library-first planner](../../superpowers/plans/2026-08-24-library-first-meal-planner.md).
+  Part 2 §1.1 records that `fitDistance` (`packages/shared/src/nutrition/meal-macro-fit.ts`) is
+  already the one place that ranks a meal against a target — do not write a second one — and §2 two
+  live defects in `generate/route.ts` when pinned meals outnumber the slots.
 - [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](../../reviews/2026-08-15-pillar-model-soundness-review.md)
   — §3: the energy model is sound (Schofield BMR + Mifflin factors + Compendium METs) and targets are
   internally consistent, but **adaptive TDEE has not fired once in 30 rolling windows** because food
