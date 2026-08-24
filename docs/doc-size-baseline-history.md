@@ -18,6 +18,15 @@ section here saying why. Conflicts in an append-only log resolve by keeping both
 
 ---
 
+## 2026-08-24 — `CLAUDE.md` 1154 → 1155
+
+One line on the backlog-conflict rule, because the class recurred a third time and the rule now has a
+check behind it. #348 removed four resurrected entries and wrote the rule; **#349 put LB-4 back four
+commits later**, from a branch cut before #348 landed. A rule cannot reach a branch that predates it,
+so the line records what `check-backlog-pointers.js` catches (a heading with no body — the shape all
+three took) and what it deliberately does not (a resurrection that restores a full entry, which wants
+git history CI does not have at depth 1).
+
 ## 2026-08-23 — BF-9, the trainer role
 
 **`docs/implementation-backlog.md` — no raise needed in the end.** The owner wants to build programs for other
