@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.351.0",
+    date: "2026-08-24",
+    changes: [
+      "The admin ring debug page's Device Metrics sparklines now draw a night-only signal as a short line with visible gaps around it, instead of stretching a few hours of samples to fill the whole width like they ran all day.",
+    ],
+  },
+  {
     version: "1.350.0",
     date: "2026-08-24",
     changes: [
