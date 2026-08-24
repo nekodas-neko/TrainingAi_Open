@@ -430,12 +430,26 @@ wrong. To answer "which sessions need me", query it — do not read it off a tit
 session: there is no `claude` CLI subcommand for it, the MCP tool is available to the model and not
 to hook scripts, and the REST route (`/v1/code/sessions/{session_id}`) needs the session ingress
 credential, which the auto-mode classifier blocks reading — correctly, and it was not worked around.
-That leaves model-driven renames, which cost a round trip and roughly 300 tokens of response JSON at
-each end of every turn. And the case that prompted the request — a session blocked on a permission
-prompt or an interactive question — is the one a model-driven rename **cannot** signal, because the
-model is the thing that is blocked. Only the harness knows, and the harness already records it.
+That leaves model-driven renames — a hook *can* wake the model (a `Stop` hook returning
+`decision: "block"` forces another turn), so the trigger was never the obstacle. **The cost is, and
+it is not the rename.** Every extra inference pass re-reads the whole conversation context from
+cache, so a flip costs roughly `context × $0.50/MTok` regardless of how small the call is: about
+$0.10 at a 200k context, $0.20 at 400k. At two flips per turn that is **+$7.50 on a 50-turn
+session and +$400 at the scale Lane A actually runs at** — measured 2026-08-23, when Lane A stood at
+409.6M cache-read tokens and $628 billed. The cost scales with context × turns, which is already the
+axis that dominates spend here. (Ten manual renames in the session that investigated this came to
+about 7% of its total.)
 
-The 🟢/🔴 pair stays as it is: cheap, set once at each end of a session's life, and about a state
+And the case that prompted the request — a session blocked on a permission prompt or an interactive
+question — is the one a model-driven rename **cannot** signal. `Stop` does not fire, because the turn
+has not ended; and the model cannot act, because the model is the thing that is blocked. Only the
+harness knows, and the harness already records it.
+
+A cheaper variant was costed and also declined: flip 🟠 only when a session parks itself on a
+scheduled check-in, which is a handful of flips per session rather than two per turn (~$0.30). The
+owner's decision on 2026-08-23 was to keep **🟢/🔴 only** — two states, no third.
+
+The pair stays as it is: cheap, set once at each end of a session's life, and about a state
 (*this session is finished*) that nothing else records.
 
 ### The baton: `docs/agents/state/<agent>.md`
