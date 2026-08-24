@@ -4,6 +4,7 @@ import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
+import { tryEnsureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { hrMaxFromAge, hrReserve, HR_REST_THRESHOLD } from '@trainingai/shared/health/hr-zones'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { resolveBatteryHrMax, batteryConfidence, HR_PEAK_WINDOW_DAYS, type BatteryConfidence } from '@trainingai/shared/health/body-battery-inputs'
@@ -245,11 +246,32 @@ async function buildBodyBattery(userId: string, tz: string) {
   const dhrvModel = await repo.getDaytimeHrvModel(userId)
   if (dhrvModel && dhrvBaseline != null && tempBaseline != null && tempBaseline > 0) {
     const baselines: DhrvBaselines = { dhrvBaseline, hrBaseline: restingHr, tempBaseline }
-    stressSeries = buildDaytimeStressSeriesFromModel(
-      daytimeSignals.temp, daytimeSignals.met,
-      hrRows.map(r => ({ tsMs: r.timestamp.getTime(), bpm: r.bpm })),
-      dhrvModel, baselines, wakeTime, now.getTime(),
-    )
+    // TN-4. Two hardening changes, both "worth doing regardless of root cause" — the 31 × 500 on
+    // 2026-08-23 (`daytime-stress: constants not set`, 10:37–20:59 UTC) stopped on its own and is
+    // still unexplained.
+    //
+    // 1. Self-inject rather than assume boot got there. `ensureServerOuraConstants()` runs at boot
+    //    from instrumentation-node.ts, and `lib/data/index.ts` calls the swallowing variant when the
+    //    repository handle is built — but that one swallows, so it can fail to take without a trace,
+    //    which is consistent with what happened. The injector is idempotent and documents this exact
+    //    use ("a composition root that is unsure whether boot reached it should just call it");
+    //    after the first call it is three boolean checks. The TRY variant deliberately: the throwing
+    //    one would turn a missing constants directory back into the 500 this is removing.
+    tryEnsureServerOuraConstants()
+    try {
+      stressSeries = buildDaytimeStressSeriesFromModel(
+        daytimeSignals.temp, daytimeSignals.met,
+        hrRows.map(r => ({ tsMs: r.timestamp.getTime(), bpm: r.bpm })),
+        dhrvModel, baselines, wakeTime, now.getTime(),
+      )
+    } catch (err) {
+      // 2. A stress-model failure must not take Body Battery down with it — the same guard, and the
+      //    same reasoning, as the readiness call above. This throw was reaching the outer catch, so
+      //    the WHOLE card 500'd when only the stress strip was unavailable. Falling through leaves
+      //    `stressSeries` empty, which the walk already handles: `stressAt` returns null and the
+      //    STRESS_DRAIN_RATE term is simply not applied.
+      console.error('[body-battery] daytime stress series failed, continuing without it:', err)
+    }
   }
   // Step lookup: stressLevel (∈[−1,1]) of the most recent bucket at/under a time (30-min, held forward).
   const stressAt = (ms: number): number | null => {

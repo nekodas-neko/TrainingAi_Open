@@ -541,6 +541,30 @@ exactly that guard and comments saying why.
 
 *Counts above are the owner's account only (`claude_ro` is row-scoped) and within the 30-day prune.*
 
+- 🚧 **BOTH HARDENING CHANGES SHIPPED 2026-08-24 (Lane A). The ROOT CAUSE IS STILL OPEN — keep this
+  entry.** `app/api/body-battery/route.ts` now calls `tryEnsureServerOuraConstants()` before the
+  stress block and wraps `buildDaytimeStressSeriesFromModel` in try/catch. A stress-model failure
+  now costs the stress strip, not the whole card: `stressSeries` stays empty, `stressAt` returns
+  null, and the `STRESS_DRAIN_RATE` term is simply never applied.
+  - **The TRY variant of the injector, deliberately.** The throwing `ensureServerOuraConstants()`
+    would turn a missing constants directory back into the 500 this removes. Note
+    `lib/data/index.ts` already calls the swallowing variant when the repository handle is built —
+    **so it can fail to take without leaving a trace, which is consistent with what happened** and
+    is why the try/catch matters more than the injection.
+  - **Proven by mutation:** `app/api/body-battery/__tests__/stress-failure-does-not-500.test.ts`
+    fails with `expected 500 to be 200` when the guard is removed, and passes with it restored.
+  - **⚠️ The first version of that test was VACUOUS and this is the lesson worth keeping.** It
+    seeded only the dHRV model row, so `tempBaseline` stayed null, the stress branch was never
+    entered, and it passed *identically* with the guard removed. `getOuraDaytimeSignals` decodes raw
+    BLE frames, so the branch is unreachable without either real `body_hex` + a ring-clock anchor or
+    a repository-level override; the test now overrides that one method and says why. A regression
+    test that cannot fail reads as coverage and is worse than none.
+- **Keep — what is NOT done:** why the constants were unset for those ten hours. Nothing here
+  explains it and nothing here would have prevented the underlying condition; the card now degrades
+  instead of dying. **Not observed in production or on device** — verification is the mutation test
+  above plus source reading. The `error_events` row still disappears on 2026-09-22, so if the
+  mechanism matters it has to be caught before then.
+
 ## Filed 2026-08-19 — the workflow review that produced the ID scheme
 
 *These four came out of reviewing the multi-agent setup itself. They are filed rather than fixed
