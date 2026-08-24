@@ -218,6 +218,14 @@ Live at the time of writing (2026-07-30):
   expensive to re-derive. (Its "17 DB-coupled lines" counted lines, not operations; the extracted
   port is 22 methods.)
 
+- [`docs/handoff-2026-08-24-devices-daily-summary-wipe-retraction.md`](../../handoff-2026-08-24-devices-daily-summary-wipe-retraction.md)
+  — **the daily-summary wipe that never happened, and where chronic stress actually refuses.**
+  `n_live_tup` read 1 against 45 real rows and a data-loss incident was filed off it; carries the two
+  measured counter-examples, the three chronic-stress gates with the first two shown to pass, and the
+  two traps that cost time here — `git log` cannot date anything before the public-repo cut, and
+  `oura_raw_samples` holding only ~10 days is **not** data loss (`readRawFrames` reads both tiers).
+  Numbers pulled 2026-08-20; re-pull before quoting.
+
 - Handoffs: `ls docs/handoff-*-devices-*.md` — plus
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-40 — the chest-strap card stuck on "Connecting…"), filed under `cross` because it spans five pillars and so is not matched by the glob above.

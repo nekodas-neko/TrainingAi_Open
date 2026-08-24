@@ -628,10 +628,9 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Not device-verified:** only the gallery path ran here. A wrong field pair downscales silently
   never, which looks exactly like "the fix did not help".
 
-### [workouts][platform] LA-21 — a workout session's duration is uncapped, so one left running poisons its load and its calories
+### [workouts][platform] LA-21 — ✅ SHIPPED 2026-08-24: implausible session durations are culled from statistics
 
 - **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`.
-- **Branch:** `fix/cap-session-duration`
 - **Added:** 2026-08-24, found while shipping Q-420's derivation — the derived series made it visible
   on nine points where it had been visible on one.
 - **⚠️ MEASURED IN PRODUCTION 2026-08-24, and the filing above was wrong about severity.** It said
@@ -665,8 +664,6 @@ answered by subtraction rather than re-argued. Verified through the real route o
   **today's** workouts, so the day-energy path cannot reach a May session. What is left is the
   per-session views: `workout-sessions/[id]/energy` and the recap, where opening one of those eleven
   shows a calorie estimate built on a 10× duration.
-- **Placement:** low-mid — high prevalence, narrow live reach, unknown cause. The prevalence is the
-  argument for bounding it; the reach is the argument for not rushing.
 - **What.** `durationMin = (completedAt - startedAt) / 60_000` with **no upper bound anywhere**:
   `app/api/health-trends/route.ts` (`sessionLoad = rpe × durationMin`), `estWorkoutKcal` and
   `estSessionKcal` (`workout-energy.ts:113, 225`). Observed on the dev database: a session spanning
@@ -676,22 +673,38 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Why it is not merely cosmetic:** ACWR is a ratio of recent to chronic load, so a single 24× point
   distorts both windows for weeks, and it distorts them in the direction that reads as "you are
   training far too hard".
-- **Fix shape:** one shared cap, not three — the same `One Formula, One Place` argument as everything
-  else in `workout-energy.ts`. Pick the bound from the data rather than from taste: the owner's real
-  sessions run 45–75 minutes, so a cap in the 3–4 hour region is far outside anything genuine while
-  still bounding the pathological case. Whether an over-cap session should be **clamped** or
-  **excluded** is the real decision — clamping keeps a data point that is partly fiction, excluding
-  loses a session that did happen. **The measurement above settles it: clamp.** All eleven are real
-  workouts, so excluding them would delete training that happened, and only the duration is wrong.
-- **The client already handles the restart case, which is why the cause is still open.**
-  `lib/stores/workout-store.ts:215` drops a session's whole identity on rehydrate once its start
-  anchor is over four hours old or from a previous day, so an app-kill cannot produce one of these.
-  That leaves the app being left **open** across a long gap with Complete tapped at the end —
-  `resolveCompletedAt` accepts the phone's own `completedAtMs` and only rejects it for preceding the
-  start or being in the future. Plausible, and not proven: the eleven cluster in one month and
-  nothing explains why they stopped.
-- **Also cap the seed/dev path or this stays invisible locally** — the dev database carries a
-  1,176-minute session, which is how this was found at all.
+
+- **Lane:** A · **Branch:** `fix/cull-implausible-session-duration`
+- **Owner-decided 2026-08-24:** *"There are likely all errors from it being left on too long. Make
+  sure they are culled from statistics."* Culled, not clamped — a clamped figure is still partly
+  fiction, and the entry's earlier guess (exclude from load, clamp for calories) is superseded.
+- **`MAX_PLAUSIBLE_SESSION_MIN` + `isPlausibleSessionDuration`** now live once, in
+  `packages/shared/src/health/workout-energy.ts`, and both `estWorkoutKcal` and `estWorkoutKcalFromHr`
+  return `null` above the bound — so `estSessionKcal` is covered on both of its branches.
+  `app/api/health-trends` drops the point from the `sessionLoad` series.
+- **⚠ The bound already existed in THREE independent copies and nobody had noticed** — `body-metadata`
+  (declared and never read), `weekly-stats`, and `daily-energy` — all `= 240`, with **two different
+  behaviours** attached: `daily-energy` clamps for activities and excludes for sessions, `weekly-stats`
+  excludes and falls back to the exercise-log span. That is the One Formula, One Place failure this
+  repo keeps paying for, and it means `body-metadata` and `weekly-stats` were **already** culling
+  while `health-trends` and the per-session energy routes were not. All four now share one export;
+  each site keeps its own deliberate clamp-or-exclude behaviour.
+- **⚠ THERE ARE TWO CAUSES, NOT ONE, AND THE LOCAL CLOCK TIMES SEPARATE THEM CLEANLY.** Of the eleven:
+
+  | local start → end | n | reading |
+  |---|---:|---|
+  | **00:00** → 08:53–14:05 | **7** | `startedAt` fell back to local midnight — the cause the existing code comments named |
+  | 07:29–11:56 → 18:12–22:52 | **4** | started for real and completed ~11 hours later — the owner's "left running", morning to after work |
+
+  So the owner's explanation is right for four of them and the comments already in `weekly-stats` and
+  `body-metadata` are right for the other seven. **Both stopped after 2026-05-29 and neither is
+  explained**, which per CLAUDE.md is unexplained rather than fixed. The cull bounds the number
+  whichever cause fires.
+- **Keep:** the **midnight-`startedAt` fallback itself is not fixed** — seven sessions recorded a start
+  time that was never captured, and the cull hides the symptom rather than restoring the real span.
+  `weekly-stats` already substitutes the exercise-log span for exactly this case; whether the other
+  duration consumers should do the same, or whether the write path should stop inventing a midnight
+  start at all, is the open half.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 

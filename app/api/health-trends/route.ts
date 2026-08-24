@@ -11,6 +11,7 @@ import { sorenessVsVolumePoints } from '@trainingai/shared/health/soreness-volum
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
 import { minutesFromNoon } from '@trainingai/shared/health/sleep-consistency'
 import { sessionEffort, type SessionRpeSource } from '@trainingai/shared/workout/derive-session-rpe'
+import { isPlausibleSessionDuration } from '@trainingai/shared/health/workout-energy'
 
 export interface TrendsResponse {
   view: string
@@ -174,6 +175,11 @@ export async function GET(req: Request) {
         const effort = sessionEffort(ws.sessionRpe, ws.exercises.flatMap(e => e.sets.map(set => set.rpe)))
         if (!effort) return null
         const durationMin = (ws.completedAt!.getTime() - ws.startedAt.getTime()) / 60_000
+        // LA-21, owner-decided: a session left running is culled from statistics rather than clamped.
+        // `sessionLoad` is `rpe × durationMin`, so one 14-hour row is a 10× point in a series that
+        // feeds the acute:chronic ratio — and a ratio distorted upward reads as "you are training far
+        // too hard", which is the direction that would change someone's programme.
+        if (!isPlausibleSessionDuration(durationMin)) return null
         return {
           date: toAestDay(ws.startedAt, tz),
           sessionRpe: effort.rpe,
