@@ -1087,6 +1087,94 @@ work is to bring them down, and **it is not a separate task**: a baton is rewrit
 handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
 Close this when all five are under ~150 lines.
 
+### [readiness][devices] BF-13 — "Body temp elevated" is a baseline that never finished converging, not a fever; and the breathing baseline is ~9.5x its own metric
+
+- **Lane: A** — `packages/shared/src/health/personal-baseline.ts` and whatever feeds it. Reached by
+  the rollup and the summary push, not by a screen.
+- **Added:** 2026-08-24 · owner: *"body temperature elevation could we look to see what its at? as
+  its done this a few times but I have not been sick in the last 50+ days. so might need to raise
+  the safe range"* — screenshot showed **"+0.5C above your baseline (threshold 0.5C), based on 50
+  nights of history"** driving a Recovery recommendation on a Push day.
+- **Raising the threshold is the WRONG FIX, and this entry exists to say so before someone does it.**
+  The owner's instinct treats the symptom. The signal is not measuring their body.
+
+**The measurement (owner's rows, `claude_ro.oura_daily_summary`, 34 nights with data):**
+
+```
+temp_dev_c:   min +0.14   mean +0.66   sd 0.29   max +1.33     <- NEVER NEGATIVE
+nights over the 0.5 threshold: 23 of 34 (68%)
+```
+
+**A deviation that is never negative is not a deviation.** For comparison, the Cloud-era
+`oura_daily.temperature_deviation` over the same kind of window reads mean **+0.035**, sd 0.158,
+range **-0.22 to +0.27** — centred on zero, symmetric, which is what this column should look like.
+
+**Cause, traced to the line.** `updateBaseline` (`packages/shared/src/health/personal-baseline.ts:29`)
+seeds `meanX8 = baseline?.meanX8 ?? 0` — **zero** — on the first-ever sample, then anneals its gain
+by age: 1/2 under 4 nights, 1/8 from 4-14, **1/32 after 14**. So the mean starts at 0 C and the
+step size collapses long before it has climbed to ~35.8 C. Watch it converge, and watch the
+"elevation" decay with it while the actual nightly temperature stays flat:
+
+```
+night  n_history   nightly C   baseline C   temp_dev_c
+   2       2         35.81       17.905        (null)
+   4       4         35.96       31.919        (null)
+  14      14         35.86       34.696        +1.33
+  30      30         35.86       35.203        +0.68
+  40      40         35.85       35.349        +0.52
+  50      50         35.95       35.464        +0.50
+```
+
+**The nightly value is flat at 35.5-36.1 the whole time** (that is the body: no fever, matching the
+owner exactly). **The baseline is the only thing moving.** `temp_dev_c` is tracking baseline
+immaturity, not physiology — 50 nights in, the baseline is still ~0.4 C short of the true mean, and
+that residual *is* the reported elevation.
+
+- **`TEMP_BASELINE_MIN_DAYS = 30` was meant to prevent exactly this and is insufficient.** Its own
+  comment says a green baseline "produced spurious body temp elevated deloads". At n=30 the
+  deviation was still +0.68; at n=50 it is +0.50. The guard picked a number; the algorithm needed a
+  different seed.
+- **Why raising the threshold is the wrong fix, stated plainly:** it papers over a converging
+  artefact, and it *permanently desensitises the real signal*. Once the baseline does converge, a
+  genuine fever would have to clear an inflated bar to register. It also would not work now — at
+  0.8 C it still fires on 10 of 34 nights.
+- **Fix direction (not decided here):** seed the baseline from the **first real sample**
+  (`meanX8 = sampleX8`, `devX8 = 0`) instead of 0, and backfill/reset the existing baselines so they
+  restart from a true value rather than crawling. **Check the vendor port first** — this file is a
+  faithful port of `baseline_update_lt_mean_and_dev` and the header says do not "improve" the
+  algorithm, so establish whether ecore seeds differently (or never exposes a baseline this young)
+  before changing the shared function. If the port is faithful, the fix belongs at the **call site
+  or the seed**, not in the ported maths.
+
+**Second, separate defect found in the same pass — the breathing baseline is ~9.5x its metric.**
+
+```
+n_history:      5      15      30      40      50
+breath base:  80.9    88.9    91.6    93.0    92.5     <- converging toward ~95
+breath_avg_rpm: 9.1     9.7    10.0     9.8      9.8     <- the real value
+```
+
+The baseline is converging correctly — **toward the wrong number**, ~9.5x the metric it is compared
+against. Consistent with `updateBaseline` being fed rpm x10 (or an extra x8) while
+`breath_avg_rpm` stores plain rpm. Any threshold reading "breathing rate elevated/depressed" off
+this is meaningless. Related to **Q-4** (`respiratory_rate` from an estimator its own docs call
+uncalibrated) but distinct: that entry is about the estimator, this is about the comparison.
+
+- **Checked and NOT broken, recorded so nobody re-investigates:** the **RHR** baseline tracks
+  `rhr_low_bpm` (53.0 vs 50.7 at n=50), **not** `rhr_avg_bpm` (60.9) — comparing it against the
+  average makes it look 8 bpm wrong when it is fine. **HRV** (55.4 against a noisy 51-66) is
+  plausible. Only temperature and breathing are affected.
+- **Blast radius:** `updateBaseline` is shared by all six BLE baselines (HRV, RHR, temp, sleep, MET,
+  breathing), so the zero-seed applies to every one — it is visible in temp because temp has a large
+  non-zero mean and a tight spread. Check MET and sleep before assuming they are clean.
+- **What would count as fixed:** `temp_dev_c` centred near zero across a wear period with no
+  illness, going negative on cool nights as a deviation should; the deload stops firing on the
+  owner's healthy nights; and the breathing baseline sits within a rpm or so of `breath_avg_rpm`.
+- **Surface: server/shared, web-reproducible from stored data.** No device needed to fix or verify —
+  the summaries are in Postgres and the maths is a pure function. A recompute of existing baselines
+  is a data change and needs the owner, same shape as Q-304b.
+
+
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
 - **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
