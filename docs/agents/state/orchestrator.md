@@ -1,6 +1,6 @@
-# Orchestrator 🪐 — baton
+# 🪐 Orchestrator — baton
 
-> **Successor sessions are titled `Orchestrator 🪐`** — exactly, emoji included. A renamed successor
+> **Successor sessions are titled `🪐 Orchestrator 🟢`** — exactly, emoji included. A renamed successor
 > is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-23 · **By:** the session that ran sweeps 1 and 2 · **Next ID:** `OR-1`

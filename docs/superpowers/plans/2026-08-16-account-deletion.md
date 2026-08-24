@@ -1,6 +1,6 @@
 # Plan — self-service account deletion (Q-287)
 
-**Written:** 2026-08-16 · **Status:** ⛔ **DRAFT AWAITING OWNER DECISIONS — do not implement**
+**Written:** 2026-08-16 · **Status:** ✅ **ALL SEVEN DECISIONS RESOLVED 2026-08-23 — see §12.**
 **Backlog:** Q-287 · **Why:** Google Play has required an in-app *and* web-accessible account-deletion
 path since 2024, and the Play Store listing is a stated goal in `CLAUDE.md`.
 
@@ -38,7 +38,7 @@ deploys — **do not rely on cascade behaviour; delete explicitly in order.**
 
 ---
 
-## 2. 🔸 OWNER DECISION 1 — hard delete or tombstone?
+## 2. ✅ DECIDED 2026-08-23 (owner) — hard delete, not a tombstone.
 
 | | Hard delete | Tombstone (`deleted_at` on `users`, rows retained) |
 |---|---|---|
@@ -51,7 +51,8 @@ deploys — **do not rely on cascade behaviour; delete explicitly in order.**
 mechanism this app deliberately does not have, so "deleted" would mean "hidden indefinitely" — which
 is the thing the Play requirement exists to prevent.
 
-## 3. 🔸 OWNER DECISION 2 — `oura_raw_samples` is 341 MB and ~1M rows for one user
+## 3. ✅ DECIDED 2026-08-23 (Orchestrator, per this plan's own recommendation — reversible, no
+owner preference involved) — measure (c) first, fall back to (b).
 
 A synchronous `DELETE` of that volume inside a request will exceed `statement_timeout: 15_000`
 (`lib/data/postgres/client.ts`). Options:
@@ -66,16 +67,17 @@ A synchronous `DELETE` of that volume inside a request will exceed `statement_ti
 **Recommendation: measure (c) first on the local seeded DB** — the load-test seeder already produces
 realistic volumes — and fall back to (b). Do not build a job queue for this.
 
-## 4. 🔸 OWNER DECISION 3 — grace period?
+## 4. ✅ DECIDED 2026-08-23 (owner) — a 14-day grace period, not the plan's own recommendation.
 
-Play permits a delay if it is disclosed. **Recommendation: 7 days, `deletion_requested_at` on `users`,
-sign-in during the window cancels it.** Requires something to execute the delete when the window
-expires — and with no cron, the honest options are: execute on the user's next sign-in attempt
-(unreliable — they may never return), or **execute immediately and offer export-before-delete
-instead**. The second is simpler and still compliant.
-
-**Sub-recommendation: no grace period; make export mandatory-offer before the final confirm.** It
-avoids inventing a scheduler for one feature.
+The owner chose the grace period over this plan's original "no grace period, export-first"
+suggestion — a scheduled, reversible deletion beats an immediate one, and the mechanism problem this
+section raised (no cron layer) has a known answer already used elsewhere in this repo: **check on
+the next authenticated request, not on a schedule.** Q-270 solved the identical "no cron" gap for a
+different feature by warming a route once per app launch; the deletion sweep is the same shape — on
+sign-in (web or app), if `deletion_requested_at` is more than 14 days in the past, execute the delete
+before serving the request. Sign-in during the window still cancels it, per this section's original
+design. **Do not build a scheduler for this** — it is one more instance of a pattern that already
+exists.
 
 ## 5. 🔸 OWNER DECISION 4 — the export must be fixed first
 
@@ -84,23 +86,19 @@ first", that export is the user's last chance at their own history — and it cu
 heart rate, derived scores, AI conversations and nutrition plans. **Q-288 should land before Q-287
 ships**, and this plan treats it as a hard dependency.
 
-## 6. 🔸 OWNER DECISION 5 — `friendships` is two-sided
+## 6. ✅ DECIDED 2026-08-23 (Orchestrator — cheap, reversible, not the owner's preference to
+weigh) — delete the row. A friendship with a deleted account is meaningless on either side, and
+this is what every other cross-user relationship in the schema already does on a hard delete. If
+this ever needs a softer touch (notifying the other party, say) it is a small, independent addition
+later, not a reason to hold this plan on it now.
 
-`friendships` is scoped `requester_id = $OWNER OR addressee_id = $OWNER`. Deleting user A removes
-rows that are also user B's data. **Recommendation: delete the row** (a friendship with a deleted
-account is meaningless) but confirm you agree, since it mutates another user's visible state.
+## 7. ✅ DECIDED 2026-08-23 (owner) — refuse deletion for the last remaining admin. Matches this
+plan's own recommendation exactly. `db-query` and every other admin-only tool this repo's session
+routine depends on stays reachable.
 
-## 7. 🔸 OWNER DECISION 6 — deleting the only admin
-
-You are the only admin. Deleting your account removes admin access to `/api/admin/*`, including the
-`db-query` endpoint every one of these reviews used. **Recommendation: refuse deletion for the last
-remaining admin** with a clear message, rather than allowing a self-lockout.
-
-## 8. 🔸 OWNER DECISION 7 — the web-accessible path
-
-Play requires deletion to be initiable **outside the app** too. Options: a route on the Railway
-domain reachable after web sign-in (cheapest — the app already has web auth), or a documented email
-process. **Recommendation: a web route**, since the sign-in path already exists.
+## 8. ✅ DECIDED 2026-08-23 (Orchestrator, per this plan's own recommendation — reversible,
+mechanical) — a web route on the Railway domain, reached through the sign-in path that already
+exists. An email process is strictly more work for the same compliance outcome.
 
 ---
 
@@ -128,10 +126,17 @@ process. **Recommendation: a web route**, since the sign-in path already exists.
 
 ---
 
-## 11. What I need from you
+## 11. Where each decision landed (2026-08-23)
 
-Answer the seven 🔸 decisions — or just say *"go with your recommendations"*, in which case the
-defaults are: **hard delete · measure the big-table delete first · no grace period, export-first ·
-Q-288 lands first · friendship rows deleted · last admin protected · web route.**
+| # | question | who | answer |
+|---|---|---|---|
+| 1 | hard delete vs tombstone | **owner** | hard delete |
+| 2 | big-table delete mechanism | Orchestrator | measure (c) first, fall back to (b) |
+| 3 | grace period | **owner** | 14 days, executed on next authenticated request (no cron needed) |
+| 4 | Q-288 must land first | (already settled — a hard dependency, not a preference) | unchanged |
+| 5 | friendship rows | Orchestrator | delete them |
+| 6 | last admin | **owner** | refuse the deletion |
+| 7 | web-accessible path | Orchestrator | a web route on the existing sign-in path |
 
-**I will not write any of it until you have.**
+**All seven are resolved. Nothing here still needs the owner.** §9's implementation sketch is
+buildable as written, behind `Needs: Q-288` in the backlog entry.

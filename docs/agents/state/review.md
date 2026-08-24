@@ -1,6 +1,6 @@
-# Review Agent 📖 — baton
+# 📖 Review Agent — baton
 
-> **Successor sessions are titled `Review Agent 📖`** — exactly, emoji included. The title is how five
+> **Successor sessions are titled `📖 Review Agent 🟢`** — exactly, emoji included. The title is how five
 > concurrent sessions stay tellable apart; a renamed successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-20 · **By:** forty sweeps (2026-08-17 ×2, 2026-08-18 ×37, 2026-08-20 ×1) ·

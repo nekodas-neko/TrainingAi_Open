@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **207** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **208** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -435,7 +435,7 @@ design decision. See the correction at the top of that entry.
 
 - Lane: A — **the Lane B half SHIPPED 2026-08-23 (v1.331.0)**: `capture-step.tsx` bounds the photo to
   1024 px, a **-86.6%** payload cut
-  ([`journal`](overview/entries/2026-08-23-bounded-scan-photo.md)). **It was NOT shown to be the
+  ([`journal`](overview/entries/2026-08-23-bounded-scan-photo-payload.md)). **It was NOT shown to be the
   owner's slowdown** — #112 and the cold-start check are the open half, and both are Lane A's, which
   is why this entry's lane is now A. Nothing here is startable by Lane B.
 
@@ -639,7 +639,7 @@ changes shape — check the order still reads correctly on a back-dated day, not
 meal card, End of Day is the last element on the page, both still behave correctly on a past date,
 and the misleading comment is gone.
 
-### [workouts] Q-420 — session RPE is asked for in a unit the owner cannot judge, and the per-set ratings that could derive it are already there
+### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
 > **⚠️ RE-MEASURED 2026-08-19 after Q-421 shipped — the energy case for this entry has largely
 > evaporated, and the real case is a different one. Read this before starting.**
@@ -673,8 +673,56 @@ and the misleading comment is gone.
 > place and losing the ability to tell them apart.
 
 
-- **Gate: owner** — needs a decision on the 6–10 → 1–10 scale mapping before anything is fitted;
-  see the re-measurement note above. Added 2026-08-20 for the same reason as Q-422's.
+- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`,
+  `app/api/body-metadata`; the prompt removal is `components/workout/done-screen.tsx`.
+- **✅ DECIDED BY THE OWNER 2026-08-23. The gate is cleared and the scope changed — read this
+  before the older notes below, which were written against a narrower question.**
+  1. **Delete the user-facing prompt.** *"Get rid of the user facing 'how hard was the session'."*
+     `done-screen.tsx:398` — *How hard was that session?* — goes. The owner has said twice that they
+     cannot judge a session as one number and can judge a set, and the 26% fill rate agrees.
+  2. **Derive a background session intensity from the set RPEs instead.** Because it stops being a
+     value anyone types, **the scale question that gated this entry dissolves** — the owner's words:
+     *"it doesnt matter what number we use. You could even use 1-5 and map 6→1 and 10→5."*
+     **Keep the stored field on 1–10** and do the mapping internally: four call sites already read
+     `sessionRpe` on that scale, so this avoids a migration for no behavioural gain. The internal
+     mapping is free to change later without touching them.
+  3. **Store derived separately from self-reported**, so the 20 real ratings in history stay
+     distinguishable and a re-fit only recomputes the derived ones.
+  4. **The training-load chart keeps its line, labelled as derived.** It goes from 20 points to 44,
+     which is what makes the trend readable; the label costs nothing.
+- **⚠ THE BIGGER CORRECTION, AND IT IS THE REASON THIS ENTRY MATTERS.** This entry and Q-421 both
+  said heart rate had made RPE redundant for energy. **The owner rejected that and was right:**
+  *"HR only depicts cardio/heart rate, not CNS."*
+  - **What the code does today is a hard override, not a blend.** `estSessionKcal`
+    (`packages/shared/src/health/workout-energy.ts:196`): if an `avgBpm` exists, Keytel produces the
+    kcal and **RPE contributes nothing**; RPE only picks a MET tier when HR is missing.
+  - **Measured 2026-08-23 over the 44 sessions carrying both an `avg_bpm` and rated sets:
+    `corr(avgBpm, mean set RPE) = +0.083`.** They are uncorrelated. Whatever heart rate is
+    measuring on a lifting day, it is not how hard the session was.
+  - **Two structural reasons, both checked in source.** `summariseWorkoutHr`
+    (`packages/shared/src/workout/hr-summary.ts:25`) takes a **flat mean over every reading in the
+    session, rest periods included** — so a heavy day with long rests averages *low* precisely when
+    it was hardest. And Keytel's equation was fitted on steady-state aerobic exercise; it carries no
+    anaerobic term and nothing for neuromuscular cost.
+  - **What that does to real numbers** (male, 70.9 kg, 33 — the owner's own profile):
+
+    | session | avg HR | mean set RPE | Keytel |
+    |---|---:|---:|---:|
+    | **74 min**, mean pct 74.4, one set at RPE 9 | 73 | 7.27 | **207 kcal** |
+    | 48 min | 104 | 7.67 | **359 kcal** |
+    | 45 min deload at 50% 1RM | 76 | 6.00 | 146 kcal |
+
+    **The longer, harder session is credited with 40% fewer calories**, at 2.8 kcal/min — barely
+    above sitting. The ordering is inverted, and inverted against the heaviest work.
+  - **So HR and the derived intensity must COMBINE — HR as the base, RPE as a correction on top.**
+    Not RPE overriding HR either; that is the same mistake mirrored. A zero correlation is what
+    makes each one worth having.
+- **The correction formula is NOT picked here.** It is a scoring change (Tuning proposes, the owner
+  signs off, Lane A implements) and it has to be **fitted, not designed** — the fitting target is
+  **Q-422**'s adaptive-TDEE back-solve, which recovers true maintenance from paired intake and
+  weight and is the only ground truth this app has for a day's energy. **Q-420 supplies the input
+  Q-422 needs; Q-422 is how anyone knows the combination is right.** They are one project in two
+  parts, and this entry is the part that can start now.
 - **Branch:** `feat/derive-session-rpe-from-set-rpe`
 - **Added:** 2026-08-19 · owner, unprompted, while discussing energy accuracy: *"i cant tell session
   rpe I can tell excefcise rpe; so maybe it takes the average of excercise RPE to calculate the
@@ -788,6 +836,14 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
 - **Gate: owner** — a scoring change: Tuning proposes, the owner signs off, Lane A implements. Added
   2026-08-20 because `scripts/next-item.js` listed this as READY: the blocker was stated in prose
   further down the entry, and prose is exactly what the `Gate:` field replaced.
+- **Needs:** Q-420
+- **⚑ THE DIRECTION IS SETTLED (owner, 2026-08-23) — what is still gated is the fitted numbers.**
+  Q-420 records the measurement that decides it: across 44 sessions with both signals,
+  `corr(avgBpm, mean set RPE) = +0.083`, and a 74-minute session the owner rated 7.27 is credited
+  **207 kcal** against 359 for a 48-minute one, because `avgBpm` is a flat mean over rest periods
+  and Keytel has no neuromuscular term. **Heart rate is the base and the derived intensity is a
+  correction on it — neither overrides the other.** What this entry owes is the correction fitted
+  against the adaptive-TDEE back-solve, not a formula chosen for looking reasonable.
 - **Branch:** `feat/calibrated-active-energy-multiplier`
 - **Added:** 2026-08-19 · from the owner's question, second half — *"what type of data can we feed to
   calibrate it over time"*. Tier 3, and the only rung that makes the number better the longer the app
@@ -829,23 +885,7 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [nutrition] LB-2 — there is no way to delete a meal type's entries, only to move them
-
-- **Branch:** `feat/meal-type-delete-logs`
-- **Added:** 2026-08-23 · **Lane: A** — a repository method and a route parameter
-- **Gate: owner** — it is a bulk destructive action, and the escape it duplicates already exists
-- **Placement:** low. Nobody is stuck: Q-326 shipped the move, which is the escape that was missing.
-
-Q-326 asked its dialog for a secondary *"Delete them instead"*. **Nothing on the server can do it.**
-`reassignAndDeleteMealType` is the only escape the repository offers; there is no
-`deleteFoodLogsByMealType`, and `DELETE /api/nutrition/meal-types/[id]` either reassigns or refuses.
-So the button was not built rather than built dead.
-
-**Worth deciding before building.** It would let someone discard real logged history in one tap, and
-the only thing it saves over the move is a meal type they did not want to keep — which they can
-delete afterwards, once it is empty. If it is wanted, it needs its own confirm naming the count, and
-`invalidateNutritionWrite()` on the client, same as the move.
-
+### [nutrition][platform] LB-4 — logging food evicts the caches BEFORE the server has the write, so the refetch re-caches the pre-log figures
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
@@ -1038,6 +1078,181 @@ delete afterwards, once it is empty. If it is wanted, it needs its own confirm n
   inert without checking which.
 - **What would count as done:** all six converted, and `grep` for the shape returns only the
   engine's three (already converted) plus the sheets you just changed.
+
+### [nutrition][platform] LB-7 — the recipe spec's attribution assertion can pass with no attribution
+
+> **⚠️ REWRITTEN 2026-08-24 — the diagnosis below was wrong about the cause, and the blocking failure
+> is already fixed (#359).** This entry was filed from a CI failure and reasoned that *"when the
+> scrape returns no title the name falls back to the host"*. That fallback is real, but it was not
+> what happened. **The CI server log shows `POST /api/nutrition/scan 400` three times, once per
+> failing attempt** — the request reached the real route, so the spec's `page.route` stub never
+> applied and the row fell into its could-not-resolve state, where the host IS the name.
+>
+> **Why the stub was bypassed:** `public/sw-template.js` re-issues **every** `/api/` request — no
+> method filter — so once the service worker controls the page the request originates from the
+> worker, and Playwright does not intercept service-worker fetches. Whether the worker has taken
+> control by the time the POST fires is a race, which is why the same run had three failures and one
+> stubbed pass, and why it passed locally every time. Fixed with
+> `test.use({ serviceWorkers: 'block' })`; both that rule and "never `expect` inside a route handler"
+> are now in `e2e/README.md`.
+>
+> **Chasing "make the scrape mock return no title" would have fixed a condition that was not
+> occurring.**
+
+- **Lane:** B — `e2e/` only now.
+- **Branch:** `fix/recipe-spec-structural-attribution`
+- **Placement:** low. Not blocking anything; the spec is green.
+
+**What is left, and it is the one point of the original entry that still stands.** The assertion is
+`dialog.getByText('example.com').last()`. `.last()` targets the attribution today because it renders
+after the name — but if the attribution row disappeared entirely, `.last()` would match the *name*
+and the assertion would still pass. A guard that survives the removal of the thing it guards is not
+a guard.
+
+**Fix shape:** assert on the attribution's structure rather than on its text position — it is the row
+carrying the `Link2` icon and the `· from a N-serve recipe` suffix. A `data-testid` on that row is
+the cheap version. Then delete the `.last()` and its comment.
+
+### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
+
+- **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
+  Done: `day_checkins.food_logging_completed_at` (migration **201**, local SQLite **v27**, both sync
+  directions, `claude_ro` views **202**), `POST /api/food-logging-complete` with its Undo, and
+  `estimateMaintenance` filtering on the flag instead of `intakeKcal > 0`. The partial-day case the
+  module had **zero** coverage of now has five tests, plus an end-to-end pair through
+  `computeEnergyBalance`. [`Journal`](overview/entries/2026-08-19-tdee-day-completeness.md).
+- **⚠️ Until the button ships, the calibration cannot engage** — no day can be marked, so every day
+  is excluded and `source` stays `'formula'`. That is the intended failure mode ("the estimate
+  waits", not "the estimate is quietly wrong") and it costs nothing today, because per Q-302 **0 of
+  the last 30 rolling windows** cleared `MIN_LOGGED_DAYS` anyway. It does mean the feature is inert
+  until Lane B lands.
+- **Still open — Lane B:** the *"Complete Today's Logging"* button as the last element in the day's
+  scroll (not the header, not beside the ring), the copy beneath it, the receipt-with-Undo it
+  becomes, and the **"N of 10 days" counter shipped with it, not after** — the button feeds
+  something invisible, and that invisibility is why this bug survived. `POST /api/food-logging-complete`
+  takes `{ date?, complete }` and answers `{ date, complete, completedAt }`; sending
+  `complete: false` is the Undo.
+
+- **Branch:** `fix/tdee-partial-day-completeness`
+- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
+  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
+  the rest? does it assume thats all I had for the day and tune around that? Need some control
+  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
+  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
+  that the owner's suspicion is correct.
+- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
+  There is no completeness concept anywhere in the path.
+
+**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
+"logged day" is with a bare non-zero test:
+
+```ts
+const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
+```
+
+A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
+*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
+(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
+`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
+
+**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
+miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
+in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
+comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
+in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
+the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
+abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
+fixed the version that self-corrects by evening, and left the version that never does.
+
+**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
+eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
+1400, dinner never logged):
+
+```
+partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
+0            14          2600        2600         medium      null
+6            14          2086        2086         medium      null
+14           14          1400        1400         medium      null
+```
+
+Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
+`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
+as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
+"plausible" 1400.
+
+**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
+`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
+inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
+under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
+module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
+too, so the Balance card's "burned" figure is dragged down in step.
+
+- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
+  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
+  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
+  presents protections (1) and (2) as the complete story — the claim this corrects.
+- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
+  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
+  this question is about: logs consistently enough to switch tuning on.
+- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
+  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
+  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
+  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
+
+**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
+
+1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
+   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
+   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
+   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
+   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
+   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
+2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
+   "expected" is the calorie target, derived *from* maintenance, which is the number being
+   estimated, so a low estimate lowers the threshold and admits more partial days next window.
+   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
+   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
+   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
+3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
+   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
+   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
+   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
+   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
+
+- **What would count as fixed:** a day the user did not finish logging can no longer enter
+  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
+  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
+  rather than toward a confident wrong number. Whichever mechanism is chosen,
+  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
+  module is well-tested for empty days and has never been tested for half-full ones.
+- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
+  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
+  control, if option 1 is chosen, would need a device check.
+
+
+**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
+meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
+one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
+option 3 (silent inference) cannot be corrected by the person who knows the answer.
+
+**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
+— not in the header, not beside the ring. It is a statement about a day that has finished, and its
+position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
+is everything you ate. Only completed days are used to work out your maintenance calories."*
+Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
+must be reversible, since the whole point is that a wrong day poisons the estimate.
+
+**Ship the counter with it, not after it.** The button feeds something invisible today, and that
+invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
+had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
+for, so the two land together rather than one inventing a second version of the other.
+
+**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
+`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
+assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
+quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
+honest one, so the estimate starts from days marked after this ships and the counter shows that
+plainly.
 
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
@@ -3181,91 +3396,13 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   Q-541's *"skip it, a packed blob is already bytea"* is clearly the right call rather than a
   close one.
 - Needs `VACUUM FULL` to reclaim (ops-doc I17).
-
-
-### [devices][platform] Q-541 — repack raw frames: ~20× smaller, byte-for-byte lossless
-
-- **Plan:** [`docs/superpowers/plans/2026-08-17-oura-raw-frame-packing.md`](superpowers/plans/2026-08-17-oura-raw-frame-packing.md)
-  — full implementation plan, written 2026-08-17. Decision context in
-  [`…-db-storage-raw-samples-retention.md`](superpowers/plans/2026-08-17-db-storage-raw-samples-retention.md) §6 C.
-- **Branch:** `perf/oura-two-tier-frame-reader` (Tasks 0–2 landed on `perf/oura-raw-frame-packing`)
-- **Lane A.** Server/JS only — migration, `lib/data/**`, `lib/oura-ble/**`. No Kotlin, no APK.
-- **Added:** 2026-08-17
-- **Lane:** A
-- ✅ **UNBLOCKED — owner chose A+B+C on 2026-08-17 (see Q-542).** This is the option the current
-  archival rule does not consider, and the only one that makes the growth curve sustainable without
-  deleting anything or depending on the phone.
-- **It is load-bearing, not polish.** Against the stock 500 MB target: `VACUUM FULL` alone re-crosses
-  500 MB in ~5 days, A+B in ~7 weeks, **C in ~3 years** (~0.37 MB/day vs ~7.5 today). C is the only
-  step that makes 500 MB a home rather than somewhere the database passes through.
-- **It also deletes the failure mode behind the Q-534 outage.** A packed table holds ~30 rows/day
-  instead of 22,910, and `measured_at` stops being a stored per-frame column — it is derived at decode
-  time from the anchor — so a clock correction re-stamps nothing at all.
-- **Supersedes the `bytea` half of Q-540** — a packed blob *is* `bytea`. If C is taken promptly, skip
-  the standalone `text` → `bytea` migration rather than doing the work twice.
-- 🚧 **Task 4 SHIPPED 2026-08-18 — the packer.** `lib/data/postgres/slices/oura-raw-pack.ts` +
-  `GET|POST /api/oura-ble/samples/pack`, admin-gated, bounded, idempotent, resumable, never automatic.
-  **This is the first code in the project that deletes an archival frame**, and it does so only after
-  re-reading the committed blob and proving the frames equal; a refusal is returned per bucket rather
-  than thrown. Four decisions the plan left open are settled in it: the hot window anchors to
-  `max(ring_timestamp_ds)` not `now()`; a wall-clock quiet guard (`max(recorded_at) < now() - 1 day`)
-  sits on top, because ds says when the ring recorded a frame and not when we received it; and
-  `body_sha256` hashes the frame *sequence*, not the blob, so it is an independent check rather than a
-  restatement of the re-read. Verified live: 251 seeded frames → **2,800 bytes of blob (≈29×)**, and
-  the API's full dump hashes identically before and after. ⚠️ **No button yet — Q-316, Lane B.**
-- 🚧 **Task 3 SHIPPED 2026-08-18 (v1.318.12) — the two-tier reader.**
-  `lib/data/postgres/slices/oura-raw-frames.ts`: `readRawFrames` (ds range + tags, ascending) and
-  `readRecentRawFrames` (newest-first, limited), returning **exactly the shape of the `select` they
-  replace**. Eleven read sites converted — the rollup, both step-feature reads, the temp/MET and
-  battery range reads, the two tag censuses, the admin raw dump and the summary. Still inert in
-  production: nothing writes a blob yet.
-  Three findings worth not re-deriving: **(a)** an aggregate cannot use the reader's identity dedupe,
-  and the summary's per-tag counts double-counted a bucket sitting in both tiers — 80 frames read as
-  120 on the dev server — so they now anti-join on `(epoch, tag, ds_bucket)`; **(b)** `event_name` had
-  to become derived from `tag`, because a packed frame carries none and grouping on a column one tier
-  lacks splits a tag into two rows; **(c)** a tag dormant longer than the hot window needs a cold
-  fallback in three places or it reads as never having produced data.
-  Verified on `pnpm dev` by rehearsing the packer by hand over four seeded ring-days: every read is
-  byte-identical across all-hot, both-tiers and hot-rows-deleted.
-- 🚧 **Tasks 0–2 SHIPPED 2026-08-17 (v1.318.11), additively.** Task 0 answered structurally rather
-  than by counting — `epoch` is **not** in the dedup unique constraint, so a cross-epoch duplicate
-  was never insertable, and the count the plan proposed now returns "none" for the wrong reason
-  because migration 190 merged the epochs. Migration **191** creates `oura_raw_packed`; **192**
-  regenerates the `claude_ro` views a new table requires; `lib/oura-ble/frame-pack.ts` is the codec,
-  with 7 property tests and 2 DB-backed round-trip tests. **Nothing reads or writes it yet, and no
-  row has moved** — `oura_raw_samples` and the ingest path are untouched.
-  **Remaining: Tasks 5–7** — the backfill (run the packer over all history in bounded batches, then
-  `VACUUM FULL` **after**, not during), the hot-window prune, and the `measured_at` range-query sweep.
-  The plan's gate still stands: a verified backfill on a copy of production before the real one.
-- ✅ **Planned 2026-08-17 — ready for an implementer.** The three open questions are answered in the
-  plan: **(a)** the dedup key does not move at all — ingest and `oura_raw_samples` are left untouched
-  and a *second* table holds sealed blobs, so `ON CONFLICT DO NOTHING` and the cursor path carry no new
-  failure mode; **(b)** every reader becomes "cold blobs ∪ hot rows", which is one shared helper rather
-  than a per-call-site rewrite, because nearly every read is already the same
-  `user_id + tag IN (…) + ds BETWEEN` shape; **(c)** the migration adds a table and moves data with a
-  packer that only deletes a hot row after re-reading its blob and proving the frames equal.
-- **Measured shape (production 2026-08-17):** **968 blobs replace 1,098,956 rows — 1,135×.** 22.5
-  blobs/day, mean 1,135 frames each, 13 MB of raw payload for all history. Projected steady state
-  **~70 MB** (hot 7 days ~52 MB + cold ~16–20 MB) growing ~117 MB/year, against ~7.5 MB/day today.
-- **The bucket key is `(user_id, epoch, tag, ring_timestamp_ds/864000)` — NOT a calendar day.** Wall
-  time is derived through anchors and that derivation changes (Q-71/I25), so a calendar-day partition
-  would need re-partitioning on every clock fix, reintroducing exactly the failure this removes.
-  `epoch` is load-bearing and the data proves it: the four epochs' ds ranges overlap heavily.
-- **Task 0 first** — check whether any rows share `(user_id, ring_timestamp_ds, tag, body_hex)` across
-  different epochs. The existing unique constraint omits `epoch`; given the overlap that is worth
-  ruling out before relying on the key. Cheap, and it could change the design.
-- **The number that motivates it:** `body_hex` averages **24 hex chars — 12 bytes of real frame** —
-  stored at **~328 bytes/row**. A 27× overhead. Measured 22,910 rows/day over the last 14 complete
-  days: the irreplaceable payload grows at **205 MB/year**, the table at **2.7 GB/year**. The 2.5 GB
-  difference is representation, not information.
-- **Shape:** one row per `(user, day, tag)` holding a `bytea` blob of concatenated frames with
-  delta-encoded `ring_timestamp_ds`, plus count and ds range. TOAST compresses blobs over 2 kB on top.
-  At ~16 effective bytes/frame that is **~134 MB/year**, and the existing 1.1M rows repack to under
-  50 MB.
-- **The hard part is the dedup key**, which currently includes `body_hex` and is what makes re-sends
-  free (ops-doc I8) — it has to move in-blob or to a narrow side index. Ingest, the rollup reader,
-  redecode and the admin tester all change. Bounded, sandbox-testable, touches **no native code**.
-
+- **✅ Q-541 is COMPLETE as of 2026-08-23, so the conditional above is resolved: skip the `bytea`
+  half.** The packer now runs automatically from the ingest path, so every sealed bucket leaves
+  `oura_raw_samples` on its own and the rows a `text` → `bytea` migration would rewrite are the
+  ~7 days of hot tier that is about to be packed anyway. **What is left of this entry is the
+  `event_name` drop alone**, and that is a data-dropping migration: it needs the owner's yes before
+  it merges, even though the column is derivable from `tag` and no reader has touched it since
+  Q-541 Task 7.
 
 ### [devices][platform] Q-542 — ANSWERED 2026-08-17: A+B+C, nothing irreversible. Keep for the audit trail, then remove.
 
@@ -3575,6 +3712,19 @@ ehr     0     0     0     0   648   208   128   556     0
 - 🚧 **89 → 85, 2026-08-23.** Four converted, each after reading the one client that posts to it:
   `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. All four
   now 400 on an unknown key and still accept the real body — verified live, not just by test.
+- 🚧 **85 → 79, 2026-08-24.** Six more, all under `app/api/admin/`: `activity-types`, `ai-usage`,
+  `exercises`, `fix-exercise-units`, `generate-exercise-media`, `mirror-dataset-gifs`. Same method,
+  same live verification. **Two of them are precisely the shape a codemod would have broken:**
+  `activity-types` and `exercises` PATCH destructure `id` out of the body **before** parsing
+  (`const { id, ...rest }`) while their clients post `{id, ...data}` — so the schema never sees `id`
+  and strict is safe, which is knowable only from the handler, not the schema. Round-tripped live to
+  confirm the PATCH still returns 200.
+- **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
+  builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
+  unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
+  still added, because it catches the day someone swaps the literal for a spread of the search
+  params — but it needs **no client verification**, which is the expensive half of this sweep.
+  Recognise the shape before budgeting time for one.
 - **⚠ Two more exemption classes were found while doing it, and both are now in the script's header
   with evidence rather than as a guess.** (a) **A third-party SDK's wire format:** `/api/coach` is
   driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts `{ id, messages, trigger,
@@ -3593,43 +3743,6 @@ ehr     0     0     0     0   648   208   128   556     0
   APK may legitimately carry fields the current schema does not name; making that one strict could
   reject mutations from a device that has not updated. Handle it deliberately, or exempt it with a
   written reason. **Lane A.**
-
-### [platform] Q-456 — the owner's production user ID is baked into 18 committed migrations, and the documented process re-publishes it on every schema change
-
-- **Branch:** `fix/claude-ro-owner-id-out-of-committed-migrations`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** upper-mid. Not urgent — nothing is exploitable today — but it **compounds**: the
-  documented process adds another public copy on every schema change, so the cost of fixing it only
-  goes up.
-- **What.** `fe481797-4114-4f59-824d-223e0281823e` is the owner's production `users.id`. It is in
-  **18 tracked files**: every `NNN_claude_ro_views*.sql` migration,
-  `lib/data/postgres/__tests__/claude-ro-readonly-role.test.ts:41` (`OWNER_ID`), and
-  `docs/superpowers/plans/2026-08-12-meal-plan-portions-and-editing.md` (which spells out
-  `CLAUDE_RO_OWNER_USER_ID=fe481797-…`). `scripts/generate-claude-ro-views.js` bakes it in as the
-  row-scoping predicate and the generated SQL is committed. Invisible while the repo was private.
-- **What it is NOT.** Not a credential. It grants nothing alone — `/api/admin/db-query` needs
-  `CLAUDE_DB_QUERY_SECRET` **and** `requireAdmin`, and every other route is `auth()`-scoped. No
-  health data, email or name is exposed with it. **Do not treat this as an incident.**
-- **Why it is still worth fixing, in order:**
-  1. **It is one half of a credential pair.** `WEBHOOK_USER_ID` (+ `HEALTH_CONNECT_INGEST_SECRET`)
-     and `ADMIN_EXPORT_USER_ID` (+ `ADMIN_EXPORT_SECRET`) resolve to a user id that is almost
-     certainly this one. If either secret leaks, the other half is no longer a guess.
-  2. **It cannot be rotated cheaply** — 18 files plus the production row it identifies.
-  3. **The process re-publishes it.** `CLAUDE.md` requires re-running the generator into a **new**
-     migration number whenever a table is added, so every future schema change adds another public
-     file containing it, indefinitely.
-- **Fix shape (implementer's call).** Prefer killing the class over scrubbing 18 files: have the
-  generator resolve the owner at **apply** time rather than **generate** time — views scoped on
-  `current_setting('app.claude_ro_owner')`, or a single-row private lookup seeded out-of-band, the
-  same way the `claude_readonly` role's password is already kept out of committed migrations. Then
-  the 18 existing files can be superseded by one rebuild migration rather than edited. Note
-  `CLAUDE.md`'s warning: `ensureSchema` tracks by filename, so **never edit an already-applied
-  migration** — this has to land as a new number that DROPs and rebuilds the schema.
-- **Lane A owns this** — it is migrations, and no other agent takes a migration number.
-- **Related, not filed separately:** `private-paths.json` protects a third party's IP well, and
-  nothing plays that role for this project's own users' identifiers. Whether that wants a second list
-  or a widening of the existing one is a design decision; see the review's closing section.
 
 ### [platform] Q-312 — the synthetic MET table is physiologically impossible, and it costs ~9 tests in CI
 
@@ -4550,43 +4663,41 @@ session working from a temporarily restored copy.
   making it high-cardinality and awkward to group. Consider a separate `subject_id` column if this
   is touched anyway — not worth its own PR.
 
-### [platform] Q-287 — there is no self-service account deletion, and the Play Store requires one
+### [platform] Q-287 — self-service account deletion, all seven plan decisions resolved
 
-- **Gate:** owner
-
-- **Branch:** `feat/account-deletion`
-- **Plan:** **required before any code** — this is destructive and irreversible
-- **Added:** 2026-08-15 · from the uncovered-lenses review §4
+- **Lane:** A
+- **Needs:** Q-288
+- **✅ ALL SEVEN DECISIONS IN THE PLAN ARE RESOLVED 2026-08-23 — see
+  [§11 of the plan](superpowers/plans/2026-08-16-account-deletion.md#11-where-each-decision-landed-2026-08-23)
+  for the table. This entry is startable; only `Q-288` (fixing the export the deletion flow offers
+  first) blocks it, and that is a `Needs:`, not an owner gate.**
+  - **Owner-decided:** hard delete (not a tombstone); a **14-day grace period**, executed on the
+    next authenticated request rather than a schedule — this repo has no cron layer, and Q-270
+    already solved the identical gap the same way, by checking once per app launch rather than
+    inventing a scheduler; and the last remaining admin's own deletion is **refused outright**, so
+    `/api/admin/*` — including `db-query`, which every review session depends on — cannot be
+    self-locked-out.
+  - **Decided without going back to the owner, because each was cheap, reversible, and a mechanical
+    call rather than a preference:** the big `oura_raw_samples` delete is measured against the
+    indexed `user_id` path first, falling back to a chunked delete only if that proves too slow; a
+    deleted user's `friendships` rows are deleted outright, on both sides, since a friendship with
+    a deleted account is meaningless; and the web-accessible deletion path Google Play requires is
+    a route on the existing sign-in flow, not a new email process.
+  - **This entry remains destructive/irreversible per `CLAUDE.md`'s carve-out.** The seven
+    decisions unblock *building the plan into code* — the resulting PR still needs sign-off before
+    merge, same as any auth/data-dropping change.
 - **Confirmed:** account deletion exists only under `app/api/admin/users`. There is no user-facing
   path, in-app or web. Google Play has required both since 2024, and `CLAUDE.md` names the Play
   Store listing as the goal (alongside the privacy policy, data-safety declarations, and the Health
   Connect declared-use-case review, which are separate gates).
-- **📋 PLAN DRAFTED 2026-08-16 — [`docs/superpowers/plans/2026-08-16-account-deletion.md`](superpowers/plans/2026-08-16-account-deletion.md).**
-  Still ⛔ blocked: the plan is a set of **seven marked owner decisions**, not an implementation.
-  Key findings it records so an implementer does not re-derive them:
-  - **The user-scoping map is already solved** — `scripts/generate-claude-ro-views.js` classifies all
-    ~80 tables (`user_id` / 17-table `VIA` FK paths / `GLOBAL` / `DENIED`) and **fails loudly on an
-    unclassified table**. Generate the delete from that map with the same default-deny failure mode;
-    a hand-written list is how a later table survives a deletion request.
-  - **`oura_raw_samples` is 341 MB / ~1M rows for one user** — a synchronous delete will exceed
-    `statement_timeout: 15_000`. Measure before designing around it.
-  - **Q-288 is a hard dependency**: if deletion offers export-first, an export covering 27 of 80
-    tables is the user's last chance at data it does not include.
-  - **Last-admin lockout** — deleting the only admin removes access to `/api/admin/*`, including the
-    `db-query` endpoint every review depends on.
-- **⛔ Do not implement without the owner's explicit sign-off on the semantics.** Per *Safety &
-  Reversibility*, this is exactly the destructive/irreversible class that stays confirm-first. The
-  deliverable of the first PR is a **plan**, not a route.
-- **What the plan must settle:**
-  1. **Hard delete vs. tombstone**, per table. 80 tables, and `oura_raw_samples` alone is 1M rows.
-  2. **The user-scoping map already exists — reuse it.** `scripts/generate-claude-ro-views.js`
-     had to solve exactly this problem (which tables are user-scoped, which are FK-reachable, which
-     are global) and **fails rather than guessing** on an unclassifiable table. That failure mode is
-     the right one here too, and rebuilding the map by hand would be the mistake.
-  3. **FK order.** `CLAUDE.md` records that `ON DELETE SET NULL` once wiped session identity across
-     four deploys — deletion order is a known hazard in this schema.
-  4. **Confirmation UX and a grace period** — a mis-tap must not be terminal.
-  5. **What the owner's own account does.** Deleting the only admin has obvious consequences.
+- **Branch:** `feat/account-deletion`
+- **Added:** 2026-08-15 · from the uncovered-lenses review §4
+- **The plan** (`docs/superpowers/plans/2026-08-16-account-deletion.md`) already carries the two
+  findings worth keeping without re-deriving them: `scripts/generate-claude-ro-views.js`'s ~80-table
+  classification is the deletion routine's user-scoping map — generate or validate against it, never
+  hand-write a second list — and deletion order must follow the FK path explicitly (`CLAUDE.md`
+  records `ON DELETE SET NULL` wiping session identity across four deploys once already; do not
+  rely on cascade behaviour here).
 - **Verify the current Play policy wording** before building; this entry asserts the 2024
   requirement from knowledge, not from a fetch of Google's current page.
 
@@ -7799,9 +7910,22 @@ measured, not the ~3,300-test full suite.
   rollup queries do not select, so every frame resolves against the *current* epoch. Not a regression
   (behaviour across a ring reset is unchanged), but it is the honest completion of this work.
 
-### [sleep][readiness] 🔴 Q-72 — the Sleep Score cannot tell a good night from a bad one (MEASURED, needs an owner decision)
+### [sleep][readiness] Q-72 — the Sleep Score's model is retuned; a partial-data flag is what's left
 
-- **Gate:** owner
+- **Lane:** A — the coverage-ratio formula belongs in
+  `packages/shared/src/health/sleep-score.ts` (one formula, one place), and this reaches
+  `components/health/**` display code too, which the §3 rule puts in Lane A whole ("Both → Lane A,
+  engine half first"). The display half is a small, obvious follow-on once the formula exists.
+- **⚑ NO OWNER GATE REMAINS as of 2026-08-23. Both decisions this entry ever needed are made.**
+  Read the two `✅ ANSWERED` bullets below before anything else — the rest of this entry is the
+  history that got there and is not itself blocking.
+  1. **2026-08-12: re-tune the stuck contributors, not a global rescale.** Shipped as v1.319.0
+     (2026-08-18) — mean sleep score 87 → 70, range 86–92 → 32–99.
+  2. **2026-08-23: flag a partial night, scaled to how much is missing** (below).
+- **⏳ One thing is still time-gated, not owner-gated, and does not block starting the flag work.**
+  The rank-based re-validation against the owner's morning ratings needs ~3 weeks of nights scored
+  under the new v1.319.0 model to accumulate (history is not back-filled) — due around
+  **2026-09-08**. Nobody is waiting on a decision; the clock is the whole blocker.
 
 - **Added:** 2026-08-04. Started as *"put the sleep rating on the morning check-in"* (the owner's
   idea). **That turned out to be already built** — `MorningCheckinSheet` has collected
@@ -7903,10 +8027,21 @@ each other. The score has ~18 points of dynamic range and spends all of it above
   `schedule` and `latency` so they stop sitting at their ceiling and diluting the six that already
   track the owner's experience. The owner was told their nightly number will change and that bad
   nights will start scoring genuinely low, and accepted that.
-- **Open sub-question the implementer must still resolve (do not guess):** `hr` and `hrv` are
-  present on only **39 of 56** scored nights, so the score already means something different on the
-  other 17. Down-weighting them changes that asymmetry rather than fixing it — decide and document
-  what a night with neither contributor should score before shipping.
+- **✅ ANSWERED BY THE OWNER 2026-08-23 — show when data is missing, scaled to how much.** Do not
+  silently score a partial night the same as a full one. *"If its missing data it shouldnt
+  [score] differently [without saying so]. Depending on how much is missing."*
+  - **The denominator, so "how much" is a number and not a feel:** `hr` and `hrv` together carry
+    **28 of the model's 110 weight points — 25%**. A night missing both is missing a quarter of the
+    model, not a rounding error; a night missing only `latency` (6 points, 5%) is not the same case
+    and should not be flagged the same way.
+  - **Shape, for whoever builds this — not a further owner decision, a design note:** a coverage
+    ratio (`present weight / 110`) with two or three bands is enough — full data, a light
+    "partial data" note, and a clearer flag once missing weight crosses roughly the `hr`+`hrv`
+    threshold. Do not invent a fourth band or a numeric confidence score; the owner asked for
+    something that says *this number is less complete*, not a second metric to interpret.
+  - **This is additive to the 2026-08-12 decision, not a new gate.** It changes how the score is
+    *presented* on a partial night, not how it is computed. It can ship independently of the
+    ~3-week rank-based re-validation below.
 
 - **⚑ 2026-08-19 — the yardstick question is answered, and the obvious next move was the wrong one.**
   [`docs/reviews/2026-08-19-sleep-validation-targets.md`](reviews/2026-08-19-sleep-validation-targets.md).
@@ -8235,106 +8370,6 @@ per-field merge where an AI write has no honest source rank to claim.
   cover more of this than a calorie estimate would. See
   [`docs/activity-goal-calibration.md`](activity-goal-calibration.md) §5-B — a heart-rate load term
   may be the better target than reproducing a calorie number.
-
-### [activity][readiness] Q-137 — the Activity Score is effectively a step counter: 57 of 100 weight is constant, and it lost its second-best input a month ago
-
-- **Gate:** owner
-
-- **Branch:** `fix/activity-score-calibration`
-- **Added:** 2026-08-07 · [review §6.1-6.3](reviews/2026-08-07-full-app-review.md)
-- **⛔ Needs an owner decision before code**, same shape as Q-72 — this changes a number read daily.
-- **Measured over 91 days** (2026-05-09 → 2026-08-07) via `/api/admin/day-review`, contributor-level:
-
-  | contributor | weight | n | mean | **sd** | at exactly 100 |
-  |---|---|---|---|---|---|
-  | `strengthFreq` | 25 | 91 | 100.0 | **0.0** | **91/91** |
-  | `moveHours` | 12 | 44 | 100.0 | **0.0** | **44/44** |
-  | `strengthVolume` | 20 | 91 | 94.8 | 18.0 | 82/91 |
-  | `steps` | 18 | 91 | 56.1 | **33.6** | 19/91 |
-  | `zoneMinutes` | 10 | 44 | 5.3 | 20.9 | 2/44 |
-  | `activeEnergy` | 15 | 16 | 53.1 | **29.5** | 2/16 |
-
-  **r(steps, activityScore) = 0.775.** `strengthFreq` — the single **largest** weight — has been
-  exactly 100 on all 91 days across three months and has never once carried information. The cause is
-  goals far below actuals: strength-frequency goal **3** against 5–7 sessions/week, move-hours **15**
-  against 19–24, volume **4,700** against 29,661. A hard training day and a rest day with the same
-  step count score identically.
-- **The score lost its second-best input at the BLE re-key and nothing surfaces it.** `activeEnergy`
-  is `excludedReason: "no input available"` on every recent day — `body_metrics.active_calories` came
-  from Oura Cloud `daily_activity`, which stopped. The model handles this **correctly** (excluded,
-  weights renormalised, not silently zeroed) but with **sd 29.5** it was the second-most
-  discriminating contributor. The pillar went from two informative inputs to one.
-- **`zoneMinutes` exposes an absent-vs-zero asymmetry.** Absent data is excluded and renormalised; a
-  *structural* zero is scored as a genuine zero at full weight. Zone 1 spans 55–134 bpm (≈60% HRR),
-  and strength training with rest rarely sustains above it, so a lifter scores ~0 on a cardio metric
-  permanently. **An initial hypothesis that chest-strap HR was missing from `oura_heartrate` is
-  WRONG** — it carries `chest_strap` samples (1,090 on 2026-08-07). Do not re-chase that.
-- **Options for the owner:** (a) re-anchor the goals to the user's actual baseline so the three
-  saturated contributors can move; (b) drop or re-weight contributors that cannot discriminate for
-  this training style; (c) find a BLE-derived replacement for `activeEnergy`. Do not pick one for them.
-
-**Re-measured and worked up 2026-08-11 — the three options were all downstream of a question none of
-them asked.** Owner was asked to choose and said the goals need to be *scientifically calibrated*
-first, so the output is a design discussion, not a patch:
-[`docs/activity-goal-calibration.md`](activity-goal-calibration.md). What changed:
-- **Every premise re-verified against production and holds, sharper.** `active_calories` last landed
-  **2026-07-07** (34 days dead at time of writing). Strength frequency is **4.9/wk** against a goal
-  of 3 → ratio 1.63, and `STRENGTH_FREQ_CURVE` caps at 100 from ratio **1.0**, so the largest weight
-  is pinned *structurally*, not just observed.
-- **Stated as an outcome rather than as contributors:** the score's own 30-day spread is mean
-  **74.3, sd 5.9, range 60–81**, while steps — its one live discriminating input — runs sd **4,028**
-  on a mean of 6,959. The input swings ±58%; the output moves in a 21-point band.
-- **Option (a) partly reverses a deliberate decision.** The 2026-07-22 rewrite moved *away* from
-  self-referential scoring precisely because "a lazy week lowered the bar"; any rolling-baseline goal
-  reintroduces that plus a treadmill. The doc proposes fixed *personal* goals instead.
-- **Option (c) is bigger than it reads** — the replacement's plumbing already exists and is empty.
-  Split out as **Q-184** (device work, needs an APK).
-- **The "missing score-days" worry was unfounded** — checked: every day from **2026-07-28** onward
-  has an activity score and all gaps precede it. That is the score's start date, not a fault.
-- ✅ **DECIDED 2026-08-11 — direction C, and goals set ABOVE typical.** See
-  [§8 of the doc](activity-goal-calibration.md). No longer blocked; what remains is implementation.
-  - **The "above typical" half is load-bearing and was nearly missed.** A strength goal of 5 against
-    a measured 4.9/wk is ratio 0.98 → ~99 — the saturation re-created with better-looking numbers.
-    Targets must sit meaningfully above typical or this does nothing.
-  - **Expect the score to move AND to centre lower than 74.** Intended (100 should be reachable, not
-    routine) and not to be read as a regression. Q-183 pushed the other way and has **already
-    shipped**, so **measure any before/after against a post-Q-183 window, not against the 74.3
-    quoted above.**
-  - ✅ **SHIPPED 2026-08-11 (v1.284.0): `DEFAULT_STRENGTH_FREQ_GOAL` 3 → 5.** One line, and it
-    unfroze **both** strength lanes — the volume target is derived from the same number
-    (`volTarget = typicalSessionVolumeKg × strengthFreqGoal`), so at goal 3 it sat at 14,100, below
-    even a weak week. Regression test pins the bug as a property: **at goal 3 a weak week and a
-    strong week scored identically on both lanes**; at 5 they separate and a strong week still
-    reaches 100. See
-    [the journal entry](overview/history-2026-08-08.md).
-    **What remains on this entry: nothing** — move hours is Q-188, the volume anchor is Q-190, and
-    direction B is still gated. Strike this entry once those two land.
-  - ✅ **Target values set 2026-08-11 — see [§9 of the doc](activity-goal-calibration.md).** Steps
-    **8,000** (unchanged), strength frequency **5** (at the optimum, deliberately not above it — the
-    ACWR taper already penalises over-reaching, so a goal of 6 would have one part of the model
-    rewarding what another punishes), weekly volume **28,000**. **Move hours is BLOCKED on Q-188** —
-    it is saturated by a window mismatch, not by a low goal, and raising it would hide that.
-  - **Re-verifying the baselines paid for itself:** the filed weekly volume of **29,661** is not
-    representative — the measured 8-week mean is **25,159** (sd 4,545, range 16,843–31,083), so
-    29,661 sits near the *maximum*. A target set from the filed figure would have been ~18% above
-    the real mean rather than ~11%.
-  - **B is gated, NOT queued.** Before filing it, measure HR coverage during non-workout hours (the
-    ring power-gates its PPG when worn-idle, so sparse coverage would under-count ordinary movement
-    and over-weight workouts) and whether `training_load_ots` is actually populated — **the column
-    was verified from the schema, not from the data.** Q-183's 40-of-45 finding below is the
-    strongest argument *for* B: that is what a threshold-minute metric looks like when it cannot see
-    the training.
-- **Q-183 went first and shipped 2026-08-11 (v1.279.2)** — a lifting day with no zone-2+
-  minutes now excludes that lane instead of scoring it zero, worth **+5 points** on a measured local
-  A/B. Its measurement also sharpened this entry: of the owner's last 45 days, **40 had exactly zero
-  zone minutes**, so `zoneMinutes` carries almost no information either way and any re-anchoring of
-  its goal should account for that.
-- **Confidence that this is calibration and not data:** on the same 91 days the **Readiness** pillar's
-  contributors show healthy spread (`hrvBalance` sd 27.1, `sleepBalance` 26.2, `recoveryIndex` 23.0,
-  `restingHeartRate` 15.9, `checkin` 13.1; only `activityBalance` at 7.5 is low-signal). Same ring,
-  same days, same pipeline — Readiness is the control case.
-- **Clean result worth keeping:** **zero** persisted-vs-live score divergence across 88 checked
-  pillar-days. No stale-model drift anywhere.
 
 ### [platform][app-shell] Q-138 — component-size hotspots, with concrete extractions
 

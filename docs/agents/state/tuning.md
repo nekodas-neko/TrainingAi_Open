@@ -1,6 +1,6 @@
-# Tuning Agent 🎶 — baton
+# 🎶 Tuning Agent — baton
 
-> **Successor sessions are titled `Tuning Agent 🎶`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
+> **Successor sessions are titled `🎶 Tuning Agent 🟢`** — exactly, emoji included. The title is how five concurrent sessions stay tellable apart; a renamed
 > successor is a lost thread even with a perfect baton.
 
 **Updated:** 2026-08-20 · **By:** `claude/tuning-agent-0q9yl7` · **Next ID:** `TN-2`. **The band that ran out is gone** — IDs now count up from your own `TN-` prefix with no ceiling, so there is nothing to agree with the owner. Find the next free with `grep -rhoE '\bTN-[0-9]+\b' docs/ | sort -t- -k2 -n | tail -1`.

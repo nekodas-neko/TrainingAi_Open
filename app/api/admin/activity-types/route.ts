@@ -13,7 +13,7 @@ const ActivityTypeBody = z.object({
   icon:            z.string().min(1).max(60),
   isDistanceBased: z.boolean(),
   sortOrder:       z.number().int(),
-})
+}).strict()
 
 export async function GET() {
   const session = await auth()

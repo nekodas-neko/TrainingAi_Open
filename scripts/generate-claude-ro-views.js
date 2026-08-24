@@ -62,6 +62,37 @@ const DERIVED = {
 // a documented FK path, explicitly global, nor explicitly denied makes the generator FAIL rather
 // than silently emitting an unscoped view. That is the same default-deny posture as the column
 // withholding — a new table cannot leak by being forgotten.
+/**
+ * The owner is resolved AT QUERY TIME, not baked in here (Q-456).
+ *
+ * `fe481797-…` — the owner's production `users.id` — used to be interpolated into every view, and
+ * the generated SQL is committed. That put it in **18 tracked files**, and `CLAUDE.md` requires
+ * re-running this generator into a new migration whenever a table is added, so the process
+ * *re-published it on every schema change*. Invisible while the repo was private; permanent once it
+ * was not.
+ *
+ * It is not a credential — `/api/admin/db-query` needs `CLAUDE_DB_QUERY_SECRET` **and**
+ * `requireAdmin`, and no health data, email or name is exposed with it. What it is, is one half of a
+ * pair: `WEBHOOK_USER_ID` and `ADMIN_EXPORT_USER_ID` resolve to a user id that is almost certainly
+ * this one, so a leak of either secret no longer needs the id guessed.
+ *
+ * `current_setting` puts it where the role's password already lives — in the database, set
+ * out-of-band, never in a committed file:
+ *
+ *     ALTER ROLE claude_readonly SET app.claude_ro_owner = '<uuid>';
+ *
+ * **Fail-closed by construction.** The two-argument form returns NULL when the setting is absent,
+ * and `user_id = NULL` is never true, so an unconfigured role reads **zero rows** rather than every
+ * user's. The one-argument form would throw instead; NULL was chosen because a session hitting the
+ * audit endpoint on a fresh database should get an empty result it can diagnose, not a driver error
+ * from inside a view.
+ */
+const OWNER_SQL = "current_setting('app.claude_ro_owner', true)::uuid"
+
+// Still read, and still required — not for the SQL, but for the report line below and for the
+// generator's own refusal to run unconfigured. Dropping the requirement would make it easy to
+// generate views against a database whose role setting nobody has set, which produces a schema that
+// silently returns nothing.
 const OWNER = process.env.CLAUDE_RO_OWNER_USER_ID
 if (!OWNER) {
   console.error('CLAUDE_RO_OWNER_USER_ID is required — refusing to generate unscoped views.')
@@ -160,8 +191,8 @@ async function main() {
     // an unscoped view.
     const hasUserId = cols.includes('user_id')
     let where = null
-    if (hasUserId) where = `t.user_id = ${lit(OWNER)}`
-    else if (VIA[table]) where = VIA[table]('t').replace(/\$OWNER/g, lit(OWNER))
+    if (hasUserId) where = `t.user_id = ${OWNER_SQL}`
+    else if (VIA[table]) where = VIA[table]('t').replace(/\$OWNER/g, OWNER_SQL)
     else if (!GLOBAL.has(table)) {
       console.error(`\nUNCLASSIFIED TABLE: "${table}" has no user_id, no VIA path, and is not in GLOBAL or DENIED.`)
       console.error('Add it to one of those lists in scripts/generate-claude-ro-views.js — refusing to emit an unscoped view.')
@@ -195,7 +226,9 @@ async function main() {
 
   process.stdout.write(out.join('\n') + '\n')
   process.stderr.write(`[claude-ro] ${byTable.size - skipped.length} views, ${denied} columns withheld, ` +
-    `${skipped.length} tables denied (${skipped.join(', ')}), scoped to user ${OWNER}\n`)
+    `${skipped.length} tables denied (${skipped.join(', ')}), scoped to app.claude_ro_owner\n`)
+  process.stderr.write(`[claude-ro] the id is NOT in the output — the role needs it set once, out of band:\n` +
+    `           ALTER ROLE claude_readonly SET app.claude_ro_owner = '${OWNER}';\n`)
 }
 
 /** A safely-quoted SQL string literal. */
