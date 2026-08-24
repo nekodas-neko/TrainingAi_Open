@@ -1420,93 +1420,44 @@ whether or not anyone draws them first.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
 
-### [nutrition] BF-11 — recipe-URL scan only exists inside the meal-plan wizard; the owner wants it on "create a meal" instead, with the wizard referencing the result
+### [nutrition] BF-11 — the meal creator and meal planner need a coordinated redesign; the owner and BugFix worked out the shape together
 
-- **Lane: B.** `components/nutrition/my-meals-picker.tsx`, `components/nutrition/saved-meals-sheet.tsx`,
-  `components/nutrition/meal-plan-setup-sheet.tsx`. No schema. **Feature request — this entry is the
-  trace, not a plan.** A planning session still needs to write the implementation plan before Lane B
-  builds it, per the backlog protocol.
+- **Lane: B**, one item needs a migration (see below). **Feature request — this entry plus its
+  linked spec are the trace and the settled design, not an implementation plan.** A planning session
+  still turns this into implementation plan(s) before Lane B builds it, per the backlog protocol.
 - **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
   think this needs to be moved 'create a meal' then the meal builder can reference previously made
-  meals."*
-- **Traced — the owner's read of where the feature lives is exactly right.**
-  `/api/nutrition/scan` accepts `{ text }`, `{ image }` or, since Q-409, `{ url }` — a whole recipe
-  in one call. The **only** call site that ever sends `{ url }` is
-  `my-meals-picker.tsx` (`docs/overview/entries/2026-08-24-recipe-url-to-meal-ui.md`), which is
-  itself reachable from exactly one place: the **"Meals" step of the meal-plan wizard**
-  (`meal-plan-setup-sheet.tsx`, `STEPS = ['Stores','Avoid','Skip','Meals','Yours','Training','Review']`).
-  To turn a recipe link into a meal today you start the whole plan wizard, work through Stores/Avoid/
-  Skip to reach the Meals step, scan the URL there, and it only becomes a reusable saved meal if you
-  finish the wizard to Review and hit **Save to My Meals** / **Save all** (Q-398). There is no path
-  from Nutrition → Saved Meals → **New Meal** (`saved-meals-sheet.tsx`'s "Build a Meal" screen — the
-  actual general-purpose meal-creation UI) to a URL scan at all.
-- **"Build a Meal" already calls the same scan route, but only in a narrower mode.**
-  `saved-meals-sheet.tsx:241-271` (`estimateAndAdd`) posts `{ text }` to add **one** ingredient at a
-  time by AI estimate — it has no URL field and no whole-recipe path. So the gap is not "Build a Meal
-  can't scan" — it already can, for single items — it's that the *recipe* mode (URL → several
-  ingredients, ask-if-no-yield, keep/discard) exists only in the wizard's picker.
-- **The wizard step is not purely a scanner today — it is already half a picker.** `my-meals-picker`
-  takes `selectedIds: string[]` of existing `SavedMeal`s alongside `typedMeals` (freshly
-  typed/scanned entries) — so the Meals step already blends "pick from your library" and "create
-  something new" in one screen. The owner's ask is to un-blend it: creation (especially the
-  URL-recipe path) becomes "Build a Meal"'s job, since that is the one general-purpose place a
-  scanned meal is born as a first-class saved meal with no wizard required around it; the wizard step
-  narrows to picking from the resulting library, the way `selectedIds` already half-does.
-- **Overlap with Q-407, not a duplicate of it.** Q-407 (queued, above this entry once inserted)
-  reworks the *whole* wizard into a coach conversation and explicitly plans to keep the Meals step's
-  shape unless it says otherwise — it does not address where scanning lives. Whoever plans this
-  should read Q-407 first: if Q-407 lands first, the Meals step becomes a widget and this entry's
-  "wizard references saved meals" half may fall out of that redesign directly, leaving only the
-  "move URL scan into Build a Meal" half to do. If this lands first, Q-407's plan should design the
-  Meals step as a **picker over saved meals**, not a scanner, from the start.
-- **What a plan needs to settle, not decided here:** (1) does `estimateAndAdd`'s single-item path
-  gain a URL/whole-recipe mode, or does "Build a Meal" grow a second entry point for it; (2) what
-  happens to a URL-scanned recipe's per-serving question (Q-409's "how many does it serve" ask) in a
-  context with no wizard footer to hold state across; (3) whether the wizard's Meals step keeps
-  *any* create-new affordance or becomes pure-picker with a "New Meal" handoff to Build a Meal.
-- **Surface:** web-reproducible, no device needed — this is a screen-placement question, not native.
-
-- **2026-08-24, same day — owner expanded the ask with two more pieces and a priority order.** Owner:
-  *"the meal creator should 1. be able to look at a URL or image and create a meal from each item. I
-  think more focus should be on the meal creator first to have a good and functionable UI to create
-  meals. then in the meal planner it prefers meals already in the planner and adds other meals around
-  it or similar to it. but i guess it would only try match 1 meal to one meals macros a day. there is
-  work that can be done here to create a meal plan based on well thought out meals."*
-  1. **Priority: Build a Meal comes first, on its own merits, before the meal-planner integration
-     above.** Read as sequencing, not scope-cutting — the rest of this entry stands, this just orders
-     it.
-  2. **Multi-item detection is a real gap, traced.** `ScanSchema` in `app/api/nutrition/scan/route.ts`
-     (lines 29-40) returns exactly **one** `name` + one `ingredients[]`, for every input mode —
-     image, URL and text alike. The image-mode system prompt is explicit that this is by design:
-     *"For a simple single food... return exactly one ingredient covering the whole portion"* — there
-     is no schema shape for "this photo/page shows N distinct dishes; here are N meals." A photo of a
-     week's meal-prep containers, or a recipe blog's "5 lunches" roundup page, gets forced into one
-     `identified`/`ingredients[]` result today — most likely a wrong or merged estimate, not a clean
-     failure. This is new scope on top of BF-11's original ask (which only asked where the *existing*
-     single-item URL scan should live) and belongs on the plan as its own line: the schema, the
-     prompt and the picker UI (which currently assumes one result per scan call) all need to handle
-     an array.
-  3. **The owner's guess about the meal-planner is correct — confirmed against
-     `app/api/nutrition/meal-plans/generate/route.ts`.** `keepSavedMealIds` meals (`kept`, line 130)
-     are NOT built around — `splitMacrosAcrossMeals` (line 250) divides the day's total macros into
-     `mealCount` slots **first**, independently of which meals are kept, and each meal (kept or
-     generated) is then scaled/topped-up (`scaleWithTopUp`, line 270) to fit only its own
-     pre-assigned slot. The model generating the remaining slots is told only that kept meals are
-     *"not yours to change... everything you return must be genuinely DIFFERENT"* (line 202) — a
-     difference instruction, not a complementary or macro-aware one. So: **exactly one meal is
-     matched to exactly one slot's macros, precisely as the owner suspected**, and nothing in this
-     route ever searches the saved-meals library to fill a remaining slot — every non-kept slot is
-     always a fresh AI-generated recipe. There is no "day plan built from a library of well-thought-
-     out meals, matched against what's left of the day's budget" mode at all today.
-  4. **What a plan for the meal-planner half would need to design, not decided here:** whether
-     remaining slots first search the saved-meals library for a macro-fitting match before falling
-     back to AI generation; how "prefers meals already in the planner" composes with the existing
-     "genuinely different" instruction (own-library meals presumably CAN repeat style/ingredients
-     with each other, unlike AI-generated ones); and whether matching stays 1-meal-to-1-slot or a day
-     can be assembled from multiple partial-macro library meals plus fill food, which is a larger
-     change to `scaleWithTopUp`'s single-meal contract.
-  5. **Scope note:** items 2 and 3 above extend BF-11 rather than replacing it — the original
-     "move URL scan to Build a Meal" ask is unaffected and still the first, smaller piece to plan.
+  meals."* Grew across three more owner messages, same session, into a full design for both the
+  meal creator and the meal planner's generation logic — BugFix traced each piece against current
+  code live as the owner described it, confirming what already exists, what's a real gap, and
+  reaching agreement on the open calls.
+- **Full design: [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](../superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).**
+  Read that doc before planning this — it has the complete trace (file/line citations for every
+  claim), what's already built vs. genuinely missing, and the owner's decisions on each open
+  question. Summary only, here:
+  - **Meal Creator** (`saved-meals-sheet.tsx` "Build a Meal"): move the URL-recipe scan there from
+    the wizard (original ask); add multi-item detection so one scan can produce several meals; wire
+    in the existing food-item History list (`capture-step.tsx`) as a quick-add source; PDF upload
+    descoped (screenshot-as-image instead); duplicate-detection on scan agreed as designed.
+  - **Meal Planner** (`generate/route.ts` + `meal-plan-review-step.tsx`): reorder generation to
+    search the saved-meal library for each slot before falling back to AI; lift/redesign the
+    6-meal `keepSavedMealIds` cap for a "use my whole library" mode; add a meal-type/tag system so
+    slot-matching isn't macro-blind (pancakes ≠ dinner) — **recommends reusing `MealType`
+    (`packages/shared/src/types/nutrition.ts`) via a new `SavedMeal`↔`MealType` join, which needs a
+    migration Lane A numbers when this is planned**; extend reroll to offer a library swap before
+    AI regeneration; surface "why this meal was picked" so edits/rerolls have context; redesign the
+    meal-count-change prompt (inspired by but NOT reusing `MealTypeReassignDialog`'s mechanism,
+    which moves logged history — this needs to redistribute an in-progress draft instead).
+  - **Owner's priority, explicit:** Meal Creator ships first, on its own merits; Planner integration
+    depends on it and comes after.
+  - **Still open for the planning session** (not decided in the design conversation): the
+    no-library-match fallback (prompt-to-create vs. AI-fallback), the exact meal-count-change
+    interaction, and the upper bound for "select all" against a large library.
+- **Overlap with Q-407, not a duplicate of it.** Q-407 (below) reworks the *whole* wizard into a
+  coach conversation and does not address scanning location or planner matching logic. Whoever plans
+  either should read the other first — if Q-407 lands first, its Meals step should be designed as a
+  **picker over saved meals** from the start, per this entry's design.
+- **Surface:** web-reproducible, no device needed. Item requiring a migration is server-side only.
 
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
