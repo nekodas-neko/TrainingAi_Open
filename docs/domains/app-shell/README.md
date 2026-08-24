@@ -101,10 +101,12 @@ Live at the time of writing (2026-07-30):
   push) and **not device-verified** —
   [`journal`](../../overview/entries/2026-08-23-one-calorie-budget.md).
 
-- ⚠️ **`components/health/day-overlay-sheet.tsx` is unreachable and still in the tree** (LB-3). LB-1
-  took the edit/delete controls off it and onto `/health/day` (2026-08-23, v1.334.0); the sheet still
-  owns three affordances the day screen has not got, so it was not deleted —
-  [`journal`](../../overview/entries/2026-08-23-day-screen-edit-delete.md).
+- ✅ **`components/health/day-overlay-sheet.tsx` is gone** (LB-3, 2026-08-24). LB-1 took its
+  edit/delete controls onto `/health/day` and left the file because it still owned three affordances
+  that screen had not got. Two were ported — tap an exercise name for its history, tap an activity
+  for its detail — and the per-session HR recovery chart was dropped, since `done-screen` still
+  reaches it at the moment it means something. `health-content.tsx` lost 167 lines with it —
+  [`journal`](../../overview/entries/2026-08-24-retire-day-overlay-sheet.md).
 
 - ⚠️ **Q-154 — three inline sparklines remain, and the primitive cannot draw them yet.** Half the
   original list turned out to be *time-axis* charts (the primitive projects x by index) and is now

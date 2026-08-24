@@ -61,9 +61,14 @@ paths, since the outbox reaches the same table
 backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
 the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
 inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
-with `Gate: device`. **Item (3) needed no work:** battery polls have persisted since 2026-07-19
-(6,346 rows), so the drain the entry called unmeasurable is measured — −22, −24, −22, −38, −15
-points overnight, confirming the owner's report; the SpO₂ A/B is two nights of wear, not code.
+with `Gate: device`. **Item (3) needed no work:** 6,346 battery polls since 2026-07-19 measure the
+drain the entry called unmeasurable — −22, −24, −22, −38, −15 overnight, confirming the owner's
+report; the SpO₂ A/B is two nights of wear, not code.
+
+**Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
+`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise for its history and an activity for
+its detail were dead a fortnight, unreported. Both are on `/health/day` (the NAME is the target, not
+a third icon); `health-content.tsx` lost 167 lines; the HR chart was dropped, `done-screen` has it.
 
 **Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed
 six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it (55 steps).
@@ -3487,8 +3492,7 @@ thumb. Nothing else here is device-sensitive — no blur, filter or backdrop-fil
 **Two known gaps, deliberate:** days never scored show "—" for readiness/activity (the screen reads
 `oura_daily_derived` in one query rather than recomputing via `buildDayAudit`, whose ~13-query fan-out
 is the shape Q-107 blames for pool exhaustion — if the gap is common, run the existing backfill rather
-than making this screen expensive). The old `day-overlay-sheet.tsx` still exists and is still reachable
-from other surfaces; retiring it is its own change.
+than making this screen expensive). ~~The old `day-overlay-sheet.tsx` still exists~~ — **deleted, LB-3.**
 
 Session journal: `docs/overview/entries/2026-08-08-day-detail-screen.md`.
 
@@ -6396,9 +6400,8 @@ is fully sandbox-tested** (formula, DB round-trip, `computeWorkoutHr` integratio
 tool — 24 tests) **and dev-server verified** (trend route 200 + correct aggregation; recap route actually
 persisted a per-set row). **Accessibility fix (v1.200.1):** the card was shipped **unreachable** — the
 only entry points were `session-select`/`/stats`, which the owner reported don't surface it. Now tapping
-an **exercise in the Health → Training calendar day-overlay** opens its history sheet (wired
-`onExerciseTap` on `day-overlay-sheet.tsx` → `ExerciseHistorySheet` in `health-content.tsx`, with a `›`
-affordance). **Playwright-verified in dev** that the tap opens the correct sheet (screenshot) and both
+an **exercise on the day screen** opens its history sheet (`onExerciseTap` → `ExerciseHistorySheet`;
+wired through `day-overlay-sheet.tsx` until LB-3 deleted it and moved the tap onto `/health/day`). **Playwright-verified in dev** that the tap opens the correct sheet (screenshot) and both
 `/api/workout/exercise-hr-trend` + `/api/exercise-history` return 200 with data — **but the sheet's
 content paint could not be confirmed in the dev harness** (nested bottom-sheet showed persistent loading
 skeletons behind successful 200s; believed a turbopack dev-compile/timing artifact since it's the same

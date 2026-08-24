@@ -43,6 +43,8 @@ const DELIBERATE = new Map([
    'devices index names it as non-existent; the ops reference is docs/oura-ble-operations.md (Q-554)'],
   ['app/overview/',
    'app-shell index names it as a route that does not exist (Q-554)'],
+  ['components/health/day-overlay-sheet.tsx',
+   'app-shell index names it as deleted; its two live affordances moved to /health/day (LB-3)'],
 ])
 
 const TOP = /^(app|lib|components|packages|scripts|docs|android|e2e|public)\//
