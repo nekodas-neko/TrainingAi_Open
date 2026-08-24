@@ -700,11 +700,24 @@ answered by subtraction rather than re-argued. Verified through the real route o
   `body-metadata` are right for the other seven. **Both stopped after 2026-05-29 and neither is
   explained**, which per CLAUDE.md is unexplained rather than fixed. The cull bounds the number
   whichever cause fires.
-- **Keep:** the **midnight-`startedAt` fallback itself is not fixed** — seven sessions recorded a start
-  time that was never captured, and the cull hides the symptom rather than restoring the real span.
-  `weekly-stats` already substitutes the exercise-log span for exactly this case; whether the other
-  duration consumers should do the same, or whether the write path should stop inventing a midnight
-  start at all, is the open half.
+- ✅ **THE MIDNIGHT FALLBACK IS FIXED TOO, 2026-08-24 — and it was still LIVE, not just history.**
+  `packages/shared/src/workout/log-exercise.ts` fell back to `aestMidnight(...)` outright whenever the
+  payload carried no `workoutStartedAt`, so a session that began at 09:00 was recorded as beginning at
+  midnight. It now walks the ladder `loggedAt` already used forty lines below: the device anchor, then
+  **the first set's start** (already in the payload as `setStartTimes`, and *inside* the session), then
+  `now` for a log dated today, then midnight only for a **back-dated** log — where the start is
+  genuinely unknown and `now` would be the worse lie, putting the session on the wrong day.
+- **The mechanism, which none of the earlier notes named:** `components/workout-screen.tsx` sends
+  `workoutStartMs ?? undefined`, and the store's abandoned-session guard sets `workoutStartMs` to
+  **null**. The guard that stops a days-old session being resumed is what leaves the next log with no
+  anchor. That is also why the cull alone was not enough — a real workout logged after an abandonment
+  would have gone on contributing nothing, because its duration would have gone on being culled.
+- **Keep:** the seven historical rows still carry their midnight `started_at`. The fix is
+  **forward-only**. A backfill would have to reconstruct each span from its exercise logs — which is
+  exactly what `weekly-stats` already does at read time — so the open question is whether it is worth
+  writing back at all, or whether the other duration consumers should derive it the way `weekly-stats`
+  does. **Not reproduced on a device:** confirming the abandonment trigger means leaving a session open
+  past four hours, restarting the app, and logging an exercise.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
