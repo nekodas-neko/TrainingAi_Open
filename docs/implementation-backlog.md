@@ -4194,6 +4194,7 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
 
+- **Needs:** Q-289
 - **Branch:** `fix/deload-trigger-thresholds`
 - **Plan:** none yet
 - **Added:** 2026-08-16 · from the load-test review §2
@@ -4403,38 +4404,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Third instance of a recurring class** — Q-270 (`training_load_ots`: live producer, zero rows)
   and Q-231 (the "Exercise detected" card losing its only writer). Worth proposing a CI check that
   flags a repository read method with no callers outside the data layer.
-
-### [nutrition] Q-302 — adaptive TDEE has not fired once in 30 days, and nothing tells the user why
-
-- **Branch:** `feat/tdee-gate-visibility`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the pillar-soundness review §3.2
-- **The gate** (`packages/shared/src/nutrition/adaptive-tdee.ts`): `MIN_LOGGED_DAYS = 10` within
-  `DEFAULT_WINDOW_DAYS = 14` (`MIN_LOGGED_FRACTION = 0.7`), plus `MIN_WEIGH_INS = 4`.
-- **Measured against production food logs, rolling 14-day windows:**
-  ```
-  window ending   logged/14
-  2026-08-15         4/14   fail
-  2026-08-14         3/14   fail
-  2026-08-13         2/14   fail
-  2026-08-12         1/14   fail
-  …
-  of the last 30 rolling windows, 0 pass the >=10-logged-days gate
-  ```
-  The weigh-in gate passes comfortably (14 weigh-ins in 14 days) — **food logging alone blocks it.**
-- **Note the aggregate figure is misleading and was corrected during the review:** "41 of 76 days
-  logged (54%)" is true overall, but logging is front-loaded; recent coverage is **1–4 days per 14**.
-- **The gate is probably RIGHT — do not lower it.** Estimating maintenance from 3 of 14 days would
-  be worse than not estimating it. `MIN_PLAUSIBLE_MAINTENANCE`/`MAX_PLAUSIBLE_MAINTENANCE` show the
-  module already takes its own reliability seriously.
-- **The defect is invisibility.** `TdeeAdaptationCard` is on the nutrition screen and the user has
-  no way to know it is dormant, why, or what would wake it. Show the gate: *"Adaptive TDEE needs 10
-  logged days in a fortnight — you have 4. Log 6 more to switch it on."* That is a real, achievable
-  instruction and it is strictly better than a card that quietly shows nothing.
-- **Check first what the card currently renders** in the not-enough-data state — it may already show
-  something, in which case this is a copy change rather than a new state.
-- **Ties to Q-278** (a score that could not be computed rendered identically to a real one) — same
-  class, different pillar. Consider one shared "this needs more data, here is how much" treatment.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
