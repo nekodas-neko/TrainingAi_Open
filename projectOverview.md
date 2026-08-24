@@ -27,6 +27,19 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-23.
 
+**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** The
+2026-08-18 hand-run is verifiably clean in production — **764 blobs hold 941,233 frames in 13 MB**,
+contiguous with the hot tier — but a button does not hold a growth curve: `oura_raw_samples` was
+pruned back to 2026-08-10 by that run and had regrown to **318,183 rows / 92 MB** five days later,
+~6.5 MB/day against the ~0.4 MB/day the database is meant to grow at. It now fires from the ingest
+path, throttled **per user** (one shared timestamp lets a busy user starve another's table), and
+`OURA_AUTOPACK=off` stops it without a deploy. Automating it is also what made the delete's race
+reachable, so phase 3 deletes **by row id** rather than by the bucket's ds range — a frame arriving
+between the select and the delete was previously removed having never been packed, i.e. in neither
+tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)). ⚠️ **Not yet observed in
+production**, and the 92 MB high-water mark does not come back without a `VACUUM FULL` (Q-315,
+`Gate: owner`).
+
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the
 pre-log figures, which then stood for the key's full TTL — Home read 42 kcal high, exactly one
