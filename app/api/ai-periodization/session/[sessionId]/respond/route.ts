@@ -10,7 +10,7 @@ const MAX_BODY_BYTES = 16 * 1024
 
 const BodySchema = z.object({
   action: z.enum(['accept', 'dismiss']),
-})
+}).strict()
 
 export async function POST(
   req: NextRequest,
