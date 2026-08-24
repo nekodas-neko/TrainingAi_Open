@@ -11,8 +11,9 @@ stay valid. **Rewritten in full, never appended** — narrative lives in the lin
 
 ## Now
 
-**Nothing is blocked on you.** Two proposals await the owner's sign-off: **TN-5** (sleep curve) and
-**TN-6** (temperature baseline). TN-2's *direction* is signed off; its offset is unfitted.
+**Nothing is blocked on the owner, and nothing is blocked on you.** Every decision this batch needed
+was asked plainly and answered on 2026-08-24 — see the block under the table. TN-2's offset is the
+only thing still open, and it is a fit Lane A must run, not a decision.
 
 Filed this session, all propose-only, all in the queue:
 
@@ -21,9 +22,18 @@ Filed this session, all propose-only, all in the queue:
 | **TN-2** | Body Battery charge window is below the owner's 5th-pct waking HR; floors by ~12:30pm | direction signed off, offset unfitted (**+8…+12**) |
 | **TN-3a/b** | per-bucket stress series is computed then discarded — no hour-of-day question is answerable | 3b `Needs: 3a` |
 | **TN-4** | `/api/body-battery` 500s on a stress-model failure | **SHIPPED** #415; root cause still open |
-| **TN-5** | `SCORE_CALIBRATION` gain varies 8-fold | `Gate: owner` |
-| **TN-6** | temp baseline 0.363 °C low → −16 pts/day on 89% of days | `Gate: owner`, batched with Q-506 |
+| **TN-5** | `SCORE_CALIBRATION` gain varies 8-fold | **signed off** — build it |
+| **TN-6** | temp baseline 0.363 °C low → −16 pts/day on 89% of days | **signed off**; batched with Q-506 + **BF-13** |
+| **TN-6a** | suspend the temperature penalty until the baseline is centred | **signed off**, ships alone, outside the batch |
 | **TN-7** | TN-4's catch only `console.error`s, disarming LA-20's verification | one line, Lane A |
+
+**Owner decisions, 2026-08-24 — all recorded on the entries, nothing left gated on them.** TN-5 and
+TN-6 signed off; **TN-6a** added (suspend the temperature penalty on a self-clearing condition, ships
+outside the batch, must cover all three consumers). **History policy: leave stored days alone and
+stamp the new model** — which leans on a stamp Q-518 says gets erased, so **Q-518 is now load-bearing**.
+On **BF-13** (BugFix's entry, whose root cause supersedes TN-6's): re-derive the baselines, fix the
+seed for all six, re-derive only what is measurably wrong. **Measured: only `temp` is** (gap +2.80 sd,
+100% of nights above; the other five are ≤0.28 sd).
 
 Reviews: [battery](../../reviews/2026-08-24-body-battery-charge-window-collapse.md) ·
 [sleep](../../reviews/2026-08-24-sleep-score-volatility.md) ·
@@ -64,6 +74,13 @@ sleep ✅ · readiness ✅ · activity ✅ · body ✅ · devices ✅ · workout
   power-gates its PPG, so a per-sample percentile read ~20% where the time-weighted answer was 1.6%.
 - **+18 bpm overshoots Body Battery** into a permanently-full tank (mean 90.8, a third of days at
   100). "It floors too often" invites exactly that; a full tank carries no information (Q-57).
+- **Get a fixed-point factor from the CALL SITE, never by inference.** Inferring each baseline's
+  scale as the best-fitting power of ten is right for temp (×100) and wrong for sleep (**×60**), and
+  produced a phantom "sleep baseline 4.768 h against a true 8.010" that would have caused an
+  unnecessary production data change. `daily-summary.ts:102-112` has all six, four lines apart.
+- **To ask whether a baseline is centred, use `% of nights above it`, not the raw gap.** 100% for
+  temperature, near 50 when healthy. Pair it with gap/nightly-sd: hrv reads 87.8% above on a gap of
+  0.04 sd, which is an EMA lagging a rising metric, not a defect.
 - **⛔ `pg_stat_user_tables` row counters are planner ESTIMATES** — `last_analyze` is NULL on every
   table here. Its **size** columns are exact. To ask whether a table is empty, run `count(*)`. A
   predecessor filed a data-loss incident (Q-528) off `n_live_tup` that had never happened.

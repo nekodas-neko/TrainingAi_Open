@@ -1327,8 +1327,50 @@ owner's healthy nights, and a fresh baseline for any metric is within one sample
 true mean on night 2 rather than converging for fifty.
 
 - **Surface: server/shared, web-reproducible.** Pure function over data already in Postgres; no
-  device needed to fix or verify. **Re-deriving the stored baselines is a data change** and needs the
-  owner, same shape as Q-304b.
+  device needed to fix or verify.
+
+- **✅ OWNER DECISION 2026-08-24 — asked plainly, both halves answered. `Gate: owner` is CLEARED.**
+  1. **Re-derive the stored baselines** (not seed-fix-only). The reasoning the owner accepted: a
+     baseline is a corrupted *intermediate*, not a record of what the app told them, so re-deriving it
+     is a different act from re-scoring history and does not contradict the "leave stored days alone,
+     stamp the new model" policy set the same day. The raw nightly values are untouched, so the
+     re-derivation is re-runnable and reversible.
+  2. **Fix the seed for all six baselines; re-derive only the ones measurably wrong.** One line
+     protects every metric; data changes stay evidence-led.
+
+- **📏 Which ones are measurably wrong — MEASURED 2026-08-24 (Tuning), so this needs no TODO.**
+  Baselines converted to native units with the factors at their call sites
+  (`daily-summary.ts:102-112`: hrv ×1 ms · rhr ×1 bpm · temp ×100 · sleep ×60 · met ×10 · breath ×10),
+  compared against the true mean of the same nightly column over 50 summary rows:
+
+  | metric | true mean | stored baseline | gap | **gap / nightly sd** | % nights above | verdict |
+  |---|---|---|---|---|---|---|
+  | **temp** | 35.842 °C | 35.464 | +0.378 | **+2.80** | **100.0%** | **RE-DERIVE** |
+  | breath | 9.400 rpm | 9.250 | +0.150 | +0.27 | 77.6% | leave |
+  | rhr | 53.871 bpm | 53.000 | +0.871 | +0.28 | 36.7% | leave |
+  | sleep | 8.010 h | 7.946 | +0.064 | +0.06 | 57.1% | leave |
+  | hrv | 55.765 ms | 55.375 | +0.390 | +0.04 | 87.8% | leave |
+  | met | 1.365 MET | 1.375 | −0.010 | −0.09 | 44.0% | leave |
+
+  **Temperature is the only one to re-derive.** That is this entry's own hypothesis — *"visible in
+  temperature because temperature has a large non-zero mean and a tight spread"* — now measured
+  rather than assumed: the zero seed leaves a similar absolute gap in fixed-point units across all
+  six, and only temperature's nightly sd (0.140 °C) is small enough for that gap to be 2.8 sd out.
+  **Still fix the seed for all six** — a metric that is within noise today is one input change away
+  from not being.
+
+  **`% nights above` is the diagnostic to reuse**, not the raw gap: it is 100% for temperature and
+  near 50 for a centred baseline. Read it alongside `gap/sd` — hrv reads 87.8% on a gap of only
+  0.04 sd, which is an EMA lagging a genuinely rising metric (overnight HRV has climbed for months),
+  not this defect.
+
+- **⚠️ Near-miss worth copying: get the fixed-point factor from the CALL SITE, never by inference.**
+  The first pass here inferred each scale by choosing the power of ten that best fit the newest row.
+  That is right for temp (×100) and **wrong for sleep, which is ×60** — it produced a "baseline
+  4.768 h against a true 8.010 h, 98% of nights above, gap +3.24 h" that read exactly like a second
+  severe defect. Acting on it would have meant an **unnecessary data change to the sleep baselines**,
+  which is the one category of mistake the owner gate exists to prevent. The factors are four lines
+  apart in `daily-summary.ts`; read them.
 
 ### [devices][readiness] BF-14 — the breathing-rate baseline converges to ~93 against a real 9.8 rpm
 
