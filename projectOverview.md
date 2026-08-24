@@ -1966,10 +1966,13 @@ domains, one heavy-fault day, pointing at the connection-starvation class (Q-213
 60 s rest is not the stimulus the model assumes. **Re-run Q-289's bucket table split by rest
 adherence before recalibrating anything** — the confound may be most of the finding.
 
-**🟠 The running baseline is written, empty, and read by nothing (Q-301).** `running_baselines` holds
-vo2max / max_hr / threshold_hr / easy_pace. Production: **0 rows**, against 12 `prescribed_runs`.
-`saveRunningBaseline` **is** wired at plan creation — but **`getRunningBaseline` has zero callers
-outside the repository layer**, so even a full table would change nothing. Third instance of this
+**🟡 The dead `running_baselines` write/read code was removed 2026-08-24 — the physical table is
+the one thing left (Q-301b, `Gate: owner`).** Investigation confirmed the 12 real `prescribed_runs`
+already derive from a better, live source (`resolveSnapshot()` reads `fitness_tests`/`body_metrics`
+fresh on every request); the table's write and its never-called reader were pure dead weight.
+`saveRunningBaseline`/`getRunningBaseline`, the `RunningBaseline` interface, and the Drizzle table
+definition are gone — nothing in the app can reach the table any more. What's owed is the actual
+`DROP TABLE`, deferred as a data-dropping migration needing the owner's yes. Third instance of this
 class after Q-270 and Q-231.
 
 **🟠 Adaptive TDEE has not fired once in 30 days (Q-302).** Its gate needs 10 logged days per

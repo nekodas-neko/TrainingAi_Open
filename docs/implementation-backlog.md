@@ -3817,28 +3817,27 @@ ehr     0     0     0     0   648   208   128   556     0
   check whether the rushed sets cluster in time-budget-constrained sessions before treating this as
   a user-behaviour finding.
 
-### [cardio] Q-301 — the running baseline is written at plan creation, has zero rows, and nothing reads it
+### [cardio] Q-301b — drop the `running_baselines` table itself (code already removed)
 
-- **Branch:** `fix/running-baseline-wiring`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the pillar-soundness review §2
-- **`running_baselines` holds exactly what a run prescription should rest on:** `vo2max`, `max_hr`,
-  `resting_hr`, `threshold_hr`, `weekly_base_minutes`, `easy_pace_sec_per_km`.
-- **Three verified facts:**
-  1. Production holds **0 rows**, against 1 `running_plans` row and **12 `prescribed_runs`**.
-  2. `saveRunningBaseline` **is** wired — `app/api/running-plan/route.ts:144` calls it at plan creation.
-  3. **`getRunningBaseline` has zero callers outside the repository layer** (`adapter.ts:2425`,
-     `repository.ts:543`). Nothing in `app/`, `components/` or the rest of `lib/` reads it.
-- **The dead reader is the finding, not the empty table.** Even fully populated, no prescription
-  would consult it — so all 12 prescribed runs were generated without reference to the athlete's
-  VO2max, threshold HR or easy pace. Whatever they *are* based on is the thing to establish first.
-- **Investigate in this order:**
-  1. **What do the 12 `prescribed_runs` actually derive from?** Read the generator. If it uses
-     sensible inputs by another route, this is dead code to delete, not a broken feature to wire.
-  2. **Why is the table empty** when the writer is on the plan-creation path? Either the one plan
-     predates the writer, or the write fails silently. Check the plan's `created_at` against the
-     commit that added `saveRunningBaseline`.
-  3. Only then decide: wire the reader, or delete the table and its repository methods.
+- **Gate:** owner
+- **Added:** 2026-08-24 · Q-301's code half shipped
+- **Investigation completed, in the entry's own order:**
+  1. **What the 12 `prescribed_runs` actually derive from:** `resolveSnapshot()`
+     (`packages/shared/src/running/assemble-plan-context.ts`), called **fresh on every request** from
+     `fitness_tests` and `body_metrics` — live data, not the stale plan-creation-time snapshot
+     `running_baselines` would have held. Sensible inputs by another (better) route — dead code to
+     delete, not a broken feature to wire, per the entry's own decision tree.
+  2. **Why the table was empty:** the one `running_plans` row was created 2026-07-21; the writer
+     (migration 146) landed after that plan already existed. No plan has been created since — not a
+     silent write failure.
+  3. **Decision: delete.** `saveRunningBaseline`/`getRunningBaseline`, the `RunningBaseline` interface,
+     the dead write call in `app/api/running-plan/route.ts`, and the `runningBaselines` Drizzle table
+     definition are all removed. `tsc --noEmit` clean, `pnpm check:rules` 55 of 55, full suite green.
+- **What's left, gated on the owner:** the physical `running_baselines` Postgres table itself.
+  Dropping it is a schema-changing migration and CLAUDE.md's data-dropping rule applies regardless of
+  the table currently holding zero rows — the code no longer references it (Drizzle's schema.ts entry
+  is gone, so no query can reach it), so the physical table is a harmless, disconnected leftover until
+  a small follow-up migration drops it.
 - **Third instance of a recurring class** — Q-270 (`training_load_ots`: live producer, zero rows)
   and Q-231 (the "Exercise detected" card losing its only writer). Worth proposing a CI check that
   flags a repository read method with no callers outside the data layer.
