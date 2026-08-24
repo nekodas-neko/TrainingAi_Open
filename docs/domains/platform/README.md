@@ -417,6 +417,14 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-24-platform-orchestrator-first-run.md`](../../handoff-2026-08-24-platform-orchestrator-first-run.md)
+  — the Orchestrator role's first session: cleared the 17-entry completed-work baseline (only 7 were
+  actually finished), assigned the first real `Batch:`, split a 269-line nutrition rework into a
+  phased chain, and walked the owner through seven `Gate: owner` entries one question at a time.
+  Reverses a shared premise in two other entries — heart rate has not made session RPE redundant
+  for workout energy, measured at `corr(avgBpm, mean set RPE) = +0.083` across 44 real sessions.
+  Carries three mechanical gotchas: a shallow-clone merge trap, a squash-merge diff that shows a
+  whole file as new, and a backlog conflict that looked like an ID collision and wasn't.
 - [`handoff-2026-08-20-platform-review-sweeps-29-39.md`](../../handoff-2026-08-20-platform-review-sweeps-29-39.md) — **Review sweeps 29–39, 2026-08-20** (11 PRs, Q-492…Q-499 + Q-552…Q-556; three CI checks added for documentation facts nothing was checking). **10 of 13 findings have since shipped**, verified in source. Its most transferable output is the method section: **five measurements were wrong, each producing a plausible result in the expected direction** — and the keeper, *corroboration between two weak signals is not evidence when they can fail for the same reason*.
 - [`handoff-2026-08-18-platform-decision-brief-rule.md`](../../handoff-2026-08-18-platform-decision-brief-rule.md)
   — the `CLAUDE.md` rule governing how a decision is brought to the owner (#69), and the merge
