@@ -331,6 +331,70 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner report with screenshot — *"its often triggering deload days. its not trustable yet."*
+- **Lane: A** — `lib/health/readiness-payload.ts`, `lib/health/temperature-baseline.ts`
+- **Batch:** temperature-baseline — ships with **Q-506**, the same baseline object's other half (its *sd* is ~13× too wide, so the illness radar can never fire).
+- **Gate: owner** — changes the readiness score. Not signed off.
+
+Home shows *"Body temp elevated · +0.5°C above your baseline (threshold 0.5°C)"* and a Recovery
+recommendation with readiness 52. `computeBlendedScore` (`readiness-payload.ts:169`) applies an
+**absolute °C** ladder to the blended score — **−10** past 0.3 °C, **−20** past 0.5 °C, **capped at
+40** past 1.0 °C. This is *not* the `tempZ` path Q-506 covers; it is a hard subtraction, and nothing
+was queued against it.
+
+**Measured over the 34 nights holding a stored deviation:**
+
+| | |
+|---|---|
+| deviation mean | **+0.662 °C**, range +0.14 … +1.33 |
+| nights with a **negative** deviation | **0 of 34** |
+| −10 arm fires | **31/34 (91.2%)** |
+| −20 arm fires | **23/34 (67.6%)** |
+| cap-at-40 arm fires | **6/34 (17.6%)** |
+| nights with **no** penalty | **3/34 (8.8%)** |
+
+A deviation that is positive on every night is not a deviation.
+
+**Root cause — the baseline mean never converged.** `temp_baseline_mean_x8` is ×8 of centi-degrees
+(degrees = `raw/800`; confirmed against the stored deviation: 35.950 − 35.464 = +0.486 vs stored
++0.503). True measured nightly temp over 34 nights is **35.827 °C (sd 0.140)**; the stored baseline
+is **35.464 °C** — **0.363 °C low, which exceeds the 0.3 °C threshold on its own.** The EMA
+cold-started at 34.696 °C and has climbed +0.767 over 36 nights: converging, still short at
+`n_history = 50`.
+
+**⚠️ The same object's SD is also ~13× too wide** — 1.82 °C against a true 0.140 °C, which is
+**Q-506's finding reproduced from a different table**. One baseline is failing two consumers in
+opposite directions: the **wide sd** divides `tempZ` to nothing so the illness radar can never fire
+(Q-506), the **low mean** makes the absolute deviation permanently positive so readiness is penalised
+daily (this entry). **Fix both or neither** — correcting one leaves the other looking addressed.
+
+**Counterfactual** (baseline = trailing mean of prior nights, min 7; 27 comparable nights): deviation
+mean **+0.557 → −0.040 °C**, negative nights **0/27 → 16/27**, −10 arm **88.9% → 3.7%**, −20 arm
+**59.3% → 0%**, mean readiness penalty **−16.3 → −0.4 pts/day**. The trailing mean is a **diagnostic,
+not the proposed design** — it shows the offset is an estimator artefact rather than physiology, but
+it would absorb a genuine multi-day fever into the baseline within a week. Re-seed or correct the
+existing baseline instead.
+
+**⛔ Do not touch the 0.3/0.5/1.0 ladder.** Against a true nightly sd of 0.140 °C it sits at
+2.1/3.6/7.1 sd, which is defensible. **Fourth instance of "the threshold is right, the input is
+wrong"** in this pillar after Q-506, Q-512 and Q-514; adjusting the ladder would hide a broken
+baseline behind a plausible firing rate, which is the Q-504 mistake.
+
+**Check Q-2 first** (nightly temperature treats one frame's simultaneous probes as consecutive
+samples) — it is already queued and is a plausible contributor to why the EMA seeded ~1.1 °C low.
+
+**Pass test:** stored deviation mean within ±0.05 °C of zero over the trailing 30 nights; at least
+40% of nights negative; the −10 arm firing on under 20% of nights; and the illness radar able to
+reach its `watch` threshold on at least one historical night (the Q-506 half).
+
+**Not established:** whether the owner was actually ill on any flagged night. The finding is that a
+permanently-positive deviation cannot tell illness from baseline error.
+
+Review: [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](reviews/2026-08-24-readiness-temperature-penalty.md).
+
 ### [readiness][heart-rate] TN-2 — the Body Battery charge window has closed, so the tank only drains
 
 - **Branch:** _unassigned_
@@ -4050,6 +4114,30 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.5).** One line in `app/globals.css`'s existing
+> `prefers-reduced-motion` block — `.animate-bounce { animation: none !important; }` — plus
+> `e2e/workout-set-loop.spec.ts`, which drives a real workout through three logged sets and asserts
+> they reached `set_logs`. [`journal`](overview/entries/2026-08-24-workout-automatable-past-set-one.md).
+>
+> **Reproduced and re-measured on the spec's own flow:**
+> ```
+> reducedMotion=reduce          animation=none | 1            CLICKED in 85ms
+> reducedMotion=no-preference   animation=bounce | infinite   BLOCKED after 8009ms
+> ```
+> The affordance is untouched for anyone who has not asked for less motion, which is what this entry
+> insists on. `force: true` is not used anywhere in the spec.
+>
+> **The spec was checked as a guard, not assumed to be one:** removing the CSS rule makes it fail,
+> on `toHaveCSS('animation-name','none')` before the click, so the failure names the cause.
+>
+> **Three things worth knowing before writing the follow-on spec.** `/workout` and the pre-workout
+> screen BOTH carry a button reading "Start Workout" (the session id in the URL separates them); a
+> 3-second countdown overlay sits between the second press and the warm-up; and the set write is
+> fire-and-forget, so a single DB read after the last tap races it — poll.
+- **Keep:** the follow-on spec this unblocks — log-set through complete-workout — is not written.
+  Also one look on device with Android's reduce-motion setting ON, since the bounce is the cue that
+  a set is next. `Gate: device`.
+
 - **Branch:** `fix/start-set-bounce-blocks-automation`
 - **Added:** 2026-08-18 · review sweep (workout write path) ·
   [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)
@@ -4566,6 +4654,28 @@ ehr     0     0     0     0   648   208   128   556     0
   surfaced anywhere. Note Q-85 (a shortened session keeps full-length rest periods) is adjacent —
   check whether the rushed sets cluster in time-budget-constrained sessions before treating this as
   a user-behaviour finding.
+- ✅ **THAT CHECK IS DONE — 2026-08-24, and the answer is NO.** Full working in
+  [`docs/reviews/2026-08-24-rest-adherence-clustering.md`](reviews/2026-08-24-rest-adherence-clustering.md).
+  On n = 344 sets / 27 sessions (2026-07-18 → 08-23) rushed is **39.8%**, holding the 37% at filing.
+  It is **uniform, not episodic**: per-session rushed fraction is mean 0.411 sd 0.138, and **zero of
+  26 sessions is rush-free while zero is mostly-rushed**. A time budget is an event and would split
+  the sessions; this is one narrow cluster.
+- **⚠ Two traps this measurement walked into, recorded so they are not walked into again.**
+  (a) **Session duration correlates and the correlation is circular** — rest is a *component* of
+  duration, so rushing produces a short session. Do not use duration as a rest-adherence covariate
+  anywhere. (b) **Q-85's hypothesis has NO INSTANCES here**: every shortened session in the history
+  predates `planned_rest_sec`, and 26 of the 27 measurable sessions are the same 5-exercise shape.
+  Q-85 is neither confirmed nor refuted — it stays open on its own evidence.
+- **The better finding, which replaces the framing:** actual rest barely responds to the
+  prescription. Planned 60 s → **75 s taken** (the owner rests *longer* than asked); planned 90 →
+  65; 120 → 110; 187 → 133. Prescribed spans 60–187 s, actual spans 65–133 s. So the coaching line
+  is *"your rest ignores the plan"*, not *"you rushed today"* — the latter is meaningless when every
+  session rushes. **Within-session drift is real but secondary** (0.32 at exercise 1 → 0.47 at
+  exercise 5): time pressure explains the slope, not the 0.32 intercept, and the intercept is most
+  of it.
+- **Keep:** the surfacing itself is unbuilt, and the primary half (Q-289's bucket table split by
+  rest band) is already measured — see the ✅ above it. Surfacing is a Lane B UI change once the
+  owner has seen the framing; nothing here licenses a rest term in `expectedRpe`.
 
 ### [cardio] Q-301b — drop the `running_baselines` table itself (code already removed)
 
@@ -4872,6 +4982,33 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Minor, same area:** `section` embeds a UUID for `session-explain:<id>` / `session-recap:<id>`,
   making it high-cardinality and awkward to group. Consider a separate `subject_id` column if this
   is touched anyway — not worth its own PR.
+- ✅ **SHIPPED 2026-08-24** (`fix/insight-context-hash`). Intent established first, as the entry
+  asked: **migration 121 added the column for NUT-7**, a daily digest generated at lunch reporting
+  lunch totals all evening — and `getAiHealthInsightWithHash` plus the optional `contextHash`
+  parameter sit on the *generic* repository interface. Possibility three: every section was meant
+  to write it and one was wired.
+- **⚠ THE ENTRY'S "nothing is broken for the user" WAS BACKWARDS, and it is what makes this worth
+  more than a tidy-up.** It reasoned that "insights regenerate rather than being served stale". They
+  do not: all four other read sites served the cache **unconditionally** for the whole day or week.
+  An insight written before the ring synced is the one the user reads afterwards. `health-insight`
+  already carried an in-code workaround for one instance — its zero-data answer was *"Deliberately
+  NOT cached: the cache is keyed by (user, section, date), so persisting this would still be served
+  after the ring syncs later the same day."*
+- **All five surfaces now hash** through one helper, `lib/ai/insight-cache.ts`. The context is the
+  prompt each route already assembles, so the check is exact. **A legacy NULL hash counts as a
+  MISS** — it is precisely a row that cannot be vouched for; the cost is one regeneration per
+  section per day, once. **The hash-less `getAiHealthInsight` is deleted from the repository
+  interface and the adapter**, so the bug class is unreachable rather than merely fixed.
+- **Two costs, stated rather than buried.** (a) The cache check moved *after* the deterministic
+  reads in every route, so a cache hit now pays for them — cheap next to the model call it avoids,
+  and the trade daily-digest already accepted. (b) `session-explain` lost a fast path that served
+  the narrative from the `sessionId` query param **without calling `getNextSession`**, so the Home
+  card now pays for that call. That read structurally could not know whether the signals it
+  describes still hold, on the one route whose entire subject is signals that move during the day —
+  a plausible mechanism for **Q-291** (the AI surfaces contradicting each other on the same day),
+  though not confirmed as its cause.
+- **Keep:** the `subject_id` idea above is untouched, and **Q-291 is not closed by this** — the
+  contradiction was never traced, and this removes one way it could happen, not all of them.
 
 ### [platform] Q-287 — self-service account deletion, all seven plan decisions resolved
 
@@ -5406,6 +5543,7 @@ ehr     0     0     0     0   648   208   128   556     0
 ### [devices][readiness] Q-506 — the illness radar cannot fire: the temperature baseline's deviation is 18.7× too large
 
 - **Branch:** `fix/temperature-baseline-cold-start`
+- **Batch:** temperature-baseline — ships with **TN-6**, the same baseline object's other half (its *mean* is 0.36 °C low, penalising readiness daily). Correcting only one of the two looks like it fixed both.
 - **Plan:** none yet — **Lane A implements; Tuning proposes only.** This is a baseline/data fix, not
   a scoring-constant change.
 - **Added:** 2026-08-18 · Tuning agent ·

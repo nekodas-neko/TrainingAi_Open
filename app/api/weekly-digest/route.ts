@@ -3,6 +3,7 @@ import { auth } from '@/auth'
 import { getRepository } from '@/lib/data'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { formatInTimeZone } from 'date-fns-tz'
 import { DEFAULT_TZ, todayMidnightUtc, todayDayOfWeek } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
@@ -51,15 +52,9 @@ export async function POST(req: Request) {
 
   const repo = await getRepository()
 
-  // Cache first — cached reads don't cost an AI call so don't count against the limit
-  if (!force) {
-    const cached = await repo.getAiHealthInsight(userId, CACHE_SECTION, isoWeekKey)
-    if (cached) return NextResponse.json({ digest: cached, weekStart: isoWeekKey, generatedAt: null, cached: true })
-  }
-
-  if (!rateLimit(`${userId}:weekly-digest`, 3, 60_000)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-  }
+  // Q-293: the cache check used to sit here and serve the first digest written for the week for
+  // the rest of it. The recap week is closed, so its inputs mostly are too — but a late ring
+  // back-fill or a corrected weigh-in still changes them, and there was no way to notice.
 
   // Last day of the recap week = the Sunday just gone (recapWeekEnd is the exclusive
   // start of the current week, so step back 1 ms to land on that Sunday's date).
@@ -234,10 +229,21 @@ export async function POST(req: Request) {
     friendsContext,
   ].filter(Boolean).join('\n')
 
+  const contextHash = hashInsightContext(context)
+
+  if (!force) {
+    const cached = await readFreshInsight(repo, userId, CACHE_SECTION, isoWeekKey, contextHash)
+    if (cached) return NextResponse.json({ digest: cached, weekStart: isoWeekKey, generatedAt: null, cached: true })
+  }
+
+  if (!rateLimit(`${userId}:weekly-digest`, 3, 60_000)) {
+    return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+  }
+
   let text: string
   try {
     ;({ text } = await loggedGenerateText(
-      { section: 'weekly-digest', userId, fingerprint: isoWeekKey },
+      { section: 'weekly-digest', userId, fingerprint: { isoWeekKey, contextHash } },
       () => generateText({
         model: aiModel(),
         prompt: `You are a personal training coach. Write a concise recap of the user's last completed training week (Monday to Sunday, the week that just ended). 4–6 bullet points, max 180 words total. Cover training load, any PRs, recovery (HRV/readiness/sleep), and one specific recommendation for the week ahead. Be specific, encouraging, and actionable. Use the data below — quote its numbers, never invent or recompute any.\n\n${context}`,
@@ -250,7 +256,7 @@ export async function POST(req: Request) {
   }
 
   const digest = text.trim()
-  await repo.upsertAiHealthInsight(userId, CACHE_SECTION, isoWeekKey, digest)
+  await repo.upsertAiHealthInsight(userId, CACHE_SECTION, isoWeekKey, digest, contextHash)
 
   return NextResponse.json({ digest, weekStart: isoWeekKey, generatedAt: new Date().toISOString(), cached: false })
 }
