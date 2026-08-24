@@ -173,6 +173,14 @@ Legacy `Q-` numbers stay valid and are not renumbered. **An implementer's first 
 `Needs:` and `Gate: owner|device` fields — the queue file cannot show you which of its top entries
 are actually startable.
 
+**Session handoff:** [`docs/handoff-2026-08-24-devices-daily-summary-wipe-retraction.md`](docs/handoff-2026-08-24-devices-daily-summary-wipe-retraction.md)
+— Tuning retracted its own Q-528: `oura_daily_summary` was never wiped, and **43 of its 45 rows were
+created 2026-08-17 07:50**, straddling the reading that reported one. The count came from
+`pg_stat_user_tables.n_live_tup`, a **planner estimate** that reads **0** against `oura_raw_packed`'s
+**764** real rows — **to ask whether a table is empty, run `count(*)`**, a rule now in `CLAUDE.md`.
+With Q-525 un-suspended, both of chronic stress's countable gates were measured and **both pass**, so
+its refusal is inside the granular layer, which records no reason for a null (**TN-1**).
+
 **Session handoff:** [`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)
 — the CI job named **Migration Check** could not fail on a broken migration, and fixing that
 immediately caught one: `142_claude_ro_views.sql` creates a view over a table `143` creates, so on
