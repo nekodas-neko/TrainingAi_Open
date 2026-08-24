@@ -12,12 +12,9 @@ import { NextWorkoutCard } from "./next-workout-card";
 import type { WorkoutExercise } from "@/app/api/workout-data/route";
 import { formatTime } from "./utils";
 import { useCountUp } from "@/lib/hooks/use-count-up";
-import { getLocalStore } from "@/lib/local-store";
-import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { todayInTz } from "@trainingai/shared/date-utils";
 import { TrainingStressBadge } from "@/components/workout/training-stress-badge";
 import { TimeSummaryCard } from "@/components/workout/time-summary-card";
-import { invalidateHealthTrends } from "@/lib/cache-groups";
 import { cachedFetch } from "@/lib/sqlite/cache";
 import { aggregateHrRecoveryByExercise, formatRecoveryRate } from "@trainingai/shared/health/hr-recovery-by-exercise";
 import { WORKOUT_RECAP_TTL, WORKOUT_ENERGY_TTL, WORKOUT_HR_TTL, HR_PROFILE_TTL } from "@trainingai/shared/cache-ttl";
@@ -53,7 +50,6 @@ interface DoneScreenProps {
   totalVolumeKg?: number;
   totalSets?: number;
   workoutSessionId?: string;
-  userId?: string;
 }
 
 interface HrData {
@@ -81,7 +77,6 @@ export function DoneScreen({
   totalVolumeKg,
   totalSets,
   workoutSessionId,
-  userId,
 }: DoneScreenProps) {
   const router = useRouter();
 
@@ -95,13 +90,8 @@ export function DoneScreen({
   const [hrLoading, setHrLoading] = useState(false);
   const [hrAttempted, setHrAttempted] = useState(false);
   const [hrError, setHrError] = useState(false);
-  const [sessionRpe, setSessionRpe] = useState<number | null>(null);
   const [energy, setEnergy] = useState<{ kcal: number | null; intensity: string; source: 'hr' | 'met' } | null>(null);
   const [activityId, setActivityId] = useState<number>(DEFAULT_ACTIVITY_ID);
-  // In-flight guard on the POST itself — the 1-10 grid stays mounted after selection
-  // (a re-tap re-POSTs, the write path already upserts session_rpe) so this replaces
-  // the old rpeSaved unmount-and-block-forever guard (UI-5).
-  const [rpeSubmitting, setRpeSubmitting] = useState(false);
   const [recap, setRecap] = useState<string | null>(null);
   const [recapLoading, setRecapLoading] = useState(false);
   const [recapError, setRecapError] = useState(false);
@@ -137,11 +127,11 @@ export function DoneScreen({
           : null;
     if (durSec == null || durSec <= 0) return;
     const qs = new URLSearchParams({ durationMin: String(durSec / 60), activityId: String(activityId) });
-    if (sessionRpe != null) qs.set("rpe", String(sessionRpe));
-    // Keyed by the inputs that change the answer (rpe + activity), so tapping a different
-    // session RPE re-fetches rather than serving the previous estimate.
+    // No `rpe` param (Q-420): the prompt that used to supply it is gone. `estSessionKcal` treats a
+    // missing RPE as 'moderate' intensity, and heart rate (when the session has one) overrides it
+    // entirely regardless — deriving intensity from set RPEs is Q-422/Tuning's, not this entry's.
     await cachedFetch<{ kcal: number | null; intensity?: string; source?: 'hr' | 'met' }>(
-      `workout-energy:${workoutSessionId}:${activityId}:${sessionRpe ?? 'none'}`,
+      `workout-energy:${workoutSessionId}:${activityId}`,
       `/api/workout-sessions/${workoutSessionId}/energy?${qs}`,
       WORKOUT_ENERGY_TTL,
       (data) => {
@@ -152,34 +142,7 @@ export function DoneScreen({
       // The estimate is a nice-to-have — no error state, same as before.
       { onError: () => {} },
     );
-  }, [workoutSessionId, durationMinutes, workoutStartMs, activityId, sessionRpe]);
-
-  const handleRpeTap = async (rpe: number) => {
-    if (!workoutSessionId || rpeSubmitting) return;
-    setRpeSubmitting(true);
-    setSessionRpe(rpe);
-    try {
-      const store = userId ? getLocalStore(userId) : null;
-      if (store) {
-        await store.setSessionRpe(workoutSessionId, rpe);
-        await store.queueMutation({
-          userId: userId!, domain: 'session_rpe', date: todayInTz(),
-          payload: { workoutSessionId, sessionRpe: rpe },
-        });
-        pushThenRevalidate(userId!, invalidateHealthTrends);
-      } else {
-        const res = await fetch('/api/workout-sessions/rpe', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workoutSessionId, sessionRpe: rpe }),
-        });
-        if (!res.ok) throw new Error();
-      }
-      invalidateHealthTrends().catch(() => {});
-    } catch { /* keep the optimistic UI; outbox retries on device */ }
-    finally { setRpeSubmitting(false); }
-    // energy re-fetches automatically — loadEnergy depends on sessionRpe.
-  };
+  }, [workoutSessionId, durationMinutes, workoutStartMs, activityId]);
 
   const loadHr = useCallback(async () => {
     if (!workoutSessionId) return;
@@ -391,62 +354,34 @@ export function DoneScreen({
         {/* Time summary — actual vs planned set-work and rest, with the rest-budget headline */}
         {workoutSessionId && <TimeSummaryCard workoutSessionId={workoutSessionId} />}
 
-        {/* Session RPE one-tap (Foster sRPE) — re-tap to change (UI-5) */}
-        {workoutSessionId && (
+        {/* Energy estimate (Q-420: the session-RPE prompt that used to sit above this was removed
+            — the owner can't judge a session as one number, and the derived-intensity replacement
+            is Q-422/Tuning's, not a client-side change) */}
+        {workoutSessionId && energy?.kcal != null && (
           <div className="w-full max-w-xs rounded-2xl bg-muted/40 border border-border p-4">
-            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-              {sessionRpe != null ? `Session effort: ${sessionRpe}/10` : 'How hard was that session?'}
-            </p>
-            <div className="grid grid-cols-5 gap-1.5">
-              {[...Array(10)].map((_, i) => {
-                const val = i + 1;
-                const selected = sessionRpe === val;
-                return (
-                  <button
-                    key={val}
-                    type="button"
-                    aria-pressed={selected}
-                    disabled={rpeSubmitting}
-                    onClick={() => handleRpeTap(val)}
-                    className={`h-10 rounded-xl text-sm font-semibold border transition disabled:opacity-60 ${
-                      selected
-                        ? "border-brand bg-brand/15 text-brand"
-                        : "border-border/60 text-muted-foreground hover:text-foreground"
-                    }`}
-                  >
-                    {val}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
+              <span className="flex items-center gap-1">
+                <FlameIcon className="h-3 w-3" style={{ color: "var(--accent-amber)" }} />
+                {/*
+                  "{intensity} effort" is the MET tier, and naming it beside a figure heart rate
+                  produced would credit the wrong input — the same trap the route already guards
+                  by returning a null `met` on the HR path (Q-421). So the suffix follows the
+                  basis rather than always reading as the tier.
+                */}
+                ~{energy.kcal.toLocaleString()} kcal · {energy.source === 'hr' ? 'from heart rate' : `${energy.intensity} effort`}
+              </span>
+              <TrainingStressBadge date={todayInTz()} />
+              <Select value={String(activityId)} onValueChange={(v) => setActivityId(Number(v))}>
+                <SelectTrigger className="h-7 w-auto gap-1 rounded-lg border-border/60 px-2 py-0 text-[11px]" aria-label="Workout activity type">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {COMMON_WORKOUT_ACTIVITIES.map((a) => (
+                    <SelectItem key={a.id} value={String(a.id)} className="text-xs">{a.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-              <span>Easy</span><span>Max effort</span>
-            </div>
-            {energy?.kcal != null && (
-              <div className="mt-2 flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-[11px] text-muted-foreground">
-                <span className="flex items-center gap-1">
-                  <FlameIcon className="h-3 w-3" style={{ color: "var(--accent-amber)" }} />
-                  {/*
-                    "{intensity} effort" is the MET tier, and naming it beside a figure heart rate
-                    produced would credit the wrong input — the same trap the route already guards
-                    by returning a null `met` on the HR path (Q-421). So the suffix follows the
-                    basis rather than always reading as the tier.
-                  */}
-                  ~{energy.kcal.toLocaleString()} kcal · {energy.source === 'hr' ? 'from heart rate' : `${energy.intensity} effort`}
-                </span>
-                <TrainingStressBadge date={todayInTz()} />
-                <Select value={String(activityId)} onValueChange={(v) => setActivityId(Number(v))}>
-                  <SelectTrigger className="h-7 w-auto gap-1 rounded-lg border-border/60 px-2 py-0 text-[11px]" aria-label="Workout activity type">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {COMMON_WORKOUT_ACTIVITIES.map((a) => (
-                      <SelectItem key={a.id} value={String(a.id)} className="text-xs">{a.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
           </div>
         )}
 

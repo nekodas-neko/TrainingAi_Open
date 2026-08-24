@@ -27,6 +27,10 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** The owner can't judge a
+whole session as one number (25.6% fill rate agreed); `sessionEffort()` already derives it from set
+RPEs at read time (Lane A, no schema change) — the done screen's own kcal estimate needed no change.
+
 **Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
 `hr-recovery-profile-card.tsx`/`strength-progress-card.tsx` now show "Couldn't load… — pull to
 refresh" on a 429/500. Wiring `onError` alone didn't work: under StrictMode's dev double-invoke, a
@@ -193,16 +197,11 @@ double trip. They now carry what distinguishes a request, keyed through a new `c
 [journal](docs/overview/entries/2026-08-23-ai-fingerprint-granularity.md).
 
 **The Oura rollup now takes an I/O port (Q-545, D2 Task 2).** `aggregateOuraRawSamples` is now
-`runOuraRollup(io, timezone, opts)` (`lib/oura-ble/rollup/run.ts`) behind a 22-method `RollupIO`;
-`adapter.ts` drops 6,906 → 5,818 lines. No behaviour change — the 20 test files that drive the
-rollup end-to-end pass unchanged. It does **not** move the bill (the rollup still runs on the
-server); it removes the reason a device rollup would be written twice. **The models followed the
-same day** — `sleepnet`, `step-counter` and `dhrv` take a `ModelRuntime` rather than importing
-`onnxruntime-node`, taking `run.ts`'s server-only edges from **5 to 1** (measured: 46 modules). The
-the constants followed — the four ports that read them now take them by **injection**
-(Q-221's mechanism), so **`run.ts` reaches zero server-only modules**: 45, no `node:` builtin, no
-`onnxruntime-node`, no driver. What is left of Task 3 is the device half, and nothing in the engine
-blocks it ([journal](docs/overview/entries/2026-08-23-constants-injection.md)).
+`runOuraRollup(io, timezone, opts)` behind a 22-method `RollupIO`; `adapter.ts` drops 6,906 → 5,818
+lines, no behaviour change. Models followed — `sleepnet`/`step-counter`/`dhrv` take a `ModelRuntime`
+instead of importing `onnxruntime-node` — and constants followed by injection, so `run.ts` reaches
+**zero** server-only modules. Device half is Task 3, unblocked
+([journal](docs/overview/entries/2026-08-23-constants-injection.md)).
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is

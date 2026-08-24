@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.357.0",
+    date: "2026-08-24",
+    changes: [
+      "The end-of-workout “How hard was that session?” rating is gone — the app now works out how hard a session was from your own set ratings instead of asking you to judge the whole thing as one number.",
+    ],
+  },
+  {
     version: "1.356.0",
     date: "2026-08-24",
     changes: [
