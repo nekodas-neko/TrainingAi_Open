@@ -3718,13 +3718,31 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   dump hashing identically before and after). This item is the affordance only.
 
 ### [platform] Q-315 — `error_events` holds 4 live rows in 49 MB: Q-539 stopped the bleeding but never reclaimed the space
-- **Gate: owner** — the route shipped; what is left is a press, and it needs an admin session
-  cookie against production. A session has read-only DB access (`claude_readonly`, which cannot
-  `VACUUM` by design) and no way to obtain one, so this cannot leave the queue from here.
-
-- **Lane A.** Server only. No migration, no schema change — an admin-triggered `VACUUM FULL`.
+- **🔁 RE-SCOPED 2026-08-24 — this was never an owner DECISION, and the `Gate: owner` was hiding a
+  missing button. `Lane: B` now.** *"What is left is a press"* was true and incomplete: **nothing in
+  the app can make that press.** `app/api/admin/vacuum/route.ts` shipped, generalised, with
+  `error_events` in `VACUUM_FULL_TABLES` — and **has no caller**. The one vacuum control that exists
+  (`components/oura-ble/db-footprint-card.tsx:108`) still posts to the *old*
+  `/api/oura-ble/samples/vacuum`, which only ever touches `oura_raw_samples`. The route is
+  session-only (no bearer path, unlike `ADMIN_EXPORT_SECRET`/`ADMIN_SNAPSHOT_SECRET`), so there is
+  no way to reach `error_events` from anywhere.
+  - **The work is small and is Lane B's:** point that control at the generalised route with a table
+    selector, driven by the `GET` the route already serves (it returns
+    `VACUUM_FULL_TABLES` as `{table, what}[]` for exactly this). **Then** the owner presses it —
+    which is an action, not a decision, and needs no gate.
+  - **It is reachable once wired.** Q-544 moved `DbFootprintCard` **above** the native-gated
+    `OuraBleDebug` on `/admin/oura-ble` precisely so it renders on a desktop — which is the client
+    that can actually hold the `ACCESS EXCLUSIVE` lock.
+  - **Third instance of this repo's "built it, never wired it" class**, alongside Q-467's undo
+    subsystem with no caller and LB-3's sheet nothing opened.
+- **↻ NUMBERS REFRESHED 2026-08-24 — the case got STRONGER, not weaker.** The headline and the
+  measurements below are from 2026-08-18, when the database was 819 MB. Packing has since taken it
+  to **181 MB**, so `error_events` at **49 MB is now ~27% of the whole database**, not 6%. Live rows
+  have drifted 4 → **33** (`n_tup_ins` 37) and the size has not moved — consistent with the entry's
+  own diagnosis that this is dead tuples and TOAST, not data. Q-534's 500 MB deadline is met, so the
+  urgency framing below is spent; the waste is not.
 - **Added:** 2026-08-18 (found while measuring production for Q-541)
-- **Lane:** A
+- **Lane:** B — see the re-scope above; the remaining work is wiring the existing control to the generalised route, which is `components/**`.
 - **Measured production, 2026-08-18:** `error_events` is **49 MB total against `n_live_tup = 4`** —
   12 MB heap, 1.1 MB indexes, and the remaining ~36 MB in TOAST. That is **6% of the whole 819 MB
   database** held by four rows.
