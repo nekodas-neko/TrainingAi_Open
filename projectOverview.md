@@ -27,6 +27,11 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
+it. Its confirm copy deliberately does not read like the lossless VACUUM one — it is the only
+control here that DELETEs archival frames — and a refused bucket is listed with its reason rather
+than counted as "packed 0". APK-only, like the card. `Gate: device`.
+
 **Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, deliberately outside
 `OuraBleDebug` — that renders nothing without the native plugin, which is exactly the laptop doing
 the re-key. Says up front that nothing happens until the ring next reports. `Gate: device`.
@@ -130,25 +135,20 @@ trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not 
 back the **whole recipe** — 1,956 kcal for a banana-bread loaf — so the row asks how many it serves
 and cannot be kept until answered; `perServing` is shared with the route so the divides cannot drift.
 
-**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to
-128 px WebP (~6 KB) to fit `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because
-nothing else fails loudly when that cap slips. The storage half shipped with Q-396, unreachable.
+**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px
+WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
 
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
-routes — create/rename/activate/delete a plan, restructure it, edit one meal, save dietary
-restrictions — read the request body and then validated a variable nothing had assigned, so every
-one answered `400 Invalid input: expected object, received undefined` to a valid request. Confirmed
-at runtime, not read: the whole meal-plan write surface was dead on `main`.
-`scripts/check-json-body-parsed.js` now fails Custom Rules on the class (52 → 53 steps). On top of
-that, each plan meal carries **Save to My Meals** with a **Save all**, keyed for idempotence on the
-`saved_meal_id` column that already existed, so the plan becomes a generator rather than somewhere
-to live ([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
+write routes validated a variable nothing had assigned, so every one answered `400 Invalid input:
+expected object, received undefined` to a valid request — the whole meal-plan write surface was dead
+on `main`, confirmed at runtime. `check-json-body-parsed.js` holds the class. Each plan meal now
+carries **Save to My Meals** with a **Save all**, idempotent on the existing `saved_meal_id` column
+([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
 
-**Preferences have a server home; nothing reads it yet (Q-392, engine half).**
-`users.preferences` JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, which **merges**
-under a row lock — the unlocked version demonstrably drops the other device's key when a write
-lands mid-merge. Proven with two signed-in sessions against the local DB. **Nothing the owner can
-see changed:** the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
+**Preferences have a server home; nothing reads it yet (Q-392, engine half).** `users.preferences`
+JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, merging under a row lock — the unlocked
+version demonstrably drops the other device's key mid-merge. **Nothing the owner can see changed:**
+the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
 
 **The UTC-offset fixture sweep came back clean, and found something else (Q-394, LA-19 — both
 closed).** No third test carries the hazard that took out two PRs, but one *correctly written* test
