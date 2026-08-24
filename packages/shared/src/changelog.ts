@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.361.0",
+    date: "2026-08-24",
+    changes: [
+      "The morning check-in, mood check-in, water log and body-metric log now file what you save under your own day rather than the phone's or the app's default \u2014 they disagree whenever your timezone isn't Brisbane, and the body-metric sheet was using two different answers for the same save.",
+    ],
+  },
+  {
     version: "1.360.0",
     date: "2026-08-24",
     changes: [
