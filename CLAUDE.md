@@ -48,6 +48,13 @@
 - **Working in one area of the app? Read that pillar's index first — [`docs/domains/`](docs/domains/README.md).** The docs are otherwise organised by *document type* (plans, specs, reviews, journal entries, handoffs), so knowledge about one subject is spread across a dozen folders. `docs/domains/<pillar>/README.md` is the subject-based view: what the pillar owns, where its code lives, every reference doc about it, its open known issues, and the handoffs/reviews that already covered it. The eleven pillars are `sleep` · `readiness` · `heart-rate` · `cardio` · `activity` · `workouts` · `nutrition` · `body` · `devices` · `app-shell` · `platform`; [`docs/domains/README.md`](docs/domains/README.md) holds the boundary/routing rules for topics that could sit in two of them. Domain tags are **greppable on purpose**: every `projectOverview.md` Known-Issues heading carries them (`grep -n '^### .*\[sleep\]' projectOverview.md`) and every handoff filename carries one (`ls docs/handoff-*-sleep-*.md`). When you add a reference doc for a pillar, link it from that pillar's index in the same PR.
 - **Before building any new feature or shared helper, check [`docs/module-map.md`](docs/module-map.md) first.** It is the "what already exists and where" index of the app's modules and infrastructure — dates, cache, sync/outbox, repository, auth/security, domain formulas, AI, Oura, notifications, UI primitives, and (critically) how recurring/scheduled/background work is done (there is **no cron layer** — see §0 of that file). It exists to stop new work re-implementing infrastructure the app already has. When you add a genuinely new piece of shared infrastructure, add a one-line row to it in the same PR.
 - **At the end of every session, fold the journal/index update into the same PR as the implementation** — don't open a separate follow-up PR for it. Write the session summary as **its own new file** in `docs/overview/entries/` named `YYYY-MM-DD-<branch-slug>.md` (per the convention in [`docs/overview/entries/README.md`](docs/overview/entries/README.md)) — **do NOT prepend to a shared `docs/overview/history-*.md`; that shared-line edit was the most frequent multi-PR merge conflict, and per-entry files take it to zero.** A periodic compaction sweep folds these into the batched history later. Also make the `projectOverview.md` lean-index update (current status, any new known issues, what's planned next) as commits on the *same branch* as the code change, once the diff is final and CI is green — i.e. write it last, right before merging (or before auto-merge lands), not speculatively at the start of the session. Because it rides in the same PR, it only ever lands if that PR actually merges — a PR that gets abandoned, superseded, or reworked never leaves a stale "done" claim behind. Keep shared *pointer* lines out of a feature PR (the backlog serial-track "Next on the track" line and `planned_upgrades.md` tick marks defer to the compaction sweep — see the README); striking the completed item's own backlog **queue entry** stays in the feature PR (non-adjacent, rarely conflicts). If user-visible changes were shipped, bump the version in `package.json` and add an entry to `packages/shared/src/changelog.ts` in that same PR — patch for bug fixes, minor for new features, major for breaking changes or large redesigns. (The version/changelog bump still edits shared lines and can conflict on parallel merges — re-bump on rebase; a future changelog-fragment change could remove that too.)
+- **Every session carries a status light at the end of its title — 🟢 while it is live, 🔴 once it is
+  wrapped.** This is **every** session, not just the six standing agents: an ad-hoc
+  `Token usage investigation 🟢` is what tells the owner, scanning the session list, which threads are
+  still open and need closing out. Set it early — rename yourself so the title ends in ` 🟢`, via
+  `get_session` with `session_id` **omitted** (it describes the calling session and returns your own
+  ID in `ccr.id`), then `set_session_title`. Flip it to 🔴 as the last act of the Session Wrap-Up
+  below. The standing agents come up 🟢 from their own prompts; everything else sets its own.
 - **When the user says the session is wrapping up** — "let's wrap this session", "let's close this session", "we're finishing up", or anything equivalent — that is a request for the three-part wrap-up ritual below (handoff doc → documentation cleanup → next-agent prompt), not just an acknowledgement. See **Session Wrap-Up** immediately after this list.
 - **Tick off roadmap items immediately when pushed to `main`** — as soon as any planned feature or fix lands on `main` (even for testing), mark it as ✅ in `projectOverview.md`. If it still needs testing or has known gaps, add a ⚠️ note inline rather than leaving it unchecked. Never leave a shipped item unchecked because it "isn't fully verified yet".
 - **Decisions come with a recommendation attached, and cheap reversible ones don't come at all.** Recommendation first, why it wins long-term, alternatives and what each is better at, reversal cost, plain English. Full rule: **Decisions That Come Back To Me**, below.
@@ -121,11 +128,11 @@ and never write code — which is what keeps the collision surface to Lane A aga
   similar; the 17 that already did are baselined shrink-only, and clearing them is Orchestrator's
   first sweep. An entry genuinely still owing an owner or device check states so with
   `- **Keep:** <what is owed>` rather than being deleted or left to look finished.
-- **The session titles are fixed, and a successor reuses its predecessor's exactly** — `Implementation
-  Agent (A) 🚧` · `Implementation Agent (B) 🚧` · `BugFix Intake Agent 🪲` · `Tuning Agent 🎶` ·
-  `Review Agent 📖` · `Orchestrator 🪐`. The title is how the owner tells six concurrent sessions apart, so a renamed
-  successor is a lost thread even when its baton is perfect. Every handoff states its successor's
-  title outright rather than leaving it to be inferred.
+- **The session titles are fixed, and a successor reuses its predecessor's exactly** — `🚧 Implementation
+  Agent (A) 🟢` · `🚧 Implementation Agent (B) 🟢` · `🪲 BugFix Intake Agent 🟢` · `🎶 Tuning Agent 🟢` ·
+  `📖 Review Agent 🟢` · `🪐 Orchestrator 🟢`. Leading emoji = role; **trailing = this session's status, and
+  the outgoing session flips 🟢 to 🔴 as its last act** so the owner archives the reds. A renamed successor
+  is a lost thread even with a perfect baton; every handoff states its successor's title outright.
 - **Handing over:** land everything first — the container is ephemeral, so an uncommitted baton is a
   lost baton — then **rewrite** `docs/agents/state/<agent>.md` in full. Never append; a baton that is
   half last week's is worse than none, because it gets trusted. The dated
@@ -138,7 +145,7 @@ and never write code — which is what keeps the collision surface to Lane A aga
 
 **Trigger:** the user signals the session is ending — *"let's wrap this session"*, *"let's close this
 session"*, *"we're finishing up"*, *"wrap it up"*, or any equivalent. Treat it as a standing
-instruction to do all three steps below, in order, without being asked for each one. Do them even if
+instruction to do all four steps below, in order, without being asked for each one. Do them even if
 the session's actual code work was small — the point is that nothing lives only in the chat.
 
 **1. Write the handoff document.**
@@ -189,7 +196,12 @@ branch to check out, the docs to read and in what order (typically `projectOverv
 state, anything waiting on the owner). Write it to be pasted verbatim — no "see above", no
 references to this chat.
 
-**All three land in a commit on the working branch and get pushed** (docs-only, so it merges with
+**4. Flip the session's status light to 🔴.**
+Rename the session so its title ends in 🔴 rather than 🟢 — the same two calls as above. Do it last,
+once steps 1–3 have landed and pushed. A session still showing 🟢 after its wrap-up reads as live,
+and the owner has to re-open it to find out otherwise.
+
+**Steps 1–3 land in a commit on the working branch and get pushed** (docs-only, so it merges with
 zero ceremony per Standing Instructions). The container is ephemeral and the repo is re-cloned each
 session — an uncommitted handoff is a lost handoff. If the session's PR is still open, fold the
 wrap-up into that same PR rather than opening a second one.

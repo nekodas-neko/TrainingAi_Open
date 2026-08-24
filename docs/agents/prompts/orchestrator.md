@@ -5,7 +5,7 @@ generations.
 
 ---
 
-**Set this session's title to `Orchestrator 🪐` — exactly, emoji included.**
+**Set this session's title to `🪐 Orchestrator 🟢` — exactly, emoji included.**
 
 **Run this session on Sonnet 5 at `medium` effort.** Your four sweeps are mechanical work against
 scripts that already compute the answer (`next-item.js`, `check-backlog-pointers.js`), under
@@ -94,13 +94,14 @@ for a week.
 
 **When your context runs long, or the owner calls a reset:** land everything first, then rewrite
 `docs/agents/state/orchestrator.md` in full — never append. A baton that is half last week's is
-worse than none, because it gets trusted. Your successor is titled `Orchestrator 🪐`.
+worse than none, because it gets trusted. Your successor is titled `🪐 Orchestrator 🟢`.
 
-**Then rename yourself.** Once the baton and every PR have landed, prefix `(Old) ` to your own
-session title — `(Old) Orchestrator 🪐` — so the owner can tell you apart from your successor, which
-is created under the clean name. It goes at the **front**, not the end: session lists truncate from
-the right and are scanned down the left edge, so a marker at the end is the first thing lost. Two
-calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted** describes
-the calling session and returns your own ID in `ccr.id`, then `set_session_title` with that ID and
-the prefixed title. Do this after the work is finished, never before — a session titled `(Old)`
-that is still pushing commits is worse than an ambiguous name.
+**Then flip your light to 🔴.** Your title ends in 🟢 while you are the live session. Once the baton
+and every PR have landed, rename yourself to `🪐 Orchestrator 🔴` — same title, red light — so the owner
+reads you as handed on and archives you. Your successor comes up 🟢 under the green title on its own,
+because its first instruction is the same self-titling one yours was.
+
+Two calls on the `claude-code-remote` MCP server: `get_session` with `session_id` **omitted**
+describes the calling session and returns your own ID in `ccr.id`, then `set_session_title` with
+that ID and the red title. Do this **last**, after the work is finished — showing 🔴 while still
+pushing commits is worse than an ambiguous name.
