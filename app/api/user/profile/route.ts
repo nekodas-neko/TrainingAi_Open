@@ -17,7 +17,7 @@ const ProfileSchema = z.object({
   sex:           z.enum(['male', 'female', 'other']).optional().nullable(),
   activityLevel: z.enum([...ACTIVITY_LEVELS]).optional().nullable(),
   fitnessGoal:   z.enum([...FITNESS_GOALS]).optional().nullable(),
-})
+}).strict()
 
 export async function GET() {
   const session = await auth()

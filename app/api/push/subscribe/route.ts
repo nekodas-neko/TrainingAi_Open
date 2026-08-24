@@ -10,13 +10,17 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 // A push endpoint and its keys.
 const MAX_BODY_BYTES = 8 * 1024
 
+// `existing.toJSON()`/`sub.toJSON()` (`lib/push-client.ts`) is a browser `PushSubscriptionJSON`,
+// which always carries `expirationTime` (string | number | null) alongside `endpoint`/`keys` —
+// omitting it here would make `.strict()` 400 every real subscribe (Q-464).
 const SubscribeSchema = z.object({
   endpoint: z.string().url(),
+  expirationTime: z.union([z.number(), z.null()]).optional(),
   keys: z.object({
     p256dh: z.string(),
     auth: z.string(),
-  }),
-})
+  }).strict(),
+}).strict()
 
 export async function GET() {
   // Auth first (Q-454). A 503 "Push not configured" to an anonymous caller discloses deployment

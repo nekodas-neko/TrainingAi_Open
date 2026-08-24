@@ -795,8 +795,15 @@ answered by subtraction rather than re-argued. Verified through the real route o
 > place and losing the ability to tell them apart.
 
 
-- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`,
-  `app/api/body-metadata`; the prompt removal is `components/workout/done-screen.tsx`.
+- **Lane:** B — **the Lane A half SHIPPED** (#368, `packages/shared/src/workout/derive-session-rpe.ts`):
+  `sessionEffort()` derives from set RPEs with no stored column, and `app/api/health-trends`'s
+  `session-rpe` view already reads it (`effort.source: 'self' | 'derived'`), labelled in the series
+  and the insight line. Owner decision items 2–4 below are done. **What remains is item 1 only** —
+  `done-screen.tsx:398` still prompts *"How hard was that session?"* — and that file is Lane B's
+  (`components/**`). The correction formula (HR × RPE combined) is explicitly not this entry; it
+  waits on Q-422/Tuning per the note below. Verified against `main` 2026-08-24 — the entry's own
+  `Lane: A` field was stale (it named files that already shipped) and is corrected here rather than
+  the entry being re-implemented.
 - **✅ DECIDED BY THE OWNER 2026-08-23. The gate is cleared and the scope changed — read this
   before the older notes below, which were written against a narrower question.**
   1. **Delete the user-facing prompt.** *"Get rid of the user facing 'how hard was the session'."*
@@ -1821,8 +1828,24 @@ this fits without an extraction.
   short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
   from source, not observed, and that is still true after the fix. `Gate: device`.
 
-### [activity][platform] Q-556 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
+### [activity][platform] ✅ REFUTED 2026-08-24 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
 
+> **The remaining fix ("answer 404 when zero") is refuted, not just deferred. Do not implement it.**
+> Re-verified against `main` 2026-08-24: `docs/reviews/2026-08-18-write-surface-not-found.md` §Clean
+> item 2 probed this *exact* route cross-user (`DELETE /api/activity-logs` against another user's
+> row, same day as the finding below) and explicitly declined to file the 200-on-miss behaviour —
+> *"`DELETE` is idempotent by HTTP convention, the desired end state (row absent) genuinely holds,
+> and the client's outbox is correct to treat the mutation as done… Recorded so a later sweep does
+> not file the benign half of the pattern."* It names `activity-logs` as one of eight routes doing
+> this deliberately (`injuries`, `food-logs`, `meal-types`, `saved-meals`, `supplements/[id]`,
+> `supplements/[id]/log`, `friends`, `activity-logs`). Two reviews from the same day reached opposite
+> conclusions about the same route; the later one actually drove it cross-user and is the one to
+> trust. **`deleted` stays in the response body for callers that want to distinguish the two cases —
+> that part already shipped and is harmless — but the route stays `200` for a miss.** No code change
+> made. Superseded, not fixed: nothing here is startable.
+>
+> *(Original finding below, kept for the reasoning trail.)*
+>
 > **⚠️ PARTLY SHIPPED, and the prescribed fix was RE-ORDERED rather than applied. Read this before
 > touching the route.** `deleteActivityLog` now returns whether the `(id, user)` pair matched, and the
 > route answers `{ success: true, deleted }` — so it no longer reports success for a delete that
@@ -3531,6 +3554,25 @@ ehr     0     0     0     0   648   208   128   556     0
   returns `Invalid body`, and `{"newPhase":"deload","force":true}` came back **200 with real state**.
   **Read the handler's error MESSAGE, not its status:** all six probes returned 400, and half of them
   were the handler working correctly.
+- 🚧 **75 → 67, 2026-08-24 (Lane A).** Eight more: `workout-sessions` DELETE and `fitness-tests`
+  DELETE (single-field `{id}`/`{workoutSessionId}` bodies, no in-repo client calling either DELETE
+  route found by grep — safe regardless of what's on the other end), `exercise-gif` and
+  `nutrition/barcode` GET (both validate an object the route itself builds from `searchParams`, the
+  no-client-verification exemption class already in the script's header), `nutrition/meal-types`
+  POST, `user/goals` PATCH and `user/profile` PATCH (each read against its one real client — fields
+  match exactly, verified by reading `meal-type-manager.tsx`, `goals-section.tsx`,
+  `goal-recommendation-sheet.tsx` and `edit-profile-sheet.tsx`). **One trap caught before it
+  shipped, worth the whole batch on its own:** `push/subscribe`'s real client
+  (`lib/push-client.ts`, `sub.toJSON()`) sends a browser `PushSubscriptionJSON`, which always
+  carries `expirationTime` beside `endpoint`/`keys` — the schema named only two of the three keys,
+  so `.strict()` as first written would have 400'd every real subscribe. Fixed by adding the missing
+  field to the schema before adding `.strict()`, not by exempting the route. Verified: relevant
+  vitest suites green (`clear-a-goal`, `goal-write-invalidation`, `cache-groups`,
+  `auth-before-param-validation`, `not-found-status`, `sentry-scrub`), `tsc --noEmit` clean on every
+  touched file. **`pnpm dev` could not be exercised this session** — the sandbox's `node_modules` is
+  missing `@sentry/nextjs` even though `package.json` declares it, unrelated to this change and not
+  investigated further; static verification (reading every real client's payload against the
+  tightened schema) stood in for it.
 - **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
   builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
   unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
