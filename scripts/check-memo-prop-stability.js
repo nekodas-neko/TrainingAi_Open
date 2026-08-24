@@ -23,16 +23,13 @@ const DIRS = ['app', 'components'];
 
 // Recorded 2026-08-18 (Q-490). These are the sites that PREDATE the check; each is a real defeat.
 // Q-357 is queued to clear them. Do not add a row to dodge a failure — hoist the prop instead.
-const BASELINE = {
-  // Two single-instance cards on the nutrition screen: four inline arrows and one inline object.
-  // Cheap relative to the list sites below, but real.
-  'app/nutrition/nutrition-content.tsx': 2,
-  // The expensive one: five inline arrows on a card rendered inside `visibleMeals.map(...)`, so
-  // every render of the sheet re-renders every saved meal.
-  'components/nutrition/saved-meals-sheet.tsx': 1,
-  // Debug console, admin-only surface.
-  'components/oura-ble/oura-ble-debug.tsx': 1,
-};
+// EMPTY, and that is the point: any defeated call site is now a regression rather than a debt row.
+//
+// It held four when Q-490 wrote this check and Q-357 cleared the rest (2026-08-24). The expensive
+// one was `SavedMealCard`, five inline arrows on a card inside `visibleMeals.map(...)` — where a
+// hook is not allowed, so the fix was to move the identity into the child: each callback takes the
+// meal and hands it back, letting the parent share one `useCallback` per action across every card.
+const BASELINE = {};
 
 function walk(dir, out) {
   for (const e of fs.readdirSync(dir, { withFileTypes: true })) {

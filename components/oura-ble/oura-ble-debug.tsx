@@ -89,6 +89,10 @@ export function OuraBleDebug() {
   const [keyCopied, setKeyCopied] = useState(false)
   const [status, setStatus] = useState<OuraBleStatus | null>(null)
   const [lines, setLines] = useState<string[]>([])
+  // Q-357: `LogConsole` is `memo()`, and this console appends a line per BLE frame — so an inline
+  // arrow here re-rendered the whole log on every frame, which is the one screen where that is
+  // measurable.
+  const clearLines = useCallback(() => setLines([]), [])
   const [tagCounts, setTagCounts] = useState<Record<string, number>>({})
   const [summary, setSummary] = useState<RecordedSummary | null>(null)
   const [sent, setSent] = useState({ frames: 0, stored: 0 })
@@ -755,7 +759,7 @@ export function OuraBleDebug() {
               {Object.entries(tagCounts).sort(([, a], [, b]) => b - a).map(([name, n]) => `${name}×${n}`).join(' · ')}
             </div>
           )}
-          <LogConsole lines={lines} onClear={() => setLines([])} />
+          <LogConsole lines={lines} onClear={clearLines} />
         </div>
       </CollapsibleSection>
     </div>
