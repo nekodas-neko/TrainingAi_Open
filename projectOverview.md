@@ -27,6 +27,10 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, deliberately outside
+`OuraBleDebug` — that renders nothing without the native plugin, which is exactly the laptop doing
+the re-key. Says up front that nothing happens until the ring next reports. `Gate: device`.
+
 **The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported
 `failed: 502`; the step backfill said "Done" at the gateway timeout. Both now wait for the real
 status. The route's default flip is Lane A's. `Gate: device`.
@@ -87,18 +91,16 @@ indistinguishable from a check-in in which the user answered nothing — guarded
 paths, since the outbox reaches the same table
 ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
 
-**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
-backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
-the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
-inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
-with `Gate: device`. **Item (3) needed no work:** 6,346 battery polls since 2026-07-19 measure the
-drain the entry called unmeasurable — −22, −24, −22, −38, −15 overnight, confirming the owner's
-report; the SpO₂ A/B is two nights of wear, not code.
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
+(`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect
+sequence that resets the live-HR levers a killed session left on. **All native — inert until a new
+APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no
+work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15
+overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
 
 **Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
-`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise for its history and an activity for
-its detail were dead a fortnight, unreported. Both are on `/health/day` (the NAME is the target, not
-a third icon); `health-content.tsx` lost 167 lines; the HR chart was dropped, `done-screen` has it.
+`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight,
+unreported. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
 
 **Deleting an activity works offline now (Q-328, v1.350.0).** It was the one activity-log write with
 no outbox domain — created through the queue, deleted by a bare `fetch` that simply failed with no
@@ -106,14 +108,12 @@ connection. `softDeleteActivityLogPending`, not `deleteActivityLog`: a queued de
 `pending` or a pull clobbers it, while `'synced'` is what later lets `applyDelta` reap the tombstone.
 
 **The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
-new one is a regression rather than a debt row. The expensive one was inside `visibleMeals.map(...)`,
-where a hook is not allowed — its callbacks take the meal and hand it back, letting the parent share
-one `useCallback` per action across every card.
+new one is a regression. The expensive one was inside `visibleMeals.map(...)`, where a hook is not
+allowed — its callbacks take the meal and hand it back, so the parent shares one per action.
 
-**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` had
-held every threshold for months and nothing under `components/`/`app/` imported it, so a 5,000 kg
-weight was queued and dropped server-side. **Three** sheets, not the one the entry named:
-`log-value-sheet.tsx` had no check at all across seven fields.
+**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held
+every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued
+and dropped server-side. **Three** sheets, not the one the entry named.
 
 **Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed
 six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it (55 steps).

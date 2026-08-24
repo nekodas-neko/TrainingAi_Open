@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.2",
+    date: "2026-08-24",
+    changes: [
+      "There is now a button for telling the app the ring was re-keyed, instead of it being a command-line-only step. It says plainly that nothing happens until the ring next syncs, shows a declaration that is waiting, and lets you cancel one made by mistake.",
+    ],
+  },
+  {
     version: "1.363.1",
     date: "2026-08-24",
     changes: [
