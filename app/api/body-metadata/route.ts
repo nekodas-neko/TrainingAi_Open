@@ -11,8 +11,8 @@ import { readJsonLimited } from '@trainingai/shared/http/request-guards'
 // One day's body metadata.
 const MAX_BODY_BYTES = 16 * 1024
 
-// Reject an implausibly long session span (a midnight `startedAt` fallback + evening completion).
-const MAX_PLAUSIBLE_SESSION_MIN = 240;
+// (The local MAX_PLAUSIBLE_SESSION_MIN that stood here was declared and never read — LA-21. The
+// bound that actually governs this route is applied inside `computeActiveEnergy`.)
 
 export interface BodyMetaRow {
   date: string;
