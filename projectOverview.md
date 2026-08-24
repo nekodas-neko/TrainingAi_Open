@@ -1442,9 +1442,15 @@ order.
   degrades to correct rather than to a frozen release failing as "Could not fetch release info".
   **Guarded** by a test on the URL actually requested, which fails when the default is flipped back —
   the fixtures the entry flagged proved nothing about which repo is *asked*. Never a live outage.
-- **🟡 Q-459 — the rolling APK release is delete-then-recreate,** so the advertised public download
-  URL 404s during every native merge. Known trade-off in the workflow's own comment; the migration is
-  what made it matter, since that URL is now the documented distribution path.
+- **🟠 Q-459 — the rolling APK release used to delete-then-recreate; fixed 2026-08-24, not yet
+  observed running.** `.github/workflows/android.yml`'s publish step now swaps only the release
+  **asset** (`gh release delete-asset` + `upload` + `edit`) when the release already exists, falling
+  back to `gh release create` only on the first-ever publish — the release id and tag survive a swap,
+  so `/releases/tags/apk-latest` (what `/api/download-apk` resolves against) no longer 404s during the
+  window. **Keep: unverified against a live `gh` run** — the `if: github.event_name == 'push'` publish
+  step only executes on a merge to `main` that touches a native path, which this session could not
+  trigger from a PR; confirm on the next such merge that the swap actually completes (`gh release
+  view apk-latest` before/after, or watch the workflow log).
 - **Also came back clean:** a fresh clone's test suite genuinely works (synthetic constants are
   committed and `vitest.config.ts` falls back to them when the real `MANIFEST.json` is absent — the
   path CI takes every run, so `NOTICE`'s claim holds); the `AWS_*`/`STORAGE_*` split is a deliberate

@@ -3878,27 +3878,6 @@ ehr     0     0     0     0   648   208   128   556     0
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly.
 
-### [platform][devices] Q-459 — the rolling APK release is delete-then-recreate, so the advertised public download URL 404s during every native merge
-
-- **Branch:** `fix/apk-rolling-release-no-404-window`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** low. Short window, infrequent trigger.
-- **What.** `.github/workflows/android.yml:122-127`:
-  ```bash
-  gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-  gh release create apk-latest android/app/build/outputs/apk/debug/app-debug.apk …
-  ```
-  Between the two commands the release **and its tag** do not exist. `CLAUDE.md` advertises
-  `…/releases/download/apk-latest/app-debug.apk` as *"always the newest `main` build, non-expiring,
-  and genuinely no login required"*, and `/api/download-apk` resolves it via
-  `/releases/tags/apk-latest` — a 404 in that window, surfacing as "Could not fetch release info".
-- **The workflow comment explains the choice honestly** (`gh` cannot overwrite an existing asset of
-  the same name in place), so this is a known trade-off, not an oversight. **The migration is what
-  made it matter:** while the repo was private nobody could use that URL; it is now the documented
-  distribution path.
-- **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
-  than the release and tag, so the release id and tag survive the swap.
 
 ### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
 
