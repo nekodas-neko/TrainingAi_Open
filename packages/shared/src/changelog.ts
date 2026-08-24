@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.350.0",
+    date: "2026-08-24",
+    changes: [
+      "Deleting a logged activity now works with no connection. It was the one activity write that went straight to the server with nothing queued behind it, so offline it just failed \u2014 everything else about an activity, including creating it, already went through the offline queue.",
+    ],
+  },
+  {
     version: "1.349.0",
     date: "2026-08-24",
     changes: [

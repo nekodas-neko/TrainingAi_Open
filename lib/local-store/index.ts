@@ -87,10 +87,6 @@ export interface LocalStore {
   deleteInjury(id: string): Promise<void>;
   upsertDayCheckin(record: LocalDayCheckin): Promise<void>;
   upsertActivityLog(record: LocalActivityLog): Promise<void>;
-  /** Q-488 — soft-delete an activity locally after the server DELETE has already succeeded, so the
-   *  three local-first readers stop showing it. Writes `sync_status='synced'`, not 'pending': local
-   *  matches server at this instant, and 'pending' would block the pull tombstone forever. */
-  deleteActivityLog(id: string): Promise<void>;
   /** Offline-capable delete — pair with a queued `activity_logs` `{ id, deleted: true }` (Q-328). */
   softDeleteActivityLogPending(id: string): Promise<void>;
   /** Confirm a queued activity-log mutation, so a tombstone becomes prunable (Q-328). */
