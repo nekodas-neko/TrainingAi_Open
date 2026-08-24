@@ -3807,6 +3807,30 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [workouts][app-shell][platform] Q-461 — the workout flow cannot be automated past set 1: the Start Set button animates forever, so Playwright never sees it as stable
 
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.5).** One line in `app/globals.css`'s existing
+> `prefers-reduced-motion` block — `.animate-bounce { animation: none !important; }` — plus
+> `e2e/workout-set-loop.spec.ts`, which drives a real workout through three logged sets and asserts
+> they reached `set_logs`. [`journal`](overview/entries/2026-08-24-workout-automatable-past-set-one.md).
+>
+> **Reproduced and re-measured on the spec's own flow:**
+> ```
+> reducedMotion=reduce          animation=none | 1            CLICKED in 85ms
+> reducedMotion=no-preference   animation=bounce | infinite   BLOCKED after 8009ms
+> ```
+> The affordance is untouched for anyone who has not asked for less motion, which is what this entry
+> insists on. `force: true` is not used anywhere in the spec.
+>
+> **The spec was checked as a guard, not assumed to be one:** removing the CSS rule makes it fail,
+> on `toHaveCSS('animation-name','none')` before the click, so the failure names the cause.
+>
+> **Three things worth knowing before writing the follow-on spec.** `/workout` and the pre-workout
+> screen BOTH carry a button reading "Start Workout" (the session id in the URL separates them); a
+> 3-second countdown overlay sits between the second press and the warm-up; and the set write is
+> fire-and-forget, so a single DB read after the last tap races it — poll.
+- **Keep:** the follow-on spec this unblocks — log-set through complete-workout — is not written.
+  Also one look on device with Android's reduce-motion setting ON, since the bounce is the cue that
+  a set is next. `Gate: device`.
+
 - **Branch:** `fix/start-set-bounce-blocks-automation`
 - **Added:** 2026-08-18 · review sweep (workout write path) ·
   [`docs/reviews/2026-08-18-workout-write-path.md`](reviews/2026-08-18-workout-write-path.md)

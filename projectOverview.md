@@ -27,6 +27,11 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave
+Playwright a stable frame, so `Start Set 2` hung — measured 85 ms vs 8,009 ms with and without the
+new `prefers-reduced-motion` rule. A spec now drives three logged sets and fails if the rule is
+removed. Testability, not a user-facing defect. `Gate: device`.
+
 **Disk maintenance works from a desktop again (Q-544).** The DB-footprint card and the device-metrics
 panel touch no plugin, but sat after `OuraBleDebug`'s native early-return — so reclaiming disk needed
 the APK, the one client `VACUUM FULL`'s exclusive lock blocks, and was impossible while the APK was
@@ -172,25 +177,19 @@ effect. `driftAgainst` now takes a side — `from` for apply, `to` for undo — 
 Latent: nothing calls the undo route yet (Q-467), production's `coach_changes` is empty.
 
 **The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
-schema was deleted forever — no badge, no toast, no retry — while one that failed a layer later got
-all three. It returns a per-item error now, so the row is kept and dead-letters normally. **The fix
-shape needed correcting:** the entry said report it as *retryable*, which under Q-475's split means
-"the server could not write" and backs off the whole queue; `retryable: false` is what quarantines
-it. The write-time companion is deliberately still open (`Keep:` on the entry) — it is device-only
-verifiable and sits on 36 save paths.
+schema was deleted forever — no badge, no toast, no retry. It returns a per-item error now, so the
+row is kept and dead-letters. **The entry's fix shape was wrong:** `retryable: true` backs off the
+whole queue under Q-475's split; `retryable: false` quarantines. Write-time companion still open.
 
 **`workout_sessions`'s dead column owned the name the live one was used under (Q-474).** Of its two
-FKs to `program_sessions`, `session_id` is live and `program_session_id` has never been written —
-yet the Drizzle property `programSessionId` pointed at the dead one, which already cost a session
-when a repro fixture populated the inert column. Property names only; the column stays (dropping it
-is data-losing, owner-gated).
+FKs to `program_sessions`, `session_id` is live and `program_session_id` never written — yet the
+Drizzle property `programSessionId` pointed at the dead one, which already cost a session. Property
+names only; the column stays (dropping it is data-losing, owner-gated).
 
 **A rate limit is not an idempotency mechanism (Q-470).** The background prescription regeneration
-fired twice for one session-day — two call sites in one handler, and `cachedFetch` revalidates on
-every screen open, so the second GET started a second generation before the first landed. It now
-takes an in-flight marker keyed the same way its fingerprint is, released when the work settles
-(**including on rejection** — a leak would wedge that session-day until restart) and checked before
-the rate limit, so a deduped call spends no budget.
+fired twice for one session-day — two call sites, and `cachedFetch` revalidates on every screen open.
+It now takes an in-flight marker keyed like its fingerprint, released when the work settles
+(**including on rejection** — a leak would wedge that session-day) and checked before the limit.
 
 **The AI-usage screen's top row was an artefact of its own fingerprint (Q-471).** Three meal-plan
 sections fingerprinted on a rounded calorie target alone, so every deliberate reroll read as a

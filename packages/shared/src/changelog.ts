@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.5",
+    date: "2026-08-24",
+    changes: [
+      "If you have reduce-motion turned on, the bouncing \u201cStart Set\u201d button now holds still instead of animating. It stays exactly where it is and is still the main button \u2014 it just stops moving.",
+    ],
+  },
+  {
     version: "1.363.4",
     date: "2026-08-24",
     changes: [
