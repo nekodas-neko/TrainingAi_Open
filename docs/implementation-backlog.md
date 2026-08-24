@@ -3959,6 +3959,37 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [body][app-shell] Q-319 — the Water widget's web fallback posts to a route that has no water field, and the value is discarded behind a 200
 
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.6) — and TWO of this entry's claims are wrong. Read this
+> before trusting the analysis below.**
+> [`journal`](overview/entries/2026-08-24-water-widget-web-fallback.md).
+>
+> **1. It is not reachable from the UI, and never was.** `metric-tiles-card.tsx:89` branches on
+> `waterIntake` and calls `onLogWater()` → `components/profile/water-log-sheet.tsx`, the correct
+> sheet on the correct route. `LogValueSheet` is reached only through `onLogTile`, which that branch
+> bypasses for water. The diversion predates this entry — it has been there since the public snapshot
+> (2026-08-16), two days before this was filed. The measurement here was a direct route call, not a
+> UI drive. Re-confirmed live: `POST /api/body-metadata {waterIntake:750}` → `400 Invalid input`.
+>
+> **2. "The device path is FINE and must not be fixed with it" is false**, and it is the more
+> important half. The local branch wrote `waterMl: numVal` — an **absolute** — and queued
+> `{ waterMl: numVal }`. Water is an increment everywhere else: `metric-bounds.ts:51` bounds
+> `waterIntake` with `validWaterMlDeltaOrNull` and says *"A water ENTRY is an increment"*;
+> `water-log-sheet.tsx` read-merges and queues `waterMlDelta`; `adapter.ts:3901` routes that through
+> `incrementWaterLog` **because an absolute total reintroduces SYNC-P7** (concurrent adds on two
+> devices clobbering each other). `upsertBodyMetric` overwrites every column, so the absolute also
+> discarded the day's accumulated water.
+>
+> **What shipped** is the sibling's shape on all three paths: read-merge locally, queue
+> `waterMlDelta`, post to `/api/water-log`. Kept rather than deleted — dead code that is wrong is a
+> trap for whoever next routes a water widget through the generic sheet.
+>
+> **Verified on `pnpm dev`** by mounting the sheet on a scratch route (the tile cannot reach it):
+> three successive entries **summed** — 750 → 1050 → 1250 → 1400 — with `POST /api/water-log` 200
+> each time. **NOT exercised:** the local-store branch (`getLocalStore` is null in the sandbox), and
+> no user-visible behaviour changed, because nothing user-visible could reach this branch.
+- **Keep:** the device check of the read-merge and the `waterMlDelta` queue — the half that matters
+  on the canonical runtime, and the half a browser cannot run. `Gate: device`.
+
 - **Lane B.** `app/session-select/components/log-value-sheet.tsx` only.
 - **Added:** 2026-08-18, found while implementing Q-464 — **this is the live instance of that class**,
   which Q-464's own entry said it did not have.

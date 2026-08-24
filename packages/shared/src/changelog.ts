@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.6",
+    date: "2026-08-24",
+    changes: [
+      "Fixed a water-logging path that would have overwritten the day's running total instead of adding to it, and would have thrown an error rather than saving. Nothing you can currently tap reached it \u2014 the water tile already used the correct sheet.",
+    ],
+  },
+  {
     version: "1.363.5",
     date: "2026-08-24",
     changes: [
