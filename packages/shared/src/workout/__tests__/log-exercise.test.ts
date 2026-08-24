@@ -333,3 +333,43 @@ describe('logExerciseFromPayload — the session start ladder (LA-21)', () => {
     expect(startOf().getTime()).toBe(localMidnightMs('2026-05-04'))
   })
 })
+
+// Q-298. A phase-level deload zeroes the 1RM (deload work is submaximal and must not read as a max)
+// and used to store `exercise_deloaded = false` — so the row did not describe what had happened to
+// it. The estimate and its provenance now come from one named predicate, which is the only way they
+// cannot drift apart again.
+describe('logExerciseFromPayload — deload provenance (Q-298)', () => {
+  const storedDeloaded = () => logExerciseAndSets.mock.calls[0][1].exerciseDeloaded as boolean
+  const storedEstimate = () => logExerciseAndSets.mock.calls[0][1].estimated1rm as number
+
+  beforeEach(() => {
+    getActiveProgramWithPhases.mockResolvedValue(null)
+    getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'manual' })
+  })
+
+  it('stamps the flag when the PHASE is the deload, not only when the AI flag is', async () => {
+    getActiveProgramWithPhases.mockResolvedValue(null)
+    getActiveProgram.mockResolvedValue({ id: 'p1', phaseMode: 'ai_dynamic' })
+    getSessionPeriodization.mockResolvedValue({ phase: 'deload' })
+
+    await logExerciseFromPayload('u1', basePayload, TZ)
+
+    expect(storedEstimate()).toBe(0)        // the estimate was declined…
+    expect(storedDeloaded()).toBe(true)     // …and the row now says so
+  })
+
+  it('still stamps it for a per-exercise AI deload', async () => {
+    await logExerciseFromPayload('u1', { ...basePayload, exerciseDeloaded: true }, TZ)
+    expect(storedEstimate()).toBe(0)
+    expect(storedDeloaded()).toBe(true)
+  })
+
+  // The invariant that makes this safe to rely on downstream: a zero estimate and a false flag can
+  // no longer occur together, which is the state `getLastRealOneRmBatch` needed a second predicate
+  // to defend against.
+  it('leaves an ordinary set unflagged and estimated', async () => {
+    await logExerciseFromPayload('u1', basePayload, TZ)
+    expect(storedDeloaded()).toBe(false)
+    expect(storedEstimate()).toBeGreaterThan(0)
+  })
+})

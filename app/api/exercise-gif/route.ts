@@ -7,11 +7,13 @@ import { ilike, and, eq, sql } from "drizzle-orm";
 import { StatusCodes } from "http-status-codes";
 import { DATASET_BASE, loadDataset, findBestMatch, findDirectUrl } from "@trainingai/shared/exercise-gif-matcher";
 
+// Built from `searchParams` below, not a raw client body — `.strict()` guards nothing today but
+// costs nothing and catches the day this route reads a spread of the query instead (Q-464).
 const ExerciseNameSchema = z.object({
   name: z.string()
     .min(1, "Exercise name required")
     .max(100, "Exercise name too long"),
-});
+}).strict();
 
 export async function GET(req: Request) {
   const session = await auth();

@@ -330,12 +330,6 @@ export interface RunningPlan {
   timePerSessionMinutes: number | null
   isActive: boolean; createdAt: Date; updatedAt: Date
 }
-export interface RunningBaseline {
-  id: string; userId: string; planId: string
-  vo2max: number | null; maxHr: number | null; restingHr: number | null; thresholdHr: number | null
-  weeklyBaseMinutes: number | null; easyPaceSecPerKm: number | null
-  createdAt: Date
-}
 export interface PrescribedRun {
   id: string; userId: string; planId: string; date: string; runType: string
   durationMin: number | null; distanceKm: number | null
@@ -564,8 +558,6 @@ export interface WorkoutRepository {
   deleteFitnessTest(userId: string, id: string): Promise<void>
   getActiveRunningPlan(userId: string): Promise<RunningPlan | null>
   saveRunningPlan(userId: string, plan: Omit<RunningPlan, 'id' | 'userId' | 'createdAt' | 'updatedAt'> & { id?: string }): Promise<RunningPlan>
-  saveRunningBaseline(userId: string, baseline: Omit<RunningBaseline, 'id' | 'userId' | 'createdAt'>): Promise<RunningBaseline>
-  getRunningBaseline(userId: string, planId: string): Promise<RunningBaseline | null>
   getPrescribedRuns(userId: string, from: string, to: string): Promise<PrescribedRun[]>
   upsertPrescribedRun(userId: string, run: Omit<PrescribedRun, 'userId' | 'updatedAt'>): Promise<PrescribedRun>
   updatePrescribedRun(userId: string, id: string, patch: PrescribedRunUpdate): Promise<PrescribedRun | null>

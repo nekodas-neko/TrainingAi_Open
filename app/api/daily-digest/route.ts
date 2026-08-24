@@ -6,12 +6,13 @@ import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
 import { formatInTimeZone } from 'date-fns-tz'
 import { createHash } from 'crypto'
-import { DEFAULT_TZ, todayInTz, todayMidnightUtc, startOfWeekInTz } from '@trainingai/shared/date-utils'
+import { DEFAULT_TZ, todayInTz, todayMidnightUtc, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { projectWeeklyWeightChangeKg, stepsPaceToWeeklyGoal } from '@trainingai/shared/health/daily-digest-context'
 import { buildAutomaticPhaseStatus } from '@trainingai/shared/phase-engine'
 import { getScheduledSessionsPerWeek } from '@trainingai/shared/schedule-utils'
 import { readJsonLimited } from '@trainingai/shared/http/request-guards'
+import { MIN_LOGGED_DAYS, DEFAULT_WINDOW_DAYS } from '@trainingai/shared/nutrition/adaptive-tdee'
 
 // An optional force flag.
 const MAX_BODY_BYTES = 4 * 1024
@@ -79,6 +80,15 @@ export async function POST(req: Request) {
       const delta = totals.calories - nutritionTargets.calories
       const weeklyKg = projectWeeklyWeightChangeKg(delta)
       lines.push(`At today's rate: ${weeklyKg > 0 ? '+' : ''}${weeklyKg.toFixed(2)} kg/week`)
+    }
+
+    // Q-303: a single logged day looks exactly like a representative one, so a model reading only
+    // today's totals has no way to know they rest on almost no history. Reuse Q-302's own gate
+    // (MIN_LOGGED_DAYS over a 14-day window) rather than inventing a second coverage floor.
+    const windowStart = shiftDateStr(todayIso, -(DEFAULT_WINDOW_DAYS - 1))
+    const nutritionWindow = await repo.listFoodLogsSummary(userId, windowStart, todayIso)
+    if (nutritionWindow.length < MIN_LOGGED_DAYS) {
+      lines.push(`Nutrition logging coverage: ${nutritionWindow.length} of ${DEFAULT_WINDOW_DAYS} days logged in the last two weeks (sparse)`)
     }
   }
 
@@ -148,7 +158,7 @@ export async function POST(req: Request) {
       { section: 'daily-digest', userId, fingerprint: { date: todayIso, contextHash } },
       () => generateText({
         model: aiModel(),
-        prompt: `You are a personal training coach. Write a 2-3 sentence end-of-day check-in — a quick reflection, not a report. Cover what stands out most (training, nutrition, or how the day compared to the morning check-in). Be specific, warm, and brief. Use the data below — quote its numbers, never invent or recompute any.\n\n${context}`,
+        prompt: `You are a personal training coach. Write a 2-3 sentence end-of-day check-in — a quick reflection, not a report. Cover what stands out most (training, nutrition, or how the day compared to the morning check-in). Be specific, warm, and brief. Use the data below — quote its numbers, never invent or recompute any. If a line below flags a domain's logging coverage as sparse, do not give corrective advice for that domain (e.g. telling the user to eat more or less of something) — one day's numbers do not support it; mention that domain only in passing, if at all.\n\n${context}`,
         maxRetries: 0,
       }),
     ))

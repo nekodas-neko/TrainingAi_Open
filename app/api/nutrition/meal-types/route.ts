@@ -15,7 +15,7 @@ const MealTypeSchema = z.object({
   timeEndHour:      z.number().int().min(0).max(24).optional(),
   remindersEnabled: z.boolean().optional(),
   required:         z.boolean().optional(),
-})
+}).strict()
 
 export async function GET() {
   const session = await auth()

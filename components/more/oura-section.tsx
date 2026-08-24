@@ -1,7 +1,8 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Activity, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, TriangleAlert, Wifi } from "lucide-react"
+import Link from "next/link"
+import { Activity, BatteryCharging, BatteryFull, BatteryLow, BatteryMedium, TriangleAlert, Wifi, KeyRound } from "lucide-react"
 import { invalidateRingBattery } from "@/lib/cache-groups"
 import { isBleDataFresh } from "@/lib/oura/ble-freshness"
 import { cachedFetchToday } from "@/lib/sqlite/cache"
@@ -50,11 +51,25 @@ export function OuraConnectionSection() {
   const [liveBattery, setLiveBattery] = useState<LiveBattery | null>(null)
   const [lastMeasuredAt, setLastMeasuredAt] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  // `null` = not checked yet / web (plugin absent), `false` = no key stored (LB-5). Server data
+  // (freshness/battery) keeps looking fine after an uninstall/reinstall for as long as the server
+  // holds recent rows, so this is the only signal that actually reflects the native service's state.
+  const [hasKey, setHasKey] = useState<boolean | null>(null)
 
   useEffect(() => {
     void loadBattery()
     void loadFreshness()
+    void loadKeyState()
   }, [])
+
+  async function loadKeyState() {
+    try {
+      const { getOuraBle } = await import('@/lib/oura-ble/plugin')
+      const ref = await getOuraBle()
+      if (!ref) return // web/old APK — no plugin, no failure mode to show
+      setHasKey((await ref.plugin.hasKey()).hasKey)
+    } catch { /* leave as null — not a failure worth surfacing */ }
+  }
 
   // Ring battery and last-seen age are the two things on this card that are wrong within minutes,
   // and the tab never unmounts to re-fetch them.
@@ -96,6 +111,32 @@ export function OuraConnectionSection() {
   }
 
   const seen = lastMeasuredAt != null || liveBattery != null
+
+  // LB-5: no key stored means the native service refuses to start, and every server-derived signal
+  // above (freshness, battery) keeps reporting the ring's LAST known state indefinitely — this is
+  // the one place that can actually tell the difference. Takes priority over the "seen" card: a
+  // ring that synced recently but has no key now is not healthy, whatever the server still shows.
+  if (hasKey === false) {
+    return (
+      <div>
+        <p className="px-1 pb-1.5 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+          Ring
+        </p>
+        <Link
+          href="/admin/oura-ble"
+          className="flex items-center gap-3 rounded-2xl border border-amber-500/40 bg-amber-500/5 px-4 py-3.5"
+        >
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 bg-amber-500/15">
+            <KeyRound className="h-4 w-4 text-amber-500" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold">No ring key stored</p>
+            <p className="text-[10px] text-muted-foreground">The ring can&rsquo;t sync until a key is entered — tap to fix</p>
+          </div>
+        </Link>
+      </div>
+    )
+  }
 
   return (
     <div>

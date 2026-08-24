@@ -211,6 +211,24 @@ async function main() {
     out.push('')
   }
 
+  // Q-530: the export drift gate reads these two at request time to prove no table/column was added
+  // without regenerating this migration. Emitted from the SAME DENIED/DENY objects that built the
+  // views above — one source, so the meta views cannot drift from what was actually withheld.
+  out.push('-- Q-530: the tables this generator deliberately excludes (no view at all).')
+  out.push('CREATE VIEW claude_ro._meta_excluded_tables AS')
+  out.push('SELECT * FROM (VALUES')
+  out.push([...DENIED].map(t => `  (${lit(t)})`).join(',\n'))
+  out.push(') AS t(table_name);')
+  out.push('')
+
+  out.push('-- Q-530: every column withheld from an emitted view, so a drift check can be column-level.')
+  out.push('CREATE VIEW claude_ro._meta_withheld_columns AS')
+  const withheldRows = Object.entries(DENY).flatMap(([table, cols]) => cols.map(c => `  (${lit(table)}, ${lit(c)})`))
+  out.push('SELECT * FROM (VALUES')
+  out.push(withheldRows.join(',\n'))
+  out.push(') AS t(table_name, column_name);')
+  out.push('')
+
   // The role is created out-of-band by the owner (it carries a password, which must never live in a
   // committed migration). This migration runs on every cold start via ensureSchema, so the GRANT is
   // guarded: without the guard, a database where the owner has not created the role would fail the

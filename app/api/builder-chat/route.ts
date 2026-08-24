@@ -22,7 +22,7 @@ const ChatMessageSchema = z.object({
   // caps history at 2000/turn) — an uncapped string is serialized straight into the
   // prompt, so a buggy/replayed client could ship a megabyte prompt.
   content: z.string().max(2000),
-})
+}).strict()
 
 const RequestSchema = z.object({
   message: z.string().min(1).max(1000),
@@ -31,7 +31,7 @@ const RequestSchema = z.object({
   equipment: z.array(z.string()),
   goal: z.enum(['hypertrophy', 'strength+hypertrophy', 'powerbuilding', 'strength']).optional(),
   timePerSessionMinutes: z.number().int().min(20).max(180).nullable().optional(),
-})
+}).strict()
 
 const BuilderExerciseSchema = z.object({
   name: z.string(),

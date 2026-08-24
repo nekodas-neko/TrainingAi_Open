@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **210** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **212** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -355,6 +355,183 @@ work is to bring them down, and **it is not a separate task**: a baton is rewrit
 handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
 Close this when all five are under ~150 lines.
 
+## Nutrition — pushed to the top, 2026-08-24 (owner request)
+
+*"push the nutrition work closer to the top"* — BF-11 and Q-407 moved up from their prior position
+(below BF-10/BF-4/LA-21/Q-420/Q-422/Q-406/Q-395abc) to sit right after the standing coordination
+entry. Queue position is priority; nothing else about either entry changed in this move.
+
+### [nutrition] BF-11 — the meal creator and meal planner need a coordinated redesign; the owner and BugFix worked out the shape together
+
+- **Lane: B**, one item needs a migration (see below). **Feature request — this entry plus its
+  linked spec are the trace and the settled design, not an implementation plan.** A planning session
+  still turns this into implementation plan(s) before Lane B builds it, per the backlog protocol.
+- **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
+  think this needs to be moved 'create a meal' then the meal builder can reference previously made
+  meals."* Grew across three more owner messages, same session, into a full design for both the
+  meal creator and the meal planner's generation logic — BugFix traced each piece against current
+  code live as the owner described it, confirming what already exists, what's a real gap, and
+  reaching agreement on the open calls.
+- **Full design: [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](../superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).**
+  Read that doc before planning this — it has the complete trace (file/line citations for every
+  claim), what's already built vs. genuinely missing, and the owner's decisions on each open
+  question. Summary only, here:
+  - **Meal Creator** (`saved-meals-sheet.tsx` "Build a Meal"): move the URL-recipe scan there from
+    the wizard (original ask); add multi-item detection so one scan can produce several meals; wire
+    in the existing food-item History list (`capture-step.tsx`) as a quick-add source; PDF upload
+    descoped (screenshot-as-image instead); duplicate-detection on scan agreed as designed.
+  - **Meal Planner** (`generate/route.ts` + `meal-plan-review-step.tsx`): reorder generation to
+    search the saved-meal library for each slot before falling back to AI; lift/redesign the
+    6-meal `keepSavedMealIds` cap for a "use my whole library" mode; add a meal-type/tag system so
+    slot-matching isn't macro-blind (pancakes ≠ dinner) — **recommends reusing `MealType`
+    (`packages/shared/src/types/nutrition.ts`) via a new `SavedMeal`↔`MealType` join, which needs a
+    migration Lane A numbers when this is planned**; extend reroll to offer a library swap before
+    AI regeneration; surface "why this meal was picked" so edits/rerolls have context; redesign the
+    meal-count-change prompt (inspired by but NOT reusing `MealTypeReassignDialog`'s mechanism,
+    which moves logged history — this needs to redistribute an in-progress draft instead).
+  - **Owner's priority, explicit:** Meal Creator ships first, on its own merits; Planner integration
+    depends on it and comes after.
+  - **Still open for the planning session** (not decided in the design conversation): the
+    no-library-match fallback (prompt-to-create vs. AI-fallback), the exact meal-count-change
+    interaction, and the upper bound for "select all" against a large library.
+- **Overlap with Q-407, not a duplicate of it.** Q-407 (below) reworks the *whole* wizard into a
+  coach conversation and does not address scanning location or planner matching logic. Whoever plans
+  either should read the other first — if Q-407 lands first, its Meals step should be designed as a
+  **picker over saved meals** from the start, per this entry's design.
+- **Surface:** web-reproducible, no device needed. Item requiring a migration is server-side only.
+
+### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
+
+- **Branch:** `feat/nutrition-coach-meal-plan`
+- **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
+- **Lane:** ?
+- **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
+  dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
+  can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
+  was only a nicer-looking dead end.
+- **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
+  work - its too step by step - Could we try implement this into an AI coach/meal builder type
+  thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I
+  keep clicking each grocery store."* and, on the mockup, *"This looks really good - I'd like to
+  see that in prod"*.
+
+- **What it is today.** `components/nutrition/meal-plan-setup-sheet.tsx` (445 lines) is a linear
+  stepper: `const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review']`
+  (line 28), seven screens holding thirteen `useState` fields, with a fixed footer per step. It
+  works, and the docstring's reason for the stepped shape is sound (a fixed action row that never
+  scrolls away, and `SheetFooter` owning the bottom inset — this repo's most repeated on-device
+  regression). **Keep that property.** The problem is not the footer, it is that six of the seven
+  screens ask a question the app can mostly answer itself, and none of them can be skipped.
+
+- **Three of the four pieces already exist, which is why this is smaller than it sounds.**
+  - `lib/coach/widgets.ts` is a **union of client-side tool schemas**, explicitly documented as the
+    extension point: *"Adding a widget means adding a member here and a row in
+    `components/coach/widget-registry.tsx`. The union is the extension point; the protocol does not
+    change."*
+  - `CHOICE_SOURCES` (`['sessions','exercises','swap_candidates']`) is the **server-fills-the-list**
+    mechanism, and its docstring is already the token argument the owner is asking for: a
+    nine-option picker the model typed out cost **~554 output tokens**, and *"having a language
+    model re-type it is paying to transcribe your own database"*. `app/api/coach/options/route.ts`
+    is where a source is resolved.
+  - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
+    'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
+
+- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
+  `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
+  multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
+  option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
+  grocery store" is not a missing convenience on top of a multi-select; the widget has never had
+  one. **Extend the schema rather than adding a second widget:**
+  - add `multi?: boolean` and `selectAll?: boolean` to `ChoiceListSchema`, defaulting false so
+    every existing call site is unchanged;
+  - `ChoiceList` gains checkbox rows, a "Select all" row (with an `n of m` count) and a Continue
+    button, resolving to a **list** of options;
+  - **flat, not a discriminated union** — the schema's own comment says why: *"Gemini's
+    function-declaration schema is fussy about unions, and this feature has already lost a day to
+    one (`z.literal(false)`)."* Do not model this as a union of single/multi variants.
+  - `MAX_VISIBLE_ROWS = 6` already scrolls the list; six stores fit, so no change needed there, but
+    check the Continue button is inside the widget and not below the scroll region.
+
+- **The stores list is the reference case for the token saving.** `STORES` is a hardcoded curated
+  six-item AU list in the component (line 21) with a docstring saying it is deliberate. The coach
+  must **never type those six names** — add a `grocery_stores` source to `CHOICE_SOURCES` and serve
+  it from `app/api/coach/options/route.ts` alongside the existing three. Same for the ingredient
+  lists (`PROTEINS`, `CARBS`, `FATS`, `VEG` — 32 more strings) and the dietary-restriction
+  catalogue, which is already an API (`/api/nutrition/dietary-restrictions`). **Every one of those
+  is a string the model would otherwise generate and the app already holds.**
+
+- **The conversation shape (from the mockup).** Three things, in order:
+  1. **Answers are widgets.** Stores as the new multi-select with Select all; restrictions as chips.
+     The coach **states what it already knows instead of asking** — *"I already know you log dairy
+     most days, so I have left it in"* — which is both the token saving and the better manner. The
+     seven steps become at most three exchanges, and any of them can be typed past instead of
+     tapped.
+  2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
+     item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
+     the meals outlive it.
+  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
+     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
+     data" is a request the model will occasionally ignore, while a tool it never receives is a
+     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
+     patch domains + widget sources) rather than an inline filter, so a second coach can have one
+     without a refactor. That one line is all that survives of Q-408 — see the note below.
+
+- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
+  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
+  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
+  nobody re-files it unexamined:**
+  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
+     between coaches, and every decision in that design would have been made against imagined
+     requirements until a real second coach exists.
+  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
+     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
+     architecture's central question was never how to separate the coaches but how to let them talk
+     anyway, which is a harder problem than the one that motivated it.
+  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
+     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
+     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
+     The real saving — naming a `source` and letting the server fill the list — already exists as
+     `CHOICE_SOURCES` and is already in this entry.
+  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
+  real requirements. The named-record shape above is what keeps that cheap.
+
+- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
+  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
+  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
+  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
+  from one built by hand — loggable, editable, and with its own printable label.
+  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
+    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
+    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
+    plan is the same dead end the stepper already is.
+  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
+    whole reason this beats a plan document: the user keeps meals, not a plan.
+  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
+    meals under `My Foods` tagged *from your plan*) —
+    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
+
+- **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
+  conversation as the path behind the same entry point and keep the stepped sheet reachable until
+  the conversation has been used on-device for a plan the owner actually keeps. A conversational
+  flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
+
+- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
+  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
+  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
+  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
+  `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
+  prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
+  `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
+  **Lane B**. The schema change lands first — the component cannot render a flag the schema does
+  not carry.
+
+- **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
+  `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
+  call site still resolves to one option (that regression is the actual risk). The **conversation
+  half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
+  say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
+  thread) was not exercised unless it was.
+
 ## Nutrition focus — the owner's priority, 2026-08-18
 
 *"lets focus on the nutrition changes now. id like to get this perfected today"*
@@ -438,45 +615,28 @@ design decision. See the correction at the top of that entry.
 
 ### [devices][heart-rate] BF-10 — the admin Device Metrics sparklines plot by sample index, not by time, so a night-only signal renders as if it ran all day
 
-- **Lane: B.** `components/oura-ble/device-metrics-panel.tsx` + `components/ui/sparkline.tsx`. No
-  schema, no migration, reproduces in `pnpm dev` — this is a rendering defect, not a device one.
-- **Added:** 2026-08-24 · found while answering the owner's Q-388 follow-up (the night-only
-  SpO₂/temp gating question). The owner pushed back on that answer with a screenshot of `/admin`'s
-  **Device Metrics (BLE-derived)** panel — Intraday SpO₂ and Intraday temp both show a dense
-  waveform filling the *entire* card width for every day shown, which reads as continuous all-day
-  sensing and appears to contradict the "SpO₂ is 98.9% inside 22:00–09:00" finding just written into
-  Q-388.
-- **It doesn't contradict it — the chart can't show the contradiction either way, and that's the
-  bug.** `app/api/oura-ble/device-metrics/route.ts:70-84` computes a real `tSec` (seconds since
-  local midnight) per sample and returns it on every point (`{ tSec, spo2 }` / `{ tSec, tempC }`).
-  But the panel only ever passes the *value* array to `<Sparkline>`
-  (`device-metrics-panel.tsx:31,35,39` — `.map(p => p.rmssd/tempC/spo2)`), and `Sparkline` places
-  each point at `x: i * step` (`sparkline.tsx:21-24`) — **array index, evenly spaced, `tSec` is
-  never read.** So 5,700 SpO₂ samples that all land in an 11-hour night window get stretched across
-  the same full width as 24 hours' worth of continuous data would. The panel cannot currently
-  distinguish "sampled all day" from "sampled for 11 hours, packed left-to-right" — both render
-  identically.
-- **temp's full-width fill in the same screenshot is not this bug — that one is real coverage.**
-  Q-388's hourly count confirms `temp_event`/`temp_period` genuinely fire at a flat, near-constant
-  rate across all 24 hours, so its sparkline filling the whole width is an accurate picture by
-  coincidence. SpO₂'s is not: it is the same index-projection artifact hiding an 11-hour signal
-  inside a 24-hour-looking line. Daytime HRV is index-projected the same way and has the same
-  disclosure gap, just not raised by the owner here.
-- **This is the class CLAUDE.md's sparkline section already names** (Q-154: *"the primitive projects
-  x by index"*) — but that section's audit list only ever covered call sites bypassing the primitive
-  with a hand-rolled polyline, and its exemption list is files that draw a genuine time axis
-  *outside* the shared primitive. `device-metrics-panel.tsx` is in neither list: it's an admin-only
-  diagnostic panel that was never swept, and it's the primitive itself being asked to draw
-  time-series data it structurally cannot place correctly on the x-axis.
-- **What would fix it:** project `x` from `tSec` (or add a variant/prop that does), so a gap in
-  coverage renders as a gap — or, cheaper, don't route real time-series data through the
-  index-projecting `Sparkline` for this panel at all. Either way, the fix belongs to the shared
-  primitive's known gap (Q-154), not to this panel alone — `daytimeHrv` has the identical shape.
-  **What would count as fixed:** feeding the panel one real day of SpO₂ data with a genuine 11-hour
-  active window renders as an 11-hour-wide line with visible dead space either side, not full width.
-- **Surface: web-reproducible.** No device or real ring needed — seed `oura_raw_samples` rows for
-  one user-local day with `measured_at` clustered in a window under a third of the day and load
-  `/admin/oura-ble`; the sparkline will still span the full card.
+> **Shipped 2026-08-24.** `Sparkline` takes optional `times`/`timeDomain` props and projects `x` by
+> position within the domain instead of by index when given; `device-metrics-panel.tsx` passes
+> `tSec` against the full `[0, 86_400]` day for all three curves (daytime HRV, intraday temp,
+> intraday SpO₂). Verified with a scratch route rendering the panel against seeded
+> `oura_raw_samples`/`oura_ble_clock_anchors` rows for a 2-hour window: before the fix the line
+> filled the full 120px card width, after it occupies only the ~10px matching the window's share of
+> the day, with visible dead space either side.
+>
+> **The entry's own reproduction premise was wrong, and it matters for anyone reading it next.**
+> "Surface: web-reproducible… load `/admin/oura-ble`" does not hold on current `main`:
+> `OuraBleDebug` (`components/oura-ble/oura-ble-debug.tsx:429`) returns the native-unavailable
+> banner and nothing after it whenever the native plugin isn't registered, which is always true in
+> `pnpm dev`/the web sandbox — `SampleInspector` and `DeviceMetricsPanel` are both inside that
+> unreachable tail. The panel is only reachable in the APK, on the ring's own data, which is the
+> only place the fix can be seen for real. The underlying rendering defect was real regardless (read
+> from source and confirmed by mounting `DeviceMetricsPanel` directly, off the gated page) — this
+> only corrects where it can be *observed*.
+
+- **Branch:** `fix/sparkline-time-axis`
+- **Lane:** B
+- **Keep:** the on-device check, against `/admin/oura-ble` in the APK with real ring data spanning
+  less than a full day (SpO₂/temp night-only windows are the common case). `Gate: device`.
 
 ### [nutrition][platform] 🟠 BF-4 — the photo scan feels much slower, and the only dated change is the structured-output conversion
 
@@ -795,8 +955,15 @@ answered by subtraction rather than re-argued. Verified through the real route o
 > place and losing the ability to tell them apart.
 
 
-- **Lane:** A — `packages/shared/src/health/workout-energy.ts`, `app/api/health-trends`,
-  `app/api/body-metadata`; the prompt removal is `components/workout/done-screen.tsx`.
+- **Lane:** B — **the Lane A half SHIPPED** (#368, `packages/shared/src/workout/derive-session-rpe.ts`):
+  `sessionEffort()` derives from set RPEs with no stored column, and `app/api/health-trends`'s
+  `session-rpe` view already reads it (`effort.source: 'self' | 'derived'`), labelled in the series
+  and the insight line. Owner decision items 2–4 below are done. **What remains is item 1 only** —
+  `done-screen.tsx:398` still prompts *"How hard was that session?"* — and that file is Lane B's
+  (`components/**`). The correction formula (HR × RPE combined) is explicitly not this entry; it
+  waits on Q-422/Tuning per the note below. Verified against `main` 2026-08-24 — the entry's own
+  `Lane: A` field was stale (it named files that already shipped) and is corrected here rather than
+  the entry being re-implemented.
 - **✅ DECIDED BY THE OWNER 2026-08-23. The gate is cleared and the scope changed — read this
   before the older notes below, which were written against a narrower question.**
   1. **Delete the user-facing prompt.** *"Get rid of the user facing 'how hard was the session'."*
@@ -968,16 +1135,26 @@ tapping. Observed set-RPE range is 6–10, mean 7.48.
   **It costs nothing:** `getWorkoutSessionsFrom` already hydrates each session's set logs, so there is
   no extra query. Measured on the dev database: the `session-rpe` series went from **0 points to 10**
   (9 derived, 1 self-reported), insight line *"10 sessions rated so far (9 from set ratings)"*.
+- ✅ **THE PROMPT REMOVAL SHIPPED 2026-08-24 (Lane B) — item 1 of the owner's decision.**
+  `done-screen.tsx`'s "How hard was that session?" 1–10 tap grid is gone, along with `sessionRpe`
+  state, `handleRpeTap`, and the now-dead `userId` prop threading (it existed only to reach the
+  local store from that handler). The energy-estimate card below it (kcal, activity picker, training
+  stress badge) is unchanged — that div held both, and only the prompt half was the owner's ask.
+  `estSessionKcal` already treats a missing RPE as `'moderate'` and HR overrides it entirely when the
+  session has one, so the done screen's own kcal estimate needed no other change.
+  [`journal`](overview/entries/2026-08-24-drop-session-rpe-prompt.md).
 - **What is still open on this entry:**
-  - **The user-facing prompt removal** (`done-screen.tsx:398`) — **Lane B**, and it is item 1 of the
-    owner's decision. The derivation exists now, so removing the prompt no longer loses anything.
   - **`intensityFromRpe` still applies Foster's ≤4/≥8 thresholds to a set-scale number.** The entry
     is right that a derived value needs its own thresholds, and picking them is a **scoring change** —
     Tuning proposes, the owner signs off. Deliberately not done here, which is why the derived value
     is not yet wired into the energy path.
   - **The HR + derived-intensity combination is Q-422's**, not this entry's, and it is `Gate: owner`.
-- **Keep:** the prompt removal, the derived-scale thresholds, and the plausibility check against the
-  20 paired sessions.
+  - **The `session_rpe` write path is now client-unreachable, not removed.** `POST
+    /api/workout-sessions/rpe`, `pushMutations`' `session_rpe` domain, and
+    `lib/local-store`'s `setSessionRpe` still exist — nothing calls them from the app any more,
+    since the prompt was their only caller. Left in place deliberately: they're Lane A files, and
+    retiring dead server/local-store code wasn't asked for here.
+- **Keep:** the derived-scale thresholds and the plausibility check against the 20 paired sessions.
 
 ### [workouts][nutrition] Q-422 — calibrate the burn estimate against the owner's own energy balance
 
@@ -1420,177 +1597,6 @@ whether or not anyone draws them first.
 - **Verification.** As Q-395a, plus a grep proving nothing user-facing still says *Saved meals* or
   *My Meals*.
 
-### [nutrition] BF-11 — the meal creator and meal planner need a coordinated redesign; the owner and BugFix worked out the shape together
-
-- **Lane: B**, one item needs a migration (see below). **Feature request — this entry plus its
-  linked spec are the trace and the settled design, not an implementation plan.** A planning session
-  still turns this into implementation plan(s) before Lane B builds it, per the backlog protocol.
-- **Added:** 2026-08-24 · owner: *"the meal scan by url — this was added to the meal planner — but I
-  think this needs to be moved 'create a meal' then the meal builder can reference previously made
-  meals."* Grew across three more owner messages, same session, into a full design for both the
-  meal creator and the meal planner's generation logic — BugFix traced each piece against current
-  code live as the owner described it, confirming what already exists, what's a real gap, and
-  reaching agreement on the open calls.
-- **Full design: [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](../superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).**
-  Read that doc before planning this — it has the complete trace (file/line citations for every
-  claim), what's already built vs. genuinely missing, and the owner's decisions on each open
-  question. Summary only, here:
-  - **Meal Creator** (`saved-meals-sheet.tsx` "Build a Meal"): move the URL-recipe scan there from
-    the wizard (original ask); add multi-item detection so one scan can produce several meals; wire
-    in the existing food-item History list (`capture-step.tsx`) as a quick-add source; PDF upload
-    descoped (screenshot-as-image instead); duplicate-detection on scan agreed as designed.
-  - **Meal Planner** (`generate/route.ts` + `meal-plan-review-step.tsx`): reorder generation to
-    search the saved-meal library for each slot before falling back to AI; lift/redesign the
-    6-meal `keepSavedMealIds` cap for a "use my whole library" mode; add a meal-type/tag system so
-    slot-matching isn't macro-blind (pancakes ≠ dinner) — **recommends reusing `MealType`
-    (`packages/shared/src/types/nutrition.ts`) via a new `SavedMeal`↔`MealType` join, which needs a
-    migration Lane A numbers when this is planned**; extend reroll to offer a library swap before
-    AI regeneration; surface "why this meal was picked" so edits/rerolls have context; redesign the
-    meal-count-change prompt (inspired by but NOT reusing `MealTypeReassignDialog`'s mechanism,
-    which moves logged history — this needs to redistribute an in-progress draft instead).
-  - **Owner's priority, explicit:** Meal Creator ships first, on its own merits; Planner integration
-    depends on it and comes after.
-  - **Still open for the planning session** (not decided in the design conversation): the
-    no-library-match fallback (prompt-to-create vs. AI-fallback), the exact meal-count-change
-    interaction, and the upper bound for "select all" against a large library.
-- **Overlap with Q-407, not a duplicate of it.** Q-407 (below) reworks the *whole* wizard into a
-  coach conversation and does not address scanning location or planner matching logic. Whoever plans
-  either should read the other first — if Q-407 lands first, its Meals step should be designed as a
-  **picker over saved meals** from the start, per this entry's design.
-- **Surface:** web-reproducible, no device needed. Item requiring a migration is server-side only.
-
-### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
-
-- **Branch:** `feat/nutrition-coach-meal-plan`
-- **Added:** 2026-08-19 · BugFix Intake, from the owner · mockup rendered in-session
-- **Lane:** ?
-- **Placement:** in the nutrition cluster, after Q-398 — **which shipped 2026-08-24**, so the
-  dependency is cleared. The plan's exit route in this design is "Save all as meals", and plan meals
-  can now become ordinary saved meals; before that, a conversational plan had nowhere to land and
-  was only a nicer-looking dead end.
-- **Owner's words:** *"lets get the meal plan setup wizard mocked up too -> This could use some
-  work - its too step by step - Could we try implement this into an AI coach/meal builder type
-  thing? Where it feels like a chat with a UI? Also there should be options for 'select all' as I
-  keep clicking each grocery store."* and, on the mockup, *"This looks really good - I'd like to
-  see that in prod"*.
-
-- **What it is today.** `components/nutrition/meal-plan-setup-sheet.tsx` (445 lines) is a linear
-  stepper: `const STEPS = ['Stores', 'Avoid', 'Skip', 'Meals', 'Yours', 'Training', 'Review']`
-  (line 28), seven screens holding thirteen `useState` fields, with a fixed footer per step. It
-  works, and the docstring's reason for the stepped shape is sound (a fixed action row that never
-  scrolls away, and `SheetFooter` owning the bottom inset — this repo's most repeated on-device
-  regression). **Keep that property.** The problem is not the footer, it is that six of the seven
-  screens ask a question the app can mostly answer itself, and none of them can be skipped.
-
-- **Three of the four pieces already exist, which is why this is smaller than it sounds.**
-  - `lib/coach/widgets.ts` is a **union of client-side tool schemas**, explicitly documented as the
-    extension point: *"Adding a widget means adding a member here and a row in
-    `components/coach/widget-registry.tsx`. The union is the extension point; the protocol does not
-    change."*
-  - `CHOICE_SOURCES` (`['sessions','exercises','swap_candidates']`) is the **server-fills-the-list**
-    mechanism, and its docstring is already the token argument the owner is asking for: a
-    nine-option picker the model typed out cost **~554 output tokens**, and *"having a language
-    model re-type it is paying to transcribe your own database"*. `app/api/coach/options/route.ts`
-    is where a source is resolved.
-  - `HandoffSchema` routes to real screens (`destination: 'program_builder' | 'log_activity' |
-    'profile' | 'nutrition'`), so a conversation that must hand off to a full screen has a route.
-
-- **The one genuine gap: `choice_list` is single-select, and that is exactly the owner's complaint.**
-  `ChoiceListSchema` (lib/coach/widgets.ts) has `prompt`, `source`, `sourceId`, `options[]` — **no
-  multi flag** — and `ChoiceList`'s callback is `onChoose?: (option: { id, label }) => void`, one
-  option, singular. There is no configuration that makes it multi-select. So "I keep clicking each
-  grocery store" is not a missing convenience on top of a multi-select; the widget has never had
-  one. **Extend the schema rather than adding a second widget:**
-  - add `multi?: boolean` and `selectAll?: boolean` to `ChoiceListSchema`, defaulting false so
-    every existing call site is unchanged;
-  - `ChoiceList` gains checkbox rows, a "Select all" row (with an `n of m` count) and a Continue
-    button, resolving to a **list** of options;
-  - **flat, not a discriminated union** — the schema's own comment says why: *"Gemini's
-    function-declaration schema is fussy about unions, and this feature has already lost a day to
-    one (`z.literal(false)`)."* Do not model this as a union of single/multi variants.
-  - `MAX_VISIBLE_ROWS = 6` already scrolls the list; six stores fit, so no change needed there, but
-    check the Continue button is inside the widget and not below the scroll region.
-
-- **The stores list is the reference case for the token saving.** `STORES` is a hardcoded curated
-  six-item AU list in the component (line 21) with a docstring saying it is deliberate. The coach
-  must **never type those six names** — add a `grocery_stores` source to `CHOICE_SOURCES` and serve
-  it from `app/api/coach/options/route.ts` alongside the existing three. Same for the ingredient
-  lists (`PROTEINS`, `CARBS`, `FATS`, `VEG` — 32 more strings) and the dietary-restriction
-  catalogue, which is already an API (`/api/nutrition/dietary-restrictions`). **Every one of those
-  is a string the model would otherwise generate and the app already holds.**
-
-- **The conversation shape (from the mockup).** Three things, in order:
-  1. **Answers are widgets.** Stores as the new multi-select with Select all; restrictions as chips.
-     The coach **states what it already knows instead of asking** — *"I already know you log dairy
-     most days, so I have left it in"* — which is both the token saving and the better manner. The
-     seven steps become at most three exchanges, and any of them can be typed past instead of
-     tapped.
-  2. **The plan arrives as a widget, not prose.** A card listing each meal with its calories and
-     item count, plus **Save all as meals** (Q-398) and Redo. The plan is then disposable, because
-     the meals outlive it.
-  3. Entering from the Nutrition tab starts you **inside the nutrition scope**. **Scope it by giving
-     the coach a tool subset, not by instructing it** — a prompt that says "do not read workout
-     data" is a request the model will occasionally ignore, while a tool it never receives is a
-     boundary it cannot cross. **Make that subset a named record** (prompt section + tool subset +
-     patch domains + widget sources) rather than an inline filter, so a second coach can have one
-     without a refactor. That one line is all that survives of Q-408 — see the note below.
-
-- **Q-408 was descoped into the line above, 2026-08-19, on the owner's call.** It proposed the full
-  architecture from the owner's original message: Home as an "AI Coach" routing to scoped Nutrition,
-  Workout and Goal specialists. **Removed rather than deferred, for three reasons worth keeping so
-  nobody re-files it unexamined:**
-  1. **It is a router for one destination.** There is one coach. Routing has value when it picks
-     between coaches, and every decision in that design would have been made against imagined
-     requirements until a real second coach exists.
-  2. **Its hardest problem argues against it.** The owner's own example — *"what should I eat before
-     tomorrow's legs session?"* — is nutrition **and** workout. A strict boundary breaks it, so the
-     architecture's central question was never how to separate the coaches but how to let them talk
-     anyway, which is a harder problem than the one that motivated it.
-  3. **The token argument does not survive contact with Q-170's measurement.** Latency is almost
-     entirely *output* tokens; a shorter per-scope system prompt saves *input* tokens, which are not
-     the bottleneck. And inlining more prompt context was measured **twice** and made things worse.
-     The real saving — naming a `source` and letting the server fill the list — already exists as
-     `CHOICE_SOURCES` and is already in this entry.
-  **Reversal cost is nil.** If a second coach earns its place, write the architecture then, against
-  real requirements. The named-record shape above is what keeps that cheap.
-
-- **OWNER REVIEW OF THE PROTOTYPE, 2026-08-19 — the plan must end by writing meals, and that is not
-  optional polish.** ***"Meal plan coach needs more work - I want it to make the meal plan; then add
-  each item to the saved meals/my foods"***. The conversation is not finished when it prints a plan;
-  it is finished when **every meal in the plan exists as a row in `My Foods`**, indistinguishable
-  from one built by hand — loggable, editable, and with its own printable label.
-  - **This makes Q-398 a hard prerequisite rather than a related item.** Q-398 is the write path
-    (plan meal → saved meal, keyed on `(plan id, plan item id)` so a repeat save is a no-op). Without
-    it there is nothing for the widget's button to call, and a coach that produces an un-saveable
-    plan is the same dead end the stepper already is.
-  - **The plan is disposable once its meals are saved**, and the copy should say so. That is the
-    whole reason this beats a plan document: the user keeps meals, not a plan.
-  - The prototype demonstrates the loop end-to-end (tap *Save all to My Foods*, then find the four
-    meals under `My Foods` tagged *from your plan*) —
-    <https://claude.ai/code/artifact/4fc7f99e-71f3-442c-b88b-1bb83b5fa9d6>.
-
-- **Do not delete the stepper in this PR.** The wizard is a working flow the owner uses; ship the
-  conversation as the path behind the same entry point and keep the stepped sheet reachable until
-  the conversation has been used on-device for a plan the owner actually keeps. A conversational
-  flow that stalls mid-plan with no fallback is strictly worse than seven screens that finish.
-
-- **Lane.** Split, and **`lib/coach/**` is Lane A** — six `app/api/coach/**` routes import it
-  (nine imports; `apply.ts` and `patch.ts` also write storage), and the rule in
-  [`docs/agents/README.md`](agents/README.md) §3 sends anything reached by `app/api/**` to Lane A.
-  **No baton claim is needed**, and an earlier draft of this paragraph saying otherwise was wrong.
-  `lib/coach/widgets.ts` + `app/api/coach/options/route.ts` + `app/api/coach/route.ts` (the SYSTEM
-  prompt's widget rules, lines 27–59) are **Lane A**; `components/coach/choice-list.tsx`,
-  `components/coach/widget-registry.tsx` and `components/nutrition/meal-plan-setup-sheet.tsx` are
-  **Lane B**. The schema change lands first — the component cannot render a flag the schema does
-  not carry.
-
-- **Verification.** The multi-select half is testable in the sandbox: a widget rendered with
-  `multi: true` returns every checked id, Select all toggles all six, and an existing single-select
-  call site still resolves to one option (that regression is the actual risk). The **conversation
-  half is not** — it needs a real Gemini turn, so run one plan end-to-end against `pnpm dev` and
-  say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
-  thread) was not exercised unless it was.
-
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 - **Gate: device** — and the gate is the entry's own instruction, not a formality: it says
   *verify before adding metrics*, because background tracking with the screen off has never been
@@ -1860,119 +1866,6 @@ this fits without an extraction.
   short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
   from source, not observed, and that is still true after the fix. `Gate: device`.
 
-### [activity][platform] Q-328 — deleting an activity is the one activity-log write with no outbox domain, so offline it just fails
-
-> **⚠️ The Lane A half SHIPPED. What is left is Lane B only** — switching
-> `app/health/health-content.tsx:687` from its bare `fetch` to
-> `store.softDeleteActivityLogPending(id)` + `queueMutation({ domain: 'activity_logs', payload: { id, deleted: true } })`,
-> following `saved-meals-sheet.tsx:459`. The old `store.deleteActivityLog(id)` becomes dead in that
-> same PR and should be removed with it.
->
-> **One correction to the plan below, and it is the part that would have broken things.** The entry
-> said to flip `sqlite-backend.ts`'s local soft-delete from `synced` to `pending`. **Do not** — that
-> `synced` is load-bearing, not a mistake: `applyDelta` reaps an activity-log tombstone with
-> `DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, so a row left `pending` blocks
-> its own tombstone forever. A pre-existing test already pinned that (Q-488). Both states are
-> correct at different moments, so the offline delete is a **second** method
-> (`softDeleteActivityLogPending`) plus a `markActivityLogSynced` that moves the row across on push
-> confirmation — which also keeps the existing bare-`fetch` caller working unchanged until Lane B
-> switches it. See [`entries/2026-08-19-activity-log-delete-outbox.md`](overview/entries/2026-08-19-activity-log-delete-outbox.md).
->
-> **After Lane B lands, Q-556's 404 half is unblocked.**
-
-
-- **Branch:** `feat/activity-log-delete-outbox`
-- **Added:** 2026-08-19 · Lane A, found while reconciling Q-556 · [`journal`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md)
-- **Lane:** B
-- **Placement:** immediately above Q-556, which it gates. Small on its own; it is the prerequisite
-  that makes Q-556's 404 half safe.
-
-**The asymmetry.** An activity log is **created** through the outbox — `exercise-review-sheet.tsx:147`
-and `done-activity-screen.tsx:228` both `upsertActivityLog` + `queueMutation`, `syncStatus: 'pending'`.
-It is **deleted** by a bare `fetch("/api/activity-logs", { method: "DELETE" })`
-(`app/health/health-content.tsx:687`) with no `queueMutation` anywhere, and the `activity_logs` branch
-of `pushMutations` (`adapter.ts:4195`) handles upserts only.
-
-**What that costs.** CLAUDE.md's rule is *"every user-visible write needs an outbox domain — any POST
-reachable offline must queue a mutation or visibly fail"*. This one visibly fails, so it is not a
-silent data loss — but it is the only activity-log write that cannot be made offline at all, and it is
-what forces Q-556's route to keep answering 200 for a miss.
-
-**What to build.** A delete branch for the `activity_logs` outbox domain: a tombstone payload the
-client queues, a `pushMutations` arm that calls the same `deleteActivityLog` the web route calls (one
-write function per domain — `check-push-mutations.js` forbids raw `sql` there), and the client
-switching from bare `fetch` to local-delete + `queueMutation`.
-
-- **The local soft-delete already exists** (`sqlite-backend.ts:2654`) and already marks the row
-  `synced` rather than `pending` — deliberately, per its own comment. **That flag has to change with
-  this**, or the queued delete is a mutation the pull can clobber.
-- **`getSyncDelta` already emits `deleted_at` tombstones for `activity_logs`**, so the cross-device
-  half works; this is the push direction only.
-- **Lane:** the `pushMutations` arm and the repo function are **Lane A**;
-  `app/health/health-content.tsx` is **Lane B**. Ship Lane A first — the client cannot queue into a
-  domain that does not accept deletes.
-- **Then, and only then, Q-556's 404 half** — with the client treating 404 as success, since by that
-  point a 404 means "already gone", which is not a failure.
-
-### [activity][platform] Q-556 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
-
-> **⚠️ PARTLY SHIPPED, and the prescribed fix was RE-ORDERED rather than applied. Read this before
-> touching the route.** `deleteActivityLog` now returns whether the `(id, user)` pair matched, and the
-> route answers `{ success: true, deleted }` — so it no longer reports success for a delete that
-> touched nothing, which was the finding. **What was NOT done is the second half, "answer 404 when
-> zero", and it must not be done next.**
->
-> **Why 404 is unsafe today.** Activity logs are **created through the outbox** —
-> `components/activity/exercise-review-sheet.tsx:147` and `components/activity/done-activity-screen.tsx:228`
-> both `upsertActivityLog` + `queueMutation` with `syncStatus: 'pending'` — so a row exists locally
-> before its push lands, **online as well as offline**. Deleting it in that window matches no server
-> row. `app/health/health-content.tsx:687-695` treats any `!res.ok` as failure and **skips its local
-> delete**, so a 404 would toast *"Failed to delete"* and leave on screen a row the user just removed.
->
-> **And nothing would reconcile it**, because *delete is the one activity-log write that never
-> queues*: the `activity_logs` branch of `pushMutations` (`adapter.ts:4195`) handles upserts only.
-> That gap is now filed as **Q-328** below, and it is the prerequisite — 404 belongs in the PR after
-> it, alongside a client that treats 404 as success.
->
-> **Two cases that sound like regressions and are not**, checked rather than assumed: the WHERE does
-> not filter `deleted_at IS NULL`, so a **double-tap** and a **row already deleted on another device**
-> both still match and still report `true`. Only a genuinely absent or not-yours row reports `false`,
-> and those two stay indistinguishable — the enumeration property the review's control pass verified.
->
-> Reason (2) in the entry below — *"a queued mutation receiving a 2xx is confirmed and dropped from
-> the outbox"* — is **void as written**, for the same reason: there is no queued delete mutation to
-> confirm. It was correctly flagged as not demonstrated; it is in fact not reachable. Reasons (1) and
-> (3) stand. See [`entries/2026-08-19-activity-log-delete-affected-rows.md`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md).
-
-
-- **Branch:** `fix/activity-log-delete-affected-rows`
-- **Needs:** Q-328
-- **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
-  [`docs/reviews/2026-08-18-cross-user-isolation.md`](reviews/2026-08-18-cross-user-isolation.md)
-- **Placement:** low. **Not a leak — verified, not assumed.** As user B, deleting user A's activity
-  log returns `200 {"success":true}`; the database immediately after shows the row **intact**,
-  `deleted_at` NULL, still owned by A, A's count unchanged. The scoping is deliberate and already
-  tested (`repository-ownership-scoping.test.ts:326`).
-- **The route cannot report what happened.** `deleteActivityLog(userId, id): Promise<void>` returns
-  nothing, so the handler `await`s it and answers `{ success: true }` unconditionally.
-- **Why file it anyway:**
-  1. **Inconsistent with every sibling.** The house posture — verified by an enumeration control in
-     the same run — is **404 for both a nonexistent id and someone else's**. This route is **200 for
-     both**. Both are safe against enumeration, but they cannot both be the convention.
-  2. **Offline-first makes a false success expensive.** A queued mutation receiving a 2xx is confirmed
-     and dropped from the outbox, so a delete that matched zero rows *for a different reason* (sync
-     ordering; row not yet on the server) is indistinguishable and gets confirmed away.
-     **⚠️ That path was NOT demonstrated** — it is why the response matters, not an observed bug.
-  3. Same family as the existing rule *"after a user-scoped UPDATE whose row id came from the client,
-     check the affected-row count"*, applied to a DELETE.
-- **Fix:** return the affected-row count from `deleteActivityLog`; answer 404 when zero, matching siblings.
-- **✅ Everything else held.** 10 of 11 probes rejected by the route's own ownership check — A's recap/
-  energy/timing, deleting A's workout, logging a set **into A's session**, completing A's workout.
-  **The enumeration control passed:** nonexistent and A's ids return byte-identical responses.
-- **Not exercised:** `PATCH /api/activity-logs/<id>/metrics` returned `400 Invalid body` (my payload was
-  wrong), so that route's ownership check is **still unverified**. Local DB + web build; not production,
-  not on device; two accounts only — says nothing about admin-vs-user boundaries.
-
 ### [app-shell][platform] Q-555 — offline, a tab tap is a silent no-op until the service worker claims the page
 
 - **Branch:** `fix/offline-first-load-navigation`
@@ -2025,10 +1918,40 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 > `clients.claim()` on activate, so it claims as early as it can; the uncontrolled window is inherent
 > to a first-ever load. The fix is in the click handler.
 >
-> **Fix shape, for Lane B to weigh rather than a prescription:** stop suppressing the native
-> navigation when there is no `onTabChange` to run — outside the shell the `preventDefault()` buys
-> nothing — or keep it and give the failed `router.push` a visible outcome. The first is smaller and
-> restores a browser behaviour the app is currently discarding.
+> **⚠️ THE RECOMMENDED FIX SHAPE DOES NOT WORK, and three more things were measured 2026-08-24
+> (Lane B). Read this before starting — an attempt got as far as a working predicate and could not
+> verify it, and the branch `fix/offline-tab-tap-native-fallback` is pushed unmerged as the record.**
+>
+> 1. **"Stop suppressing the native navigation" is not available.** These are `next/link` anchors, so
+>    Next's own click handler intercepts and calls `router.push` regardless — removing our
+>    `preventDefault()` hands the click to the same failing path. There is no native navigation to
+>    restore.
+> 2. **Forcing one is possible but worse.** Measured: a plain `<a>` click offline with no controller
+>    lands on `chrome-error://chromewebdata/`. That is "something", but it throws away the cached
+>    screen the user is looking at — the one thing that still works offline.
+> 3. **They already know they are offline.** `components/shell/offline-indicator.tsx` renders a
+>    persistent *"Offline — showing saved data"* pill from `useOnlineStatus()` whenever offline, and
+>    it is in the root layout. So the missing feedback is specifically **a response to the tap**, not
+>    a statement that the connection is down. Do not add a second offline notice.
+> 4. **The predicate is the easy half and it is written.** `components/shell/nav-offline.ts` on that
+>    branch, with `components/shell/__tests__/nav-offline.test.ts` pinning all four states (only
+>    `offline && !controller` is the bug; offline WITH a controller is the path the review measured
+>    working at ~101% of online content, so warning there would be a false alarm).
+>
+> **What blocked it, and it is the whole remaining task: nobody has reproduced the failing tap.**
+> Three Playwright attempts, each failing for a different and instructive reason:
+> - Tapping from a settled `/health` measures **`TabShell`'s in-app tab switch** (`onTabChange={show}`),
+>   not this defect. The URL does not change there either, which is exactly what makes the two look
+>   identical — the first probe was misread as a reproduction because of it.
+> - Holding a tab route open with `page.route` does put `tab-loading.tsx`'s `<BottomNav />` (the one
+>   with no `onTabChange`) on screen — `[aria-busy="true"]` confirms it — but a tap on an
+>   already-visited tab then succeeds straight from the client router cache and proves nothing.
+> - Tapping a never-visited tab from that fallback still produced no toast. **Not diagnosed.** Next
+>   step: log inside `handleNavClick` to establish whether the handler runs at all in that window,
+>   before changing any more product code.
+>
+> **Do not ship this without that reproduction.** The fix is three lines and unverifiable by reading;
+> the defect is a silent no-op, so a fix that does nothing looks exactly like a fix that works.
 - **Lane: B** — `components/shell/bottom-nav.tsx`.
 - **Not exercised — and this limit is load-bearing:** web build only. On web `cachedFetch` falls back
   to `localStorage`, so what was verified is the **seed** path, **not** the native SQLite local store
@@ -2049,55 +1972,31 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [app-shell] Q-499 — self-fetching cards cannot tell "no data" from "the fetch failed"
 
-- **Lane: B** — the fix is `onError` handlers and error states in `components/health/*.tsx`; the
-  `CLAUDE.md` wording correction rides with it.
+> **The two verified instances shipped 2026-08-24, plus a deeper bug the fix uncovered.**
+> `hr-recovery-profile-card.tsx` and `strength-progress-card.tsx` now pass `onError` to
+> `useCachedValue` and render a compact "Couldn't load… — pull to refresh" state instead of a bare
+> `return null`, following the `observed-hr-card.tsx` pattern. `CLAUDE.md`'s wording is corrected —
+> `cachedFetch`/`useCachedValue` swallow `!res.ok` **only when the caller passes no `onError`**.
+>
+> **The two-instance fix would have been unreliable without a second one.** `cachedFetchCore`'s
+> in-flight dedup relays a *successful* response to every joined "waiter" for the same key, but a
+> *failed* one only ever reached the original/owning caller — a joiner with nothing cached learned
+> nothing and stayed silently blank, defeating a correctly-wired `onError` whenever two callers
+> raced for the same key. That race is guaranteed on every dev render by React StrictMode's double
+> effect-invoke (confirmed: the fix's own e2e spec was red against `pnpm dev` until this was fixed
+> too), and is reachable for real whenever two components read the same cache key concurrently.
+> Fixed in `lib/sqlite/cache.ts` by carrying each waiter's own `onError` and cached-state alongside
+> its `onData`, so a failure is now relayed to every waiter that had nothing to fall back on — the
+> same "stale beats an error state, per caller" rule the owning caller already followed.
+> [`journal`](overview/entries/2026-08-24-card-429-error-states.md).
 
 - **Branch:** `fix/card-fetch-error-states`
-- **Added:** 2026-08-18 · review sweep (three lenses) ·
-  [`docs/reviews/2026-08-18-silent-card-failures.md`](reviews/2026-08-18-silent-card-failures.md)
-- **Placement:** low-medium. Cosmetic in the common case. The sharp edge is diagnosability: a
-  rate-limited or erroring card is **indistinguishable from an empty one**, which makes an owner
-  report of *"the card is gone"* unanswerable.
-- **⚠️ One correction to `CLAUDE.md`'s premise.** The rule says `cachedFetch` *"swallows `!res.ok`"*.
-  It does **not** unconditionally — `cachedFetchCore` accepts
-  `onError?: (info: CacheFetchErrorInfo) => void`. It swallows *unless the caller opts in*. That makes
-  this a **coverage** problem with an existing mechanism, not a missing capability, and the rule's
-  wording should name `onError` so the next reader knows the hook is there.
-- **Adoption:** 78 components call `cachedFetch`; **18 reference `onError`** — an upper bound, since
-  some are unrelated matches (`components/ai/code-block.tsx`, `components/ai/response.tsx`).
-- **Verified by hand, two instances:**
-  - `components/health/hr-recovery-profile-card.tsx` — `cachedFetch` at :48 with no `onError`, then
-    `:57 if (!profile || profile.bands.length === 0) return null`. `profile` stays `null` on failure,
-    so a failed request and an empty profile render identically.
-  - `components/health/strength-progress-card.tsx` — `:36 ).catch(() => {})` (the smell `CLAUDE.md`
-    names), then `:40 if (withData.length === 0) return null`.
-- **Scoped honestly:** a crude filter produced **12** candidates; **2 were verified**. The other ten
-  are a **worklist, not a defect count** — several `return null` paths there are legitimate empty
-  states, and telling them apart needs per-file judgement.
-- **Why it matters more than it looks:** `cachedFetch` treats **any** `!res.ok` alike, **including a
-  429 from the app's own rate limiter**. A user who trips a limit watches health cards vanish instead
-  of seeing "try again in a minute", and the same silence covers a 500. Offline it is worse —
-  `cachedFetch` cannot revalidate at all.
-- **Fix:** pass `onError` and render a compact error state. In-repo references that already do it:
-  `components/health/observed-hr-card.tsx`, `components/workout/workout-load-error.tsx`. Amend the
-  `CLAUDE.md` wording in the same PR.
-- **✅ REPRODUCED 2026-08-18 (sweep 34) —
-  [`docs/reviews/2026-08-18-card-429-reproduction.md`](reviews/2026-08-18-card-429-reproduction.md).**
-  Forced `/api/weights-summary` to 429 by Playwright route interception at the S25 viewport:
-  **`Estimated 1RM` went from 1 node at baseline to 0 under the 429, with no error wording anywhere on
-  the page.** **The control holds** — blocking a *different* endpoint (`/api/oura/stats`) in the same
-  harness left it at 1, so the disappearance is caused by blocking that card's own endpoint, not by
-  the interception. (`Ring Status` is **inconclusive**, not clean: absent at baseline too.)
-- **⚠️ The vanish is invisible on a warm cache and appears on a cold one.** A repeat visit paints the
-  seeded value and the failed refresh is silent; a first visit has no seed and the card is gone. So
-  the person most likely to hit it is opening the app fresh, and least likely to reproduce it a minute
-  later — which makes *"the card is gone"* **intermittent-looking**, inviting the "can't reproduce"
-  dismissal that `CLAUDE.md`'s report-invalidation rule exists to prevent.
-- **A paste-ready reproduction spec is in the review doc.** Deliberately not committed as a test: it
-  asserts the *correct* behaviour and is red today, so it belongs in the fix PR, not before it.
-- **Still not exercised:** on device (APK WebView + native local store) and offline, where
-  `cachedFetch` cannot revalidate at all. Only **one** card is proven; the other eleven remain a
-  worklist.
+- **Lane:** B
+- **Keep:** the other ~10–18 candidate cards from the 2026-08-18 sweep remain an unenumerated
+  worklist (the review's own file list wasn't retrievable when this shipped; a fresh grep for
+  `cachedFetch`/`useCachedValue` + `return null` + no `onError`/error wording turns up ~18 today,
+  most needing per-file judgement to tell a real gap from a legitimate empty state). Not device or
+  offline verified — `cachedFetch` cannot revalidate at all offline.
 
 ### [app-shell] Q-359 — 36 other fetch-once effects have Q-402's latent bug; only the shell ones can bite
 
@@ -2268,46 +2167,45 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 ### [app-shell] Q-491 — nine collapsible toggles still ship no `aria-expanded`, and the hand-maintained list of them has drifted
 
-- **Branch:** `fix/aria-expanded-collapsibles-ratchet`
-- **Added:** 2026-08-18 · review sweep (control semantics) ·
-  [`docs/reviews/2026-08-18-aria-expanded-collapsibles.md`](reviews/2026-08-18-aria-expanded-collapsibles.md)
-- **Placement:** low. **No known screen-reader user today.** Filed because the stated direction is a
-  **Play Store listing**, where accessibility is a review surface rather than a preference, and
-  because the recommended fix is a ratchet that removes a maintenance burden rather than adding one.
-- **Still 9, but not the same 9.** `CLAUDE.md` names a specific nine (re-counted 2026-08-09). Re-checked:
-  - **`more/profile-tab.tsx` is fixed** — 0 chevrons remain.
-  - **`components/weights-summary.tsx` has the defect and was never on the list.**
-  - `deload-explanation` and `signal-sections` **moved** (`app/session-select/components/`,
-    `app/session-explain/components/`) — the paths in the rule are stale.
-  - The other six are unchanged: `health/day-overlay-sheet`, `workout/active-workout-screen`,
-    `workout/ai-prescription-card`, `workout/added-weight-toggle`, `nutrition/meal-card`,
-    `nutrition/saved-meals-sheet`.
-- **One partially compensates:** `weights-summary.tsx` carries
-  `aria-label={collapsed ? "Expand" : "Collapse"}`, so state does reach a screen reader — just not
-  through the attribute that also expresses the control→region relationship. Better than the other
-  eight; still not the rule.
-- **Fix shape — prefer the ratchet over the sweep.** Adding `aria-expanded={isOpen}` (+ `aria-controls`
-  where the region has an id) to nine sites is easy and will drift again. `CLAUDE.md`'s own rule says
-  to prefer Radix `Collapsible`, **which supplies both attributes for free** — converting the worst
-  offenders is the better trade. Then add a Custom Rules step counting chevron collapsibles without
-  `aria-expanded`, shrink-only, so the list stops needing a human.
-- **⚠️ The pattern is worth more than the finding — third stale hand-maintained count this run:**
+> **✅ THE TWO REAL VIOLATORS SHIPPED 2026-08-24 (Lane B), and the count of "9" was stale even at the
+> time this entry was re-checked — this is the fourth instance of the exact pattern the entry itself
+> flags below.** Re-verified each of the nine named files against `main` directly, one by one, rather
+> than trusting the list:
+> - `health/day-overlay-sheet` — the file **no longer exists** (retired by LB-3, #370/#373).
+> - `deload-explanation`, `signal-sections`, `ai-prescription-card` — all three already use Radix
+>   `Collapsible`/`CollapsibleTrigger` (confirmed against the installed
+>   `@radix-ui/react-collapsible` source: `CollapsibleTrigger` sets `aria-expanded`/`aria-controls`
+>   on the underlying element automatically, `asChild` included). **None of these three was ever a
+>   violator by the time this entry named them** — a chevron-icon grep can't see that the toggle
+>   is a real `<button>` wired through Radix, only that a chevron exists.
+> - `nutrition/meal-card` — same: `CollapsibleTrigger asChild` wrapping a `role="button"` div, which
+>   gets Radix's props merged onto it via `Slot`. Not a violator.
+> - `workout/active-workout-screen`, `nutrition/saved-meals-sheet` — their chevron is `ChevronLeft`,
+>   a **back-button icon**, not a collapse toggle. Never violators; a plain "contains Chevron" grep
+>   can't distinguish the two.
+> - `weights-summary.tsx`, `workout/added-weight-toggle.tsx` — genuinely hand-rolled, genuinely no
+>   `aria-expanded`. **These are the only two real ones.**
+>
+> Fixed directly rather than converting to Radix (the toggle in each renders different content by
+> state, not a show/hide of one region, so a Collapsible wrap would be more code than the two-line
+> fix): `weights-summary.tsx`'s collapse `Button` and both of `added-weight-toggle.tsx`'s buttons
+> now carry `aria-expanded` + `aria-controls` pointing at an `id` on the toggled region (`useId`).
+> Verified live: clicking each button flips `aria-expanded` and the `aria-controls` target exists in
+> the DOM. [`journal`](overview/entries/2026-08-24-aria-expanded-collapsibles.md).
+>
+> **The ratchet from the fix-shape section below was NOT built.** A first attempt at the obvious
+> heuristic (files containing a Chevron icon, no `CollapsibleTrigger`, no literal `aria-expanded`)
+> matched **34 files** on current `main` — most legitimately not violators (back-button chevrons,
+> non-toggle uses), which is exactly the false-positive class this re-check just walked through by
+> hand for nine of them. A script that flags 34 candidates to save auditing 9 by hand is not a
+> ratchet, it's a bigger version of the same problem. Left as `Keep:` rather than shipped as noise.
 
-  | Rule | Recorded | Actual |
-  |---|---|---|
-  | *"Repo day-window helpers currently hardcode `DEFAULT_TZ`"* (**Q-480**) | broken | a parameter every caller passes |
-  | *"both long-standing memos in the codebase"* (**Q-490**) | 2 | **66** |
-  | *"9 hand-rolled chevron toggles"* (this) | a specific 9 | a **different** 9 |
-
-  Every **ratcheted** count is current — hex literals, TTL divergence, component size, doc-index size,
-  backlog pointers. `CLAUDE.md` already drew this lesson for hex literals (*"recorded here as improving
-  and it was not … because this line was prose and nothing measured it"*); it applies to its own prose.
-  **A count in prose is a claim with a decay date; a count in a script is a fact.** Consider a
-  standing follow-up to replace remaining prose counts with script citations.
-- **Lane B owns this** (`components/**`, `app/**` surfaces); the ratchet script is a `scripts/` addition.
-- **Not verified: no screen-reader testing.** The claim is that the attribute is absent, not that a
-  specific announcement is wrong. Not on the APK, where TalkBack is the relevant reader.
-  `app/coach/coach-content.tsx` was examined and **excluded** — its chevron is a back button.
+- **Branch:** `fix/aria-expanded-collapsibles`
+- **Lane:** B
+- **Keep:** a real ratchet script, if one is worth building — it needs to recognize a Radix
+  `CollapsibleTrigger` (direct or via `asChild`/`Slot`) as already-covered and distinguish a
+  collapse chevron from a navigation chevron, neither of which a text grep can do reliably. Also
+  not done: screen-reader/TalkBack verification on either fixed component, and no device check.
 
 ### [app-shell][platform] Q-477 — the Profile "Auto-detect timezone" button is what breaks the app's dates: the server honours the new zone, 100 of 125 client call sites do not
 
@@ -2324,7 +2222,16 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 >
 > The sweep order in the entry still stands (calendar today-marker → write paths → display), and so
 > does the warning not to make `todayInTz()`'s default throw or read a global.
-
+>
+> **First slice shipped 2026-08-24 (Lane B): the calendar today-marker, the one named live symptom.**
+> `calendar-widget.tsx`'s `todayStr` now reads `todayInTz(useUserTimezone())` instead of the
+> device-local `localDateString()` — the exact site and exact bug the entry measured (Training
+> Calendar highlighting the 18th for a `Pacific/Kiritimati` user on their own 19th). Verified live,
+> the same way: set a seeded user to `Pacific/Midway` (UTC−11, currently a day behind this
+> container's UTC clock), re-logged in, and the calendar now bolds the *previous* day — the user's
+> actual today — not the container's. Ratchet down to **76 calls across 37 files** (was 78/38).
+> [`journal`](overview/entries/2026-08-24-calendar-today-marker-timezone.md). **37 files remain**,
+> ordered write paths next, then display, per the sweep order above.
 
 - **Branch:** `fix/client-today-uses-user-timezone`
 - **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
@@ -2942,24 +2849,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][app-shell] LB-5 — the Devices card calls the ring healthy while the service has no key
 
-- **Lane:** B
+> **Shipped 2026-08-24.** `OuraConnectionSection` now calls `hasKey()` on mount via `getOuraBle()`
+> and, when it returns `false`, replaces the whole card with an amber "No ring key stored" state
+> linking to `/admin/oura-ble` — takes priority over the normal "seen"/"not seen" card, since a ring
+> that synced recently but has no key now is not healthy whatever the server-derived freshness/
+> battery data still says. Nothing reveals or re-enters the key from this card, matching the
+> constraint below — it only navigates to the console. `getOuraBle()` returning `null` (web, old
+> APK) leaves `hasKey` at `null` and the card renders exactly as before; verified live by forcing
+> the state locally — no crash, no change to the existing web-sandbox render.
+> [`journal`](overview/entries/2026-08-24-devices-card-ring-key-state.md).
+
 - **Branch:** `fix/devices-card-ring-key-state`
-- **Added:** 2026-08-23, split out of Q-537 (whose engine half shipped the same day).
-- **What it is.** `components/more/oura-section.tsx` renders the ring's state from server data —
-  `/api/oura-ble/freshness` and the battery cache. Those keep looking fine for as long as the
-  server holds recent rows, so after an uninstall/reinstall the card shows *"Ring synced 2h ago"*
-  while the native service is logging `no key stored` and refusing to start. The one screen where
-  someone would look to find out why the ring stopped is the one screen that cannot tell them.
-- **What to do.** Call `hasKey()` on the plugin (`lib/oura-ble/plugin.ts`, already exported) and
-  show a keyless state on the card, pointing at `/admin/oura-ble` → Ring key. Catch and ignore on
-  web, where the plugin is absent — the card must not grow a web-only failure mode.
-- **⚠ Do not offer to reveal or re-enter the key from this card.** The backup affordance lives in
-  the console behind a deliberate button (Q-537); a second entry point on a routinely-visited
-  screen is the opposite of what the owner asked for (*"so it cant accidently be used"*).
-- **What would count as done:** with no key stored, the Devices card says so rather than reporting
-  a healthy ring.
-- **Surface:** device — `getOuraBle()` returns null in the web sandbox, so the keyless branch is
-  only reachable on the APK.
+- **Lane:** B
+- **Keep:** the keyless branch itself is device-only (`getOuraBle()` returns `null` in the web
+  sandbox), so it has never been seen rendering for real — only the inert web path and a locally
+  forced state were verified. `Gate: device`.
 
 ### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
@@ -3587,6 +3491,46 @@ ehr     0     0     0     0   648   208   128   556     0
   returns `Invalid body`, and `{"newPhase":"deload","force":true}` came back **200 with real state**.
   **Read the handler's error MESSAGE, not its status:** all six probes returned 400, and half of them
   were the handler working correctly.
+- 🚧 **75 → 67, 2026-08-24 (Lane A).** Eight more: `workout-sessions` DELETE and `fitness-tests`
+  DELETE (single-field `{id}`/`{workoutSessionId}` bodies, no in-repo client calling either DELETE
+  route found by grep — safe regardless of what's on the other end), `exercise-gif` and
+  `nutrition/barcode` GET (both validate an object the route itself builds from `searchParams`, the
+  no-client-verification exemption class already in the script's header), `nutrition/meal-types`
+  POST, `user/goals` PATCH and `user/profile` PATCH (each read against its one real client — fields
+  match exactly, verified by reading `meal-type-manager.tsx`, `goals-section.tsx`,
+  `goal-recommendation-sheet.tsx` and `edit-profile-sheet.tsx`). **One trap caught before it
+  shipped, worth the whole batch on its own:** `push/subscribe`'s real client
+  (`lib/push-client.ts`, `sub.toJSON()`) sends a browser `PushSubscriptionJSON`, which always
+  carries `expirationTime` beside `endpoint`/`keys` — the schema named only two of the three keys,
+  so `.strict()` as first written would have 400'd every real subscribe. Fixed by adding the missing
+  field to the schema before adding `.strict()`, not by exempting the route. Verified: relevant
+  vitest suites green (`clear-a-goal`, `goal-write-invalidation`, `cache-groups`,
+  `auth-before-param-validation`, `not-found-status`, `sentry-scrub`), `tsc --noEmit` clean on every
+  touched file. **`pnpm dev` could not be exercised this session** — the sandbox's `node_modules` is
+  missing `@sentry/nextjs` even though `package.json` declares it, unrelated to this change and not
+  investigated further; static verification (reading every real client's payload against the
+  tightened schema) stood in for it.
+- 🚧 **67 → 40, 2026-08-24 (Lane A).** The largest single batch: 16 files reached zero —
+  `activity-logs` (both DELETE and the metrics PATCH), `exercise-estimates`, `exercises` (create),
+  `nutrition/dietary-restrictions`, `nutrition/targets`, `running-plan/explain`,
+  `workout-review/session/[sessionId]/apply`, `nutrition/meal-plans` (create, `[id]` PATCH,
+  `[id]/structure` PATCH, `meals/[mealId]` PATCH, `plan-meal-answers` POST+DELETE), and the shared
+  `packages/shared/src/validation/generated-program.ts` — plus `builder-chat`, `exercises/generate`,
+  `generate-program` and `meal-plans/generate{,/meal}` lowered to their `generateObject`
+  response-schema remainder (their one real request schema each is now strict). Every conversion
+  read the real client's payload against the tightened schema first; no codemod.
+  **Two more traps caught before shipping, same class as `push/subscribe`'s `expirationTime`:**
+  (a) `workout-review-sheet.tsx` sends an unread `confidence` field to
+  `workout-review/session/[sessionId]/apply` — added to the schema (documented as unread; the route
+  already computes its own deterministic confidence per CLAUDE.md's no-self-reported-number rule)
+  rather than exempting the route. (b) `builder-review.tsx` mints a `clientId` on every exercise in
+  its live `program` state (the review editor's React key) and sends that state wholesale to
+  `builder-chat` — added to `GeneratedExerciseSchema` in the shared validation file, which is where
+  it would have silently 400'd every real chat turn had it been missed.
+  Verified: the touched routes' own vitest suites (81 tests, 8 files) plus the full suite (4,693
+  passed, 51 skipped, 2 pre-existing unrelated failures — missing `qrcode` in this sandbox),
+  `tsc --noEmit` clean, `pnpm check:rules` 55 of 55. **`pnpm dev` still could not be exercised** —
+  same sandbox gap as the prior batch; static per-client verification stood in for it again.
 - **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
   builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
   unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
@@ -3668,206 +3612,34 @@ ehr     0     0     0     0   648   208   128   556     0
 > `freshWithinTtl` entries inside them — and Q-263 files that.
 > Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/history-2026-08-15.md).
 
-### [platform] Q-530 — an admin snapshot endpoint, so a migration's first real run is not production
+### [workouts] Q-298 — the 10 historical zero-1RM rows: recompute or null (the code fixes shipped 2026-08-24)
 
-- **Branch:** `feat/admin-db-snapshot`
-- **Plan:** [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)
-- **Lane: A**, and not splittable — `app/api/**`, `lib/data/postgres/migrations/`, and a Postgres
-  migration number, which belongs to Lane A alone. No Lane B surface is touched at all.
-  ⚠️ **Two of the paths are unlisted in the lane contract and must be claimed in Lane A's baton
-  before starting**: `scripts/` (the generator and the restore command) and `lib/export/` — neither
-  appears in §3 of [`docs/agents/README.md`](agents/README.md), and `lib/export/` is shared with
-  Q-288 below, so the two items must not run concurrently in different sessions.
-- **Added:** 2026-08-17 · planning session against the rescoped Q-251
-- **Steps, in order — the plan carries the detail, this is the slot list:**
-  1. `scripts/generate-claude-ro-views.js` — emit `_meta_excluded_tables` and
-     `_meta_withheld_columns`; regenerate into **migration 191** (a new number, never overwriting an
-     applied file) and re-point the filename pin in `claude-ro-readonly-role.test.ts` *in the same
-     commit*.
-  2. `lib/export/db-snapshot.ts` — view enumeration, the drift gate, PK discovery from `pg_index`,
-     keyset chunking, the manifest. All the tests live here.
-  3. `app/api/admin/db-snapshot/route.ts` — copy `day-review`'s `authorize()` verbatim; `bulk` and
-     `tables` params; NDJSON via `ReadableStream`; audit row into `db_query_log`.
-  4. `scripts/local-db/snapshot.js` + `pnpm db:snapshot` — local-target guard **first**, then
-     restore per plan §5.
-  5. Docs — `CLAUDE.md` env-var row, `docs/module-map.md` row, and a
-     `docs/runbooks/db-backup-restore.md` section distinguishing this from `pg_dump`.
-- **✅ Step 3 is unblocked. `ADMIN_SNAPSHOT_SECRET` was approved as a separate secret and set by the
-  owner on 2026-08-17**, in both places it is needed: Railway (so the server accepts the token) and
-  the Claude Code environment (so a session can send it). Reusing `ADMIN_EXPORT_SECRET` was
-  considered and rejected — day-review returns 31 days of derived scores, this returns the database,
-  so a leak of one must not be a leak of both.
-  - **A session started before that change cannot see the variable** — the environment is injected at
-    container start. If `echo ${#ADMIN_SNAPSHOT_SECRET}` prints 0, that is a stale container, not a
-    missing secret; start a fresh session.
-  - **Nothing has verified the Railway half yet, and nothing can until step 3 ships**, because no
-    code reads the variable. The first real check is
-    `curl -si …/api/admin/db-snapshot -H "Authorization: Bearer $ADMIN_SNAPSHOT_SECRET"` returning a
-    200 and a manifest line. A 401 there means the two copies disagree; treat it as configuration
-    before suspecting the route.
-- **Placement:** below the four live user-facing bugs above it and below the two CI-integrity items,
-  above everything else — it is a capability every later item borrows (rehearse a migration against
-  prod-shaped rows, run `pnpm dev` against real data), and it is the first thing that touches
-  `CLAUDE.md`'s standing root cause *"a bug that reproduces in prod but not locally: suspect prod
-  data drift vs the fresh local seed"*.
-- **This is Q-251 shape (a), designed.** Q-251 stays open for shape (b), the second Railway service,
-  which remains deferred. Read Q-251 first for the decision history; read the plan for what to build.
-- **It is much smaller than Q-251 implies, and the reason is the finding to carry into the work:**
-  `claude_ro` already *is* the export — 80 views, one user, default-deny, 9 columns withheld, served
-  by a role with no write grants. The endpoint paginates `SELECT *` over that schema. **No new
-  scoping map is written**, so there is no second copy to drift, which is the property this could not
-  survive losing.
-- **What happens when a table is added and the views are not regenerated: the export fails, naming
-  it.** The gate is a runtime set difference — `public` base tables minus `claude_ro` views minus a
-  generator-emitted exclusion view — computed from `pg_catalog`, which the `claude_readonly` role can
-  read for `public` despite holding no `SELECT` there (verified against production: 83 tables, 944
-  columns). Column-level, not just table-level. The existing CI parity test stays but does not cover
-  this: it is a count rather than a set of names, it is column-blind, its migration pin **went stale
-  silently between 181 and 185**, and it checks the *local* schema.
-- **Volume, measured 2026-08-17.** The DB is 477 MB and `oura_raw_samples` is 360 MB of it —
-  **1,098,005 of its 1,098,183 rows are the owner's**, so scoping to one user removes 0.02% of the
-  volume. Scoping is a consent fix, never a size fix. The shaped data that rehearsal actually needs
-  is a few MB, so the default export omits the four bulk tables and `?bulk=<days>` opts a window
-  back in.
-- **Ships with a first-class round-trip** (`pnpm db:snapshot`), guarded to refuse any target that is
-  not the local DB. Two verified constraints: `push_subscriptions` **cannot** round-trip (all three
-  withheld columns are `NOT NULL`) and is skipped and declared in the manifest; `users.password_hash`
-  is withheld and nullable, so the restore stamps the seed's known bcrypt hash or nobody can log in.
-- **⚠️ New secret — `ADMIN_SNAPSHOT_SECRET`, not a reuse of `ADMIN_EXPORT_SECRET`.** Secret handling
-  is confirm-first per `CLAUDE.md`; the owner has approved the endpoint's existence, but confirm the
-  variable before it is added to Railway. Leak analysis is in the plan §6: total health-data
-  disclosure for one person, **no** account takeover, no write path, no third-party rows — and the
-  marginal risk over today is small, because `CLAUDE_DB_QUERY_SECRET` already reads exactly this data
-  through the same views and the same role.
-
-### [platform] Q-263 — audit the remaining cache groups the way Q-262 audited one
-
-- **Branch:** `chore/audit-remaining-cache-groups`
-- **Plan:** none needed
-- **Added:** 2026-08-16 · the scope Q-262 deliberately did not take
-- Q-262 established the method and applied it to `invalidateGoalRecommendations()` only: for each key
-  in a group, does any call site pass `freshWithinTtl`, and is any read path seed-only? Those are the
-  only two ways an invalidation changes a settled value.
-- **The remaining groups are NOT expected to come out the same way**, which is why this is worth
-  doing rather than assuming. `lib/cache-groups.ts` comments already name `freshWithinTtl` keys
-  inside them — `workout-data:all` and `workout-card:<id>` at TTL_LONG are called out explicitly as
-  having caused a real bug (the pre-injury exercise card). Those are load-bearing; the question is
-  which others are.
-- **The valuable output is not "delete the inert ones".** It is a per-group note saying which keys
-  carry the protection, so a future session changing a fetch to `freshWithinTtl` knows it has just
-  made an invalidation matter, and a future stale-value report starts by checking condition (b)
-  rather than hunting a missing group entry.
-- Watch the static blind spot: a key built by a helper (`energyKeyFor(date)`) is invisible to a
-  literal grep. Q-262 hit this and resolved it by reading the call site; `check-cache-ttl-divergence.js`
-  reports how many such sites it skipped, which is the number to reconcile against.
-
-
-### [workouts] Q-298 — a phase-level deload zeroes the 1RM and never stamps `exercise_deloaded` (diagnosed 2026-08-16, still unfixed)
-
-- **⚠️ Re-checked 2026-08-20 against `f23b327`: NOT fixed.** `log-exercise.ts:196` still zeroes
-  the estimate on `exerciseDeloaded === true || (isAnyDeload && !isBaseline)` while line 264 still
-  stores `exerciseDeloaded ?? false`. The heading said RESOLVED because the *cause* was found, not
-  because the two-line fix shipped — which is precisely how a finished-looking entry outlives its
-  work. The work below is unchanged and still owed.
-
-- **Branch:** `fix/zero-estimated-1rm`
-- **Plan:** none needed for the guard; the backfill wants a decision first
-- **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](reviews/2026-08-15-pillar-model-soundness-review.md) §1.1
-- **✅ RESOLVED 2026-08-16 — the cause is found, and the work is now small and specific.** All five
-  2026-08-09 rows belong to **one `Pull` session**, and `session_periodization` shows **Pull entered
-  the `deload` phase on exactly 2026-08-09**. So `estimateOneRm` was called with `deloaded: true`
-  from the phase and correctly returned 0 — the same deliberate branch that explains the 08-06
-  `Upper` session. **The zeros were never the bug.**
-  **The defect is the provenance mismatch: the phase-level deload zeroed the estimate and did not
-  stamp `exercise_deloaded` on the row.** That is exactly why Q-228's fix misses them —
-  `getLastRealOneRmBatch` filters on `exercise_deloaded`, which is `false` here, so these zeros **do**
-  leak into prescription. The original entry claimed that outcome with the wrong reason; the outcome
-  stands and now has a cause. Working in
-  [`docs/reviews/2026-08-16-multi-user-load-test.md`](reviews/2026-08-16-multi-user-load-test.md) §1.
-- **✅ PINNED TO SOURCE 2026-08-16 — the fix is one line.** `packages/shared/src/workout/log-exercise.ts`:
-  ```ts
-  188:  const isAnyDeload = currentPhaseType === 'deload' || sessionIsEarlyDeload;
-  196:    deloaded: exerciseDeloaded === true || (isAnyDeload && !isBaseline)   // zeroes the 1RM
-  264:    exerciseDeloaded: exerciseDeloaded ?? false                          // stores ONLY the AI flag
-  ```
-  Line 196 zeroes the estimate when **either** the AI flag **or the phase** says deload; line 264
-  records only the AI flag. **Line 264 should store the same predicate line 196 uses.** The file's own
-  comment at 190–191 says both cases must not feed the estimate — they don't; only one is recorded.
-  Working in [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §4.
-- **The work, now that it is understood — two small changes:**
-  1. **Stamp `exercise_deloaded` from the phase** wherever `estimateOneRm` is called with
-     `deloaded: true`, so the row records what actually happened and Q-228's filter works.
-  2. **Store `null`, not `0`**, for a deliberately-unestimated 1RM. A null propagates as "no
-     estimate"; a zero propagates as an estimate *of* zero, which is what read as −100% on a trend.
-  Both are cheap. The historical-row decision (recompute vs null the 10 existing rows) still edits
-  training history and still needs the owner's say-so.
-- **⚠️ AMENDED 2026-08-15, same day, before any work started — this entry was HALF WRONG as first
-  filed.** It claimed all ten rows were a defect. Reading the write path settles it: the write path
-  (`log-exercise.ts:194`) calls `estimateOneRm`, and `packages/shared/src/1rm.ts:158` is
-  `if (deloaded) return { estimated1rm: 0, target80: 0, targetPct }`. **The five 2026-08-06 rows all
-  carry `exercise_deloaded = true` and are zero ON PURPOSE** — deload work is submaximal and must not
-  feed a 1RM. That is correct behaviour. Full working in
-  [`docs/reviews/2026-08-15-workout-model-round-3.md`](reviews/2026-08-15-workout-model-round-3.md) §1.
-  **Two things survive**, and they are what this entry is now about:
-  1. **`0` is the wrong sentinel — use `null`.** A null propagates as "no estimate"; a zero
-     propagates as an estimate *of zero*. That is what produced the visible damage: a first-vs-last
-     trend query reads those exercises as **−100%**. This applies to the deliberate deload case too.
-  2. **The five 2026-08-09 rows are still unexplained**, since they carry `exercise_deloaded = false`.
-- **Narrowed to at least two mechanisms, and three rows still unaccounted for.** Their `set_logs`:
-  ```
-  Barbell Shrug           4 × 87.5 kg × 6    use_for_1rm=TRUE   → should compute ~103 kg, stored 0
-  Sumo Deadlift           4 × 82.5 kg × 6-7  use_for_1rm=TRUE   → should compute, stored 0
-  Bent-Over Barbell Row   4 × 30 kg × 6      use_for_1rm=TRUE   → should compute, stored 0
-  Dumbbell Preacher Curl  3 × 16.25 kg × 12  use_for_1rm=FALSE  → no qualifying set
-  Pull-Up                 3 × 0 kg × 5       use_for_1rm=FALSE  → bodyweight, weight_kg = 0
-  ```
-  - **Pull-Up**: `estimateOneRm` substitutes `max(1, bwRef + weightKg)` **only when
-    `exerciseType === 'bodyweight'`**. If that did not resolve, `weights` is 0, the `!(w && r)` filter
-    drops every set, `oneRMs` is empty and `calculate1RM` returns 0.
-  - **Preacher Curl**: `use_for_1rm = false` on all three sets. When the style has *some* `useFor1rm`,
-    `calculate1RM` filters to those indices; none qualify, so `oneRMs` is empty → 0.
-  - **Shrug / Sumo Deadlift / Bent-Over Row have real weights, real reps and `use_for_1rm = true`.
-    Start here — these three are the actual mystery.**
-- **The zero was written at compute time, not overwritten later.** Every one of those sets has
-  `intensity_pct = NULL`, and the write path derives it as `computeIntensityPct(weight, estimated1rm)`,
-  which is null exactly when the estimate is 0.
-- **`runningEstimate1RM` already solves the empty-`oneRMs` case** ("fall back to averaging all logged
-  sets so a number always shows from set 1") — **and `calculate1RM` does not, while the write path uses
-  `calculate1RM`.** So the live widget shows a sensible number and the saved row gets 0. That asymmetry
-  is the most likely single fix.
-- **Measured:** **10 of 355 `exercise_logs` (2.8%) have `estimated_1rm = 0`** — the value zero, not
-  null — alongside entirely real volume and reps:
-  ```
-  2026-08-09 21:36  Sumo Deadlift           e1rm=0  vol=2062.5  avg_reps=6.3  deload=false
-  2026-08-09 21:46  Bent-Over Barbell Row   e1rm=0  vol=720     avg_reps=6    deload=false
-  2026-08-09 21:56  Barbell Shrug           e1rm=0  vol=2100    avg_reps=6    deload=false
-  2026-08-09 22:04  Pull-Up                 e1rm=0  vol=1064.3  avg_reps=5    deload=false
-  2026-08-09 22:13  Dumbbell Preacher Curl  e1rm=0  vol=585     avg_reps=12   deload=false
-  2026-08-06 ×5     (all deload=true)
-  ```
-- **Two clusters; only one is explained.** The 08-06 five are `exercise_deloaded = true` — the
-  Q-115/Q-228 deload-corruption date. **The 08-09 five are `exercise_deloaded = false`, consecutive
-  over 37 minutes — one entire workout session** where every exercise stored a zero 1RM.
-- **Q-228's fix does not cover them.** That fix added an `exercise_deloaded` filter to
-  `getLastRealOneRmBatch`; the 08-09 rows have that flag false and pass straight through into
-  prescription.
-- **Zero is a value, not an absence.** Null means "could not compute"; zero is a number that flows
-  into trend charts, PR detection and the next prescription. First-vs-last e1RM reads those two
-  lifts as **−100%**.
-- **Likely common cause, worth checking first:** **2026-08-09 logged 1,000 `error_events`**, mostly
-  connection timeouts, and the same date carries a 0.00 h sleep row at 04:52 (Q-274). Three
-  anomalies in three domains on one heavy-fault day points at the connection-starvation class
-  (Q-213/Q-107). If `estimated_1rm` is computed from a query that returned nothing under contention,
-  the fix is at the computation, not the filter.
-- **Do three things, in this order:**
-  1. **Find the writer** and establish how a zero is produced from real sets. `logExerciseFromPayload`
-     (`packages/shared/src/workout/log-exercise.ts`) is the shared write path.
-  2. **Guard at the write**: refuse to persist `estimated_1rm = 0` when sets exist — store null.
-     A null is honest and every downstream reader already handles it.
-  3. **Then decide on the 10 existing rows.** Recompute from their `set_logs` if the sets survive;
-     null them if not. **Ask before writing** — this edits historical training data.
-- **Add the sibling check:** `volume = 0` is currently 0 of 355, but the same "computed and stored as
-  zero" hazard applies to it and to `avg_reps`.
+- **Branch:** `fix/deload-provenance-and-previous-1rm` · **Lane A**
+- **⚠️ THE ENTRY'S CENTRAL CLAIM WAS ALREADY FALSE ON `main`, and checking it is what found the real
+  defect.** It said the zeros *"do leak into prescription"* because `getLastRealOneRmBatch` filters
+  on `exercise_deloaded`. That query also filters `AND el.estimated_1rm > 0`, so a zero never
+  reached it — and the `-100%` trend it blamed had been fixed too, with an explicit
+  `FILTER (WHERE estimated_1rm > 0)` and a comment saying why. Both named symptoms were closed.
+- **✅ The leak was real, and in a query the entry never mentions.** `listPrevious1rm`
+  (`adapter.ts`) gated on `estimated_1rm IS NOT NULL` — the one sibling that did not use `> 0` —
+  so a deload's deliberate 0 became *"your previous 1RM"* whenever the last-but-one session for an
+  exercise was a deload.
+- **It produced a signal pair that contradicted itself, and both halves go to the AI.**
+  `oneRmTrendStatus` guards `previous <= 0` and reported **flat**; `signals.ts`'s
+  `rm1ChangeKg` (`current - prev`) has no such guard and reported the lifter's **entire 1RM as a
+  gain since last time**. Fixed at the source — one query, both consumers.
+- **✅ The provenance stamp shipped too.** The estimate and the stored flag now come from one named
+  predicate (`deloadedForEstimate`), so a phase-level deload records `exercise_deloaded = true`
+  instead of describing itself as a normal set the app happened to decline to estimate. Deliberately
+  **not** changed: what is passed to `shouldCountTowardPr`, which takes `isAnyDeload` separately
+  and already gates on it — this changes what is *stored*, not what is *decided*.
+- **Keep:** the **10 historical rows** — the owner's call, unchanged. Recompute them or null them;
+  both edit training history. Note the forward fix does not touch them, and the read-time `> 0`
+  guards mean they are inert everywhere now rather than merely inert in two places.
+- **The 0-vs-null sentinel is NOT done, and it is bigger than the entry implies.**
+  `OneRmEstimate.estimated1rm` is typed `number`, so making it nullable ripples through every
+  consumer of `calculate1RM`. With every read path now gating on `> 0`, the sentinel is a
+  correctness improvement rather than a live defect — worth doing deliberately, not as a rider.
 
 ### [workouts] Q-306 — the emergency-deload RPE trigger sits 0.07 inside a known measurement error
 
@@ -3905,85 +3677,22 @@ ehr     0     0     0     0   648   208   128   556     0
   sequence has a `deload` phase at position 4 (Accumulation 4 → Intensification 3 → Peak 2 →
   Testing 1), so ~10 cycles between deloads. Long-ish, but a program-design choice.
 
-### [cardio][activity] Q-307 — pace is null on 32 of the 39 activity logs that carry everything needed to compute it
+### [workouts] Q-304b — recompute (or leave) the 30 `personal_records` rows written before the AMRAP correction
 
-- **Branch:** `fix/derive-activity-pace`
-- **Plan:** none needed — likely the same fix as Q-230
-- **Added:** 2026-08-16 · from the load-test review §5
-- **Measured** across 46 `activity_logs` (`deleted_at IS NULL`):
-
-  | field | populated |
-  |---|---|
-  | `duration_min` | 46 / 46 |
-  | `distance_km` | 39 / 46 |
-  | `avg_hr` | 21 / 46 |
-  | `calories_burned` | **18 / 46** |
-  | `avg_pace_sec_per_km` | **7 / 46** |
-  | `steps` | **1 / 46** |
-- **Pace is `duration_min × 60 ÷ distance_km`.** 39 logs carry both inputs; 7 carry the pace. It is
-  **read from the column, never derived at render** — `components/cardio/efficiency-chart.tsx` plots
-  `p.avgPaceSecPerKm` directly and `done-activity-screen.tsx` guards on `!= null` (so the pace block
-  silently disappears rather than showing a wrong value).
-- **Consequence:** the efficiency chart has gaps for **32 of 39** distance-bearing activities, and
-  pace — the number a walker or runner actually looks at — is absent on **85%** of logs.
-- **Same shape as Q-230**, which is about `steps` and `caloriesBurned` being hardcoded `null` at save
-  on guided walks. `components/activity/exercise-review-sheet.tsx:143` writes
-  `avgPaceSecPerKm: null` explicitly, alongside `splits: null, bestEfforts: null, paceSeries: null`.
-  **Check Q-230 before starting — this is very likely one fix covering all of these fields**, and
-  doing them separately would be the sibling-surface mistake.
-- **Decide derive-at-write vs derive-at-read.** At-write matches how the column is consumed today
-  and needs a backfill for the 32 existing rows; at-read needs no backfill but must be applied at
-  every consumer. Prefer at-write with a backfill, and keep the column authoritative.
-- **Out of scope:** whether pace/HR values are physiologically *correct* where present. This entry
-  is about absence only; correctness was not assessed.
-
-### [workouts] Q-304 — 29 sets at 13+ reps feed the 1RM estimate on the one path that skips the AMRAP correction
-
-- **Branch:** `fix/high-rep-1rm-correction`
-- **Plan:** none yet — **measure the qualifier below before changing anything**
-- **Added:** 2026-08-15 · from [`docs/reviews/2026-08-15-workout-model-round-3.md`](reviews/2026-08-15-workout-model-round-3.md) §2
-- **The model is well built — this is one gap in it, not a rewrite.** `repFactor` averages Epley and
-  Brzycki and **freezes the Brzycki term at 20 reps** so it cannot blow up toward its 37-rep pole,
-  with `REP_CEILING = 30` above which nothing is estimated. That is more careful than most
-  implementations and should not be touched.
-- **The gap:** `amrapScaleFactor` exists for exactly this problem — 1.0 / 0.97 / 0.93 / **0.88** /
-  **0.82** by rep band — and is applied by `calcAmrap1RM`. But `estimateOneRm`'s ordinary
-  (non-bodyweight, non-baseline) path calls **`calculate1RM`**, which does not apply it.
-- **Measured** (`claude_ro.set_logs`, `deleted_at IS NULL`):
-
-  | rep band | sets | **feeding the 1RM estimate** |
-  |---|---|---|
-  | 1–5 | 40 | 32 |
-  | 6–8 | 497 | 390 |
-  | 9–12 | 411 | 191 |
-  | **13–20** | **59** | **27** |
-  | **21+** | **2** | **2** |
-
-  **29 sets at 13+ reps feed the estimate**, where the band's own scale factor would cut 12–18%.
-- **✅ QUALIFIER MEASURED 2026-08-16 — it did NOT close the entry. Skip to the fix.** Of the sets
-  feeding the 1RM estimate, **28 of the 29 at 13+ reps carry no `planned_pct`** (13–20 reps: 1 of 27;
-  21+: 0 of 2), so `prescriptionFactor` returns 1 and the raw `repFactor` stands with no AMRAP
-  correction. **The proxy is exact, not approximate**: `log-exercise.ts:233` writes
-  `plannedPct: progressionStyle?.[i]?.pct` — the same value `prescriptionFactor` consumes. Working in
-  [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §1.
-  **So apply the band correction on the `calculate1RM` path when no prescription factor applies**, and
-  add tests at 13, 20 and 21 reps. The double-correction warning below still stands.
-- **⚠️ THE QUALIFIER — do this measurement FIRST, it may close the entry.** `prescriptionFactor`
-  rescales by `1 / ((pct/100) × repFactor(targetReps))` when a style supplies both `pct` and
-  `targetReps`. **Where a style is present, that normalisation may already absorb most of the
-  inflation.** This review did **not** establish how often a style accompanies those 29 sets, so
-  this is a flagged risk with a measurement attached, not a proven defect.
-  - Query: for the 29 sets at 13+ reps with `use_for_1rm = true`, how many had a progression style
-    with a non-null `pct` at write time? `planned_pct` on the row is the closest proxy.
-  - **If most had a style → close this entry as measured-and-rejected.** That is a fine outcome and
-    a better one than a speculative change to a shared formula.
-  - **If most did not → apply the AMRAP band correction** on the `calculate1RM` path when no
-    prescription factor applies, and add a test at 13, 20 and 21 reps.
-- **Do not simply route everything through `calcAmrap1RM`.** Double-correcting a set that already has
-  a prescription factor would deflate the estimate, which is the mirror of the current bug.
-- **Related:** `personal_records` (30 rows) is written from these estimates. If a correction lands,
-  decide separately whether historical PRs are recomputed — that edits training history and needs the
-  owner's say-so.
+- **Gate:** owner
+- **Added:** 2026-08-24 · split off Q-304 when its forward fix shipped
+- **Q-304's forward fix shipped** (`packages/shared/src/1rm.ts` — an unprescribed set now gets the
+  same `amrapScaleFactor` band discount an explicit AMRAP set already got via `calcAmrap1RM`, so a
+  13+ rep set with no progression style no longer feeds the 1RM estimate un-discounted). Verified:
+  measured against production first (1 of 29 flagged sets carried a style, so the qualifier that
+  would have closed the entry did not), 3 new tests at 13/20/21 reps plus the no-double-correction
+  case, full suite green.
+- **What is deliberately NOT done:** `personal_records` (30 rows) was written from the old,
+  un-discounted formula. Recomputing them edits training history and needs the owner's say-so —
+  same shape as Q-298's 10 historical zero-1RM rows, kept as its own decision rather than folded
+  into the forward fix. Options: leave them (only the 29 flagged sets' history is inflated, a small
+  and shrinking share as new sessions log correctly going forward), or recompute the affected rows
+  from `set_logs` with the corrected formula.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 
@@ -4050,107 +3759,6 @@ ehr     0     0     0     0   648   208   128   556     0
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly.
 
-### [platform] Q-458 — `.env.example` is the public configuration contract and it is wrong in both directions
-
-- **Branch:** `fix/env-example-reconcile`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** mid. Mostly tidy-up, with one edge that names a security property the app does not
-  have.
-- **Method.** Differenced every `process.env.X` read under `lib app packages scripts
-  instrumentation*` against the keys declared in `.env.example`.
-- **Declared, read by no code — 8 keys:**
-
-  | Key | Why dead |
-  |---|---|
-  | `OURA_CLIENT_ID`, `OURA_CLIENT_SECRET`, `OURA_REDIRECT_URI`, `OURA_WEBHOOK_CALLBACK_URL`, `OURA_WEBHOOK_VERIFICATION_TOKEN` | Oura **Cloud** integration deleted 2026-08-13 |
-  | `GEMINI_API_KEY` | Retired at Q-189; `CLAUDE.md` already says nothing reads it |
-  | `TOKEN_ENC_KEY` | Nothing reads it |
-  | `AUTH_URL` | Nothing reads it |
-
-- **The sharp edge is `TOKEN_ENC_KEY`.** It reads as the key that encrypts stored tokens. An operator
-  will generate one, set it, and reasonably conclude tokens are encrypted at rest. Nothing reads it,
-  so nothing is. **A dead variable that names a security property is worse than a dead variable** —
-  fix this one even if the rest is deferred.
-- **The second edge is the five Oura Cloud keys.** `CLAUDE.md` is emphatic that the Cloud integration
-  must never be re-added (re-onboarding the official app risks a firmware update that breaks the
-  reverse-engineered BLE protocol). The public onboarding file currently invites a contributor to go
-  get credentials for exactly that. Two project files contradict each other, and the newcomer reads
-  the wrong one first.
-- **Read by code, undeclared — the real configuration** (excluding test/script knobs
-  `OURA_CONSTANTS_DIR`, `RECORD_MODEL_FIXTURES`, `CHUNKS`, `RTT_MS`, `SERIAL`):
-  `CLAUDE_RO_OWNER_USER_ID`, `LOCAL_DATABASE_URL`, `PG_POOL_MAX`, `RAILWAY_GIT_COMMIT_SHA`.
-- **Do NOT "fix" the `AWS_*` keys.** They are absent from `.env.example` deliberately —
-  `lib/exercise-storage.ts:4-24` reads `AWS_* ?? STORAGE_*` as an alias chain and
-  `constants-delivery.ts:74` reuses that module, so documenting `STORAGE_*` alone is correct. This
-  was checked and cleared; see the review.
-- **Fix shape:** delete the eight, add the four. Consider a Custom Rules step that differences the
-  two automatically — this drifted silently because nothing measured it, the same argument that
-  produced the hex-literal and TTL-divergence ratchets.
-
-### [platform][devices] Q-459 — the rolling APK release is delete-then-recreate, so the advertised public download URL 404s during every native merge
-
-- **Branch:** `fix/apk-rolling-release-no-404-window`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** low. Short window, infrequent trigger.
-- **What.** `.github/workflows/android.yml:122-127`:
-  ```bash
-  gh release delete apk-latest --yes --cleanup-tag 2>/dev/null || true
-  gh release create apk-latest android/app/build/outputs/apk/debug/app-debug.apk …
-  ```
-  Between the two commands the release **and its tag** do not exist. `CLAUDE.md` advertises
-  `…/releases/download/apk-latest/app-debug.apk` as *"always the newest `main` build, non-expiring,
-  and genuinely no login required"*, and `/api/download-apk` resolves it via
-  `/releases/tags/apk-latest` — a 404 in that window, surfacing as "Could not fetch release info".
-- **The workflow comment explains the choice honestly** (`gh` cannot overwrite an existing asset of
-  the same name in place), so this is a known trade-off, not an oversight. **The migration is what
-  made it matter:** while the repo was private nobody could use that URL; it is now the documented
-  distribution path.
-- **Fix shape:** upload under a temporary asset name and swap, or delete only the **asset** rather
-  than the release and tag, so the release id and tag survive the swap.
-
-### [workouts] Q-299 — autoregulation's missing-data defaults make "add load" easier and "cut load" harder
-
-- **Branch:** `fix/autoreg-null-defaults`
-- **Plan:** none yet — small change, but it moves a safety-relevant behaviour
-- **Added:** 2026-08-15 · from the pillar-soundness review §1.3
-- **A prescription is recorded on a minority of sets** (of 1,009 total, `deleted_at IS NULL`):
-
-  | field | sets | share |
-  |---|---|---|
-  | `planned_pct` | 280 | 28% |
-  | `planned_rest_sec` | 296 | 29% |
-  | **`planned_reps`** | **176** | **17%** |
-
-  `repCompletionRate` is null in the remaining ~83%, and additionally requires
-  `lastSessionRanPrescription && sessionsInPhase > 0 && prescription && last5.length > 0`.
-- **What `autoregulation.ts` does with null is asymmetric:**
-  ```ts
-  // back-off (cut load)
-  const missedReps = sig.repCompletionRate != null && sig.repCompletionRate < COMPLETION_CEIL
-  if (sig.rpeDelta >= RPE_DEAD_BAND && (sig.rm1Trend === 'down' || missedReps)) { … }
-
-  // push (add reps)
-  const metReps = (sig.repCompletionRate ?? 1) >= 1
-  if (sig.rpeDelta <= -RPE_DEAD_BAND && sig.rm1Trend !== 'down' && metReps) { … }
-  ```
-  **Null makes `missedReps` false and `metReps` true.** Missing data *removes* a condition from the
-  increase path and *adds* one to the decrease path: back-off then needs the 1RM to be actively
-  falling, while push needs only the RPE delta plus a 1RM that is not falling.
-- **It compounds Q-289.** That measured a systematic **−2.19** RPE delta at expected-10, past the
-  `<= -2` threshold that adds **two** target reps — and on 83% of sets the only remaining guard is
-  auto-satisfied.
-- **Fix direction — decide the intent, then encode it symmetrically.** `?? 1` reads as "assume the
-  reps were met", which is the optimistic reading of missing data on the path that adds load. Either:
-  - treat null as **unknown and blocking on both paths** (safest: no autoregulation without
-    prescription data), or
-  - treat null as neutral on both paths.
-
-  What it must not stay is optimistic on one side and pessimistic on the other.
-- **Also worth fixing the input:** 83% of sets carrying no `planned_reps` is the root cause. Find out
-  why — whether it is sets logged outside a prescribed session, or a write path that drops the
-  planned fields.
 
 ### [workouts] Q-300 — 37% of sets are taken with materially less rest than prescribed, and the RPE model has no rest term
 
@@ -4193,28 +3801,27 @@ ehr     0     0     0     0   648   208   128   556     0
   check whether the rushed sets cluster in time-budget-constrained sessions before treating this as
   a user-behaviour finding.
 
-### [cardio] Q-301 — the running baseline is written at plan creation, has zero rows, and nothing reads it
+### [cardio] Q-301b — drop the `running_baselines` table itself (code already removed)
 
-- **Branch:** `fix/running-baseline-wiring`
-- **Plan:** none yet
-- **Added:** 2026-08-15 · from the pillar-soundness review §2
-- **`running_baselines` holds exactly what a run prescription should rest on:** `vo2max`, `max_hr`,
-  `resting_hr`, `threshold_hr`, `weekly_base_minutes`, `easy_pace_sec_per_km`.
-- **Three verified facts:**
-  1. Production holds **0 rows**, against 1 `running_plans` row and **12 `prescribed_runs`**.
-  2. `saveRunningBaseline` **is** wired — `app/api/running-plan/route.ts:144` calls it at plan creation.
-  3. **`getRunningBaseline` has zero callers outside the repository layer** (`adapter.ts:2425`,
-     `repository.ts:543`). Nothing in `app/`, `components/` or the rest of `lib/` reads it.
-- **The dead reader is the finding, not the empty table.** Even fully populated, no prescription
-  would consult it — so all 12 prescribed runs were generated without reference to the athlete's
-  VO2max, threshold HR or easy pace. Whatever they *are* based on is the thing to establish first.
-- **Investigate in this order:**
-  1. **What do the 12 `prescribed_runs` actually derive from?** Read the generator. If it uses
-     sensible inputs by another route, this is dead code to delete, not a broken feature to wire.
-  2. **Why is the table empty** when the writer is on the plan-creation path? Either the one plan
-     predates the writer, or the write fails silently. Check the plan's `created_at` against the
-     commit that added `saveRunningBaseline`.
-  3. Only then decide: wire the reader, or delete the table and its repository methods.
+- **Gate:** owner
+- **Added:** 2026-08-24 · Q-301's code half shipped
+- **Investigation completed, in the entry's own order:**
+  1. **What the 12 `prescribed_runs` actually derive from:** `resolveSnapshot()`
+     (`packages/shared/src/running/assemble-plan-context.ts`), called **fresh on every request** from
+     `fitness_tests` and `body_metrics` — live data, not the stale plan-creation-time snapshot
+     `running_baselines` would have held. Sensible inputs by another (better) route — dead code to
+     delete, not a broken feature to wire, per the entry's own decision tree.
+  2. **Why the table was empty:** the one `running_plans` row was created 2026-07-21; the writer
+     (migration 146) landed after that plan already existed. No plan has been created since — not a
+     silent write failure.
+  3. **Decision: delete.** `saveRunningBaseline`/`getRunningBaseline`, the `RunningBaseline` interface,
+     the dead write call in `app/api/running-plan/route.ts`, and the `runningBaselines` Drizzle table
+     definition are all removed. `tsc --noEmit` clean, `pnpm check:rules` 55 of 55, full suite green.
+- **What's left, gated on the owner:** the physical `running_baselines` Postgres table itself.
+  Dropping it is a schema-changing migration and CLAUDE.md's data-dropping rule applies regardless of
+  the table currently holding zero rows — the code no longer references it (Drizzle's schema.ts entry
+  is gone, so no query can reach it), so the physical table is a harmless, disconnected leftover until
+  a small follow-up migration drops it.
 - **Third instance of a recurring class** — Q-270 (`training_load_ots`: live producer, zero rows)
   and Q-231 (the "Exercise detected" card losing its only writer). Worth proposing a CI check that
   flags a repository read method with no callers outside the data layer.
@@ -4250,27 +3857,6 @@ ehr     0     0     0     0   648   208   128   556     0
   something, in which case this is a copy change rather than a new state.
 - **Ties to Q-278** (a score that could not be computed rendered identically to a real one) — same
   class, different pillar. Consider one shared "this needs more data, here is how much" treatment.
-
-### [nutrition][platform] Q-303 — the AI gives macro coaching on days with almost no logging coverage
-
-- **Branch:** `fix/ai-qualify-sparse-nutrition`
-- **Plan:** none needed
-- **Added:** 2026-08-15 · from the pillar-soundness review §3.3
-- **Observed**, 2026-08-15 daily digest: *"While your activity was great with 8266 steps, let's focus
-  on bumping that protein closer to your 150g goal tomorrow to better support those big strength
-  gains."*
-- **The 14-day window containing that day has 4 logged days.** The protein advice rests on almost
-  nothing, and it is delivered in the same sentence, with the same confidence, as the workout
-  numbers beside it — which are complete and correct.
-- **Distinct from Q-292**, which is about a *false* number ("perfect activity score" when it was 80).
-  Nothing here is false; it is **unqualified**. The fix is different: the model needs to know the
-  coverage behind each figure it is given, and to say so or stay quiet.
-- **Fix direction:** pass a coverage/confidence value alongside each domain's numbers in the digest
-  prompt, and instruct the model not to issue a corrective recommendation for a domain below a
-  coverage floor. The data is already computed for Q-302's gate — reuse it rather than deriving it
-  twice.
-- **Sibling sweep:** every AI surface taking nutrition data has this exposure, not just the daily
-  digest — check `weekly-digest`, `health-insight` and the Coach's nutrition tools.
 
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
@@ -6869,8 +6455,8 @@ ehr     0     0     0     0   648   208   128   556     0
 
 - **Branch:** `feat/staging-environment`
 - **Added:** 2026-08-14 · same owner ask
-- **✅ Shape (a) is now planned and split out as [Q-530](#platform-q-530--an-admin-snapshot-endpoint-so-a-migrations-first-real-run-is-not-production)**
-  (2026-08-17), which sits higher in the queue. It came out smaller than shape (a) describes below:
+- **✅ Shape (a) shipped as Q-530** (planned 2026-08-17, implemented 2026-08-24) — an admin snapshot
+  endpoint, `GET /api/admin/db-snapshot` + `pnpm db:snapshot`. It came out smaller than shape (a) describes below:
   `pg_dump` is the wrong transport, because the consumer is the agent sandbox and Railway's Postgres
   port is blocked there — only 80/443 are open. So it is an HTTPS endpoint reading the `claude_ro`
   views, which already carry the one-user scoping, the default-deny and the column withholding.

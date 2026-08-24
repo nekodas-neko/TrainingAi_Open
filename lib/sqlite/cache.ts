@@ -138,7 +138,15 @@ const inFlightRequests = new Map<string, Promise<void>>();
 // Callers that called cachedFetch while a request for the same key was already
 // in flight — without this they'd return with only the (possibly null) cached
 // value and never learn the fresh result the in-flight request eventually got.
-const pendingWaiters = new Map<string, Array<(data: unknown) => void>>();
+// `onError`/`hadCached` mirror the owning call's failure rule (surface an error
+// only when this particular caller had nothing cached to show instead) — a
+// joiner's own cached state can differ from the owner's, however slightly.
+interface PendingWaiter {
+  onData: (data: unknown) => void;
+  onError?: (info: CacheFetchErrorInfo) => void;
+  hadCached: boolean;
+}
+const pendingWaiters = new Map<string, PendingWaiter[]>();
 
 export async function getCached<T>(key: string): Promise<T | null> {
   if (isSQLiteAvailable()) {
@@ -293,11 +301,16 @@ async function cachedFetchCore<T>(
   }
 
   // If a request is already in-flight for this key, join its waiter list instead
-  // of firing a second fetch — every joiner still gets the fresh result once the
-  // in-flight request resolves (previously only the original caller's onData fired).
+  // of firing a second fetch — every joiner still gets the fresh result, or the
+  // failure, once the in-flight request resolves (previously only the original
+  // caller's onData/onError fired, so a joiner with no cached data to fall back
+  // on could see a 429/500 and never learn about it — the same silent-vanish
+  // class Q-499 fixed at the component level, reachable here too whenever two
+  // callers race for the same key, which React StrictMode's double effect-invoke
+  // does on every render in dev).
   if (inFlightRequests.has(key)) {
     const waiters = pendingWaiters.get(key) ?? [];
-    waiters.push(onData as (data: unknown) => void);
+    waiters.push({ onData: onData as (data: unknown) => void, onError, hadCached: cached !== null });
     pendingWaiters.set(key, waiters);
     try {
       await inFlightRequests.get(key);
@@ -327,8 +340,18 @@ async function cachedFetchCore<T>(
       if (!res.ok) {
         // Got a response the server rejected (500/429/401/…) — the device is
         // online, so this is a real error. Only surface it when nothing was
-        // painted from cache (stale data beats an error state).
-        if (cached === null) { try { onError?.({ status: res.status }); } catch { /* caller's onError threw */ } }
+        // painted from cache (stale data beats an error state) — per caller,
+        // since a joined waiter's own cached state can differ from the owner's.
+        const info: CacheFetchErrorInfo = { status: res.status };
+        if (cached === null) { try { onError?.(info); } catch { /* caller's onError threw */ } }
+        const waiters = pendingWaiters.get(key);
+        if (waiters) {
+          pendingWaiters.delete(key);
+          for (const waiter of waiters) {
+            if (waiter.hadCached) continue;
+            try { waiter.onError?.(info); } catch { /* a joined caller's onError threw */ }
+          }
+        }
         return;
       }
       const data = await res.json() as T;
@@ -337,15 +360,24 @@ async function cachedFetchCore<T>(
       if (waiters) {
         pendingWaiters.delete(key);
         for (const waiter of waiters) {
-          try { waiter(data); } catch { /* ignore — a joined caller's onData threw */ }
+          try { waiter.onData(data); } catch { /* ignore — a joined caller's onData threw */ }
         }
       }
       await setCached(key, toStored(data), ttlSeconds);
     } catch {
       // Network-level throw. Offline is not an error (queue + show saved data);
       // only report a genuine failure while online with nothing cached to show.
-      if (cached === null && typeof navigator !== 'undefined' && navigator.onLine) {
-        try { onError?.({ status: null }); } catch { /* caller's onError threw */ }
+      const online = cached === null && typeof navigator !== 'undefined' && navigator.onLine;
+      if (online) { try { onError?.({ status: null }); } catch { /* caller's onError threw */ } }
+      const waiters = pendingWaiters.get(key);
+      if (waiters) {
+        pendingWaiters.delete(key);
+        if (typeof navigator !== 'undefined' && navigator.onLine) {
+          for (const waiter of waiters) {
+            if (waiter.hadCached) continue;
+            try { waiter.onError?.({ status: null }); } catch { /* a joined caller's onError threw */ }
+          }
+        }
       }
     } finally {
       pendingWaiters.delete(key);

@@ -19,7 +19,7 @@ const GoalsSchema = z.object({
   waterGoalType:   z.enum(['daily', 'weekly']).optional().nullable(),
   targetWeightKg:  z.number().min(20).max(500).optional().nullable(),
   targetBfPct:     z.number().min(0).max(70).optional().nullable(),
-})
+}).strict()
 
 export async function GET() {
   const session = await auth()

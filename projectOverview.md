@@ -25,20 +25,49 @@
 ## 🔖 Current Status
 
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
-**Last updated:** 2026-08-23.
+**Last updated:** 2026-08-24.
 
-**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** The
-2026-08-18 hand-run is verifiably clean in production — **764 blobs hold 941,233 frames in 13 MB**,
-contiguous with the hot tier — but a button does not hold a growth curve: `oura_raw_samples` was
-pruned back to 2026-08-10 by that run and had regrown to **318,183 rows / 92 MB** five days later,
-~6.5 MB/day against the ~0.4 MB/day the database is meant to grow at. It now fires from the ingest
-path, throttled **per user** (one shared timestamp lets a busy user starve another's table), and
-`OURA_AUTOPACK=off` stops it without a deploy. Automating it is also what made the delete's race
-reachable, so phase 3 deletes **by row id** rather than by the bucket's ds range — a frame arriving
-between the select and the delete was previously removed having never been packed, i.e. in neither
-tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)). ⚠️ **Not yet observed in
-production**, and the 92 MB high-water mark does not come back without a `VACUUM FULL` (Q-315,
-`Gate: owner`).
+**The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
+
+**Training Calendar's today marker uses the user's timezone now (Q-477 slice 1)**, not device-local. Ratchet 78/38 → 76/37 files.
+
+**"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
+retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/
+`added-weight-toggle.tsx` were real, now fixed. A ratchet heuristic matched 34 files, mostly noise.
+
+**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** The owner can't judge a
+whole session as one number (25.6% fill rate agreed); `sessionEffort()` already derives it from set
+RPEs at read time (Lane A, no schema change) — the done screen's own kcal estimate needed no change.
+
+**Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
+`hr-recovery-profile-card.tsx`/`strength-progress-card.tsx` now show "Couldn't load… — pull to
+refresh" on a 429/500. Wiring `onError` alone didn't work: under StrictMode's dev double-invoke, a
+joined caller's failure was never relayed by `cachedFetchCore`'s dedup — only the torn-down owner's
+was, fixed in `lib/sqlite/cache.ts` — a race reachable in production too, not just under StrictMode.
+
+**The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
+`oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now
+observed in production — four runs, **318,883 → 205,278 rows**, 0 faults. Left: **Q-315,
+`VACUUM FULL error_events`, ~49 MB**, and there is **no button for it** — the admin control covers
+`oura_raw_samples` only, so it needs `POST /api/admin/vacuum {"table":"error_events"}` with an admin
+session cookie. `Gate: owner`.
+
+**Four engine fixes, each of whose entry described something other than the defect.** A deload's
+stored `0` was being served as the previous 1RM (**Q-298** — `listPrevious1rm` gated on `IS NOT NULL`
+while its two siblings already filtered `> 0`); **11 of 81 production sessions (13.6%) ran 534–845
+min** and are real workouts left running, so **LA-21** culls the *duration* and keeps the session,
+with `isPlausibleSessionDuration()` consolidated from three copies onto both the MET and HR branches;
+the fixture MET constants sat below `estWorkoutKcal`'s 1.5 floor, so **every** MET strength estimate
+was **0** in CI and those tests passed vacuously (**Q-312**); and `sessionEffort()` now returns
+`{ rpe, source: 'self' | 'derived' }` so a mean of set RPEs is never read as a self-report
+(**Q-420**). ⚠️ **None device-verified.** Detail, and the four wrong turns that produced them, in
+[the Lane A handoff](docs/handoff-2026-08-24-platform-implementation-lane-a-engine-run.md).
+
+**The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button
+does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18
+hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch.
+Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range
+([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the
@@ -69,6 +98,21 @@ report; the SpO₂ A/B is two nights of wear, not code.
 `day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise for its history and an activity for
 its detail were dead a fortnight, unreported. Both are on `/health/day` (the NAME is the target, not
 a third icon); `health-content.tsx` lost 167 lines; the HR chart was dropped, `done-screen` has it.
+
+**Deleting an activity works offline now (Q-328, v1.350.0).** It was the one activity-log write with
+no outbox domain — created through the queue, deleted by a bare `fetch` that simply failed with no
+connection. `softDeleteActivityLogPending`, not `deleteActivityLog`: a queued delete must stay
+`pending` or a pull clobbers it, while `'synced'` is what later lets `applyDelta` reap the tombstone.
+
+**The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
+new one is a regression rather than a debt row. The expensive one was inside `visibleMeals.map(...)`,
+where a hook is not allowed — its callbacks take the meal and hand it back, letting the parent share
+one `useCallback` per action across every card.
+
+**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` had
+held every threshold for months and nothing under `components/`/`app/` imported it, so a 5,000 kg
+weight was queued and dropped server-side. **Three** sheets, not the one the entry named:
+`log-value-sheet.tsx` had no check at all across seven fields.
 
 **Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed
 six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it (55 steps).
@@ -106,19 +150,25 @@ lands mid-merge. Proven with two signed-in sessions against the local DB. **Noth
 see changed:** the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
 
 **The UTC-offset fixture sweep came back clean, and found something else (Q-394, LA-19 — both
-closed).** No third test carries the hazard that took out two PRs. But one *correctly written* test
-failed the sweep because the code under it re-derived midnight in Brisbane: `aestMidnight` takes a
-timezone and only **9 of 22** call sites passed one. All 22 do now, nine callers thread
-`session.user?.timezone`, and `scripts/check-aest-midnight-timezone.js` holds it at zero with an
-**empty** baseline (Custom Rules is now 52 steps). Proven by the experiment that found it — the
-failing case passes 18/18 under a shifted timezone.
+closed).** No third test carries the hazard that took out two PRs, but one *correctly written* test
+failed because the code under it re-derived midnight in Brisbane: `aestMidnight` takes a timezone
+and only **9 of 22** call sites passed one. All 22 do now, `check-aest-midnight-timezone.js` holds
+it at zero (empty baseline). Proven by the experiment that found it — 18/18 under a shifted tz.
 
-**Coach undo wrote over whatever was there (Q-468).** Apply refuses a moved target; undo read its
-captured `beforeState` and wrote it back. Two stacked changes on one exercise: undoing the *first*
-returned the row to its original value while the history still showed the second in effect, and
-undoing both left a value the user never chose. `driftAgainst` now takes a side — `from` for apply,
-`to` for undo — and the check runs once centrally rather than five times. Latent: nothing calls the
-undo route yet (Q-467), and production's `coach_changes` is empty.
+**`DELETE /api/activity-logs` stopped reporting success for a delete that deleted nothing (Q-556).**
+Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or
+not-yours id, matching every sibling delete, while a double-tap or an already-gone row still matches
+and reports success. The web fallback treats a 404 the same as success rather than throwing.
+
+**Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
+`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day rather than
+by sample index, so a night-only SpO₂/HRV signal renders with dead space either side, not apparent
+24-hour coverage. Native-gated — verified by mounting the component off the gated page. `Gate: device`.
+
+**Coach undo wrote over whatever was there (Q-468).** Two stacked changes on one exercise: undoing
+the *first* returned the row to its original value while the history still showed the second in
+effect. `driftAgainst` now takes a side — `from` for apply, `to` for undo — checked once centrally.
+Latent: nothing calls the undo route yet (Q-467), production's `coach_changes` is empty.
 
 **The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
 schema was deleted forever — no badge, no toast, no retry — while one that failed a layer later got
@@ -149,16 +199,11 @@ double trip. They now carry what distinguishes a request, keyed through a new `c
 [journal](docs/overview/entries/2026-08-23-ai-fingerprint-granularity.md).
 
 **The Oura rollup now takes an I/O port (Q-545, D2 Task 2).** `aggregateOuraRawSamples` is now
-`runOuraRollup(io, timezone, opts)` (`lib/oura-ble/rollup/run.ts`) behind a 22-method `RollupIO`;
-`adapter.ts` drops 6,906 → 5,818 lines. No behaviour change — the 20 test files that drive the
-rollup end-to-end pass unchanged. It does **not** move the bill (the rollup still runs on the
-server); it removes the reason a device rollup would be written twice. **The models followed the
-same day** — `sleepnet`, `step-counter` and `dhrv` take a `ModelRuntime` rather than importing
-`onnxruntime-node`, taking `run.ts`'s server-only edges from **5 to 1** (measured: 46 modules). The
-the constants followed — the four ports that read them now take them by **injection**
-(Q-221's mechanism), so **`run.ts` reaches zero server-only modules**: 45, no `node:` builtin, no
-`onnxruntime-node`, no driver. What is left of Task 3 is the device half, and nothing in the engine
-blocks it ([journal](docs/overview/entries/2026-08-23-constants-injection.md)).
+`runOuraRollup(io, timezone, opts)` behind a 22-method `RollupIO`; `adapter.ts` drops 6,906 → 5,818
+lines, no behaviour change. Models followed — `sleepnet`/`step-counter`/`dhrv` take a `ModelRuntime`
+instead of importing `onnxruntime-node` — and constants followed by injection, so `run.ts` reaches
+**zero** server-only modules. Device half is Task 3, unblocked
+([journal](docs/overview/entries/2026-08-23-constants-injection.md)).
 
 **The public repository is now the working repo.** `nekodas-neko/TrainingAi_Open` carries the
 history that was ported out of the archived private repo (PRs #1, #3, #7). The archived repo is
@@ -187,13 +232,10 @@ With Q-525 un-suspended, both of chronic stress's countable gates were measured 
 its refusal is inside the granular layer, which records no reason for a null (**TN-1**).
 
 **Session handoff:** [`docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md`](docs/handoff-2026-08-20-platform-migration-gate-and-energy-weight.md)
-— the CI job named **Migration Check** could not fail on a broken migration, and fixing that
-immediately caught one: `142_claude_ro_views.sql` creates a view over a table `143` creates, so on
-every fresh CI database 142 aborted and every view below it rolled back, in three green jobs. Also
-the CSP's missing `'wasm-unsafe-eval'`, and the done screen estimating calories from the first
-weight ever logged. **PS-3 closed on top of it (2026-08-20):** the four migrations that failed on a
-database already holding their objects — and so were retried on every cold start — are idempotent,
-and the dev database now records 206 of 206
+— CI's **Migration Check** couldn't fail on a broken migration; fixing that caught `142_claude_ro_views.sql`
+creating a view over a table `143` creates, aborting on every fresh CI database. Also the CSP's
+missing `'wasm-unsafe-eval'` and the done screen's first-ever-weight calorie estimate. **PS-3 closed
+on top:** the four migrations retried on every cold start are idempotent now, 206 of 206
 ([journal](docs/overview/entries/2026-08-20-non-idempotent-migrations.md)).
 
 **Q-331 closed on top of that (2026-08-20, v1.333.1):** the done screen and the day screen were
@@ -244,16 +286,9 @@ The first version was green with a migration deliberately broken, because the "a
 SQLSTATEs that are benign on an ordinary run are precisely the failure signal under replay
 ([journal](docs/overview/entries/2026-08-20-migration-replay-check.md)).
 
-**Session handoff:** [`docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md`](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
-— the intake pass behind that energy work, from the owner's *"how can we make energy usage/burned
-from excercuse more accurate"*. Read it as reasoning rather than status: three of its six entries
-were built by Lane A within hours of being filed.
-
-**Session handoff:** [`docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md`](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
-— the agent model itself, plus six findings from a live APK reinstall and Oura re-sync. **Q-536 is
-CLOSED (2026-08-17, confirmed on device)**: the 43 wrong sleep windows came from a re-drain misread
-as a clock reset, and migrations 189 + 190 plus a redecode took the midday cluster to 4 short
-daytime fragments. Its *cause* — **Q-314** — is still live, so every re-pair reopens it.
+**Older session handoffs:** [2026-08-20 workouts energy/RPE intake](docs/handoff-2026-08-20-workouts-energy-accuracy-and-rpe-intake.md)
+(reasoning, not status) and [2026-08-17 agent model/device findings](docs/handoff-2026-08-17-platform-agent-model-and-device-session-findings.md)
+(**Q-536 CLOSED, confirmed on device**; its cause **Q-314** is still live and reopens on every re-pair).
 
 **Open at the time of writing:** PR #6 (session notes the public cut did not carry), PR #10 (the
 public-repo migration handoff). Check `list_pull_requests` rather than trusting this line — it is a
@@ -673,10 +708,17 @@ order.
 
 ### [activity][app-shell] 🟠 Deleting an activity leaves it in the local store, so three other screens keep showing it (Q-488, 2026-08-18)
 
-> **⚠ Stale as written (noticed 2026-08-23 during LB-1, not investigated further).**
-> `deleteActivityLog` exists and the delete path calls it; Q-328 then gave the domain a real outbox
-> delete ([`journal`](docs/overview/entries/2026-08-19-activity-log-delete-outbox.md)). Not struck —
-> that needs someone to confirm nothing else this row lists is still owed.
+> **⚠️ THE SUBSTANCE IS FIXED — only the device check keeps this row here (2026-08-24).** What this
+> row describes, a delete that updates the server and never touches the local store, is no longer
+> what the code does: Q-328 routed it through the outbox, so the client writes a local tombstone
+> **first** and queues the mutation
+> ([`journal`](docs/overview/entries/2026-08-24-activity-log-delete-outbox.md)). The call site also
+> moved twice — it is `handleDeleteActivity` in `lib/hooks/use-day-entry-mutations.ts` now, not
+> `health-content.tsx`, so the line numbers below are dead.
+>
+> **Kept, not archived, per the archive rule:** `getLocalStore` returns null in the sandbox, so every
+> test of that path took the web fallback. The local write is verified by reading and unit test, never
+> on the S25. **Strike this row once it is exercised on device with the network off.**
 
 - **The successor sweep 22 named for itself:** a stale value arising *outside* Q-262's test — a write
   that updates the server without touching the local store.
@@ -1407,14 +1449,15 @@ order.
   degrades to correct rather than to a frozen release failing as "Could not fetch release info".
   **Guarded** by a test on the URL actually requested, which fails when the default is flipped back —
   the fixtures the entry flagged proved nothing about which repo is *asked*. Never a live outage.
-- **🟡 Q-458 — `.env.example` is wrong in both directions.** Eight declared keys are read by no code,
-  including **`TOKEN_ENC_KEY`, which names a security property the app does not have** (an operator
-  will set it and conclude tokens are encrypted at rest; nothing reads it), and five Oura **Cloud**
-  keys inviting a contributor to configure the one integration `CLAUDE.md` forbids re-adding. Four
-  real config vars are undeclared.
-- **🟡 Q-459 — the rolling APK release is delete-then-recreate,** so the advertised public download
-  URL 404s during every native merge. Known trade-off in the workflow's own comment; the migration is
-  what made it matter, since that URL is now the documented distribution path.
+- **🟠 Q-459 — the rolling APK release used to delete-then-recreate; fixed 2026-08-24, not yet
+  observed running.** `.github/workflows/android.yml`'s publish step now swaps only the release
+  **asset** (`gh release delete-asset` + `upload` + `edit`) when the release already exists, falling
+  back to `gh release create` only on the first-ever publish — the release id and tag survive a swap,
+  so `/releases/tags/apk-latest` (what `/api/download-apk` resolves against) no longer 404s during the
+  window. **Keep: unverified against a live `gh` run** — the `if: github.event_name == 'push'` publish
+  step only executes on a merge to `main` that touches a native path, which this session could not
+  trigger from a PR; confirm on the next such merge that the swap actually completes (`gh release
+  view apk-latest` before/after, or watch the workflow log).
 - **Also came back clean:** a fresh clone's test suite genuinely works (synthetic constants are
   committed and `vitest.config.ts` falls back to them when the real `MANIFEST.json` is absent — the
   path CI takes every run, so `NOTICE`'s claim holds); the `AWS_*`/`STORAGE_*` split is a deliberate
@@ -1846,11 +1889,6 @@ the threshold must be re-derived after that calibration, not tuned now. Separate
 three behaviours at three thresholds** (1.5 here, 1.2 early-deload, 1.5 activity taper) on a metric
 Q-279 already questions. Deload has fired **once in 3.5 months**, so this is not over-firing today.
 
-**🟠 Pace is null on 32 of the 39 activity logs that could compute it (Q-307).** `avg_pace_sec_per_km`
-is populated on **7 of 46** while 39 carry both duration and distance. Read from the column, never
-derived at render, and written as an explicit `null` at save — the same shape as **Q-230**, and very
-likely one fix for pace, steps and calories together.
-
 **Clean results, recorded so they are not re-swept.** **The phase engine is working** — the active
 program progresses coherently; five rows that looked like stuck `sessions_in_phase` counters belong
 to an **inactive** program (`AI-Phase1`), which is correct dormant state. **Fifth finding to die on
@@ -1930,21 +1968,18 @@ flows into trends, PR detection and the next prescription, and reads as −100% 
 **2026-08-09 also logged 1,000 `error_events`** and carries the 0.00 h sleep row from Q-274 — three
 domains, one heavy-fault day, pointing at the connection-starvation class (Q-213/Q-107).
 
-**🟠 Autoregulation's missing-data defaults favour adding load (Q-299).** `planned_reps` is recorded
-on **176 of 1,009 sets (17%)**, so `repCompletionRate` is usually null — and
-`autoregulation.ts` reads null as `missedReps = false` but `metReps = (x ?? 1) >= 1` → **true**.
-Missing data *removes* a condition from the increase path and *adds* one to the decrease path. It
-compounds **Q-289**, whose measured −2.19 delta at expected-10 already clears the `<= -2` two-rep bump.
-
 **🟠 37% of sets are rushed, and `expectedRpe` has no rest term (Q-300).** Where both are recorded
 (n = 276): mean 99 s taken vs 111 s planned; **103 rushed (< 75%)**, 44 overlong. A set at 80% with
 60 s rest is not the stimulus the model assumes. **Re-run Q-289's bucket table split by rest
 adherence before recalibrating anything** — the confound may be most of the finding.
 
-**🟠 The running baseline is written, empty, and read by nothing (Q-301).** `running_baselines` holds
-vo2max / max_hr / threshold_hr / easy_pace. Production: **0 rows**, against 12 `prescribed_runs`.
-`saveRunningBaseline` **is** wired at plan creation — but **`getRunningBaseline` has zero callers
-outside the repository layer**, so even a full table would change nothing. Third instance of this
+**🟡 The dead `running_baselines` write/read code was removed 2026-08-24 — the physical table is
+the one thing left (Q-301b, `Gate: owner`).** Investigation confirmed the 12 real `prescribed_runs`
+already derive from a better, live source (`resolveSnapshot()` reads `fitness_tests`/`body_metrics`
+fresh on every request); the table's write and its never-called reader were pure dead weight.
+`saveRunningBaseline`/`getRunningBaseline`, the `RunningBaseline` interface, and the Drizzle table
+definition are gone — nothing in the app can reach the table any more. What's owed is the actual
+`DROP TABLE`, deferred as a data-dropping migration needing the owner's yes. Third instance of this
 class after Q-270 and Q-231.
 
 **🟠 Adaptive TDEE has not fired once in 30 days (Q-302).** Its gate needs 10 logged days per

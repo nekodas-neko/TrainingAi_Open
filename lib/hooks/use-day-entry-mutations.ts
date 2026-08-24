@@ -3,7 +3,10 @@
 import { useCallback, useState } from "react";
 import { toast } from "sonner";
 import { getLocalStore } from "@/lib/local-store";
+import { pushThenRevalidate } from "@/lib/local-store/push-then-revalidate";
 import { invalidateWorkoutSummaries, invalidateActivityWrites } from "@/lib/cache-groups";
+import { todayInTz } from "@trainingai/shared/date-utils";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import type { DayExercise } from "@/app/api/day-log/route";
 import type { ActivityLog } from "@trainingai/shared/types";
 
@@ -30,6 +33,9 @@ export function useDayEntryMutations(
   const [deleteSession, setDeleteSession] = useState<{ id: string; name: string } | null>(null);
   const [deleteActivity, setDeleteActivity] = useState<ActivityLog | null>(null);
   const [mutating, setMutating] = useState(false);
+  // The user's setting, not the device's and not the Brisbane default — a bare `todayInTz()` keys
+  // the outbox row to the wrong day for anyone outside AEST (Q-477).
+  const tz = useUserTimezone();
 
   const handleEditSave = useCallback(async () => {
     if (!editEx) return;
@@ -153,23 +159,51 @@ export function useDayEntryMutations(
     const log = deleteActivity;
     const date = currentDate();
     setMutating(true);
+    const store = userId ? getLocalStore(userId) : null;
     try {
+      if (store) {
+        // Q-328: local tombstone + outbox, so this works offline. It was the one activity-log
+        // write with no outbox domain — created through the queue, deleted by a bare `fetch` that
+        // simply failed with no connection.
+        //
+        // `softDeleteActivityLogPending`, NOT `deleteActivityLog`. The latter leaves the row
+        // `synced`, which is right for a delete that already reached the server and wrong for one
+        // that has not: a pull would clobber it. The row moves to `synced` on push confirmation,
+        // which is what lets `applyDelta` reap its tombstone later.
+        await store.softDeleteActivityLogPending(log.id);
+        await store.queueMutation({
+          userId: userId!, domain: 'activity_logs', date: todayInTz(tz),
+          payload: { id: log.id, deleted: true },
+        });
+        // Feedback fires after the LOCAL write, never after the network — the saves-feel-instant
+        // rule, and offline there is no network to wait for.
+        toast.success("Deleted");
+        setDeleteActivity(null);
+        await invalidateActivityWrites();
+        onChanged(date);
+        pushThenRevalidate(userId!, async () => {
+          await invalidateActivityWrites();
+          onChanged(currentDate());
+        });
+        return;
+      }
+      // Web fallback, logic-free by policy: the sandbox has no local store, so `pnpm dev` still
+      // renders. It carries no defaults or semantics the device path lacks.
       const res = await fetch("/api/activity-logs", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id: log.id }),
       });
-      if (!res.ok) throw new Error();
-      // Q-488: three other screens read activity_logs local-first, so a server-only delete left it
-      // visible there until the next sync. See deleteActivityLog in sqlite-backend for the why.
-      if (userId) await getLocalStore(userId)?.deleteActivityLog(log.id).catch(() => {});
+      // A 404 means the row is already gone (Q-556) — same outcome the user asked for, not a
+      // failure to report.
+      if (!res.ok && res.status !== 404) throw new Error();
       toast.success("Deleted");
       setDeleteActivity(null);
       await invalidateActivityWrites();
       onChanged(date);
     } catch { toast.error("Failed to delete"); }
     finally { setMutating(false); }
-  }, [deleteActivity, currentDate, onChanged, userId]);
+  }, [deleteActivity, currentDate, onChanged, userId, tz]);
 
   return {
     editEx, setEditEx,

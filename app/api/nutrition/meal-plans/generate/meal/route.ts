@@ -35,7 +35,7 @@ const IngredientInputSchema = z.object({
   proteinPer100g: z.number().min(0).max(100),
   carbsPer100g: z.number().min(0).max(100),
   fatPer100g: z.number().min(0).max(100),
-})
+}).strict()
 
 const RequestSchema = z.object({
   targetCalories: z.number().min(0).max(10000),
@@ -57,8 +57,8 @@ const RequestSchema = z.object({
   currentMeal: z.object({
     name: z.string().max(200),
     ingredients: z.array(IngredientInputSchema).max(30),
-  }).optional(),
-})
+  }).strict().optional(),
+}).strict()
 
 const IngredientSchema = z.object({
   name: z.string().describe('Ingredient as you would find it in a supermarket'),

@@ -77,7 +77,12 @@ export function computeRpeAdjustment(sig: AutoregSignal, ctx: AutoregContext): A
   }
 
   // ⬆️ Push: RPE ran low AND the lift is holding/rising AND the reps were met.
-  const metReps = (sig.repCompletionRate ?? 1) >= 1
+  // Q-299: null must read the same way on both paths. `missedReps` above already treats "no
+  // completion data" as "not proven missed" (false) rather than blocking the back-off outright —
+  // so this must equally treat it as "not proven met" (false) rather than assuming success. The
+  // old `?? 1` read missing data as a completed set, which is optimistic on exactly the path that
+  // adds load and had no matching pessimism on the path that cuts it.
+  const metReps = sig.repCompletionRate != null && sig.repCompletionRate >= 1
   if (sig.rpeDelta <= -RPE_DEAD_BAND && sig.rm1Trend !== 'down' && metReps) {
     if (ctx.phase === 'realisation') return NONE // no rep pushes in a low-rep peak block
     const bump = sig.rpeDelta <= -2 ? 2 : 1

@@ -14,7 +14,7 @@ const TargetsSchema = z.object({
   carbsG:   z.number().min(0).max(2000).optional().nullable(),
   fatG:     z.number().min(0).max(2000).optional().nullable(),
   fiberG:   z.number().min(0).max(500).optional().nullable(),
-})
+}).strict()
 
 export async function GET() {
   const session = await auth()

@@ -568,7 +568,7 @@ The log-exercise path is the reference pattern (local write + outbox fallback, P
   (c) **client-supplied row ids in upserts must be ownership-verified even when the table has no `user_id` column** — pre-check via a join to the owning table (exercise/set logs → `workout_sessions`), exactly as `ensureWorkoutSession` does for session ids.
 - **Webhooks verify signatures before any DB lookup keyed on unverified payload fields.** The lookup itself (e.g. a per-user signing key) can't always be avoided, but the *response* must not diverge before verification completes — branching to a different status code for "user not found" vs "bad signature" is an enumeration oracle. Look the user up, but let verification (which already fails closed on an undefined key) produce the response.
 - **Ingest routes get a Zod schema at creation**, same as sibling routes — untyped numeric passthrough to the driver is not validation.
-- **Self-fetching cards need an explicit failure state** — `cachedFetch` swallows `!res.ok` including your own rate limit; a bare `return null` makes the card vanish silently instead of showing an error state.
+- **Self-fetching cards need an explicit failure state** — `cachedFetch`/`useCachedValue` swallow `!res.ok`, including your own rate limit, *unless the caller passes `onError`*; a bare `return null` with no `onError` makes the card vanish silently instead of showing an error state (Q-499).
 - **Cumulative per-day fields from an external API must treat "today" as a partial day** — don't assume a full 86,400s (the Oura `wornHours` mistake); a partial-day cumulative reads as an anomaly if compared against completed-day values.
 - Every new AI or expensive route gets the standard rate limit at creation — check its sibling routes and match them.
 - No silent fallbacks on failure paths: log and surface an error state; wrap AI/external calls in try-catch returning JSON errors. When adding a DB column, update **every** row→object mapper (`rowToX`, SELECT lists) — a missed field fails silently as "save doesn't persist" (sessions 29, 64).
@@ -1138,7 +1138,7 @@ Optional:
   resolved user must still be an admin, so the token widens *transport*, never authority. Anyone holding
   it can read that user's health history, so treat it as a credential: generate with
   `openssl rand -hex 32`, never commit it, rotate by changing the Railway var. Leave it unset and the
-  route is session-only.
+  route is session-only. `ADMIN_SNAPSHOT_SECRET` is the same idea for `GET /api/admin/db-snapshot` (Q-530) — a separate secret, since that route returns the whole database, not scores.
 - ~~`GITHUB_RELEASES_TOKEN`~~ — **no longer needed (Q-49, 2026-08-17).** It was required while the
   releases lived in a private repo, where an unauthenticated call could only 404. The repo is public,
   so `lib/github-release.ts` now sends the `Authorization` header only when a token happens to be

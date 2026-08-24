@@ -1,6 +1,7 @@
 'use client'
 
-import { HeartPulse, Info } from 'lucide-react'
+import { useState } from 'react'
+import { HeartPulse, Info, TriangleAlert } from 'lucide-react'
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { HR_RECOVERY_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
 import { formatHrChange } from '@trainingai/shared/health/hr-change-display'
@@ -35,10 +36,22 @@ function sourceMixLabel(bySource: Record<string, number | undefined>): string | 
 }
 
 export function HrRecoveryProfileCard() {
+  const [error, setError] = useState(false)
   const profile = useCachedValue<HrRecoveryProfileResponse>(
     'hr-recovery-profile', '/api/health/hr-recovery-profile', HR_RECOVERY_PROFILE_TTL,
+    { onError: () => setError(true) },
   )
 
+  if (error && !profile) {
+    return (
+      <div className="rounded-2xl bg-muted/30 border border-border/50 p-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <TriangleAlert className="h-3.5 w-3.5" aria-hidden />
+          Couldn&rsquo;t load your HR recovery profile — pull to refresh.
+        </div>
+      </div>
+    )
+  }
   if (!profile || profile.bands.length === 0) return null
 
   // Only bands with a real trajectory (≥2 months of data) are worth a sparkline.

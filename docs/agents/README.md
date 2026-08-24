@@ -540,8 +540,18 @@ conversation, and none need editing between generations.
 
 ### Which model, and at what effort
 
-Set both when the session is created; each prompt restates its own pair so a pasted prompt is
-self-contained.
+**Both are set when the session is CREATED, and nothing later can change them.** There is no tool
+that alters a running session's model — `create_session` takes one, and after that it is fixed. A
+line inside a prompt saying "run this on Sonnet 5" is therefore inert: the prompt is read by a
+session that is already running on whatever was picked. That mistake shipped on 2026-08-23 and every
+agent started from those prompts came up on the creation default.
+
+Each prompt now carries the pair **twice**, in two different voices. Above the paste line it is an
+instruction to the owner, before the session exists. Below it, the session's first action is to call
+`get_session` (with `session_id` omitted), compare `session_context.model` and
+`session_context.effort_level` against what its role wants, and say so in its first message if they
+differ. The self-check is the half that cannot be forgotten — it fires on every session, and a
+mismatch surfaces in the first thing the owner reads rather than never.
 
 | Agent | Model | Effort | Why this one |
 |---|---|---|---|

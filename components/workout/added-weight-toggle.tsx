@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useId, useState } from "react";
 import { ChevronDownIcon, ChevronUpIcon, PlusIcon } from "lucide-react";
 import { WeightDial } from "@/components/ui/weight-dial";
 
@@ -13,11 +13,14 @@ interface AddedWeightToggleProps {
 // pull-ups, assisted dips). Defaults open if a non-zero load is already set.
 export function AddedWeightToggle({ value, onChange }: AddedWeightToggleProps) {
   const [open, setOpen] = useState(value !== 0);
+  const contentId = useId();
 
   if (!open) {
     return (
       <button
         onClick={() => setOpen(true)}
+        aria-expanded={false}
+        aria-controls={contentId}
         className="w-full flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-semibold text-muted-foreground border border-dashed border-border"
       >
         {value === 0 ? (
@@ -30,10 +33,10 @@ export function AddedWeightToggle({ value, onChange }: AddedWeightToggleProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-muted/30 p-2">
+    <div id={contentId} className="rounded-xl border border-border bg-muted/30 p-2">
       <div className="flex items-center justify-between mb-1 px-1">
         <p className="text-[10px] font-bold uppercase tracking-wide text-muted-foreground">Added weight</p>
-        <button onClick={() => setOpen(false)} className="text-muted-foreground">
+        <button onClick={() => setOpen(false)} aria-expanded={true} aria-controls={contentId} className="text-muted-foreground">
           <ChevronUpIcon className="h-3.5 w-3.5" />
         </button>
       </div>

@@ -17,7 +17,7 @@ const PatchSchema = z.object({
   stores: z.array(z.string().max(60)).max(20).optional(),
   excludedFoods: z.array(z.string().max(80)).max(200).optional(),
   isActive: z.boolean().optional(),
-})
+}).strict()
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()

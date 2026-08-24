@@ -417,6 +417,18 @@ Live at the time of writing (2026-07-30):
 
 ## Handoffs
 
+- [`handoff-2026-08-24-platform-implementation-lane-a-engine-run.md`](../../handoff-2026-08-24-platform-implementation-lane-a-engine-run.md)
+  — **Implementation Lane A, 2026-08-24** (fifteen PRs): the raw-frame packer made automatic and its
+  phase-3 delete moved from the bucket's ds range to **row ids** (automating it is what made the race
+  reachable), `claude_ro` scoped on a boot-set setting rather than a baked user id, the fixture MET
+  floor that had been making **every** MET strength estimate `0` in CI, and LA-21's implausible
+  session durations culled after production measurement (**11 of 81, 13.6%, at 534–845 min**). Its
+  transferable half is four wrong turns: a diagnosis reached from a config file (LB-7 — the service
+  worker re-issues `/api/` requests, so `page.route` is bypassed), a severity claim taken from the
+  local seed, a cap sized by a comment rather than a measurement, and three journal-compaction traps
+  including **a concurrent PR linking an entry you already folded**. The database reclaim is now
+  three-quarters done — only `VACUUM FULL error_events` (Q-315, ~49 MB) is still owed.
+
 - [`handoff-2026-08-24-platform-orchestrator-first-run.md`](../../handoff-2026-08-24-platform-orchestrator-first-run.md)
   — the Orchestrator role's first session: cleared the 17-entry completed-work baseline (only 7 were
   actually finished), assigned the first real `Batch:`, split a 269-line nutrition rework into a
@@ -447,6 +459,7 @@ Live at the time of writing (2026-07-30):
   thresholds land at 900k/950k. Records that the transcript exposes no window size, so the hook
   cannot self-calibrate and this constant goes stale silently.
 - [`handoff-2026-08-16-platform-public-repo-cut-a4b.md`](../../handoff-2026-08-16-platform-public-repo-cut-a4b.md)
+- [`docs/handoff-2026-08-24-platform-lane-b-nine-prs.md`](../../handoff-2026-08-24-platform-lane-b-nine-prs.md) — **Lane B, nine PRs, 2026-08-24.** Q-486, Q-321, Q-357, Q-328, LB-3, LB-6, LB-7 and Q-359's demotion. Carries the two lessons that cost the most: read the CI *server* log before fixing a CI-only failure, and a spec stubbing an `/api/` route needs `serviceWorkers: 'block'`. **Q-555's fix is written, unmerged and unverified** on `fix/offline-tab-tap-native-fallback`.
   — Q-49 public-repo cut. **Updated at the Phase B boundary:** A4b has shipped, Oura's material is
   out of the tree, and the handoff now carries what A4b cost beyond the plan — the constants were
   still a build-time dependency and `publish-dry-run` has no build gate to see it (Q-313), the
@@ -455,4 +468,5 @@ Live at the time of writing (2026-07-30):
 - [`overview/entries/2026-08-16-public-repo-cut-a4b.md`](../../overview/history-2026-08-15.md)
 - [`docs/overview/entries/2026-08-24-recipe-spec-structural-attribution.md`](../../overview/entries/2026-08-24-recipe-spec-structural-attribution.md) — **LB-7, the recipe spec's attribution guard, 2026-08-24** (`getByText('example.com').last()` matched the row's NAME, which is the host while the scrape resolves — measured passing with the attribution deleted and the mock delayed 8 s. It asserts on a `data-testid` row now.)
 - [`docs/overview/entries/2026-08-24-metric-bounds-at-keyboard.md`](../../overview/entries/2026-08-24-metric-bounds-at-keyboard.md) — **Q-321, bounds asked at the keyboard, 2026-08-24** (`validation/body-metrics.ts` held every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued and dropped server-side. Three sheets now share `components/health/metric-bounds.ts`; `log-value-sheet.tsx` had no check at all across seven fields.) **Device path not exercised.**
+- [`docs/overview/entries/2026-08-24-activity-log-delete-outbox.md`](../../overview/entries/2026-08-24-activity-log-delete-outbox.md) — **Q-328, the activity delete goes through the outbox, 2026-08-24** (the one activity-log write with no outbox domain; `softDeleteActivityLogPending` not `deleteActivityLog`, because a queued delete must stay `pending` until its push is confirmed). **Offline path not exercised** — `Gate: device`.
   — the A4b journal entry.

@@ -18,12 +18,17 @@ const ApplySchema = z.object({
     reps: z.number().int().min(1).max(30),
     pct: z.number().min(30).max(100),
     restSec: z.number().int().min(30).max(600),
-  })).default([]),
+  }).strict()).default([]),
   dropThisCycle: z.array(z.string()).default([]),
   dropPermanent: z.array(z.string()).default([]),
   estimatedSessionDurationMin: z.number().int().min(0).max(600),
   reasoning: z.string().max(2000).default(''),
-})
+  // Sent by the client (workout-review-sheet.tsx) but never read below — the route computes its
+  // own deterministic confidence (1.0) rather than trusting the model's self-report, per CLAUDE.md's
+  // "no LLM self-reported number may gate an automatic action". Accepted so `.strict()` doesn't
+  // 400 every real apply call.
+  confidence: z.number().optional(),
+}).strict()
 
 const ROLE_FLOOR: Record<string, number> = { primary: 2, secondary: 2, accessory: 1 }
 

@@ -154,6 +154,14 @@ cause of one class was a posted step window coming from a *different stream* tha
 
 ## History
 
+- **[`docs/overview/entries/2026-08-24-activity-log-delete-outbox.md`](../../overview/entries/2026-08-24-activity-log-delete-outbox.md)**
+  — Q-328: deleting an activity was the one activity-log write with no outbox domain, so offline it
+  simply failed while creating one already queued. The client writes a local tombstone and queues
+  `{ deleted: true }` now. **`softDeleteActivityLogPending`, not `deleteActivityLog`** — a queued
+  delete must stay `pending` until its push is confirmed, or a pull clobbers it; `'synced'` is what
+  later lets `applyDelta` reap the tombstone, so both values are correct at different moments.
+  **The offline path itself is not exercised here** (`getLocalStore` is null in the sandbox) —
+  `Gate: device`. Unblocks Q-556's 404 half.
 - **[`docs/overview/entries/2026-08-17-activity-untyped-entry.md`](../../overview/entries/2026-08-17-activity-untyped-entry.md)**
   — 🆕 Q-450: `/activity` with no `activityType` recorded a full activity and discarded it on Save.
   The typeless store is the **normal** between-activities state (`resetSession()` clears the type
