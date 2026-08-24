@@ -3709,27 +3709,6 @@ ehr     0     0     0     0   648   208   128   556     0
   marginal risk over today is small, because `CLAUDE_DB_QUERY_SECRET` already reads exactly this data
   through the same views and the same role.
 
-### [platform] Q-263 — audit the remaining cache groups the way Q-262 audited one
-
-- **Branch:** `chore/audit-remaining-cache-groups`
-- **Plan:** none needed
-- **Added:** 2026-08-16 · the scope Q-262 deliberately did not take
-- Q-262 established the method and applied it to `invalidateGoalRecommendations()` only: for each key
-  in a group, does any call site pass `freshWithinTtl`, and is any read path seed-only? Those are the
-  only two ways an invalidation changes a settled value.
-- **The remaining groups are NOT expected to come out the same way**, which is why this is worth
-  doing rather than assuming. `lib/cache-groups.ts` comments already name `freshWithinTtl` keys
-  inside them — `workout-data:all` and `workout-card:<id>` at TTL_LONG are called out explicitly as
-  having caused a real bug (the pre-injury exercise card). Those are load-bearing; the question is
-  which others are.
-- **The valuable output is not "delete the inert ones".** It is a per-group note saying which keys
-  carry the protection, so a future session changing a fetch to `freshWithinTtl` knows it has just
-  made an invalidation matter, and a future stale-value report starts by checking condition (b)
-  rather than hunting a missing group entry.
-- Watch the static blind spot: a key built by a helper (`energyKeyFor(date)`) is invisible to a
-  literal grep. Q-262 hit this and resolved it by reading the call site; `check-cache-ttl-divergence.js`
-  reports how many such sites it skipped, which is the number to reconcile against.
-
 
 ### [workouts] Q-298 — the 10 historical zero-1RM rows: recompute or null (the code fixes shipped 2026-08-24)
 
