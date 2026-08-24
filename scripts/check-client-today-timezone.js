@@ -62,7 +62,6 @@ const BASELINE = {
   'components/activity/done-activity-screen.tsx': 2,
   'components/admin/day-review-tab.tsx': 2,
   'components/admin/time-audit-card.tsx': 1,
-  'components/calendar-widget.tsx': 1,
   'components/day-review-sheet.tsx': 2,
   'components/exercise-history-sheet.tsx': 1,
   'components/fitness-tests/test-result.tsx': 1,

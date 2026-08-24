@@ -2177,7 +2177,16 @@ this fits without an extraction.
 >
 > The sweep order in the entry still stands (calendar today-marker → write paths → display), and so
 > does the warning not to make `todayInTz()`'s default throw or read a global.
-
+>
+> **First slice shipped 2026-08-24 (Lane B): the calendar today-marker, the one named live symptom.**
+> `calendar-widget.tsx`'s `todayStr` now reads `todayInTz(useUserTimezone())` instead of the
+> device-local `localDateString()` — the exact site and exact bug the entry measured (Training
+> Calendar highlighting the 18th for a `Pacific/Kiritimati` user on their own 19th). Verified live,
+> the same way: set a seeded user to `Pacific/Midway` (UTC−11, currently a day behind this
+> container's UTC clock), re-logged in, and the calendar now bolds the *previous* day — the user's
+> actual today — not the container's. Ratchet down to **76 calls across 37 files** (was 78/38).
+> [`journal`](overview/entries/2026-08-24-calendar-today-marker-timezone.md). **37 files remain**,
+> ordered write paths next, then display, per the sweep order above.
 
 - **Branch:** `fix/client-today-uses-user-timezone`
 - **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·

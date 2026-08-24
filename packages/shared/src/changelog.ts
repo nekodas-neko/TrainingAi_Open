@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.360.0",
+    date: "2026-08-24",
+    changes: [
+      "The Training Calendar's today marker now uses your own timezone setting instead of the device's — if you'd set a timezone other than Brisbane, it could highlight the wrong day.",
+    ],
+  },
+  {
     version: "1.359.0",
     date: "2026-08-24",
     changes: [

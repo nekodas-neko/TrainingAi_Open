@@ -29,6 +29,8 @@
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
 
+**Training Calendar's today marker uses the user's timezone now (Q-477 slice 1)**, not device-local. Ratchet 78/38 → 76/37 files.
+
 **"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
 retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/
 `added-weight-toggle.tsx` were real, now fixed. A ratchet heuristic matched 34 files, mostly noise.
@@ -63,11 +65,9 @@ was **0** in CI and those tests passed vacuously (**Q-312**); and `sessionEffort
 
 **The raw-frame packer runs itself, and it deletes only what it verified (Q-541 complete).** A button
 does not hold a growth curve — `oura_raw_samples` regrew to 92 MB within five days of the 2026-08-18
-hand-run, ~6.5 MB/day against the ~0.4 MB/day the database is meant to grow at. It fires from the
-ingest path now, throttled **per user** (one shared timestamp lets a busy user starve another's
-table), with `OURA_AUTOPACK=off` as the kill switch. Automating it is what made the delete's race
-reachable, so phase 3 deletes **by row id**, not by the bucket's ds range: a frame arriving between
-select and delete was previously removed having never been packed — in neither tier ([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
+hand-run. Fires from the ingest path now, throttled per user, `OURA_AUTOPACK=off` kill switch.
+Automating it made the delete's race reachable, so phase 3 deletes by row id, not ds range
+([`journal`](docs/overview/entries/2026-08-23-feat-oura-autopack.md)).
 
 **Logging food evicted the caches before the server had the write (LB-4).** The invalidation fired
 correctly and too early: subscribers refetched a server that lacked the log and re-cached the
