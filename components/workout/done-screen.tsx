@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import Link from "next/link";
@@ -79,6 +80,7 @@ export function DoneScreen({
   workoutSessionId,
 }: DoneScreenProps) {
   const router = useRouter();
+  const tz = useUserTimezone();
 
   // Warm /session-select before the tap — see oura-score-chip-row for the pattern. Every workout
   // ends on this screen and the only way forward is back to session select, so this is the most
@@ -370,7 +372,7 @@ export function DoneScreen({
                 */}
                 ~{energy.kcal.toLocaleString()} kcal · {energy.source === 'hr' ? 'from heart rate' : `${energy.intensity} effort`}
               </span>
-              <TrainingStressBadge date={todayInTz()} />
+              <TrainingStressBadge date={todayInTz(tz)} />
               <Select value={String(activityId)} onValueChange={(v) => setActivityId(Number(v))}>
                 <SelectTrigger className="h-7 w-auto gap-1 rounded-lg border-border/60 px-2 py-0 text-[11px]" aria-label="Workout activity type">
                   <SelectValue />

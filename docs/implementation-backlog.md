@@ -2297,6 +2297,27 @@ this fits without an extraction.
 > for the same save; the `localDateString` import is now gone from that file.
 > [`journal`](overview/entries/2026-08-24-checkin-sheets-user-timezone.md).
 >
+> **Third slice shipped 2026-08-24 (Lane B): `session-select-content` (16 calls — the single
+> largest file) and the four workout surfaces.** Ratchet down to **47 calls across 28 files** (was
+> 70/33). Two of the sixteen were in *module-scope* helpers (`isMorningCheckinPromptDone`,
+> `markMorningCheckinPromptDone`), which cannot call a hook — they take `tz` as a parameter now,
+> the shape `getGreeting(name, tz)` in the same file already used.
+>
+> **It also turned up a blind spot in the ratchet itself, worth knowing before the next slice.**
+> `session-select-content` declared two local `const tz = Intl.DateTimeFormat().resolvedOptions().timeZone`
+> — the *device's* zone — used for the early-deload dismiss key and the "is it evening yet" hour
+> check. Same Q-477 bug class, but **the ratchet cannot see it**: `BARE` only matches
+> `todayInTz()`/`localDateString()` with empty parens. One of them shadowed the component's own
+> `tz` in the same block, which is what surfaced it (a TS use-before-declaration error) rather than
+> any check. Both now use the component's `tz`. **The counted number is a floor, not the whole
+> class** — an `Intl.DateTimeFormat()` sweep is separate, unmeasured work.
+> [`journal`](overview/entries/2026-08-24-session-select-workout-user-timezone.md).
+>
+> **`lib/stores/workout-store.ts` (3 calls) is deliberately NOT in this slice.** It is a Zustand
+> store, not a component — no hook available — so its three calls need `tz` threaded in from every
+> caller, including `applyRehydrateFixups` on the rehydrate path. Structurally different work from
+> the rest of the sweep; left for its own slice.
+>
 > **What that slice actually proved, and what it did not.** With a seeded user on
 > `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the
 > user's day, Brisbane's day and the device's day are three distinguishable values):

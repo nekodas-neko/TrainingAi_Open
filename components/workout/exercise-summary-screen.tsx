@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import dynamic from "next/dynamic";
 import { ChevronRightIcon, TrophyIcon, ArrowUpIcon, ArrowDownIcon, ArrowRightIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ interface ExerciseSummaryScreenProps {
 }
 
 export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, userId }: ExerciseSummaryScreenProps) {
+  const tz = useUserTimezone();
   const {
     exName,
     setWeights: sw,
@@ -50,7 +52,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
     // Local-first seed (SYN-5) before the cachedFetch revalidates.
     const store = userId ? getLocalStore(userId) : null;
     if (store) {
-      const cutoffStr = shiftDateStr(todayInTz(), -90);
+      const cutoffStr = shiftDateStr(todayInTz(tz), -90);
       store.getWorkoutHistory(cutoffStr).then(history => {
         const localEntries: Array<{ date: string; estimated1rm: number | null }> = [];
         for (const { exerciseLogs } of history) {
@@ -76,7 +78,7 @@ export function ExerciseSummaryScreen({ summaryData, workoutStartMs, onNext, use
         setRmHistory(vals);
       },
     ).catch(() => {});
-  }, [exName, userId]);
+  }, [exName, userId, tz]);
 
   // E1-7: a "New Personal Record!" badge must beat the ALL-TIME PR, not merely last
   // session — an off-day previous session made every recovery day flash a phantom PR

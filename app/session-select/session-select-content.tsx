@@ -104,13 +104,13 @@ function getGreeting(name: string, tz: string): string {
 // once per day; set on save OR dismiss so a "not now" doesn't re-nag all day.
 const MORNING_CHECKIN_KEY = 'ta_morning_checkin';
 
-function isMorningCheckinPromptDone(): boolean {
+function isMorningCheckinPromptDone(tz: string): boolean {
   if (typeof window === 'undefined') return true;
-  try { return localStorage.getItem(MORNING_CHECKIN_KEY) === todayInTz(); } catch { return true; }
+  try { return localStorage.getItem(MORNING_CHECKIN_KEY) === todayInTz(tz); } catch { return true; }
 }
-function markMorningCheckinPromptDone(): void {
+function markMorningCheckinPromptDone(tz: string): void {
   if (typeof window === 'undefined') return;
-  try { localStorage.setItem(MORNING_CHECKIN_KEY, todayInTz()); } catch { /* ignore */ }
+  try { localStorage.setItem(MORNING_CHECKIN_KEY, todayInTz(tz)); } catch { /* ignore */ }
 }
 
 export default function SessionSelectContent({ userId, isAdmin }: { userId?: string; isAdmin?: boolean }) {
@@ -221,12 +221,12 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         // (or a stale prior-day one) and is ignored rather than trusted, so a
         // resident app can't flash yesterday's rest-day/deload banner across midnight.
         const stamped = JSON.parse(recRaw) as { date: string; data: NextSessionRecommendation }
-        if (stamped?.date === todayInTz() && stamped.data) seededRec = withRestDayOverride(stamped.data)
+        if (stamped?.date === todayInTz(tz) && stamped.data) seededRec = withRestDayOverride(stamped.data)
       }
       if (!seededRec) seededRec = withRestDayOverride(readTodayCacheSync<NextSessionRecommendation>('next-session'))
       setRecommendation(seededRec)
     } catch { /* leave recommendation null */ }
-    setMoodLog(readCacheSync<import("@trainingai/shared/types/mood").MoodLog | null>(`mood:${todayInTz()}`) ?? undefined)
+    setMoodLog(readCacheSync<import("@trainingai/shared/types/mood").MoodLog | null>(`mood:${todayInTz(tz)}`) ?? undefined)
 
     // Re-read localStorage when app returns to foreground (PWA background/foreground cycle
     // doesn't remount the component, so useLayoutEffect above only runs once on first mount)
@@ -253,7 +253,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     const meta = readCacheSync<{ today: BodyMetaRow | null; recent: BodyMetaRow[]; weekToDate?: { steps: number; calories: number; waterMl: number } | null }>('body-metadata');
     if (meta) {
       // Server-tz "today" (DATE-A7) — meta.today.date is stamped in AEST by the server.
-      if (!meta.today || meta.today.date === todayInTz()) {
+      if (!meta.today || meta.today.date === todayInTz(tz)) {
         setMetaToday(meta.today ?? null);
         setMetaRecent(meta.recent ?? []);
         setWeekToDate(meta.weekToDate ?? null);
@@ -266,7 +266,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
     // Seed the HR chart from the same cache keys the Health → Body Oura section
     // uses, so the home widget paints instantly instead of re-fetching every visit.
-    const hrToday = todayInTz();
+    const hrToday = todayInTz(tz);
     const cachedHr = readCacheSync<{ readings: { timestamp: string; bpm: number; source: string | null }[]; sleep: HrSleepWindow | null }>(`oura-hr-day:${hrToday}`);
     if (cachedHr?.readings?.length) setOuraHrReadings(cachedHr.readings);
     if (cachedHr) setOuraSleepWindow(cachedHr.sleep ?? null);
@@ -294,7 +294,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     try {
       const recRaw = sessionStorage.getItem("ta_recommendation_v1");
       const stamped = recRaw ? (JSON.parse(recRaw) as { date: string; data: NextSessionRecommendation }) : null;
-      if (stamped?.date === todayInTz() && stamped.data) {
+      if (stamped?.date === todayInTz(tz) && stamped.data) {
         setRecommendation(withRestDayOverride(stamped.data));
       } else {
         const cached = readTodayCacheSync<NextSessionRecommendation>('next-session');
@@ -334,12 +334,11 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // correctly show the check-in card, which is replaced by actual data once
     // the useEffect fetch resolves.
     try {
-      const moodKey = `mood:${todayInTz()}`;
+      const moodKey = `mood:${todayInTz(tz)}`;
       const cachedMood = readCacheSync<import("@trainingai/shared/types/mood").MoodLog | null>(moodKey);
       setMoodLog(cachedMood);
     } catch { /* ignore */ }
 
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone
     const weekKey = `ta_early_deload_dismissed_${formatInTimeZone(new Date(), tz, 'yyyy-MM')}`
     setEarlyDeloadDismissed(!!localStorage.getItem(weekKey));
 
@@ -351,7 +350,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     // local hour in addition to the per-day dismiss flag so it stops resurfacing every morning.
     const currentHour = parseInt(formatInTimeZone(new Date(), tz, 'H'), 10)
     setDayReviewDismissed(
-      currentHour < 17 || localStorage.getItem(`ta_day_review_dismissed_${todayInTz()}`) === '1'
+      currentHour < 17 || localStorage.getItem(`ta_day_review_dismissed_${todayInTz(tz)}`) === '1'
     );
 
     // Local-first trained-days fill (APK-only — no local store in the web sandbox):
@@ -385,7 +384,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     }
 
     return () => document.removeEventListener('visibilitychange', onVisible);
-  }, []);
+  }, [tz]);
 
   // Workouts still waiting in the outbox, for the week strip and the streak. The fill above
   // already reads 90 days of local history, but it yields to whatever key the cache or the
@@ -483,7 +482,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             proteinPct: m.proteinPct, bmrKcal: m.bmrKcal, metabolicAge: m.metabolicAge,
           });
           setMetaRecent(rows.map(toRow));
-          const todayStr = todayInTz();
+          const todayStr = todayInTz(tz);
           const todayRow = rows.find(m => m.date === todayStr);
           if (todayRow) setMetaToday(toRow(todayRow));
           setMetaLoading(false);
@@ -563,7 +562,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
           (rec) => {
             const adjusted = withRestDayOverride(rec) ?? rec;
             setRecommendation(adjusted);
-            try { sessionStorage.setItem("ta_recommendation_v1", JSON.stringify({ date: todayInTz(), data: adjusted })); } catch { /* ignore */ }
+            try { sessionStorage.setItem("ta_recommendation_v1", JSON.stringify({ date: todayInTz(tz), data: adjusted })); } catch { /* ignore */ }
           },
         ),
       ]);
@@ -592,7 +591,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     } finally {
       setRefreshing(false);
     }
-  }, []);
+  }, [tz]);
 
   useEffect(() => { fetchWorkoutData(); }, [fetchWorkoutData]);
 
@@ -603,7 +602,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // would re-show the check-in card on the next visit), so only apply/cache a
   // non-null response, and otherwise keep whatever is already cached.
   const loadTodayMood = useCallback(async () => {
-    const today = todayInTz();
+    const today = todayInTz(tz);
     const key = `mood:${today}`;
     // Local-first: the on-device store is the source of truth, so a check-in
     // saved offline (or not yet synced) shows here instead of the server's null.
@@ -638,7 +637,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         if (cached == null) setMoodLog(prev => (prev == null ? null : prev));
       }
     } catch { /* offline — keep the seeded value */ }
-  }, [userId]);
+  }, [userId, tz]);
 
   // Re-fetches all data shown on this screen, updating React state from fresh network responses.
   // Called after pull-to-sync to guarantee the UI is current. readiness-score, training-load,
@@ -782,21 +781,21 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // checked first so a check-in saved on another device (or before a reinstall)
   // suppresses the prompt.
   useEffect(() => {
-    if (isMorningCheckinPromptDone()) return;
+    if (isMorningCheckinPromptDone(tz)) return;
     let cancelled = false;
     (async () => {
-      const today = todayInTz();
+      const today = todayInTz(tz);
       const store = userId ? getLocalStore(userId) : null;
       const existing = store
         ? await store.getDayCheckin(today, 'morning').catch(() => null)
         : await fetch(`/api/day-checkin?date=${today}&phase=morning`)
             .then(r => (r.ok ? r.json() : null)).catch(() => null);
       if (cancelled) return;
-      if (existing) { markMorningCheckinPromptDone(); return; }
+      if (existing) { markMorningCheckinPromptDone(tz); return; }
       setMorningCheckinOpen(true);
     })();
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, tz]);
 
   useEffect(() => {
     cachedFetchToday<import('@/app/api/body-battery/route').BodyBatteryResponse>(
@@ -825,7 +824,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
   useEffect(() => {
     if (!activeCardWidgets.includes("hrChartWidget")) return;
-    const today = todayInTz();
+    const today = todayInTz(tz);
     cachedFetch<{ readings: { timestamp: string; bpm: number; source: string | null }[]; sleep: HrSleepWindow | null }>(
       `oura-hr-day:${today}`, `/api/oura/hr-day?date=${today}`, TTL_MEDIUM,
       d => { if (d?.readings?.length) setOuraHrReadings(d.readings); setOuraSleepWindow(d?.sleep ?? null); }).catch(() => {});
@@ -845,7 +844,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
     cachedFetch<{ sessions: { sessionName: string; startedAt: string; completedAt: string | null }[] }>(
       `workout-sessions-day:${today}`, `/api/workout-sessions/day?date=${today}`, TTL_MEDIUM,
       d => { if (d?.sessions?.length) setOuraWorkoutSessions(d.sessions) }).catch(() => {});
-  }, [activeCardWidgets, refreshTick, userId]);
+  }, [activeCardWidgets, refreshTick, userId, tz]);
 
   useEffect(() => {
     let cancelled = false;
@@ -904,11 +903,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   }, []);
 
   const handleEarlyDeloadDismiss = useCallback(() => {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const weekKey = `ta_early_deload_dismissed_${formatInTimeZone(new Date(), tz, 'yyyy-MM')}`;
     localStorage.setItem(weekKey, '1');
     setEarlyDeloadDismissed(true);
-  }, []);
+  }, [tz]);
 
   const handleGoalsRemindLater = useCallback(async () => {
     setGoalsCheckinDismissed(true);
@@ -1004,7 +1002,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
   // server data never disagree by a day.
   const weekStrip = useMemo(() => {
     const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
-    const todayStr = todayInTz().replace(/-/g, "/");
+    const todayStr = todayInTz(tz).replace(/-/g, "/");
     const todayDowIdx = todayDayOfWeek();
     const mondayStr = startOfWeekInTz();
 
@@ -1019,7 +1017,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
         isFuture: i > todayDowIdx,
       };
     });
-  }, [trainedDays]);
+  }, [trainedDays, tz]);
 
   // Streak: counts calendar days in the active window (training + allowed rest days)
   const streak = useMemo(() => {
@@ -1194,7 +1192,7 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
             title="Your day in review is ready"
             onActivate={() => setDayReviewOpen(true)}
             onDismiss={() => {
-              localStorage.setItem(`ta_day_review_dismissed_${todayInTz()}`, '1');
+              localStorage.setItem(`ta_day_review_dismissed_${todayInTz(tz)}`, '1');
               setDayReviewDismissed(true);
             }}
           />
@@ -1423,10 +1421,10 @@ export default function SessionSelectContent({ userId, isAdmin }: { userId?: str
 
       <MorningCheckinSheet
         open={morningCheckinOpen}
-        onClose={() => { markMorningCheckinPromptDone(); setMorningCheckinOpen(false); }}
+        onClose={() => { markMorningCheckinPromptDone(tz); setMorningCheckinOpen(false); }}
         userId={userId}
         readiness={readiness?.score ?? null}
-        onSaved={markMorningCheckinPromptDone}
+        onSaved={() => markMorningCheckinPromptDone(tz)}
       />
 
       <WaterLogSheet
