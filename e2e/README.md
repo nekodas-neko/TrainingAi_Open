@@ -101,6 +101,16 @@ Chromium-on-Linux, and gestures behave differently under a real thumb. Those sti
   cannot tap the way a user taps is testing something adjacent to the product, so it is a finding to
   chase rather than a pattern to copy.
 
+- **Stubbing an `/api/` route needs `test.use({ serviceWorkers: 'block' })`.** `public/sw-template.js`
+  re-issues **every** `/api/` request — no method filter — so once the worker controls the page the
+  request comes from the worker and **`page.route` never sees it**; Playwright does not intercept
+  service-worker fetches. Whether the worker has taken control yet is a race, so the spec passes
+  locally and fails on CI *sometimes*, with the real route answering in the server log. Measured on
+  `recipe-url-to-meal.spec.ts`: three attempts hit the route, a fourth was stubbed and passed.
+- **Never put an `expect` inside a `page.route` handler.** A throw there skips `route.fulfill`, so the
+  app's request breaks and the failure surfaces several assertions later as something unrelated —
+  a locator error, usually. Record the request and assert in the test body.
+
 ## Layout
 
 | Path | What it is |
