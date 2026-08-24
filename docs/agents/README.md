@@ -412,6 +412,32 @@ trusted. This was a known trade at the time it was chosen (2026-08-23): the alte
 only retired sessions so that absent-means-live cannot go stale, gives up the positive signal the
 owner sorts on, and sorting on greens is the thing this is for.
 
+### Why there is no third light for "working"
+
+Asked on 2026-08-23: add 🟠 for *working, needs nothing from you*, so the greens are only the
+sessions actually waiting. It was investigated and **not built**, for two reasons that are worth
+recording so it is not re-attempted.
+
+**The platform already tracks it, per session, correctly.** `list_sessions` returns
+`session_status` (`RUNNING` / `IDLE`), `status_bucket` (`WORKING` / `REVIEW_READY`), a
+`task_summary` of what a running session is doing, and a `post_turn_summary` carrying
+`status_category`, `status_detail` and a `needs_action` field. Measured against the six standing
+sessions, that data separated *working* from *waiting on the owner* exactly as intended. A title
+emoji would be a hand-maintained duplicate of a signal the system computes for free and never gets
+wrong. To answer "which sessions need me", query it — do not read it off a title.
+
+**Nothing that could maintain the light can see the state that matters.** A hook cannot rename a
+session: there is no `claude` CLI subcommand for it, the MCP tool is available to the model and not
+to hook scripts, and the REST route (`/v1/code/sessions/{session_id}`) needs the session ingress
+credential, which the auto-mode classifier blocks reading — correctly, and it was not worked around.
+That leaves model-driven renames, which cost a round trip and roughly 300 tokens of response JSON at
+each end of every turn. And the case that prompted the request — a session blocked on a permission
+prompt or an interactive question — is the one a model-driven rename **cannot** signal, because the
+model is the thing that is blocked. Only the harness knows, and the harness already records it.
+
+The 🟢/🔴 pair stays as it is: cheap, set once at each end of a session's life, and about a state
+(*this session is finished*) that nothing else records.
+
 ### The baton: `docs/agents/state/<agent>.md`
 
 One file per agent, at a stable path, **overwritten** at every handoff. This is the first thing a
