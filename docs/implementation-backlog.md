@@ -7554,38 +7554,6 @@ ehr     0     0     0     0   648   208   128   556     0
   snapshot Q-192 added. It delivers most of the daily value and leaves the automatic prefill — the
   part that needs the unconfirmed state — as a genuinely separate decision.
 
-### [nutrition][platform] Q-201 — a plan meal's suggested time is stored, shown, and never used for anything
-
-- **Gate:** owner
-
-- **⛔ Needs an owner decision before implementing (added 2026-08-12, while shipping Q-200).** The
-  two things are not the same notification. The existing reminders fire at a **meal type's end
-  hour** as a *"you didn't log this"* catch-up (`computeMealReminderActions`); a plan's
-  `suggestedTime` is a *"time to eat"* prompt. Meal types and plan meals are not 1:1 either — a plan
-  meal's `mealTypeId` is usually null. Three different products follow:
-  **(a)** plan times replace the meal-type end hour as the reminder time while a plan is active —
-  one stream, but it changes what the existing reminder *means*;
-  **(b)** a second, separate "time to eat" stream — which is the two-sources-for-one-notification
-  trap this entry already names;
-  **(c)** leave them as labels and close this.
-  Notifications cannot be verified anywhere but the device, so guessing here ships an unverifiable
-  behaviour change to a surface that interrupts the user.
-
-- **Branch:** `feat/meal-plan-time-reminders`
-- **Added:** 2026-08-12 · found reviewing v1.290.0
-- **What it is.** `meal_plan_meals.suggested_time` is written by the generator, carried through
-  sync, rendered on three surfaces and fed to the AI as context. Nothing schedules a notification
-  from it. The app **does** have meal reminders (`lib/meal-reminders.ts`), but they key off
-  `mealTypeId` — the user's Breakfast/Lunch/Dinner buckets — with no awareness that a plan exists or
-  that it disagrees about the time.
-- **Why it matters.** "Eat at 12:30" that never says anything at 12:30 is a label, not a plan. This
-  is also the cheapest thing that would make an active plan feel alive between building it and
-  Q-187's prefill landing.
-- **What to do.** Decide first whether plan times *drive* the existing meal-type reminders or add a
-  second reminder source — two sources for one notification is the trap here, and the existing
-  `computeMealReminderActions` is the place that should keep deciding. Needs the notification
-  permission story checked on-device; reminders are one of the surfaces the sandbox cannot verify.
-
 ### [platform] ⏳ Q-181 — a schema per vitest worker: WATCH ONLY, deferral re-confirmed by measurement
 
 - **Branch:** `test/db-per-worker-schema` (unclaimed)

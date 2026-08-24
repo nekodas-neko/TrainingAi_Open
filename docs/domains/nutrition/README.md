@@ -187,7 +187,8 @@ Live at the time of writing (2026-07-30):
   unblocked, **plan written 2026-08-13**:
   [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](../../superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md)
   — keep unconfirmed prefills out of `food_logs` rather than filtering a column across its 24 readers)
-  and **Q-201** (meal times schedule nothing — a three-way fork awaiting the owner).
+  and ~~**Q-201**~~ (meal times schedule nothing — **decided 2026-08-24: they stay labels and
+  schedule nothing.** See *Decided, and deliberately not built* below; the entry is out of the queue).
   Carry-forwards worth more than the features: portion sizing is arithmetic, never the model's job;
   an OFF **503** is usually our own rate limiting, but a **502 is a real outage** (measured
   2026-08-13 — OFF served a downtime page across its whole API for hours), and the two must reach
@@ -200,6 +201,28 @@ Live at the time of writing (2026-07-30):
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
 
 ## Decided, and deliberately not built
+
+- **A plan meal's `suggestedTime` stays a LABEL — it schedules nothing (owner, 2026-08-24 — Q-201,
+  removed from the queue).** *"For now it can stay as a label; we already have the notification
+  system for when meals are missed, that's fine."* `meal_plan_meals.suggested_time` is written by the
+  generator, synced, rendered on three surfaces and fed to the AI as context; nothing fires from it,
+  and nothing should. **Keep it that way**, and do not read the dead field as a bug to fix.
+  - The two things were never the same notification, which is what made this a fork rather than a
+    task: the existing reminders (`computeMealReminderActions`, `lib/meal-reminders.ts`) fire at a
+    **meal type's end hour** as a *"you didn't log this"* catch-up, while `suggestedTime` is a
+    *"time to eat"* prompt. Meal types and plan meals are not 1:1 either — a plan meal's
+    `mealTypeId` is usually null, so there is often no meal type to hang a plan time on.
+  - **Both build options were rejected for the same underlying reason:** making plan times drive the
+    existing reminders changes what today's catch-up reminder *means*, and adding a second stream
+    puts two independent schedulers behind one interrupting surface. Notifications are also
+    verifiable **only** on the device, so either choice ships an unverifiable behaviour change to
+    the one surface that interrupts the user.
+  - **What meets the underlying need instead: Q-187's prefill.** The day's food logs pre-populate
+    from the active plan, so the plan is present in the day without anything having to interrupt.
+    That is the entry's own *"cheapest thing that would make an active plan feel alive"*, without a
+    notification.
+  - **Revisit only if** the owner reports actually wanting a prompt at the time — at which point the
+    fork above is still the fork, and prefill will have shown whether presence beats interruption.
 
 - **A meal type's entries can be MOVED, never bulk-deleted (owner, 2026-08-23 — LB-2, removed from
   the queue).** Q-326's delete dialog offers *"move them"* and no *"delete them instead"*, and the

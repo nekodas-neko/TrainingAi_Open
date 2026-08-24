@@ -108,5 +108,10 @@ ingredient snapshot, Q-192), and "confirmed" (that is the food log itself). Stor
   needs its own design: what gets re-scaled, whether an already-eaten meal can push another below a
   sensible floor, and what happens when the remaining macros are unreachable. File separately once
   this lands and is in real use.
-- **Q-201** (a plan meal's suggested time schedules nothing) — a three-way fork only the owner can
-  settle, and the notification surface is unverifiable from the sandbox.
+- ~~**Q-201**~~ (a plan meal's suggested time schedules nothing) — ~~a three-way fork only the owner
+  can settle~~. **SETTLED 2026-08-24: the time stays a label and schedules nothing**, and the entry
+  is out of the queue (reasoning in
+  [`docs/domains/nutrition/README.md`](../../domains/nutrition/README.md) → *Decided, and
+  deliberately not built*). **This raises the stakes on the prefill below rather than lowering
+  them:** the owner's answer leans on prefill to make an active plan present in the day, since
+  nothing will now interrupt to announce it. Prefill is the whole mechanism, not one of two.
