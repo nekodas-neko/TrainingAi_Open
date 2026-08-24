@@ -331,6 +331,36 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner decision, asked and answered plainly
+- **Lane: A** — `lib/health/readiness-payload.ts`
+- **Owner sign-off: RECEIVED 2026-08-24.** *"Fix baseline + suspend penalty now."*
+- **Do NOT batch with TN-6/Q-506.** The whole point is that this lands first, on its own.
+
+The interim half of TN-6. `computeBlendedScore`'s absolute-°C ladder costs **−16.3 readiness
+points/day** and fires on **91.2%** of nights because the baseline mean is 0.363 °C low. The proper
+fix is TN-6 (batched with Q-506) and needs real design; this stops the damage in one deploy.
+
+**Skip the temperature arm while the baseline is demonstrably uncentred.** Gate it on a condition the
+code can evaluate rather than a hardcoded date — e.g. suspend while the trailing-30-night mean
+deviation sits outside ±0.15 °C, or while fewer than ~30% of recent nights are negative. A
+self-clearing guard cannot be forgotten; a `TODO: remove after` comment can.
+
+**What this costs, stated plainly:** genuine fever detection through this path, until TN-6 lands.
+That cost is near zero today — the deviation is positive on **34 of 34 nights**, so the ladder cannot
+currently distinguish illness from baseline error in either direction. The owner was told this before
+choosing.
+
+**Pass test:** on the owner's stored history the temperature arm contributes **0** points while the
+suspension condition holds; readiness rises by the **−16.3 pts/day** the penalty was costing; and the
+suspension **clears by itself** on a synthetic history whose deviations are centred — proven by a
+test that feeds both, not by reading the condition.
+
+**Keep:** this is a suppression, not a fix. It must be removed by TN-6 rather than left as permanent
+behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) is what retires it.
+
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 
 - **Branch:** _unassigned_
@@ -345,7 +375,13 @@ signed off by the owner in that conversation. Review:
   seed wants a longer warm-up, a zero seed wants a correct seed. BF-13 also finds a **third**
   consumer (the deload card's `TEMP_ALERT_THRESHOLD_C`, firing on 23/34 nights), so this entry's
   *"fix both or neither"* is really **all three**.
-- **Gate: owner** — changes the readiness score. Not signed off.
+- **Owner sign-off: RECEIVED 2026-08-24** for the baseline fix — given before BF-13 surfaced, and it
+  stands: BF-13 changes *how* to fix the seed, not whether to. The owner also asked for the penalty
+  **suspended in the meantime** — that is **TN-6a**, which ships on its own and is deliberately NOT
+  in this batch. **TN-6a must cover all three consumers**, including the deload card BF-13 found;
+  that card is the surface the owner actually reported.
+- **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Do not
+  re-score past days.
 
 Home shows *"Body temp elevated · +0.5°C above your baseline (threshold 0.5°C)"* and a Recovery
 recommendation with readiness 52. `computeBlendedScore` (`readiness-payload.ts:169`) applies an
@@ -468,7 +504,13 @@ which fires on a measured average of 50 stress-high minutes/day. Real-world ends
 shipped TypeScript with the stress term included, not against this table.
 
 **Pass test:** over the same 56 days, end-of-day mean **55–65**, sd **≥ 28**, **≤ 3 days at 0** and
-**≤ 6 days at 100**, with the stress-drain term active. Bump `MODEL_VERSION` to `v6` in the same PR
+**≤ 6 days at 100**, with the stress-drain term active.
+
+**History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
+keep what the owner saw; the `MODEL_VERSION` bump below is what makes the two eras separable.
+**⚠️ That policy leans on the stamp surviving, and Q-518 says it does not** — a sibling writer erases
+`model_versions` within hours. Body Battery writes its own `model_version` column and is fine; a
+readiness-side stamp is not, so **Q-518 is now load-bearing for this decision** rather than a tidy-up. Bump `MODEL_VERSION` to `v6` in the same PR
 so v5 and v6 days are never pooled — `docs/body-battery-tuning.md` depends on that stamp.
 
 **Not to be done here:** do not fit the boundary to a percentile of the owner's own waking HR. It is
@@ -605,8 +647,11 @@ part of this entry**, not only new surfaces.
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
 - **Lane: A** — `packages/shared/src/health/sleep-score.ts`
-- **Gate: owner** — a scoring change; the owner has not signed this one off (TN-2's sign-off does
-  not carry over).
+- **Owner sign-off: RECEIVED 2026-08-24.** Asked plainly, with the caveat that this does **not** make
+  the score less jumpy, and approved on that basis. Build it.
+- **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
+  keep the numbers the owner actually saw; new days use the new curve under a bumped model version.
+  Do **not** re-score the back catalogue.
 - **Do not batch.** It re-scores every night and its threshold check must run in the same PR.
 
 `SCORE_CALIBRATION` (`sleep-score.ts:155`) maps the weighted blend onto the display scale, and its
@@ -655,6 +700,50 @@ same 41 nights within ±2 of 87.0 and **not above it**; `LOW_SLEEP_SCORE` firing
 2/41; the three tests asserting the ceiling is reachable-but-not-routine still pass.
 
 Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24-sleep-score-volatility.md).
+
+### [readiness][platform] TN-7 — TN-4's guard swallows the one signal LA-20's open verification depends on
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · found while reconciling TN-4 against LA-20's Known-Issues row
+- **Lane: A** — `app/api/body-battery/route.ts`, one line
+- **Needs: TN-4** — this is a follow-up to what TN-4 shipped, not a criticism of it.
+
+TN-4's fix (#415, merged 2026-08-24 12:51 UTC) is correct and should stay. Its catch, though, ends at
+
+```ts
+console.error('[body-battery] daytime stress series failed, continuing without it:', err)
+```
+
+**`console.error` does not reach `error_events`** — the route imports `reportServerError` and uses it
+in the outer catch, but not here. So from that deploy onward a recurrence of
+`daytime-stress: constants not set` produces **no row anywhere**.
+
+**That is exactly the signal LA-20's Known-Issues row is waiting on.** Its `Keep:` reads *"the check
+is `error_events` after this deploys … the count must be zero across a window where
+`/api/body-battery` was actually called."* After TN-4 the count is zero **whether or not the root
+cause is fixed**, so the condition can no longer fail and no longer distinguishes anything.
+
+**What the observable window did establish, before the guard landed.** The fault ran
+2026-08-23 10:37 → **20:59** UTC (**31 occurrences** — LA-20's row records 19 and a 12:27 latest,
+read while it was still firing; both figures are superseded). It then went silent, and at
+**2026-08-24 11:20:38 UTC** `/api/body-battery` completed a full run and wrote a
+`body_battery_daily` snapshot with no fault — a genuine successful call ~14 h after the last error
+and ~1.5 h *before* TN-4's guard deployed. That is **one confirmed clean run in an observable
+window**, which is real evidence and is weaker than the "window" LA-20 asked for. Everything after
+~13:00 UTC on 2026-08-24 is uninformative.
+
+**Fix:** report from the catch as well as logging — `reportServerError(err, { userId, url: '/api/body-battery#stress' })`
+or an equivalent non-fatal severity. The card must still degrade rather than 500; what has to change
+is that the degradation leaves a trace.
+
+**Pass test:** force the constants unset in a test and assert both that the route returns 200 **and**
+that a report was emitted. Then LA-20's `Keep:` becomes checkable again and can be struck on a clean
+window; until then it must not be struck on silence.
+
+**The general shape, worth naming:** a hardening change that converts a loud failure into a quiet
+degradation also removes the evidence a *separate* open investigation was relying on. When a fix
+turns a 500 into a fallback, check whether anything is waiting on that 500 — and carry the signal
+across.
 
 ### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
 

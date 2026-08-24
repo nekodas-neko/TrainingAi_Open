@@ -211,6 +211,15 @@ Live at the time of writing (2026-07-30):
 
 ## History
 
+- [`docs/handoff-2026-08-24-readiness-scores-owner-batch.md`](../../handoff-2026-08-24-readiness-scores-owner-batch.md)
+  — **the owner's readiness/battery batch, 2026-08-24.** Four owner questions in one session
+  (daytime stress, Body Battery flooring, score volatility, the temperature deload trigger) →
+  **TN-2** … **TN-7**. Carries the method rules that cost time: a per-sample percentile on the BLE
+  HR series is **not** a per-time percentile (an order-of-magnitude error), SQL integer division
+  silently zeroes a ratio, and `+18 bpm` overshoots the battery into a permanently-full tank.
+
+
+
 - Handoffs: `ls docs/handoff-*-readiness-*.md` — plus
   [`docs/handoff-2026-08-02-cross-owner-bug-batch-investigation.md`](../../handoff-2026-08-02-cross-owner-bug-batch-investigation.md)
   (Q-39 — the Body Battery anchor flipping source mid-day, **fixed in #996**), filed under `cross`

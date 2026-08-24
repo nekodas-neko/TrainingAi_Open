@@ -55,9 +55,24 @@ against the stored deviation on the newest night: measured 35.950 − baseline 3
 | **baseline too low by** | **0.363 °C** |
 
 **That gap alone exceeds the 0.3 °C penalty threshold**, before the night's real variation is
-considered. The EMA cold-started at **34.696 °C** (36 nights ago) and has climbed +0.767 °C since —
-converging, but still 0.363 short after 50 nights of history. First-half mean deviation +0.884,
-second-half +0.441.
+considered. The EMA reads **34.696 °C** at the oldest night carrying a deviation and has climbed
++0.767 °C since — converging, but still 0.363 short after 50 nights of history. First-half mean
+deviation +0.884, second-half +0.441.
+
+> **⚑ Corrected 2026-08-24 — BugFix found the mechanism independently (BF-13), and it is better than
+> the one this review gave.** The phrase "cold-started at 34.696 °C" is measured from **n=14** — the
+> first night `temp_dev_c` is non-null, so it is the first value this query can see, not the first
+> value the estimator held. `updateBaseline` seeds the mean at **literal zero**
+> (`personal-baseline.ts:30`) and the true start is **17.905 °C at n=2**, exactly `35.81 / 2` — a
+> first update from zero at gain 1/2. **This changes the fix**: a low-but-plausible seed argues for a
+> longer warm-up, a zero seed argues for a correct seed. BF-13 also finds a **third** consumer, the
+> deload card's `TEMP_ALERT_THRESHOLD_C`, firing on 23 of 34 nights — so "fix both or neither" below
+> is really **all three**. The measured *consequences* in this review stand unchanged; only the
+> account of where the estimator started is superseded.
+>
+> **The general lesson:** a column that is NULL until a maturity gate opens does not show the
+> estimator's history — it shows the part something decided was fit to publish. Reading a cold start
+> off the first non-null row understates it, here by about 17 °C.
 
 ### And the same object's SD is ~13× too wide
 
@@ -101,10 +116,11 @@ would hide a broken baseline behind a plausible firing rate, which is the Q-504 
 - **Whether the owner has actually been ill on any of these nights.** The claim is that a permanently
   positive deviation cannot distinguish illness from baseline error, not that every flagged night was
   healthy.
-- **Why the EMA cold-started ~1.1 °C low.** It converges, so the seeding or the update rate is the
-  suspect; that is a code question this measurement does not answer. Q-2 (nightly temperature treats
-  one frame's simultaneous probes as consecutive samples) is a plausible contributor and is already
-  queued — check it before designing the fix.
+- ~~**Why the EMA cold-started low.**~~ **Answered by BF-13** (see the correction above): the mean is
+  seeded at literal zero in `personal-baseline.ts:30`. This review named the seeding as the suspect
+  and could not settle it from SQL, which is right — it took reading the estimator. Q-2 (nightly
+  temperature treats one frame's simultaneous probes as consecutive samples) remains worth checking,
+  but it is no longer the leading explanation.
 - **The trailing mean is a diagnostic, not a shipped design.** It demonstrates the offset is an
   artefact of the estimator rather than real physiology. A production fix should re-seed or correct
   the existing baseline; a naive trailing mean has its own problems (it absorbs a genuine multi-day
