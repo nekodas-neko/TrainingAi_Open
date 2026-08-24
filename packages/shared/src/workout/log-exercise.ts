@@ -149,7 +149,34 @@ export async function logExerciseFromPayload(
   const rawDate = norm ?? todayInTz(tz).replace(/-/g, '/');
   const [y, m, d] = rawDate.split('/').map(Number);
   const startOfDay = aestMidnight(y, m, d, tz);
-  const sessionStart = workoutStartedAt ? new Date(workoutStartedAt) : startOfDay;
+  /**
+   * LA-21. The fallback here used to be local midnight outright, and it is where **7 of the owner's
+   * 11 implausible sessions came from** — each recorded `started_at` at exactly 00:00 local and
+   * `completed_at` between 08:53 and 14:05, so the session read as an 8-to-14-hour workout. Those
+   * durations are now culled from statistics, which means a real workout currently contributes no
+   * duration-derived number at all. Recording a plausible start is what makes it count again.
+   *
+   * The ladder is the same one `loggedAt` uses forty lines below, for the same reason: prefer the
+   * timing the payload actually carries.
+   *
+   *   1. `workoutStartedAt` — the device's own session anchor, and what a normal submit sends.
+   *   2. **the first set's start** — already in the payload (`setStartTimes`), and it is *inside* the
+   *      session, so at worst it loses the warm-up rather than hours.
+   *   3. `now`, but only when the log is for TODAY. Logging an exercise happens during the session,
+   *      so `now` is inside it.
+   *   4. midnight, for a back-dated log, where we genuinely do not know — and the cull is then the
+   *      honest outcome rather than a fabricated span.
+   *
+   * **Why the fallback fires at all:** `workout-screen.tsx` sends `workoutStartMs ?? undefined`, and
+   * the store's abandoned-session guard sets `workoutStartMs` to null. So the guard that protects
+   * against a days-old session is itself what leaves the next log with no anchor.
+   */
+  const firstSetStartMs = setStartTimes?.find((t): t is number => typeof t === 'number');
+  const isForToday = rawDate === todayInTz(tz).replace(/-/g, '/');
+  const sessionStart = workoutStartedAt ? new Date(workoutStartedAt)
+    : firstSetStartMs != null ? new Date(firstSetStartMs)
+    : isForToday ? new Date()
+    : startOfDay;
 
   let wsId = workoutSessionId;
   if (wsId) {
