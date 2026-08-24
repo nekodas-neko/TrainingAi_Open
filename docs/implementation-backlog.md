@@ -372,7 +372,7 @@ entry. Queue position is priority; nothing else about either entry changed in th
   meal creator and the meal planner's generation logic — BugFix traced each piece against current
   code live as the owner described it, confirming what already exists, what's a real gap, and
   reaching agreement on the open calls.
-- **Full design: [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](../superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).**
+- **Full design: [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](superpowers/specs/2026-08-24-meal-creator-and-planner-design.md).**
   Read that doc before planning this — it has the complete trace (file/line citations for every
   claim), what's already built vs. genuinely missing, and the owner's decisions on each open
   question. Summary only, here:
