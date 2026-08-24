@@ -27,6 +27,10 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The
+tile already routes water to the correct sheet. But the generic sheet's water branch wrote an
+ABSOLUTE total — discarding the day's water, reintroducing SYNC-P7 — and queues `waterMlDelta` now.
+
 **The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave
 Playwright a stable frame, so `Start Set 2` hung — measured 85 ms vs 8,009 ms with and without the
 new `prefers-reduced-motion` rule. A spec now drives three logged sets and fails if the rule is
@@ -39,8 +43,7 @@ broken. Both moved above it. `Gate: device`.
 
 **The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
 it. Its confirm copy deliberately does not read like the lossless VACUUM one — it is the only
-control here that DELETEs archival frames — and a refused bucket is listed with its reason rather
-than counted as "packed 0". APK-only, like the card. `Gate: device`.
+control here that DELETEs archival frames — and a refused bucket is listed with its reason. `Gate: device`.
 
 **Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, deliberately outside
 `OuraBleDebug` — that renders nothing without the native plugin, which is exactly the laptop doing
@@ -167,14 +170,13 @@ Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for
 not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
 
 **Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
-`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day rather than
-by sample index, so a night-only SpO₂/HRV signal renders with dead space either side, not apparent
-24-hour coverage. Native-gated — verified by mounting the component off the gated page. `Gate: device`.
+`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day, so a
+night-only SpO₂/HRV signal renders with dead space either side, not apparent 24-hour coverage.
+Verified by mounting the component off the native-gated page. `Gate: device`.
 
-**Coach undo wrote over whatever was there (Q-468).** Two stacked changes on one exercise: undoing
-the *first* returned the row to its original value while the history still showed the second in
-effect. `driftAgainst` now takes a side — `from` for apply, `to` for undo — checked once centrally.
-Latent: nothing calls the undo route yet (Q-467), production's `coach_changes` is empty.
+**Coach undo wrote over whatever was there (Q-468).** With two stacked changes on one exercise,
+undoing the first returned the row to its original value while the history showed the second in
+effect. `driftAgainst` takes a side now. Latent: nothing calls the undo route yet (Q-467).
 
 **The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
 schema was deleted forever — no badge, no toast, no retry. It returns a per-item error now, so the
@@ -192,8 +194,7 @@ It now takes an in-flight marker keyed like its fingerprint, released when the w
 (**including on rejection** — a leak would wedge that session-day) and checked before the limit.
 
 **The AI-usage screen's top row was an artefact of its own fingerprint (Q-471).** Three meal-plan
-sections fingerprinted on a rounded calorie target alone, so every deliberate reroll read as a
-double trip. They now carry what distinguishes a request, keyed through a new `contentKey` helper.
+sections fingerprinted on a rounded calorie target alone, so every reroll read as a double trip.
 **44 of the 89 redundant calls were this artefact; the other 45 are real** (Q-470, Q-469) —
 [journal](docs/overview/entries/2026-08-23-ai-fingerprint-granularity.md).
 
@@ -342,7 +343,8 @@ order.
 **Found, not fixed.** Owner report with a Home screenshot — *"Body temp elevated · +0.5°C above your baseline"*, readiness 52, Recovery recommended — *"its often triggering deload days. its not trustable yet."* `computeBlendedScore` (`lib/health/readiness-payload.ts:169`) subtracts on an **absolute °C** ladder: −10 past 0.3, −20 past 0.5, capped at 40 past 1.0. Over 34 nights the **−10 arm fires on 91.2%**, the −20 on 67.6%, the cap on 17.6%; only 3 nights escape, and the stored deviation is **positive on all 34**. Cause: measured nightly temp is **35.827 °C (sd 0.140)** against a stored baseline of **35.464** — **0.363 °C low, clearing the 0.3 threshold on its own**. A trailing-mean baseline takes the mean penalty from **−16.3 to −0.4 pts/day**. [`review`](docs/reviews/2026-08-24-readiness-temperature-penalty.md).
 - **One baseline, two consumers, opposite failures.** The same object's **sd is ~13× too wide** (1.82 °C vs a true 0.140) — Q-506 reproduced from another table. Wide sd → the illness radar can never fire; low mean → readiness penalised daily. **Fix both or neither**; batched as `temperature-baseline`.
 - **⛔ Do not touch the 0.3/0.5/1.0 ladder** — against a true sd of 0.140 °C it sits at 2.1/3.6/7.1 sd. Fourth "the threshold is right, the input is wrong" in this pillar after Q-506, Q-512, Q-514.
-- **Owner signed off 2026-08-24**, and asked for the penalty **suspended in the meantime** — that is **TN-6a**, which ships alone and is not in the batch. **Check Q-2 first** (nightly temperature treats one frame's simultaneous probes as consecutive samples) — a plausible reason the EMA seeded ~1.1 °C low. **History policy: leave stored days alone, stamp the new model.**
+- **⚑ BugFix found the mechanism independently (BF-13); it supersedes the account above.** `updateBaseline` seeds the mean at **literal zero** (`personal-baseline.ts:30`). The 34.696 °C figure is read from n=14, the first night `temp_dev_c` is non-null; the true start is **17.905 °C at n=2** (`35.81 / 2` — a first update from zero at gain 1/2). A zero seed argues for a correct seed, not a longer warm-up. BF-13 also finds a **third** consumer — the deload card's `TEMP_ALERT_THRESHOLD_C`, firing on 23/34 nights — so this is a three-consumer fix, and that card is the surface the owner actually reported. The measured consequences stand.
+- **Owner signed off 2026-08-24**, and asked for the penalty **suspended in the meantime** — **TN-6a**, which ships alone, outside the batch, and must cover all three consumers. **History policy: leave stored days alone, stamp the new model.**
 
 ### [sleep] 🟡 The sleep score's swing is real signal; its calibration gain varies 8-fold (TN-5, 2026-08-24)
 

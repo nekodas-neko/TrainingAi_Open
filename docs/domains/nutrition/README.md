@@ -19,6 +19,23 @@ fallback) are what every offline-first domain should copy. See CLAUDE.md, "Offli
 
 ## Reference docs
 
+- [`docs/design/2026-08-18-nutrition-rework-mockups.html`](../../design/2026-08-18-nutrition-rework-mockups.html)
+  — **the nutrition rework's twelve reference drawings**, at true S25 size in the app's own tokens.
+  Open this before building **Q-395 / Q-395a / Q-395b / Q-395c** or **Q-406**; it is what they cite.
+  Page 1 is the six reworked screens (day · add food · my meals · meal detail · edit meal ·
+  quantity), page 2 the review that produced them (today's Saved Meals, the tap-target audit, the
+  hardcoded-green finding, and `srv/g` options A/B/C).
+  **Recovered and committed 2026-08-24** from the Claude Design canvas they had only ever lived in —
+  which had blocked those four entries for six days. Two corrections it carries: there is no
+  `unit-options.png` (it was a screenshot of the `srv/g` artboards), and Q-395a's expanded and
+  collapsed rows are **two different artboards** (`UnitA` and `EditMeal`), not one.
+- [`docs/superpowers/specs/2026-08-24-meal-creator-and-planner-design.md`](../../superpowers/specs/2026-08-24-meal-creator-and-planner-design.md)
+  — **the meal creator / planner redesign** (BF-11), owner-agreed. Plans:
+  [Part 1, the creator](../../superpowers/plans/2026-08-24-meal-creator.md) ·
+  [Part 2, the library-first planner](../../superpowers/plans/2026-08-24-library-first-meal-planner.md).
+  Part 2 §1.1 records that `fitDistance` (`packages/shared/src/nutrition/meal-macro-fit.ts`) is
+  already the one place that ranks a meal against a target — do not write a second one — and §2 two
+  live defects in `generate/route.ts` when pinned meals outnumber the slots.
 - [`docs/reviews/2026-08-15-pillar-model-soundness-review.md`](../../reviews/2026-08-15-pillar-model-soundness-review.md)
   — §3: the energy model is sound (Schofield BMR + Mifflin factors + Compendium METs) and targets are
   internally consistent, but **adaptive TDEE has not fired once in 30 rolling windows** because food
@@ -170,7 +187,8 @@ Live at the time of writing (2026-07-30):
   unblocked, **plan written 2026-08-13**:
   [`plans/2026-08-13-meal-plan-prefill-and-confirmation.md`](../../superpowers/plans/2026-08-13-meal-plan-prefill-and-confirmation.md)
   — keep unconfirmed prefills out of `food_logs` rather than filtering a column across its 24 readers)
-  and **Q-201** (meal times schedule nothing — a three-way fork awaiting the owner).
+  and ~~**Q-201**~~ (meal times schedule nothing — **decided 2026-08-24: they stay labels and
+  schedule nothing.** See *Decided, and deliberately not built* below; the entry is out of the queue).
   Carry-forwards worth more than the features: portion sizing is arithmetic, never the model's job;
   an OFF **503** is usually our own rate limiting, but a **502 is a real outage** (measured
   2026-08-13 — OFF served a downtime page across its whole API for hours), and the two must reach
@@ -183,6 +201,28 @@ Live at the time of writing (2026-07-30):
 - Journal: `grep -rl 'nutrition\|food\|supplement' docs/overview/entries/`
 
 ## Decided, and deliberately not built
+
+- **A plan meal's `suggestedTime` stays a LABEL — it schedules nothing (owner, 2026-08-24 — Q-201,
+  removed from the queue).** *"For now it can stay as a label; we already have the notification
+  system for when meals are missed, that's fine."* `meal_plan_meals.suggested_time` is written by the
+  generator, synced, rendered on three surfaces and fed to the AI as context; nothing fires from it,
+  and nothing should. **Keep it that way**, and do not read the dead field as a bug to fix.
+  - The two things were never the same notification, which is what made this a fork rather than a
+    task: the existing reminders (`computeMealReminderActions`, `lib/meal-reminders.ts`) fire at a
+    **meal type's end hour** as a *"you didn't log this"* catch-up, while `suggestedTime` is a
+    *"time to eat"* prompt. Meal types and plan meals are not 1:1 either — a plan meal's
+    `mealTypeId` is usually null, so there is often no meal type to hang a plan time on.
+  - **Both build options were rejected for the same underlying reason:** making plan times drive the
+    existing reminders changes what today's catch-up reminder *means*, and adding a second stream
+    puts two independent schedulers behind one interrupting surface. Notifications are also
+    verifiable **only** on the device, so either choice ships an unverifiable behaviour change to
+    the one surface that interrupts the user.
+  - **What meets the underlying need instead: Q-187's prefill.** The day's food logs pre-populate
+    from the active plan, so the plan is present in the day without anything having to interrupt.
+    That is the entry's own *"cheapest thing that would make an active plan feel alive"*, without a
+    notification.
+  - **Revisit only if** the owner reports actually wanting a prompt at the time — at which point the
+    fork above is still the fork, and prefill will have shown whether presence beats interruption.
 
 - **A meal type's entries can be MOVED, never bulk-deleted (owner, 2026-08-23 — LB-2, removed from
   the queue).** Q-326's delete dialog offers *"move them"* and no *"delete them instead"*, and the

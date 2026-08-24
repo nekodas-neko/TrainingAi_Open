@@ -2058,7 +2058,7 @@ Known Issue to archive for exactly this headroom and found none. A file sitting 
 allowed by the ratchet's own rule; lowering it here would hand a live PR a conflict for no gain. The
 next session to touch this file should ratchet it to whatever the tree then holds.
 
-## 2026-08-24 — `projectOverview.md` 7908 → 7935 (+27); `docs/agents/state/tuning.md` 582 → 99 (−483)
+## 2026-08-24 — `projectOverview.md` 7908 → 7937 (+29); `docs/agents/state/tuning.md` 582 → 99 (−483)
 
 **Raised** `projectOverview.md` for three new Known-Issues rows from the owner's readiness/battery
 batch — **TN-2** (Body Battery floors by early afternoon), **TN-6** (the temperature baseline is
