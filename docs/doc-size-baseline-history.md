@@ -1913,6 +1913,14 @@ Ten lines: the Current Status entry for the Q-454/Q-455/Q-465 route-hardening ba
 a merge. The count moved because the surrounding section shrank underneath it, not because the entry
 grew.
 
+## 2026-08-23 — `CLAUDE.md` 1148 → 1154
+
+Six lines in the `CLAUDE_DB_READONLY_URL` section: the owner id has left the generated `claude_ro`
+views (Q-456) and is now set at boot from the environment. It belongs in the rules because the
+failure mode when *no* variable is set is *the views return zero rows* — and a session that reads
+`error_events` at start-up and gets nothing needs to recognise a missing setting rather than
+conclude production is quiet.
+
 ## 2026-08-23 — `docs/implementation-backlog.md` 11202 → 11129
 
 Removing four entries that had already shipped and were **resurrected by one of my own merge
@@ -1947,3 +1955,21 @@ on a JSON file produces two `files` blocks and an unparseable document — the s
 that resurrected the four entries this branch removes, failing a different way. On a JSON baseline
 take main's copy and re-measure; the numbers are derived from the files, so there is nothing to
 merge.
+
+## 2026-08-23 — `CLAUDE.md` 1136 → 1148 (raise, +12)
+
+The session status light (🟢 live / 🔴 wrapped) became a rule for **every** session rather than only
+the six standing agents, and that cannot live in `docs/agents/README.md` — an ad-hoc session never
+opens it. So a Standing Instruction (7 lines) plus a fourth step in Session Wrap-Up (5 lines).
+
+The trigger is why it belongs in the index at all: the owner says *"wrap up this session"*, which
+lands on the Session Wrap-Up ritual, and that ritual had three steps and no mention of the light.
+Documented anywhere else, the convention would have lived in a file the sessions that most need it
+never read. The mechanism — two MCP calls — stays in `docs/agents/README.md` under *The trailing
+light*; the index carries only the rule and the trigger.
+
+Mid-branch this went 1136 → 1135 (the rewritten session-titles bullet came out a line shorter) and
+then up to 1148. Recorded as the single net change, since the branch squash-merges. The lesson kept
+from the detour: do not ratchet a baseline down while the convention it measures is still being
+worked out — it bought nothing and had to be undone within the hour.
+

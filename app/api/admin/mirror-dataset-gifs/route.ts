@@ -17,7 +17,7 @@ const MAX_BODY_BYTES = 8 * 1024
 const BodySchema = z.object({
   exerciseName: z.string().min(1).max(120),
   force: z.boolean().optional(),
-});
+}).strict();
 
 export async function POST(req: Request) {
   const session = await auth();

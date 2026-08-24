@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { and, asc, eq, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { getDb } from '../client'
 import * as s from '../schema'
 import { bodyToHex, hexToBody, packFrames, unpackFrames, type RawFrame } from '@/lib/oura-ble/frame-pack'
@@ -143,7 +143,7 @@ export async function packOuraRawBuckets(
     )
 
     const rows = await db
-      .select({ ds: s.ouraRawSamples.ringTimestampDs, bodyHex: s.ouraRawSamples.bodyHex })
+      .select({ id: s.ouraRawSamples.id, ds: s.ouraRawSamples.ringTimestampDs, bodyHex: s.ouraRawSamples.bodyHex })
       .from(s.ouraRawSamples)
       .where(scope)
       .orderBy(asc(s.ouraRawSamples.ringTimestampDs))
@@ -198,8 +198,18 @@ export async function packOuraRawBuckets(
       continue
     }
 
-    // Phase 3 — the only destructive statement in this plan.
-    await db.delete(s.ouraRawSamples).where(scope)
+    // Phase 3 — the only destructive statement in this plan, scoped to the rows that were actually
+    // read and verified rather than to the bucket range.
+    //
+    // Task 6 is what makes the difference matter. The bucket-range delete would also remove a frame
+    // that arrived *between* the select above and this statement — a frame that is therefore in
+    // neither tier. The quiet guard makes that narrow, but firing the packer from the ingest path is
+    // precisely arranging for it to run while frames are arriving, so narrow is not the same as
+    // impossible. Deleting by primary key makes the set provably a subset of what the verify proved.
+    await db.delete(s.ouraRawSamples).where(and(
+      eq(s.ouraRawSamples.userId, userId),
+      inArray(s.ouraRawSamples.id, rows.map(r => r.id)),
+    ))
 
     results.push({ epoch: b.epoch, tag: b.tag, dsBucket, frames: source.length, bytes: blob.length })
     framesMoved += source.length
@@ -261,6 +271,71 @@ export function verifyStoredBucket(
     if (a[i] !== c[i]) return `frame ${i} differs: stored ${c[i]}, source ${a[i]}`
   }
   return null
+}
+
+/**
+ * Q-541 Task 6 — the automatic run.
+ *
+ * Task 4 shipped the packer admin-triggered and deliberately never automatic, because it holds the
+ * only DELETE of an archival frame. Task 5 then ran it over all history in production and verified
+ * clean: **764 blobs hold 941,233 frames in 13 MB**, contiguous with the hot tier's oldest ds, and
+ * nothing downstream noticed. That is the evidence the plan's ordering asked for, so the button
+ * becomes a schedule.
+ *
+ * It has to, because a manual packer does not hold a growth curve. `oura_raw_samples` was pruned to
+ * 2026-08-10 by that run and had regrown to **318,183 rows / 92 MB** five days later — ~6.5 MB/day
+ * against the ~0.4 MB/day the whole database is supposed to grow at. The packing is not what was
+ * missing; pressing the button was.
+ *
+ * There is no cron layer in this app (module-map §0), so this rides the ingest path like every other
+ * retention job — with two differences that follow from what it deletes:
+ *
+ *   - **Per user, not per process.** The other throttles are one module-level timestamp, which with
+ *     two ringed users lets the busier one starve the other indefinitely. The cost of keying it is a
+ *     `Map` sized by real users.
+ *   - **Claim, don't check.** This both tests and sets, so two ingest batches arriving together in
+ *     one process cannot both start a run. It does not coordinate across replicas — it does not need
+ *     to, because concurrent runs are safe by construction (the insert is `DO NOTHING`, the verify
+ *     re-reads what is committed, and the delete names row ids) — it just avoids the wasted work.
+ *
+ * `OURA_AUTOPACK=off` stops it without a code deploy. Nothing else in the pipeline depends on it
+ * running: the readers span both tiers, so the only consequence of it being off is the growth curve.
+ */
+export const AUTOPACK_THROTTLE_MS = 6 * 60 * 60 * 1000
+/**
+ * Bounded, because this runs behind a device request — but sized from the measurement, not from
+ * caution. The 2026-08-18 backfill packed **764 buckets in 246 s**, i.e. **0.32 s per bucket**, so
+ * 25 is about **8 seconds** of background work every 6 hours.
+ *
+ * 8 was the first number here and it was too small, on arithmetic that was also wrong. Four runs a
+ * day of 8 is 32 buckets against **22.5 arriving** — a net of 9.5, which converges, but would take
+ * **~12 days** to absorb the backlog that exists right now (measured in production 2026-08-24:
+ * **115 eligible buckets holding 140,487 frames**). At 25 it is ~100 a day against 22.5, and the
+ * backlog is gone in **a day and a bit** — which is what makes the follow-up `VACUUM FULL` a single
+ * press rather than something to repeat as the tail dribbles in.
+ */
+export const AUTOPACK_MAX_BUCKETS = 25
+
+const lastAutoPack = new Map<string, number>()
+
+/** Exported for the tests; resets the per-user throttle so a case can fire a run of its own. */
+export function resetAutoPackThrottle(): void {
+  lastAutoPack.clear()
+}
+
+export function claimAutoPackSlot(
+  userId: string,
+  nowMs: number,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  if (env.OURA_AUTOPACK === 'off') return false
+  // A user this process has not seen claims immediately — `?? 0` would instead compare against the
+  // epoch, which is only indistinguishable from "claim" because `Date.now()` is large. It would make
+  // the first claim after a restart depend on the clock rather than on the user.
+  const last = lastAutoPack.get(userId)
+  if (last !== undefined && nowMs - last < AUTOPACK_THROTTLE_MS) return false
+  lastAutoPack.set(userId, nowMs)
+  return true
 }
 
 /** How much is left to pack, without packing anything — for the admin readout. */
