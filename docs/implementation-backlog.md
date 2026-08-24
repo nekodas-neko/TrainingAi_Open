@@ -331,6 +331,36 @@ days/hours cause most stress". Measured against production the same day; the bou
 signed off by the owner in that conversation. Review:
 [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](reviews/2026-08-24-body-battery-charge-window-collapse.md).*
 
+### [readiness] TN-6a — suspend the temperature penalty until its baseline is centred
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner decision, asked and answered plainly
+- **Lane: A** — `lib/health/readiness-payload.ts`
+- **Owner sign-off: RECEIVED 2026-08-24.** *"Fix baseline + suspend penalty now."*
+- **Do NOT batch with TN-6/Q-506.** The whole point is that this lands first, on its own.
+
+The interim half of TN-6. `computeBlendedScore`'s absolute-°C ladder costs **−16.3 readiness
+points/day** and fires on **91.2%** of nights because the baseline mean is 0.363 °C low. The proper
+fix is TN-6 (batched with Q-506) and needs real design; this stops the damage in one deploy.
+
+**Skip the temperature arm while the baseline is demonstrably uncentred.** Gate it on a condition the
+code can evaluate rather than a hardcoded date — e.g. suspend while the trailing-30-night mean
+deviation sits outside ±0.15 °C, or while fewer than ~30% of recent nights are negative. A
+self-clearing guard cannot be forgotten; a `TODO: remove after` comment can.
+
+**What this costs, stated plainly:** genuine fever detection through this path, until TN-6 lands.
+That cost is near zero today — the deviation is positive on **34 of 34 nights**, so the ladder cannot
+currently distinguish illness from baseline error in either direction. The owner was told this before
+choosing.
+
+**Pass test:** on the owner's stored history the temperature arm contributes **0** points while the
+suspension condition holds; readiness rises by the **−16.3 pts/day** the penalty was costing; and the
+suspension **clears by itself** on a synthetic history whose deviations are centred — proven by a
+test that feeds both, not by reading the condition.
+
+**Keep:** this is a suppression, not a fix. It must be removed by TN-6 rather than left as permanent
+behaviour, and TN-6's own pass test (deviation mean within ±0.05 °C of zero) is what retires it.
+
 ### [readiness][devices] TN-6 — the temperature baseline is 0.36 °C too low, so readiness carries a −16 pt penalty on 89% of days
 
 - **Branch:** _unassigned_
@@ -345,7 +375,13 @@ signed off by the owner in that conversation. Review:
   seed wants a longer warm-up, a zero seed wants a correct seed. BF-13 also finds a **third**
   consumer (the deload card's `TEMP_ALERT_THRESHOLD_C`, firing on 23/34 nights), so this entry's
   *"fix both or neither"* is really **all three**.
-- **Gate: owner** — changes the readiness score. Not signed off.
+- **Owner sign-off: RECEIVED 2026-08-24** for the baseline fix — given before BF-13 surfaced, and it
+  stands: BF-13 changes *how* to fix the seed, not whether to. The owner also asked for the penalty
+  **suspended in the meantime** — that is **TN-6a**, which ships on its own and is deliberately NOT
+  in this batch. **TN-6a must cover all three consumers**, including the deload card BF-13 found;
+  that card is the surface the owner actually reported.
+- **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Do not
+  re-score past days.
 
 Home shows *"Body temp elevated · +0.5°C above your baseline (threshold 0.5°C)"* and a Recovery
 recommendation with readiness 52. `computeBlendedScore` (`readiness-payload.ts:169`) applies an
@@ -468,7 +504,13 @@ which fires on a measured average of 50 stress-high minutes/day. Real-world ends
 shipped TypeScript with the stress term included, not against this table.
 
 **Pass test:** over the same 56 days, end-of-day mean **55–65**, sd **≥ 28**, **≤ 3 days at 0** and
-**≤ 6 days at 100**, with the stress-drain term active. Bump `MODEL_VERSION` to `v6` in the same PR
+**≤ 6 days at 100**, with the stress-drain term active.
+
+**History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
+keep what the owner saw; the `MODEL_VERSION` bump below is what makes the two eras separable.
+**⚠️ That policy leans on the stamp surviving, and Q-518 says it does not** — a sibling writer erases
+`model_versions` within hours. Body Battery writes its own `model_version` column and is fine; a
+readiness-side stamp is not, so **Q-518 is now load-bearing for this decision** rather than a tidy-up. Bump `MODEL_VERSION` to `v6` in the same PR
 so v5 and v6 days are never pooled — `docs/body-battery-tuning.md` depends on that stamp.
 
 **Not to be done here:** do not fit the boundary to a percentile of the owner's own waking HR. It is
@@ -605,8 +647,11 @@ part of this entry**, not only new surfaces.
 - **Branch:** _unassigned_
 - **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
 - **Lane: A** — `packages/shared/src/health/sleep-score.ts`
-- **Gate: owner** — a scoring change; the owner has not signed this one off (TN-2's sign-off does
-  not carry over).
+- **Owner sign-off: RECEIVED 2026-08-24.** Asked plainly, with the caveat that this does **not** make
+  the score less jumpy, and approved on that basis. Build it.
+- **History policy (owner, 2026-08-24): leave stored history alone and stamp the new model.** Old days
+  keep the numbers the owner actually saw; new days use the new curve under a bumped model version.
+  Do **not** re-score the back catalogue.
 - **Do not batch.** It re-scores every night and its threshold check must run in the same PR.
 
 `SCORE_CALIBRATION` (`sleep-score.ts:155`) maps the weighted blend onto the display scale, and its
@@ -655,6 +700,50 @@ same 41 nights within ±2 of 87.0 and **not above it**; `LOW_SLEEP_SCORE` firing
 2/41; the three tests asserting the ceiling is reachable-but-not-routine still pass.
 
 Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24-sleep-score-volatility.md).
+
+### [readiness][platform] TN-7 — TN-4's guard swallows the one signal LA-20's open verification depends on
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · found while reconciling TN-4 against LA-20's Known-Issues row
+- **Lane: A** — `app/api/body-battery/route.ts`, one line
+- **Needs: TN-4** — this is a follow-up to what TN-4 shipped, not a criticism of it.
+
+TN-4's fix (#415, merged 2026-08-24 12:51 UTC) is correct and should stay. Its catch, though, ends at
+
+```ts
+console.error('[body-battery] daytime stress series failed, continuing without it:', err)
+```
+
+**`console.error` does not reach `error_events`** — the route imports `reportServerError` and uses it
+in the outer catch, but not here. So from that deploy onward a recurrence of
+`daytime-stress: constants not set` produces **no row anywhere**.
+
+**That is exactly the signal LA-20's Known-Issues row is waiting on.** Its `Keep:` reads *"the check
+is `error_events` after this deploys … the count must be zero across a window where
+`/api/body-battery` was actually called."* After TN-4 the count is zero **whether or not the root
+cause is fixed**, so the condition can no longer fail and no longer distinguishes anything.
+
+**What the observable window did establish, before the guard landed.** The fault ran
+2026-08-23 10:37 → **20:59** UTC (**31 occurrences** — LA-20's row records 19 and a 12:27 latest,
+read while it was still firing; both figures are superseded). It then went silent, and at
+**2026-08-24 11:20:38 UTC** `/api/body-battery` completed a full run and wrote a
+`body_battery_daily` snapshot with no fault — a genuine successful call ~14 h after the last error
+and ~1.5 h *before* TN-4's guard deployed. That is **one confirmed clean run in an observable
+window**, which is real evidence and is weaker than the "window" LA-20 asked for. Everything after
+~13:00 UTC on 2026-08-24 is uninformative.
+
+**Fix:** report from the catch as well as logging — `reportServerError(err, { userId, url: '/api/body-battery#stress' })`
+or an equivalent non-fatal severity. The card must still degrade rather than 500; what has to change
+is that the degradation leaves a trace.
+
+**Pass test:** force the constants unset in a test and assert both that the route returns 200 **and**
+that a report was emitted. Then LA-20's `Keep:` becomes checkable again and can be struck on a clean
+window; until then it must not be struck on silence.
+
+**The general shape, worth naming:** a hardening change that converts a loud failure into a quiet
+degradation also removes the evidence a *separate* open investigation was relying on. When a fix
+turns a 500 into a fallback, check whether anything is waiting on that 500 — and carry the signal
+across.
 
 ### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
 
@@ -1238,8 +1327,50 @@ owner's healthy nights, and a fresh baseline for any metric is within one sample
 true mean on night 2 rather than converging for fifty.
 
 - **Surface: server/shared, web-reproducible.** Pure function over data already in Postgres; no
-  device needed to fix or verify. **Re-deriving the stored baselines is a data change** and needs the
-  owner, same shape as Q-304b.
+  device needed to fix or verify.
+
+- **✅ OWNER DECISION 2026-08-24 — asked plainly, both halves answered. `Gate: owner` is CLEARED.**
+  1. **Re-derive the stored baselines** (not seed-fix-only). The reasoning the owner accepted: a
+     baseline is a corrupted *intermediate*, not a record of what the app told them, so re-deriving it
+     is a different act from re-scoring history and does not contradict the "leave stored days alone,
+     stamp the new model" policy set the same day. The raw nightly values are untouched, so the
+     re-derivation is re-runnable and reversible.
+  2. **Fix the seed for all six baselines; re-derive only the ones measurably wrong.** One line
+     protects every metric; data changes stay evidence-led.
+
+- **📏 Which ones are measurably wrong — MEASURED 2026-08-24 (Tuning), so this needs no TODO.**
+  Baselines converted to native units with the factors at their call sites
+  (`daily-summary.ts:102-112`: hrv ×1 ms · rhr ×1 bpm · temp ×100 · sleep ×60 · met ×10 · breath ×10),
+  compared against the true mean of the same nightly column over 50 summary rows:
+
+  | metric | true mean | stored baseline | gap | **gap / nightly sd** | % nights above | verdict |
+  |---|---|---|---|---|---|---|
+  | **temp** | 35.842 °C | 35.464 | +0.378 | **+2.80** | **100.0%** | **RE-DERIVE** |
+  | breath | 9.400 rpm | 9.250 | +0.150 | +0.27 | 77.6% | leave |
+  | rhr | 53.871 bpm | 53.000 | +0.871 | +0.28 | 36.7% | leave |
+  | sleep | 8.010 h | 7.946 | +0.064 | +0.06 | 57.1% | leave |
+  | hrv | 55.765 ms | 55.375 | +0.390 | +0.04 | 87.8% | leave |
+  | met | 1.365 MET | 1.375 | −0.010 | −0.09 | 44.0% | leave |
+
+  **Temperature is the only one to re-derive.** That is this entry's own hypothesis — *"visible in
+  temperature because temperature has a large non-zero mean and a tight spread"* — now measured
+  rather than assumed: the zero seed leaves a similar absolute gap in fixed-point units across all
+  six, and only temperature's nightly sd (0.140 °C) is small enough for that gap to be 2.8 sd out.
+  **Still fix the seed for all six** — a metric that is within noise today is one input change away
+  from not being.
+
+  **`% nights above` is the diagnostic to reuse**, not the raw gap: it is 100% for temperature and
+  near 50 for a centred baseline. Read it alongside `gap/sd` — hrv reads 87.8% on a gap of only
+  0.04 sd, which is an EMA lagging a genuinely rising metric (overnight HRV has climbed for months),
+  not this defect.
+
+- **⚠️ Near-miss worth copying: get the fixed-point factor from the CALL SITE, never by inference.**
+  The first pass here inferred each scale by choosing the power of ten that best fit the newest row.
+  That is right for temp (×100) and **wrong for sleep, which is ×60** — it produced a "baseline
+  4.768 h against a true 8.010 h, 98% of nights above, gap +3.24 h" that read exactly like a second
+  severe defect. Acting on it would have meant an **unnecessary data change to the sleep baselines**,
+  which is the one category of mistake the owner gate exists to prevent. The factors are four lines
+  apart in `daily-summary.ts`; read them.
 
 ### [devices][readiness] BF-14 — the breathing-rate baseline converges to ~93 against a real 9.8 rpm
 
@@ -1271,6 +1402,163 @@ breath_avg_rpm:   9.1     9.7    10.0     9.8      9.8     <- the value it is co
   return.
 - **Surface: server/shared, web-reproducible.** Same as BF-13.
 
+
+### [workouts] BF-15 — the exercise-role default is `primary`, so an unclassified isolation movement gets prescribed like a main lift
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner report — *"my concern here is that some 'isolation' type work will increase to a main level when it should be accessory sort of — like bicep curls... but what about cable dips?"*
+- **Lane: A** — `lib/data/postgres/schema.ts`, one Postgres migration, `lib/sqlite/migrations.ts` (local schema version), plus the `?? 'primary'` read fallbacks listed below.
+- **Ships alone.** BF-16 depends on it but is owner-gated, and BF-17 is a pure rename that must stay separately revertable — batching either makes the revert non-separable.
+
+**The role decides the prescription, not a badge.** `resolveStyleForExercise`
+(`packages/shared/src/phase-engine.ts:147`) selects the progression style from `exercise_role`, and
+the style carries the per-set percentages and reps. `primary` takes the phase's *primary* style —
+the heavy one that climbs across the block. So a movement that lands on `primary` by omission is
+prescribed at main-lift percentages and escalates with the phase, which is exactly the owner's
+report.
+
+**Two places default it to `primary`, and both are wrong way round:**
+
+| Site | Current |
+|---|---|
+| `lib/data/postgres/schema.ts:138` | `text('exercise_role').notNull().default('primary')` |
+| `lib/sqlite/migrations.ts:178` | `exercise_role TEXT NOT NULL DEFAULT 'primary'` |
+
+Both must flip in the same PR — a local default that disagrees with the server default writes
+divergent rows on the offline path.
+
+**Ten read sites also hard-code the same fallback** and must flip with it, or a null read
+re-manufactures the defect downstream of the column: `lib/coach/domains/session-exercise.ts:311`,
+`lib/local-store/sync-engine.ts:422`, `lib/local-store/sqlite-backend.ts:1010`,
+`lib/data/postgres/slices/programs.ts:118,289`, `app/api/admin/program-export/route.ts:63`,
+`components/config/program-editor-sheet.tsx:854`, `components/config-screen.tsx:398,450`,
+`packages/shared/src/workout/session-data.ts:190,299,317,365`,
+`packages/shared/src/ai-periodization/generate-prescription.ts:389,464`,
+`components/workout/ai-prescription-card.tsx:278`.
+
+**`session-data.ts:299` is the one that shows the blast radius is not only load:**
+`lastSetMode = (ex.exerciseRole ?? 'primary') === 'primary' ? 'amrap' : 'plus1'` — so an
+unclassified exercise also gets an **AMRAP** last set. On an isolation movement that is a set taken
+to failure at a percentage chosen for a compound.
+
+**`accessory` is the correct floor, and the codebase already says so.**
+`UNCLASSIFIED_EXERCISE_ROLE` (`packages/shared/src/workout/exercise-role.ts:80`) is already
+`'accessory'`, with the reasoning written out: being wrong at `accessory` under-loads, being wrong
+at `primary` puts a heavy percentage on a movement nobody has classified. The Coach swap path
+honours that constant; the schema default contradicts it. This entry makes the schema agree with
+the code that was written to be careful.
+
+**Second half — the classifier exists and is wired to exactly one path.**
+`recommendExerciseRole` is called only from `lib/coach/domains/session-exercise.ts:183,273` (the
+Coach swap). Every other way a `session_exercises` row is created — the program editor, the
+AI program generator, the local program assembler — takes the column default instead. Wire the
+classifier into those insert paths so a *new* slot arrives with a recommendation rather than a
+default. It returns `null` when the catalogue entry has no muscles, which means *ask* and must not
+be collapsed into a default at the call site (the function's own contract).
+
+- **What would count as fixed:** a new session exercise created from the program editor for
+  Dumbbell Bicep Curl arrives as `accessory` without anyone touching the role control, and a test
+  asserts the two schema defaults agree.
+- **Do NOT sweep existing rows in this PR.** Correcting the rows the owner already has is BF-16 and
+  is gated on their approval — a silent re-role changes the prescription of a program mid-block.
+- **Surface: server/shared + local SQLite.** The local-schema half is **not** web-reproducible —
+  `getLocalStore` returns null in the sandbox — so the migration path needs the device check, or a
+  Known-Issues row saying it did not get one.
+
+### [workouts] BF-16 — 14 exercises hold two or three different roles across the owner's own program
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · found while tracing BF-15, from production
+- **Lane: A** — data correction, no schema. `session_exercises.exercise_role`.
+- **Needs:** BF-15
+- **Gate: owner** — every changed row changes a prescribed percentage. The deliverable is an
+  **advisory list the owner approves row by row**, never a silent sweep.
+
+Measured against production (`claude_ro.session_exercises`, 87 slots: 31 primary / 31 secondary /
+25 accessory). Fourteen exercise names carry more than one role:
+
+| Exercise | Roles held | Slots |
+|---|---|---|
+| Cable Chest Dips | primary + secondary | 5 |
+| Bent-Over Barbell Row | primary + secondary | 4 |
+| Dumbbell Bulgarian Split Squat | primary + secondary | 4 |
+| **Dumbbell Lateral Raise** | accessory + primary + secondary | 4 |
+| Barbell Hip Thrust | primary + secondary | 3 |
+| Barbell Romanian Deadlift | primary + secondary | 3 |
+| Cable Pulldown | primary + secondary | 3 |
+| Landmine Press | primary + secondary | 3 |
+| Single Leg Hip Thrusts | primary + secondary | 3 |
+| Cable Crunch Abs | accessory + primary | 3 |
+| Dumbbell Preacher Curl | accessory + primary | 3 |
+| Tricep Cable Combo | accessory + primary | 3 |
+| Barbell Shrug | accessory + secondary | 2 |
+| Pull-Up | accessory + secondary | 2 |
+
+**Not all of these are defects, and the distinction is the whole entry.** A row can legitimately be
+primary on one day and secondary on another — Bent-Over Barbell Row leading a pull session and
+supporting a deadlift session is correct, and role is a property of the *slot*, not the exercise.
+What is not defensible is a **lateral raise** appearing at `primary`, or a **preacher curl** and a
+**cable crunch** at `primary`: those are isolation movements taking a main-lift style, and they are
+the owner's reported symptom.
+
+**The split to apply:** for each of the 14, present the current role per slot alongside
+`recommendExerciseRole`'s recommendation and the catalogue's muscle count + equipment, and let the
+owner accept or reject each. Movements the classifier calls `accessory` (fewer than 3 muscles) that
+are currently sitting at `primary` are the high-confidence corrections; the barbell compounds
+holding two roles are probably deliberate and should default to *keep*.
+
+- **What would count as fixed:** no isolation movement (catalogue muscle count < 3) holds
+  `exercise_role = 'primary'` anywhere in the owner's program, and each change is one the owner
+  approved.
+- **Surface: production data.** Not reproducible against the local seed — the dev database's nine
+  slots are seeded correct.
+
+### [workouts][platform] BF-17 — `main` and `primary` are two different axes wearing the same word, and `secondary` means both
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner: *"can we have consistent names? I know we use main as well somewhere?"*
+- **Lane: A** — one idempotent data migration over `exercise_library.muscles`, plus ~25 mechanical
+  code sites. No behaviour change.
+- **Needs:** BF-15
+
+Two unrelated axes share near-synonymous vocabulary, and collide outright on `secondary`:
+
+| Axis | Stored in | Values |
+|---|---|---|
+| **Muscle** role — how hard this exercise works this muscle | `exercise_library.muscles` JSONB (`{"muscle":"biceps","role":"main"}`) | `main` \| `secondary` |
+| **Exercise** role — what the exercise is *for* in the session | `session_exercises.exercise_role` (`ExerciseRole`) | `primary` \| `secondary` \| `accessory` |
+
+So `secondary` is an assisting muscle in one context and a second-tier lift in the other, and
+`main`/`primary` are the same word on different axes.
+
+**This is not cosmetic — it has already misled the code that reads it.**
+`packages/shared/src/workout/exercise-role.ts` carries a whole paragraph of docstring explaining
+that a "2+ `main` muscles = compound" rule calls Barbell Bench Press an isolation, because 117 of
+142 catalogue rows carry exactly one `main` muscle. That warning exists only because the naming
+invites the mistake. `roleWeight` (`packages/shared/src/muscles.ts:29`) and six
+`ai-periodization` sites all branch on `role === 'main'` for muscle weighting, adjacent to code
+branching on `exerciseRole === 'primary'` for style selection.
+
+**Rename the MUSCLE axis, not the exercise axis:** `main` → `target`, `secondary` → `assisting`.
+The exercise axis is a real column, drives the progression engine, and is shown in the UI; the
+muscle axis lives inside a JSONB blob and in-memory types, so it is the cheaper half to move.
+
+Scope: one idempotent `UPDATE … jsonb` migration over the catalogue rows; the `'main' | 'secondary'`
+literal type in `packages/shared/src/types/program.ts:3` and its ~25 call sites (`muscles.ts`,
+`ai-periodization/*`, `injury-substitution.ts`, `session-data.ts`, `program-assembler.ts`,
+`coach/tools.ts`, `exercise-image-gen.ts`); the `mainMuscles` field name in
+`packages/shared/src/types/builder.ts` and its validator; and the AI prompt string at
+`app/api/exercises/generate/route.ts:30`, which instructs the model to emit `"main"`.
+
+**Alternative considered — document the two axes and leave the words.** Genuinely better at zero
+risk, and nothing is broken today. It loses because the confusion is already load-bearing in a
+docstring, and every future change to the classifier re-pays the tax.
+
+- **Must not batch with BF-15.** A rename with no behaviour change riding alongside a change that
+  alters prescriptions makes the revert non-separable.
+- **What would count as fixed:** `grep -rn "'main'" --include=*.ts packages/ lib/ app/ components/`
+  returns no muscle-role hits, and the catalogue holds no `"role":"main"`.
+- **Surface: server/shared, web-reproducible.** The migration is idempotent and reversible.
 
 ### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
 
