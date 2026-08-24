@@ -4518,7 +4518,7 @@ ehr     0     0     0     0   648   208   128   556     0
   on its own day's value regardless.) Working in [`docs/reviews/2026-08-16-deferred-measurements.md`](reviews/2026-08-16-deferred-measurements.md) §5.
 - **Scope note:** 8 of 117 insights were read closely. A systematic pass over the rest is the
   natural companion and would size the problem properly.
-- ✅ **THE FORWARD FIX SHIPPED 2026-08-24** (`fix/supplement-reminder-gap`). `PROSE_GUARDS`
+- ✅ **THE FORWARD FIX SHIPPED 2026-08-24** (`fix/ai-model-attribution-and-prose-guards`). `PROSE_GUARDS`
   (`lib/ai/prompt-guards.ts`) is **one string interpolated by all five prose routes** —
   health-insight's builder, daily-digest, weekly-digest, recap, session-explain. It states metric
   units outright, forbids converting to imperial, requires numbers to be quoted rather than
@@ -4729,7 +4729,7 @@ ehr     0     0     0     0   648   208   128   556     0
   `AI_MODEL_ID === 'gemini-3.1-flash-lite'`; find whether `COACH_MODEL_ID` exists at all, and
   whether the coach route passes it through the logged wrapper or around it.
 - **Cheap to settle, and it invalidates measurements while it stands.**
-- ✅ **SETTLED AND FIXED 2026-08-24** (`fix/supplement-reminder-gap`). **The docs were right and the
+- ✅ **SETTLED AND FIXED 2026-08-24** (`fix/ai-model-attribution-and-prose-guards`). **The docs were right and the
   logging was wrong** — the second branch, the one that invalidates measurements. `COACH_MODEL_ID =
   'gemini-3.6-flash'` does exist, `app/api/coach/route.ts` calls `coachModel()`, and the grounding
   tool is live. What was wrong is that `logAiCall` wrote **`model: AI_MODEL_ID`, a constant**, so

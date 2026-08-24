@@ -1,6 +1,6 @@
 # The AI call log recorded an assumption, and the prose had no guards (Q-296, Q-292)
 
-**Branch:** `fix/supplement-reminder-gap` · **Lane A** · no migration · two entries batched
+**Branch:** `fix/ai-model-attribution-and-prose-guards` · **Lane A** · no migration · two entries batched
 
 Batched because neither needs device verification and both are the AI platform — one CI run and one
 read rather than two.
