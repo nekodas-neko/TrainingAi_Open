@@ -17,8 +17,7 @@ import { StepCalibration } from './step-calibration'
 import { LiveStepTest } from './live-step-test'
 import { BatterySoakTest } from './battery-soak-test'
 import { ContinuousCaptureCard } from './continuous-capture-card'
-import { DbFootprintCard } from './db-footprint-card'
-import { DeviceMetricsPanel } from './device-metrics-panel'
+import { runRedecodeJob } from './redecode-job'
 
 type Availability = 'checking' | 'unavailable' | 'ready'
 
@@ -280,34 +279,24 @@ export function OuraBleDebug() {
   // Redecode: re-run the server decoders + rollup over all stored raw samples. This is what
   // applies server-side changes (decoders, sleep staging, rollup) to existing data.
   const redecode = useCallback(async () => {
-    // Redecode is a full-table rewrite (decode every stored row + re-aggregate). On a large
-    // table it can outlast the response, so the body may come back empty/truncated even though
-    // the server committed the work — parse defensively and always refresh.
-    try {
-      const res = await fetch('/api/oura-ble/samples/redecode', { method: 'POST' })
-      const text = await res.text().catch(() => '')
-      let j: { scanned?: number; updated?: number; error?: string; redecodeError?: string | null; aggregateError?: string | null; aggregated?: { sleepSessions?: number; bodyMetricDays?: number; daysWritten?: string[]; stepErrors?: string[] } } = {}
-      try { j = text ? JSON.parse(text) : {} } catch { /* empty/truncated slow response */ }
-      const next: string[] = []
-      if (res.ok && j.scanned != null) {
-        next.push(`redecode: scanned=${j.scanned} updated=${j.updated} · sleep=${j.aggregated?.sleepSessions ?? 0} days=${j.aggregated?.bodyMetricDays ?? 0}`)
-        if (j.aggregated?.daysWritten?.length) next.push(`  wrote: ${j.aggregated.daysWritten.join(', ')}`)
-        if (j.redecodeError) next.push(`  ⚠ redecode error: ${j.redecodeError}`)
-        if (j.aggregateError) next.push(`  ⚠ aggregate error: ${j.aggregateError}`)
-        for (const e of j.aggregated?.stepErrors ?? []) next.push(`  ⚠ ${e}`)
-      } else if (res.ok) {
-        next.push('redecode ran (response was slow to return) — data refreshed')
-      } else {
-        next.push(`redecode failed: ${j.aggregateError ?? j.redecodeError ?? j.error ?? res.status}`)
-      }
-      setLines((prev) => [...prev, ...next])
-      void refreshSummary()
-      void invalidateOuraSync()
-    } catch (err) {
-      setLines((prev) => [...prev, `redecode: response not received (it may still have run) — ${err instanceof Error ? err.message : String(err)}`])
-      void refreshSummary()
-      void invalidateOuraSync()
+    // Q-318: POST returns a job id immediately and the poller waits for the real outcome. The
+    // synchronous route outlived the gateway timeout on real data, so a completed run reported as
+    // "redecode failed: 502" — and the retry that invites is another full-history re-aggregate.
+    const outcome = await runRedecodeJob('', (line) => setLines((prev) => [...prev, line]))
+    const next: string[] = []
+    if (outcome.kind === 'failed') {
+      next.push(`redecode failed: ${outcome.message}`)
+    } else {
+      const j = outcome.phases
+      next.push(`redecode: scanned=${j.scanned ?? 0} updated=${j.updated ?? 0} · sleep=${j.aggregated?.sleepSessions ?? 0} days=${j.aggregated?.bodyMetricDays ?? 0}`)
+      if (j.aggregated?.daysWritten?.length) next.push(`  wrote: ${j.aggregated.daysWritten.join(', ')}`)
+      if (j.redecodeError) next.push(`  ⚠ redecode error: ${j.redecodeError}`)
+      if (j.aggregateError) next.push(`  ⚠ aggregate error: ${j.aggregateError}`)
+      for (const e of j.aggregated?.stepErrors ?? []) next.push(`  ⚠ ${e}`)
     }
+    setLines((prev) => [...prev, ...next])
+    void refreshSummary()
+    void invalidateOuraSync()
   }, [refreshSummary])
 
   // HR recording coverage: fetch the newest raw HR events (IBI 0x80/0x60 + always-on 0x86,
@@ -600,8 +589,6 @@ export function OuraBleDebug() {
       {/* Decoded-field inspector — one newest sample per event type */}
       {summary && <SampleInspector samples={summary.latestByTag} />}
 
-      <DeviceMetricsPanel />
-
       {/* Domain sections (Sub-plan G-1) — the console is sliced by DATA DOMAIN (one chevron per
           program area) rather than by tool type, so each program feature PR drops its device-test
           card into the right section. Every lever keeps the handler defined above; only the grouping
@@ -610,8 +597,7 @@ export function OuraBleDebug() {
       {/* ① Data / Ingestion / Retention */}
       <CollapsibleSection title="Data · Ingestion · Retention" icon={<History className="h-4 w-4" />}>
         <div className="space-y-3">
-          <DbFootprintCard />
-          <div className="space-y-3 border-t border-border/60 pt-3">
+          <div className="space-y-3">
             <BtnGroup label="History & sync">
               <Button size="sm" variant="outline" onClick={() => withPlugin((p) => p.drainHistory())}><History className="mr-1 h-4 w-4" /> Drain history</Button>
               <Button size="sm" variant="outline" onClick={fullResync}><History className="mr-1 h-4 w-4" /> Full re-sync</Button>

@@ -5,6 +5,21 @@ import { Database, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
 
+interface PackableCount {
+  buckets: number
+  sealBelowDs: number | null
+}
+
+interface PackRunResult {
+  buckets: { epoch: number; tag: number; dsBucket: number; frames: number; bytes: number; refused?: string }[]
+  packed: number
+  refused: number
+  framesMoved: number
+  bytesWritten: number
+  remaining: number
+  ms: number
+}
+
 interface Stats {
   tables: { table: string; rows: number; bytes: number }[]
   rawSamples: { totalRows: number; decodedRows: number; decodedBytes: number; bodyHexBytes: number }
@@ -34,7 +49,11 @@ export function DbFootprintCard() {
   const [backfillMsg, setBackfillMsg] = useState<string | null>(null)
   const [vacuuming, setVacuuming] = useState(false)
   const [vacuumMsg, setVacuumMsg] = useState<string | null>(null)
-  const [confirm, setConfirm] = useState<'backfill' | 'vacuum' | null>(null)
+  const [confirm, setConfirm] = useState<'backfill' | 'vacuum' | 'pack' | null>(null)
+  const [packable, setPackable] = useState<PackableCount | null>(null)
+  const [packing, setPacking] = useState(false)
+  const [packMsg, setPackMsg] = useState<string | null>(null)
+  const [packRefusals, setPackRefusals] = useState<string[]>([])
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -43,6 +62,8 @@ export function DbFootprintCard() {
       const res = await fetch('/api/oura-ble/db-stats')
       if (!res.ok) { setError(`db-stats failed: ${res.status}`); return }
       setStats(await res.json())
+      const packRes = await fetch('/api/oura-ble/samples/pack')
+      if (packRes.ok) setPackable(await packRes.json())
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))
     } finally {
@@ -96,6 +117,39 @@ export function DbFootprintCard() {
     }
   }, [load])
 
+  // Q-541 Task 4 / Q-316 — move sealed buckets of raw frames into compact blobs. This is the one
+  // control in the app that issues a DELETE against archival frames, so its refusals are surfaced
+  // rather than folded into a count: `refused > 0` means a bucket could not be proven equal after
+  // the re-read and was left intact, which is a finding, not a no-op.
+  const runPack = useCallback(async () => {
+    setConfirm(null)
+    setPacking(true)
+    setPackMsg(null)
+    setPackRefusals([])
+    try {
+      const res = await fetch('/api/oura-ble/samples/pack', { method: 'POST' })
+      if (!res.ok) { setPackMsg(`pack failed: ${res.status}`); return }
+      const j = await res.json() as PackRunResult
+      const parts = [
+        `packed ${fmtNum(j.packed)} bucket(s) · ${fmtNum(j.framesMoved)} frames → ${fmtBytes(j.bytesWritten)}`,
+        j.remaining > 0 ? `${fmtNum(j.remaining)} still packable — press again` : 'nothing left to pack',
+        `${(j.ms / 1000).toFixed(1)}s`,
+      ]
+      if (j.refused > 0) parts.splice(1, 0, `⚠ ${fmtNum(j.refused)} refused and left intact`)
+      setPackMsg(parts.join(' · '))
+      setPackRefusals(
+        j.buckets
+          .filter(b => b.refused)
+          .map(b => `epoch ${b.epoch} tag ${b.tag} bucket ${b.dsBucket} (${fmtNum(b.frames)} frames): ${b.refused}`),
+      )
+      await load()
+    } catch (err) {
+      setPackMsg(err instanceof Error ? err.message : String(err))
+    } finally {
+      setPacking(false)
+    }
+  }, [load])
+
   const raw = stats?.rawSamples
   const totalBytes = stats?.tables.reduce((s, t) => s + t.bytes, 0) ?? 0
 
@@ -138,6 +192,26 @@ export function DbFootprintCard() {
               </Button>
               {vacuumMsg && <span className="text-muted-foreground">{vacuumMsg}</span>}
             </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="destructive" disabled={packing || packable?.buckets === 0} onClick={() => setConfirm('pack')}>
+                  {packing ? 'Packing…' : 'Pack sealed frames (Lever 5)'}
+                </Button>
+                <span className="text-muted-foreground">
+                  {packable == null
+                    ? 'checking…'
+                    : packable.buckets === 0
+                      ? 'no sealed buckets to pack'
+                      : `${fmtNum(packable.buckets)} bucket(s) packable`}
+                </span>
+              </div>
+              {packMsg && <span className="text-muted-foreground">{packMsg}</span>}
+              {packRefusals.length > 0 && (
+                <ul className="ml-1 list-disc pl-4 text-destructive">
+                  {packRefusals.map(r => <li key={r}>{r}</li>)}
+                </ul>
+              )}
+            </div>
           </div>
         </div>
       )}
@@ -172,6 +246,14 @@ export function DbFootprintCard() {
         message={`Null the "decoded" JSONB on all ${(stats?.rawSamples.decodedRows ?? 0).toLocaleString()} historical oura_raw_samples rows that still carry it? body_hex stays untouched and every row still redecodes from it. This cannot be undone automatically.`}
         confirmLabel="Null decoded"
         onConfirm={() => void runBackfill()}
+      />
+      <ConfirmDialog
+        open={confirm === 'pack'}
+        onOpenChange={o => !o && setConfirm(null)}
+        title="Pack sealed raw frames?"
+        message={`Move sealed buckets older than 7 days out of oura_raw_samples and into compact blobs in oura_raw_packed${packable?.buckets ? ` (${packable.buckets.toLocaleString()} eligible now)` : ''}. Each blob is re-read and its frames proved identical before the originals are deleted; a bucket that cannot be proved equal is left intact and reported. The frames are moved, not discarded — but this is the only control here that deletes archival frames at all.`}
+        confirmLabel="Pack frames"
+        onConfirm={() => void runPack()}
       />
       <ConfirmDialog
         open={confirm === 'vacuum'}

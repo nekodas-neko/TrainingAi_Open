@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import dynamic from "next/dynamic";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { cachedFetch, readCacheSync } from "@/lib/sqlite/cache";
@@ -26,6 +27,7 @@ interface DailyDigestResponse {
 }
 
 export function DayReviewSheet({ open, onOpenChange }: Props) {
+  const tz = useUserTimezone();
   const [digest, setDigest] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hrData, setHrData] = useState<{ readings: { timestamp: string; bpm: number; source: string | null }[]; sleep: unknown } | null>(null);
@@ -34,7 +36,7 @@ export function DayReviewSheet({ open, onOpenChange }: Props) {
 
   useEffect(() => {
     if (!open) return;
-    const today = todayInTz();
+    const today = todayInTz(tz);
     setLoading(true);
     fetch("/api/daily-digest", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" })
       .then(res => res.ok ? res.json() as Promise<DailyDigestResponse> : null)
@@ -64,7 +66,7 @@ export function DayReviewSheet({ open, onOpenChange }: Props) {
         ).catch(() => {});
       },
     ).catch(() => {});
-  }, [open]);
+  }, [open, tz]);
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -76,7 +78,7 @@ export function DayReviewSheet({ open, onOpenChange }: Props) {
           {loading && <div className="h-16 animate-pulse rounded-xl bg-muted" />}
           {digest && <Response className="text-sm leading-relaxed">{digest}</Response>}
           {hrData && hrData.readings.length > 0 && (
-            <HrDayChart readings={hrData.readings} date={todayInTz()} compact />
+            <HrDayChart readings={hrData.readings} date={todayInTz(tz)} compact />
           )}
           {loadEntries && loadEntries.length > 0 && sessionName && (
             <WorkoutLoadComparisonChart entries={loadEntries} sessionName={sessionName} />

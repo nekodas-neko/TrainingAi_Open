@@ -41,11 +41,13 @@ import { scoreAvailability, trailingBaselineZ, type ReadinessInputKey, type Scor
  * pair is the signal, not either number on its own. Aligning it to 1.3 would change who sees the
  * card.
  *
- * Named here rather than inlined so the card can state the threshold it tripped instead of
- * asserting "your readiness is low" with no number, which is what the owner asked for (Q-173).
+ * The number itself lives in `ACWR_THRESHOLDS` as `elevatedMin` (Q-306) so that the one
+ * deliberate exception sits beside the boundaries it is an exception to; it is re-exported under
+ * this name so the card can state the threshold it tripped instead of asserting "your readiness is
+ * low" with no number, which is what the owner asked for (Q-173).
  */
 export const EARLY_DELOAD_SCORE_MAX = 45
-export const EARLY_DELOAD_ACWR_MIN = 1.2
+export const EARLY_DELOAD_ACWR_MIN = ACWR_THRESHOLDS.elevatedMin
 
 /** Why the early-deload card is showing — the two values that tripped it, and what they had to beat. */
 export interface EarlyDeloadReason {

@@ -8,6 +8,9 @@ import { WorkoutSensorProbeConsole } from '@/components/oura-ble/workout-sensor-
 import { DaytimeCoverageConsole } from '@/components/oura-ble/daytime-coverage-console'
 import { StepCounterExportConsole } from '@/components/oura-ble/step-counter-export-console'
 import { StepBackfillConsole } from '@/components/oura-ble/step-backfill-console'
+import { RekeyDeclarationCard } from '@/components/oura-ble/rekey-declaration-card'
+import { DbFootprintCard } from '@/components/oura-ble/db-footprint-card'
+import { DeviceMetricsPanel } from '@/components/oura-ble/device-metrics-panel'
 import { RingBatteryConsole } from '@/components/oura-ble/ring-battery-console'
 import { ComparisonHarnessConsole } from '@/components/oura-ble/comparison-harness-console'
 import { RawStoreStatusConsole } from '@/components/oura-ble/raw-store-status-console'
@@ -23,7 +26,20 @@ export default async function OuraBlePage() {
     <>
       <main className="pt-safe-or-4 mx-auto max-w-lg px-4 pb-24">
         <h1 className="mb-4 text-lg font-semibold">Oura Ring — direct BLE</h1>
+        {/* Q-544 — these two read only `/api/oura-ble/*` and touch no plugin, so they render on a
+            desktop. They must stay ABOVE <OuraBleDebug />, which early-returns a
+            "native plugin unavailable" banner and renders nothing after it: inside that component
+            they were reachable only from the APK, which is the one client VACUUM FULL's ACCESS
+            EXCLUSIVE lock blocks, and unreachable at all while the APK is broken or mid-rebuild —
+            exactly when a full volume is most likely. */}
+        <div className="mb-4 space-y-4">
+          <DbFootprintCard />
+          <DeviceMetricsPanel />
+        </div>
         <OuraBleDebug />
+        <div className="mt-4">
+          <RekeyDeclarationCard />
+        </div>
         <div className="mt-4">
           <RawStoreStatusConsole />
         </div>

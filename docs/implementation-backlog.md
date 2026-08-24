@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **212** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **214** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -403,6 +403,41 @@ so v5 and v6 days are never pooled — `docs/body-battery-tuning.md` depends on 
 stable by construction, so charge goes near-constant and a genuinely restful day stops reading as
 one — the "treadmill" the activity-goal volume lane already removed (Q-190).
 
+- ✅ **THE ENABLING REFACTOR SHIPPED 2026-08-24 (Lane A).** The walk is now
+  `walkBodyBattery()` in `packages/shared/src/health/body-battery-walk.ts` — the arithmetic was
+  welded into a ~200-line DB-bound function, which is *why* the only evidence so far is a SQL
+  replay. It is now callable directly. Behaviour unchanged, `MODEL_VERSION` untouched.
+  [`Journal`](overview/entries/2026-08-24-battery-walk-extract.md).
+  - **The change is confirmed to be a one-parameter substitution.** `restThreshold` is a reserve
+    fraction, so the explicit bpm offset is `offsetBpm / reserve` and nothing else in the walk
+    moves. Two tests pin it: the ceiling sits at exactly `restingHr + offsetBpm` for reserves of 80,
+    100 and 137, **and it is immune to `hrMax` re-estimation while the fraction form is not** —
+    reproduced against the 2026-08-05 step (187 → 168) that caused this. So the calibration PR is a
+    constant plus a `v6` bump, not a rewrite.
+- ⛔ **THE FIT CANNOT BE DONE FROM AN AGENT SANDBOX — measured 2026-08-24, not assumed. Read this
+  before attempting it, or you will rediscover it.** The entry requires the fit to include the
+  stress term. `buildDaytimeStressSeriesFromModel` needs `DaytimeStressConstants`, which are
+  `.constants.json` files **downloaded at boot** into `OURA_CONSTANTS_DIR` (or `.oura-constants`).
+  **Q-49 removed them from the repository**, and neither path exists in a session container — so the
+  stress function cannot execute here at all. That is the same absence that makes TN-4's
+  `daytime-stress: constants not set` reproducible locally.
+  - **Two further obstacles, each independently sufficient**, so this is not one missing file:
+    **(a)** `oura_raw_samples` retains only the hot tier — production holds **170,406 rows reaching
+    back only to 2026-08-17**, about 7 days of the 56 the pass test needs, because Q-541's packer
+    moves sealed buckets to `oura_raw_packed`. **(b)** `decoded` is **NULL on every one of those
+    rows** (ingestion culling — it is re-derivable from `body_hex`), so temp/met would have to be
+    decoded from packed `blob`s keyed by ring-clock `ds_bucket`, which needs the same absent
+    constants again.
+  - **What this rules out:** fitting the offset without the stress term and shipping it anyway. The
+    entry already warns that the stress term pushes real ends **below** the replay table, which is
+    the whole reason the bracket is +8…+12 rather than the table's apparent +10. A number fitted
+    without it would be the exact overshoot the +18 note exists to prevent — and it re-scores the
+    owner's history.
+  - **Who can do it:** a context with the constants present — the Railway runtime itself, or a
+    machine holding the vendored directory. The cheapest shape is probably an admin-gated,
+    owner-triggered replay endpoint that runs `walkBodyBattery()` server-side across a bracket and
+    returns the four pass-test numbers per offset. **That is new work and is not scoped here.**
+
 ### [readiness] TN-3a — the per-bucket daytime-stress series is computed and thrown away
 
 - **Branch:** _unassigned_
@@ -440,6 +475,38 @@ one of them and reading it back alongside the other is how two numbers for one m
 the rollup as the writer (it is the one that can back-fill) and have the route read through, or
 record explicitly why not.
 
+- 🚧 **THE STORAGE LAYER AND THE WRITE SHIPPED 2026-08-24 (Lane A). The entry stays open — see what
+  is NOT done.** Migration **212** creates `oura_daytime_stress_buckets` (`user_id`, `day`,
+  `bucket_start`, `level`), rows not JSONB as the entry specifies; **213** regenerates the
+  `claude_ro` views so the new table is readable (86 views — the schema is default-deny and
+  `claude-ro-readonly-role.test.ts` fails on the count divergence, so this is not bookkeeping).
+  The rollup writes at its existing per-day series build (`run.ts`), through
+  `io.replaceStressBuckets` → `replaceDaytimeStressBuckets`.
+  - **The two-baselines hazard is settled the way the entry asks: the rollup is the sole writer.**
+    The live route builds the same series from `restingHr` + a 28-day HRV mean, the rollup from
+    `latest.rhrLowBpm` + `nightHrvMs`. Only the rollup is persisted, because only the rollup can
+    back-fill. The route is **unchanged** and still computes its own for today — see below.
+  - **Whole-day REPLACE, not a merge.** The series is recomputed as a unit, so a re-run producing
+    fewer buckets (shorter waking window, a frame that failed to decode) must shrink the stored day
+    rather than leave stale buckets merged in beside the new ones, where they read as real stress.
+    Two tests catch a merge — removing the day-clearing delete fails them with `expected length 1,
+    got 3` and `expected 0, got 1`.
+  - **A correction worth keeping.** The write's `setWhere` user-scope is **redundant**: the primary
+    key is `(user_id, bucket_start)`, so a cross-user conflict cannot arise. It was first committed
+    with a comment claiming it prevented cross-user overwrite, and a test claiming to prove it —
+    removing the line left every test green. Both now say what is actually true. The line stays as
+    insurance against the key narrowing, per CLAUDE.md's `onConflictDoUpdate` rule.
+- **Keep — three things are NOT done, and none of them is verifiable from a sandbox:**
+  1. **No back-fill has been RUN, and its depth is unknown.** The write rides the existing rollup
+     path, so a wide pass will fill history from `oura_raw_packed` — but the rollup cannot execute
+     here at all (it needs the vendored constants Q-49 removed from the repo), so **no bucket has
+     ever been written by the real producer.** The entry asks for the achieved depth to be stated:
+     it cannot be, until a pass runs on Railway. Storage is proven; the producer is not.
+  2. **The route still computes its own series for today** rather than reading through. Left
+     deliberately — changing the live Body Battery read is a behaviour change on a working card and
+     belongs with TN-3b, which is the thing that needs a consistent read across days.
+  3. **TN-3b is still blocked on a back-fill existing**, not merely on the table existing.
+
 ### [readiness] TN-3b — surface stress by hour, and on the HR charts
 
 - **Branch:** _unassigned_
@@ -460,6 +527,62 @@ Note what already exists so this is not built twice: `components/body-battery/st
 renders a sparkline of today's series plus a High/Elevated/Calm/Recovering label and "high ~N min
 today", inside the Body Battery card. The owner did not know it was there, so **discoverability is
 part of this entry**, not only new surfaces.
+
+### [sleep] TN-5 — the sleep calibration's gain varies 8-fold, so the same real improvement is worth 4 points or 0.5
+
+- **Branch:** _unassigned_
+- **Added:** 2026-08-24 · owner report *"the scores have been very varied lately"*
+- **Lane: A** — `packages/shared/src/health/sleep-score.ts`
+- **Gate: owner** — a scoring change; the owner has not signed this one off (TN-2's sign-off does
+  not carry over).
+- **Do not batch.** It re-scores every night and its threshold check must run in the same PR.
+
+`SCORE_CALIBRATION` (`sleep-score.ts:155`) maps the weighted blend onto the display scale, and its
+slope is wildly non-uniform:
+
+| blend segment | display points per blend point | nights there |
+|---|---|---|
+| 65.4 – 74.0 | 1.16× | 2 |
+| **74.0 – 78.0** | **3.00×** | 4 |
+| **78.0 – 81.0** | **4.00×** | 3 |
+| 81.0 – 85.6 | 1.96× | 3 |
+| 88.7 – 91.0 | 0.87× | 8 |
+| 91.0 – 93.0 | 0.50× | 4 |
+
+**A one-point gain in real sleep quality shows as 4 displayed points at blend 79 and 0.5 at blend
+92.** Six of the last twelve nights landed on the 3.0×/4.0× segments, because the blend mean fell
+from 87.1 to 71.1 — straight into the steep zone.
+
+**Recommended curve** (gain spread 8.0× → 1.0×, endpoints and the `[93,100]` ceiling anchor
+preserved):
+
+```
+[[0,0],[20,18],[34.6,33],[50,41],[65.4,48],[74,64.2],[78,71.7],[81,77.4],[85.6,86.0],[88.7,91.9],[91,96.2],[93,100]]
+```
+
+Measured over the 41 nights that store `sleep_contributors`: displayed mean **87.0 → 85.5** (a small
+drop, so it does not lift the scale back toward its old mean — Q-511 stays satisfied), sd 18.36 →
+17.01, and `LOW_SLEEP_SCORE = 42` fires on **2/41 (5%) either way**, so no re-anchoring is needed.
+**Re-verify that firing rate against the shipped TypeScript rather than trusting this line** — the
+standing rule is that a threshold on a display scale is calibrated to that scale's distribution.
+
+**⛔ This is NOT a fix for the volatility that prompted it, and must not be sold as one.** The baton's
+standing advice was to flatten the 74–85 segment if the spread read as jitter. **That was tested and
+it fails**: the curve must climb 0 → 100 across the blend's range, so flattening one segment steepens
+another and total movement is conserved. Measured night-to-night mean |Δ| goes **13.53 → 13.75** — it
+gets marginally *worse*. Replace that line in the baton rather than leaving it to be retried.
+
+**The volatility itself is real signal, not a defect.** The pre-calibration blend moves a mean
+**9.15** points/night before 2026-08-19 and **9.27** after — unchanged. The owner's sleep is genuinely
+that variable; the calibration adds ~1.4×. Do not respond by compressing the scale: range is what the
+2026-08-17 recalibration was asked to produce, and sleep and readiness agreeing is load-bearing for
+the Body Battery anchor (Q-511).
+
+**Pass test:** gain spread ≤ 1.2× across every segment above blend 65.4; displayed mean over the
+same 41 nights within ±2 of 87.0 and **not above it**; `LOW_SLEEP_SCORE` firing rate unchanged at
+2/41; the three tests asserting the ceiling is reachable-but-not-routine still pass.
+
+Review: [`docs/reviews/2026-08-24-sleep-score-volatility.md`](reviews/2026-08-24-sleep-score-volatility.md).
 
 ### [readiness][platform] TN-4 — /api/body-battery threw 31 × 500 for ten hours, then stopped on its own
 
@@ -484,6 +607,30 @@ the battery read down with it — the readiness call two blocks above it at line
 exactly that guard and comments saying why.
 
 *Counts above are the owner's account only (`claude_ro` is row-scoped) and within the 30-day prune.*
+
+- 🚧 **BOTH HARDENING CHANGES SHIPPED 2026-08-24 (Lane A). The ROOT CAUSE IS STILL OPEN — keep this
+  entry.** `app/api/body-battery/route.ts` now calls `tryEnsureServerOuraConstants()` before the
+  stress block and wraps `buildDaytimeStressSeriesFromModel` in try/catch. A stress-model failure
+  now costs the stress strip, not the whole card: `stressSeries` stays empty, `stressAt` returns
+  null, and the `STRESS_DRAIN_RATE` term is simply never applied.
+  - **The TRY variant of the injector, deliberately.** The throwing `ensureServerOuraConstants()`
+    would turn a missing constants directory back into the 500 this removes. Note
+    `lib/data/index.ts` already calls the swallowing variant when the repository handle is built —
+    **so it can fail to take without leaving a trace, which is consistent with what happened** and
+    is why the try/catch matters more than the injection.
+  - **Proven by mutation:** `app/api/body-battery/__tests__/stress-failure-does-not-500.test.ts`
+    fails with `expected 500 to be 200` when the guard is removed, and passes with it restored.
+  - **⚠️ The first version of that test was VACUOUS and this is the lesson worth keeping.** It
+    seeded only the dHRV model row, so `tempBaseline` stayed null, the stress branch was never
+    entered, and it passed *identically* with the guard removed. `getOuraDaytimeSignals` decodes raw
+    BLE frames, so the branch is unreachable without either real `body_hex` + a ring-clock anchor or
+    a repository-level override; the test now overrides that one method and says why. A regression
+    test that cannot fail reads as coverage and is worse than none.
+- **Keep — what is NOT done:** why the constants were unset for those ten hours. Nothing here
+  explains it and nothing here would have prevented the underlying condition; the card now degrades
+  instead of dying. **Not observed in production or on device** — verification is the mutation test
+  above plus source reading. The `error_events` row still disappears on 2026-09-22, so if the
+  mechanism matters it has to be caught before then.
 
 ## Filed 2026-08-19 — the workflow review that produced the ID scheme
 
@@ -2663,10 +2810,39 @@ this fits without an extraction.
 > class** — an `Intl.DateTimeFormat()` sweep is separate, unmeasured work.
 > [`journal`](overview/entries/2026-08-24-session-select-workout-user-timezone.md).
 >
-> **`lib/stores/workout-store.ts` (3 calls) is deliberately NOT in this slice.** It is a Zustand
-> store, not a component — no hook available — so its three calls need `tz` threaded in from every
-> caller, including `applyRehydrateFixups` on the rehydrate path. Structurally different work from
-> the rest of the sweep; left for its own slice.
+> **Fourth slice shipped 2026-08-24 (Lane B) — the sweep is DONE for every component.** 27 files,
+> 44 call sites, ratchet **47/28 → 3 calls in 1 file**. The baseline now holds exactly one entry.
+>
+> **Two more of `metric-log-sheet`'s class, found by reading rather than by the count:**
+> `log-value-sheet.tsx` POSTed `localDate: localDateString()` (device zone) while its own local
+> branch used `todayInTz(tz)` — two answers for one save. And `weekly-stats-hub.tsx`'s `todayKey`
+> needed `todayInTz(tz).replace(/-/g,"/")`, **not** a plain swap: `/api/weekly-stats` emits
+> `dateKey` as `yyyy/MM/dd`, so a dash-formatted key would have silently stopped matching and
+> killed the today-highlight. **A blind find-and-replace across this sweep would have shipped that.**
+>
+> Also threaded through three module-scope helpers that cannot call a hook (`linkPrescribedRun`,
+> `readSeed`, and `warmCache` in `sync-provider` — that last writes the `{date, data}` envelope
+> `cachedFetchToday` reads, so a zone mismatch makes every warmed today-key a permanent miss).
+> Zero lint warnings introduced across all 27 files.
+> [`journal`](overview/entries/2026-08-24-client-timezone-sweep-components-complete.md).
+>
+> **`lib/stores/workout-store.ts` is all that remains, and it is a DESIGN decision, not a
+> conversion.** It is a Zustand store, so no hook is available. **The risk is real:** `storedDate`
+> exists only to detect a day rollover, and a mismatch makes `rolloverDay()` clear `todayLogged` —
+> dropping the day's completed-set ticks. A wrong-zone stamp can both *miss* a rollover and *fire a
+> spurious one*.
+>
+> **The pure functions are already parameterised** — `applyRehydrateFixups(state, today, now)` and
+> `rolloverDay(today)` both take the date, and `workout-screen.tsx`'s visibilitychange effect
+> already passes `todayInTz(tz)`. What has no answer is the three places that *supply* the stamp:
+> the initial-state object, one reducer, and `onRehydrateStorage`, which runs at store creation
+> **outside React, before any provider mounts**.
+>
+> Two shapes, neither free: **(a)** reconcile on mount — let the store stamp `DEFAULT_TZ` and have
+> the component correct it, which adds a `rolloverDay` call whose clearing behaviour must be proven
+> not to eat a legitimate day's ticks; or **(b)** a module-level "current user tz" the store reads,
+> which is the global this entry's own header warns against. **Pick deliberately and verify the
+> clear path** — do not convert it mechanically.
 >
 > **What that slice actually proved, and what it did not.** With a seeded user on
 > `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the
@@ -3315,6 +3491,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.2).** `components/oura-ble/rekey-declaration-card.tsx` on
+> `/admin/oura-ble` — declare with an optional note, see the pending declaration and when it was
+> made, cancel one made by mistake. Cancel is offered only while `GET` reports something pending; a
+> consumed declaration offers none.
+> [`journal`](overview/entries/2026-08-24-rekey-declaration-control.md).
+>
+> **It sits OUTSIDE `OuraBleDebug`, as a sibling section on the page, and that is the load-bearing
+> decision.** `OuraBleDebug` returns the native-unavailable banner and renders nothing after it when
+> the plugin is absent — which is exactly the situation the laptop doing the re-key is in. Inside it,
+> the control would have been reachable only from the APK, i.e. only from the device that is not
+> being used at that moment. The declaration needs no ring present.
+>
+> **Verified end to end on `pnpm dev`:** declare (row + note persisted), idempotency (a second POST
+> returned `alreadyPending` and the pending count stayed at 1), cancel (back to idle, 0 pending), and
+> a row carrying `consumed_at` offering no cancel. Zero page errors.
+>
+> **NOT exercised:** the *effect* — a declaration being consumed by the next ingest batch needs a
+> real ring. That half was already proven by Lane A under Q-314; this item was the affordance.
+- **Keep:** an on-device look at the card's layout in the APK. `Gate: device`.
+
 - **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
   Lane A's and already shipped (Q-314).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
@@ -3384,6 +3580,29 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-318 — poll the redecode job, and stop the two consoles reporting "done" for work that has started
 
+> **✅ THE CLIENT HALF SHIPPED 2026-08-24 (Lane B, v1.363.1).** `components/oura-ble/redecode-job.ts`
+> POSTs `?async=1` and polls `GET ?jobId=…` every 3s until the server reports `done`/`failed`, then
+> hands back the same phases payload the synchronous route returned. Both consoles use it;
+> `oura-ble-debug.tsx`'s defensive empty/truncated-body parse is gone, and `step-backfill-console.tsx`
+> no longer prints "Done. Backfill applied" at the moment of the gateway timeout (it also surfaces
+> `redecodeError`, which it silently ignored). `alreadyRunning` is stated in words rather than shown
+> as progress. No client poll timeout — the server's reaper turns an abandoned run into `failed`, so
+> the loop always ends on a status the server stands behind.
+> [`journal`](overview/entries/2026-08-24-redecode-job-polling.md).
+>
+> **Verified end to end on `pnpm dev` for all three branches** (done with the phases payload;
+> `alreadyRunning` against a seeded running row, starting no second job; `failed` by finishing that
+> job with an error mid-poll). **NOT driven at runtime:** the backfill console's run path — Preview
+> reports `0 day(s) would change` on the local seed, so the fire button never renders — and
+> `oura-ble-debug.tsx`'s Redecode button, which sits behind the native-plugin gate and is
+> APK-only (the same gate BF-10 documented).
+>
+> **What remains is the last bullet, and it is Lane A's:** drop `?async=1` and delete the
+> synchronous branch in `app/api/oura-ble/samples/redecode/route.ts`. The seam that kept the default
+> alive was these two callers, and they now poll.
+- **Keep:** the on-device check of the Redecode button in the APK, and the route's default flip
+  (Lane A). `Gate: device`.
+
 - **Lane B.** `components/oura-ble/oura-ble-debug.tsx` and `components/oura-ble/step-backfill-console.tsx`
   only — the job store, the route and the reaper are Lane A's and already shipped (Q-535).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
@@ -3413,6 +3632,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   client only.
 
 ### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
+
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.3).** A third control in `db-footprint-card.tsx`'s ① Data
+> section. The `GET` count renders beside the button (*"N bucket(s) packable"* / *"no sealed buckets
+> to pack"*, disabled at zero) and the footprint reloads after each press, so `oura_raw_samples`
+> shrinking and `oura_raw_packed` growing show in the same table.
+> [`journal`](overview/entries/2026-08-24-frame-packer-control.md).
+>
+> **The confirm copy does NOT read like the VACUUM one**, per this entry's warning: it names what it
+> moves, that each blob is re-read and proved identical first, and that this is the only control here
+> that deletes archival frames at all. **A refusal is surfaced as a finding** — the summary carries
+> "⚠ N refused and left intact" and each refused bucket is listed with epoch/tag/ds-bucket/frames and
+> the server's reason, so it can never read as "packed 0".
+>
+> **Verified on `pnpm dev`** against a seeded sealed bucket: idle count `1 bucket(s) packable`; a real
+> press moved 40 frames (`oura_raw_samples` 242 → 202, `oura_raw_packed` 0 → 1) and flipped the count
+> to zero. **NOT exercised:** a genuine refusal — only its rendering, by substituting the response;
+> forcing a real verify mismatch is the server's path and was already proven by Lane A.
+>
+> ⚠️ **The card is APK-only.** `DbFootprintCard` renders inside `OuraBleDebug`, which shows the
+> native-unavailable banner and nothing after it without the plugin (the gate BF-10 documented).
+> Everything above was driven by mounting the card directly, off the gated page.
+- **Keep:** the on-device check of the button in its real home. `Gate: device`.
 
 - **Lane B.** `components/oura-ble/db-footprint-card.tsx` only — the route, the repository method and
   the slice all exist and are Lane A's, already shipped.
@@ -3482,6 +3723,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   drop, which is why it was generalised rather than copied.
 
 ### [app-shell][platform] Q-544 — server-side disk maintenance is trapped behind a native-plugin gate, so it cannot be run from a desktop
+
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.4).** `DbFootprintCard` **and** `DeviceMetricsPanel` moved
+> out of `OuraBleDebug` onto `app/admin/oura-ble/page.tsx`, above `<OuraBleDebug />`. Neither touches
+> the plugin — both read only `/api/oura-ble/*`. The genuinely native panels (`RawStoreStatusConsole`,
+> the SleepNet dump, the sensor probe, `SampleInspector`, which takes plugin-sourced props) stay
+> behind the gate. [`journal`](overview/entries/2026-08-24-db-maintenance-off-native-gate.md).
+>
+> **`DeviceMetricsPanel` was the second one, and the entry did not name it** — it is the panel BF-10
+> fixed and then could not observe, blocked by this same gate.
+>
+> **This entry's second half — the pack backfill having no button — shipped separately today as
+> Q-316.** This change is what makes that button reachable from anything but the phone.
+>
+> **Verified on `pnpm dev` with no native plugin** (the unavailable banner present on the page
+> throughout, confirmed rather than assumed): all three maintenance controls render, `1 bucket(s)
+> packable` shows, both cards sit above the banner, and pack was actually driven from that desktop
+> context (`packed 1 bucket(s) · 40 frames → 244 B`). **NOT exercised:** `VACUUM FULL` itself —
+> nothing to reclaim on the local seed, and it rewrites under an exclusive lock.
+- **Keep:** an on-device look — the APK's view of this page changes, with the two cards now above the
+  console rather than inside it. `Gate: device`.
 
 - **Branch:** `fix/admin-db-maintenance-off-native-gate`
 - **Added:** 2026-08-18, found while reclaiming 513 MB during the `disk_full` recovery.
@@ -3998,11 +4259,16 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Sequencing matters here.** Fixing Q-289's calibration will move the delta distribution, so this
   threshold must be re-derived *after* that, not tuned now. **This entry is blocked on Q-289** and
   should be worked immediately after it.
-- **Second issue, independent: ACWR now drives three behaviours at three thresholds** —
-  `acwr > 1.5` here, `EARLY_DELOAD_ACWR_MIN = 1.2` (readiness early-deload card), and
-  `ACWR_TAPER_START = 1.5` (Activity Score taper). Q-279 already questions the evidence base for
-  ACWR at all; three uncoordinated thresholds on one contested metric should be consolidated into a
-  single named band set whatever else is decided.
+- ✅ **Second issue DONE 2026-08-24, behaviour unchanged** (`fix/consolidate-acwr-thresholds`).
+  All three now read from `ACWR_THRESHOLDS` in `packages/shared/src/ai-periodization/acwr.ts`:
+  the emergency-deload trigger and the Activity-score taper both take `highMax` — they were 1.5
+  **by coincidence of typing**, and nothing recorded that they were the same boundary — and the
+  early-deload card's 1.2 moved in as `elevatedMin`, beside the boundaries it is a deliberate
+  exception to rather than in a comment three files away. **The numbers are untouched**: moving any
+  of them changes who gets a deload or a taper, which is a scoring change and the owner's call.
+  Source-scraped tests hold it, since an imported value cannot tell a literal 1.5 from a reference.
+- **Keep:** the first issue. The trigger threshold itself is still un-re-derived and still blocked
+  on Q-289 — consolidating where the number lives does not decide what it should be.
 - **One thing that is RIGHT and should not be "fixed":** `repCompletionRate < 0.7` is null-guarded
   (`!== null`), so with the field null on ~83% of sets it mostly cannot fire. That fails **safe**,
   and it is the correct treatment — unlike the autoregulation path in **Q-299**, which reads the

@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useEffect, useState } from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Button } from '@/components/ui/button'
 import { Footprints, TrendingUp, Info, Check } from 'lucide-react'
 import type { RunType } from '@trainingai/shared/running/types'
@@ -35,6 +36,7 @@ interface Props {
 }
 
 function PrescribedRunCardImpl({ prescription, gateAction, gateReasons, isPushSession, onStart }: Props) {
+  const tz = useUserTimezone();
   const { type, durationMin, distanceKm, targets, rationale } = prescription
 
   // Warmer one-sentence AI restatement of the deterministic rationale (running-plan/explain).
@@ -56,7 +58,7 @@ function PrescribedRunCardImpl({ prescription, gateAction, gateReasons, isPushSe
   //
   // Seeded in an effect rather than a `useState` initializer: a cache read in an initializer caused
   // hydration mismatches (CLAUDE.md, Instant paint).
-  const cacheKey = runningPlanExplainCacheKey({ date: todayInTz(), type, durationMin, gateKey, rationale })
+  const cacheKey = runningPlanExplainCacheKey({ date: todayInTz(tz), type, durationMin, gateKey, rationale })
 
   useEffect(() => {
     const cached = readCacheSync<string>(cacheKey)

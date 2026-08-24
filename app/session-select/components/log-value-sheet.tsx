@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { toast } from "sonner"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
@@ -9,7 +10,7 @@ import type { WidgetDef } from "@/lib/home/home-prefs"
 import { getLocalStore } from "@/lib/local-store"
 import { pushMutations } from "@/lib/local-store/sync-engine"
 import { todayInTz, todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils"
-import { cn, localDateString } from "@trainingai/shared/utils"
+import { cn } from "@trainingai/shared/utils"
 import { invalidateBodyMetricWrite, invalidateReadinessInputs } from "@/lib/cache-groups"
 import type { LocalBodyMetric } from "@/lib/local-store/types"
 import { metricBoundError } from "@/components/health/metric-bounds"
@@ -25,6 +26,7 @@ interface LogValueSheetProps {
 }
 
 export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, setMetaToday, fetchMeta }: LogValueSheetProps) {
+  const tz = useUserTimezone();
   const [logValue, setLogValue] = useState("")
   const [logSaving, setLogSaving] = useState(false)
 
@@ -45,7 +47,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
     if (metricBoundError(widget.key, logValue)) return;
     setLogSaving(true);
     try {
-      const date = todayInTz();
+      const date = todayInTz(tz);
       const numVal = parseFloat(logValue);
       // Map widget keys to LocalBodyMetric field names
       const widgetToLocal: Partial<Record<string, keyof LocalBodyMetric>> = {
@@ -170,7 +172,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
           const res = await fetch("/api/body-metadata", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ localDate: localDateString(), [widget.key]: numVal }),
+            body: JSON.stringify({ localDate: date, [widget.key]: numVal }),
           });
           if (!res.ok) throw new Error();
           await invalidateBodyMetricWrite();

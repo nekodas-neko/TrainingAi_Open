@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Button } from '@/components/ui/button'
 import { Loader2, TimerIcon, ChevronDownIcon, ChevronUpIcon, TriangleAlert, FlagIcon } from 'lucide-react'
 import { MIN_TRUSTED_SAMPLES } from '@trainingai/shared/workout/time-audit'
@@ -47,6 +48,7 @@ const fmtSec = (v: number | null) => (v == null ? '—' : v >= 90 ? `${(v / 60).
 const lowN = (n: number) => (n > 0 && n < MIN_TRUSTED_SAMPLES ? 'opacity-50' : '')
 
 export default function TimeAuditCard() {
+  const tz = useUserTimezone();
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [data, setData] = useState<{ equipment: EquipmentRow[]; exercises: ExerciseRow[]; sessions: SessionRow[] } | null>(null)
@@ -115,7 +117,7 @@ export default function TimeAuditCard() {
           <div className="flex items-center gap-2 text-muted-foreground">
             <FlagIcon className="h-3.5 w-3.5 shrink-0" />
             <span>Monitoring baseline: {baselineDate ?? 'none (full history)'}</span>
-            <Button size="sm" variant="ghost" disabled={baselineSaving} onClick={() => setBaseline(todayInTz())}>
+            <Button size="sm" variant="ghost" disabled={baselineSaving} onClick={() => setBaseline(todayInTz(tz))}>
               Set to today
             </Button>
             {baselineDate && (

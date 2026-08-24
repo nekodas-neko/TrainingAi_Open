@@ -1,9 +1,11 @@
 "use client";
 
 import type { WeeklyStatsResponse } from "@/app/api/weekly-stats/route";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { getPaletteEntry } from "@trainingai/shared/session-palette";
 import type { ProgramSession } from "@trainingai/shared/types/program";
-import { localDateString, shortSessionName } from "@trainingai/shared/utils";
+import { shortSessionName } from "@trainingai/shared/utils";
+import { todayInTz } from "@trainingai/shared/date-utils";
 import { useCountUp } from "@/lib/hooks/use-count-up";
 
 // Diagonal stripe cut out of a bar. A mask uses only the gradient's alpha, so `currentColor` (any
@@ -27,6 +29,7 @@ function CountUpValue({ target, fallback }: { target: number | null; fallback: n
 }
 
 export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubProps) {
+  const tz = useUserTimezone();
   if (loading) {
     return (
       <div className="space-y-3">
@@ -39,7 +42,7 @@ export function WeeklyStatsHub({ data, loading, sessions = [] }: WeeklyStatsHubP
 
   // name (lowercase) → palette position
   const nameToPos = new Map(sessions.map(s => [s.name.toLowerCase(), s.position]));
-  const todayKey = localDateString();
+  const todayKey = todayInTz(tz).replace(/-/g, "/");
 
   // Deload days now draw from `deloadVolume`, so they have to scale against it too — otherwise a
   // week of nothing but deloads leaves maxVolume at the 1 floor and the bar runs off the chart.
