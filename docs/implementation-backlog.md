@@ -1779,60 +1779,6 @@ this fits without an extraction.
   short-circuits and the enqueue never runs. That `queueMutation` throws on a dead local DB is read
   from source, not observed, and that is still true after the fix. `Gate: device`.
 
-### [activity][platform] Q-328 — deleting an activity is the one activity-log write with no outbox domain, so offline it just fails
-
-> **⚠️ The Lane A half SHIPPED. What is left is Lane B only** — switching
-> `app/health/health-content.tsx:687` from its bare `fetch` to
-> `store.softDeleteActivityLogPending(id)` + `queueMutation({ domain: 'activity_logs', payload: { id, deleted: true } })`,
-> following `saved-meals-sheet.tsx:459`. The old `store.deleteActivityLog(id)` becomes dead in that
-> same PR and should be removed with it.
->
-> **One correction to the plan below, and it is the part that would have broken things.** The entry
-> said to flip `sqlite-backend.ts`'s local soft-delete from `synced` to `pending`. **Do not** — that
-> `synced` is load-bearing, not a mistake: `applyDelta` reaps an activity-log tombstone with
-> `DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, so a row left `pending` blocks
-> its own tombstone forever. A pre-existing test already pinned that (Q-488). Both states are
-> correct at different moments, so the offline delete is a **second** method
-> (`softDeleteActivityLogPending`) plus a `markActivityLogSynced` that moves the row across on push
-> confirmation — which also keeps the existing bare-`fetch` caller working unchanged until Lane B
-> switches it. See [`entries/2026-08-19-activity-log-delete-outbox.md`](overview/entries/2026-08-19-activity-log-delete-outbox.md).
->
-> **After Lane B lands, Q-556's 404 half is unblocked.**
-
-
-- **Branch:** `feat/activity-log-delete-outbox`
-- **Added:** 2026-08-19 · Lane A, found while reconciling Q-556 · [`journal`](overview/entries/2026-08-19-activity-log-delete-affected-rows.md)
-- **Lane:** B
-- **Placement:** immediately above Q-556, which it gates. Small on its own; it is the prerequisite
-  that makes Q-556's 404 half safe.
-
-**The asymmetry.** An activity log is **created** through the outbox — `exercise-review-sheet.tsx:147`
-and `done-activity-screen.tsx:228` both `upsertActivityLog` + `queueMutation`, `syncStatus: 'pending'`.
-It is **deleted** by a bare `fetch("/api/activity-logs", { method: "DELETE" })`
-(`app/health/health-content.tsx:687`) with no `queueMutation` anywhere, and the `activity_logs` branch
-of `pushMutations` (`adapter.ts:4195`) handles upserts only.
-
-**What that costs.** CLAUDE.md's rule is *"every user-visible write needs an outbox domain — any POST
-reachable offline must queue a mutation or visibly fail"*. This one visibly fails, so it is not a
-silent data loss — but it is the only activity-log write that cannot be made offline at all, and it is
-what forces Q-556's route to keep answering 200 for a miss.
-
-**What to build.** A delete branch for the `activity_logs` outbox domain: a tombstone payload the
-client queues, a `pushMutations` arm that calls the same `deleteActivityLog` the web route calls (one
-write function per domain — `check-push-mutations.js` forbids raw `sql` there), and the client
-switching from bare `fetch` to local-delete + `queueMutation`.
-
-- **The local soft-delete already exists** (`sqlite-backend.ts:2654`) and already marks the row
-  `synced` rather than `pending` — deliberately, per its own comment. **That flag has to change with
-  this**, or the queued delete is a mutation the pull can clobber.
-- **`getSyncDelta` already emits `deleted_at` tombstones for `activity_logs`**, so the cross-device
-  half works; this is the push direction only.
-- **Lane:** the `pushMutations` arm and the repo function are **Lane A**;
-  `app/health/health-content.tsx` is **Lane B**. Ship Lane A first — the client cannot queue into a
-  domain that does not accept deletes.
-- **Then, and only then, Q-556's 404 half** — with the client treating 404 as success, since by that
-  point a 404 means "already gone", which is not a failure.
-
 ### [activity][platform] Q-556 — `DELETE /api/activity-logs` reports success for a delete that deleted nothing
 
 > **⚠️ PARTLY SHIPPED, and the prescribed fix was RE-ORDERED rather than applied. Read this before
@@ -1845,13 +1791,21 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 > `components/activity/exercise-review-sheet.tsx:147` and `components/activity/done-activity-screen.tsx:228`
 > both `upsertActivityLog` + `queueMutation` with `syncStatus: 'pending'` — so a row exists locally
 > before its push lands, **online as well as offline**. Deleting it in that window matches no server
-> row. `app/health/health-content.tsx:687-695` treats any `!res.ok` as failure and **skips its local
-> delete**, so a 404 would toast *"Failed to delete"* and leave on screen a row the user just removed.
+> row.
 >
-> **And nothing would reconcile it**, because *delete is the one activity-log write that never
-> queues*: the `activity_logs` branch of `pushMutations` (`adapter.ts:4195`) handles upserts only.
-> That gap is now filed as **Q-328** below, and it is the prerequisite — 404 belongs in the PR after
-> it, alongside a client that treats 404 as success.
+> **✅ UNBLOCKED 2026-08-24 — Q-328 shipped, and this is now startable.** Delete goes through the
+> outbox: the client writes a local tombstone and queues
+> `{ domain: 'activity_logs', payload: { id, deleted: true } }`, the push arm calls the same
+> `deleteActivityLog` the web route calls, and a **miss there is deliberately not an error** — a
+> re-sent delete whose confirmation never landed is the commonest benign replay, and the row is gone
+> either way. So the reconciliation this entry said was missing exists.
+>
+> **Two things to re-read before starting, because the entry below predates the change.** The client
+> is no longer `app/health/health-content.tsx:687-695` — it is `handleDeleteActivity` in
+> `lib/hooks/use-day-entry-mutations.ts` (LB-1 moved it, LB-3 rewrote the screen). And its local path
+> no longer waits on `res.ok` at all, so the described *"treats any `!res.ok` as failure and skips
+> its local delete"* now applies only to the **web fallback**. What is left here is the route
+> answering 404 for a miss, plus that fallback treating 404 as success.
 >
 > **Two cases that sound like regressions and are not**, checked rather than assumed: the WHERE does
 > not filter `deleted_at IS NULL`, so a **double-tap** and a **row already deleted on another device**
@@ -1865,7 +1819,6 @@ switching from bare `fetch` to local-delete + `queueMutation`.
 
 
 - **Branch:** `fix/activity-log-delete-affected-rows`
-- **Needs:** Q-328
 - **Added:** 2026-08-18 · review sweep (cross-user isolation, two real accounts) ·
   [`docs/reviews/2026-08-18-cross-user-isolation.md`](reviews/2026-08-18-cross-user-isolation.md)
 - **Placement:** low. **Not a leak — verified, not assumed.** As user B, deleting user A's activity

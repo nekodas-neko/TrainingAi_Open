@@ -2634,46 +2634,24 @@ export class SQLiteLocalStore implements LocalStore {
   }
 
   /**
-   * Q-488 — the activity delete was server-only, so three local-first readers kept showing it.
-   *
-   * `sync_status='synced'`, not 'pending', for the reason `deleteExerciseLogLocally` above gives:
-   * the web DELETE round-trip has already succeeded when this runs, so local matches server at this
-   * exact instant. 'pending' would be actively harmful here rather than merely wrong — `applyDelta`
-   * applies the server tombstone as `DELETE … WHERE id = ? AND sync_status='synced'`, so a row left
-   * pending would block its own tombstone forever and the soft-deleted row would never be reaped.
-   *
-   * This is NOT an offline-capable delete: there is no `queueMutation`, so a delete attempted with
-   * no network still fails at the fetch and never reaches here. Giving this domain a real offline
-   * delete is a larger question (it needs an outbox domain and a tombstone path) and is deliberately
-   * not folded in.
-   *
-   * Do not "simplify" this into `upsertActivityLog` with a `deletedAt` field: that method's INSERT
-   * column list and its ON CONFLICT DO UPDATE both omit `deleted_at` entirely, so the write would
-   * compile, type-check, lint clean, and change nothing.
-   */
-  async deleteActivityLog(id: string): Promise<void> {
-    const now = new Date().toISOString();
-    await runSQL(
-      `UPDATE activity_logs SET deleted_at=?, sync_status='synced', updated_at=? WHERE id=?`,
-      [now, now, id],
-    );
-  }
-
-  /**
-   * The offline-capable delete the method above is not (Q-328) — pair it with a
+   * The offline-capable activity delete (Q-328) — pair it with a
    * `queueMutation({ domain: 'activity_logs', payload: { id, deleted: true } })`.
    *
-   * **The only difference is `sync_status`, and it is the whole point.** `'synced'` above is
-   * load-bearing rather than incidental: `applyDelta` prunes an activity-log tombstone with
+   * **`sync_status` is the whole point, and both values are correct at different moments.**
+   * `'synced'` is load-bearing rather than incidental: `applyDelta` prunes an activity-log tombstone with
    * `DELETE FROM activity_logs WHERE id = ? AND sync_status='synced'`, so a row left `'pending'`
    * is skipped by that prune forever. A row awaiting a push MUST be `'pending'` anyway — that is
    * what stops the pull-clobber gate overwriting a delete that has not reached the server — so the
    * two states are both correct, at different moments. `markActivityLogSynced` is what moves the
    * row from one to the other, and it runs on push confirmation.
    *
-   * Kept as a second method rather than a flag on the first so the existing bare-`fetch` caller
-   * (`app/health/health-content.tsx`) keeps its exact behaviour until it is switched over; a row
-   * marked `'pending'` with no mutation queued behind it would never be pruned.
+   * **Never write `'pending'` without queueing the mutation behind it** — such a row is skipped by
+   * the prune above forever. This shipped alongside a `deleteActivityLog` that wrote `'synced'`,
+   * for the bare-`fetch` caller that has since been converted; that method is gone (Q-328).
+   *
+   * Do not "simplify" this into `upsertActivityLog` with a `deletedAt` field: that method's INSERT
+   * column list and its ON CONFLICT DO UPDATE both omit `deleted_at` entirely, so the write would
+   * compile, type-check, lint clean, and change nothing.
    */
   async softDeleteActivityLogPending(id: string): Promise<void> {
     const now = new Date().toISOString();
