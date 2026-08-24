@@ -27,6 +27,10 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The
+tile already routes water to the correct sheet. But the generic sheet's water branch wrote an
+ABSOLUTE total — discarding the day's water, reintroducing SYNC-P7 — and queues `waterMlDelta` now.
+
 **The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave
 Playwright a stable frame, so `Start Set 2` hung — measured 85 ms vs 8,009 ms with and without the
 new `prefers-reduced-motion` rule. A spec now drives three logged sets and fails if the rule is
@@ -39,8 +43,7 @@ broken. Both moved above it. `Gate: device`.
 
 **The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
 it. Its confirm copy deliberately does not read like the lossless VACUUM one — it is the only
-control here that DELETEs archival frames — and a refused bucket is listed with its reason rather
-than counted as "packed 0". APK-only, like the card. `Gate: device`.
+control here that DELETEs archival frames — and a refused bucket is listed with its reason. `Gate: device`.
 
 **Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, deliberately outside
 `OuraBleDebug` — that renders nothing without the native plugin, which is exactly the laptop doing
@@ -167,14 +170,13 @@ Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for
 not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
 
 **Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
-`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day rather than
-by sample index, so a night-only SpO₂/HRV signal renders with dead space either side, not apparent
-24-hour coverage. Native-gated — verified by mounting the component off the gated page. `Gate: device`.
+`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day, so a
+night-only SpO₂/HRV signal renders with dead space either side, not apparent 24-hour coverage.
+Verified by mounting the component off the native-gated page. `Gate: device`.
 
-**Coach undo wrote over whatever was there (Q-468).** Two stacked changes on one exercise: undoing
-the *first* returned the row to its original value while the history still showed the second in
-effect. `driftAgainst` now takes a side — `from` for apply, `to` for undo — checked once centrally.
-Latent: nothing calls the undo route yet (Q-467), production's `coach_changes` is empty.
+**Coach undo wrote over whatever was there (Q-468).** With two stacked changes on one exercise,
+undoing the first returned the row to its original value while the history showed the second in
+effect. `driftAgainst` takes a side now. Latent: nothing calls the undo route yet (Q-467).
 
 **The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
 schema was deleted forever — no badge, no toast, no retry. It returns a per-item error now, so the
@@ -192,8 +194,7 @@ It now takes an in-flight marker keyed like its fingerprint, released when the w
 (**including on rejection** — a leak would wedge that session-day) and checked before the limit.
 
 **The AI-usage screen's top row was an artefact of its own fingerprint (Q-471).** Three meal-plan
-sections fingerprinted on a rounded calorie target alone, so every deliberate reroll read as a
-double trip. They now carry what distinguishes a request, keyed through a new `contentKey` helper.
+sections fingerprinted on a rounded calorie target alone, so every reroll read as a double trip.
 **44 of the 89 redundant calls were this artefact; the other 45 are real** (Q-470, Q-469) —
 [journal](docs/overview/entries/2026-08-23-ai-fingerprint-granularity.md).
 
