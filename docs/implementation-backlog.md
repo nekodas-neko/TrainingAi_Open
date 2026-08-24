@@ -3878,44 +3878,6 @@ ehr     0     0     0     0   648   208   128   556     0
   `DEFAULT_LANDMARKS`. It is not — `muscles.ts:17` maps `core: 'abs'` and `volume-targets.ts:58`
   applies `normalizeMuscle` before the lookup. Working correctly.
 
-### [platform] Q-458 — `.env.example` is the public configuration contract and it is wrong in both directions
-
-- **Branch:** `fix/env-example-reconcile`
-- **Added:** 2026-08-17 · review sweep (repo-migration architecture lens) ·
-  [`docs/reviews/2026-08-17-repo-migration-architecture.md`](reviews/2026-08-17-repo-migration-architecture.md)
-- **Placement:** mid. Mostly tidy-up, with one edge that names a security property the app does not
-  have.
-- **Method.** Differenced every `process.env.X` read under `lib app packages scripts
-  instrumentation*` against the keys declared in `.env.example`.
-- **Declared, read by no code — 8 keys:**
-
-  | Key | Why dead |
-  |---|---|
-  | `OURA_CLIENT_ID`, `OURA_CLIENT_SECRET`, `OURA_REDIRECT_URI`, `OURA_WEBHOOK_CALLBACK_URL`, `OURA_WEBHOOK_VERIFICATION_TOKEN` | Oura **Cloud** integration deleted 2026-08-13 |
-  | `GEMINI_API_KEY` | Retired at Q-189; `CLAUDE.md` already says nothing reads it |
-  | `TOKEN_ENC_KEY` | Nothing reads it |
-  | `AUTH_URL` | Nothing reads it |
-
-- **The sharp edge is `TOKEN_ENC_KEY`.** It reads as the key that encrypts stored tokens. An operator
-  will generate one, set it, and reasonably conclude tokens are encrypted at rest. Nothing reads it,
-  so nothing is. **A dead variable that names a security property is worse than a dead variable** —
-  fix this one even if the rest is deferred.
-- **The second edge is the five Oura Cloud keys.** `CLAUDE.md` is emphatic that the Cloud integration
-  must never be re-added (re-onboarding the official app risks a firmware update that breaks the
-  reverse-engineered BLE protocol). The public onboarding file currently invites a contributor to go
-  get credentials for exactly that. Two project files contradict each other, and the newcomer reads
-  the wrong one first.
-- **Read by code, undeclared — the real configuration** (excluding test/script knobs
-  `OURA_CONSTANTS_DIR`, `RECORD_MODEL_FIXTURES`, `CHUNKS`, `RTT_MS`, `SERIAL`):
-  `CLAUDE_RO_OWNER_USER_ID`, `LOCAL_DATABASE_URL`, `PG_POOL_MAX`, `RAILWAY_GIT_COMMIT_SHA`.
-- **Do NOT "fix" the `AWS_*` keys.** They are absent from `.env.example` deliberately —
-  `lib/exercise-storage.ts:4-24` reads `AWS_* ?? STORAGE_*` as an alias chain and
-  `constants-delivery.ts:74` reuses that module, so documenting `STORAGE_*` alone is correct. This
-  was checked and cleared; see the review.
-- **Fix shape:** delete the eight, add the four. Consider a Custom Rules step that differences the
-  two automatically — this drifted silently because nothing measured it, the same argument that
-  produced the hex-literal and TTL-divergence ratchets.
-
 ### [platform][devices] Q-459 — the rolling APK release is delete-then-recreate, so the advertised public download URL 404s during every native merge
 
 - **Branch:** `fix/apk-rolling-release-no-404-window`

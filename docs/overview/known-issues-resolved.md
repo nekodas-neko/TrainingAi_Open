@@ -1742,3 +1742,27 @@ save site.
 > backfill has not yet run against the real 46-row production table this entry was measured
 > against — it applies automatically on the next `ensureSchema()` cold start after this deploys,
 > same as any other migration, and nothing further is owed beyond that ordinary deploy.
+
+### [platform] ✅ `.env.example` was wrong in both directions — FIXED 2026-08-24, Q-458
+
+Eight declared keys were read by no code, and four real config vars were undeclared. Verified by
+differencing every `process.env.X` read under `lib app packages scripts instrumentation*` against
+the file, re-checked against `main` before touching anything (each of the twelve confirmed
+individually, not taken from the entry's word).
+
+- **Removed** (dead): the five Oura **Cloud** OAuth keys (`OURA_CLIENT_ID`/`_SECRET`/
+  `_REDIRECT_URI`/`_WEBHOOK_CALLBACK_URL`/`_WEBHOOK_VERIFICATION_TOKEN`) — the integration was
+  deleted 2026-08-13 and `CLAUDE.md` forbids re-adding it, so the public onboarding file was
+  inviting a contributor to configure the one thing the project docs say never to touch. Also
+  `GEMINI_API_KEY` (retired at Q-189), `AUTH_URL` (unread), and **`TOKEN_ENC_KEY`** — the sharpest
+  edge, since it read as "encrypts stored tokens at rest" and nothing consumed it, so setting it
+  bought an operator a false sense of a security property the app does not have.
+- **Added** (real, previously undeclared): `PG_POOL_MAX`, `LOCAL_DATABASE_URL` (dev-tooling,
+  auto-set by `scripts/local-db/setup.sh`), `CLAUDE_RO_OWNER_USER_ID`, and an informational note for
+  `RAILWAY_GIT_COMMIT_SHA` (Railway-injected, never set by hand).
+- **A drive-by while in the file:** `GITHUB_RELEASES_TOKEN`'s comment still said "required only
+  while the repository is private" — the repo went public 2026-08-17 (Q-49), so the comment was
+  corrected to "optional, buys a higher rate limit" rather than filed as a second entry.
+- **Verified:** `pnpm check:rules` 55 of 55. No dedicated env-example-vs-code CI check exists yet —
+  the entry suggested one; not built here, since the drift it would catch is exactly what this fix
+  just cleared and adding the check is a separable, smaller follow-up.

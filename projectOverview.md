@@ -1442,11 +1442,6 @@ order.
   degrades to correct rather than to a frozen release failing as "Could not fetch release info".
   **Guarded** by a test on the URL actually requested, which fails when the default is flipped back —
   the fixtures the entry flagged proved nothing about which repo is *asked*. Never a live outage.
-- **🟡 Q-458 — `.env.example` is wrong in both directions.** Eight declared keys are read by no code,
-  including **`TOKEN_ENC_KEY`, which names a security property the app does not have** (an operator
-  will set it and conclude tokens are encrypted at rest; nothing reads it), and five Oura **Cloud**
-  keys inviting a contributor to configure the one integration `CLAUDE.md` forbids re-adding. Four
-  real config vars are undeclared.
 - **🟡 Q-459 — the rolling APK release is delete-then-recreate,** so the advertised public download
   URL 404s during every native merge. Known trade-off in the workflow's own comment; the migration is
   what made it matter, since that URL is now the documented distribution path.
