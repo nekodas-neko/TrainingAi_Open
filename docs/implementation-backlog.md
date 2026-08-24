@@ -3865,27 +3865,6 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Ties to Q-278** (a score that could not be computed rendered identically to a real one) — same
   class, different pillar. Consider one shared "this needs more data, here is how much" treatment.
 
-### [nutrition][platform] Q-303 — the AI gives macro coaching on days with almost no logging coverage
-
-- **Branch:** `fix/ai-qualify-sparse-nutrition`
-- **Plan:** none needed
-- **Added:** 2026-08-15 · from the pillar-soundness review §3.3
-- **Observed**, 2026-08-15 daily digest: *"While your activity was great with 8266 steps, let's focus
-  on bumping that protein closer to your 150g goal tomorrow to better support those big strength
-  gains."*
-- **The 14-day window containing that day has 4 logged days.** The protein advice rests on almost
-  nothing, and it is delivered in the same sentence, with the same confidence, as the workout
-  numbers beside it — which are complete and correct.
-- **Distinct from Q-292**, which is about a *false* number ("perfect activity score" when it was 80).
-  Nothing here is false; it is **unqualified**. The fix is different: the model needs to know the
-  coverage behind each figure it is given, and to say so or stay quiet.
-- **Fix direction:** pass a coverage/confidence value alongside each domain's numbers in the digest
-  prompt, and instruct the model not to issue a corrective recommendation for a domain below a
-  coverage floor. The data is already computed for Q-302's gate — reuse it rather than deriving it
-  twice.
-- **Sibling sweep:** every AI surface taking nutrition data has this exposure, not just the daily
-  digest — check `weekly-digest`, `health-insight` and the Coach's nutrition tools.
-
 ### [workouts] Q-289 — `expectedRpe` misses by more than the autoregulation dead band at both ends of its own range
 
 - **Branch:** `fix/expected-rpe-calibration`
