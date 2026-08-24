@@ -9,6 +9,7 @@ import { todayInTz, todayMidnightUtc, toAestDay } from "@trainingai/shared/date-
 import { getLocalStore } from "@/lib/local-store"
 import { pushMutations } from "@/lib/local-store/sync-engine"
 import type { BodyMetaRow } from "@/app/api/body-metadata/route"
+import { metricBoundError } from "@/components/health/metric-bounds"
 
 export type LogField = "weightKg" | "steps" | "bodyFat";
 
@@ -35,14 +36,16 @@ export function MetricLogSheet({ logState, userId, onClose, onSaved }: MetricLog
     setValue(logState?.value ?? "")
   }, [logState])
 
-  const valueNum = value !== "" ? parseFloat(value) : NaN
-  const error =
-    logState && value !== "" && (!isFinite(valueNum) || valueNum <= 0)
-      ? "Enter a value above 0"
-      : null
+  // Q-321: the SAME bounds the server enforces, asked at the keyboard. The old check was
+  // `valueNum <= 0`, which let a 5,000 kg weight through to be discarded three layers later —
+  // and rejected a legitimate 0 steps, since `STEPS_MIN` is 0.
+  const error = logState ? metricBoundError(logState.field, value) : null
 
   const handleSave = async () => {
     if (!logState || value.trim() === "") return
+    // Never queue a value the server will drop. The Save button is already disabled for this, but
+    // the guard is what makes "never queue it" true rather than merely hard to reach.
+    if (metricBoundError(logState.field, value)) return
     setSaving(true)
     try {
       const date = todayInTz()

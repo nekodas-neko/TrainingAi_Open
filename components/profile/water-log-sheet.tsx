@@ -8,6 +8,8 @@ import { invalidateBodyMetricWrite } from '@/lib/cache-groups'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { todayInTz } from '@trainingai/shared/date-utils'
+import { cn } from '@trainingai/shared/utils'
+import { metricBoundError } from '@/components/health/metric-bounds'
 
 const QUICK_ADD_ML = [150, 250, 330, 500, 750, 1000]
 
@@ -106,6 +108,11 @@ export function WaterLogSheet({ open, onOpenChange, onLogged, userId }: WaterLog
     }
   }
 
+  // Q-321: `validWaterMlDeltaOrNull` is one of the two validators that QUARANTINES rather than
+  // coercing, so a 9,000 ml custom entry did not get clamped — it dead-lettered into a badge the
+  // user cannot act on. Of the fields this check covers, it is the one that was actually costing
+  // something. The quick-add buttons are all well inside the bound and need no guard.
+  const boundError = metricBoundError('waterMlDelta', value)
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom">
@@ -133,14 +140,21 @@ export function WaterLogSheet({ open, onOpenChange, onLogged, userId }: WaterLog
               value={value}
               onChange={e => setValue(e.target.value)}
               placeholder="Custom ml"
-              className="flex-1 rounded-xl border bg-muted px-4 py-3 text-xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-brand"
+              aria-invalid={!!boundError}
+              className={cn(
+                "flex-1 rounded-xl border bg-muted px-4 py-3 text-xl font-bold tabular-nums focus:outline-none focus:ring-2 focus:ring-brand",
+                boundError && "border-destructive",
+              )}
             />
             <span className="text-muted-foreground font-medium">ml</span>
           </div>
+          {boundError && (
+            <p role="alert" className="text-xs text-destructive">{boundError}</p>
+          )}
           <Button
             className="w-full h-12 font-semibold"
             onClick={() => handleSave(Number(value))}
-            disabled={saving || !value.trim() || Number(value) <= 0}
+            disabled={saving || !value.trim() || !!boundError}
           >
             {saving ? 'Saving…' : 'Log'}
           </Button>
