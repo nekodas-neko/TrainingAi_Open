@@ -8,6 +8,7 @@ import { WorkoutSensorProbeConsole } from '@/components/oura-ble/workout-sensor-
 import { DaytimeCoverageConsole } from '@/components/oura-ble/daytime-coverage-console'
 import { StepCounterExportConsole } from '@/components/oura-ble/step-counter-export-console'
 import { StepBackfillConsole } from '@/components/oura-ble/step-backfill-console'
+import { RekeyDeclarationCard } from '@/components/oura-ble/rekey-declaration-card'
 import { RingBatteryConsole } from '@/components/oura-ble/ring-battery-console'
 import { ComparisonHarnessConsole } from '@/components/oura-ble/comparison-harness-console'
 import { RawStoreStatusConsole } from '@/components/oura-ble/raw-store-status-console'
@@ -24,6 +25,9 @@ export default async function OuraBlePage() {
       <main className="pt-safe-or-4 mx-auto max-w-lg px-4 pb-24">
         <h1 className="mb-4 text-lg font-semibold">Oura Ring — direct BLE</h1>
         <OuraBleDebug />
+        <div className="mt-4">
+          <RekeyDeclarationCard />
+        </div>
         <div className="mt-4">
           <RawStoreStatusConsole />
         </div>

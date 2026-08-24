@@ -3261,6 +3261,26 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.2).** `components/oura-ble/rekey-declaration-card.tsx` on
+> `/admin/oura-ble` — declare with an optional note, see the pending declaration and when it was
+> made, cancel one made by mistake. Cancel is offered only while `GET` reports something pending; a
+> consumed declaration offers none.
+> [`journal`](overview/entries/2026-08-24-rekey-declaration-control.md).
+>
+> **It sits OUTSIDE `OuraBleDebug`, as a sibling section on the page, and that is the load-bearing
+> decision.** `OuraBleDebug` returns the native-unavailable banner and renders nothing after it when
+> the plugin is absent — which is exactly the situation the laptop doing the re-key is in. Inside it,
+> the control would have been reachable only from the APK, i.e. only from the device that is not
+> being used at that moment. The declaration needs no ring present.
+>
+> **Verified end to end on `pnpm dev`:** declare (row + note persisted), idempotency (a second POST
+> returned `alreadyPending` and the pending count stayed at 1), cancel (back to idle, 0 pending), and
+> a row carrying `consumed_at` offering no cancel. Zero page errors.
+>
+> **NOT exercised:** the *effect* — a declaration being consumed by the next ingest batch needs a
+> real ring. That half was already proven by Lane A under Q-314; this item was the affordance.
+- **Keep:** an on-device look at the card's layout in the APK. `Gate: device`.
+
 - **Lane B.** `components/oura-ble/` only — the route, the repository methods and the classifier are
   Lane A's and already shipped (Q-314).
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)
