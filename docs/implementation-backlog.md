@@ -4317,20 +4317,42 @@ ehr     0     0     0     0   648   208   128   556     0
 
 ### [workouts] Q-304b — recompute (or leave) the 30 `personal_records` rows written before the AMRAP correction
 
-- **Gate:** owner
-- **Added:** 2026-08-24 · split off Q-304 when its forward fix shipped
+- **Lane:** A
+- **Added:** 2026-08-24 · split off Q-304 when its forward fix shipped · **owner answered the same
+  day: recompute** (the `Gate: owner` is cleared — see the decision below)
 - **Q-304's forward fix shipped** (`packages/shared/src/1rm.ts` — an unprescribed set now gets the
   same `amrapScaleFactor` band discount an explicit AMRAP set already got via `calcAmrap1RM`, so a
   13+ rep set with no progression style no longer feeds the 1RM estimate un-discounted). Verified:
   measured against production first (1 of 29 flagged sets carried a style, so the qualifier that
   would have closed the entry did not), 3 new tests at 13/20/21 reps plus the no-double-correction
   case, full suite green.
-- **What is deliberately NOT done:** `personal_records` (30 rows) was written from the old,
-  un-discounted formula. Recomputing them edits training history and needs the owner's say-so —
-  same shape as Q-298's 10 historical zero-1RM rows, kept as its own decision rather than folded
-  into the forward fix. Options: leave them (only the 29 flagged sets' history is inflated, a small
-  and shrinking share as new sessions log correctly going forward), or recompute the affected rows
-  from `set_logs` with the corrected formula.
+- **✅ DECIDED 2026-08-24 — RECOMPUTE. Gate cleared; this is now work, not a question.**
+  - **Lane: A** — it writes `personal_records`.
+  - **The framing that decided it: `personal_records` is a derived CACHE, not a primary record.**
+    `set_logs` holds what was actually lifted and is **not touched** — it stays the source of truth.
+    The stored `estimated1rm` is that data run through the 1RM formula, and the formula had a bug, so
+    the corrected value is **derivable and verifiable rather than a guess**. That is why this is not
+    the "silently rewriting your training history" hazard it first reads as, and why it differs from
+    a case where the raw record itself was wrong.
+  - **The prescription impact is real but NARROWER than this entry implied — do not over-state it in
+    the PR.** `resolveWorkingBasis` (`packages/shared/src/1rm.ts:398`) takes `lastNonDeload1rm`
+    **first**; `allTimePr1rm` is reached only when there is no real logged session at all, and even
+    then competes with `seedEstimate` via `Math.max`. So an inflated PR drives the prescribed weight
+    only for an exercise carrying a PR but **no recent log** — where it prescribes too heavy. The
+    everyday cost is the PR badge (`exercise-summary-screen.tsx`, `prBar`) and the AI chat's
+    `getPersonalRecords` tool reporting numbers never actually hit.
+- **How to do it.** Recompute the affected rows from `set_logs` through the corrected formula — the
+  same `amrapScaleFactor` path the forward fix now uses, imported, never re-derived (One Formula,
+  One Place). **Idempotent and unconditional**, per the Postgres-migration rules: running it twice
+  must not move a row twice, and it must not depend on a seed that may not exist.
+- **⚠ This is a data-changing migration — the destructive carve-out applies.** The owner has
+  authorised the *recompute* (2026-08-24); that is not a blanket approval of the migration's shape.
+  **Report the before/after per exercise in the PR**, and expect to show it before merging.
+- **Verification.** Measure against production first — 29 flagged sets, 30 PR rows, and only 1 of 29
+  carried a progression style. State how many rows actually moved and by how much; a recompute that
+  moves zero rows is a finding (the formula path was not what wrote them) and not a success.
+- **Related, and deliberately still separate:** Q-298's 10 historical zero-1RM rows are the same
+  shape and are **not** covered by this decision.
 
 ### [workouts] Q-305 — the volume landmarks are computed and never shown to anyone
 
