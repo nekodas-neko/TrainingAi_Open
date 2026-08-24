@@ -22,6 +22,18 @@ canonical-display-source table in the same section).
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-24-sleep-score-volatility.md`](../../reviews/2026-08-24-sleep-score-volatility.md)
+  — **"the scores have been very varied lately", measured 2026-08-24.** Stored sleep score's
+  day-to-day |Δ| went **9.2 → 21.2** at the recalibration, but the **pre-calibration blend moved
+  9.15 → 9.27 — unchanged**, so the sleep is genuinely that variable and the model is reading it
+  correctly. Two things landed together on 2026-08-19: the calibration began applying at all (before
+  it, the stored score *is* the raw blend), and the blend mean fell 87.1 → 71.1 into the curve's
+  steep zone. **The real defect is `SCORE_CALIBRATION`'s gain spread of 8×** — 4.00× at blend 79
+  against 0.50× at 92, so the same real improvement is worth eight times as much in one place as
+  another (**TN-5**, `Gate: owner`). **⛔ Flattening the curve does NOT reduce volatility** — tested,
+  night-to-night |Δ| goes 13.53 → **13.75**, because the curve's total rise is conserved. The baton's
+  old advice to do exactly that has been replaced.
+
 - [`docs/reviews/2026-08-15-comprehensive-app-review.md`](../../reviews/2026-08-15-comprehensive-app-review.md)
   — §1.9 measured the fragment-night problem across all post-re-key `sleep_sessions`: 10 of 46 rows
   under 1.5 h, three at exactly 0.00 h, and on 2026-08-11 and 2026-08-13 the fragment is the *only*
@@ -157,6 +169,26 @@ found eleven read sites that had never been converted to it and routed them all 
 stay on raw rows on purpose and say so in comments (day timeline, sleep list, `oura/hr-day`, and the
 daytime-HRV sleep-exclusion windows, which need naps *included* to exclude them from a daytime
 curve). **Before writing anything that treats one row as one night, call the helper.**
+
+## Decided, and deliberately not built
+
+- **The morning sleep-feel rating does NOT drive the Sleep Score, and must not (owner, in person,
+  2026-08-06 — Q-102, removed from the queue 2026-08-24).** `sleep_quality_feel` stays read-only: an
+  admin calibration diagnostic and a separate AI-periodization signal, never an input to the score.
+  **Do not implement without the owner explicitly reopening it** — this line is the standing
+  instruction the queue entry used to carry.
+  - **Why it is kept out, and it is not squeamishness:** holding the self-report *outside* the score
+    is what lets it independently **validate** the score — "does the number match how it felt" is
+    only answerable while the two are independent. That was the deliberate Q-16 decision
+    (2026-07-27), and Q-102 would have reversed it. The owner walked it through live against a real
+    disrupted night and declined, asking for an **objective awake-time criterion** instead, which
+    shipped separately.
+  - **It was also moot on independent grounds**, which is the part worth remembering: the on-screen
+    `sleepQualityFeel` slider is **pre-filled from the Sleep score itself** (`prefillMorningScales()`),
+    so an unedited answer would have fed the score a value derived from that same score. Wiring it up
+    as originally scoped would have been a feedback loop, not a signal. See Q-113.
+  - **Revisit only if** the prefill is removed *and* the owner reopens it — the second condition does
+    not follow from the first.
 
 ## History
 

@@ -18,7 +18,7 @@ const BodySchema = z.object({
   /** Only these change ids are written. The rest of the patch is recorded but not applied — what
    *  the assistant suggested is part of the history, not just what was taken. */
   acceptedChangeIds: z.array(z.string().min(1)).min(1).max(8),
-})
+}).strict()
 
 /**
  * The only place AI Coach writes. The chat route never does.

@@ -1,3 +1,4 @@
+import { ACWR_THRESHOLDS } from './acwr'
 import type { PrescriptionSignals } from './signals'
 import type { SessionPeriodization } from '@trainingai/shared/types/ai-periodization'
 
@@ -31,7 +32,7 @@ export function shouldTriggerEmergencyDeload(signals: EmergencySignals, state: E
     signals.selfReportedSick ||
     signals.consecutiveSessionDaysOfThisType >= 4 ||
     (signals.hoursSinceLastSession !== null && signals.hoursSinceLastSession < 36 && signals.soreMusclesInSession.length >= 3) ||
-    (signals.acwr !== null && signals.acwr > 1.5) ||
+    (signals.acwr !== null && signals.acwr > ACWR_THRESHOLDS.highMax) ||
     (signals.rpeTrend !== null && signals.rpeTrend.delta > 2.0) ||
     (signals.repCompletionRate !== null && signals.repCompletionRate < 0.7)
   )

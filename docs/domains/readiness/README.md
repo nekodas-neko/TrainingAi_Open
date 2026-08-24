@@ -57,6 +57,31 @@ render the band's label/icon alongside its colour (CLAUDE.md, One Formula One Pl
   measured and **both pass** — 43 summary rows against a threshold of 21, and 27 of 31 nights complete
   in the trailing window — so the refusal is inside the **granular** layer, which persists no reason
   for a null. Filed **TN-1**.
+- [`docs/reviews/2026-08-24-readiness-temperature-penalty.md`](../../reviews/2026-08-24-readiness-temperature-penalty.md)
+  — **the temperature penalty fires on 91% of nights, 2026-08-24.** `computeBlendedScore`
+  (`readiness-payload.ts:169`) subtracts on an **absolute °C** ladder (−10 past 0.3, −20 past 0.5,
+  cap 40 past 1.0) — a different path from the `tempZ` one Q-506 covers, and nothing was queued
+  against it. The stored deviation is **positive on 34 of 34 nights** (mean +0.662 °C) because the
+  baseline mean sits **0.363 °C below** the true measured mean, a gap that clears the 0.3 threshold
+  on its own. Cost: **−16.3 readiness points/day**; a trailing-mean baseline takes that to −0.4.
+  **The same object's sd is ~13× too wide**, which is Q-506 reproduced from another table — so **one
+  baseline fails two consumers in opposite directions** (wide sd → the radar can never fire; low mean
+  → readiness penalised daily). Filed **TN-6**, batched with Q-506 as `temperature-baseline`.
+  **Do not touch the 0.3/0.5/1.0 ladder** — against a true sd of 0.140 °C it sits at 2.1/3.6/7.1 sd,
+  and this is the fourth "the threshold is right, the input is wrong" in this pillar.
+- [`docs/reviews/2026-08-24-body-battery-charge-window-collapse.md`](../../reviews/2026-08-24-body-battery-charge-window-collapse.md)
+  — **the Body Battery charge window has closed, 2026-08-24.** Charging needs
+  `HR ≤ restingHr + 0.05 × reserve` = **57.8 bpm**, against a 5th-percentile waking HR of **62** and a
+  median of **86**, so a time-weighted **0.5%** of the waking day can charge and the tank floors by
+  early afternoon (7 of 56 days at 0, **5 of the last 8**). Both causes are correct data — resting HR
+  fell 67 → 52, and `hrMax` fell 187 → 168 on 2026-08-05 — which is **Q-515's** mechanism with a
+  visible consequence. Filed **TN-2** (fit an explicit waking-rest bpm offset, bracket **+8 … +12**,
+  owner signed off on the direction), **TN-3a/b** (the per-bucket stress series is computed and
+  discarded, so no hour-of-day question is answerable), **TN-4** (31 × 500 on `/api/body-battery` on
+  2026-08-23, stopped unexplained). **Two method rules to carry out of it:** any coverage or
+  percentile measurement on the BLE HR series must be **time-weighted**, because the ring power-gates
+  its PPG and a per-sample percentile reads ~20% where the time-weighted answer is ~1.6%; and
+  **+18 bpm overshoots** into a permanently-full tank (mean 90.8, a third of days at 100).
 - [`docs/reviews/2026-08-18-illness-radar-calibration.md`](../../reviews/2026-08-18-illness-radar-calibration.md)
   — **the illness radar measured over 46 days: it has never produced an action-bearing flag**, peaking
   at 38 against a `watch` threshold of 40. The cause is not the thresholds — the temperature baseline's

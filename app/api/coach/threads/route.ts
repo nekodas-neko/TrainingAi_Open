@@ -15,9 +15,9 @@ const MAX_BODY_BYTES = 8 * 1024 * 1024
 const SaveSchema = z.object({
   threadId: z.string().uuid().nullable(),
   messages: z
-    .array(z.object({ role: z.string().min(1).max(20), parts: z.array(z.unknown()).max(80) }))
+    .array(z.object({ role: z.string().min(1).max(20), parts: z.array(z.unknown()).max(80) }).strict())
     .max(120),
-})
+}).strict()
 
 /** History: applied changes (nearly free — the rows already exist) plus recent conversations. */
 export async function GET(req: Request) {

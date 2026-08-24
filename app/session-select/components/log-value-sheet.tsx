@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type Dispatch, type SetStateAction } from "react"
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { toast } from "sonner"
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Button } from "@/components/ui/button"
@@ -9,7 +10,7 @@ import type { WidgetDef } from "@/lib/home/home-prefs"
 import { getLocalStore } from "@/lib/local-store"
 import { pushMutations } from "@/lib/local-store/sync-engine"
 import { todayInTz, todayMidnightUtc, toAestDay } from "@trainingai/shared/date-utils"
-import { cn, localDateString } from "@trainingai/shared/utils"
+import { cn } from "@trainingai/shared/utils"
 import { invalidateBodyMetricWrite, invalidateReadinessInputs } from "@/lib/cache-groups"
 import type { LocalBodyMetric } from "@/lib/local-store/types"
 import { metricBoundError } from "@/components/health/metric-bounds"
@@ -25,6 +26,7 @@ interface LogValueSheetProps {
 }
 
 export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, setMetaToday, fetchMeta }: LogValueSheetProps) {
+  const tz = useUserTimezone();
   const [logValue, setLogValue] = useState("")
   const [logSaving, setLogSaving] = useState(false)
 
@@ -45,7 +47,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
     if (metricBoundError(widget.key, logValue)) return;
     setLogSaving(true);
     try {
-      const date = todayInTz();
+      const date = todayInTz(tz);
       const numVal = parseFloat(logValue);
       // Map widget keys to LocalBodyMetric field names
       const widgetToLocal: Partial<Record<string, keyof LocalBodyMetric>> = {
@@ -62,7 +64,21 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
       let savedLocally = false;
       if (store && localField) {
         try {
-          const leanPayload: Record<string, number | null> = { [localField]: numVal };
+          // Q-319: water is an INCREMENT everywhere else in the app — `metric-bounds.ts` bounds
+          // `waterIntake` with `validWaterMlDeltaOrNull` and says so, `water-log-sheet.tsx`
+          // read-merges and queues `waterMlDelta`, and the push branch routes that through
+          // `incrementWaterLog` because an absolute total made concurrent adds on two devices
+          // clobber each other (SYNC-P7). This sheet wrote an absolute on all three paths, so it
+          // both discarded the day's accumulated water and reintroduced SYNC-P7 on a second
+          // surface. `upsertBodyMetric` overwrites every column, so the merge has to be explicit.
+          const isWater = widget.key === 'waterIntake';
+          const existingToday = isWater
+            ? (await store.getBodyMetrics(date)).find(r => r.date === date) ?? null
+            : null;
+          const waterTotal = isWater ? (existingToday?.waterMl ?? 0) + numVal : null;
+          const leanPayload: Record<string, number | null> = isWater
+            ? { waterMlDelta: numVal }
+            : { [localField]: numVal };
           await store.upsertBodyMetric({
             date,
             weightKg:         widget.key === 'weightKg'    ? numVal : null,
@@ -72,7 +88,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
             proteinG:         widget.key === 'protein'      ? numVal : null,
             carbsG:           widget.key === 'carb'         ? numVal : null,
             fatG:             widget.key === 'fat'          ? numVal : null,
-            waterMl:          widget.key === 'waterIntake'  ? numVal : null,
+            waterMl:          isWater                       ? waterTotal : null,
             restingHeartRate: null,
             hrvMs:            null,
             spo2Pct:          null,
@@ -155,6 +171,7 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
         const prevMetaToday = metaToday;
         onClose();
         toast.success(`${widget.label} saved`);
+        const isWaterWeb = widget.key === 'waterIntake';
         if (metaField) {
           const base: BodyMetaRow = prevMetaToday ?? {
             date, weightKg: null, bodyFat: null, calories: null, protein: null,
@@ -164,14 +181,24 @@ export function LogValueSheet({ widget, onClose, userId, metaToday, metaRecent, 
             skeletalMusclePct: null, fatFreeMassKg: null, subcutaneousFatPct: null, visceralFatIndex: null,
             bodyWaterPct: null, muscleMassKg: null, boneMassKg: null, proteinPct: null, bmrKcal: null, metabolicAge: null,
           };
-          setMetaToday({ ...base, date, [metaField]: numVal });
+          // The optimistic paint follows the same increment semantics as the write.
+          setMetaToday({ ...base, date, [metaField]: isWaterWeb ? (base.waterMl ?? 0) + numVal : numVal });
         }
         try {
-          const res = await fetch("/api/body-metadata", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ localDate: localDateString(), [widget.key]: numVal }),
-          });
+          // Q-319: `BodyMetadataPostSchema` names no water field — water lives on
+          // `/api/water-log`, which increments. Posting `waterIntake` here was silently dropped
+          // behind a 200 until Q-464 made the schema `.strict()`, and has 400'd since.
+          const res = isWaterWeb
+            ? await fetch("/api/water-log", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ ml: numVal }),
+              })
+            : await fetch("/api/body-metadata", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ localDate: date, [widget.key]: numVal }),
+              });
           if (!res.ok) throw new Error();
           await invalidateBodyMetricWrite();
           await invalidateReadinessInputs();

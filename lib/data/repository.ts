@@ -786,7 +786,8 @@ export interface WorkoutRepository {
   listSeasonsWithResults(userId: string): Promise<Season[]>
 
   // ── AI Health Insights ─────────────────────────────────────────────────────
-  getAiHealthInsight(userId: string, section: string, date: string): Promise<string | null>
+  // There is deliberately NO hash-less read. One existed and every section but daily-digest used
+  // it, so an insight written before the ring synced was served for the rest of the day (Q-293).
   // contextHash lets a non-forced request recompute the cheap deterministic context and only
   // serve the cache when it matches — see NUT-7 (daily-digest staleness).
   getAiHealthInsightWithHash(userId: string, section: string, date: string): Promise<{ insight: string; contextHash: string | null } | null>

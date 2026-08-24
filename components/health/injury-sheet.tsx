@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -30,9 +31,10 @@ interface Props {
 }
 
 export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, userId }: Props) {
+  const tz = useUserTimezone();
   const [muscle, setMuscle] = useState('')
   const [severity, setSeverity] = useState<Severity>('mild')
-  const [startedDate, setStartedDate] = useState(todayInTz())
+  const [startedDate, setStartedDate] = useState(todayInTz(tz))
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
 
@@ -45,10 +47,10 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
     } else {
       setMuscle('')
       setSeverity('mild')
-      setStartedDate(todayInTz())
+      setStartedDate(todayInTz(tz))
       setNotes('')
     }
-  }, [injury, open])
+  }, [injury, open, tz])
 
   async function handleSave() {
     if (!muscle) return
@@ -109,7 +111,7 @@ export function InjurySheet({ open, onOpenChange, injury, onSaved, onDeleted, us
     setSaving(true)
     try {
       const store = userId ? getLocalStore(userId) : null
-      const resolvedDate = todayInTz()
+      const resolvedDate = todayInTz(tz)
       let savedLocally = false
       if (store) {
         try {

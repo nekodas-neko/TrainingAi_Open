@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState, useEffect, useCallback, useMemo } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CalculatorIcon, ChevronLeftIcon, DumbbellIcon, ListIcon, SkipForwardIcon, ZapIcon, TriangleAlertIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import type { WorkoutExercise, PhaseStatus } from "@/app/api/workout-data/route";
@@ -87,6 +88,7 @@ export function ActiveWorkoutScreen({
   onRequestInjurySwap,
   userId,
 }: ActiveWorkoutScreenProps) {
+  const tz = useUserTimezone();
   // Only the SET-1 working weight is read reactively here (for the warmup ramp + the "load the
   // bar to" header). The per-set weight/reps/lap/rest/RPE the active card renders live on every
   // dial detent are read at the leaf (ActiveSetCard / Live1rmReadout self-subscribe), so a dial
@@ -126,7 +128,7 @@ export function ActiveWorkoutScreen({
     // blank offline mid-workout.
     const store = userId ? getLocalStore(userId) : null;
     if (store) {
-      const cutoffStr = shiftDateStr(todayInTz(), -90);
+      const cutoffStr = shiftDateStr(todayInTz(tz), -90);
       store.getWorkoutHistory(cutoffStr).then(history => {
         const localEntries: Array<{ date: string; estimated1rm: number | null }> = [];
         for (const { exerciseLogs } of history) {
@@ -146,7 +148,7 @@ export function ActiveWorkoutScreen({
       EXERCISE_HISTORY_TTL,
       d => { if (d?.entries) setRmHistory(d.entries.slice(0, 6).reverse()); },
     );
-  }, [exercise?.name, timerStarted, userId]);
+  }, [exercise?.name, timerStarted, userId, tz]);
 
   const handleRpeChange = useCallback(
     (value: number) => onRpeChange?.(currentSet, value),

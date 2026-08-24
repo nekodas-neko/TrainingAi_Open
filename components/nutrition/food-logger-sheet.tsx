@@ -168,7 +168,7 @@ export function FoodLoggerSheet({ open, preselectedMealTypeId = null, onClose, o
         }]
       }
 
-      const today = logDate ?? todayInTz()
+      const today = logDate ?? todayInTz(tz)
       const logs = await logFoodEntries(entries, today, mealTypeId, userId, tz)
 
       hapticLight()

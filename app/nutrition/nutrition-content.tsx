@@ -94,7 +94,7 @@ function formatDateLabel(dateStr: string, todayStr: string): string {
 
 export default function NutritionContent({ userId }: { userId?: string }) {
   const tz = useUserTimezone();
-  const todayStr = todayInTz();
+  const todayStr = todayInTz(tz);
   const searchParams = useSearchParams();
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const selectedDateRef = useRef(selectedDate);
@@ -311,7 +311,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   const lastVisibleDayRef = useRef(todayStr);
   useEffect(() => {
     if (tabEpoch === 0) return;
-    const today = todayInTz();
+    const today = todayInTz(tz);
     if (lastVisibleDayRef.current !== today && selectedDateRef.current === lastVisibleDayRef.current) {
       // Midnight rolled while hidden and the user was on "today" — follow it,
       // as a fresh mount used to. fetchData re-runs via the [selectedDate] effect.
@@ -322,7 +322,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
     }
     lastVisibleDayRef.current = today;
     fetchData(selectedDateRef.current);
-  }, [tabEpoch, fetchData]);
+  }, [tabEpoch, fetchData, tz]);
 
   // Local-first meal-type read: paint the mirrored names/emoji before the network cache
   // resolves, so a food log opened offline groups under a real meal type. `fetchMountData`'s
@@ -338,7 +338,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
   }, [userId]);
 
   useEffect(() => {
-    const today = todayInTz();
+    const today = todayInTz(tz);
     const store = userId ? getLocalStore(userId) : null;
     if (store) {
       Promise.all([store.getSupplements(), store.getSupplementLogs(today)]).then(([defs, logs]) => {
@@ -373,7 +373,7 @@ export default function NutritionContent({ userId }: { userId?: string }) {
         d => setSupplements(Array.isArray(d) ? d : []),
       ).catch(() => {}).finally(() => setSupplementsLoading(false));
     }
-  }, [userId, tabEpoch])
+  }, [userId, tabEpoch, tz])
 
   const totals = logs.reduce(
     (acc, l) => ({ calories: acc.calories + l.calories, proteinG: acc.proteinG + l.proteinG, carbsG: acc.carbsG + l.carbsG, fatG: acc.fatG + l.fatG }),

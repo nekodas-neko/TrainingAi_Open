@@ -4,12 +4,14 @@ import { getRepository } from '@/lib/data'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, shiftDateStr, ageFromDob } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { reportServerError } from '@/lib/observability'
+import { tryEnsureServerOuraConstants } from '@/lib/oura-models/constants-inject'
 import { hrMaxFromAge, hrReserve, HR_REST_THRESHOLD } from '@trainingai/shared/health/hr-zones'
 import { computeObservedHr } from '@trainingai/shared/health/observed-hr'
 import { resolveBatteryHrMax, batteryConfidence, HR_PEAK_WINDOW_DAYS, type BatteryConfidence } from '@trainingai/shared/health/body-battery-inputs'
 import { computeSleepScore, sleepScoreBaselines } from '@trainingai/shared/health/sleep-score'
 import type { BodyBatteryLabel } from '@trainingai/shared/health/body-battery-band'
 import { nightSessions } from '@trainingai/shared/health/sleep-night'
+import { walkBodyBattery } from '@trainingai/shared/health/body-battery-walk'
 import { buildDaytimeStressSeriesFromModel, summarizeStressDay, type StressPoint, type DhrvBaselines } from '@/lib/health/daytime-stress'
 import { resolveAnchor, type AnchorSource } from './anchor'
 import { buildReadinessPayload } from '@/lib/health/readiness-payload'
@@ -245,11 +247,32 @@ async function buildBodyBattery(userId: string, tz: string) {
   const dhrvModel = await repo.getDaytimeHrvModel(userId)
   if (dhrvModel && dhrvBaseline != null && tempBaseline != null && tempBaseline > 0) {
     const baselines: DhrvBaselines = { dhrvBaseline, hrBaseline: restingHr, tempBaseline }
-    stressSeries = buildDaytimeStressSeriesFromModel(
-      daytimeSignals.temp, daytimeSignals.met,
-      hrRows.map(r => ({ tsMs: r.timestamp.getTime(), bpm: r.bpm })),
-      dhrvModel, baselines, wakeTime, now.getTime(),
-    )
+    // TN-4. Two hardening changes, both "worth doing regardless of root cause" — the 31 × 500 on
+    // 2026-08-23 (`daytime-stress: constants not set`, 10:37–20:59 UTC) stopped on its own and is
+    // still unexplained.
+    //
+    // 1. Self-inject rather than assume boot got there. `ensureServerOuraConstants()` runs at boot
+    //    from instrumentation-node.ts, and `lib/data/index.ts` calls the swallowing variant when the
+    //    repository handle is built — but that one swallows, so it can fail to take without a trace,
+    //    which is consistent with what happened. The injector is idempotent and documents this exact
+    //    use ("a composition root that is unsure whether boot reached it should just call it");
+    //    after the first call it is three boolean checks. The TRY variant deliberately: the throwing
+    //    one would turn a missing constants directory back into the 500 this is removing.
+    tryEnsureServerOuraConstants()
+    try {
+      stressSeries = buildDaytimeStressSeriesFromModel(
+        daytimeSignals.temp, daytimeSignals.met,
+        hrRows.map(r => ({ tsMs: r.timestamp.getTime(), bpm: r.bpm })),
+        dhrvModel, baselines, wakeTime, now.getTime(),
+      )
+    } catch (err) {
+      // 2. A stress-model failure must not take Body Battery down with it — the same guard, and the
+      //    same reasoning, as the readiness call above. This throw was reaching the outer catch, so
+      //    the WHOLE card 500'd when only the stress strip was unavailable. Falling through leaves
+      //    `stressSeries` empty, which the walk already handles: `stressAt` returns null and the
+      //    STRESS_DRAIN_RATE term is simply not applied.
+      console.error('[body-battery] daytime stress series failed, continuing without it:', err)
+    }
   }
   // Step lookup: stressLevel (∈[−1,1]) of the most recent bucket at/under a time (30-min, held forward).
   const stressAt = (ms: number): number | null => {
@@ -259,52 +282,36 @@ async function buildBodyBattery(userId: string, tz: string) {
   }
 
   // ── Walk the HR series from wake → now ────────────────────────────────────
-  let battery = anchor
-  let charged = 0
-  let drained = 0
-  let stressDrained = 0
-  const series: BodyBatteryPoint[] = [{ t: wakeTime, v: Math.round(battery) }]
+  // The arithmetic lives in `walkBodyBattery` (packages/shared/src/health/body-battery-walk.ts) so
+  // it can be driven without a database — TN-2 needs the charge-window offset fitted against the
+  // shipped TypeScript rather than a SQL replay, and that is impossible while the loop is welded
+  // into this function. The constants stay declared HERE and are passed in, so this route remains
+  // the one place they are chosen.
+  const walk = walkBodyBattery(
+    hrRows.map(r => ({ tsMs: r.timestamp.getTime(), bpm: r.bpm })),
+    {
+      anchor, wakeTime, restingHr, reserve,
+      restThreshold: REST_THRESHOLD,
+      chargeRate: CHARGE_RATE,
+      drainRate: DRAIN_RATE,
+      stressDrainRate: STRESS_DRAIN_RATE,
+      gapHoldMin: GAP_HOLD_MIN,
+      sampleCapMin: SAMPLE_CAP_MIN,
+      stressAt,
+    },
+  )
+  const battery = walk.battery
+  const charged = walk.charged
+  const drained = walk.drained
+  const stressDrained = walk.stressDrained
+  const series: BodyBatteryPoint[] = walk.series
+  const wakingRowCount = walk.sampleCount
 
-  const wakingRows = hrRows.filter(r => r.timestamp.getTime() >= wakeTime)
-  let prevMs = wakeTime
-  for (const row of wakingRows) {
-    const ms = row.timestamp.getTime()
-    const dtMin = (ms - prevMs) / 60_000
-    prevMs = ms
-    if (dtMin <= 0) continue
-    if (dtMin > GAP_HOLD_MIN) {
-      // Ring off / no data — hold steady but keep the timeline continuous.
-      series.push({ t: ms, v: Math.round(battery) })
-      continue
-    }
-    const dt = Math.min(dtMin, SAMPLE_CAP_MIN)
-    const hrr = clamp((row.bpm - restingHr) / reserve, 0, 1)
-    let delta: number
-    if (hrr <= REST_THRESHOLD) {
-      delta = CHARGE_RATE * (1 - hrr / REST_THRESHOLD) * dt
-      charged += delta
-    } else {
-      delta = -DRAIN_RATE * (hrr - REST_THRESHOLD) * dt
-      drained += -delta
-    }
-    // Daytime stress adds drain on top — Oura's stress level is already normalized to [−1,0) when
-    // stressed, so scale drain directly by its magnitude.
-    const rs = stressAt(ms)
-    if (rs != null && rs < 0) {
-      const extra = STRESS_DRAIN_RATE * -rs * dt
-      delta -= extra
-      drained += extra
-      stressDrained += extra
-    }
-    battery = clamp(battery + delta, 0, 100)
-    series.push({ t: ms, v: Math.round(battery) })
-  }
-
-  const hasData = wakingRows.length > 0
+  const hasData = wakingRowCount > 0
   // Sparse days are unmeasured days, not calm ones — the ring power-gates its PPG when worn and
   // idle. Seven of 36 measured production days carried under 100 waking samples and the battery
   // travelled 8 points across the whole day, rendered as confidently as a 2,541-sample day.
-  const confidence = batteryConfidence(wakingRows.length, (now.getTime() - wakeTime) / 60_000)
+  const confidence = batteryConfidence(wakingRowCount, (now.getTime() - wakeTime) / 60_000)
   // Carry the line to "now" so the chart ends at the present moment.
   if (series[series.length - 1].t < now.getTime()) {
     series.push({ t: now.getTime(), v: Math.round(battery) })
@@ -359,7 +366,7 @@ async function buildBodyBattery(userId: string, tz: string) {
       restingHr,
       hrMax,
       hrMaxObserved: observedMax,
-      hrSampleCount: wakingRows.length,
+      hrSampleCount: wakingRowCount,
       modelVersion:  MODEL_VERSION,
     }).catch(() => { /* snapshot is best-effort — never fail the read */ })
   }

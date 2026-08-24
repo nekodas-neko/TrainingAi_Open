@@ -1,6 +1,7 @@
 'use client'
 
 import { ActivityIcon } from 'lucide-react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useCachedValue } from '@/lib/hooks/use-cached-value'
 import { TRAINING_STRESS_TTL } from '@trainingai/shared/cache-ttl'
 import { todayInTz } from '@trainingai/shared/date-utils'
@@ -10,10 +11,11 @@ import type { TrainingStressResponse } from '@/app/api/training-stress/route'
 // `training-stress` cache key as the done-screen badge (one key per endpoint). Self-hides
 // when gated (readiness learning / no profile / not enough MET).
 export function TrainingStressLine() {
+  const tz = useUserTimezone();
   // `today: true` because 'training-stress' is a date-less today key — `sync-provider` warms it
   // that way and the done-screen badge reads it that way, so all three agree.
   const data = useCachedValue<TrainingStressResponse>(
-    'training-stress', `/api/training-stress?date=${todayInTz()}`, TRAINING_STRESS_TTL,
+    'training-stress', `/api/training-stress?date=${todayInTz(tz)}`, TRAINING_STRESS_TTL,
     { today: true },
   )
 

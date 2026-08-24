@@ -1,0 +1,939 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Nutrition rework — reference drawings (Q-395)</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&display=swap">
+<style>
+  body { margin:0; background:oklch(0.14 0 0); color:oklch(0.985 0 0);
+         font-family:Geist,system-ui,-apple-system,sans-serif; padding:28px; }
+  h1 { font-size:19px; margin:0 0 6px; }
+  h2 { font-size:15px; margin:34px 0 14px; padding-top:18px;
+       border-top:1px solid oklch(0.28 0 0); color:oklch(0.75 0 0);
+       text-transform:uppercase; letter-spacing:.09em; }
+  .lede { font-size:12.5px; line-height:1.6; color:oklch(0.68 0 0); max-width:76ch; margin:0 0 8px; }
+  .lede code { background:oklch(0.22 0 0); padding:1px 5px; border-radius:4px; }
+  .warn { border-left-color:oklch(0.75 0.16 85) !important; }
+  .note { font-size:11.5px; line-height:1.6; color:oklch(0.70 0 0); background:oklch(0.19 0 0);
+          border-left:3px solid oklch(0.45 0 0); padding:11px 14px; margin:0 0 16px;
+          max-width:80ch; white-space:pre-wrap; border-radius:0 6px 6px 0; }
+  .grid { display:flex; flex-wrap:wrap; gap:26px; align-items:flex-start; }
+  figure { margin:0; } 
+  figcaption { font-size:11.5px; font-weight:600; color:oklch(0.72 0 0); margin:0 0 7px; }
+  .frame { border:1px solid oklch(0.30 0 0); border-radius:9px; overflow:hidden; background:oklch(0.05 0 0); }
+  .tmpl { font-size:10px; font-weight:600; color:oklch(0.75 0.16 85); margin-left:4px; }
+  .ph { opacity:.42; font-style:italic; }
+</style>
+<h1>Nutrition rework — the reference drawings</h1>
+<p class="lede">
+  Twelve artboards at <strong>true S25 size (412&nbsp;dp)</strong> in the app's own tokens. These are the
+  drawings <strong>Q-395 / Q-395a / Q-395b / Q-395c</strong> and <strong>Q-406</strong> cite; the owner
+  reviewed them twice and answered every blocking question against them.
+</p>
+<p class="lede">
+  <strong>Provenance.</strong> Recovered 2026-08-24 from the Claude Design canvas <em>"Nutrition UI
+  Review"</em> and committed so a session can open them without the canvas. A <strong>faithful
+  transcription</strong>: every artboard's markup and inline styles are unchanged — only the editor's
+  <code>&lt;x-dc&gt;</code>/<code>&lt;helmet&gt;</code> wrappers were removed. Source of record:
+  <a href="https://claude.ai/code/artifact/936866ab-387b-44a3-9de0-de080a8d6c3b"
+     style="color:oklch(0.723 0.219 149.579)">the canvas</a>.
+</p>
+<div class="note warn"><strong>Two corrections to what the queue entries say — read before building.</strong>
+
+1. <strong>There is no <code>unit-options.png</code>, and there never was.</strong> Q-395a and Q-406 name it as
+   a file; it was a screenshot of the <code>srv/g — A/B/C</code> artboards on page 2 below. Cite
+   <code>UnitA.dc.html</code> instead.
+
+2. <strong>The "<code>Full Cream Milk</code> row" Q-395a cites is NOT in the unit-options drawing.</strong> It is
+   in <code>EditMeal.dc.html</code> (artboard 5) and <code>Quantity.dc.html</code> (artboard 6). So Q-395a's two
+   references are two different artboards: the EXPANDED row is <code>srv/g — A</code>, the COLLAPSED row is
+   Edit meal's. Do not hunt for a Full Cream Milk row inside unit-options — it is not there.</div>
+<div class="note warn"><strong>Three artboards used editor-side loops</strong> (<code>sc-for</code>/<code>sc-if</code>) that were never bound to
+data — they drew N placeholder rows in the canvas via <code>hint-placeholder-count</code>. A small inline shim
+below reproduces that, so those artboards render as the owner saw them. Rows showing a muted
+<code>{{token}}</code> are placeholders by design, not a transcription error. Affected:
+<code>MealsNow</code>, <code>Targets</code>, <code>UnitA</code> — marked TEMPLATED in their caption. The six reworked screens
+on page 1 use no templating and are exact.</div>
+
+<h2>Reworked screens</h2>
+<div class="note">NUTRITION, REWORKED — six screens at true S25 size (412 dp) in the app&#x27;s own tokens: Geist, oklch(0.05) page, oklch(0.09) cards, 10 and 14 px radii, the real MACRO_COLORS trio.
+
+The conventions taken from mainstream food loggers are structural, not visual — a list row that never carries a control, a grey second line saying what and how much, the calorie number right-aligned in the same column on every screen, and a macro donut showing each macro as a share of calories. The chrome, colour and type are ours throughout; nothing here copies another app&#x27;s look.
+
+The single biggest change is that editing moved off the row and into a sheet. That is what makes everything else fit.</div>
+<div class="note">ON PHOTOS
+
+The thumbnails are placeholders — a tile and a glyph, not a bad attempt at food photography.
+
+Storing them is a real decision, not a detail: a data-URI thumbnail rides in the sync delta and the on-device SQLite mirror, once per meal, forever. The size cap is the whole design. See Q-396.</div>
+<div class="note">WHY EVERY ROW LOOKS THE SAME
+
+Today a food reads one way in the diary, another in search, another in a saved meal, and another again in the meal builder. Four shapes for one thing.
+
+Here there is one: optional thumbnail · name · grey line of what and how much · calories, right-aligned in a fixed column · optional chevron. It is used on all six screens above, which is what makes the whole section feel like one app rather than six sheets that grew separately.
+
+That also makes it a component — `components/nutrition/food-row.tsx` — rather than markup repeated at six call sites, which is the shape the repo&#x27;s own reuse rule asks for.</div>
+<div class="grid">
+<figure>
+<figcaption>1 · Nutrition — the day <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×812 · Main.dc.html</span></figcaption>
+<div class="frame">
+<div style="width:412px;height:812px;overflow:hidden;position:relative;box-sizing:border-box;background:oklch(0.05 0 0);color:oklch(0.985 0 0);font-family:Geist,system-ui,sans-serif;font-size:14px;display:flex;flex-direction:column">
+
+<div style="flex:none;padding:34px 16px 12px;display:flex;align-items:flex-start;gap:12px">
+  <div style="flex-grow:1;min-width:0">
+    <div style="font-size:26px;font-weight:600;letter-spacing:-.02em">Nutrition</div>
+    <div style="font-size:13px;color:oklch(0.75 0 0);margin-top:1px">Wednesday 18 August</div>
+  </div>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09A1.65 1.65 0 008 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H2a2 2 0 110-4h.09A1.65 1.65 0 004.6 8a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06A1.65 1.65 0 009 3.6 1.65 1.65 0 0010 2.09V2a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06A1.65 1.65 0 0019.4 8v0a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+</div>
+<div style="flex-grow:1;overflow:hidden;display:flex;flex-direction:column;gap:14px">
+
+  <div style="margin:0 16px;border-radius:16px;background:oklch(0.09 0 0);border:1px solid oklch(1 0 0 / 7%);padding:14px;display:flex;align-items:center;gap:16px">
+    
+<div style="flex:none;width:104px;height:104px;border-radius:50%;background:conic-gradient(#22c55e 0 34%, #3b82f6 34% 64%, #f97316 64% 85%, oklch(0.16 0 0) 85% 100%);display:flex;align-items:center;justify-content:center">
+  <div style="width:82px;height:82px;border-radius:50%;background:oklch(0.09 0 0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+    <div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1">1,284</div>
+    <div style="font-size:9.5px;color:oklch(0.75 0 0);text-transform:uppercase;letter-spacing:.05em">of 2,100</div>
+  </div>
+</div>
+    <div style="flex-grow:1;display:flex;flex-direction:column;gap:10px">
+      <div style="display:flex;align-items:baseline;gap:6px">
+        <span style="font-size:18px;font-weight:700;font-variant-numeric:tabular-nums">816</span>
+        <span style="font-size:11.5px;color:oklch(0.75 0 0)">kcal left</span>
+        <span style="flex-grow:1"></span>
+        <span style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">+412 burned</span>
+      </div>
+      <div style="display:flex;gap:4px">
+        
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+  <div style="font-size:11.5px;font-weight:600;color:#22c55e;font-variant-numeric:tabular-nums">34%</div>
+  <div style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">108 g</div>
+  <div style="font-size:10.5px;color:oklch(0.75 0 0)">Protein</div>
+</div>
+        
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+  <div style="font-size:11.5px;font-weight:600;color:#3b82f6;font-variant-numeric:tabular-nums">30%</div>
+  <div style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">96 g</div>
+  <div style="font-size:10.5px;color:oklch(0.75 0 0)">Carbs</div>
+</div>
+        
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+  <div style="font-size:11.5px;font-weight:600;color:#f97316;font-variant-numeric:tabular-nums">21%</div>
+  <div style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">30 g</div>
+  <div style="font-size:10.5px;color:oklch(0.75 0 0)">Fat</div>
+</div>
+      </div>
+    </div>
+  </div>
+
+  <div style="display:flex;gap:8px;padding:0 16px">
+    
+<div style="flex:1;height:62px;border-radius:14px;background:oklch(0.09 0 0);border:1px solid oklch(1 0 0 / 7%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><div style="font-size:10.5px;color:oklch(0.75 0 0)">Search</div>
+</div>
+<div style="flex:1;height:62px;border-radius:14px;background:oklch(0.09 0 0);border:1px solid oklch(1 0 0 / 7%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14M7 5v14M11 5v10M15 5v14M19 5v14"/></svg><div style="font-size:10.5px;color:oklch(0.75 0 0)">Scan</div>
+</div>
+<div style="flex:1;height:62px;border-radius:14px;background:oklch(0.09 0 0);border:1px solid oklch(1 0 0 / 7%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg><div style="font-size:10.5px;color:oklch(0.75 0 0)">Photo</div>
+</div>
+<div style="flex:1;height:62px;border-radius:14px;background:oklch(0.09 0 0);border:1px solid oklch(1 0 0 / 7%);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px">
+  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h11a3 3 0 013 3v13H7a3 3 0 01-3-3z"/><path d="M4 17a3 3 0 013-3h11"/></svg><div style="font-size:10.5px;color:oklch(0.75 0 0)">My meals</div>
+</div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <div style="display:flex;align-items:baseline;gap:8px;padding:0 16px"><div style="flex-grow:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:oklch(0.75 0 0)">Breakfast</div><div style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">486</div></div>
+    <div style="margin:0 16px;border-radius:14px;border:1px solid oklch(1 0 0 / 7%);overflow:hidden;background:oklch(0.09 0 0)"><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Ninja Creami Protein Ice Cream</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">1 portion · 180 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">208</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Whole Milk</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Lucerne, 230 ml</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">142</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Granny Smith Apple</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Apple Fresh, 166 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">86</div>
+    
+  </div></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <div style="display:flex;align-items:baseline;gap:8px;padding:0 16px"><div style="flex-grow:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:oklch(0.75 0 0)">Lunch</div><div style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">798</div></div>
+    <div style="margin:0 16px;border-radius:14px;border:1px solid oklch(1 0 0 / 7%);overflow:hidden;background:oklch(0.09 0 0)"><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Protein Shake + Rice thins</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">2 items · 193 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">456</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Buffalo Chicken Breast</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Primo Taglio, 123 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">184</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Cheese Wedges</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Laughing Cow, 1 piece</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">35</div>
+    
+  </div></div>
+  </div>
+
+  <div style="display:flex;flex-direction:column;gap:7px">
+    <div style="display:flex;align-items:baseline;gap:8px;padding:0 16px"><div style="flex-grow:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:oklch(0.75 0 0)">Dinner</div><div style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">—</div></div>
+    <div style="margin:0 16px;height:52px;border-radius:14px;border:1px dashed oklch(1 0 0 / 14%);display:flex;align-items:center;justify-content:center;gap:8px;color:oklch(0.75 0 0);font-size:13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add food</div>
+  </div>
+</div></div>
+</div>
+</figure>
+<figure>
+<figcaption>2 · Add food <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×812 · AddFood.dc.html</span></figcaption>
+<div class="frame">
+<div style="width:412px;height:812px;overflow:hidden;position:relative;box-sizing:border-box;background:oklch(0.05 0 0);color:oklch(0.985 0 0);font-family:Geist,system-ui,sans-serif;font-size:14px;display:flex;flex-direction:column">
+<div style="flex:none;padding:34px 16px 10px;display:flex;align-items:center;gap:12px">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  <div style="flex-grow:1;font-size:17px;font-weight:600">Add to Lunch</div>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5v14M7 5v14M11 5v10M15 5v14M19 5v14"/></svg>
+</div>
+<div style="flex:none;padding:0 16px 10px">
+  <div style="height:44px;border-radius:12px;background:oklch(0.13 0 0);display:flex;align-items:center;gap:9px;padding:0 12px">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span style="font-size:14px;color:oklch(0.75 0 0)">Search for a food</span>
+  </div>
+</div>
+<div style="flex:none;display:flex;gap:16px;padding:0 16px;border-bottom:1px solid oklch(1 0 0 / 7%)">
+  <div style="flex:none;padding:0 3px;height:38px;display:flex;align-items:center;font-size:13px;font-weight:600;color:oklch(0.985 0 0);border-bottom:2px solid oklch(0.985 0 0)">Recent</div><div style="flex:none;padding:0 3px;height:38px;display:flex;align-items:center;font-size:13px;font-weight:500;color:oklch(0.75 0 0);border-bottom:2px solid transparent">Frequent</div><div style="flex:none;padding:0 3px;height:38px;display:flex;align-items:center;font-size:13px;font-weight:500;color:oklch(0.75 0 0);border-bottom:2px solid transparent">My meals</div><div style="flex:none;padding:0 3px;height:38px;display:flex;align-items:center;font-size:13px;font-weight:500;color:oklch(0.75 0 0);border-bottom:2px solid transparent">Recipes</div>
+</div>
+<div style="flex-grow:1;overflow:hidden;padding-top:6px">
+  <div style="margin:0 16px;border-radius:14px;border:1px solid oklch(1 0 0 / 7%);overflow:hidden;background:oklch(0.09 0 0)"><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Whole Milk<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="oklch(0.723 0.219 149.579)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Lucerne, 230 ml</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">142</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Honey</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">2.5 ml</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">11</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Speculoos Cookie Butter<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="oklch(0.723 0.219 149.579)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Trader Joe's, 21.7 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">130</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Granny Smith Apple<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="oklch(0.723 0.219 149.579)" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg></div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Apple Fresh, 166 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">86</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Buffalo Chicken Breast</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Primo Taglio, 123 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">184</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Cheese Wedges</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Laughing Cow, 1 piece</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">35</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Garlic &amp; Herbs</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Laughing Cow, 19 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">21</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Cherry Tomato</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">Cherub, 100 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">35</div>
+    
+  </div></div>
+</div>
+<div style="flex:none;padding:10px 16px 20px;border-top:1px solid oklch(1 0 0 / 7%);display:flex;gap:10px">
+  <div style="flex-grow:1;height:48px;border-radius:12px;background:oklch(0.13 0 0);color:oklch(0.985 0 0);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">Multi-add</div><div style="flex-grow:1;height:48px;border-radius:12px;background:transparent;color:oklch(0.985 0 0);border:1px solid oklch(1 0 0 / 7%);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">Create food</div>
+</div></div>
+</div>
+</figure>
+<figure>
+<figcaption>3 · My meals <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×812 · MyMeals.dc.html</span></figcaption>
+<div class="frame">
+<div style="width:412px;height:812px;overflow:hidden;position:relative;box-sizing:border-box;background:oklch(0.05 0 0);color:oklch(0.985 0 0);font-family:Geist,system-ui,sans-serif;font-size:14px;display:flex;flex-direction:column">
+<div style="flex:none;padding:34px 16px 10px;display:flex;align-items:center;gap:12px">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  <div style="flex-grow:1;font-size:17px;font-weight:600">My Meals</div>
+  <div style="flex:none;height:36px;padding:0 13px;border-radius:999px;background:oklch(0.922 0 0);color:oklch(0.205 0 0);display:flex;align-items:center;gap:6px;font-size:13px;font-weight:600"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.205 0 0)" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> New</div>
+</div>
+<div style="flex:none;padding:0 16px 12px">
+  <div style="height:44px;border-radius:12px;background:oklch(0.13 0 0);display:flex;align-items:center;gap:9px;padding:0 12px">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg><span style="font-size:14px;color:oklch(0.75 0 0)">Search your meals</span>
+  </div>
+</div>
+<div style="flex-grow:1;overflow:hidden;display:flex;flex-direction:column;gap:7px">
+  <div style="display:flex;align-items:baseline;gap:8px;padding:0 16px"><div style="flex-grow:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:oklch(0.75 0 0)">3 meals</div></div>
+  <div style="margin:0 16px;border-radius:14px;border:1px solid oklch(1 0 0 / 7%);overflow:hidden;background:oklch(0.09 0 0)"><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Ninja Creami Protein Ice Cream</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">5 items · makes 2 portions</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">208</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Protein Shake</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">1 item · 130 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">178</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:8px 14px;">
+    <div style="flex:none;width:40px;height:40px;border-radius:9px;background:linear-gradient(140deg, oklch(0.30 0.06 150), oklch(0.18 0.04 70));display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 45%)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg></div>
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Protein Shake + Rice thins</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">2 items · 193 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">456</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div></div>
+  <div style="padding:8px 16px 0;font-size:11px;line-height:1.45;color:oklch(0.75 0 0)">Calories are per portion. Swipe a row for label, edit and delete.</div>
+</div></div>
+</div>
+</figure>
+<figure>
+<figcaption>4 · Meal detail <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×812 · MealDetail.dc.html</span></figcaption>
+<div class="frame">
+<div style="width:412px;height:812px;overflow:hidden;position:relative;box-sizing:border-box;background:oklch(0.05 0 0);color:oklch(0.985 0 0);font-family:Geist,system-ui,sans-serif;font-size:14px;display:flex;flex-direction:column">
+
+<div style="flex:none;height:150px;position:relative;background:linear-gradient(140deg, oklch(0.34 0.07 150), oklch(0.20 0.05 60));display:flex;align-items:center;justify-content:center">
+  <svg width="54" height="54" viewBox="0 0 24 24" fill="none" stroke="oklch(1 0 0 / 22%)" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3v8a2 2 0 002 2v8"/><path d="M11 3v6"/><path d="M17 3c-1.5 2-2 4-2 7h4c0-3-.5-5-2-7z"/><path d="M17 10v11"/></svg>
+  <div style="position:absolute;left:14px;top:38px;width:36px;height:36px;border-radius:999px;background:oklch(0 0 0 / 42%);display:flex;align-items:center;justify-content:center"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+  <div style="position:absolute;right:14px;bottom:12px;height:32px;padding:0 12px;border-radius:999px;background:oklch(0 0 0 / 48%);display:flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:oklch(0.985 0 0)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg> Photo</div>
+</div>
+<div style="flex:none;padding:14px 16px 10px">
+  <div style="font-size:19px;font-weight:600;letter-spacing:-.01em">Ninja Creami Protein Ice Cream</div>
+  <div style="margin-top:2px;font-size:12px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">Makes 2 portions · 5 ingredients</div>
+</div>
+<div style="flex:none;margin:0 16px 12px;border-radius:16px;background:oklch(0.09 0 0);border:1px solid oklch(1 0 0 / 7%);padding:12px;display:flex;align-items:center;gap:14px">
+  
+<div style="flex:none;width:92px;height:92px;border-radius:50%;background:conic-gradient(#22c55e 0 48%, #3b82f6 48% 83%, #f97316 83% 100%, oklch(0.16 0 0) 100% 100%);display:flex;align-items:center;justify-content:center">
+  <div style="width:70px;height:70px;border-radius:50%;background:oklch(0.09 0 0);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px">
+    <div style="font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1">278</div>
+    <div style="font-size:9.5px;color:oklch(0.75 0 0);text-transform:uppercase;letter-spacing:.05em">per portion</div>
+  </div>
+</div>
+  <div style="flex-grow:1;display:flex;gap:4px">
+    
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+  <div style="font-size:11.5px;font-weight:600;color:#22c55e;font-variant-numeric:tabular-nums">48%</div>
+  <div style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">33 g</div>
+  <div style="font-size:10.5px;color:oklch(0.75 0 0)">Protein</div>
+</div>
+    
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+  <div style="font-size:11.5px;font-weight:600;color:#3b82f6;font-variant-numeric:tabular-nums">35%</div>
+  <div style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">24 g</div>
+  <div style="font-size:10.5px;color:oklch(0.75 0 0)">Carbs</div>
+</div>
+    
+<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:1px">
+  <div style="font-size:11.5px;font-weight:600;color:#f97316;font-variant-numeric:tabular-nums">17%</div>
+  <div style="font-size:15px;font-weight:700;font-variant-numeric:tabular-nums">6.5 g</div>
+  <div style="font-size:10.5px;color:oklch(0.75 0 0)">Fat</div>
+</div>
+  </div>
+</div>
+<div style="flex-grow:1;overflow:hidden;display:flex;flex-direction:column;gap:7px">
+  <div style="display:flex;align-items:baseline;gap:8px;padding:0 16px"><div style="flex-grow:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:oklch(0.75 0 0)">Ingredients</div><div style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">whole batch</div></div>
+  <div style="margin:0 16px;border-radius:14px;border:1px solid oklch(1 0 0 / 7%);overflow:hidden;background:oklch(0.09 0 0)"><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Whey Protein Isolate</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">60 g · 2 servings</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">230</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Full Cream Milk</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">300 g · 1.2 servings</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">186</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Frozen Banana</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">120 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">107</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Cocoa Powder</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">8 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">20</div>
+    
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Vanilla Extract</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">5 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">12</div>
+    
+  </div></div>
+</div>
+<div style="flex:none;padding:10px 16px 20px;border-top:1px solid oklch(1 0 0 / 7%);display:flex;gap:10px">
+  <div style="flex-grow:1;height:48px;border-radius:12px;background:oklch(0.922 0 0);color:oklch(0.205 0 0);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">Log this meal</div>
+  <div style="flex:none;width:48px;height:48px;border-radius:12px;background:oklch(0.13 0 0);display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><path d="M14 14h3v3h-3zM19 19h2v2h-2z"/></svg></div>
+  <div style="flex:none;width:48px;height:48px;border-radius:12px;background:oklch(0.13 0 0);display:flex;align-items:center;justify-content:center"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg></div>
+</div></div>
+</div>
+</figure>
+<figure>
+<figcaption>5 · Edit meal <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×812 · EditMeal.dc.html</span></figcaption>
+<div class="frame">
+<div style="width:412px;height:812px;overflow:hidden;position:relative;box-sizing:border-box;background:oklch(0.05 0 0);color:oklch(0.985 0 0);font-family:Geist,system-ui,sans-serif;font-size:14px;display:flex;flex-direction:column">
+<div style="flex:none;padding:34px 16px 12px;display:flex;align-items:flex-start;gap:12px">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  <div style="flex-grow:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="font-size:17px;font-weight:600;letter-spacing:-.01em">Ninja Creami Protein Ice Cream</div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+    </div>
+    <div style="margin-top:3px;font-size:12px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">Makes 2 portions · 278 kcal each</div>
+  </div>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+</div>
+<div style="flex-grow:1;overflow:hidden;display:flex;flex-direction:column;gap:7px">
+  <div style="display:flex;align-items:baseline;gap:8px;padding:0 16px"><div style="flex-grow:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:oklch(0.75 0 0)">Ingredients</div><div style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">whole batch</div></div>
+  <div style="margin:0 16px;border-radius:14px;border:1px solid oklch(1 0 0 / 7%);overflow:hidden;background:oklch(0.09 0 0)"><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Whey Protein Isolate</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">60 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">230</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Full Cream Milk</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">300 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">186</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Frozen Banana</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">120 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">107</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Cocoa Powder</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">8 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">20</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Vanilla Extract</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">5 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">12</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div></div>
+  <div style="margin:0 16px;height:48px;border-radius:14px;border:1px dashed oklch(1 0 0 / 14%);display:flex;align-items:center;justify-content:center;gap:8px;color:oklch(0.75 0 0);font-size:13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add ingredient</div>
+  <div style="margin:6px 16px 0;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:8px;color:oklch(0.75 0 0);font-size:13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg> Add a photo</div>
+</div>
+<div style="flex:none;padding:10px 16px 20px;border-top:1px solid oklch(1 0 0 / 7%);display:flex;flex-direction:column;gap:10px">
+  <div style="display:flex;align-items:baseline;gap:10px">
+    <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:oklch(0.75 0 0)">Batch</span>
+    <span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">555 kcal</span>
+    <span style="font-size:12px;font-weight:600;color:#22c55e">66 P</span>
+    <span style="font-size:12px;font-weight:600;color:#3b82f6">48 C</span>
+    <span style="font-size:12px;font-weight:600;color:#f97316">13 F</span>
+    <span style="flex-grow:1"></span>
+    <span style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">278 / portion</span>
+  </div>
+  <div style="flex-grow:1;height:48px;border-radius:12px;background:oklch(0.922 0 0);color:oklch(0.205 0 0);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">Save meal</div>
+</div></div>
+</div>
+</figure>
+<figure>
+<figcaption>6 · Quantity <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×812 · Quantity.dc.html</span></figcaption>
+<div class="frame">
+<div style="width:412px;height:812px;position:relative;overflow:hidden;background:oklch(0.05 0 0)">
+<div style="position:absolute;inset:0"><div style="width:412px;height:812px;overflow:hidden;position:relative;box-sizing:border-box;background:oklch(0.05 0 0);color:oklch(0.985 0 0);font-family:Geist,system-ui,sans-serif;font-size:14px;display:flex;flex-direction:column">
+<div style="flex:none;padding:34px 16px 12px;display:flex;align-items:flex-start;gap:12px">
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  <div style="flex-grow:1;min-width:0">
+    <div style="display:flex;align-items:center;gap:7px">
+      <div style="font-size:17px;font-weight:600;letter-spacing:-.01em">Ninja Creami Protein Ice Cream</div>
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"/></svg>
+    </div>
+    <div style="margin-top:3px;font-size:12px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">Makes 2 portions · 278 kcal each</div>
+  </div>
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>
+</div>
+<div style="flex-grow:1;overflow:hidden;display:flex;flex-direction:column;gap:7px">
+  <div style="display:flex;align-items:baseline;gap:8px;padding:0 16px"><div style="flex-grow:1;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:oklch(0.75 0 0)">Ingredients</div><div style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">whole batch</div></div>
+  <div style="margin:0 16px;border-radius:14px;border:1px solid oklch(1 0 0 / 7%);overflow:hidden;background:oklch(0.09 0 0)"><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Whey Protein Isolate</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">60 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">230</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Full Cream Milk</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">300 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">186</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Frozen Banana</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">120 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">107</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;border-bottom:1px solid oklch(1 0 0 / 5%)">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Cocoa Powder</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">8 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">20</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div><div style="display:flex;align-items:center;gap:12px;padding:9px 14px;">
+    
+    <div style="flex-grow:1;min-width:0">
+      <div style="display:flex;align-items:center;gap:5px;font-size:14px;line-height:1.25">Vanilla Extract</div>
+      <div style="font-size:11.5px;color:oklch(0.75 0 0);line-height:1.3;margin-top:1px">5 g</div>
+    </div>
+    <div style="flex:none;font-size:14px;font-weight:600;font-variant-numeric:tabular-nums;color:oklch(0.985 0 0)">12</div>
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+  </div></div>
+  <div style="margin:0 16px;height:48px;border-radius:14px;border:1px dashed oklch(1 0 0 / 14%);display:flex;align-items:center;justify-content:center;gap:8px;color:oklch(0.75 0 0);font-size:13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg> Add ingredient</div>
+  <div style="margin:6px 16px 0;height:48px;border-radius:14px;display:flex;align-items:center;justify-content:center;gap:8px;color:oklch(0.75 0 0);font-size:13px"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-2h6l2 2h3v11H4z"/><circle cx="12" cy="13" r="3.2"/></svg> Add a photo</div>
+</div>
+<div style="flex:none;padding:10px 16px 20px;border-top:1px solid oklch(1 0 0 / 7%);display:flex;flex-direction:column;gap:10px">
+  <div style="display:flex;align-items:baseline;gap:10px">
+    <span style="font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:oklch(0.75 0 0)">Batch</span>
+    <span style="font-size:14px;font-weight:700;font-variant-numeric:tabular-nums">555 kcal</span>
+    <span style="font-size:12px;font-weight:600;color:#22c55e">66 P</span>
+    <span style="font-size:12px;font-weight:600;color:#3b82f6">48 C</span>
+    <span style="font-size:12px;font-weight:600;color:#f97316">13 F</span>
+    <span style="flex-grow:1"></span>
+    <span style="font-size:11px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">278 / portion</span>
+  </div>
+  <div style="flex-grow:1;height:48px;border-radius:12px;background:oklch(0.922 0 0);color:oklch(0.205 0 0);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">Save meal</div>
+</div></div></div>
+<div style="position:absolute;inset:0;background:#000;opacity:.62"></div>
+<div style="position:absolute;left:0;right:0;bottom:0;background:oklch(0.09 0 0);border-top:1px solid oklch(1 0 0 / 7%);border-radius:16px 16px 0 0;color:oklch(0.985 0 0);padding:14px 16px 22px;display:flex;flex-direction:column;gap:14px">
+  <div style="width:36px;height:4px;border-radius:999px;background:oklch(1 0 0 / 14%);align-self:center"></div>
+  <div>
+    <div style="font-size:17px;font-weight:600">Whey Protein Isolate</div>
+    <div style="margin-top:2px;font-size:12px;color:oklch(0.75 0 0);font-variant-numeric:tabular-nums">1 serving = 30 g</div>
+  </div>
+  <div style="display:flex;align-items:center;gap:10px">
+    <div style="flex:none;width:56px;height:56px;border-radius:12px;background:oklch(0.13 0 0);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/></svg></div>
+    <div style="flex-grow:1;min-width:0;height:56px;border-radius:12px;background:oklch(0.13 0 0);display:flex;align-items:center;justify-content:center;gap:8px">
+      <span style="font-size:24px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em">60</span>
+      <span style="display:flex;align-items:center;gap:4px;padding:5px 9px;border-radius:8px;background:oklch(0.05 0 0);font-size:13px;font-weight:600">g <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+    </div>
+    <div style="flex:none;width:56px;height:56px;border-radius:12px;background:oklch(0.13 0 0);display:flex;align-items:center;justify-content:center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg></div>
+  </div>
+  <div style="display:flex;gap:8px"><div style="flex:none;height:40px;padding:0 14px;border-radius:999px;display:flex;align-items:center;font-size:12.5px;font-weight:600;background:oklch(0.13 0 0);color:oklch(0.75 0 0)">1 srv</div><div style="flex:none;height:40px;padding:0 14px;border-radius:999px;display:flex;align-items:center;font-size:12.5px;font-weight:600;background:oklch(0.723 0.219 149.579);color:#000">2 srv</div><div style="flex:none;height:40px;padding:0 14px;border-radius:999px;display:flex;align-items:center;font-size:12.5px;font-weight:600;background:oklch(0.13 0 0);color:oklch(0.75 0 0)">3 srv</div><div style="flex:none;height:40px;padding:0 14px;border-radius:999px;display:flex;align-items:center;font-size:12.5px;font-weight:600;background:oklch(0.13 0 0);color:oklch(0.75 0 0)">100 g</div></div>
+  <div style="display:flex;align-items:baseline;gap:12px;padding:12px 14px;border-radius:12px;background:oklch(0.13 0 0 / 60%)">
+    <span style="font-size:16px;font-weight:700;font-variant-numeric:tabular-nums">230 kcal</span>
+    <span style="font-size:12px;font-weight:600;color:#22c55e">P 52.8</span>
+    <span style="font-size:12px;font-weight:600;color:#3b82f6">C 2</span>
+    <span style="font-size:12px;font-weight:600;color:#f97316">F 0.6</span>
+  </div>
+  <div style="display:flex;gap:10px">
+    <div style="flex:none;width:56px;height:52px;border-radius:12px;background:oklch(0.704 0.191 22.216 / 10%);display:flex;align-items:center;justify-content:center"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="oklch(0.704 0.191 22.216)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"/></svg></div>
+    <div style="flex-grow:1;height:52px;border-radius:12px;background:oklch(0.922 0 0);color:oklch(0.205 0 0);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:600">Save</div>
+  </div>
+</div></div>
+</div>
+</figure>
+</div>
+
+<h2>The review</h2>
+<div class="note">THE REVIEW THAT CAME FIRST — kept because the findings still bind whatever gets built.
+
+Every control on the shipped screens is 44 px against this repo&#x27;s own 48 dp rule, and the srv/g segments are 40. The hardcoded green ignores both the accent the user picks and the darkening light mode applies. The three srv/g options are superseded by the sheet on page one — the toggle now appears once, at 56 px, instead of on every row — but the reasoning is here rather than lost.</div>
+<div class="grid">
+<figure>
+<figcaption>Saved Meals — today <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×620 · MealsNow.dc.html</span> <span class="tmpl">TEMPLATED</span></figcaption>
+<div class="frame">
+<div style="width: 412px; height: 620px; box-sizing: border-box; padding: 14px; background: oklch(0.05 0 0); color: oklch(0.985 0 0); font-family: Geist, system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: center; gap: 10px;">
+    <div style="flex-grow: 1; font-size: 19px; font-weight: 600;">Saved Meals · 3</div>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+  </div>
+
+  <div style="display: flex; gap: 10px;">
+    <div style="flex-grow: 1; height: 44px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 500;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"></rect><path d="M8 12l3 3 5-6"></path></svg>
+      Select
+    </div>
+    <div style="flex-grow: 1; height: 44px; border-radius: 10px; background: oklch(0.922 0 0); color: oklch(0.205 0 0); display: flex; align-items: center; justify-content: center; gap: 8px; font-size: 13px; font-weight: 600;">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.205 0 0)" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      New Meal
+    </div>
+  </div>
+
+  <sc-for list="{{meals}}" as="m" hint-placeholder-count="3">
+    <div style="border-radius: 14px; border: 1px solid oklch(1 0 0 / 7%); overflow: hidden;">
+      <div style="padding: 12px 16px;">
+        <div style="display: flex; align-items: flex-start; gap: 12px;">
+          <div style="flex-grow: 1; min-width: 0;">
+            <div style="font-size: 14px; font-weight: 600;">{{m.name}}</div>
+            <sc-if value="{{m.portions}}" hint-placeholder-val="{{true}}">
+              <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.025em; color: oklch(0.75 0 0);">Makes 2 portions</div>
+            </sc-if>
+            <div style="margin-top: 4px; display: flex; align-items: center; gap: 8px;">
+              <span style="border-radius: 999px; background: oklch(0.985 0 0); color: oklch(0.05 0 0); padding: 4px 10px; font-size: 12px; font-weight: 700; font-variant-numeric: tabular-nums;">{{m.kcal}}</span>
+              <span style="font-size: 11px; color: oklch(0.75 0 0); font-variant-numeric: tabular-nums;">{{m.meta}}</span>
+            </div>
+          </div>
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex: none; margin-top: 2px;"><path d="M6 9l6 6 6-6"></path></svg>
+        </div>
+        <div style="margin-top: 8px; display: flex; height: 6px; overflow: hidden; border-radius: 999px; background: oklch(0.13 0 0);">
+          <span style="width: {{m.p}}; background: #22c55e;"></span>
+          <span style="width: {{m.c}}; background: #3b82f6;"></span>
+          <span style="width: {{m.f}}; background: #f97316;"></span>
+        </div>
+        <div style="margin-top: 6px; display: flex; gap: 12px; font-size: 11px; font-weight: 600; font-variant-numeric: tabular-nums;">
+          <span style="color: #22c55e;">P {{m.pg}}</span>
+          <span style="color: #3b82f6;">C {{m.cg}}</span>
+          <span style="color: #f97316;">F {{m.fg}}</span>
+        </div>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px; border-top: 1px solid oklch(1 0 0 / 7%); padding: 8px 12px;">
+        <div style="flex-grow: 1; height: 44px; border-radius: 10px; background: oklch(0.922 0 0); color: oklch(0.205 0 0); display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 600;">Log this meal</div>
+        <div style="flex: none; width: 44px; height: 44px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect><path d="M14 14h3v3h-3zM19 19h2v2h-2z"></path></svg>
+        </div>
+        <div style="flex: none; width: 44px; height: 44px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.1 2.1 0 013 3L7 19l-4 1 1-4z"></path></svg>
+        </div>
+        <div style="flex: none; width: 44px; height: 44px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center;">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+</div>
+</div>
+</figure>
+<figure>
+<figcaption>Tap targets <span style="font-weight:400;color:oklch(0.55 0 0)">· 460×470 · Targets.dc.html</span> <span class="tmpl">TEMPLATED</span></figcaption>
+<div class="frame">
+<div style="width: 460px; height: 470px; box-sizing: border-box; padding: 18px; background: oklch(0.05 0 0); color: oklch(0.985 0 0); font-family: Geist, system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 12px;">
+
+  <div>
+    <div style="font-size: 15px; font-weight: 600;">Every control in nutrition is 44&nbsp;px. The rule says 48.</div>
+    <div style="margin-top: 3px; font-size: 11.5px; line-height: 1.45; color: oklch(0.75 0 0);">44&nbsp;px is the iOS floor. This repo&rsquo;s own rule is <strong style="color: oklch(0.985 0 0); font-weight: 600;">≥ 48&nbsp;dp with ≥ 8&nbsp;dp between</strong>, and nothing on these two screens meets it except the Update&nbsp;Meal button.</div>
+  </div>
+
+  <div style="display: flex; align-items: flex-end; gap: 14px; padding: 4px 0;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <div style="width: 40px; height: 40px; border-radius: 10px; background: oklch(0.13 0 0); border: 1px solid oklch(0.704 0.191 22.216 / 60%);"></div>
+      <div style="font-size: 10px; color: oklch(0.704 0.191 22.216); font-weight: 600;">40</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <div style="width: 44px; height: 44px; border-radius: 10px; background: oklch(0.13 0 0); border: 1px solid oklch(0.79 0.18 85 / 60%);"></div>
+      <div style="font-size: 10px; color: oklch(0.79 0.18 85); font-weight: 600;">44</div>
+    </div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 5px;">
+      <div style="width: 48px; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); border: 1px solid oklch(0.723 0.219 149.579 / 70%);"></div>
+      <div style="font-size: 10px; color: oklch(0.723 0.219 149.579); font-weight: 600;">48</div>
+    </div>
+    <div style="flex-grow: 1; font-size: 11px; line-height: 1.5; color: oklch(0.75 0 0);">The gap looks small drawn side by side. It is 19% more area, on the controls tapped most while holding a 6.9&Prime; phone in one hand.</div>
+  </div>
+
+  <div style="display: flex; flex-direction: column; gap: 0; border-radius: 12px; border: 1px solid oklch(1 0 0 / 7%); overflow: hidden;">
+    <div style="display: flex; gap: 8px; padding: 7px 12px; background: oklch(0.13 0 0 / 60%); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: oklch(0.75 0 0);">
+      <span style="flex-grow: 1;">Control</span><span style="width: 44px; text-align: right;">Now</span><span style="width: 52px; text-align: right;">Short by</span>
+    </div>
+    <sc-for list="{{rows}}" as="r" hint-placeholder-count="5">
+      <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border-top: 1px solid oklch(1 0 0 / 5%); font-size: 11.5px;">
+        <span style="flex-grow: 1; min-width: 0;">{{r.what}}</span>
+        <span style="width: 44px; text-align: right; font-variant-numeric: tabular-nums; color: oklch(0.75 0 0);">{{r.now}}</span>
+        <span style="width: 52px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: {{r.tone}};">{{r.gap}}</span>
+      </div>
+    </sc-for>
+  </div>
+
+  <div style="font-size: 11px; line-height: 1.45; color: oklch(0.75 0 0);">The srv&nbsp;/&nbsp;g segments are the worst of them: the smallest targets on the screen, and the ones that change what the number beside them means.</div>
+</div>
+</div>
+</figure>
+<figure>
+<figcaption>The green <span style="font-weight:400;color:oklch(0.55 0 0)">· 470×400 · ThemeBug.dc.html</span></figcaption>
+<div class="frame">
+<div style="width: 470px; height: 400px; box-sizing: border-box; padding: 18px; background: oklch(0.05 0 0); color: oklch(0.985 0 0); font-family: Geist, system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 12px;">
+
+  <div>
+    <div style="font-size: 15px; font-weight: 600;">Why the hardcoded green is a bug and not a preference</div>
+    <div style="margin-top: 3px; font-size: 11.5px; line-height: 1.45; color: oklch(0.75 0 0);">The accent is a hue the user picks, and light mode darkens it deliberately. A literal opts out of both — which is invisible in the one combination everything was built in.</div>
+  </div>
+
+  <div style="display: flex; gap: 10px;">
+
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+      <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: oklch(0.723 0.219 149.579);">Dark · green · fine</div>
+      <div style="border-radius: 12px; background: oklch(0.09 0 0); border: 1px solid oklch(1 0 0 / 7%); padding: 11px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 20px; height: 20px; border-radius: 6px; border: 1px solid #22c55e; background: #22c55e; display: flex; align-items: center; justify-content: center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+          </span>
+          <span style="font-size: 12px; font-weight: 600;">Protein Shake</span>
+        </div>
+        <div style="margin-top: 9px; display: inline-flex; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(34,197,94,0.5); background: rgba(34,197,94,0.15); color: #22c55e; font-size: 11px; font-weight: 600;">High protein</div>
+      </div>
+      <div style="font-size: 10.5px; line-height: 1.4; color: oklch(0.75 0 0);">The literal happens to equal the default brand here, so nothing looks wrong.</div>
+    </div>
+
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+      <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: oklch(0.704 0.191 22.216);">Light · too bright</div>
+      <div style="border-radius: 12px; background: oklch(1 0 0); border: 1px solid oklch(0 0 0 / 10%); padding: 11px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 20px; height: 20px; border-radius: 6px; border: 1px solid #22c55e; background: #22c55e; display: flex; align-items: center; justify-content: center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+          </span>
+          <span style="font-size: 12px; font-weight: 600; color: oklch(0.145 0 0);">Protein Shake</span>
+        </div>
+        <div style="margin-top: 9px; display: flex; flex-direction: column; gap: 5px;">
+          <div style="display: inline-flex; align-self: flex-start; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(34,197,94,0.5); background: rgba(34,197,94,0.15); color: #22c55e; font-size: 11px; font-weight: 600;">High protein</div>
+          <div style="display: inline-flex; align-self: flex-start; padding: 4px 9px; border-radius: 999px; border: 1px solid oklch(0.52 0.22 149 / 50%); background: oklch(0.52 0.22 149 / 15%); color: oklch(0.52 0.22 149); font-size: 11px; font-weight: 600;">High protein</div>
+        </div>
+      </div>
+      <div style="font-size: 10.5px; line-height: 1.4; color: oklch(0.75 0 0);">Top: the literal. Bottom: the token, darkened for light mode as the CSS intends.</div>
+    </div>
+
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 7px;">
+      <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: oklch(0.704 0.191 22.216);">Purple accent · ignored</div>
+      <div style="border-radius: 12px; background: oklch(0.09 0 0); border: 1px solid oklch(0.7 0.2 300 / 25%); padding: 11px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="width: 20px; height: 20px; border-radius: 6px; border: 1px solid #22c55e; background: #22c55e; display: flex; align-items: center; justify-content: center;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+          </span>
+          <span style="font-size: 12px; font-weight: 600;">Protein Shake</span>
+        </div>
+        <div style="margin-top: 9px; display: flex; flex-direction: column; gap: 5px;">
+          <div style="display: inline-flex; align-self: flex-start; padding: 4px 9px; border-radius: 999px; border: 1px solid rgba(34,197,94,0.5); background: rgba(34,197,94,0.15); color: #22c55e; font-size: 11px; font-weight: 600;">High protein</div>
+          <div style="height: 30px; border-radius: 8px; background: oklch(0.7 0.2 300); color: #000; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;">Log this meal</div>
+        </div>
+      </div>
+      <div style="font-size: 10.5px; line-height: 1.4; color: oklch(0.75 0 0);">The button follows the picked hue. The nutrition chips do not.</div>
+    </div>
+  </div>
+
+  <div style="border-radius: 10px; border: 1px solid oklch(0.79 0.18 85 / 35%); background: oklch(0.79 0.18 85 / 7%); padding: 9px 11px; font-size: 11px; line-height: 1.45; color: oklch(0.75 0 0);">
+    <strong style="color: oklch(0.79 0.18 85); font-weight: 600;">Careful with the sweep:</strong> <span style="font-variant-numeric: tabular-nums;">#22c55e</span> is also the real value of <span style="font-variant-numeric: tabular-nums;">MACRO_COLORS.protein</span>. A blind find-and-replace would repaint the protein macro with whatever accent the user picked — those two greens are the same string and must not share a fate.
+  </div>
+</div>
+</div>
+</figure>
+<figure>
+<figcaption>srv/g — A <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×380 · UnitA.dc.html</span> <span class="tmpl">TEMPLATED</span></figcaption>
+<div class="frame">
+<div style="width: 412px; height: 380px; box-sizing: border-box; padding: 16px; background: oklch(0.05 0 0); color: oklch(0.985 0 0); font-family: Geist, system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="display: flex; align-items: baseline; gap: 8px;">
+    <div style="font-size: 15px; font-weight: 600;">A — the unit rides on the number</div>
+    <div style="font-size: 11px; font-weight: 600; padding: 2px 7px; border-radius: 999px; background: oklch(0.723 0.219 149.579 / 15%); color: oklch(0.723 0.219 149.579);">recommended</div>
+  </div>
+
+  <sc-for list="{{states}}" as="s" hint-placeholder-count="2">
+    <div style="border-radius: 14px; background: oklch(0.13 0 0 / 40%); padding: 12px;">
+      <div style="display: flex; align-items: baseline; gap: 8px;">
+        <div style="flex-grow: 1; min-width: 0; font-size: 14px; font-weight: 500;">Whey Protein Isolate</div>
+        <div style="flex: none; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">230 kcal</div>
+      </div>
+      <div style="margin-top: 2px; font-size: 12px; color: oklch(0.75 0 0); font-variant-numeric: tabular-nums;">52.8P · 2C · 0.6F &nbsp;·&nbsp; 1 srv = 30 g</div>
+      <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+        <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+        </div>
+        <div style="flex-grow: 1; min-width: 0; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center; gap: 6px;">
+          <span style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">{{s.value}}</span>
+          <span style="display: flex; align-items: center; gap: 3px; padding: 3px 7px; border-radius: 7px; background: oklch(0.05 0 0); font-size: 12px; font-weight: 600;">{{s.unit}}
+            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="oklch(0.75 0 0)" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"></path></svg>
+          </span>
+        </div>
+        <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        </div>
+        <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.704 0.191 22.216 / 10%); display: flex; align-items: center; justify-content: center;">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.704 0.191 22.216)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>
+        </div>
+      </div>
+    </div>
+  </sc-for>
+
+  <div style="font-size: 11.5px; line-height: 1.45; color: oklch(0.75 0 0);">Tapping the unit chip inside the field swaps between the two rows above. The number is never bare, so nothing has to be read sideways to know what &ldquo;2&rdquo; means &mdash; and dropping the separate toggle is what pays for 48&nbsp;px steppers and a delete button that is no longer in the corner.</div>
+</div>
+</div>
+</figure>
+<figure>
+<figcaption>srv/g — B <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×380 · UnitB.dc.html</span></figcaption>
+<div class="frame">
+<div style="width: 412px; height: 380px; box-sizing: border-box; padding: 16px; background: oklch(0.05 0 0); color: oklch(0.985 0 0); font-family: Geist, system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="font-size: 15px; font-weight: 600;">B — grams only, servings become the step</div>
+
+  <div style="border-radius: 14px; background: oklch(0.13 0 0 / 40%); padding: 12px;">
+    <div style="display: flex; align-items: baseline; gap: 8px;">
+      <div style="flex-grow: 1; min-width: 0; font-size: 14px; font-weight: 500;">Whey Protein Isolate</div>
+      <div style="flex: none; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">230 kcal</div>
+    </div>
+    <div style="margin-top: 2px; font-size: 12px; color: oklch(0.75 0 0); font-variant-numeric: tabular-nums;">52.8P · 2C · 0.6F</div>
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+      <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+        <span style="font-size: 8.5px; font-weight: 600; color: oklch(0.75 0 0);">30 g</span>
+      </div>
+      <div style="flex-grow: 1; min-width: 0; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: baseline; justify-content: center; gap: 4px;">
+        <span style="font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums; line-height: 48px;">60</span>
+        <span style="font-size: 12px; font-weight: 600; color: oklch(0.75 0 0);">g</span>
+      </div>
+      <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+        <span style="font-size: 8.5px; font-weight: 600; color: oklch(0.75 0 0);">30 g</span>
+      </div>
+      <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.704 0.191 22.216 / 10%); display: flex; align-items: center; justify-content: center;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.704 0.191 22.216)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>
+      </div>
+    </div>
+    <div style="margin-top: 6px; font-size: 10.5px; color: oklch(0.75 0 0); font-variant-numeric: tabular-nums;">2 scoops · 1 scoop = 30 g</div>
+  </div>
+
+  <div style="border-radius: 14px; border: 1px solid oklch(0.704 0.191 22.216 / 30%); background: oklch(0.704 0.191 22.216 / 6%); padding: 10px 12px;">
+    <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: oklch(0.704 0.191 22.216);">What it costs</div>
+    <div style="margin-top: 3px; font-size: 11.5px; line-height: 1.45; color: oklch(0.75 0 0);">You can no longer <em style="color: oklch(0.985 0 0); font-style: normal;">type</em> &ldquo;2 scoops&rdquo; &mdash; only step to it. That is precisely the case the code comment says both units exist for, so this option trades away the reason the toggle was built.</div>
+  </div>
+
+  <div style="font-size: 11.5px; line-height: 1.45; color: oklch(0.75 0 0);">In exchange it is the only option with no mode at all: one unit, one meaning, nothing to remember per row.</div>
+</div>
+</div>
+</figure>
+<figure>
+<figcaption>srv/g — C <span style="font-weight:400;color:oklch(0.55 0 0)">· 412×380 · UnitC.dc.html</span></figcaption>
+<div class="frame">
+<div style="width: 412px; height: 380px; box-sizing: border-box; padding: 16px; background: oklch(0.05 0 0); color: oklch(0.985 0 0); font-family: Geist, system-ui, -apple-system, sans-serif; display: flex; flex-direction: column; gap: 12px;">
+
+  <div style="font-size: 15px; font-weight: 600;">C — the toggle moves off the value row</div>
+
+  <div style="border-radius: 14px; background: oklch(0.13 0 0 / 40%); padding: 12px;">
+    <div style="display: flex; align-items: baseline; gap: 8px;">
+      <div style="flex-grow: 1; min-width: 0; font-size: 14px; font-weight: 500;">Whey Protein Isolate</div>
+      <div style="flex: none; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums;">230 kcal</div>
+    </div>
+    <div style="margin-top: 2px; font-size: 12px; color: oklch(0.75 0 0); font-variant-numeric: tabular-nums;">52.8P · 2C · 0.6F</div>
+    <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+      <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round"><path d="M5 12h14"></path></svg>
+      </div>
+      <div style="flex-grow: 1; min-width: 0; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; font-variant-numeric: tabular-nums;">2</div>
+      <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.13 0 0); display: flex; align-items: center; justify-content: center;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="oklch(0.985 0 0)" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"></path></svg>
+      </div>
+      <div style="flex: none; width: 48px; height: 48px; border-radius: 10px; background: oklch(0.704 0.191 22.216 / 10%); display: flex; align-items: center; justify-content: center;">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="oklch(0.704 0.191 22.216)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M19 6l-1 14H6L5 6"></path></svg>
+      </div>
+    </div>
+    <div style="margin-top: 8px; display: flex; align-items: center; gap: 10px;">
+      <div style="flex: none; display: flex; border-radius: 10px; background: oklch(0.13 0 0); padding: 3px;">
+        <div style="height: 42px; padding: 0 16px; border-radius: 8px; background: oklch(0.05 0 0); display: flex; align-items: center; font-size: 12px; font-weight: 600;">srv</div>
+        <div style="height: 42px; padding: 0 16px; border-radius: 8px; display: flex; align-items: center; font-size: 12px; font-weight: 600; color: oklch(0.75 0 0);">g</div>
+      </div>
+      <div style="flex-grow: 1; font-size: 10.5px; line-height: 1.35; color: oklch(0.75 0 0); font-variant-numeric: tabular-nums;">1 srv = 30 g<br>using 60 g</div>
+    </div>
+  </div>
+
+  <div style="font-size: 11.5px; line-height: 1.45; color: oklch(0.75 0 0);">The safe option: nothing about the interaction changes, the toggle just stops competing with the stepper for the same 412&nbsp;px and gets to a real tap size. It is also the tallest of the three, which works against the density complaint that started this.</div>
+</div>
+</div>
+</figure>
+</div>
+
+<script>
+/* Reproduces the canvas editor's design-time rendering of sc-for / sc-if, which had no bound data:
+   sc-for repeats its content `hint-placeholder-count` times; sc-if shows its content; any remaining
+   {{token}} is shown muted, exactly as an unbound placeholder appeared in the editor. */
+for (const el of document.querySelectorAll('sc-if')) el.replaceWith(...[...el.childNodes]);
+for (const el of document.querySelectorAll('sc-for')) {
+  const n = Math.max(1, parseInt(el.getAttribute('hint-placeholder-count') || '1', 10));
+  const frag = document.createDocumentFragment();
+  for (let i = 0; i < n; i++) for (const c of [...el.cloneNode(true).childNodes]) frag.appendChild(c);
+  el.replaceWith(frag);
+}
+const walk = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+const hits = []; let t;
+while ((t = walk.nextNode())) if (/\{\{[^}]*\}\}/.test(t.nodeValue)) hits.push(t);
+for (const node of hits) {
+  const span = document.createElement('span');
+  span.innerHTML = node.nodeValue.replace(/\{\{[^}]*\}\}/g,
+    m => '<span class="ph">' + m.replace(/[<>&]/g, c => ({'<':'&lt;','>':'&gt;','&':'&amp;'}[c])) + '</span>');
+  node.replaceWith(span);
+}
+</script>

@@ -7,8 +7,9 @@ import { rateLimit } from '@/lib/rate-limit'
 import { DEFAULT_TZ, todayInTz } from '@trainingai/shared/date-utils'
 import { textStreamResponse } from '@/lib/ai/stream'
 import { reportServerError } from '@/lib/observability'
+import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 
-export async function GET(req: Request) {
+export async function GET() {
   try {
     const session = await auth()
     const userId = session?.user?.id
@@ -18,34 +19,18 @@ export async function GET(req: Request) {
     const today = todayInTz(tz)
     const repo = await getRepository()
 
-    const sessionId = new URL(req.url).searchParams.get('sessionId')
-
-    // Cache-first: when the caller passes the session id (the Home card always
-    // does), we can serve the per-day cached narrative WITHOUT recomputing
-    // getNextSession — the id is the only thing the cache key needs.
-    if (sessionId) {
-      const cached = await repo.getAiHealthInsight(userId, `session-explain:${sessionId}`, today)
-      if (cached) {
-        return new Response(cached, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
-      }
-    }
-
-    // Miss (or no sessionId): recompute the recommendation to build the prompt.
+    // Q-293 removed a fast path here that read the cached narrative from the `sessionId` query
+    // param alone, skipping `getNextSession` entirely. That read cannot know whether the signals
+    // the narrative describes still hold, and signals moving during the day is this route's whole
+    // subject — it explains *why today's session was chosen*. `getNextSession` is what builds the
+    // context, so the hash needs it, and the Home card now pays for that call. The `sessionId`
+    // param is still accepted and ignored, so an older client keeps working.
     const recommendation = await repo.getNextSession(userId, tz)
     if (!recommendation.session || !recommendation.signals || !recommendation.weightedComponents) {
       return NextResponse.json({ error: 'No AI dynamic recommendation available' }, { status: 404 })
     }
 
     const cacheSection = `session-explain:${recommendation.session.id}`
-    // Re-check under the authoritative id in case the caller sent no/stale id.
-    const cached = await repo.getAiHealthInsight(userId, cacheSection, today)
-    if (cached) {
-      return new Response(cached, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
-    }
-
-    if (!rateLimit(`session-explain:${userId}`, 20, 60 * 60 * 1000)) {
-      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
-    }
 
     const sig = recommendation.signals
     const wc = recommendation.weightedComponents
@@ -67,13 +52,23 @@ Key signals:
 
 Write in second person. Be specific about which signals mattered. Do not use bullet points or headers.`
 
+    const contextHash = hashInsightContext(prompt)
+    const cached = await readFreshInsight(repo, userId, cacheSection, today, contextHash)
+    if (cached) {
+      return new Response(cached, { headers: { 'Content-Type': 'text/plain; charset=utf-8' } })
+    }
+
+    if (!rateLimit(`session-explain:${userId}`, 20, 60 * 60 * 1000)) {
+      return NextResponse.json({ error: 'Too many requests' }, { status: 429 })
+    }
+
     const result = loggedStreamText(
-      { section: 'session-explain', userId, fingerprint: { sessionId: recommendation.session.id, today } },
+      { section: 'session-explain', userId, fingerprint: { sessionId: recommendation.session.id, today, contextHash } },
       { model: aiModel(), prompt },
     )
 
     return textStreamResponse(result.textStream, {
-      onComplete: text => repo.upsertAiHealthInsight(userId, cacheSection, today, text.trim()),
+      onComplete: text => repo.upsertAiHealthInsight(userId, cacheSection, today, text.trim(), contextHash),
     })
   } catch (error) {
     reportServerError(error, { url: '/api/session-explain/insight' })

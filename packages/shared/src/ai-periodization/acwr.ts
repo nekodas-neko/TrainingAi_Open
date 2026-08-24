@@ -51,9 +51,21 @@ export interface AcwrBand {
   color: string
 }
 
-// Canonical ACWR band boundaries — the readiness-score route's modifier logic imports
-// these instead of re-hardcoding the same numbers.
-export const ACWR_THRESHOLDS = { lowMax: 0.8, optimalMax: 1.3, highMax: 1.5 } as const
+// Canonical ACWR boundaries. Every threshold anywhere in the app that acts on an ACWR number
+// comes from here — Q-306 found three sites deciding three different behaviours at numbers they
+// each declared themselves (`acwr > 1.5` inline in emergency-deload, `ACWR_TAPER_START = 1.5` in
+// activity-score, `EARLY_DELOAD_ACWR_MIN = 1.2` in readiness-payload), so nothing expressed that
+// two of them were the same boundary and the third deliberately was not.
+//
+//   lowMax      0.8  band floor — below is Undertraining
+//   optimalMax  1.3  band ceiling — above is amber. The running recovery gate holds back here.
+//   elevatedMin 1.2  the ONE deliberate exception, and it is inside the optimal band: the
+//                    early-deload card fires before the band turns amber because it is paired
+//                    with a readiness score under 45 — the pair is the signal, not the number.
+//                    Aligning it to optimalMax would change who sees the card.
+//   highMax     1.5  where the two HARD actions fire — the emergency-deload trigger and the
+//                    Activity-score over-exertion taper. Both were 1.5 by coincidence of typing.
+export const ACWR_THRESHOLDS = { lowMax: 0.8, optimalMax: 1.3, elevatedMin: 1.2, highMax: 1.5 } as const
 
 // Single agreed ACWR band, consumed everywhere a band/label/color is displayed —
 // never re-derive from the raw acwr number at the call site (four divergent

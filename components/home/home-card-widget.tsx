@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { usePathname, useRouter } from 'next/navigation'
 import { navigateWithTransition } from '@/lib/navigate-with-transition'
 import { Moon, Footprints, MessageCircle, BatteryLow, Frown, Meh, Smile, Zap, type LucideIcon } from 'lucide-react'
@@ -71,6 +72,7 @@ interface HomeCardWidgetProps {
 }
 
 export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCardWidgetProps) {
+  const tz = useUserTimezone();
   const router = useRouter()
   const pathname = usePathname()
   const {
@@ -131,7 +133,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
     }
     case 'card_sleepWidget': {
       if (!activeCardWidgets.includes('sleepWidget')) return null
-      const _today = todayInTz()
+      const _today = todayInTz(tz)
       const _yesterday = shiftDateStr(_today, -1)
       const latest = sleepData.find(s => s.date === _today || s.date === _yesterday) ?? null
       const hrs = latest?.durationHours ?? null
@@ -283,7 +285,7 @@ export const HomeCardWidget = React.memo(function HomeCardWidget(props: HomeCard
           <div role="button" tabIndex={0} onClick={() => { if (!sectionEditMode) navigateWithTransition(router, pathname, "/health?tab=body"); }} className={cn("w-full rounded-2xl p-4 text-left active:scale-95 transition cursor-pointer", sectionEditMode && "pointer-events-none")} style={accentCardStyle(_c)}>
             <p className="text-xs font-semibold uppercase tracking-widest mb-2" style={{ color: _c === 'transparent' ? undefined : _c }}>Heart Rate · Today</p>
             {hrData && hrData.readings.length >= 2 ? (
-              <HrDayChart readings={hrData.readings} date={todayInTz()} workoutSessions={hrData.workoutSessions} lineColor={hrLineColor} sleepWindow={hrData.sleep} showBackfill />
+              <HrDayChart readings={hrData.readings} date={todayInTz(tz)} workoutSessions={hrData.workoutSessions} lineColor={hrLineColor} sleepWindow={hrData.sleep} showBackfill />
             ) : (
               <p className="text-sm text-muted-foreground">No heart-rate data today</p>
             )}

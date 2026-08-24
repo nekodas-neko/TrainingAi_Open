@@ -3,6 +3,7 @@ import { useState } from 'react'
 import { Footprints, Play, AlertTriangle, RefreshCw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ConfirmDialog } from '@/components/ui/confirm-dialog'
+import { runRedecodeJob } from './redecode-job'
 
 /**
  * D0 historical step backfill — owner-gated, two-step (preview then fire). The rollup's steps step
@@ -45,19 +46,19 @@ export function StepBackfillConsole() {
     setConfirmOpen(false)
     setRunning(true)
     setRunResult(null)
-    try {
-      const res = await fetch('/api/oura-ble/samples/redecode?allowStepsDecrease=1', { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) setRunResult(`ERROR ${res.status}: ${data?.error ?? 'unknown'}`)
-      else {
-        setRunResult(`Done. ${data.aggregateError ? `Error: ${data.aggregateError}` : 'Backfill applied — re-run preview to confirm 0 days remain.'}`)
-        setPreview(null)
-      }
-    } catch (err) {
-      setRunResult(`ERROR: ${err instanceof Error ? err.message : String(err)}`)
-    } finally {
-      setRunning(false)
+    // Q-318: the backfill runs as a polled job. Read synchronously it reported "Done. Backfill
+    // applied" the moment the request returned — which on real data is a gateway timeout, long
+    // before the re-aggregate has written anything.
+    const outcome = await runRedecodeJob('allowStepsDecrease=1', setRunResult)
+    if (outcome.kind === 'failed') {
+      setRunResult(`ERROR: ${outcome.message}`)
+    } else if (outcome.phases.aggregateError ?? outcome.phases.redecodeError) {
+      setRunResult(`Error: ${outcome.phases.aggregateError ?? outcome.phases.redecodeError}`)
+    } else {
+      setRunResult('Done. Backfill applied — re-run preview to confirm 0 days remain.')
+      setPreview(null)
     }
+    setRunning(false)
   }
 
   return (

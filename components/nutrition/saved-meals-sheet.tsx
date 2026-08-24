@@ -377,7 +377,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
           { id: mealId, name, servings: mealServings, imageDataUri: mealImage, createdAt, updatedAt: now, deletedAt: null, syncStatus: 'pending' },
           items.map(it => ({ id: crypto.randomUUID(), savedMealId: mealId, foodItemId: it.foodItemId, quantityMultiplier: it.quantityMultiplier })),
         )
-        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(), payload: { id: mealId, name, items, servings: mealServings, imageDataUri: mealImage } })
+        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(tz), payload: { id: mealId, name, items, servings: mealServings, imageDataUri: mealImage } })
         await invalidateSavedMeals()
         setMeals(await store.getSavedMeals())
         pushThenRevalidate(userId!, invalidateSavedMeals)
@@ -416,7 +416,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       ?? mealTypeForHour(mealTypes, new Date().getHours())
     if (!mealTypeId) { toast.error('No meal type available'); return }
     setLogging(meal.id)
-    const targetDate = logDate ?? todayInTz()
+    const targetDate = logDate ?? todayInTz(tz)
     try {
       const logs = await logMealItems(meal, targetDate, mealTypeId, userId, tz)
       toast.success(`${meal.name} logged`)
@@ -468,7 +468,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       if (store) {
         // Local-first tombstone + outbox delete; UI updates synchronously (works offline).
         await store.deleteSavedMealLocally(meal.id, new Date().toISOString())
-        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(), payload: { id: meal.id, deleted: true } })
+        await store.queueMutation({ userId: userId!, domain: 'saved_meals', date: todayInTz(tz), payload: { id: meal.id, deleted: true } })
         await invalidateSavedMeals()
         setMeals(prev => prev.filter(m => m.id !== meal.id))
         pushThenRevalidate(userId!, invalidateSavedMeals)
@@ -483,7 +483,7 @@ export function SavedMealsSheet({ open, onOpenChange, onLogged, userId, logDate,
       if (opts?.silent) throw new Error('delete failed')
       toast.error('Failed to delete')
     }
-  }, [userId])
+  }, [userId, tz])
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

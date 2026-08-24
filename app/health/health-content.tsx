@@ -255,7 +255,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         // SYNC-R2: the local seed previously never set today's tile, so an offline fresh
         // app-open on Health left steps/weight blank until the network fetch landed —
         // mirrors session-select-content.tsx's Home fetchMeta pattern (SYNC-R1).
-        const todayStr = todayInTz();
+        const todayStr = todayInTz(tz);
         const todayRow = filtered.find(m => m.date === todayStr);
         if (todayRow) setMetaToday(toRow(todayRow));
         setMetaLoading(false);
@@ -278,7 +278,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
     ]);
     await Promise.all([localSeedPromise, networkPromise]);
     setMetaLoading(false);
-  }, [userId, setMetaFromPayload]);
+  }, [userId, setMetaFromPayload, tz]);
 
   // Q-91: a BLE drain settling or an admin Redecode both invalidate the 'sleep-sessions'
   // cache entry (invalidateOuraSync) but this screen, once mounted, never learned to
@@ -417,7 +417,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   useEffect(() => {
     const store = userId ? getLocalStore(userId) : null;
     if (!store) return;
-    const cutoffStr = shiftDateStr(todayInTz(), -90);
+    const cutoffStr = shiftDateStr(todayInTz(tz), -90);
     Promise.all([store.getWorkoutHistory(cutoffStr), store.getExerciseLibrary().catch(() => [])])
       .then(([history, library]) => {
       const typeByName = new Map(library.map(e => [e.nameKey, e.exerciseType]));
@@ -454,7 +454,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       });
       if (localEntries.length > 0) setStrengthTrend(prev => prev ?? localEntries);
     }).catch(() => {});
-  }, [userId]);
+  }, [userId, tz]);
 
   const handlePullSync = useCallback(async () => {
     if (userId) await pushMutations(userId).catch(() => {});
@@ -479,7 +479,7 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const lastSleep = sleepRows[0] ?? null;
   // Only treat sleep as "recent" if it's from last night or today — prevents
   // stale data from days ago showing on the card as if it's current.
-  const todayStr = todayInTz()
+  const todayStr = todayInTz(tz)
   const yesterdayStr = shiftDateStr(todayStr, -1)
   const recentSleep = lastSleep && lastSleep.date >= yesterdayStr ? lastSleep : null
 

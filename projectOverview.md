@@ -27,23 +27,46 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The
+tile already routes water to the correct sheet. But the generic sheet's water branch wrote an
+ABSOLUTE total — discarding the day's water, reintroducing SYNC-P7 — and queues `waterMlDelta` now.
+
+**The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave
+Playwright a stable frame, so `Start Set 2` hung — measured 85 ms vs 8,009 ms with and without the
+new `prefers-reduced-motion` rule. A spec now drives three logged sets and fails if the rule is
+removed. Testability, not a user-facing defect. `Gate: device`.
+
+**Disk maintenance works from a desktop again (Q-544).** The DB-footprint card and the device-metrics
+panel touch no plugin, but sat after `OuraBleDebug`'s native early-return — so reclaiming disk needed
+the APK, the one client `VACUUM FULL`'s exclusive lock blocks, and was impossible while the APK was
+broken. Both moved above it. `Gate: device`.
+
+**The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
+it. Its confirm copy deliberately does not read like the lossless VACUUM one — it is the only
+control here that DELETEs archival frames — and a refused bucket is listed with its reason. `Gate: device`.
+
+**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, deliberately outside
+`OuraBleDebug` — that renders nothing without the native plugin, which is exactly the laptop doing
+the re-key. Says up front that nothing happens until the ring next reports. `Gate: device`.
+
+**The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported
+`failed: 502`; the step backfill said "Done" at the gateway timeout. Both now wait for the real
+status. The route's default flip is Lane A's. `Gate: device`.
+
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
 
-**Training Calendar's today marker uses the user's timezone now (Q-477 slice 1)**, not device-local. Ratchet 78/38 → 76/37 files.
+**Q-477 is DONE for every client component** (4 slices, 78/38 → **3 calls in 1 file**). Left is
+`workout-store.ts` — a Zustand store with no hook, where a wrong-zone stamp makes `rolloverDay()` clear the day's completed sets. A design call, analysed on the entry.
 
-**"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
-retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/
-`added-weight-toggle.tsx` were real, now fixed. A ratchet heuristic matched 34 files, mostly noise.
+**"Nine collapsibles missing `aria-expanded`" was actually two (Q-491)** — one retired, four already
+Radix, two a back chevron. `weights-summary.tsx`/`added-weight-toggle.tsx` were real, now fixed.
 
-**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** The owner can't judge a
-whole session as one number (25.6% fill rate agreed); `sessionEffort()` already derives it from set
-RPEs at read time (Lane A, no schema change) — the done screen's own kcal estimate needed no change.
+**The end-of-workout "How hard was that session?" prompt is gone (Q-420).** 25.6% fill rate;
+`sessionEffort()` already derives it from set RPEs at read time, so nothing downstream changed.
 
 **Two Health cards stop vanishing on a failed fetch, and the fix needed a second one (Q-499).**
-`hr-recovery-profile-card.tsx`/`strength-progress-card.tsx` now show "Couldn't load… — pull to
-refresh" on a 429/500. Wiring `onError` alone didn't work: under StrictMode's dev double-invoke, a
-joined caller's failure was never relayed by `cachedFetchCore`'s dedup — only the torn-down owner's
-was, fixed in `lib/sqlite/cache.ts` — a race reachable in production too, not just under StrictMode.
+They now show "Couldn't load…" on a 429/500. `onError` alone didn't work: `cachedFetchCore`'s dedup
+relayed a failure only to the torn-down owner, never to a joined caller — fixed in `lib/sqlite/cache.ts`.
 
 **The database reclaim is three-quarters done, and the last quarter is one press.** The owner's
 `oura_raw_samples` vacuum reclaimed **36 MB** (93 → **57 MB**) and the automatic packer is now
@@ -86,18 +109,16 @@ indistinguishable from a check-in in which the user answered nothing — guarded
 paths, since the outbox reaches the same table
 ([`journal`](docs/overview/entries/2026-08-23-route-hardening-batch.md)).
 
-**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** The key can be
-backed up (`/admin/oura-ble` → **Show key for backup**), a full re-sync notifies on completion, and
-the connect sequence resets the two live-HR levers a killed session left on forever. **All native —
-inert until a new APK is installed, and until then the ring key has one copy.** Both stay queued
-with `Gate: device`. **Item (3) needed no work:** 6,346 battery polls since 2026-07-19 measure the
-drain the entry called unmeasurable — −22, −24, −22, −38, −15 overnight, confirming the owner's
-report; the SpO₂ A/B is two nights of wear, not code.
+**Three ring-service fixes, none verified on the ring (Q-537, Q-533, Q-388 item 2).** Key backup
+(`/admin/oura-ble` → **Show key for backup**), a re-sync completion notification, and a connect
+sequence that resets the live-HR levers a killed session left on. **All native — inert until a new
+APK is installed, and until then the ring key has one copy.** `Gate: device`. **Item (3) needed no
+work:** 6,346 battery polls measure the drain the entry called unmeasurable (−22/−24/−22/−38/−15
+overnight), confirming the owner's report; the SpO₂ A/B is wear, not code.
 
 **Two affordances came back and the sheet that owned them is gone (LB-3, v1.347.0).** Nothing opened
-`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise for its history and an activity for
-its detail were dead a fortnight, unreported. Both are on `/health/day` (the NAME is the target, not
-a third icon); `health-content.tsx` lost 167 lines; the HR chart was dropped, `done-screen` has it.
+`day-overlay-sheet.tsx` after Q-110, so tapping a logged exercise or an activity was dead a fortnight,
+unreported. Both on `/health/day` (the NAME is the target); `health-content.tsx` lost 167 lines.
 
 **Deleting an activity works offline now (Q-328, v1.350.0).** It was the one activity-log write with
 no outbox domain — created through the queue, deleted by a bare `fetch` that simply failed with no
@@ -105,96 +126,75 @@ connection. `softDeleteActivityLogPending`, not `deleteActivityLog`: a queued de
 `pending` or a pull clobbers it, while `'synced'` is what later lets `applyDelta` reap the tombstone.
 
 **The memo-stability baseline is empty (Q-357, v1.349.0).** All four defeated call sites cleared, so a
-new one is a regression rather than a debt row. The expensive one was inside `visibleMeals.map(...)`,
-where a hook is not allowed — its callbacks take the meal and hand it back, letting the parent share
-one `useCallback` per action across every card.
+new one is a regression. The expensive one was inside `visibleMeals.map(...)`, where a hook is not
+allowed — its callbacks take the meal and hand it back, so the parent shares one per action.
 
-**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` had
-held every threshold for months and nothing under `components/`/`app/` imported it, so a 5,000 kg
-weight was queued and dropped server-side. **Three** sheets, not the one the entry named:
-`log-value-sheet.tsx` had no check at all across seven fields.
+**Body-metric bounds are asked at the keyboard (Q-321, v1.348.0).** `validation/body-metrics.ts` held
+every threshold and nothing under `components/`/`app/` imported it, so a 5,000 kg weight was queued
+and dropped server-side. **Three** sheets, not the one the entry named.
 
-**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed
-six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it (55 steps).
+**Sixteen writes revalidated around their push, not after it (LB-6, v1.345.0).** The entry listed six — its finder read only *above* each call. `check-invalidate-after-push.js` holds it.
 
 **The finished-logging control moved above End of Day (BF-6, v1.344.0).** **Zero presses in seven
-weeks** (0 of 55 `day_checkins` rows), and the calibration excludes an unmarked day rather than
-treating it as light — so a control nobody reached withheld the feature outright.
+weeks**, and the calibration excludes an unmarked day rather than treating it as light.
 
 **A deload session says so now (BF-8, v1.343.0).** Intensity read "Full · As prescribed" while the
-card under it read "Deload session · Auto-applied" and the header showed no marker — the owner
-trained one believing it was full. Both asked `isDeloadActive` (the PHASE), not today's session.
+card under it read "Deload session" — the owner trained one believing it was full. Both asked
+`isDeloadActive` (the PHASE), not today's session.
 
-**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands
-back the **whole recipe** — 1,956 kcal for a banana-bread loaf — so the row asks how many it serves
-and cannot be kept until answered; `perServing` is shared with the route so the divides cannot drift.
+**A recipe link becomes a meal (Q-409's Lane B half, v1.342.0).** A page stating no yield hands back
+the **whole recipe** (1,956 kcal for a loaf), so the row asks how many it serves and cannot be kept
+until answered.
 
-**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to
-128 px WebP (~6 KB) to fit `SAVED_MEAL_IMAGE_MAX_BYTES`; the tile prints the stored size, because
-nothing else fails loudly when that cap slips. The storage half shipped with Q-396, unreachable.
+**Saved meals can carry a photo (Q-327, v1.341.0).** A 64 px tile in Edit Meal, downscaling to 128 px
+WebP (~6 KB); the tile prints the stored size, because nothing else fails loudly when the cap slips.
 
 **The meal plan can be written to again, and it now produces saved meals (Q-398, v1.340.0).** Five
-routes — create/rename/activate/delete a plan, restructure it, edit one meal, save dietary
-restrictions — read the request body and then validated a variable nothing had assigned, so every
-one answered `400 Invalid input: expected object, received undefined` to a valid request. Confirmed
-at runtime, not read: the whole meal-plan write surface was dead on `main`.
-`scripts/check-json-body-parsed.js` now fails Custom Rules on the class (52 → 53 steps). On top of
-that, each plan meal carries **Save to My Meals** with a **Save all**, keyed for idempotence on the
-`saved_meal_id` column that already existed, so the plan becomes a generator rather than somewhere
-to live ([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
+write routes validated a variable nothing had assigned, so every one answered `400 Invalid input:
+expected object, received undefined` to a valid request — the whole meal-plan write surface was dead
+on `main`, confirmed at runtime. `check-json-body-parsed.js` holds the class. Each plan meal now
+carries **Save to My Meals** with a **Save all**, idempotent on the existing `saved_meal_id` column
+([`journal`](docs/overview/entries/2026-08-24-meal-plan-to-saved-meals.md)).
 
-**Preferences have a server home; nothing reads it yet (Q-392, engine half).**
-`users.preferences` JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, which **merges**
-under a row lock — the unlocked version demonstrably drops the other device's key when a write
-lands mid-merge. Proven with two signed-in sessions against the local DB. **Nothing the owner can
-see changed:** the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
+**Preferences have a server home; nothing reads it yet (Q-392, engine half).** `users.preferences`
+JSONB (mig 206) behind `GET`/`PATCH /api/user/preferences`, merging under a row lock — the unlocked
+version demonstrably drops the other device's key mid-merge. **Nothing the owner can see changed:**
+the read sites are `components/**`, so Q-392 was re-scoped to Lane B, not closed.
 
 **The UTC-offset fixture sweep came back clean, and found something else (Q-394, LA-19 — both
-closed).** No third test carries the hazard that took out two PRs, but one *correctly written* test
-failed because the code under it re-derived midnight in Brisbane: `aestMidnight` takes a timezone
-and only **9 of 22** call sites passed one. All 22 do now, `check-aest-midnight-timezone.js` holds
-it at zero (empty baseline). Proven by the experiment that found it — 18/18 under a shifted tz.
+closed).** One *correctly written* test failed because the code under it re-derived midnight in
+Brisbane: `aestMidnight` takes a timezone and only **9 of 22** call sites passed one. All 22 do now.
 
 **`DELETE /api/activity-logs` stopped reporting success for a delete that deleted nothing (Q-556).**
 Q-328's outbox delete reconciled the race that made this unsafe; it now 404s for a nonexistent or
-not-yours id, matching every sibling delete, while a double-tap or an already-gone row still matches
-and reports success. The web fallback treats a 404 the same as success rather than throwing.
+not-yours id while a double-tap still matches. The web fallback treats a 404 as success.
 
 **Admin Device Metrics sparklines stopped stretching a partial day to full width (BF-10).**
-`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day rather than
-by sample index, so a night-only SpO₂/HRV signal renders with dead space either side, not apparent
-24-hour coverage. Native-gated — verified by mounting the component off the gated page. `Gate: device`.
+`Sparkline` takes optional `times`/`timeDomain` and projects `x` by position in the day, so a
+night-only SpO₂/HRV signal renders with dead space either side, not apparent 24-hour coverage.
+Verified by mounting the component off the native-gated page. `Gate: device`.
 
-**Coach undo wrote over whatever was there (Q-468).** Two stacked changes on one exercise: undoing
-the *first* returned the row to its original value while the history still showed the second in
-effect. `driftAgainst` now takes a side — `from` for apply, `to` for undo — checked once centrally.
-Latent: nothing calls the undo route yet (Q-467), production's `coach_changes` is empty.
+**Coach undo wrote over whatever was there (Q-468).** With two stacked changes on one exercise,
+undoing the first returned the row to its original value while the history showed the second in
+effect. `driftAgainst` takes a side now. Latent: nothing calls the undo route yet (Q-467).
 
 **The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
-schema was deleted forever — no badge, no toast, no retry — while one that failed a layer later got
-all three. It returns a per-item error now, so the row is kept and dead-letters normally. **The fix
-shape needed correcting:** the entry said report it as *retryable*, which under Q-475's split means
-"the server could not write" and backs off the whole queue; `retryable: false` is what quarantines
-it. The write-time companion is deliberately still open (`Keep:` on the entry) — it is device-only
-verifiable and sits on 36 save paths.
+schema was deleted forever — no badge, no toast, no retry. It returns a per-item error now, so the
+row is kept and dead-letters. **The entry's fix shape was wrong:** `retryable: true` backs off the
+whole queue under Q-475's split; `retryable: false` quarantines. Write-time companion still open.
 
-**`workout_sessions`'s dead column owned the name the live one was used under (Q-474).** Two foreign
-keys to `program_sessions`: `session_id` is live, `program_session_id` has never been written or
-read — and the Drizzle property `programSessionId` pointed at the dead one. It had already cost a
-session, when a repro fixture populated the inert column and the run read as "the race does not
-exist". Property names only, no migration; the column is kept because dropping it is data-losing and
-owner-gated.
+**`workout_sessions`'s dead column owned the name the live one was used under (Q-474).** Of its two
+FKs to `program_sessions`, `session_id` is live and `program_session_id` never written — yet the
+Drizzle property `programSessionId` pointed at the dead one, which already cost a session. Property
+names only; the column stays (dropping it is data-losing, owner-gated).
 
 **A rate limit is not an idempotency mechanism (Q-470).** The background prescription regeneration
-fired twice for one session-day — two call sites in one handler, and `cachedFetch` revalidates on
-every screen open, so the second GET started a second generation before the first landed. It now
-takes an in-flight marker keyed the same way its fingerprint is, released when the work settles
-(**including on rejection** — a leaked marker would wedge that session-day until restart) and
-checked before the rate limit, so a deduped call spends no budget.
+fired twice for one session-day — two call sites, and `cachedFetch` revalidates on every screen open.
+It now takes an in-flight marker keyed like its fingerprint, released when the work settles
+(**including on rejection** — a leak would wedge that session-day) and checked before the limit.
 
 **The AI-usage screen's top row was an artefact of its own fingerprint (Q-471).** Three meal-plan
-sections fingerprinted on a rounded calorie target alone, so every deliberate reroll read as a
-double trip. They now carry what distinguishes a request, keyed through a new `contentKey` helper.
+sections fingerprinted on a rounded calorie target alone, so every reroll read as a double trip.
 **44 of the 89 redundant calls were this artefact; the other 45 are real** (Q-470, Q-469) —
 [journal](docs/overview/entries/2026-08-23-ai-fingerprint-granularity.md).
 

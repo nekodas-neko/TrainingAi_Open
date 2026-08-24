@@ -17,7 +17,7 @@ vi.mock('@/lib/ai/instrument', () => ({
 }))
 vi.mock('@/lib/data', () => ({
   getRepository: async () => ({
-    getAiHealthInsight: async () => null,
+    getAiHealthInsightWithHash: async () => null,
     upsertAiHealthInsight: async () => {},
     // Everything a section needs, all empty except a single readiness score — the exact shape
     // Q-452's gate lets through and this bug then misreports.

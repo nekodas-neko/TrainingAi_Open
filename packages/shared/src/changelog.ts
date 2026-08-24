@@ -6,6 +6,69 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.6",
+    date: "2026-08-24",
+    changes: [
+      "Fixed a water-logging path that would have overwritten the day's running total instead of adding to it, and would have thrown an error rather than saving. Nothing you can currently tap reached it \u2014 the water tile already used the correct sheet.",
+    ],
+  },
+  {
+    version: "1.363.5",
+    date: "2026-08-24",
+    changes: [
+      "If you have reduce-motion turned on, the bouncing \u201cStart Set\u201d button now holds still instead of animating. It stays exactly where it is and is still the main button \u2014 it just stops moving.",
+    ],
+  },
+  {
+    version: "1.363.4",
+    date: "2026-08-24",
+    changes: [
+      "The database footprint readout and its disk-reclaim controls now work from a desktop browser instead of only inside the phone app. They never needed the ring \u2014 they were just rendered behind the check for it, which meant disk could not be reclaimed at all while the app was broken or being rebuilt.",
+    ],
+  },
+  {
+    version: "1.363.3",
+    date: "2026-08-24",
+    changes: [
+      "The raw-frame packer, which compacts old ring data to reclaim database space, now has a button in the BLE console instead of being command-line only. It shows how much is left to pack, and any bucket it refuses to compact is listed with the reason rather than counted as nothing done.",
+    ],
+  },
+  {
+    version: "1.363.2",
+    date: "2026-08-24",
+    changes: [
+      "There is now a button for telling the app the ring was re-keyed, instead of it being a command-line-only step. It says plainly that nothing happens until the ring next syncs, shows a declaration that is waiting, and lets you cancel one made by mistake.",
+    ],
+  },
+  {
+    version: "1.363.1",
+    date: "2026-08-24",
+    changes: [
+      "The BLE console's Redecode and the historical step backfill now wait for the work to actually finish and report what happened. Before, a long run reported \u201cfailed\u201d for work that had completed, and the backfill said \u201cDone\u201d the moment the request timed out \u2014 so a retry could kick off another full re-run of the heaviest job in the app.",
+    ],
+  },
+  {
+    version: "1.363.0",
+    date: "2026-08-24",
+    changes: [
+      "Every screen now works out what day it is from your own timezone rather than the phone's or the app's default. This finishes a sweep across the whole app \u2014 health, nutrition, running, activity, stats and the workout screens \u2014 so logs, streaks and \u201ctoday\u201d markers all agree with each other when you're not in Brisbane.",
+    ],
+  },
+  {
+    version: "1.362.0",
+    date: "2026-08-24",
+    changes: [
+      "The workout picker and the workout screens now work out what day it is from your own timezone rather than the app's default, so the recommended session, the morning check-in prompt and the day-review banner all land on the right day when you're not in Brisbane.",
+    ],
+  },
+  {
+    version: "1.361.0",
+    date: "2026-08-24",
+    changes: [
+      "The morning check-in, mood check-in, water log and body-metric log now file what you save under your own day rather than the phone's or the app's default \u2014 they disagree whenever your timezone isn't Brisbane, and the body-metric sheet was using two different answers for the same save.",
+    ],
+  },
+  {
     version: "1.360.0",
     date: "2026-08-24",
     changes: [

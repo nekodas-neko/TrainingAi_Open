@@ -1,6 +1,7 @@
 'use client'
 
 import { HR_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useState, useEffect, useMemo, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import dynamic from 'next/dynamic'
@@ -27,10 +28,10 @@ const ActivityRouteMap = dynamic(
 
 // Fire-and-forget: a failed link must never block the "Activity saved" toast the user is
 // already seeing — the run just stays 'pending' and can still be marked via Skip/Complete.
-async function linkPrescribedRun(userId: string | undefined, prescribedRunId: string, activityLogId: string) {
+async function linkPrescribedRun(userId: string | undefined, prescribedRunId: string, activityLogId: string, tz: string) {
   const store = userId ? getLocalStore(userId) : null
   if (store) {
-    const today = todayInTz()
+    const today = todayInTz(tz)
     const runs = await store.getPrescribedRuns(today)
     const existing = runs.find((r) => r.id === prescribedRunId)
     if (existing) {
@@ -49,6 +50,7 @@ async function linkPrescribedRun(userId: string | undefined, prescribedRunId: st
 }
 
 export function DoneActivityScreen({ userId }: { userId?: string }) {
+  const tz = useUserTimezone();
   const router = useRouter()
 
   // Same as done-screen: every activity ends here and all three exits go to /workout-select, so
@@ -176,7 +178,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
     }
     setSaving(true)
     const store = userId ? getLocalStore(userId) : null
-    const today = todayInTz()
+    const today = todayInTz(tz)
     const treadmillDistKmParsed = activityType === 'treadmill' && treadmillDistKm
       ? (parseFloat(treadmillDistKm) || undefined)
       : undefined
@@ -263,7 +265,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
         pushThenRevalidate(userId!, invalidateActivityWrites)
         savedLocally = true
         if (activityType === 'run' && prescribedRunId) {
-          linkPrescribedRun(userId, prescribedRunId, logId).catch(() => {})
+          linkPrescribedRun(userId, prescribedRunId, logId, tz).catch(() => {})
         }
       } catch (sqliteErr) {
         console.error('Activity log SQLite write failed, falling back to API:', sqliteErr)
@@ -300,7 +302,7 @@ export function DoneActivityScreen({ userId }: { userId?: string }) {
       if (!res.ok) throw new Error()
       const { activityLog } = await res.json()
       if (activityType === 'run' && prescribedRunId) {
-        linkPrescribedRun(userId, prescribedRunId, activityLog.id).catch(() => {})
+        linkPrescribedRun(userId, prescribedRunId, activityLog.id, tz).catch(() => {})
       }
       await invalidateActivityWrites()
       toast.success('Activity saved')

@@ -92,18 +92,44 @@ export async function logMealItems(
     }
   }
 
-  // Web fallback: serial fetches with rollback on failure
+  // Web fallback, reached only when the local store is unavailable (the K4 `isLocalStoreDead`
+  // state) or its write threw. Rollback on failure, as before.
+  //
+  // BF-12: these used to be a `for` loop of sequential `await fetch`es — one blocking round trip
+  // per ingredient, which is the pattern CLAUDE.md names outright ("never `await` POSTs serially
+  // in a loop … batch into one request or `Promise.all`"). Production timestamps for the owner's
+  // report showed a three-item meal's rows landing ~0.4s apart, confirming the chain was real.
+  // They now go out together, so the wall clock is one round trip rather than N.
   const createdIds: string[] = []
   try {
-    for (const item of oneServingItems(meal)) {
-      const res = await fetch('/api/nutrition/food-logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ date, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier }),
-      })
-      if (!res.ok) throw new Error('Failed to log item')
-      const log = await res.json()
-      createdIds.push(log.id)
+    const settled = await Promise.allSettled(
+      oneServingItems(meal).map(async item => {
+        const res = await fetch('/api/nutrition/food-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ date, mealTypeId, foodItemId: item.foodItemId, quantityMultiplier: item.quantityMultiplier }),
+        })
+        if (!res.ok) throw new Error('Failed to log item')
+        return { item, log: await res.json() as { id: string; loggedAt?: string } }
+      }),
+    )
+
+    // `allSettled`, not `all`, and the ids are recorded BEFORE rethrowing: `Promise.all` rejects on
+    // the first failure without reporting which siblings succeeded, so a partial failure would
+    // strand rows the rollback cannot see — invisible to the user until they appear as duplicates
+    // on the next tap. Serially this could not happen; making the writes concurrent is what makes
+    // the distinction load-bearing.
+    for (const r of settled) if (r.status === 'fulfilled') createdIds.push(r.value.log.id)
+    const rejected = settled.find(r => r.status === 'rejected') as PromiseRejectedResult | undefined
+    if (rejected) {
+      throw rejected.reason instanceof Error ? rejected.reason : new Error('Failed to log item')
+    }
+
+    // Ordered by `oneServingItems`, not by completion — `allSettled` preserves input order, and the
+    // caller appends these straight onto the visible list.
+    for (const r of settled) {
+      if (r.status !== 'fulfilled') continue
+      const { item, log } = r.value
       optimistic.push(savedMealItemToWithItem(item, {
         id: log.id, date, mealTypeId, loggedAt: log.loggedAt ?? new Date().toISOString(),
       }))

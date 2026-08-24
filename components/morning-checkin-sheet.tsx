@@ -13,6 +13,7 @@ import { MORNING_SCALES, type MorningScaleKey, type IllnessContext } from '@trai
 import { ScaleSelector } from '@/components/nutrition/end-of-day/scale-selector'
 import { IllnessContextPicker } from '@/components/checkin/illness-context-picker'
 import { todayInTz } from '@trainingai/shared/date-utils'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 
 // Q-113: Recovery/Sleep-quality-feel default to a neutral, non-score-derived 3 — NOT
 // prefillMorningScales(readiness/sleepScore) as before, which silently seeded the sheet
@@ -30,6 +31,7 @@ interface Props {
 
 export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved }: Props) {
   useSheetBackDismiss(open, onClose)
+  const tz = useUserTimezone()
   const [scales, setScales] = useState<Record<MorningScaleKey, number>>(() => ({ ...NEUTRAL_SCALES }))
   const [touched, setTouched] = useState<Record<MorningScaleKey, boolean>>({
     perceivedRecovery: false, sleepQualityFeel: false,
@@ -52,7 +54,7 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     if (loaded) return
     let cancelled = false
     async function init() {
-      const date = todayInTz()
+      const date = todayInTz(tz)
       const store = userId ? getLocalStore(userId) : null
       const saved = store
         ? await store.getDayCheckin(date, 'morning')
@@ -78,12 +80,12 @@ export function MorningCheckinSheet({ open, onClose, userId, readiness, onSaved 
     }
     init()
     return () => { cancelled = true }
-  }, [open, loaded, userId])
+  }, [open, loaded, userId, tz])
 
   async function handleSave() {
     if (saving) return
     setSaving(true)
-    const date = todayInTz()
+    const date = todayInTz(tz)
     const payload = {
       phase: 'morning' as const,
       perceivedRecovery: scales.perceivedRecovery,
