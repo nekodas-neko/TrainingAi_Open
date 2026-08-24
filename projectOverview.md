@@ -29,7 +29,8 @@
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
 
-**Training Calendar's today marker uses the user's timezone now (Q-477 slice 1)**, not device-local. Ratchet 78/38 → 76/37 files.
+**Q-477 slices 1–2: the calendar today-marker, then the four check-in / log sheets** now take the
+user's timezone (`metric-log-sheet` had *both* wrong answers in one save). Ratchet 78/38 → **70/33**.
 
 **"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
 retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/
@@ -178,19 +179,18 @@ shape needed correcting:** the entry said report it as *retryable*, which under 
 it. The write-time companion is deliberately still open (`Keep:` on the entry) — it is device-only
 verifiable and sits on 36 save paths.
 
-**`workout_sessions`'s dead column owned the name the live one was used under (Q-474).** Two foreign
-keys to `program_sessions`: `session_id` is live, `program_session_id` has never been written or
-read — and the Drizzle property `programSessionId` pointed at the dead one. It had already cost a
-session, when a repro fixture populated the inert column and the run read as "the race does not
-exist". Property names only, no migration; the column is kept because dropping it is data-losing and
-owner-gated.
+**`workout_sessions`'s dead column owned the name the live one was used under (Q-474).** Of its two
+FKs to `program_sessions`, `session_id` is live and `program_session_id` has never been written —
+yet the Drizzle property `programSessionId` pointed at the dead one, which already cost a session
+when a repro fixture populated the inert column. Property names only; the column stays (dropping it
+is data-losing, owner-gated).
 
 **A rate limit is not an idempotency mechanism (Q-470).** The background prescription regeneration
 fired twice for one session-day — two call sites in one handler, and `cachedFetch` revalidates on
 every screen open, so the second GET started a second generation before the first landed. It now
 takes an in-flight marker keyed the same way its fingerprint is, released when the work settles
-(**including on rejection** — a leaked marker would wedge that session-day until restart) and
-checked before the rate limit, so a deduped call spends no budget.
+(**including on rejection** — a leak would wedge that session-day until restart) and checked before
+the rate limit, so a deduped call spends no budget.
 
 **The AI-usage screen's top row was an artefact of its own fingerprint (Q-471).** Three meal-plan
 sections fingerprinted on a rounded calorie target alone, so every deliberate reroll read as a

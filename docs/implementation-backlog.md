@@ -2187,6 +2187,28 @@ this fits without an extraction.
 > actual today — not the container's. Ratchet down to **76 calls across 37 files** (was 78/38).
 > [`journal`](overview/entries/2026-08-24-calendar-today-marker-timezone.md). **37 files remain**,
 > ordered write paths next, then display, per the sweep order above.
+>
+> **Second slice shipped 2026-08-24 (Lane B): the four check-in / log sheets — the write paths the
+> order calls for next.** `mood-checkin-sheet`, `morning-checkin-sheet`, `profile/water-log-sheet`
+> and `health/metric-log-sheet` all take `useUserTimezone()` now; all four dropped to **zero** and
+> are off the baseline. Ratchet down to **70 calls across 33 files** (was 76/37).
+> `metric-log-sheet` carried **both** bugs in one function — its local branch used `todayInTz()`
+> (Brisbane) while its web fallback POSTed `localDateString()` (device zone), two different answers
+> for the same save; the `localDateString` import is now gone from that file.
+> [`journal`](overview/entries/2026-08-24-checkin-sheets-user-timezone.md).
+>
+> **What that slice actually proved, and what it did not.** With a seeded user on
+> `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the
+> user's day, Brisbane's day and the device's day are three distinguishable values):
+> `metric-log-sheet` POSTed `localDate: 2026-08-25` and `morning-checkin-sheet` POSTed
+> `date: 2026-08-25`, both landing rows on **08-25** — the user's day, where before they would have
+> sent the device's/Brisbane's 08-24. Those two are proven end-to-end.
+> **The other two are not, and the reason is structural:** `water-log-sheet`'s date feeds only the
+> **local-store** write (`/api/water-log` derives its own date server-side from the session tz), and
+> `getLocalStore` is null in the web sandbox — so its fix only bites on device, where the local row
+> would otherwise be filed a day off the server's. `mood-checkin-sheet`'s date likewise feeds the
+> local write and the outbox mutation, **plus the `mood:${date}` cache key**, which *is*
+> web-reachable but was not driven here.
 
 - **Branch:** `fix/client-today-uses-user-timezone`
 - **Added:** 2026-08-18 · review sweep (non-default-timezone lens) ·
