@@ -1566,37 +1566,6 @@ whether or not anyone draws them first.
   say plainly that the on-device pass (safe-area under the composer, the widget inside a scrolling
   thread) was not exercised unless it was.
 
-### [workouts][activity][app-shell] LB-3 — the day-overlay sheet is unreachable and still owns three affordances the day screen has not got
-
-- **Branch:** `feat/retire-day-overlay-sheet`
-- **Added:** 2026-08-23 · **Lane: B**
-- **Placement:** low, and it now SITS low — it was filed into the slot LB-1 vacated, near the top,
-  which contradicted this line (queue position is priority). Moved 2026-08-23. Nothing is broken by
-  leaving it: what is here is dead code plus three capabilities gone since Q-110 (2026-08-08)
-  without a report.
-
-LB-1 brought the edit/delete controls across to `/health/day` and put both callers on one shared
-hook (`lib/hooks/use-day-entry-mutations.ts`), so there is no longer a second copy of the write
-logic. What it deliberately did **not** do is delete `components/health/day-overlay-sheet.tsx`,
-because deleting it silently discards three things the day screen does not have:
-
-| unreachable affordance | where it lives |
-|---|---|
-| tap an exercise name → `ExerciseHistorySheet` (1RM trend, HR recovery, session log) | `day-overlay-sheet.tsx`, via `onExerciseTap` |
-| tap an activity → `ActivityDetailSheet` | via `onSelectActivity` |
-| expand a session → per-session HR recovery chart | `loadSessionHr` + `HrRecoveryChart` |
-
-`ExerciseHistorySheet` and `ActivityDetailSheet` are still rendered by `health-content.tsx`, but the
-only thing that ever set their open-state was the sheet — so they are unreachable from Health too,
-and `historyExercise`/`selectedActivity` can now only ever be `null` there.
-
-**The work:** decide each of the three (port to `/health/day`, or drop), port the ones worth
-keeping, then delete `day-overlay-sheet.tsx` together with `dayOverlay`, `fetchDayOverlay`,
-`refreshDayOverlay`, `sessionHrData`, `loadSessionHr` and the now-dead sheet wiring in
-`health-content.tsx`. The exercise-history tap is the one with the strongest case — it is the only
-route from a logged exercise to its 1RM trend outside Stats. Note the row already carries two 48dp
-controls, so a third target needs a layout decision rather than another icon.
-
 ### [cardio][devices] Q-418 — the free walk's Android pill still cannot show the time (the screen half shipped)
 - **Gate: device** — and the gate is the entry's own instruction, not a formality: it says
   *verify before adding metrics*, because background tracking with the screen off has never been
@@ -3036,7 +3005,9 @@ statement. Reserve "proposal", and the future tense, for tier 3.
   2. **A "key present" indicator on the Devices card** (`components/more/oura-section.tsx`) — still
      worth having, since that card reads server data and shows the ring as healthy while the
      service logs `no key stored`. It is a pure Lane B surface with no storage involvement, so it
-     is filed as **LB-3** rather than reached into from here.
+     is filed as **LB-5** rather than reached into from here. (This said **LB-3** until 2026-08-24 —
+     a collision with the day-overlay entry, which has since shipped and been removed, so the
+     pointer would have led nowhere. LB-5 is the entry that actually describes this work.)
 - **Placement, still open.** The owner also asked that the key field be nested behind something
   deliberate — *"so it cant accidently be used"*. It is now behind a **Show key for backup** button
   rather than an always-visible field, which is most of that; where these screens live at all is

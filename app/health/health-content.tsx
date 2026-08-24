@@ -5,7 +5,6 @@ import { SwipeCarousel } from "@/components/ui/swipe-carousel";
 import { SectionHeader } from "@/components/health/section-header";
 import { getHealthSections } from "@/app/health/health-sections";
 import { useGoalSeeds } from "@/app/health/use-goal-seeds";
-import dynamic from 'next/dynamic';
 import { useSearchParams } from "next/navigation";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { useTabVisibility } from "@/components/shell/tab-visibility";
@@ -20,34 +19,22 @@ import { cachedFetch, readCacheSync, setCached, cachedFetchToday, readTodayCache
 import { useUserTimezone } from '@/components/shell/user-timezone-provider';
 import { runWithConcurrency } from "@/lib/async/run-with-concurrency";
 import { invalidateReadinessInputs, invalidateOuraSync, invalidateBiometrics, invalidateHealthTrends, invalidateBodyMetricWrite } from "@/lib/cache-groups";
-import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL, DAY_LOG_TTL } from '@trainingai/shared/cache-ttl';
+import { TTL_MEDIUM, TTL_LONG, READINESS_SCORE_TTL, MUSCLE_RECOVERY_TTL, HEALTH_TRENDS_SUMMARY_TTL } from '@trainingai/shared/cache-ttl';
 import type { HealthTrendsResponse } from "@/app/api/health/trends/route";
 import type { SleepDetailReading } from "@/components/health-metric-sheet";
 import { MetricSheets } from "@/components/health/metric-sheets";
-import { DayOverlaySheet } from "@/components/health/day-overlay-sheet";
-import { ExerciseHistorySheet } from "@/components/exercise-history-sheet";
-import { DayOverlayDialogs } from "@/components/health/day-overlay-dialogs";
-import { useDayEntryMutations } from "@/lib/hooks/use-day-entry-mutations";
 import { WaterLogSheet } from '@/components/profile/water-log-sheet'
 import { MetricLogSheet, type LogField, type LogState } from '@/components/health/metric-log-sheet'
 import type { Injury } from "@trainingai/shared/types/injury";
-const ActivityDetailSheet = dynamic(
-  () => import('@/components/activity/activity-detail-sheet').then(m => ({ default: m.ActivityDetailSheet })),
-  { ssr: false },
-);
-
 import type { WeeklyStatsResponse } from "@/app/api/weekly-stats/route";
 import type { MuscleSetsEntry } from "@/app/api/weekly-muscle-sets/route";
 import type { StrengthTrendEntry } from "@/app/api/strength-trend/route";
-import type { DayLogResult } from "@/app/api/day-log/route";
 import type { ProgressSummaryResponse } from "@/app/api/progress-summary/route";
 import type { ProgramSession } from "@trainingai/shared/types/program";
-import type { ActivityLog, ActivityType } from "@trainingai/shared/types";
 import type { UserGoals } from "@/lib/data/repository";
 import type { ActivityLevel } from '@trainingai/shared/types/user'
 import type { ReadinessScoreResponse } from '@/app/api/readiness-score/route'
 import { useBmiClassification, useWeightTrend, useEnergyBalanceToday } from "@/app/health/hooks/use-health-calcs";
-import { classifyHrResponse, type HrSessionState, type HrDataResponse } from "@trainingai/shared/workout/hr-session-state";
 import { useInvalidationRefetch } from "@/lib/hooks/use-invalidation-refetch";
 
 type Tab = "body" | "training" | "progress";
@@ -148,17 +135,6 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
   const [muscleSets, setMuscleSets] = useState<MuscleSetsEntry[] | null>(null);
   const [strengthTrend, setStrengthTrend] = useState<StrengthTrendEntry[] | null>(null);
   const [activeSessions, setActiveSessions] = useState<ProgramSession[]>([]);
-  const [dayOverlay, setDayOverlay] = useState<{
-    date: string;
-    data: DayLogResult | null;
-    loading: boolean;
-    expanded: string | null;
-  } | null>(null);
-
-  const [sessionHrData, setSessionHrData] = useState<Record<string, HrSessionState>>({});
-  const [historyExercise, setHistoryExercise] = useState<string | null>(null);
-  const [selectedActivity, setSelectedActivity] = useState<ActivityLog | null>(null);
-  const [activityTypes, setActivityTypes] = useState<ActivityType[]>([]);
 
   // ONLY the first-paint seed (Q-241): `userGoals` below supersedes them the moment it loads. See
   // the hook for why it re-reads on tabEpoch rather than on mount alone (Q-260).
@@ -351,13 +327,6 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         'user-goals', '/api/user/goals', TTL_MEDIUM,
         d => { if (d) setUserGoals(d) },
       ),
-      // Not read by any section renderer, but consumed by the log sheets this
-      // screen opens — keep it unconditional rather than tie it to a tab.
-      () => cachedFetch<{ activityTypes: ActivityType[] }>(
-        'activity-types', '/api/activity-types', TTL_LONG,
-        d => setActivityTypes(d?.activityTypes ?? []),
-        { freshWithinTtl: true },
-      ),
     ], 4);
   }, [fetchMeta]);
 
@@ -498,56 +467,14 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
       .catch(() => {});
   }, [userId, refreshVisibleHealthData]);
 
-  const fetchDayOverlay = useCallback(async (date: string) => {
-    await cachedFetch<DayLogResult>(
-      `day-log:${date}`, `/api/day-log?date=${encodeURIComponent(date)}`, DAY_LOG_TTL,
-      (data) => setDayOverlay(prev => prev ? { ...prev, data, loading: false } : null),
-    ).finally(() => setDayOverlay(prev => (prev && prev.data === null) ? { ...prev, loading: false } : prev));
-  }, []);
-
-  // Q-110: the calendar's day-tap opens the dedicated day screen, not the bottom sheet. The note
-  // here used to add "the overlay is still opened from other surfaces" — **that was wrong, and it
-  // is what kept the sheet alive**: `dayOverlay` starts null and every setter is a
-  // `prev => prev ? … : null` no-op or `null`, so nothing can open it. Retiring it is LB-1.
+  // Q-110: the calendar's day-tap opens the dedicated day screen, and since LB-3 that screen is the
+  // ONLY place a logged day is read or written. The bottom sheet that used to live here could not
+  // be opened by anything — `dayOverlay` started null and every setter was a `prev => prev ? … :
+  // null` no-op — so it, its day-log fetch, its per-session HR loader and the three sheets it was
+  // the only opener of are gone. The two worth keeping moved to `/health/day`.
   const handleDayClick = useCallback((date: string) => {
     router.push(`/health/day?date=${encodeURIComponent(date)}`);
   }, [router]);
-
-  const loadSessionHr = useCallback(async (workoutSessionId: string) => {
-    const existing = sessionHrData[workoutSessionId];
-    // Skip if a load is in flight or we already have real data; retry on the
-    // empty sentinels ('none'/'incomplete') so a later expand re-pulls once the
-    // background sync has landed (acceptance: renders on second expand at latest).
-    if (existing === 'loading') return;
-    if (existing && existing !== 'none' && existing !== 'incomplete') return;
-    setSessionHrData(prev => ({ ...prev, [workoutSessionId]: 'loading' }));
-    try {
-      // Re-attribute already-ingested BLE heart rate to this session before reading (mirrors the
-      // Done screen, done-screen.tsx). Fire it and ignore transport errors — the route itself is
-      // fail-soft and returns { success, readings }.
-      await fetch('/api/oura/hr-sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ workoutSessionId }),
-      }).catch(() => {});
-      const res = await fetch(`/api/oura/hr-data?sessionId=${workoutSessionId}`);
-      const data = await res.json() as HrDataResponse;
-      setSessionHrData(prev => ({ ...prev, [workoutSessionId]: classifyHrResponse(data) }));
-    } catch {
-      setSessionHrData(prev => ({ ...prev, [workoutSessionId]: 'none' }));
-    }
-  }, [sessionHrData]);
-
-  const refreshDayOverlay = useCallback(async (date: string) => {
-    setDayOverlay(prev => prev ? { ...prev, data: null, loading: true } : null);
-    await fetchDayOverlay(date);
-  }, [fetchDayOverlay]);
-
-  // LB-1: these four handlers now live in useDayEntryMutations, shared with /health/day — which is
-  // where the calendar's day-tap actually lands since Q-110. Keeping a second copy here was how the
-  // two paths would drift; there is one write path per domain and both callers use it.
-  const overlayDate = useCallback(() => dayOverlay?.date ?? "", [dayOverlay]);
-  const mut = useDayEntryMutations(userId, overlayDate, refreshDayOverlay);
 
   const lastSleep = sleepRows[0] ?? null;
   // Only treat sleep as "recent" if it's from last night or today — prevents
@@ -710,50 +637,6 @@ export default function HealthContent({ userId, sex: sexProp, heightCm: heightCm
         metaRecentReversed={metaRecentReversed}
         sleepReadings={[...sleepRows] as SleepDetailReading[]}
         initialSleepDate={initialSleepDate}
-      />
-
-      <DayOverlayDialogs
-        editEx={mut.editEx}
-        onEditExChange={mut.setEditEx}
-        onEditSave={mut.handleEditSave}
-        deleteEx={mut.deleteEx}
-        onDeleteExClose={() => mut.setDeleteEx(null)}
-        onDeleteExConfirm={mut.handleDeleteExercise}
-        deleteActivity={mut.deleteActivity}
-        onDeleteActivityClose={() => mut.setDeleteActivity(null)}
-        onDeleteActivityConfirm={mut.handleDeleteActivity}
-        deleteSession={mut.deleteSession}
-        onDeleteSessionClose={() => mut.setDeleteSession(null)}
-        onDeleteSessionConfirm={mut.handleDeleteSession}
-        mutating={mut.mutating}
-      />
-
-      <DayOverlaySheet
-        dayOverlay={dayOverlay}
-        setDayOverlay={setDayOverlay}
-        onClose={() => setDayOverlay(null)}
-        activeSessions={activeSessions}
-        activityTypes={activityTypes}
-        sessionHrData={sessionHrData}
-        loadSessionHr={loadSessionHr}
-        onEditExercise={mut.setEditEx}
-        onDeleteExercise={mut.setDeleteEx}
-        onExerciseTap={setHistoryExercise}
-        onDeleteSession={mut.setDeleteSession}
-        onSelectActivity={setSelectedActivity}
-        onDeleteActivity={mut.setDeleteActivity}
-      />
-
-      <ExerciseHistorySheet
-        exerciseName={historyExercise}
-        userId={userId}
-        onClose={() => setHistoryExercise(null)}
-      />
-
-      <ActivityDetailSheet
-        log={selectedActivity}
-        icon={activityTypes.find(t => t.id === selectedActivity?.activityType)?.icon ?? 'DotsThreeCircle'}
-        onOpenChange={open => { if (!open) setSelectedActivity(null); }}
       />
 
     </div>

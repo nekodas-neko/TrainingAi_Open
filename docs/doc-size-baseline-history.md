@@ -1982,3 +1982,28 @@ then up to 1148. Recorded as the single net change, since the branch squash-merg
 from the detour: do not ratchet a baseline down while the convention it measures is still being
 worked out — it bought nothing and had to be undone within the hour.
 
+
+---
+
+## 2026-08-24 — LB-3, the day-overlay retirement
+
+**`projectOverview.md` 7897 → 7900 (+3).** A four-line note for user-visible work, on a file that
+has sat at exactly its number for several PRs in a row.
+
+The trims were tried first and the raise is what is left. This PR's own note started at six lines
+and is now four; the two statements it had to correct elsewhere in the file (both said the sheet
+still existed and was reachable, which stopped being true here) were rewritten shorter rather than
+longer. That recovered three of the six. The rest is genuinely new.
+
+**What was NOT available, and it is worth recording because it is the mechanism the wrap-up rule
+points at first.** No fully-resolved Known Issue could be moved to `known-issues-resolved.md` to
+make the room: every ✅ entry scanned states what it still owes, and Q-479's says so outright —
+*"Kept here rather than archived: the PR states production and the 24-hour window were not exercised
+end to end… Archive it once that is confirmed against production."* Archiving one anyway to buy four
+lines would be exactly the thing that rule forbids.
+
+**The pattern behind the raise, for whoever reads this next.** Trimming to fit has meant editing
+other sessions' prose three times in one day, which is a worse cost than three lines — a session
+shaving a sentence it did not write, to fit a note about work it did, is how a shared file loses
+accuracy. If this recurs, the answer is a compaction sweep of the shipped-notes section, not a
+per-PR raise.
