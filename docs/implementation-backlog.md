@@ -3438,6 +3438,28 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [app-shell][devices] Q-316 — the frame packer has no button: `POST /api/oura-ble/samples/pack` can only be driven by curl
 
+> **✅ SHIPPED 2026-08-24 (Lane B, v1.363.3).** A third control in `db-footprint-card.tsx`'s ① Data
+> section. The `GET` count renders beside the button (*"N bucket(s) packable"* / *"no sealed buckets
+> to pack"*, disabled at zero) and the footprint reloads after each press, so `oura_raw_samples`
+> shrinking and `oura_raw_packed` growing show in the same table.
+> [`journal`](overview/entries/2026-08-24-frame-packer-control.md).
+>
+> **The confirm copy does NOT read like the VACUUM one**, per this entry's warning: it names what it
+> moves, that each blob is re-read and proved identical first, and that this is the only control here
+> that deletes archival frames at all. **A refusal is surfaced as a finding** — the summary carries
+> "⚠ N refused and left intact" and each refused bucket is listed with epoch/tag/ds-bucket/frames and
+> the server's reason, so it can never read as "packed 0".
+>
+> **Verified on `pnpm dev`** against a seeded sealed bucket: idle count `1 bucket(s) packable`; a real
+> press moved 40 frames (`oura_raw_samples` 242 → 202, `oura_raw_packed` 0 → 1) and flipped the count
+> to zero. **NOT exercised:** a genuine refusal — only its rendering, by substituting the response;
+> forcing a real verify mismatch is the server's path and was already proven by Lane A.
+>
+> ⚠️ **The card is APK-only.** `DbFootprintCard` renders inside `OuraBleDebug`, which shows the
+> native-unavailable banner and nothing after it without the plugin (the gate BF-10 documented).
+> Everything above was driven by mounting the card directly, off the gated page.
+- **Keep:** the on-device check of the button in its real home. `Gate: device`.
+
 - **Lane B.** `components/oura-ble/db-footprint-card.tsx` only — the route, the repository method and
   the slice all exist and are Lane A's, already shipped.
 - **Added:** 2026-08-18 (filed by Lane A, which does not own `components/**`)

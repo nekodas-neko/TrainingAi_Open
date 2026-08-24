@@ -6,6 +6,13 @@ export interface ChangelogEntry {
 
 export const CHANGELOG: ChangelogEntry[] = [
   {
+    version: "1.363.3",
+    date: "2026-08-24",
+    changes: [
+      "The raw-frame packer, which compacts old ring data to reclaim database space, now has a button in the BLE console instead of being command-line only. It shows how much is left to pack, and any bucket it refuses to compact is listed with the reason rather than counted as nothing done.",
+    ],
+  },
+  {
     version: "1.363.2",
     date: "2026-08-24",
     changes: [
