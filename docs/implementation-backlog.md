@@ -1466,6 +1466,48 @@ whether or not anyone draws them first.
   *any* create-new affordance or becomes pure-picker with a "New Meal" handoff to Build a Meal.
 - **Surface:** web-reproducible, no device needed — this is a screen-placement question, not native.
 
+- **2026-08-24, same day — owner expanded the ask with two more pieces and a priority order.** Owner:
+  *"the meal creator should 1. be able to look at a URL or image and create a meal from each item. I
+  think more focus should be on the meal creator first to have a good and functionable UI to create
+  meals. then in the meal planner it prefers meals already in the planner and adds other meals around
+  it or similar to it. but i guess it would only try match 1 meal to one meals macros a day. there is
+  work that can be done here to create a meal plan based on well thought out meals."*
+  1. **Priority: Build a Meal comes first, on its own merits, before the meal-planner integration
+     above.** Read as sequencing, not scope-cutting — the rest of this entry stands, this just orders
+     it.
+  2. **Multi-item detection is a real gap, traced.** `ScanSchema` in `app/api/nutrition/scan/route.ts`
+     (lines 29-40) returns exactly **one** `name` + one `ingredients[]`, for every input mode —
+     image, URL and text alike. The image-mode system prompt is explicit that this is by design:
+     *"For a simple single food... return exactly one ingredient covering the whole portion"* — there
+     is no schema shape for "this photo/page shows N distinct dishes; here are N meals." A photo of a
+     week's meal-prep containers, or a recipe blog's "5 lunches" roundup page, gets forced into one
+     `identified`/`ingredients[]` result today — most likely a wrong or merged estimate, not a clean
+     failure. This is new scope on top of BF-11's original ask (which only asked where the *existing*
+     single-item URL scan should live) and belongs on the plan as its own line: the schema, the
+     prompt and the picker UI (which currently assumes one result per scan call) all need to handle
+     an array.
+  3. **The owner's guess about the meal-planner is correct — confirmed against
+     `app/api/nutrition/meal-plans/generate/route.ts`.** `keepSavedMealIds` meals (`kept`, line 130)
+     are NOT built around — `splitMacrosAcrossMeals` (line 250) divides the day's total macros into
+     `mealCount` slots **first**, independently of which meals are kept, and each meal (kept or
+     generated) is then scaled/topped-up (`scaleWithTopUp`, line 270) to fit only its own
+     pre-assigned slot. The model generating the remaining slots is told only that kept meals are
+     *"not yours to change... everything you return must be genuinely DIFFERENT"* (line 202) — a
+     difference instruction, not a complementary or macro-aware one. So: **exactly one meal is
+     matched to exactly one slot's macros, precisely as the owner suspected**, and nothing in this
+     route ever searches the saved-meals library to fill a remaining slot — every non-kept slot is
+     always a fresh AI-generated recipe. There is no "day plan built from a library of well-thought-
+     out meals, matched against what's left of the day's budget" mode at all today.
+  4. **What a plan for the meal-planner half would need to design, not decided here:** whether
+     remaining slots first search the saved-meals library for a macro-fitting match before falling
+     back to AI generation; how "prefers meals already in the planner" composes with the existing
+     "genuinely different" instruction (own-library meals presumably CAN repeat style/ingredients
+     with each other, unlike AI-generated ones); and whether matching stays 1-meal-to-1-slot or a day
+     can be assembled from multiple partial-macro library meals plus fill food, which is a larger
+     change to `scaleWithTopUp`'s single-meal contract.
+  5. **Scope note:** items 2 and 3 above extend BF-11 rather than replacing it — the original
+     "move URL scan to Build a Meal" ask is unaffected and still the first, smaller piece to plan.
+
 ### [nutrition][platform] Q-407 — the meal-plan wizard is seven screens for six answers, and the one piece the Coach lacks is multi-select
 
 - **Branch:** `feat/nutrition-coach-meal-plan`
