@@ -355,6 +355,61 @@ work is to bring them down, and **it is not a separate task**: a baton is rewrit
 handoff, so each role compacts its own on its next one, moving narrative to a dated handoff doc.
 Close this when all five are under ~150 lines.
 
+### [nutrition][platform] BF-12 — logging a saved meal takes ~20s and the owner couldn't find it after navigating away; traced to the slow fallback firing, not a lost write
+
+- **Lane: A** — the fix is in `logMealItems`/local-store availability, not the UI. No schema.
+- **Added:** 2026-08-24 · owner: *"nutrition is loading very slow; about 20 seconds from clicking
+  log to having it show up — when I swapped pages I see that it isn't in the nutrition log anymore
+  so maybe not going through properly."* Screenshot: `saved-meals-sheet.tsx`'s "Build a Meal" list,
+  **Ninja Creami Protein Ice Cream**'s "Log this meal" mid-spin.
+- **Checked production directly (`claude_ro.food_logs`, owner's rows, `date = 2026-08-24`) — the
+  writes are NOT lost, and they carry a specific fingerprint.** Two bursts land right at the
+  reported time (9:14–9:15pm Brisbane / 11:14–11:15 UTC): `BARILLA Spaghetti Protein` /
+  `Turkey Mince` / `Passata` (three rows, `updated_at` 11:14:17.072 / .457 / .886 — **staggered
+  ~0.4s apart**) and `Whey Protein Isolate` / `Full Cream Milk` (11:15:12.513 / .977, same ~0.46s
+  stagger). A local-first batch write would land these together in one JS tick; **a per-item
+  sequential network round trip would not** — this is the fingerprint of `logMealItems`'s **web
+  fallback branch**, not its local-store branch.
+- **Traced to source: `packages/shared/src/nutrition/log-meal.ts`.** `logMealItems` has two paths.
+  When `getLocalStore(userId)` returns a real store, every write is local-first (SQLite upserts,
+  `await`ed but not network-bound) and the function returns immediately with optimistic entries —
+  fast, matching the "saves feel instant" rule. **When `getLocalStore` returns `null`, it falls
+  through to a `for` loop of sequential `await fetch('/api/nutrition/food-logs', ...)` calls, one
+  per ingredient** (lines 97-110) — exactly the "never await POSTs serially in a loop" pattern
+  CLAUDE.md already names as a smell elsewhere in this codebase. For a 2-3 item meal that's 2-3
+  sequential round trips, which the production timestamps confirm are actually happening — though
+  0.4-0.9s of measured DB-write gap alone doesn't account for the full ~20s the owner felt; the rest
+  is plausibly per-request network/API latency between those writes, not visible from `updated_at`
+  alone.
+- **What makes `getLocalStore` return null on a real device: `isLocalStoreDead()`**
+  (`lib/sqlite/sqlite-service.ts`, the "K4" state) — the on-device SQLite DB failed to open. This is
+  documented as a real, recoverable-only-by-reinstall-or-retry failure mode elsewhere in this repo's
+  migration rules, not hypothetical. **There is already a visible banner for exactly this state**
+  (`components/shell/local-store-dead-banner.tsx`, "Local storage unavailable — saving online
+  only") — neither screenshot shows it, but the banner renders above the sheet and could be
+  occluded; this needs an on-device check, not a guess from the screenshot crop.
+- **The "vanished after navigating away" half is not fully explained by the above, and is flagged
+  open rather than diagnosed.** Once a fallback-path write lands server-side (confirmed above,
+  eventually), `invalidateNutritionWrite()` does cover the `nutrition-food-logs-` prefix
+  (`lib/cache-groups.ts:445`) and `useFoodLogsLoader`'s local-store-absent branch re-fetches through
+  `cachedFetch` against that same key — so a plain re-render should show it once the fetch settles.
+  Two things this entry does NOT resolve: (1) whether the specific "Ninja Creami" tap shown
+  mid-spinner in the screenshot is among the rows that landed, or whether that specific request was
+  abandoned (e.g. navigating away before a sequential fetch chain completes, in a WebView, has not
+  been checked); (2) whether "not there" meant genuinely absent on a fresh load, or present but not
+  yet re-painted because the owner looked before the ~20s chain finished.
+- **What would confirm the mechanism:** on-device, check whether `LocalStoreDeadBanner` is showing,
+  or read `isLocalStoreDead()`/`getLocalStore(userId) === null` via an admin console during a
+  reproduction. If confirmed dead, the underlying fix is whatever heals K4 (a retry path, or at
+  minimum surfacing the failure loudly enough that "slow" doesn't read as "broken") — this entry
+  does not scope that fix, only the trace to it.
+- **What would count as fixed:** logging a saved meal on this device completes in the sub-second
+  range the local-first path is designed for, or — if the local store is genuinely and permanently
+  dead on this install — the banner is visibly showing so the 20s delay reads as "expected, online
+  only" rather than "broken."
+- **Surface: device-only to confirm.** The mechanism traces cleanly from code + production data, but
+  confirming *why* this specific device's local store is null needs the device.
+
 ## Nutrition — pushed to the top, 2026-08-24 (owner request)
 
 *"push the nutrition work closer to the top"* — BF-11 and Q-407 moved up from their prior position
@@ -6651,6 +6706,33 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Needs the owner, not just an implementer** — the capture step is physical (an actual counted
   walk/run/lifting session with the ring on), via the plan's referenced admin device-data capture
   panel or an ad-hoc capture. No code review substitutes for real frames.
+- **2026-08-24 — a third false-positive incident, and it rules out the one gate that exists.**
+  Owner: *"activity still detects for doing nothing — I have been sitting at computer for over an
+  hour."* Notification shown: `TrainingAI · Oura Ring` / `Connected · 52% battery` alongside
+  `Activity detected · Recording your walk or run…`. Sitting at a desk is not a tracked workout, a
+  Guided Walk, or a manual "Other Activity" session, so `isWorkoutInProgress`/`isGuidedWalkActive`/
+  `isActivityActive` — the only gate `dispatchGate` has against a false arm
+  (`auto-detection-service.ts:303-308`) — never engages here. This is a plain sedentary false
+  positive, not the "phantom walk during training" case Q-68/the workout gate were built for, and it
+  needs the same uncalibrated-band fix this entry already tracks, not a new gate.
+- **The 90-second sustained-window requirement (`gait-confirm.ts`, `CONFIRM_WINDOW_COUNT = 3`) is
+  not enough on its own to explain the OLD priors surviving this long, and worth recording why:**
+  it correctly rules out a single stray reading (one bad window can't confirm), but if desk-bound
+  micro-motion — typing, adjusting the ring hand, reaching for a mouse — happens to sit inside the
+  uncalibrated 1.4–2.4 Hz "walk" band for three consecutive ~30 s windows, the streak requirement is
+  satisfied by noise just as easily as by a real walk. The sustained-window gate defends against
+  *brief* false positives; it was never meant to defend against *wrong bands*, which is exactly
+  what's flagged above and still unfixed.
+- **Also worth noting for whoever runs the capture:** `shouldNotifyRingConfirmedActivity`
+  (`auto-detection-service.ts:127-140`) unconditionally trusts a ring confirmation whenever GPS has
+  fewer than 2 points (`if (args.pointCount < 2) return true`) — correct and deliberate per Q-68,
+  since a genuine indoor walk can have no GPS fix at all. But it means a stationary desk session
+  (no real movement, so GPS realistically never accumulates 2 points either) gets **zero**
+  corroboration from the one signal that could have vetoed it. Not a new bug to fix — Q-68's
+  design already chose this tradeoff on purpose — but it's why this specific scenario (sitting,
+  indoors, no GPS signal) is the least defended case today, and worth having in mind when picking
+  which sessions to capture for calibration: a real "sitting at a desk" idle capture, not just the
+  lifting-session one already named, would test exactly this path.
 
 ### [platform] Q-220 — every session pays ~194,000 tokens of orientation before it starts
 
