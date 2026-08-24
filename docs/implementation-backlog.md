@@ -382,7 +382,8 @@ itself warns against. It stays queued as the home of its ratchet, not as work.
 - **Achievable** — Q-401 is small, self-contained and independent of the rework. (**Q-399 and Q-402
   are done** — v1.325.0 gave the default label its three ingredient lines at 0.401 mm per module,
   and v1.325.1 gave the cache an invalidation signal so Home's energy card stops freezing.)
-  Q-387's wiring is a shared-module change and can run in parallel in the other lane.
+  (**Q-387 is done too** — its shared-module wiring shipped 2026-08-19 and its button, Undo and
+  N-of-10 counter in #330.)
 - **Not a one-day job** — Q-395 is a full rework across six screens, gated behind extracting
   `food-row.tsx` because both landing files sit on the 800-line limit. Q-398 wants that row component
   first. **Q-396 and Q-400 need a new APK**, so they cannot complete in a single web-deploy cycle
@@ -964,147 +965,6 @@ residual into a correction rather than a mystery.
   windows, applied to active energy everywhere at once, holding at exactly 1.0 whenever the gates fail
   — and a written measurement of how many past days it moved.
 
-### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
-
-- **✅ THE LANE A HALF SHIPPED 2026-08-19. WHAT REMAINS IS LANE B'S: the button and the counter.**
-  Done: `day_checkins.food_logging_completed_at` (migration **201**, local SQLite **v27**, both sync
-  directions, `claude_ro` views **202**), `POST /api/food-logging-complete` with its Undo, and
-  `estimateMaintenance` filtering on the flag instead of `intakeKcal > 0`. The partial-day case the
-  module had **zero** coverage of now has five tests, plus an end-to-end pair through
-  `computeEnergyBalance`. [`Journal`](overview/entries/2026-08-19-tdee-day-completeness.md).
-- **⚠️ Until the button ships, the calibration cannot engage** — no day can be marked, so every day
-  is excluded and `source` stays `'formula'`. That is the intended failure mode ("the estimate
-  waits", not "the estimate is quietly wrong") and it costs nothing today, because per Q-302 **0 of
-  the last 30 rolling windows** cleared `MIN_LOGGED_DAYS` anyway. It does mean the feature is inert
-  until Lane B lands.
-- **Still open — Lane B:** the *"Complete Today's Logging"* button as the last element in the day's
-  scroll (not the header, not beside the ring), the copy beneath it, the receipt-with-Undo it
-  becomes, and the **"N of 10 days" counter shipped with it, not after** — the button feeds
-  something invisible, and that invisibility is why this bug survived. `POST /api/food-logging-complete`
-  takes `{ date?, complete }` and answers `{ date, complete, completedAt }`; sending
-  `complete: false` is the Undo.
-
-- **Branch:** `fix/tdee-partial-day-completeness`
-- **Added:** 2026-08-17 · owner: *"How does the nutrition tracker make a baseline? It requires x
-  amount of days for tuning. But what is the control in place if I just log breakfast/lunch and skip
-  the rest? does it assume thats all I had for the day and tune around that? Need some control
-  around this. either a "complete day" option so it goes into "tuning" OR x% below the expected to
-  assume "not completed"."* No screenshot — this is a question about the model, and the answer is
-  that the owner's suspicion is correct.
-- **Answer to the question as asked: yes, it assumes that is all you ate, and it tunes around it.**
-  There is no completeness concept anywhere in the path.
-
-**Confirmed root cause.** `packages/shared/src/nutrition/adaptive-tdee.ts:96` decides what a
-"logged day" is with a bare non-zero test:
-
-```ts
-const logged = sorted.filter(d => d.intakeKcal != null && d.intakeKcal > 0)
-```
-
-A day carrying one 200 kcal apple is a logged day at 200 kcal. It counts toward `MIN_LOGGED_DAYS`
-*and* enters `meanIntakeKcal`, the entire left-hand term of the estimate
-(`maintenance = meanIntake − Δweight × KCAL_PER_KG / days`). The window is built at
-`lib/health/energy-balance-service.ts:151-158` straight from `intakeByDate` with no filter.
-
-**Two partial-day protections exist, and neither covers this** — which is what makes it easy to
-miss. (1) A day with *nothing* logged is `intakeKcal: null`: excluded from the mean, still counted
-in the window. Correct and deliberate. (2) **Today** is excluded from the window entirely, and the
-comment at `energy-balance-service.ts:146-150` spells out this very bug while solving only the
-in-progress half of it: *"a day in progress has only part of its food logged, so including it drags
-the mean intake down… Same partial-day trap as the Oura `wornHours` mistake."* A **past** day
-abandoned halfway is byte-for-byte identical to a completed light day. The author saw the trap,
-fixed the version that self-corrects by evening, and left the version that never does.
-
-**Measured with the real module** (`estimateMaintenance`, 14-day window; true maintenance 2600,
-eating 2600, weight perfectly stable, all 14 days carrying a log; "partial" = breakfast+lunch at
-1400, dinner never logged):
-
-```
-partialDays  daysLogged  meanIntake  maintenance  confidence  excludedReason
-0            14          2600        2600         medium      null
-6            14          2086        2086         medium      null
-14           14          1400        1400         medium      null
-```
-
-Linear at **86 kcal per partial day**, and every row passes every gate — `excludedReason: null`,
-`confidence: medium`. At a realistic 6-of-14 the number is 514 low and looks exactly as trustworthy
-as a correct one. `MIN_PLAUSIBLE_MAINTENANCE = 1000` never fires; even 14-of-14 lands at a
-"plausible" 1400.
-
-**It reaches the prescription, not just a card.** `energy-balance-service.ts:180` feeds it to
-`targetFromMaintenance(maintenanceKcal, goalDeltaKcal)`, so the **recommended daily calorie target
-inherits the full error**, with a cut's negative `goalDeltaKcal` on top — the app telling an
-under-logger to eat hundreds of kcal below real maintenance, which is the direction of harm the
-module's own header calls "actively harmful advice". `restingBaseKcal` (`:172-174`) derives from it
-too, so the Balance card's "burned" figure is dragged down in step.
-
-- **Not a duplicate**, checked against both surfaces. **Q-302** is the same module, opposite concern
-  (the gate invisible when it *blocks*; this is it passing when it should not). **Q-303** is AI
-  coaching on sparse days, not the calibration input. `projectOverview.md`'s 2026-08-11 entry
-  presents protections (1) and (2) as the complete story — the claim this corrects.
-- **Latent, and about to stop being.** Per Q-302, 0 of the last 30 rolling windows clear
-  `MIN_LOGGED_DAYS`, so nothing wrong is shown today. It arms the moment the owner does the thing
-  this question is about: logs consistently enough to switch tuning on.
-- **Evidence that would confirm it end-to-end** (not gathered): seed 14 local days with ~6 carrying
-  only breakfast+lunch, call the route wrapping `computeEnergyBalance`, and compare
-  `maintenance.kcal` / `target.recommendedKcal` against the same window fully logged. Expect ≈500
-  kcal of delta, `confidence: 'medium'` and no `gapMessage` on either run.
-
-**On the owner's two proposed controls — one is sound, one has a trap, and there is a third:**
-
-1. **Explicit "complete day" marker** — sound, and the only option that can be *right* rather than
-   probably-right. Cost is adoption: an unmarked day becomes a gap, and the gate already fails at
-   1–4 logged days per 14, so a marker makes `MIN_LOGGED_DAYS = 10` strictly harder to reach.
-   **Design it with Q-302** — the "you have 4 of 10 days" copy Q-302 asks for is the natural place
-   to say "3 of those aren't marked complete". `day_checkins` already has an `evening` phase
-   (`lib/data/postgres/schema.ts:447-451`), so this need not be a new surface.
-2. **"x% below expected ⇒ not completed"** — **do not ship as specified.** It is circular:
-   "expected" is the calorie target, derived *from* maintenance, which is the number being
-   estimated, so a low estimate lowers the threshold and admits more partial days next window.
-   Worse, a genuinely low day (fasting, illness, a hard deficit) is exactly the observation the
-   calibration needs, and discarding it biases maintenance **high** — trading one wrong direction
-   for the other. Any threshold must key off something outside the loop, e.g. the formula baseline.
-3. **Infer completeness from logging shape, no new user action** — `food_logs` carries `mealTypeId`
-   and `loggedAt` (`schema.ts:554-563`), so "did this day span the usual meal types, and did logging
-   continue past the usual last-meal hour" is answerable from stored data, needs no marker, and is
-   not circular. Weaker than an explicit marker, better than a kcal threshold. Worth costing before
-   choosing 1, since it can *seed* the marker's default so the user confirms rather than authors.
-
-- **What would count as fixed:** a day the user did not finish logging can no longer enter
-  `meanIntakeKcal` as though complete — by marker, inference, or both — and the table above
-  collapses so partial days push `maintenanceKcal` toward `null` (an honest "not enough data")
-  rather than toward a confident wrong number. Whichever mechanism is chosen,
-  `adaptive-tdee.test.ts` gains the partial-day case it currently has **zero** coverage of: the
-  module is well-tested for empty days and has never been tested for half-full ones.
-- **Surface:** no device or production data required — shared-module logic plus a service wrapper,
-  reproducible in `pnpm dev` against the seeded DB and unit-testable directly. Only a "complete day"
-  control, if option 1 is chosen, would need a device check.
-
-
-**✅ THE CONTROL IS DECIDED — owner, 2026-08-18.** *"A button at the bottom of the log after the last
-meal that says 'Complete Today's Logging'"*. That is **option 1**, the explicit marker, and it is the
-one this entry recommended. Options 2 and 3 are closed: option 2 was circular by construction, and
-option 3 (silent inference) cannot be corrected by the person who knows the answer.
-
-**Where it goes and what it says.** The last element in the day's scroll, after the final meal group
-— not in the header, not beside the ring. It is a statement about a day that has finished, and its
-position should say so. Copy beneath it, because the reason is not guessable: *"Tells the app this
-is everything you ate. Only completed days are used to work out your maintenance calories."*
-Completing swaps the button for a receipt carrying an **Undo** — a day marked complete by accident
-must be reversible, since the whole point is that a wrong day poisons the estimate.
-
-**Ship the counter with it, not after it.** The button feeds something invisible today, and that
-invisibility is why this bug survived: nothing on any screen said how many usable days the estimate
-had. Pair it with the "N of 10 days" strip drawn on the mockup — which is also the copy Q-302 asks
-for, so the two land together rather than one inventing a second version of the other.
-
-**Wiring, in one PR:** the completeness flag is what `adaptive-tdee.ts:96` filters on, replacing the
-`intakeKcal > 0` test that treats one apple as a logged day. A day with no flag is **excluded**, not
-assumed complete — the failure mode has to be "the estimate waits" rather than "the estimate is
-quietly wrong". Backfill is deliberately **not** attempted: past days have no flag and cannot get an
-honest one, so the estimate starts from days marked after this ships and the counter shows that
-plainly.
-
 ### [nutrition][app-shell] Q-406 — the shared food row: two call sites converted, two waiting on their phase
 
 - **Branch:** `refactor/nutrition-food-row`
@@ -1266,8 +1126,9 @@ a fate — finding 1 is the former only.
   ownership; Nutrition Settings gets a row that jumps to it. They are profile-level facts like
   weight, and moving them is churn — but editing them two tabs from where they are judged is the
   friction the shortcut removes.
-- **"Complete Today's Logging" is a button at the foot of the day's log** — see **Q-387**, where the
-  decision and its wiring live.
+- ~~**"Complete Today's Logging" is a button at the foot of the day's log**~~ — **shipped** (Q-387,
+  Lane A half v1.319.x, Lane B half #330). It is **no longer at the foot**: BF-6 moved it directly
+  under the meals in v1.344.0 because at the foot it took zero presses in seven weeks.
 - **The meal plan becomes a generator of saved meals** — see **Q-398**.
 
 **11 — THE DIRECTION IS SETTLED, AND IT IS BIGGER THAN A VISUAL PASS (2026-08-18).** The owner sent
