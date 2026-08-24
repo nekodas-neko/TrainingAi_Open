@@ -403,6 +403,41 @@ so v5 and v6 days are never pooled — `docs/body-battery-tuning.md` depends on 
 stable by construction, so charge goes near-constant and a genuinely restful day stops reading as
 one — the "treadmill" the activity-goal volume lane already removed (Q-190).
 
+- ✅ **THE ENABLING REFACTOR SHIPPED 2026-08-24 (Lane A).** The walk is now
+  `walkBodyBattery()` in `packages/shared/src/health/body-battery-walk.ts` — the arithmetic was
+  welded into a ~200-line DB-bound function, which is *why* the only evidence so far is a SQL
+  replay. It is now callable directly. Behaviour unchanged, `MODEL_VERSION` untouched.
+  [`Journal`](overview/entries/2026-08-24-battery-walk-extract.md).
+  - **The change is confirmed to be a one-parameter substitution.** `restThreshold` is a reserve
+    fraction, so the explicit bpm offset is `offsetBpm / reserve` and nothing else in the walk
+    moves. Two tests pin it: the ceiling sits at exactly `restingHr + offsetBpm` for reserves of 80,
+    100 and 137, **and it is immune to `hrMax` re-estimation while the fraction form is not** —
+    reproduced against the 2026-08-05 step (187 → 168) that caused this. So the calibration PR is a
+    constant plus a `v6` bump, not a rewrite.
+- ⛔ **THE FIT CANNOT BE DONE FROM AN AGENT SANDBOX — measured 2026-08-24, not assumed. Read this
+  before attempting it, or you will rediscover it.** The entry requires the fit to include the
+  stress term. `buildDaytimeStressSeriesFromModel` needs `DaytimeStressConstants`, which are
+  `.constants.json` files **downloaded at boot** into `OURA_CONSTANTS_DIR` (or `.oura-constants`).
+  **Q-49 removed them from the repository**, and neither path exists in a session container — so the
+  stress function cannot execute here at all. That is the same absence that makes TN-4's
+  `daytime-stress: constants not set` reproducible locally.
+  - **Two further obstacles, each independently sufficient**, so this is not one missing file:
+    **(a)** `oura_raw_samples` retains only the hot tier — production holds **170,406 rows reaching
+    back only to 2026-08-17**, about 7 days of the 56 the pass test needs, because Q-541's packer
+    moves sealed buckets to `oura_raw_packed`. **(b)** `decoded` is **NULL on every one of those
+    rows** (ingestion culling — it is re-derivable from `body_hex`), so temp/met would have to be
+    decoded from packed `blob`s keyed by ring-clock `ds_bucket`, which needs the same absent
+    constants again.
+  - **What this rules out:** fitting the offset without the stress term and shipping it anyway. The
+    entry already warns that the stress term pushes real ends **below** the replay table, which is
+    the whole reason the bracket is +8…+12 rather than the table's apparent +10. A number fitted
+    without it would be the exact overshoot the +18 note exists to prevent — and it re-scores the
+    owner's history.
+  - **Who can do it:** a context with the constants present — the Railway runtime itself, or a
+    machine holding the vendored directory. The cheapest shape is probably an admin-gated,
+    owner-triggered replay endpoint that runs `walkBodyBattery()` server-side across a bracket and
+    returns the four pass-test numbers per offset. **That is new work and is not scoped here.**
+
 ### [readiness] TN-3a — the per-bucket daytime-stress series is computed and thrown away
 
 - **Branch:** _unassigned_
