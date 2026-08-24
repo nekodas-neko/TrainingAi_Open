@@ -488,11 +488,47 @@ Trigger it on context pressure, on an owner reset, or on finishing a cluster:
    index, the backlog, the journal entry.
 5. **Never write "done" for anything not in a committed diff and observed working.** State which
    failure surfaces were not exercised — device, native, safe-area, prod-data — every time.
-6. **Flip your trailing light to 🔴**, per the subsection above, and name the successor's exact
-   title in your closing message. Do this last — after the baton and every PR have landed.
+6. **Flip your trailing light to 🔴**, per the subsection above.
+7. **Create your successor**, per the subsection below, and name its title and model in your closing
+   message. This is genuinely last — the successor reads the baton you just pushed.
 
 The successor starts from the same prompt in [`prompts/`](prompts/), which tells it to read its own
 baton first. No prompt needs editing between generations; the baton carries the change.
+
+### Creating your successor
+
+The outgoing session creates the incoming one, with `create_session` on the `claude-code-remote`
+MCP server. This exists because **a session's model is fixed at creation and cannot be changed
+afterwards** — so the only moment the assignment in §6 can be applied is the moment the session is
+made. Leaving that to a person meant it was never applied at all: the six agents started after the
+assignments shipped all came up on whatever the UI defaulted to.
+
+Pass four things:
+
+| Field | Value |
+|---|---|
+| `title` | your own title with a green light — `🚧 Implementation Agent (A) 🟢` |
+| `model` | your role's model from §6 |
+| `prompt` | everything **below the `---`** in your `prompts/<role>.md` |
+| everything else | omit — environment and permission mode inherit from you |
+
+**`create_session` takes no effort parameter.** Model is settable, effort is not, so the successor
+inherits rather than getting its role's level. Its own first action re-reads both and reports a
+mismatch, which is how the owner learns to adjust it — the self-check is not redundant with this
+step, it is what covers the half this step cannot set.
+
+Three guards, all of which exist because this spawns a live session that starts working:
+
+- **One successor per session, ever.** If a handoff is retried, do not create a second. A spawn
+  loop is the failure mode with real cost attached, and nothing else stops it.
+- **Only after the baton is committed AND pushed.** The successor's first act is to read it. A
+  successor created against an unpushed baton reads last week's state and is worse than none.
+- **Standing roles only.** An ad-hoc session (`Token usage investigation 🟢`) has no successor and
+  no baton; it wraps and stops.
+
+If `create_session` fails, say so in your closing message with the title and model the owner should
+use — do not retry it, and do not leave the handoff looking complete when the successor does not
+exist.
 
 ---
 
