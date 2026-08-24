@@ -27,6 +27,10 @@
 **Version:** v1.318.10 · **Branch:** `main` · Railway auto-deploys on push to `main`.
 **Last updated:** 2026-08-24.
 
+**"Nine hand-rolled collapsible toggles missing `aria-expanded`" was actually two (Q-491)** — one
+retired, four already Radix `Collapsible`, two a back-button chevron. `weights-summary.tsx`/
+`added-weight-toggle.tsx` were real, now fixed. A ratchet heuristic matched 34 files, mostly noise.
+
 **The end-of-workout "How hard was that session?" prompt is gone (Q-420).** The owner can't judge a
 whole session as one number (25.6% fill rate agreed); `sessionEffort()` already derives it from set
 RPEs at read time (Lane A, no schema change) — the done screen's own kcal estimate needed no change.
@@ -161,12 +165,10 @@ and reports success. The web fallback treats a 404 the same as success rather th
 by sample index, so a night-only SpO₂/HRV signal renders with dead space either side, not apparent
 24-hour coverage. Native-gated — verified by mounting the component off the gated page. `Gate: device`.
 
-**Coach undo wrote over whatever was there (Q-468).** Apply refuses a moved target; undo read its
-captured `beforeState` and wrote it back. Two stacked changes on one exercise: undoing the *first*
-returned the row to its original value while the history still showed the second in effect, and
-undoing both left a value the user never chose. `driftAgainst` now takes a side — `from` for apply,
-`to` for undo — and the check runs once centrally rather than five times. Latent: nothing calls the
-undo route yet (Q-467), and production's `coach_changes` is empty.
+**Coach undo wrote over whatever was there (Q-468).** Two stacked changes on one exercise: undoing
+the *first* returned the row to its original value while the history still showed the second in
+effect. `driftAgainst` now takes a side — `from` for apply, `to` for undo — checked once centrally.
+Latent: nothing calls the undo route yet (Q-467), production's `coach_changes` is empty.
 
 **The worse sync failure had the softer handling (Q-476).** A mutation rejected by the push route's
 schema was deleted forever — no badge, no toast, no retry — while one that failed a layer later got
