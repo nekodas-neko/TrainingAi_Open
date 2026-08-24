@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useTransitionRouter } from "@/lib/view-transition";
 import { cachedFetchToday, cachedFetch, readTodayCacheSync, readCacheSync } from '@/lib/sqlite/cache'
 import { getLocalStore } from '@/lib/local-store'
@@ -48,6 +49,7 @@ interface CardioWeekQuota {
 }
 
 export function RunningPlanContent({ userId }: { userId: string }) {
+  const tz = useUserTimezone();
   const router = useTransitionRouter()
   // Starting the prescribed run hands off to /activity — the screen's primary action, and
   // a button push gets no automatic prefetch (#919).
@@ -135,12 +137,12 @@ export function RunningPlanContent({ userId }: { userId: string }) {
   useEffect(() => {
     const store = getLocalStore(userId)
     if (!store) return
-    const today = todayInTz()
+    const today = todayInTz(tz)
     store.getPrescribedRuns(today).then((runs) => {
       const todays = runs.find((r) => r.date === today)
       if (todays) setLocalStatus(todays.status)
     }).catch(() => {})
-  }, [userId, data])
+  }, [userId, data, tz])
 
   // Manually pick a different run structure/duration for today — the carousel-native
   // alternative to a separate Skip concept (Q-98-followup). Resets status to pending if it had

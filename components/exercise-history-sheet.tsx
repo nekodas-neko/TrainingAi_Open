@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { ExerciseHistoryEntry, ExerciseHistoryResponse } from "@/app/api/exercise-history/route";
 import { displayOneRmSeries, oneRmLabel, oneRmUnit } from "@trainingai/shared/1rm";
@@ -21,6 +22,7 @@ interface ExerciseHistorySheetProps {
 }
 
 export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClose }: ExerciseHistorySheetProps) {
+  const tz = useUserTimezone();
   const [entries, setEntries] = useState<ExerciseHistoryEntry[]>([]);
   const [exerciseType, setExerciseType] = useState<'weighted' | 'bodyweight'>('weighted');
   const [loading, setLoading] = useState(false);
@@ -33,7 +35,7 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
     // Seed from local store before the network resolves
     const store = userId ? getLocalStore(userId) : null;
     if (store) {
-      const cutoffStr = shiftDateStr(todayInTz(), -90);
+      const cutoffStr = shiftDateStr(todayInTz(tz), -90);
       store.getWorkoutHistory(cutoffStr).then(history => {
         if (cancelled) return;
         const localEntries: ExerciseHistoryEntry[] = [];
@@ -75,7 +77,7 @@ export function ExerciseHistorySheet({ exerciseName, muscles = [], userId, onClo
       },
     ).finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
-  }, [exerciseName, userId]);
+  }, [exerciseName, userId, tz]);
 
   // Bodyweight estimates are BW_REF-relative, so the whole panel — stat, chart and delta —
   // works in reps (audit finding Q-12). Converting up front keeps the chart and the numbers

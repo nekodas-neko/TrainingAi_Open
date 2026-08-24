@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChanged, userId }: Props) {
+  const tz = useUserTimezone();
   const [editTarget, setEditTarget] = useState<Supplement | 'new' | null>(null)
   const [name, setName] = useState('')
   const [dose, setDose] = useState('')
@@ -66,7 +68,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         await store.queueMutation({
           userId: userId!,
           domain: 'supplements',
-          date: todayInTz(),
+          date: todayInTz(tz),
           payload: { id, name: record.name, dose: record.dose, reminderEnabled, reminderTime: record.reminderTime, sortOrder, active: true },
         })
         const supplementRecord: Supplement = {
@@ -145,7 +147,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         await store.queueMutation({
           userId: userId!,
           domain: 'supplements',
-          date: todayInTz(),
+          date: todayInTz(tz),
           payload: { id, deleted: true },
         })
         onChanged(supplements.filter(s => s.id !== id))
@@ -188,7 +190,7 @@ export function ManageSupplementsSheet({ open, onOpenChange, supplements, onChan
         await store.queueMutation({
           userId: userId!,
           domain: 'supplements',
-          date: todayInTz(),
+          date: todayInTz(tz),
           payload: { id: s.id, name: s.name, dose: s.dose ?? null, reminderEnabled: s.reminderEnabled, reminderTime: s.reminderTime ?? null, sortOrder: s.sortOrder, active: !s.active },
         })
         onChanged(supplements.map(x => x.id === s.id ? { ...updated, userId: s.userId, createdAt: s.createdAt, loggedToday: s.loggedToday } : x))

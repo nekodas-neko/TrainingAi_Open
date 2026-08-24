@@ -1,5 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -29,6 +30,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
   userId?: string
   onDone: () => void
 }) {
+  const tz = useUserTimezone();
   const router = useRouter()
   const [saving, setSaving] = useState(false)
 
@@ -80,7 +82,7 @@ export function TestResult({ protocol, capture, previous, profile, userId, onDon
   async function handleSave() {
     if (saving) return
     setSaving(true)
-    const today = todayInTz()
+    const today = todayInTz(tz)
     const id = crypto.randomUUID()
     const now = new Date().toISOString()
     const durationSec = Math.round((capture.endMs - capture.startMs) / 1000)

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { CheckIcon, SettingsIcon } from "lucide-react";
 import { ManageSupplementsSheet } from "./manage-supplements-sheet";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -20,6 +21,7 @@ interface Props {
 }
 
 export function SupplementsSection({ supplements, loading, onChanged, userId }: Props) {
+  const tz = useUserTimezone();
   const [manageOpen, setManageOpen] = useState(false)
   const [toggling, setToggling] = useState<string | null>(null)
 
@@ -30,7 +32,7 @@ export function SupplementsSection({ supplements, loading, onChanged, userId }: 
     setToggling(s.id)
     try {
       const store = userId ? getLocalStore(userId) : null
-      const today = todayInTz()
+      const today = todayInTz(tz)
       let savedLocally = false
       if (store) {
         try {

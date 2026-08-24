@@ -1,5 +1,6 @@
 'use client'
 import { HR_PROFILE_TTL } from '@trainingai/shared/cache-ttl'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { cachedFetch } from '@/lib/sqlite/cache'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTransitionRouter } from "@/lib/view-transition";
@@ -42,6 +43,7 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
   config: WalkConfig; samples: WalkHrSample[]; cadence?: CadenceSummary | null
   startedAtMs: number; userId?: string; onDone: () => void
 }) {
+  const tz = useUserTimezone();
   const router = useTransitionRouter()
   // Done is the only way off this screen, and it always goes to /activity — warm it while
   // the user reads their summary. Button pushes get no automatic prefetch (#919).
@@ -116,7 +118,7 @@ export function WalkSummary({ config, samples, cadence, startedAtMs, userId, onD
   }, [])
 
   async function saveWalk() {
-    const date = todayInTz()
+    const date = todayInTz(tz)
     const startTime = msToHHMMInTz(startedAtMs)
     const endTime = msToHHMMInTz(startedAtMs + plan.totalSec * 1000)
 

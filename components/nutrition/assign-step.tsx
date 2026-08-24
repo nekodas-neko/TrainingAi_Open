@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import type { MealType, NutritionTargets, FoodLogWithItem } from '@trainingai/shared/types/nutrition'
@@ -20,6 +21,7 @@ interface Props {
 const QTY_PRESETS = [0.5, 1, 1.5, 2] as const
 
 export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm, logDate }: Props) {
+  const tz = useUserTimezone();
   const [mealTypes, setMealTypes] = useState<MealType[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(preselectedMealTypeId)
   const [quantity, setQuantity] = useState(1)
@@ -45,7 +47,7 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
       // functional update: onData fires twice (cached + fresh) — don't clobber a user pick
       setSelectedId(prev => prev ?? (match?.id ?? data[0]?.id ?? null))
     }).catch(() => {}).finally(() => setLoadingTypes(false))
-    const targetDate = logDate ?? todayInTz()
+    const targetDate = logDate ?? todayInTz(tz)
     cachedFetch<FoodLogWithItem[]>(
       `nutrition-food-logs-${targetDate}`, `/api/nutrition/food-logs?date=${targetDate}`, NUTRITION_FOOD_LOGS_TTL,
       logs => setTodayCalories(Array.isArray(logs) ? logs.reduce((sum, l) => sum + l.calories, 0) : 0),
@@ -140,7 +142,7 @@ export function AssignStep({ nutrition, preselectedMealTypeId, onBack, onConfirm
         </div>
       </div>
 
-      {todayCalories !== null && calorieTarget !== null && (!logDate || logDate === todayInTz()) && (
+      {todayCalories !== null && calorieTarget !== null && (!logDate || logDate === todayInTz(tz)) && (
         <div className="flex flex-col gap-1.5">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">Today after logging</span>

@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { useSearchParams } from 'next/navigation'
 import type { NextSessionRecommendation } from '@trainingai/shared/types/program'
 import { readTodayCacheSync, cachedFetchToday } from '@/lib/sqlite/cache'
@@ -9,19 +10,20 @@ import { buildSessionExplainData, type SessionExplainData } from '@trainingai/sh
 import { SessionExplainContent } from './session-explain-content'
 import { SessionExplainEmpty } from './components/session-explain-empty'
 
-function readSeed(): NextSessionRecommendation | null {
+function readSeed(tz: string): NextSessionRecommendation | null {
   try {
     const raw = typeof window !== 'undefined' ? sessionStorage.getItem('ta_recommendation_v1') : null
     // Date-stamped seed (CCH-4) — ignore a stale prior-day recommendation.
     if (raw) {
       const stamped = JSON.parse(raw) as { date: string; data: NextSessionRecommendation }
-      if (stamped?.date === todayInTz() && stamped.data) return stamped.data
+      if (stamped?.date === todayInTz(tz) && stamped.data) return stamped.data
     }
   } catch { /* fall through */ }
   return readTodayCacheSync<NextSessionRecommendation>('next-session')
 }
 
 export function SessionExplainClient() {
+  const tz = useUserTimezone()
   const searchParams = useSearchParams()
   const sessionId = searchParams.get('sessionId') ?? undefined
   const [rec, setRec] = useState<NextSessionRecommendation | null>(null)
@@ -29,10 +31,10 @@ export function SessionExplainClient() {
 
   // Synchronous cache seed (effect, not initializer — hydration safety).
   useEffect(() => {
-    const seed = readSeed()
+    const seed = readSeed(tz)
     if (seed) setRec(seed)
     setHydrated(true)
-  }, [])
+  }, [tz])
 
   // Background revalidate against the same key/TTL the Home screen uses.
   useEffect(() => {

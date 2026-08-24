@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { initSQLite } from '@/lib/sqlite/sqlite-service';
 import { MIGRATIONS } from '@/lib/sqlite/migrations';
 import { getCached, setCached, mirrorToSessionCache, cachedFetch, cachedFetchToday } from '@/lib/sqlite/cache';
@@ -76,7 +77,7 @@ const CACHE_TASKS: CacheTask[] = [
   { key: 'more-seasons',            url: '/api/seasons',                    ttl: TTL_MEDIUM },
 ];
 
-async function warmCache(task: CacheTask): Promise<void> {
+async function warmCache(task: CacheTask, tz: string): Promise<void> {
   // Skip if still fresh, but ensure the sessionStorage mirror is populated for
   // this tab so readCacheSync(key) doesn't return null on a fresh session
   const cached = await getCached(task.key);
@@ -90,7 +91,7 @@ async function warmCache(task: CacheTask): Promise<void> {
     const res = await fetch(task.url);
     if (!res.ok) return;
     const data = await res.json();
-    await setCached(task.key, task.today ? { date: todayInTz(), data } : data, task.ttl);
+    await setCached(task.key, task.today ? { date: todayInTz(tz), data } : data, task.ttl);
     task.afterData?.(data);
   } catch {
     // Network unavailable — skip, will retry next mount
@@ -102,6 +103,7 @@ interface SyncProviderProps {
 }
 
 export function SyncProvider({ userId }: SyncProviderProps) {
+  const tz = useUserTimezone();
   useEffect(() => {
     let cancelled = false;
 
@@ -176,12 +178,12 @@ export function SyncProvider({ userId }: SyncProviderProps) {
       const WARM_CHUNK = 5;
       for (let i = 0; i < CACHE_TASKS.length; i += WARM_CHUNK) {
         if (cancelled) break;
-        await Promise.all(CACHE_TASKS.slice(i, i + WARM_CHUNK).map(warmCache));
+        await Promise.all(CACHE_TASKS.slice(i, i + WARM_CHUNK).map(t => warmCache(t, tz)));
       }
     })();
 
     return () => { cancelled = true; };
-  }, [userId]);
+  }, [userId, tz]);
 
   // Drain the outbox again as soon as connectivity is restored (e.g. after a
   // GPS run through a dead zone), rather than waiting for the next mount.
@@ -219,7 +221,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
       // run when meal reminders are disabled — they're unrelated preferences.
       if (localStorage.getItem('ta_pref_meal_reminders') !== 'false') {
         try {
-          const today = todayInTz();
+          const today = todayInTz(tz);
           let mealTypes: unknown = null;
           let foodLogs: unknown = null;
           await Promise.all([
@@ -252,7 +254,7 @@ export function SyncProvider({ userId }: SyncProviderProps) {
     })();
 
     return () => { handle?.remove(); };
-  }, [userId]);
+  }, [userId, tz]);
 
   // Reconcile workout reminder notification on app open and on resume
   useEffect(() => {

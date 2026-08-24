@@ -2316,10 +2316,39 @@ this fits without an extraction.
 > class** — an `Intl.DateTimeFormat()` sweep is separate, unmeasured work.
 > [`journal`](overview/entries/2026-08-24-session-select-workout-user-timezone.md).
 >
-> **`lib/stores/workout-store.ts` (3 calls) is deliberately NOT in this slice.** It is a Zustand
-> store, not a component — no hook available — so its three calls need `tz` threaded in from every
-> caller, including `applyRehydrateFixups` on the rehydrate path. Structurally different work from
-> the rest of the sweep; left for its own slice.
+> **Fourth slice shipped 2026-08-24 (Lane B) — the sweep is DONE for every component.** 27 files,
+> 44 call sites, ratchet **47/28 → 3 calls in 1 file**. The baseline now holds exactly one entry.
+>
+> **Two more of `metric-log-sheet`'s class, found by reading rather than by the count:**
+> `log-value-sheet.tsx` POSTed `localDate: localDateString()` (device zone) while its own local
+> branch used `todayInTz(tz)` — two answers for one save. And `weekly-stats-hub.tsx`'s `todayKey`
+> needed `todayInTz(tz).replace(/-/g,"/")`, **not** a plain swap: `/api/weekly-stats` emits
+> `dateKey` as `yyyy/MM/dd`, so a dash-formatted key would have silently stopped matching and
+> killed the today-highlight. **A blind find-and-replace across this sweep would have shipped that.**
+>
+> Also threaded through three module-scope helpers that cannot call a hook (`linkPrescribedRun`,
+> `readSeed`, and `warmCache` in `sync-provider` — that last writes the `{date, data}` envelope
+> `cachedFetchToday` reads, so a zone mismatch makes every warmed today-key a permanent miss).
+> Zero lint warnings introduced across all 27 files.
+> [`journal`](overview/entries/2026-08-24-client-timezone-sweep-components-complete.md).
+>
+> **`lib/stores/workout-store.ts` is all that remains, and it is a DESIGN decision, not a
+> conversion.** It is a Zustand store, so no hook is available. **The risk is real:** `storedDate`
+> exists only to detect a day rollover, and a mismatch makes `rolloverDay()` clear `todayLogged` —
+> dropping the day's completed-set ticks. A wrong-zone stamp can both *miss* a rollover and *fire a
+> spurious one*.
+>
+> **The pure functions are already parameterised** — `applyRehydrateFixups(state, today, now)` and
+> `rolloverDay(today)` both take the date, and `workout-screen.tsx`'s visibilitychange effect
+> already passes `todayInTz(tz)`. What has no answer is the three places that *supply* the stamp:
+> the initial-state object, one reducer, and `onRehydrateStorage`, which runs at store creation
+> **outside React, before any provider mounts**.
+>
+> Two shapes, neither free: **(a)** reconcile on mount — let the store stamp `DEFAULT_TZ` and have
+> the component correct it, which adds a `rolloverDay` call whose clearing behaviour must be proven
+> not to eat a legitimate day's ticks; or **(b)** a module-level "current user tz" the store reads,
+> which is the global this entry's own header warns against. **Pick deliberately and verify the
+> clear path** — do not convert it mechanically.
 >
 > **What that slice actually proved, and what it did not.** With a seeded user on
 > `Pacific/Kiritimati` (UTC+14, currently a day *ahead* of this container's UTC clock — so the
