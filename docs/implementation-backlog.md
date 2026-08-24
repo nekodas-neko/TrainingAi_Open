@@ -1193,6 +1193,25 @@ right number.**
   nobody controls blocks every lane's merges, and the recovery costs a full re-run each time.
 - **Surface:** browser-reproducible, but it did not reproduce on the dev server — chase it in CI or
   by making the scrape mock return no title, which is the condition that produces the collision.
+- 🔺 **SECOND OCCURRENCE 2026-08-24, and it raises the priority: this file is now blocking merges
+  across every lane.** It failed CI on PR #363 — a diff of *test fixtures for a MET table*, which no
+  browser spec can see. **A different assertion in the same file**, this time
+  `:146 getByText(/from a 4-serve recipe/)` in *"a recipe that states its yield is not divided a
+  second time"*, `element(s) not found` after the full 20 s, **on the first run and on the retry**.
+  49 passed, 1 failed.
+- **What the second occurrence rules out.** Not a timing flake within a run — Playwright's own retry
+  reproduced it identically. Not cross-worker interference either: `playwright.config.ts` is
+  `workers: 1, fullyParallel: false`, so nothing runs beside it.
+- **What it points at instead: accumulated state.** One worker in file order means all ~50 specs
+  share one database and one signed-in user, and this file runs near the end. That is the one
+  condition a local run cannot reproduce, and it explains why the *same file* fails *different*
+  assertions on different runs while passing three runs out of four.
+- **Reproduction attempts that FAILED, so the next session does not repeat them** (2026-08-24):
+  the file alone against `pnpm dev` — **4 passed** (twice, on `main` and on a branch); and
+  `meal-label.spec.ts` then this file in order, on the theory that the other saved-meals spec seeds
+  the collision — **7 passed**. The remaining untried reproduction is the **whole suite in order**
+  against a freshly-migrated database, which is what CI does and takes ~10 minutes.
+- **Cost so far:** two blocked PRs (#345, #363) and a re-run each.
 
 ### [nutrition] Q-387 — a half-logged day is indistinguishable from a light day, and it drags the calibrated maintenance down with nothing to stop it
 
