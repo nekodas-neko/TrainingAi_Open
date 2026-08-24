@@ -2795,24 +2795,21 @@ statement. Reserve "proposal", and the future tense, for tier 3.
 
 ### [devices][app-shell] LB-5 — the Devices card calls the ring healthy while the service has no key
 
-- **Lane:** B
+> **Shipped 2026-08-24.** `OuraConnectionSection` now calls `hasKey()` on mount via `getOuraBle()`
+> and, when it returns `false`, replaces the whole card with an amber "No ring key stored" state
+> linking to `/admin/oura-ble` — takes priority over the normal "seen"/"not seen" card, since a ring
+> that synced recently but has no key now is not healthy whatever the server-derived freshness/
+> battery data still says. Nothing reveals or re-enters the key from this card, matching the
+> constraint below — it only navigates to the console. `getOuraBle()` returning `null` (web, old
+> APK) leaves `hasKey` at `null` and the card renders exactly as before; verified live by forcing
+> the state locally — no crash, no change to the existing web-sandbox render.
+> [`journal`](overview/entries/2026-08-24-devices-card-ring-key-state.md).
+
 - **Branch:** `fix/devices-card-ring-key-state`
-- **Added:** 2026-08-23, split out of Q-537 (whose engine half shipped the same day).
-- **What it is.** `components/more/oura-section.tsx` renders the ring's state from server data —
-  `/api/oura-ble/freshness` and the battery cache. Those keep looking fine for as long as the
-  server holds recent rows, so after an uninstall/reinstall the card shows *"Ring synced 2h ago"*
-  while the native service is logging `no key stored` and refusing to start. The one screen where
-  someone would look to find out why the ring stopped is the one screen that cannot tell them.
-- **What to do.** Call `hasKey()` on the plugin (`lib/oura-ble/plugin.ts`, already exported) and
-  show a keyless state on the card, pointing at `/admin/oura-ble` → Ring key. Catch and ignore on
-  web, where the plugin is absent — the card must not grow a web-only failure mode.
-- **⚠ Do not offer to reveal or re-enter the key from this card.** The backup affordance lives in
-  the console behind a deliberate button (Q-537); a second entry point on a routinely-visited
-  screen is the opposite of what the owner asked for (*"so it cant accidently be used"*).
-- **What would count as done:** with no key stored, the Devices card says so rather than reporting
-  a healthy ring.
-- **Surface:** device — `getOuraBle()` returns null in the web sandbox, so the keyless branch is
-  only reachable on the APK.
+- **Lane:** B
+- **Keep:** the keyless branch itself is device-only (`getOuraBle()` returns `null` in the web
+  sandbox), so it has never been seen rendering for real — only the inert web path and a locally
+  forced state were verified. `Gate: device`.
 
 ### [app-shell][devices] Q-317 — declaring a ring re-key has no button: `POST /api/oura-ble/rekey` is curl-only
 
