@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useEffect, useMemo, useState } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -44,14 +45,15 @@ function fmtDuration(sec: number): string {
 // stacked bar per day (minutes per zone); zone colours come only from hr-zones.ts and are paired
 // with the zone name in the legend (never colour-alone state).
 export const TimeInZoneCard = memo(function TimeInZoneCard() {
+  const tz = useUserTimezone();
   const [win, setWin] = useState<Window>("week");
   const [data, setData] = useState<ZoneMinutesResponse | null>(null);
 
   const range = useMemo(() => {
-    const to = todayInTz();
+    const to = todayInTz(tz);
     const from = shiftDateStr(to, -(SPAN_DAYS[win] - 1));
     return { from, to };
-  }, [win]);
+  }, [win, tz]);
 
   useEffect(() => {
     const key = `zone-minutes:${range.from}:${range.to}`;

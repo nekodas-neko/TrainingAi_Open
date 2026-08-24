@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { toast } from 'sonner'
@@ -14,7 +15,8 @@ import BatteryRecoveryCalibrationCard from '@/components/admin/battery-recovery-
 // that shaped it — on screen for a quick read, and as one copyable JSON blob for a deeper review.
 
 export default function DayReviewTab() {
-  const [date, setDate] = useState(() => todayInTz())
+  const tz = useUserTimezone();
+  const [date, setDate] = useState(() => todayInTz(tz))
   const [audit, setAudit] = useState<DayAudit | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -80,7 +82,7 @@ export default function DayReviewTab() {
           </Button>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" className="h-11 flex-1" onClick={() => setDate(todayInTz())}>Today</Button>
+          <Button variant="outline" className="h-11 flex-1" onClick={() => setDate(todayInTz(tz))}>Today</Button>
           <Button className="h-11 flex-1" onClick={copy} disabled={!audit}>
             <Copy className="mr-1 h-3.5 w-3.5" /> Copy JSON
           </Button>

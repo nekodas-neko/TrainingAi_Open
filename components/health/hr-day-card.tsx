@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useLayoutEffect, useState } from 'react'
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import { todayInTz } from '@trainingai/shared/date-utils'
 import { cachedFetch, readCacheSync } from '@/lib/sqlite/cache'
 import { TTL_MEDIUM } from '@trainingai/shared/cache-ttl'
@@ -16,7 +17,8 @@ interface WorkoutSession { sessionName: string; startedAt: string; completedAt: 
  * section used, so no extra network cost.
  */
 export function HrDayCard() {
-  const today = todayInTz()
+  const tz = useUserTimezone();
+  const today = todayInTz(tz)
   const [hrReadings, setHrReadings] = useState<HrReading[]>([])
   const [sleepWindow, setSleepWindow] = useState<HrSleepWindow | null>(null)
   const [workoutSessions, setWorkoutSessions] = useState<WorkoutSession[]>([])

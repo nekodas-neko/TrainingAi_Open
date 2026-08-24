@@ -1,6 +1,7 @@
 "use client";
 
 import { memo, useState } from "react";
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { PlusIcon } from "lucide-react";
 import { MuscleHeatmap, type MuscleActivation } from "@/components/muscle-heatmap";
 import { InjurySheet } from "./injury-sheet";
@@ -25,6 +26,7 @@ const SEVERITY_CHIP: Record<string, string> = {
 }
 
 export const InjuryCard = memo(function InjuryCard({ injuries, loading, onInjuriesChange, userId, recoveryMuscles = [] }: Props) {
+  const tz = useUserTimezone()
   const [sheetOpen, setSheetOpen] = useState(false)
   const [editing, setEditing] = useState<Injury | null>(null)
   const [showResolved, setShowResolved] = useState(false)
@@ -97,7 +99,7 @@ export const InjuryCard = memo(function InjuryCard({ injuries, loading, onInjuri
           <>
             <div className="space-y-2">
               {active.map(i => {
-                const days = differenceInDays(new Date(todayInTz()), new Date(i.startedDate))
+                const days = differenceInDays(new Date(todayInTz(tz)), new Date(i.startedDate))
                 return (
                   <button
                     key={i.id}

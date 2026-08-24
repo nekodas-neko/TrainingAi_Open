@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo } from "react";
+import { useUserTimezone } from "@/components/shell/user-timezone-provider";
 import type { BodyMetaRow } from "@/app/api/body-metadata/route";
 import { computeWeightRateKgPerWeek } from "@trainingai/shared/health/long-term-goal-progress";
 import { useCachedValue } from "@/lib/hooks/use-cached-value";
@@ -57,7 +58,8 @@ export function useWeightTrend(metaRecent: BodyMetaRow[]) {
  * not reach for a shorter `ENERGY_BALANCE_TTL` — an effect that never runs never consults a TTL.
  */
 export function useEnergyBalanceToday(): EnergyBalanceResponse | null {
-  const today = todayInTz();
+  const tz = useUserTimezone();
+  const today = todayInTz(tz);
   return useCachedValue<EnergyBalanceResponse>(
     `energy-balance:${today}`,
     `/api/nutrition/energy-balance?date=${today}`,
