@@ -633,9 +633,39 @@ answered by subtraction rather than re-argued. Verified through the real route o
 - **Branch:** `fix/cap-session-duration`
 - **Added:** 2026-08-24, found while shipping Q-420's derivation — the derived series made it visible
   on nine points where it had been visible on one.
-- **Placement:** low-mid. Not a live corruption; it needs a session that was started and not ended,
-  and the owner's production rows do not currently show one. Filed because the failure is silent and
-  the number it produces is not obviously wrong at a glance.
+- **⚠️ MEASURED IN PRODUCTION 2026-08-24, and the filing above was wrong about severity.** It said
+  *"not a live corruption… the owner's production rows do not currently show one."* **They show
+  eleven.** Of 81 completed sessions, **11 (13.6%) span 534–845 minutes — 8.9 to 14.1 hours.**
+- **The distribution is bimodal with an empty gap, which is what makes it a defect and not a long
+  workout:**
+
+  | duration | sessions |
+  |---|---:|
+  | 0–30 min | 21 |
+  | 30–60 min | 26 |
+  | 60–90 min | 21 |
+  | 90–120 min | 2 |
+  | *120–534 min* | **0** |
+  | 534–845 min | **11** |
+
+  p50 is **56 minutes**; p90 is **548**. Nothing at all sits between 92 and 534 minutes, so these are
+  not the tail of a distribution — they are a different phenomenon.
+- **They are REAL, COMPLETE workouts, which decides clamp-vs-exclude.** Each of the eleven carries
+  **5–6 exercises, 13–18 sets and 3,700–7,400 kg of volume**. Excluding them would delete genuine
+  training from the record; the duration is the only thing wrong. **Clamp, do not exclude** — the
+  earlier note guessing the opposite for the load series was written before this was measured.
+- **They all stopped, and nobody knows why.** Every one is between **2026-05-04 and 2026-05-29**, and
+  there has not been another since. Per CLAUDE.md that makes it **unexplained, not fixed** — whatever
+  produced it may still be reachable, and the fix should bound the number regardless of cause.
+- **Live exposure today is smaller than 13.6% sounds, and this is worth knowing before pricing it.**
+  None of the eleven carries a session RPE **or a single rated set**, so they are invisible to
+  `health-trends`' `sessionLoad` series — checked specifically against Q-420's derivation, which
+  reads set RPEs and therefore does *not* pull them in. And `app/api/body-metadata` only ever reads
+  **today's** workouts, so the day-energy path cannot reach a May session. What is left is the
+  per-session views: `workout-sessions/[id]/energy` and the recap, where opening one of those eleven
+  shows a calorie estimate built on a 10× duration.
+- **Placement:** low-mid — high prevalence, narrow live reach, unknown cause. The prevalence is the
+  argument for bounding it; the reach is the argument for not rushing.
 - **What.** `durationMin = (completedAt - startedAt) / 60_000` with **no upper bound anywhere**:
   `app/api/health-trends/route.ts` (`sessionLoad = rpe × durationMin`), `estWorkoutKcal` and
   `estSessionKcal` (`workout-energy.ts:113, 225`). Observed on the dev database: a session spanning
@@ -650,11 +680,17 @@ answered by subtraction rather than re-argued. Verified through the real route o
   sessions run 45–75 minutes, so a cap in the 3–4 hour region is far outside anything genuine while
   still bounding the pathological case. Whether an over-cap session should be **clamped** or
   **excluded** is the real decision — clamping keeps a data point that is partly fiction, excluding
-  loses a session that did happen. Excluding is probably right for the load series and clamping for
-  the calorie estimate, but decide it deliberately rather than by which is easier to write.
-- **Check first whether the workout screen can even produce one** — if an abandoned session is
-  auto-closed or discarded on the device, the reachable case is narrower than it looks and the entry
-  shrinks to the two energy call sites.
+  loses a session that did happen. **The measurement above settles it: clamp.** All eleven are real
+  workouts, so excluding them would delete training that happened, and only the duration is wrong.
+- **The client already handles the restart case, which is why the cause is still open.**
+  `lib/stores/workout-store.ts:215` drops a session's whole identity on rehydrate once its start
+  anchor is over four hours old or from a previous day, so an app-kill cannot produce one of these.
+  That leaves the app being left **open** across a long gap with Complete tapped at the end —
+  `resolveCompletedAt` accepts the phone's own `completedAtMs` and only rejects it for preceding the
+  start or being in the future. Plausible, and not proven: the eleven cluster in one month and
+  nothing explains why they stopped.
+- **Also cap the seed/dev path or this stays invisible locally** — the dev database carries a
+  1,176-minute session, which is how this was found at all.
 
 ### [workouts] Q-420 — drop the session-RPE prompt, derive the intensity, and let it correct the HR burn estimate
 
