@@ -14,7 +14,7 @@ silently misdirecting the next session. Update them in the same PR that consumes
 
 | Pointer | Value | Source of truth |
 |---|---|---|
-| Next free Postgres migration | **211** | `lib/data/postgres/migrations/` |
+| Next free Postgres migration | **212** | `lib/data/postgres/migrations/` |
 | Local SQLite schema version | **v28** | `lib/sqlite/migrations.ts`; `lib/sqlite/__tests__/migrations.test.ts` asserts the max |
 
 > **There is no third pointer any more.** Entry IDs are not allocated from a shared counter and
@@ -3546,79 +3546,6 @@ ehr     0     0     0     0   648   208   128   556     0
 > `freshWithinTtl` entries inside them — and Q-263 files that.
 > Journal: [`entries/2026-08-16-invalidation-audit.md`](overview/history-2026-08-15.md).
 
-### [platform] Q-530 — an admin snapshot endpoint, so a migration's first real run is not production
-
-- **Branch:** `feat/admin-db-snapshot`
-- **Plan:** [`plans/2026-08-17-admin-db-snapshot-endpoint.md`](superpowers/plans/2026-08-17-admin-db-snapshot-endpoint.md)
-- **Lane: A**, and not splittable — `app/api/**`, `lib/data/postgres/migrations/`, and a Postgres
-  migration number, which belongs to Lane A alone. No Lane B surface is touched at all.
-  ⚠️ **Two of the paths are unlisted in the lane contract and must be claimed in Lane A's baton
-  before starting**: `scripts/` (the generator and the restore command) and `lib/export/` — neither
-  appears in §3 of [`docs/agents/README.md`](agents/README.md), and `lib/export/` is shared with
-  Q-288 below, so the two items must not run concurrently in different sessions.
-- **Added:** 2026-08-17 · planning session against the rescoped Q-251
-- **Steps, in order — the plan carries the detail, this is the slot list:**
-  1. `scripts/generate-claude-ro-views.js` — emit `_meta_excluded_tables` and
-     `_meta_withheld_columns`; regenerate into **migration 191** (a new number, never overwriting an
-     applied file) and re-point the filename pin in `claude-ro-readonly-role.test.ts` *in the same
-     commit*.
-  2. `lib/export/db-snapshot.ts` — view enumeration, the drift gate, PK discovery from `pg_index`,
-     keyset chunking, the manifest. All the tests live here.
-  3. `app/api/admin/db-snapshot/route.ts` — copy `day-review`'s `authorize()` verbatim; `bulk` and
-     `tables` params; NDJSON via `ReadableStream`; audit row into `db_query_log`.
-  4. `scripts/local-db/snapshot.js` + `pnpm db:snapshot` — local-target guard **first**, then
-     restore per plan §5.
-  5. Docs — `CLAUDE.md` env-var row, `docs/module-map.md` row, and a
-     `docs/runbooks/db-backup-restore.md` section distinguishing this from `pg_dump`.
-- **✅ Step 3 is unblocked. `ADMIN_SNAPSHOT_SECRET` was approved as a separate secret and set by the
-  owner on 2026-08-17**, in both places it is needed: Railway (so the server accepts the token) and
-  the Claude Code environment (so a session can send it). Reusing `ADMIN_EXPORT_SECRET` was
-  considered and rejected — day-review returns 31 days of derived scores, this returns the database,
-  so a leak of one must not be a leak of both.
-  - **A session started before that change cannot see the variable** — the environment is injected at
-    container start. If `echo ${#ADMIN_SNAPSHOT_SECRET}` prints 0, that is a stale container, not a
-    missing secret; start a fresh session.
-  - **Nothing has verified the Railway half yet, and nothing can until step 3 ships**, because no
-    code reads the variable. The first real check is
-    `curl -si …/api/admin/db-snapshot -H "Authorization: Bearer $ADMIN_SNAPSHOT_SECRET"` returning a
-    200 and a manifest line. A 401 there means the two copies disagree; treat it as configuration
-    before suspecting the route.
-- **Placement:** below the four live user-facing bugs above it and below the two CI-integrity items,
-  above everything else — it is a capability every later item borrows (rehearse a migration against
-  prod-shaped rows, run `pnpm dev` against real data), and it is the first thing that touches
-  `CLAUDE.md`'s standing root cause *"a bug that reproduces in prod but not locally: suspect prod
-  data drift vs the fresh local seed"*.
-- **This is Q-251 shape (a), designed.** Q-251 stays open for shape (b), the second Railway service,
-  which remains deferred. Read Q-251 first for the decision history; read the plan for what to build.
-- **It is much smaller than Q-251 implies, and the reason is the finding to carry into the work:**
-  `claude_ro` already *is* the export — 80 views, one user, default-deny, 9 columns withheld, served
-  by a role with no write grants. The endpoint paginates `SELECT *` over that schema. **No new
-  scoping map is written**, so there is no second copy to drift, which is the property this could not
-  survive losing.
-- **What happens when a table is added and the views are not regenerated: the export fails, naming
-  it.** The gate is a runtime set difference — `public` base tables minus `claude_ro` views minus a
-  generator-emitted exclusion view — computed from `pg_catalog`, which the `claude_readonly` role can
-  read for `public` despite holding no `SELECT` there (verified against production: 83 tables, 944
-  columns). Column-level, not just table-level. The existing CI parity test stays but does not cover
-  this: it is a count rather than a set of names, it is column-blind, its migration pin **went stale
-  silently between 181 and 185**, and it checks the *local* schema.
-- **Volume, measured 2026-08-17.** The DB is 477 MB and `oura_raw_samples` is 360 MB of it —
-  **1,098,005 of its 1,098,183 rows are the owner's**, so scoping to one user removes 0.02% of the
-  volume. Scoping is a consent fix, never a size fix. The shaped data that rehearsal actually needs
-  is a few MB, so the default export omits the four bulk tables and `?bulk=<days>` opts a window
-  back in.
-- **Ships with a first-class round-trip** (`pnpm db:snapshot`), guarded to refuse any target that is
-  not the local DB. Two verified constraints: `push_subscriptions` **cannot** round-trip (all three
-  withheld columns are `NOT NULL`) and is skipped and declared in the manifest; `users.password_hash`
-  is withheld and nullable, so the restore stamps the seed's known bcrypt hash or nobody can log in.
-- **⚠️ New secret — `ADMIN_SNAPSHOT_SECRET`, not a reuse of `ADMIN_EXPORT_SECRET`.** Secret handling
-  is confirm-first per `CLAUDE.md`; the owner has approved the endpoint's existence, but confirm the
-  variable before it is added to Railway. Leak analysis is in the plan §6: total health-data
-  disclosure for one person, **no** account takeover, no write path, no third-party rows — and the
-  marginal risk over today is small, because `CLAUDE_DB_QUERY_SECRET` already reads exactly this data
-  through the same views and the same role.
-
-
 ### [workouts] Q-298 — the 10 historical zero-1RM rows: recompute or null (the code fixes shipped 2026-08-24)
 
 - **Branch:** `fix/deload-provenance-and-previous-1rm` · **Lane A**
@@ -6483,8 +6410,8 @@ ehr     0     0     0     0   648   208   128   556     0
 
 - **Branch:** `feat/staging-environment`
 - **Added:** 2026-08-14 · same owner ask
-- **✅ Shape (a) is now planned and split out as [Q-530](#platform-q-530--an-admin-snapshot-endpoint-so-a-migrations-first-real-run-is-not-production)**
-  (2026-08-17), which sits higher in the queue. It came out smaller than shape (a) describes below:
+- **✅ Shape (a) shipped as Q-530** (planned 2026-08-17, implemented 2026-08-24) — an admin snapshot
+  endpoint, `GET /api/admin/db-snapshot` + `pnpm db:snapshot`. It came out smaller than shape (a) describes below:
   `pg_dump` is the wrong transport, because the consumer is the agent sandbox and Railway's Postgres
   port is blocked there — only 80/443 are open. So it is an HTTPS endpoint reading the `claude_ro`
   views, which already carry the one-user scoping, the default-deny and the column withholding.

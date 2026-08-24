@@ -1138,7 +1138,7 @@ Optional:
   resolved user must still be an admin, so the token widens *transport*, never authority. Anyone holding
   it can read that user's health history, so treat it as a credential: generate with
   `openssl rand -hex 32`, never commit it, rotate by changing the Railway var. Leave it unset and the
-  route is session-only.
+  route is session-only. `ADMIN_SNAPSHOT_SECRET` is the same idea for `GET /api/admin/db-snapshot` (Q-530) — a separate secret, since that route returns the whole database, not scores.
 - ~~`GITHUB_RELEASES_TOKEN`~~ — **no longer needed (Q-49, 2026-08-17).** It was required while the
   releases lived in a private repo, where an unauthenticated call could only 404. The repo is public,
   so `lib/github-release.ts` now sends the `Authorization` header only when a token happens to be
