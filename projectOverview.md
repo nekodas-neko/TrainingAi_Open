@@ -28,35 +28,30 @@
 **Last updated:** 2026-08-24.
 
 **Build a Meal's ingredient picker is its own component now (BF-11a).** `saved-meals-sheet.tsx`
-774 → 590 lines — it sat 26 under the CI ceiling with four BF-11 features due to land in it. No
-behaviour change; the reset that `openBuild` did with three setters is a keyed remount, driven to
-confirm it clears the same state.
+774 → 590 lines — 26 under the CI ceiling with four BF-11 features due to land in it. No behaviour
+change; `openBuild`'s three reset setters became a keyed remount, driven to confirm it clears them.
 
 **Q-319's water bug was unreachable, and the half its entry called fine was the broken one.** The
-tile already routes water to the correct sheet. But the generic sheet's water branch wrote an
-ABSOLUTE total — discarding the day's water, reintroducing SYNC-P7 — and queues `waterMlDelta` now.
+tile already routes water to the right sheet; the generic sheet's branch wrote an ABSOLUTE total
+(discarding the day's water, reintroducing SYNC-P7) and queues `waterMlDelta` now.
 
 **The workout write path can be driven past set 1 (Q-461).** The Start Set bounce never gave
-Playwright a stable frame, so `Start Set 2` hung — measured 85 ms vs 8,009 ms with and without the
-new `prefers-reduced-motion` rule. A spec now drives three logged sets and fails if the rule is
-removed. Testability, not a user-facing defect. `Gate: device`.
+Playwright a stable frame, so `Start Set 2` hung — 85 ms vs 8,009 ms with and without the new
+`prefers-reduced-motion` rule. A spec drives three logged sets and fails if the rule is removed.
 
-**Disk maintenance works from a desktop again (Q-544).** The DB-footprint card and the device-metrics
-panel touch no plugin, but sat after `OuraBleDebug`'s native early-return — so reclaiming disk needed
-the APK, the one client `VACUUM FULL`'s exclusive lock blocks, and was impossible while the APK was
-broken. Both moved above it. `Gate: device`.
+**Disk maintenance works from a desktop again (Q-544).** The DB-footprint and device-metrics cards
+touch no plugin but sat after `OuraBleDebug`'s native early-return — so reclaiming disk needed the
+APK, the one client `VACUUM FULL`'s lock blocks. Both moved above it. `Gate: device`.
 
 **The frame packer has a button (Q-316).** In the DB-footprint card, with the packable count beside
-it. Its confirm copy deliberately does not read like the lossless VACUUM one — it is the only
-control here that DELETEs archival frames — and a refused bucket is listed with its reason. `Gate: device`.
+it. Its confirm copy deliberately does not read like the lossless VACUUM one — this is the only
+control that DELETEs archival frames — and a refusal is listed with its reason. `Gate: device`.
 
-**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, deliberately outside
-`OuraBleDebug` — that renders nothing without the native plugin, which is exactly the laptop doing
-the re-key. Says up front that nothing happens until the ring next reports. `Gate: device`.
+**Declaring a ring re-key has a button (Q-317).** On `/admin/oura-ble`, outside `OuraBleDebug` —
+which renders nothing without the plugin, exactly the laptop doing the re-key. `Gate: device`.
 
 **The two BLE consoles poll the redecode job instead of guessing (Q-318).** A completed run reported
-`failed: 502`; the step backfill said "Done" at the gateway timeout. Both now wait for the real
-status. The route's default flip is Lane A's. `Gate: device`.
+`failed: 502`; the backfill said "Done" at the gateway timeout. Both wait for the real status now.
 
 **The Devices card stops calling the ring healthy with no key (LB-5).** Checks `hasKey()`, links to `/admin/oura-ble` when false. `Gate: device`.
 
