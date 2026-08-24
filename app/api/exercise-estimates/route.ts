@@ -15,8 +15,8 @@ const BodySchema = z.object({
   entries: z.array(z.object({
     exerciseName: z.string().trim().min(1).max(200),
     estimated1rm: z.number().finite().positive().max(1000),
-  })).max(400),
-})
+  }).strict()).max(400),
+}).strict()
 
 export async function POST(req: Request) {
   const session = await auth()

@@ -19,8 +19,8 @@ const PutSchema = z.object({
   entries: z.array(z.object({
     restrictionId: z.string().uuid(),
     severity: z.enum(['avoid', 'allergy']),
-  })).max(60),
-})
+  }).strict()).max(60),
+}).strict()
 
 export async function GET() {
   const session = await auth()

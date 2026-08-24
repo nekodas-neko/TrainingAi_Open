@@ -3465,6 +3465,27 @@ ehr     0     0     0     0   648   208   128   556     0
   missing `@sentry/nextjs` even though `package.json` declares it, unrelated to this change and not
   investigated further; static verification (reading every real client's payload against the
   tightened schema) stood in for it.
+- 🚧 **67 → 40, 2026-08-24 (Lane A).** The largest single batch: 16 files reached zero —
+  `activity-logs` (both DELETE and the metrics PATCH), `exercise-estimates`, `exercises` (create),
+  `nutrition/dietary-restrictions`, `nutrition/targets`, `running-plan/explain`,
+  `workout-review/session/[sessionId]/apply`, `nutrition/meal-plans` (create, `[id]` PATCH,
+  `[id]/structure` PATCH, `meals/[mealId]` PATCH, `plan-meal-answers` POST+DELETE), and the shared
+  `packages/shared/src/validation/generated-program.ts` — plus `builder-chat`, `exercises/generate`,
+  `generate-program` and `meal-plans/generate{,/meal}` lowered to their `generateObject`
+  response-schema remainder (their one real request schema each is now strict). Every conversion
+  read the real client's payload against the tightened schema first; no codemod.
+  **Two more traps caught before shipping, same class as `push/subscribe`'s `expirationTime`:**
+  (a) `workout-review-sheet.tsx` sends an unread `confidence` field to
+  `workout-review/session/[sessionId]/apply` — added to the schema (documented as unread; the route
+  already computes its own deterministic confidence per CLAUDE.md's no-self-reported-number rule)
+  rather than exempting the route. (b) `builder-review.tsx` mints a `clientId` on every exercise in
+  its live `program` state (the review editor's React key) and sends that state wholesale to
+  `builder-chat` — added to `GeneratedExerciseSchema` in the shared validation file, which is where
+  it would have silently 400'd every real chat turn had it been missed.
+  Verified: the touched routes' own vitest suites (81 tests, 8 files) plus the full suite (4,693
+  passed, 51 skipped, 2 pre-existing unrelated failures — missing `qrcode` in this sandbox),
+  `tsc --noEmit` clean, `pnpm check:rules` 55 of 55. **`pnpm dev` still could not be exercised** —
+  same sandbox gap as the prior batch; static per-client verification stood in for it again.
 - **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
   builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
   unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was

@@ -13,12 +13,12 @@ const MAX_BODY_BYTES = 32 * 1024
 
 const CreateBody = z.object({
   name:         z.string().min(1).max(120),
-  muscles:      z.array(z.object({ muscle: z.string(), role: z.enum(['main', 'secondary']) })).default([]),
+  muscles:      z.array(z.object({ muscle: z.string(), role: z.enum(['main', 'secondary']) }).strict()).default([]),
   equipment:    z.array(z.string()).default([]),
   instructions: z.string().max(2000).optional(),
   exerciseType: z.enum(['weighted', 'bodyweight']).default('weighted'),
   mergeWithId:  z.string().uuid().optional(),
-})
+}).strict()
 
 export async function POST(req: NextRequest) {
   const session = await auth()

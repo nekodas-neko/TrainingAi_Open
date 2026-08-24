@@ -16,7 +16,7 @@ const Body = z.object({
   // buggy/replayed client can't ship a megabyte prompt (token spend / 502s).
   rationale: z.string().max(500),
   gateReasons: z.array(z.string().max(500)).max(12),
-})
+}).strict()
 
 // Rephrases the already-computed deterministic rationale into one warm sentence.
 // Prose only — never parses the model text as structured data. The AI is never

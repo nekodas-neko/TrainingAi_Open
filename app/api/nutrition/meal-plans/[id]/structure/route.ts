@@ -41,7 +41,7 @@ const PatchSchema = z.object({
    * re-split this route already does.
    */
   order: z.array(z.number().int().min(0).max(MEAL_COUNT_MAX - 1)).max(MEAL_COUNT_MAX).optional(),
-})
+}).strict()
 
 /** Carbohydrate difference between a training day and a rest day — matches the generate route. */
 const REST_DAY_CARB_REDUCTION = 0.15

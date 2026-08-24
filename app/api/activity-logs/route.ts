@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ activityLog }, { status: 201 })
 }
 
-const DeleteBody = z.object({ id: z.string().uuid() })
+const DeleteBody = z.object({ id: z.string().uuid() }).strict()
 
 export async function DELETE(req: NextRequest) {
   const session = await auth()

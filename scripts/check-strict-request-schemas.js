@@ -90,45 +90,37 @@ const ROOTS = ['app/api', 'packages/shared/src/validation'];
 // Baseline recorded 2026-08-18 — 89 non-strict request schemas across 63 files. Shrink-only.
 // A file that reaches zero should have its row deleted, so it is held to zero from then on.
 const BASELINE = {
-  'app/api/activity-logs/[id]/metrics/route.ts': 1,
-  'app/api/activity-logs/route.ts': 1,
-  'app/api/builder-chat/route.ts': 4,
+  // 89 → 67 → 40, 2026-08-24 (Q-464 batch 4): 16 files reached zero and were deleted below;
+  // builder-chat, exercises/generate, generate-program and meal-plans/generate{,/meal} lowered to
+  // their response-schema-only remainder. Two traps caught before shipping: workout-review/apply's
+  // client sends an unread `confidence` (added to the schema, not exempted); builder-review.tsx
+  // mints a `clientId` on every exercise in its live program state and sends it wholesale to
+  // builder-chat (added to `GeneratedExerciseSchema` in generated-program.ts for the same reason).
+  'app/api/builder-chat/route.ts': 2,
   'app/api/coach/apply/route.ts': 1,
   'app/api/coach/options/route.ts': 1,
   'app/api/coach/route.ts': 1,
   'app/api/coach/threads/route.ts': 1,
-  'app/api/exercise-estimates/route.ts': 1,
-  'app/api/exercises/generate/route.ts': 2,
-  'app/api/exercises/route.ts': 1,
-  'app/api/generate-program/route.ts': 3,
+  'app/api/exercises/generate/route.ts': 1,
+  'app/api/generate-program/route.ts': 2,
   'app/api/hr-ingest/route.ts': 1,
   // Q-495 moved this schema out of the route so it could be unit-tested; the exemption moves with
   // it, for the same reason as before — the Tasker payload's exact shape is not in this repo.
   'packages/shared/src/validation/health-connect-ingest.ts': 1,
   'app/api/nutrition-goals/recommend/route.ts': 1,
-  'app/api/nutrition/dietary-restrictions/route.ts': 1,
-  'app/api/nutrition/meal-plans/[id]/route.ts': 1,
-  'app/api/nutrition/meal-plans/[id]/structure/route.ts': 1,
-  'app/api/nutrition/meal-plans/generate/meal/route.ts': 4,
-  'app/api/nutrition/meal-plans/generate/route.ts': 3,
-  'app/api/nutrition/meal-plans/meals/[mealId]/route.ts': 1,
-  'app/api/nutrition/meal-plans/route.ts': 3,
-  'app/api/nutrition/plan-meal-answers/route.ts': 2,
+  'app/api/nutrition/meal-plans/generate/meal/route.ts': 2,
+  'app/api/nutrition/meal-plans/generate/route.ts': 2,
   'app/api/nutrition/scan/route.ts': 2,
-  'app/api/nutrition/targets/route.ts': 1,
   'app/api/oura-ble/accel-chunks/route.ts': 1,
   'app/api/oura-ble/live-steps/route.ts': 2,
   'app/api/oura-ble/samples/route.ts': 1,
   'app/api/oura-ble/step-counter-export/route.ts': 1,
-  'app/api/running-plan/explain/route.ts': 1,
   'app/api/scale-ble/samples/route.ts': 1,
   'app/api/sync/push/route.ts': 1,
-  'app/api/workout-review/session/[sessionId]/apply/route.ts': 1,
   'packages/shared/src/validation/activity-log.ts': 6,
   'packages/shared/src/validation/day-checkin.ts': 2,
   'packages/shared/src/validation/fitness-test.ts': 1,
   'packages/shared/src/validation/food-item.ts': 1,
-  'packages/shared/src/validation/generated-program.ts': 4,
   'packages/shared/src/validation/mood-log.ts': 1,
   'packages/shared/src/validation/oura-summary.ts': 2,
   'packages/shared/src/validation/prescribed-run.ts': 1,

@@ -23,7 +23,7 @@ const MetricsBody = z.object({
   caloriesBurned: z.number().positive().max(20_000).optional(),
   avgHr:          z.number().int().positive().max(300).optional(),
   maxHr:          z.number().int().positive().max(300).optional(),
-})
+}).strict()
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ id: string }> }) {
   const session = await auth()
