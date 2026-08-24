@@ -77,9 +77,13 @@ const BASELINE = {
   //     keys during that window, so a subscription would wait on a signal that never fires.
   //   · `my-meals-picker` reads `saved-meals`, and the only writer reachable from the flow it sits
   //     in — `meal-plan-setup-sheet`'s `invalidateSavedMeals()` — runs at the END of the wizard,
-  //     after `{step === 4 && <MyMealsPicker/>}` has unmounted it. **Limit of this check:** whether
-  //     `saved-meals-sheet` can be opened on top of the wizard was not traced, so this is "no writer
-  //     found reachable", not "proven unreachable".
+  //     after `{step === 4 && <MyMealsPicker/>}` has unmounted it. **The open question here is now
+  //     traced (2026-08-24) and the answer is the same:** `nutrition-content.tsx` renders
+  //     `MealPlanSetupSheet` and `SavedMealsSheet` as siblings on independent `open` booleans, so
+  //     both CAN be mounted at once — but the wizard is a modal sheet covering the screen, so the
+  //     control that sets `savedMealsOpen` cannot be tapped while step 4 is up. And the picker's own
+  //     writes (`onChangeTyped`, the `/api/nutrition/scan` call) touch component state only; it
+  //     invalidates nothing. So: no writer of `saved-meals` is reachable while this is mounted.
   //   · The rest are route-level screens whose next mount refetches.
   // Converting one anyway is not harmful, but it adds a refetch with no reader waiting for it,
   // which the Q-359 entry explicitly warns against. Re-judge a site if a NEW writer starts clearing
