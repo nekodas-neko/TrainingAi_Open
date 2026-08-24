@@ -22,6 +22,18 @@ canonical-display-source table in the same section).
 
 ## Reference docs
 
+- [`docs/reviews/2026-08-24-sleep-score-volatility.md`](../../reviews/2026-08-24-sleep-score-volatility.md)
+  — **"the scores have been very varied lately", measured 2026-08-24.** Stored sleep score's
+  day-to-day |Δ| went **9.2 → 21.2** at the recalibration, but the **pre-calibration blend moved
+  9.15 → 9.27 — unchanged**, so the sleep is genuinely that variable and the model is reading it
+  correctly. Two things landed together on 2026-08-19: the calibration began applying at all (before
+  it, the stored score *is* the raw blend), and the blend mean fell 87.1 → 71.1 into the curve's
+  steep zone. **The real defect is `SCORE_CALIBRATION`'s gain spread of 8×** — 4.00× at blend 79
+  against 0.50× at 92, so the same real improvement is worth eight times as much in one place as
+  another (**TN-5**, `Gate: owner`). **⛔ Flattening the curve does NOT reduce volatility** — tested,
+  night-to-night |Δ| goes 13.53 → **13.75**, because the curve's total rise is conserved. The baton's
+  old advice to do exactly that has been replaced.
+
 - [`docs/reviews/2026-08-15-comprehensive-app-review.md`](../../reviews/2026-08-15-comprehensive-app-review.md)
   — §1.9 measured the fragment-night problem across all post-re-key `sleep_sessions`: 10 of 46 rows
   under 1.5 h, three at exactly 0.00 h, and on 2026-08-11 and 2026-08-13 the fragment is the *only*
