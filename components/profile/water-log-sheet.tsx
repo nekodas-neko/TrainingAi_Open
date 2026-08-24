@@ -8,6 +8,7 @@ import { invalidateBodyMetricWrite } from '@/lib/cache-groups'
 import { getLocalStore } from '@/lib/local-store'
 import { pushThenRevalidate } from '@/lib/local-store/push-then-revalidate'
 import { todayInTz } from '@trainingai/shared/date-utils'
+import { useUserTimezone } from '@/components/shell/user-timezone-provider'
 import { cn } from '@trainingai/shared/utils'
 import { metricBoundError } from '@/components/health/metric-bounds'
 
@@ -23,6 +24,7 @@ interface WaterLogSheetProps {
 export function WaterLogSheet({ open, onOpenChange, onLogged, userId }: WaterLogSheetProps) {
   const [value, setValue] = useState('')
   const [saving, setSaving] = useState(false)
+  const tz = useUserTimezone()
 
   async function handleSave(ml: number) {
     if (ml <= 0 || ml > 5000) return
@@ -31,7 +33,7 @@ export function WaterLogSheet({ open, onOpenChange, onLogged, userId }: WaterLog
     let savedLocally = false
     if (store) {
       try {
-        const today = todayInTz()
+        const today = todayInTz(tz)
         const existing = (await store.getBodyMetrics(today)).find(r => r.date === today)
         const newWaterMl = (existing?.waterMl ?? 0) + ml
         await store.upsertBodyMetric({
