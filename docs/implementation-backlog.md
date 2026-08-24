@@ -3838,6 +3838,19 @@ ehr     0     0     0     0   648   208   128   556     0
 - 🚧 **89 → 85, 2026-08-23.** Four converted, each after reading the one client that posts to it:
   `admin/timing-baseline`, `ai/health-insight`, `running-plan`, `running-plan/override`. All four
   now 400 on an unknown key and still accept the real body — verified live, not just by test.
+- 🚧 **85 → 79, 2026-08-24.** Six more, all under `app/api/admin/`: `activity-types`, `ai-usage`,
+  `exercises`, `fix-exercise-units`, `generate-exercise-media`, `mirror-dataset-gifs`. Same method,
+  same live verification. **Two of them are precisely the shape a codemod would have broken:**
+  `activity-types` and `exercises` PATCH destructure `id` out of the body **before** parsing
+  (`const { id, ...rest }`) while their clients post `{id, ...data}` — so the schema never sees `id`
+  and strict is safe, which is knowable only from the handler, not the schema. Round-tripped live to
+  confirm the PATCH still returns 200.
+- **A fourth exemption-adjacent class, now in the script's header: a schema fed an object the ROUTE
+  builds key by key.** `admin/ai-usage` reads three named `searchParams` into a literal, so an
+  unknown query key cannot reach the schema at all. Strict guards nothing there *today* — it was
+  still added, because it catches the day someone swaps the literal for a spread of the search
+  params — but it needs **no client verification**, which is the expensive half of this sweep.
+  Recognise the shape before budgeting time for one.
 - **⚠ Two more exemption classes were found while doing it, and both are now in the script's header
   with evidence rather than as a guess.** (a) **A third-party SDK's wire format:** `/api/coach` is
   driven by `@ai-sdk/react`'s `DefaultChatTransport`, which posts `{ id, messages, trigger,
