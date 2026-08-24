@@ -4548,6 +4548,33 @@ ehr     0     0     0     0   648   208   128   556     0
 - **Minor, same area:** `section` embeds a UUID for `session-explain:<id>` / `session-recap:<id>`,
   making it high-cardinality and awkward to group. Consider a separate `subject_id` column if this
   is touched anyway — not worth its own PR.
+- ✅ **SHIPPED 2026-08-24** (`fix/insight-context-hash`). Intent established first, as the entry
+  asked: **migration 121 added the column for NUT-7**, a daily digest generated at lunch reporting
+  lunch totals all evening — and `getAiHealthInsightWithHash` plus the optional `contextHash`
+  parameter sit on the *generic* repository interface. Possibility three: every section was meant
+  to write it and one was wired.
+- **⚠ THE ENTRY'S "nothing is broken for the user" WAS BACKWARDS, and it is what makes this worth
+  more than a tidy-up.** It reasoned that "insights regenerate rather than being served stale". They
+  do not: all four other read sites served the cache **unconditionally** for the whole day or week.
+  An insight written before the ring synced is the one the user reads afterwards. `health-insight`
+  already carried an in-code workaround for one instance — its zero-data answer was *"Deliberately
+  NOT cached: the cache is keyed by (user, section, date), so persisting this would still be served
+  after the ring syncs later the same day."*
+- **All five surfaces now hash** through one helper, `lib/ai/insight-cache.ts`. The context is the
+  prompt each route already assembles, so the check is exact. **A legacy NULL hash counts as a
+  MISS** — it is precisely a row that cannot be vouched for; the cost is one regeneration per
+  section per day, once. **The hash-less `getAiHealthInsight` is deleted from the repository
+  interface and the adapter**, so the bug class is unreachable rather than merely fixed.
+- **Two costs, stated rather than buried.** (a) The cache check moved *after* the deterministic
+  reads in every route, so a cache hit now pays for them — cheap next to the model call it avoids,
+  and the trade daily-digest already accepted. (b) `session-explain` lost a fast path that served
+  the narrative from the `sessionId` query param **without calling `getNextSession`**, so the Home
+  card now pays for that call. That read structurally could not know whether the signals it
+  describes still hold, on the one route whose entire subject is signals that move during the day —
+  a plausible mechanism for **Q-291** (the AI surfaces contradicting each other on the same day),
+  though not confirmed as its cause.
+- **Keep:** the `subject_id` idea above is untouched, and **Q-291 is not closed by this** — the
+  contradiction was never traced, and this removes one way it could happen, not all of them.
 
 ### [platform] Q-287 — self-service account deletion, all seven plan decisions resolved
 

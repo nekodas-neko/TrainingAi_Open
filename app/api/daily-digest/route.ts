@@ -4,8 +4,8 @@ import { getRepository } from '@/lib/data'
 import { describePersonalRecord } from '@trainingai/shared/1rm'
 import { generateText } from 'ai'
 import { aiModel, loggedGenerateText } from '@/lib/ai/instrument'
+import { hashInsightContext, readFreshInsight } from '@/lib/ai/insight-cache'
 import { formatInTimeZone } from 'date-fns-tz'
-import { createHash } from 'crypto'
 import { DEFAULT_TZ, todayInTz, todayMidnightUtc, startOfWeekInTz, shiftDateStr } from '@trainingai/shared/date-utils'
 import { rateLimit } from '@/lib/rate-limit'
 import { projectWeeklyWeightChangeKg, stepsPaceToWeeklyGoal } from '@trainingai/shared/health/daily-digest-context'
@@ -139,13 +139,11 @@ export async function POST(req: Request) {
   }
 
   const context = lines.join('\n')
-  const contextHash = createHash('sha256').update(context).digest('hex')
+  const contextHash = hashInsightContext(context)
 
   if (!force) {
-    const cached = await repo.getAiHealthInsightWithHash(userId, CACHE_SECTION, todayIso)
-    if (cached && cached.contextHash === contextHash) {
-      return NextResponse.json({ digest: cached.insight, date: todayIso, cached: true })
-    }
+    const cached = await readFreshInsight(repo, userId, CACHE_SECTION, todayIso, contextHash)
+    if (cached) return NextResponse.json({ digest: cached, date: todayIso, cached: true })
   }
 
   if (!rateLimit(`${userId}:daily-digest`, 3, 60_000)) {
